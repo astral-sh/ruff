@@ -1,0 +1,13 @@
+[package]
+name = "rustpython_compiler"
+version = "0.1.0"
+authors = ["coolreader18 <33094578+coolreader18@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+bitflags = "1.1"
+rustpython_parser = { path = "../parser" }
+serde = { version = "1.0", features = ["derive"] }
+num-complex = { version = "0.2", features = ["serde"] }
+num-bigint = { version = "0.2", features = ["serde"] }
+log = "0.3"
