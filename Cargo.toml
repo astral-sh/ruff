@@ -5,10 +5,7 @@ authors = ["coolreader18 <33094578+coolreader18@users.noreply.github.com>", "Win
 edition = "2018"
 
 [dependencies]
-bitflags = "1.1"
 rustpython_bytecode = { path = "../bytecode" }
 rustpython_parser = { path = "../parser" }
-serde = { version = "1.0", features = ["derive"] }
 num-complex = { version = "0.2", features = ["serde"] }
-num-bigint = { version = "0.2", features = ["serde"] }
 log = "0.3"
