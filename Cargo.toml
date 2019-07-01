@@ -1,11 +1,11 @@
 [package]
-name = "rustpython_compiler"
+name = "rustpython-compiler"
 version = "0.1.0"
 authors = ["coolreader18 <33094578+coolreader18@users.noreply.github.com>", "Windel Bouwman <windel@windel.nl>"]
 edition = "2018"
 
 [dependencies]
-rustpython_bytecode = { path = "../bytecode" }
-rustpython_parser = { path = "../parser" }
+rustpython-bytecode = { path = "../bytecode" }
+rustpython-parser = { path = "../parser" }
 num-complex = { version = "0.2", features = ["serde"] }
 log = "0.3"
