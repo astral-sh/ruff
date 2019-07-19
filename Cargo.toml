@@ -8,6 +8,7 @@ license = "MIT"
 edition = "2018"
 
 [dependencies]
+indexmap = "1.0"
 rustpython-bytecode = { path = "../bytecode", version = "0.1.0" }
 rustpython-parser = { path = "../parser", version = "0.1.0" }
 num-complex = { version = "0.2", features = ["serde"] }
