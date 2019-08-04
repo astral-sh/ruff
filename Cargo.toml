@@ -13,3 +13,4 @@ rustpython-bytecode = { path = "../bytecode", version = "0.1.0" }
 rustpython-parser = { path = "../parser", version = "0.1.0" }
 num-complex = { version = "0.2", features = ["serde"] }
 log = "0.3"
+arrayvec = "0.4"
