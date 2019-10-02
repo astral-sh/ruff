@@ -9,6 +9,7 @@ edition = "2018"
 
 [dependencies]
 indexmap = "1.0"
+itertools = "0.8.0"
 rustpython-bytecode = { path = "../bytecode", version = "0.1.1" }
 rustpython-parser = { path = "../parser", version = "0.1.1" }
 num-complex = { version = "0.2", features = ["serde"] }
