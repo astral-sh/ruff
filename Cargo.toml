@@ -12,6 +12,6 @@ indexmap = "1.0"
 itertools = "0.9"
 rustpython-bytecode = { path = "../bytecode", version = "0.1.1" }
 rustpython-parser = { path = "../parser", version = "0.1.1" }
-num-complex = { version = "0.2", features = ["serde"] }
+num-complex = { version = "0.3", features = ["serde"] }
 log = "0.4"
 arrayvec = "0.5"
