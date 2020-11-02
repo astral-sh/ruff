@@ -11,10 +11,11 @@ edition = "2018"
 indexmap = "1.0"
 itertools = "0.9"
 rustpython-bytecode = { path = "../bytecode", version = "0.1.1" }
-rustpython-parser = { path = "../parser", version = "0.1.1" }
+rustpython-ast = { path = "../ast" }
 num-complex = { version = "0.3", features = ["serde"] }
 log = "0.4"
 arrayvec = "0.5"
 
 [dev-dependencies]
+rustpython-parser = { path = "../parser" }
 insta = "1.1"
