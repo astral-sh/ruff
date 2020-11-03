@@ -1,5 +1,5 @@
 [package]
-name = "rustpython-compiler"
+name = "rustpython-compiler-core"
 version = "0.1.2"
 description = "Compiler for python code into bytecode for the rustpython VM."
 authors = ["RustPython Team"]

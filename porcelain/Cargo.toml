@@ -1,0 +1,12 @@
+[package]
+name = "rustpython-compiler"
+version = "0.1.2"
+description = "A usability wrapper around rustpython-parser and rustpython-compiler-core"
+authors = ["RustPython Team"]
+edition = "2018"
+
+[dependencies]
+thiserror = "1.0"
+rustpython-compiler-core = { path = ".." }
+rustpython-parser = { path = "../../parser" }
+rustpython-bytecode = { path = "../../bytecode" }
