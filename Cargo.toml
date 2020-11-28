@@ -19,4 +19,4 @@ ahash = "0.6"
 
 [dev-dependencies]
 rustpython-parser = { path = "../parser" }
-insta = "1.1"
+insta = "1.5"
