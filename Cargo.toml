@@ -13,6 +13,7 @@ itertools = "0.9"
 rustpython-bytecode = { path = "../bytecode", version = "0.1.1" }
 rustpython-ast = { path = "../ast" }
 num-complex = { version = "0.3", features = ["serde"] }
+num-traits = "0.2"
 log = "0.4"
 arrayvec = "0.5"
 
