@@ -1,4 +1,4 @@
-use rustpython_bytecode::bytecode::CodeObject;
+use rustpython_bytecode::CodeObject;
 use rustpython_compiler_core::{compile, symboltable};
 use rustpython_parser::{ast::Location, parser};
 use std::fmt;
