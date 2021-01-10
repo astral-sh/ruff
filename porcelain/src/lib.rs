@@ -75,29 +75,16 @@ pub fn compile(
     source_path: String,
     opts: CompileOpts,
 ) -> Result<CodeObject, CompileError> {
-    macro_rules! try_parse {
-        ($x:expr) => {
-            match $x {
-                Ok(x) => x,
-                Err(e) => return Err(CompileError::from_parse(e, source, source_path)),
-            }
-        };
-    }
-    let res = match mode {
-        compile::Mode::Exec => {
-            let ast = try_parse!(parser::parse_program(source));
-            compile::compile_program(ast, source_path, opts)
-        }
-        compile::Mode::Eval => {
-            let statement = try_parse!(parser::parse_statement(source));
-            compile::compile_statement_eval(statement, source_path, opts)
-        }
-        compile::Mode::Single => {
-            let ast = try_parse!(parser::parse_program(source));
-            compile::compile_program_single(ast, source_path, opts)
-        }
+    let mode = match mode {
+        compile::Mode::Exec => parser::Mode::Module,
+        compile::Mode::Eval => parser::Mode::Expression,
+        compile::Mode::Single => parser::Mode::Interactive,
     };
-    res.map_err(|e| CompileError::from_compile(e, source))
+    let ast = match parser::parse(source, mode) {
+        Ok(x) => x,
+        Err(e) => return Err(CompileError::from_parse(e, source, source_path)),
+    };
+    compile::compile_top(&ast, source_path, opts).map_err(|e| CompileError::from_compile(e, source))
 }
 
 pub fn compile_symtable(
@@ -119,8 +106,8 @@ pub fn compile_symtable(
             symboltable::make_symbol_table(&ast)
         }
         compile::Mode::Eval => {
-            let statement = try_parse!(parser::parse_statement(source));
-            symboltable::statements_to_symbol_table(&statement)
+            let expr = try_parse!(parser::parse_expression(source));
+            symboltable::make_symbol_table_expr(&expr)
         }
     };
     res.map_err(|e| CompileError::from_symtable(e, source, source_path.to_owned()))
