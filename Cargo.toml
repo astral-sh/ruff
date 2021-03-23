@@ -9,14 +9,14 @@ edition = "2018"
 
 [dependencies]
 indexmap = "1.0"
-itertools = "0.9"
+itertools = "0.10.0"
 rustpython-bytecode = { path = "../bytecode", version = "0.1.1" }
 rustpython-ast = { path = "../ast" }
-num-complex = { version = "0.3", features = ["serde"] }
+num-complex = { version = "0.4.0", features = ["serde"] }
 num-traits = "0.2"
 log = "0.4"
-ahash = "0.6"
+ahash = "0.7.2"
 
 [dev-dependencies]
 rustpython-parser = { path = "../parser" }
-insta = "1.5"
+insta = "1.7.0"
