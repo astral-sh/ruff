@@ -1,6 +1,7 @@
 use rustpython_bytecode::CodeObject;
 use rustpython_compiler_core::{compile, symboltable};
-use rustpython_parser::{ast::Location, parser};
+use rustpython_parser::ast::{fold::Fold, ConstantOptimizer, Location};
+use rustpython_parser::parser;
 use std::fmt;
 
 pub use compile::{CompileOpts, Mode};
@@ -80,10 +81,15 @@ pub fn compile(
         compile::Mode::Eval => parser::Mode::Expression,
         compile::Mode::Single => parser::Mode::Interactive,
     };
-    let ast = match parser::parse(source, mode) {
+    let mut ast = match parser::parse(source, mode) {
         Ok(x) => x,
         Err(e) => return Err(CompileError::from_parse(e, source, source_path)),
     };
+    if opts.optimize > 0 {
+        ast = ConstantOptimizer::new()
+            .fold_mod(ast)
+            .unwrap_or_else(|e| match e {});
+    }
     compile::compile_top(&ast, source_path, opts).map_err(|e| CompileError::from_compile(e, source))
 }
 
