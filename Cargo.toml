@@ -8,7 +8,7 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
-indexmap = "1.0"
+indexmap = "1.7.0"
 itertools = "0.10.0"
 rustpython-bytecode = { path = "../bytecode", version = "0.1.1" }
 rustpython-ast = { path = "../ast", features = ["unparse"] }
