@@ -5,7 +5,7 @@ description = "Compiler for python code into bytecode for the rustpython VM."
 authors = ["RustPython Team"]
 repository = "https://github.com/RustPython/RustPython"
 license = "MIT"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 indexmap = "1.0"
