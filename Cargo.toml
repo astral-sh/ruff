@@ -8,15 +8,15 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
-indexmap = "1.7.0"
-itertools = "0.10.0"
+indexmap = "1.8.1"
+itertools = "0.10.3"
 rustpython-bytecode = { path = "../bytecode", version = "0.1.1" }
 rustpython-ast = { path = "../ast", features = ["unparse"] }
 num-complex = { version = "0.4.0", features = ["serde"] }
-num-traits = "0.2"
-log = "0.4"
-ahash = "0.7.2"
+num-traits = "0.2.14"
+log = "0.4.16"
+ahash = "0.7.6"
 
 [dev-dependencies]
 rustpython-parser = { path = "../parser" }
-insta = "1.7.0"
+insta = "1.14.0"
