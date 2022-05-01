@@ -76,12 +76,12 @@ pub fn compile(
     source_path: String,
     opts: CompileOpts,
 ) -> Result<CodeObject, CompileError> {
-    let mode = match mode {
+    let parser_mode = match mode {
         compile::Mode::Exec => parser::Mode::Module,
         compile::Mode::Eval => parser::Mode::Expression,
-        compile::Mode::Single => parser::Mode::Interactive,
+        compile::Mode::Single | compile::Mode::BlockExpr => parser::Mode::Interactive,
     };
-    let mut ast = match parser::parse(source, mode) {
+    let mut ast = match parser::parse(source, parser_mode) {
         Ok(x) => x,
         Err(e) => return Err(CompileError::from_parse(e, source, source_path)),
     };
@@ -90,7 +90,8 @@ pub fn compile(
             .fold_mod(ast)
             .unwrap_or_else(|e| match e {});
     }
-    compile::compile_top(&ast, source_path, opts).map_err(|e| CompileError::from_compile(e, source))
+    compile::compile_top(&ast, source_path, mode, opts)
+        .map_err(|e| CompileError::from_compile(e, source))
 }
 
 pub fn compile_symtable(
@@ -107,7 +108,7 @@ pub fn compile_symtable(
         };
     }
     let res = match mode {
-        compile::Mode::Exec | compile::Mode::Single => {
+        compile::Mode::Exec | compile::Mode::Single | compile::Mode::BlockExpr => {
             let ast = try_parse!(parser::parse_program(source));
             symboltable::make_symbol_table(&ast)
         }
