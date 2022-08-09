@@ -3,13 +3,11 @@ use std::time::Instant;
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
-
-use log::info;
+use log::{error, info};
 use rayon::prelude::*;
-use walkdir::{DirEntry, WalkDir};
-
 use rust_python_linter::linter::check_path;
 use rust_python_linter::message::Message;
+use walkdir::{DirEntry, WalkDir};
 
 fn set_up_logging(verbose: bool) -> Result<()> {
     fern::Dispatch::new()
@@ -74,7 +72,12 @@ fn main() -> Result<()> {
     let start = Instant::now();
     let messages: Vec<Message> = files
         .par_iter()
-        .map(|entry| check_path(entry.path()).unwrap())
+        .map(|entry| {
+            check_path(entry.path()).unwrap_or_else(|e| {
+                error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
+                vec![]
+            })
+        })
         .flatten()
         .collect();
     let duration = start.elapsed();

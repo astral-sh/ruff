@@ -1,9 +1,10 @@
-use anyhow::Result;
-use rustpython_parser::ast::Suite;
-use rustpython_parser::parser;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
+
+use anyhow::Result;
+use rustpython_parser::ast::Suite;
+use rustpython_parser::parser;
 
 pub fn parse(path: &Path) -> Result<Suite> {
     let file = File::open(path)?;

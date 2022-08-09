@@ -1,8 +1,9 @@
+use std::fmt;
+use std::path::PathBuf;
+
 use colored::Colorize;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "Location")]

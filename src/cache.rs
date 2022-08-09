@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
+use cacache::Error::EntryNotFound;
+use log::error;
 use serde::{Deserialize, Serialize};
 
 use crate::message::Message;
@@ -33,19 +35,21 @@ fn cache_key(path: &Path) -> Cow<str> {
 }
 
 pub fn get(path: &Path) -> Option<Vec<Message>> {
-    if let Ok(encoded) = cacache::read_sync(cache_dir(), cache_key(path)) {
-        if let Ok(file_metadata) = path.metadata() {
-            if let Ok(CheckResult { metadata, messages }) =
-                bincode::deserialize::<CheckResult>(&encoded[..])
-            {
-                if file_metadata.size() == metadata.size && file_metadata.mtime() == metadata.mtime
-                {
-                    return Some(messages);
+    match cacache::read_sync(cache_dir(), cache_key(path)) {
+        Ok(encoded) => match path.metadata() {
+            Ok(m) => match bincode::deserialize::<CheckResult>(&encoded[..]) {
+                Ok(CheckResult { metadata, messages }) => {
+                    if m.size() == metadata.size && m.mtime() == metadata.mtime {
+                        return Some(messages);
+                    }
                 }
-            }
-        }
+                Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
+            },
+            Err(e) => error!("Failed to read metadata from path: {e:?}"),
+        },
+        Err(EntryNotFound(_, _)) => {}
+        Err(e) => error!("Failed to read from cache: {e:?}"),
     }
-
     None
 }
 
@@ -58,10 +62,13 @@ pub fn set(path: &Path, messages: &[Message]) {
             },
             messages,
         };
-        let _ = cacache::write_sync(
+        match cacache::write_sync(
             cache_dir(),
             cache_key(path),
             bincode::serialize(&check_result).unwrap(),
-        );
+        ) {
+            Ok(_) => {}
+            Err(e) => error!("Failed to write to cache: {e:?}"),
+        }
     }
 }
