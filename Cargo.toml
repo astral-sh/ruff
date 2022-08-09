@@ -5,16 +5,15 @@ edition = "2021"
 
 [dependencies]
 anyhow = { version = "1.0.60" }
-bincode = "1.3.3"
-cacache = "10.0.1"
-chrono = "0.4.21"
+bincode = { version = "1.3.3" }
+cacache = { version = "10.0.1" }
+chrono = { version = "0.4.21" }
 clap = { version = "3.2.16", features = ["derive"] }
 colored = { version = "2.0.0" }
 fern = { version = "0.6.1" }
-log = "0.4.17"
-rayon = "1.5.3"
-rustpython-parser = { git = "https://github.com/RustPython/RustPython.git" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+log = { version = "0.4.17" }
+rayon = { version = "1.5.3" }
+rustpython-parser = { git = "https://github.com/RustPython/RustPython.git", rev = "dff916d45c5d13074d21ad329a5ab68a6499426a" }
+serde = { version = "1.0.143", features = ["derive"] }
+serde_json = { version = "1.0.83" }
 walkdir = { version = "2.3.2" }
-
