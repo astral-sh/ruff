@@ -9,9 +9,11 @@ bincode = { version = "1.3.3" }
 cacache = { version = "10.0.1" }
 chrono = { version = "0.4.21" }
 clap = { version = "3.2.16", features = ["derive"] }
+clearscreen = "1.0.10"
 colored = { version = "2.0.0" }
 fern = { version = "0.6.1" }
 log = { version = "0.4.17" }
+notify = "4.0.17"
 rayon = { version = "1.5.3" }
 rustpython-parser = { git = "https://github.com/RustPython/RustPython.git", rev = "dff916d45c5d13074d21ad329a5ab68a6499426a" }
 serde = { version = "1.0.143", features = ["derive"] }

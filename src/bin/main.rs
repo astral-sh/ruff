@@ -1,9 +1,11 @@
 use std::path::PathBuf;
-use std::time::Instant;
+use std::sync::mpsc::channel;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
-use log::{error, info};
+use log::{debug, error};
+use notify::{watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
 use rust_python_linter::fs::collect_python_files;
 use rust_python_linter::linter::check_path;
@@ -18,6 +20,8 @@ struct Cli {
     files: Vec<PathBuf>,
     #[clap(short, long, action)]
     verbose: bool,
+    #[clap(short, long, action)]
+    watch: bool,
 }
 
 fn set_up_logging(verbose: bool) -> Result<()> {
@@ -42,16 +46,12 @@ fn set_up_logging(verbose: bool) -> Result<()> {
         .map_err(|e| e.into())
 }
 
-fn main() -> Result<()> {
-    let cli = Cli::parse();
-
-    set_up_logging(cli.verbose)?;
-
+fn run_once(files: &[PathBuf]) -> Result<()> {
     // Collect all the files to check.
     let start = Instant::now();
-    let files: Vec<DirEntry> = cli.files.iter().flat_map(collect_python_files).collect();
+    let files: Vec<DirEntry> = files.iter().flat_map(collect_python_files).collect();
     let duration = start.elapsed();
-    info!("Identified files to lint in: {:?}", duration);
+    debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
     let messages: Vec<Message> = files
@@ -65,13 +65,52 @@ fn main() -> Result<()> {
         .flatten()
         .collect();
     let duration = start.elapsed();
-    info!("Checked files in: {:?}", duration);
+    debug!("Checked files in: {:?}", duration);
+
+    println!("Found {} error(s).", messages.len());
 
     if !messages.is_empty() {
-        println!("Found {} error(s)!", messages.len());
+        println!();
         for message in messages {
             println!("{}", message);
         }
+    }
+
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    set_up_logging(cli.verbose)?;
+
+    if cli.watch {
+        clearscreen::clear()?;
+        println!("Starting linter in watch mode...");
+        println!();
+
+        run_once(&cli.files)?;
+
+        let (tx, rx) = channel();
+        let mut watcher = watcher(tx, Duration::from_secs(1))?;
+        for file in &cli.files {
+            watcher.watch(file, RecursiveMode::Recursive)?;
+        }
+
+        loop {
+            match rx.recv() {
+                Ok(_) => {
+                    clearscreen::clear()?;
+                    println!("File change detected...");
+                    println!();
+
+                    run_once(&cli.files)?
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+    } else {
+        run_once(&cli.files)?;
     }
 
     Ok(())
