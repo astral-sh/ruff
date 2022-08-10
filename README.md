@@ -52,5 +52,6 @@ cargo run resources/test/src
 `rust-python-linter` is released for Python using [`maturin`](https://github.com/PyO3/maturin):
 
 ```shell
-maturin publish
+maturin publish --skip-existing --target x86_64-apple-darwin
+maturin publish --skip-existing --target aarch64-apple-darwin
 ```
