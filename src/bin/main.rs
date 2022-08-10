@@ -85,12 +85,14 @@ fn main() -> Result<()> {
     set_up_logging(cli.verbose)?;
 
     if cli.watch {
+        // Perform an initial run instantly.
         clearscreen::clear()?;
         println!("Starting linter in watch mode...");
         println!();
 
         run_once(&cli.files)?;
 
+        // Configure the file watcher.
         let (tx, rx) = channel();
         let mut watcher = watcher(tx, Duration::from_secs(1))?;
         for file in &cli.files {
@@ -100,6 +102,7 @@ fn main() -> Result<()> {
         loop {
             match rx.recv() {
                 Ok(_) => {
+                    // Re-run on all change events.
                     clearscreen::clear()?;
                     println!("File change detected...");
                     println!();

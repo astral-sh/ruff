@@ -21,15 +21,6 @@ struct CheckResult {
 }
 
 pub fn check_path(path: &Path) -> Result<Vec<Message>> {
-    // TODO(charlie): These specific files are causing a stack overflow.
-    if path.to_string_lossy().eq_ignore_ascii_case(
-         "../spring-experiments/spr_experiments/spr_experiments/assayworks/experiments/order_20220204/pipeline_steps.py") ||
-        path.to_string_lossy().eq_ignore_ascii_case
-        ( "../spring-experiments/spr_platform/spr_platform/data_index/bigquery_index.py")
-    {
-        return Ok(vec![]);
-    }
-
     // Check the cache.
     if let Some(messages) = cache::get(path) {
         debug!("Cache hit for: {}", path.to_string_lossy());
