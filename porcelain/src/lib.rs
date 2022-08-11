@@ -99,21 +99,14 @@ pub fn compile_symtable(
     mode: compile::Mode,
     source_path: &str,
 ) -> Result<symboltable::SymbolTable, CompileError> {
-    macro_rules! try_parse {
-        ($x:expr) => {
-            match $x {
-                Ok(x) => x,
-                Err(e) => return Err(CompileError::from_parse(e, source, source_path.to_owned())),
-            }
-        };
-    }
+    let parse_err = |e| CompileError::from_parse(e, source, source_path.to_owned());
     let res = match mode {
         compile::Mode::Exec | compile::Mode::Single | compile::Mode::BlockExpr => {
-            let ast = try_parse!(parser::parse_program(source));
+            let ast = parser::parse_program(source).map_err(parse_err)?;
             symboltable::make_symbol_table(&ast)
         }
         compile::Mode::Eval => {
-            let expr = try_parse!(parser::parse_expression(source));
+            let expr = parser::parse_expression(source).map_err(parse_err)?;
             symboltable::make_symbol_table_expr(&expr)
         }
     };
