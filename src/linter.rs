@@ -19,8 +19,10 @@ pub fn check_path(path: &Path, mode: &cache::Mode) -> Result<Vec<Message>> {
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
-    // Run the linter.
+    // Run the parser.
     let python_ast = parser::parse_program(&contents)?;
+
+    // Run the linter.
     let messages: Vec<Message> = check_ast(&python_ast)
         .into_iter()
         .chain(check_lines(&contents))

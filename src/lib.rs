@@ -7,4 +7,4 @@ pub mod linter;
 pub mod logging;
 pub mod message;
 mod settings;
-mod visitor;
+pub mod visitor;
