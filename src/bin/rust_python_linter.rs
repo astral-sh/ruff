@@ -7,6 +7,7 @@ use ::rust_python_linter::linter::check_path;
 use ::rust_python_linter::message::Message;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
+use colored::Colorize;
 use log::{debug, error};
 use notify::{watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
@@ -22,6 +23,20 @@ struct Cli {
     verbose: bool,
     #[clap(short, long, action)]
     watch: bool,
+}
+
+#[macro_export]
+macro_rules! timestamped_println {
+    ($($arg:tt)*) => {
+        println!(
+            "[{}] {}",
+            chrono::Local::now()
+                .format("%H:%M:%S %p")
+                .to_string()
+                .dimmed(),
+            format_args!($($arg)*)
+        )
+    }
 }
 
 fn set_up_logging(verbose: bool) -> Result<()> {
@@ -40,13 +55,12 @@ fn set_up_logging(verbose: bool) -> Result<()> {
         } else {
             log::LevelFilter::Info
         })
-        .level_for("hyper", log::LevelFilter::Info)
         .chain(std::io::stdout())
         .apply()
         .map_err(|e| e.into())
 }
 
-fn run_once(files: &[PathBuf]) -> Result<()> {
+fn run_once(files: &[PathBuf]) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
     let files: Vec<DirEntry> = files.iter().flat_map(collect_python_files).collect();
@@ -67,7 +81,27 @@ fn run_once(files: &[PathBuf]) -> Result<()> {
     let duration = start.elapsed();
     debug!("Checked files in: {:?}", duration);
 
+    Ok(messages)
+}
+
+fn report_once(messages: &[Message]) -> Result<()> {
     println!("Found {} error(s).", messages.len());
+
+    if !messages.is_empty() {
+        println!();
+        for message in messages {
+            println!("{}", message);
+        }
+    }
+
+    Ok(())
+}
+
+fn report_continuously(messages: &[Message]) -> Result<()> {
+    timestamped_println!(
+        "Found {} error(s). Watching for file changes.",
+        messages.len(),
+    );
 
     if !messages.is_empty() {
         println!();
@@ -87,14 +121,14 @@ fn main() -> Result<()> {
     if cli.watch {
         // Perform an initial run instantly.
         clearscreen::clear()?;
-        println!("Starting linter in watch mode...");
-        println!();
+        timestamped_println!("Starting linter in watch mode...\n");
 
-        run_once(&cli.files)?;
+        let messages = run_once(&cli.files)?;
+        report_continuously(&messages)?;
 
         // Configure the file watcher.
         let (tx, rx) = channel();
-        let mut watcher = watcher(tx, Duration::from_secs(1))?;
+        let mut watcher = watcher(tx, Duration::from_secs(2))?;
         for file in &cli.files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
@@ -104,16 +138,17 @@ fn main() -> Result<()> {
                 Ok(_) => {
                     // Re-run on all change events.
                     clearscreen::clear()?;
-                    println!("File change detected...");
-                    println!();
+                    timestamped_println!("File change detected...\n");
 
-                    run_once(&cli.files)?
+                    let messages = run_once(&cli.files)?;
+                    report_continuously(&messages)?;
                 }
                 Err(e) => return Err(e.into()),
             }
         }
     } else {
-        run_once(&cli.files)?;
+        let messages = run_once(&cli.files)?;
+        report_once(&messages)?;
     }
 
     Ok(())
