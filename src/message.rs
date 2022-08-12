@@ -1,5 +1,4 @@
 use std::fmt;
-use std::path::PathBuf;
 
 use colored::Colorize;
 use rustpython_parser::ast::Location;
@@ -21,62 +20,54 @@ impl From<LocationDef> for Location {
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum Message {
-    ImportStarUsage {
-        filename: PathBuf,
-        #[serde(with = "LocationDef")]
-        location: Location,
-    },
-    IfTuple {
-        filename: PathBuf,
-        #[serde(with = "LocationDef")]
-        location: Location,
-    },
+pub enum CheckKind {
+    ImportStarUsage,
+    IfTuple,
 }
 
-impl Message {
-    /// A four-letter shorthand code for the message.
+impl CheckKind {
+    /// A four-letter shorthand code for the check.
     pub fn code(&self) -> &'static str {
         match self {
-            Message::ImportStarUsage { .. } => "F403",
-            Message::IfTuple { .. } => "F634",
+            CheckKind::ImportStarUsage => "F403",
+            CheckKind::IfTuple => "F634",
         }
     }
 
-    /// The body text for the message.
+    /// The body text for the check.
     pub fn body(&self) -> &'static str {
         match self {
-            Message::ImportStarUsage { .. } => "Unable to detect undefined names",
-            Message::IfTuple { .. } => "If test is a tuple, which is always `True`",
+            CheckKind::ImportStarUsage => "Unable to detect undefined names",
+            CheckKind::IfTuple => "If test is a tuple, which is always `True`",
         }
     }
+}
+
+pub struct Check {
+    pub kind: CheckKind,
+    pub location: Location,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Message {
+    pub kind: CheckKind,
+    #[serde(with = "LocationDef")]
+    pub location: Location,
+    pub filename: String,
 }
 
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Message::ImportStarUsage { filename, location } => write!(
-                f,
-                "{}{}{}{}{}\t{}\t{}",
-                filename.to_string_lossy().white().bold(),
-                ":".cyan(),
-                location.column(),
-                ":".cyan(),
-                location.row(),
-                self.code().red().bold(),
-                self.body()
-            ),
-            Message::IfTuple { filename, location } => write!(
-                f,
-                "{}{}{}{}{}\t{}\t{}",
-                filename.to_string_lossy().white().bold(),
-                ":".cyan(),
-                location.column(),
-                ":".cyan(),
-                location.row(),
-                self.code().red().bold(),
-                self.body()
-            ),
-        }
+        write!(
+            f,
+            "{}{}{}{}{}\t{}\t{}",
+            self.filename.white().bold(),
+            ":".cyan(),
+            self.location.column(),
+            ":".cyan(),
+            self.location.row(),
+            self.kind.code().red().bold(),
+            self.kind.body()
+        )
     }
 }

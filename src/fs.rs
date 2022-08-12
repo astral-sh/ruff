@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+
 use walkdir::{DirEntry, WalkDir};
 
 fn is_not_hidden(entry: &DirEntry) -> bool {
