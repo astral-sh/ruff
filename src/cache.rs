@@ -62,13 +62,12 @@ pub fn set(path: &Path, messages: &[Message]) {
             },
             messages,
         };
-        match cacache::write_sync(
+        if let Err(e) = cacache::write_sync(
             cache_dir(),
             cache_key(path),
             bincode::serialize(&check_result).unwrap(),
         ) {
-            Ok(_) => {}
-            Err(e) => error!("Failed to write to cache: {e:?}"),
+            error!("Failed to write to cache: {e:?}")
         }
     }
 }
