@@ -4,7 +4,7 @@ use anyhow::Result;
 use log::debug;
 use serde::{Deserialize, Serialize};
 
-use crate::check::check_ast;
+use crate::checker::check_ast;
 use crate::message::Message;
 use crate::{cache, parser};
 
@@ -29,7 +29,14 @@ pub fn check_path(path: &Path) -> Result<Vec<Message>> {
 
     // Run the linter.
     let python_ast = parser::parse(path)?;
-    let messages = check_ast(path, &python_ast);
+    let messages: Vec<Message> = check_ast(&python_ast)
+        .into_iter()
+        .map(|check| Message {
+            kind: check.kind,
+            location: check.location,
+            filename: path.to_string_lossy().to_string(),
+        })
+        .collect();
     cache::set(path, &messages);
 
     Ok(messages)

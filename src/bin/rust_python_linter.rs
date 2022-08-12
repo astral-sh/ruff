@@ -4,13 +4,13 @@ use std::time::{Duration, Instant};
 
 use ::rust_python_linter::fs::collect_python_files;
 use ::rust_python_linter::linter::check_path;
-use ::rust_python_linter::message::Message;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
 use log::{debug, error};
 use notify::{watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
+use rust_python_linter::message::Message;
 use walkdir::DirEntry;
 
 #[derive(Debug, Parser)]
