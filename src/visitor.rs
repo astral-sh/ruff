@@ -4,34 +4,33 @@ use rustpython_parser::ast::{
     Withitem,
 };
 
-#[allow(unused_variables)]
 pub trait Visitor {
-    fn visit_ident(&mut self, ident: &str) {
-        // Nothing to walk.
-    }
-    fn visit_constant(&mut self, constant: &Constant) {
-        walk_constant(self, constant);
-    }
     fn visit_stmt(&mut self, stmt: &Stmt) {
         walk_stmt(self, stmt);
     }
     fn visit_expr(&mut self, expr: &Expr) {
         walk_expr(self, expr);
     }
+    fn visit_ident(&mut self, ident: &str) {
+        walk_ident(self, ident);
+    }
+    fn visit_constant(&mut self, constant: &Constant) {
+        walk_constant(self, constant);
+    }
     fn visit_expr_context(&mut self, expr_content: &ExprContext) {
-        // Nothing to walk.
+        walk_expr_context(self, expr_content);
     }
     fn visit_boolop(&mut self, boolop: &Boolop) {
-        // Nothing to walk.
+        walk_boolop(self, boolop);
     }
     fn visit_operator(&mut self, operator: &Operator) {
-        // Nothing to walk.
+        walk_operator(self, operator);
     }
     fn visit_unaryop(&mut self, unaryop: &Unaryop) {
-        // Nothing to walk.
+        walk_unaryop(self, unaryop);
     }
     fn visit_cmpop(&mut self, cmpop: &Cmpop) {
-        // Nothing to walk.
+        walk_cmpop(self, cmpop);
     }
     fn visit_comprehension(&mut self, comprehension: &Comprehension) {
         walk_comprehension(self, comprehension);
@@ -49,7 +48,7 @@ pub trait Visitor {
         walk_keyword(self, keyword);
     }
     fn visit_alias(&mut self, alias: &Alias) {
-        // Nothing to walk.
+        walk_alias(self, alias);
     }
     fn visit_withitem(&mut self, withitem: &Withitem) {
         walk_withitem(self, withitem);
@@ -141,8 +140,8 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
             visitor.visit_expr(value)
         }
         StmtKind::AugAssign { target, op, value } => {
-            // TODO(charlie): Implement operator.
             visitor.visit_expr(target);
+            visitor.visit_operator(op);
             visitor.visit_expr(value);
         }
         StmtKind::AnnAssign {
@@ -536,3 +535,24 @@ pub fn walk_withitem<V: Visitor + ?Sized>(visitor: &mut V, withitem: &Withitem) 
         visitor.visit_expr(expr);
     }
 }
+
+#[allow(unused_variables)]
+pub fn walk_ident<V: Visitor + ?Sized>(visitor: &mut V, ident: &str) {}
+
+#[allow(unused_variables)]
+pub fn walk_expr_context<V: Visitor + ?Sized>(visitor: &mut V, expr_context: &ExprContext) {}
+
+#[allow(unused_variables)]
+pub fn walk_boolop<V: Visitor + ?Sized>(visitor: &mut V, boolop: &Boolop) {}
+
+#[allow(unused_variables)]
+pub fn walk_operator<V: Visitor + ?Sized>(visitor: &mut V, operator: &Operator) {}
+
+#[allow(unused_variables)]
+pub fn walk_unaryop<V: Visitor + ?Sized>(visitor: &mut V, unaryop: &Unaryop) {}
+
+#[allow(unused_variables)]
+pub fn walk_cmpop<V: Visitor + ?Sized>(visitor: &mut V, cmpop: &Cmpop) {}
+
+#[allow(unused_variables)]
+pub fn walk_alias<V: Visitor + ?Sized>(visitor: &mut V, alias: &Alias) {}
