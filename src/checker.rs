@@ -9,6 +9,12 @@ struct Checker {
     checks: Vec<Check>,
 }
 
+impl Checker {
+    fn new() -> Self {
+        Checker { checks: vec![] }
+    }
+}
+
 impl Visitor for Checker {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match &stmt.node {
@@ -32,6 +38,7 @@ impl Visitor for Checker {
             }
             _ => {}
         }
+
         walk_stmt(self, stmt);
     }
 
@@ -72,7 +79,7 @@ pub fn check_ast(python_ast: &Suite) -> Vec<Check> {
     python_ast
         .iter()
         .flat_map(|stmt| {
-            let mut checker = Checker { checks: vec![] };
+            let mut checker = Checker::new();
             checker.visit_stmt(stmt);
             checker.checks
         })
