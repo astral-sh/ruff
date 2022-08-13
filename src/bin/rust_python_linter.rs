@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
 use log::{debug, error};
-use notify::{watcher, RecursiveMode, Watcher};
+use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
 use walkdir::DirEntry;
 
@@ -98,20 +98,23 @@ fn main() -> Result<()> {
 
         // Configure the file watcher.
         let (tx, rx) = channel();
-        let mut watcher = watcher(tx, Duration::from_secs(2))?;
+        let mut watcher = raw_watcher(tx)?;
         for file in &cli.files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
 
         loop {
             match rx.recv() {
-                Ok(_) => {
-                    // Re-run on all change events.
-                    clearscreen::clear()?;
-                    tell_user!("File change detected...\n");
+                Ok(e) => {
+                    if let Some(path) = e.path {
+                        if path.to_string_lossy().ends_with(".py") {
+                            clearscreen::clear()?;
+                            tell_user!("File change detected...\n");
 
-                    let messages = run_once(&cli.files, !cli.no_cache)?;
-                    report_continuously(&messages)?;
+                            let messages = run_once(&cli.files, !cli.no_cache)?;
+                            report_continuously(&messages)?;
+                        }
+                    }
                 }
                 Err(e) => return Err(e.into()),
             }
