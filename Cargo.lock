@@ -1493,7 +1493,7 @@ dependencies = [
 
 [[package]]
 name = "rust-python-linter"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "bincode",
