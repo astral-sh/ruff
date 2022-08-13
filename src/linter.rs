@@ -4,6 +4,7 @@ use anyhow::Result;
 use log::debug;
 use serde::{Deserialize, Serialize};
 
+use crate::cache::Mode;
 use crate::checker::check_ast;
 use crate::message::Message;
 use crate::{cache, parser};
@@ -20,9 +21,9 @@ struct CheckResult {
     messages: Vec<Message>,
 }
 
-pub fn check_path(path: &Path) -> Result<Vec<Message>> {
+pub fn check_path(path: &Path, mode: &Mode) -> Result<Vec<Message>> {
     // Check the cache.
-    if let Some(messages) = cache::get(path) {
+    if let Some(messages) = cache::get(path, mode) {
         debug!("Cache hit for: {}", path.to_string_lossy());
         return Ok(messages);
     }
@@ -37,7 +38,7 @@ pub fn check_path(path: &Path) -> Result<Vec<Message>> {
             filename: path.to_string_lossy().to_string(),
         })
         .collect();
-    cache::set(path, &messages);
+    cache::set(path, &messages, mode);
 
     Ok(messages)
 }

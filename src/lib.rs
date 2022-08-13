@@ -1,7 +1,8 @@
 mod cache;
-mod checker;
+pub mod checker;
 pub mod fs;
 pub mod linter;
+pub mod logging;
 pub mod message;
-mod parser;
-mod visitor;
+pub mod parser;
+pub mod visitor;

@@ -26,6 +26,42 @@ struct CheckResult {
     messages: Vec<Message>,
 }
 
+pub enum Mode {
+    ReadWrite,
+    ReadOnly,
+    WriteOnly,
+    None,
+}
+
+impl Mode {
+    fn allow_read(&self) -> bool {
+        match self {
+            Mode::ReadWrite => true,
+            Mode::ReadOnly => true,
+            Mode::WriteOnly => false,
+            Mode::None => false,
+        }
+    }
+
+    fn allow_write(&self) -> bool {
+        match self {
+            Mode::ReadWrite => true,
+            Mode::ReadOnly => false,
+            Mode::WriteOnly => true,
+            Mode::None => false,
+        }
+    }
+}
+
+impl From<bool> for Mode {
+    fn from(value: bool) -> Self {
+        match value {
+            true => Mode::ReadWrite,
+            false => Mode::None,
+        }
+    }
+}
+
 fn cache_dir() -> &'static str {
     "./.cache"
 }
@@ -34,7 +70,11 @@ fn cache_key(path: &Path) -> Cow<str> {
     path.to_string_lossy()
 }
 
-pub fn get(path: &Path) -> Option<Vec<Message>> {
+pub fn get(path: &Path, mode: &Mode) -> Option<Vec<Message>> {
+    if !mode.allow_read() {
+        return None;
+    };
+
     match cacache::read_sync(cache_dir(), cache_key(path)) {
         Ok(encoded) => match path.metadata() {
             Ok(m) => match bincode::deserialize::<CheckResult>(&encoded[..]) {
@@ -53,7 +93,11 @@ pub fn get(path: &Path) -> Option<Vec<Message>> {
     None
 }
 
-pub fn set(path: &Path, messages: &[Message]) {
+pub fn set(path: &Path, messages: &[Message], mode: &Mode) {
+    if !mode.allow_write() {
+        return;
+    };
+
     if let Ok(metadata) = path.metadata() {
         let check_result = CheckResultRef {
             metadata: &CacheMetadata {

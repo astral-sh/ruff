@@ -4,13 +4,15 @@ use std::time::{Duration, Instant};
 
 use ::rust_python_linter::fs::collect_python_files;
 use ::rust_python_linter::linter::check_path;
+use ::rust_python_linter::logging::set_up_logging;
+use ::rust_python_linter::message::Message;
+use ::rust_python_linter::timestamped_println;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
 use log::{debug, error};
 use notify::{watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
-use rust_python_linter::message::Message;
 use walkdir::DirEntry;
 
 #[derive(Debug, Parser)]
@@ -23,44 +25,11 @@ struct Cli {
     verbose: bool,
     #[clap(short, long, action)]
     watch: bool,
+    #[clap(short, long, action)]
+    no_cache: bool,
 }
 
-#[macro_export]
-macro_rules! timestamped_println {
-    ($($arg:tt)*) => {
-        println!(
-            "[{}] {}",
-            chrono::Local::now()
-                .format("%H:%M:%S %p")
-                .to_string()
-                .dimmed(),
-            format_args!($($arg)*)
-        )
-    }
-}
-
-fn set_up_logging(verbose: bool) -> Result<()> {
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ))
-        })
-        .level(if verbose {
-            log::LevelFilter::Debug
-        } else {
-            log::LevelFilter::Info
-        })
-        .chain(std::io::stdout())
-        .apply()
-        .map_err(|e| e.into())
-}
-
-fn run_once(files: &[PathBuf]) -> Result<Vec<Message>> {
+fn run_once(files: &[PathBuf], cache: bool) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
     let files: Vec<DirEntry> = files.iter().flat_map(collect_python_files).collect();
@@ -71,7 +40,7 @@ fn run_once(files: &[PathBuf]) -> Result<Vec<Message>> {
     let messages: Vec<Message> = files
         .par_iter()
         .map(|entry| {
-            check_path(entry.path()).unwrap_or_else(|e| {
+            check_path(entry.path(), &cache.into()).unwrap_or_else(|e| {
                 error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
                 vec![]
             })
@@ -123,7 +92,7 @@ fn main() -> Result<()> {
         clearscreen::clear()?;
         timestamped_println!("Starting linter in watch mode...\n");
 
-        let messages = run_once(&cli.files)?;
+        let messages = run_once(&cli.files, !cli.no_cache)?;
         report_continuously(&messages)?;
 
         // Configure the file watcher.
@@ -140,14 +109,14 @@ fn main() -> Result<()> {
                     clearscreen::clear()?;
                     timestamped_println!("File change detected...\n");
 
-                    let messages = run_once(&cli.files)?;
+                    let messages = run_once(&cli.files, !cli.no_cache)?;
                     report_continuously(&messages)?;
                 }
                 Err(e) => return Err(e.into()),
             }
         }
     } else {
-        let messages = run_once(&cli.files)?;
+        let messages = run_once(&cli.files, !cli.no_cache)?;
         report_once(&messages)?;
     }
 
