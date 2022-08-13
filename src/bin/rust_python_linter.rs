@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 
-use ::rust_python_linter::fs::collect_python_files;
+use ::rust_python_linter::fs::iter_python_files;
 use ::rust_python_linter::linter::check_path;
 use ::rust_python_linter::logging::set_up_logging;
 use ::rust_python_linter::message::Message;
@@ -32,7 +32,7 @@ struct Cli {
 fn run_once(files: &[PathBuf], cache: bool) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
-    let files: Vec<DirEntry> = files.iter().flat_map(collect_python_files).collect();
+    let files: Vec<DirEntry> = files.iter().flat_map(iter_python_files).collect();
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
