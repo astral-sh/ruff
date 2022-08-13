@@ -4,7 +4,7 @@ use colored::Colorize;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-use crate::check::CheckKind;
+use crate::checks::CheckKind;
 
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "Location")]
@@ -21,7 +21,7 @@ impl From<LocationDef> for Location {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
     pub kind: CheckKind,
     #[serde(with = "LocationDef")]

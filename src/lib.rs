@@ -1,6 +1,6 @@
 mod cache;
-mod check;
 pub mod checker;
+mod checks;
 pub mod fs;
 pub mod linter;
 pub mod logging;

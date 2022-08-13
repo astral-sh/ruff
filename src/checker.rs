@@ -2,17 +2,12 @@ use std::collections::HashSet;
 
 use rustpython_parser::ast::{Arg, Arguments, ExprKind, Stmt, StmtKind, Suite};
 
-use crate::check::{Check, CheckKind};
+use crate::checks::{Check, CheckKind};
 use crate::visitor::{walk_arguments, walk_stmt, Visitor};
 
+#[derive(Default)]
 struct Checker {
     checks: Vec<Check>,
-}
-
-impl Checker {
-    fn new() -> Self {
-        Checker { checks: vec![] }
-    }
 }
 
 impl Visitor for Checker {
@@ -79,9 +74,46 @@ pub fn check_ast(python_ast: &Suite) -> Vec<Check> {
     python_ast
         .iter()
         .flat_map(|stmt| {
-            let mut checker = Checker::new();
+            let mut checker: Checker = Default::default();
             checker.visit_stmt(stmt);
             checker.checks
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use rustpython_parser::ast::{Alias, Location, Stmt, StmtKind};
+
+    use crate::checker::Checker;
+    use crate::checks::Check;
+    use crate::checks::CheckKind::ImportStarUsage;
+    use crate::visitor::Visitor;
+
+    #[test]
+    fn import_star_usage() {
+        let mut checker: Checker = Default::default();
+        checker.visit_stmt(&Stmt {
+            location: Location::new(1, 1),
+            custom: (),
+            node: StmtKind::ImportFrom {
+                module: Some("bar".to_string()),
+                names: vec![Alias {
+                    name: "*".to_string(),
+                    asname: None,
+                }],
+                level: 0,
+            },
+        });
+
+        let actual = checker.checks;
+        let expected = vec![Check {
+            kind: ImportStarUsage,
+            location: Location::new(1, 1),
+        }];
+        assert_eq!(actual.len(), expected.len());
+        for i in 1..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+    }
 }
