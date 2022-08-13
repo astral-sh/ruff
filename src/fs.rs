@@ -1,5 +1,7 @@
-use std::path::PathBuf;
-
+use anyhow::Result;
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
 use walkdir::{DirEntry, WalkDir};
 
 fn is_not_hidden(entry: &DirEntry) -> bool {
@@ -17,4 +19,12 @@ pub fn iter_python_files(path: &PathBuf) -> impl Iterator<Item = DirEntry> {
         .filter_entry(is_not_hidden)
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.path().to_string_lossy().ends_with(".py"))
+}
+
+pub fn read_file(path: &Path) -> Result<String> {
+    let file = File::open(path)?;
+    let mut buf_reader = BufReader::new(file);
+    let mut contents = String::new();
+    buf_reader.read_to_string(&mut contents)?;
+    Ok(contents)
 }
