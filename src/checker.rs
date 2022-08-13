@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{ExprKind, Stmt, StmtKind, Suite};
 
-use crate::message::{Check, CheckKind};
+use crate::check::{Check, CheckKind};
 use crate::visitor::{walk_stmt, Visitor};
 
 struct Checker {
