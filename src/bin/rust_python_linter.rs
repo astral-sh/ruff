@@ -6,7 +6,7 @@ use ::rust_python_linter::fs::collect_python_files;
 use ::rust_python_linter::linter::check_path;
 use ::rust_python_linter::logging::set_up_logging;
 use ::rust_python_linter::message::Message;
-use ::rust_python_linter::timestamped_println;
+use ::rust_python_linter::tell_user;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
@@ -67,7 +67,7 @@ fn report_once(messages: &[Message]) -> Result<()> {
 }
 
 fn report_continuously(messages: &[Message]) -> Result<()> {
-    timestamped_println!(
+    tell_user!(
         "Found {} error(s). Watching for file changes.",
         messages.len(),
     );
@@ -90,7 +90,7 @@ fn main() -> Result<()> {
     if cli.watch {
         // Perform an initial run instantly.
         clearscreen::clear()?;
-        timestamped_println!("Starting linter in watch mode...\n");
+        tell_user!("Starting linter in watch mode...\n");
 
         let messages = run_once(&cli.files, !cli.no_cache)?;
         report_continuously(&messages)?;
@@ -107,7 +107,7 @@ fn main() -> Result<()> {
                 Ok(_) => {
                     // Re-run on all change events.
                     clearscreen::clear()?;
-                    timestamped_println!("File change detected...\n");
+                    tell_user!("File change detected...\n");
 
                     let messages = run_once(&cli.files, !cli.no_cache)?;
                     report_continuously(&messages)?;

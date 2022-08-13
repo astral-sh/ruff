@@ -2,7 +2,7 @@ use anyhow::Result;
 use fern;
 
 #[macro_export]
-macro_rules! timestamped_println {
+macro_rules! tell_user {
     ($($arg:tt)*) => {
         println!(
             "[{}] {}",
