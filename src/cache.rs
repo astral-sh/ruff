@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
@@ -7,6 +6,8 @@ use log::error;
 use serde::{Deserialize, Serialize};
 
 use crate::message::Message;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize, Deserialize)]
 struct CacheMetadata {
@@ -66,8 +67,8 @@ fn cache_dir() -> &'static str {
     "./.cache"
 }
 
-fn cache_key(path: &Path) -> Cow<str> {
-    path.to_string_lossy()
+fn cache_key(path: &Path) -> String {
+    format!("{}@{}", path.to_string_lossy(), VERSION)
 }
 
 pub fn get(path: &Path, mode: &Mode) -> Option<Vec<Message>> {
