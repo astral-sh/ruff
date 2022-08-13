@@ -1,7 +1,7 @@
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckKind {
     DuplicateArgumentName,
     ImportStarUsage,
@@ -28,6 +28,7 @@ impl CheckKind {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Check {
     pub kind: CheckKind,
     pub location: Location,
