@@ -2,11 +2,6 @@ use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 
-use ::rust_python_linter::fs::iter_python_files;
-use ::rust_python_linter::linter::check_path;
-use ::rust_python_linter::logging::set_up_logging;
-use ::rust_python_linter::message::Message;
-use ::rust_python_linter::tell_user;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
@@ -14,6 +9,12 @@ use log::{debug, error};
 use notify::{watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
 use walkdir::DirEntry;
+
+use ::rust_python_linter::fs::iter_python_files;
+use ::rust_python_linter::linter::check_path;
+use ::rust_python_linter::logging::set_up_logging;
+use ::rust_python_linter::message::Message;
+use ::rust_python_linter::tell_user;
 
 #[derive(Debug, Parser)]
 #[clap(name = "rust-python-linter")]
