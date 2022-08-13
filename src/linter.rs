@@ -2,10 +2,12 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
+use rustpython_parser::parser;
 
-use crate::checker::check_ast;
+use crate::check_ast::check_ast;
+use crate::check_lines::check_lines;
 use crate::message::Message;
-use crate::{cache, parser};
+use crate::{cache, fs};
 
 pub fn check_path(path: &Path, mode: &cache::Mode) -> Result<Vec<Message>> {
     // Check the cache.
@@ -14,10 +16,14 @@ pub fn check_path(path: &Path, mode: &cache::Mode) -> Result<Vec<Message>> {
         return Ok(messages);
     }
 
+    // Read the file from disk.
+    let contents = fs::read_file(path)?;
+
     // Run the linter.
-    let python_ast = parser::parse(path)?;
+    let python_ast = parser::parse_program(&contents)?;
     let messages: Vec<Message> = check_ast(&python_ast)
         .into_iter()
+        .chain(check_lines(&contents))
         .map(|check| Message {
             kind: check.kind,
             location: check.location,
@@ -37,7 +43,7 @@ mod tests {
     use rustpython_parser::ast::Location;
 
     use crate::cache;
-    use crate::checks::CheckKind::{DuplicateArgumentName, IfTuple, ImportStarUsage};
+    use crate::checks::CheckKind::{DuplicateArgumentName, IfTuple, ImportStarUsage, LineTooLong};
     use crate::linter::check_path;
     use crate::message::Message;
 
@@ -108,6 +114,25 @@ mod tests {
             kind: ImportStarUsage,
             location: Location::new(1, 1),
             filename: "./resources/test/src/import_star_usage.py".to_string(),
+        }];
+        assert_eq!(actual.len(), expected.len());
+        for i in 1..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn line_too_long() -> Result<()> {
+        let actual = check_path(
+            &Path::new("./resources/test/src/line_too_long.py"),
+            &cache::Mode::None,
+        )?;
+        let expected = vec![Message {
+            kind: LineTooLong,
+            location: Location::new(3, 80),
+            filename: "./resources/test/src/line_too_long.py".to_string(),
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 1..actual.len() {

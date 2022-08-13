@@ -85,7 +85,7 @@ pub fn check_ast(python_ast: &Suite) -> Vec<Check> {
 mod tests {
     use rustpython_parser::ast::{Alias, Location, Stmt, StmtKind};
 
-    use crate::checker::Checker;
+    use crate::check_ast::Checker;
     use crate::checks::Check;
     use crate::checks::CheckKind::ImportStarUsage;
     use crate::visitor::Visitor;

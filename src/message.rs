@@ -33,12 +33,13 @@ impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{}{}{}{}{}\t{}\t{}",
+            "{}{}{}{}{}{} {} {}",
             self.filename.white().bold(),
+            ":".cyan(),
+            self.location.row(),
             ":".cyan(),
             self.location.column(),
             ":".cyan(),
-            self.location.row(),
             self.kind.code().red().bold(),
             self.kind.body()
         )
