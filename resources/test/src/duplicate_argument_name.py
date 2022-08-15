@@ -1,3 +1,6 @@
+from baz.foo.if_tuple import f
+
+
 def foo(x: int, y: int, x: int) -> None:
     pass
 

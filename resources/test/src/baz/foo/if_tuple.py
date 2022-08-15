@@ -1,6 +1,5 @@
 import os
 from multiprocessing import pool as fool
-import os.path
 from spr_platform import module
 from spr_platform.sub_module import other
 import spr_platform.sub_module
@@ -13,3 +12,7 @@ for _ in range(5):
         pass
     elif (3, 4):
         pass
+
+
+def f(x):
+    pass
