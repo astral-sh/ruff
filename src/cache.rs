@@ -68,7 +68,11 @@ fn cache_dir() -> &'static str {
 }
 
 fn cache_key(path: &Path) -> String {
-    format!("{}@{}", path.to_string_lossy(), VERSION)
+    format!(
+        "{}@{}",
+        path.canonicalize().unwrap().to_string_lossy(),
+        VERSION
+    )
 }
 
 pub fn get(path: &Path, mode: &Mode) -> Option<Vec<Message>> {
