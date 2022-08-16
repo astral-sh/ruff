@@ -40,10 +40,10 @@ impl Visitor for Checker {
     fn visit_arguments(&mut self, arguments: &Arguments) {
         // Collect all the arguments into a single vector.
         let mut all_arguments: Vec<&Arg> = arguments
-            .posonlyargs
+            .args
             .iter()
+            .chain(arguments.posonlyargs.iter())
             .chain(arguments.kwonlyargs.iter())
-            .chain(arguments.args.iter())
             .collect();
         if let Some(arg) = &arguments.vararg {
             all_arguments.push(arg);
