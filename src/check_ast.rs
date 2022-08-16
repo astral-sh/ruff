@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 
-use rustpython_parser::ast::{Arg, Arguments, ExprKind, Stmt, StmtKind, Suite};
+use rustpython_parser::ast::{Arg, Arguments, Expr, ExprKind, Stmt, StmtKind, Suite};
 
 use crate::checks::{Check, CheckKind};
-use crate::visitor::{walk_arguments, walk_stmt, Visitor};
+use crate::visitor;
+use crate::visitor::Visitor;
 
 #[derive(Default)]
 struct Checker {
@@ -34,7 +35,23 @@ impl Visitor for Checker {
             _ => {}
         }
 
-        walk_stmt(self, stmt);
+        visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &Expr) {
+        if let ExprKind::JoinedStr { values } = &expr.node {
+            if !values
+                .iter()
+                .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
+            {
+                self.checks.push(Check {
+                    kind: CheckKind::FStringMissingPlaceholders,
+                    location: expr.location,
+                });
+            }
+        }
+
+        visitor::walk_expr(self, expr);
     }
 
     fn visit_arguments(&mut self, arguments: &Arguments) {
@@ -66,7 +83,7 @@ impl Visitor for Checker {
             idents.insert(ident.clone());
         }
 
-        walk_arguments(self, arguments);
+        visitor::walk_arguments(self, arguments);
     }
 }
 
