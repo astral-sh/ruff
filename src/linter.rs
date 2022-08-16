@@ -44,7 +44,9 @@ mod tests {
     use rustpython_parser::ast::Location;
 
     use crate::cache;
-    use crate::checks::CheckKind::{DuplicateArgumentName, IfTuple, ImportStarUsage, LineTooLong};
+    use crate::checks::CheckKind::{
+        DuplicateArgumentName, FStringMissingPlaceholders, IfTuple, ImportStarUsage, LineTooLong,
+    };
     use crate::linter::check_path;
     use crate::message::Message;
 
@@ -69,6 +71,37 @@ mod tests {
                 kind: DuplicateArgumentName,
                 location: Location::new(9, 27),
                 filename: "./resources/test/src/duplicate_argument_name.py".to_string(),
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 1..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn f_string_missing_placeholders() -> Result<()> {
+        let actual = check_path(
+            &Path::new("./resources/test/src/f_string_missing_placeholders.py"),
+            &cache::Mode::None,
+        )?;
+        let expected = vec![
+            Message {
+                kind: FStringMissingPlaceholders,
+                location: Location::new(4, 7),
+                filename: "./resources/test/src/f_string_missing_placeholders.py".to_string(),
+            },
+            Message {
+                kind: FStringMissingPlaceholders,
+                location: Location::new(5, 7),
+                filename: "./resources/test/src/f_string_missing_placeholders.py".to_string(),
+            },
+            Message {
+                kind: FStringMissingPlaceholders,
+                location: Location::new(7, 7),
+                filename: "./resources/test/src/f_string_missing_placeholders.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());

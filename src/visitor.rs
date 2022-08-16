@@ -295,7 +295,7 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
 }
 
 #[allow(unused_variables)]
-fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
+pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
     match &expr.node {
         ExprKind::BoolOp { op, values } => {
             visitor.visit_boolop(op);
