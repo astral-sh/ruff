@@ -26,7 +26,7 @@ impl CheckKind {
             CheckKind::DuplicateArgumentName => "Duplicate argument name in function definition",
             CheckKind::IfTuple => "If test is a tuple, which is always `True`",
             CheckKind::ImportStarUsage => "Unable to detect undefined names",
-            CheckKind::LineTooLong => "Line too long (> 79 characters)",
+            CheckKind::LineTooLong => "Line too long",
         }
     }
 }

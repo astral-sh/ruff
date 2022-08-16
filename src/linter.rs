@@ -29,6 +29,7 @@ pub fn check_path(path: &Path, mode: &cache::Mode) -> Result<Vec<Message>> {
             location: check.location,
             filename: path.to_string_lossy().to_string(),
         })
+        .filter(|message| !message.is_inline_ignored())
         .collect();
     cache::set(path, &messages, mode);
 
@@ -61,7 +62,7 @@ mod tests {
             },
             Message {
                 kind: DuplicateArgumentName,
-                location: Location::new(5, 9),
+                location: Location::new(5, 28),
                 filename: "./resources/test/src/duplicate_argument_name.py".to_string(),
             },
             Message {
@@ -110,11 +111,18 @@ mod tests {
             &Path::new("./resources/test/src/import_star_usage.py"),
             &cache::Mode::None,
         )?;
-        let expected = vec![Message {
-            kind: ImportStarUsage,
-            location: Location::new(1, 1),
-            filename: "./resources/test/src/import_star_usage.py".to_string(),
-        }];
+        let expected = vec![
+            Message {
+                kind: ImportStarUsage,
+                location: Location::new(1, 1),
+                filename: "./resources/test/src/import_star_usage.py".to_string(),
+            },
+            Message {
+                kind: ImportStarUsage,
+                location: Location::new(2, 1),
+                filename: "./resources/test/src/import_star_usage.py".to_string(),
+            },
+        ];
         assert_eq!(actual.len(), expected.len());
         for i in 1..actual.len() {
             assert_eq!(actual[i], expected[i]);
@@ -131,7 +139,7 @@ mod tests {
         )?;
         let expected = vec![Message {
             kind: LineTooLong,
-            location: Location::new(3, 80),
+            location: Location::new(3, 88),
             filename: "./resources/test/src/line_too_long.py".to_string(),
         }];
         assert_eq!(actual.len(), expected.len());
