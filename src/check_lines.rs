@@ -10,10 +10,15 @@ pub fn check_lines(contents: &str) -> Vec<Check> {
         .enumerate()
         .filter_map(|(row, line)| {
             if line.len() > *MAX_LINE_LENGTH {
-                Some(Check {
-                    kind: LineTooLong,
-                    location: Location::new(row + 1, MAX_LINE_LENGTH + 1),
-                })
+                let chunks: Vec<&str> = line.split_whitespace().collect();
+                if chunks.len() == 1 || (chunks.len() == 2 && chunks[0] == "#") {
+                    None
+                } else {
+                    Some(Check {
+                        kind: LineTooLong,
+                        location: Location::new(row + 1, MAX_LINE_LENGTH + 1),
+                    })
+                }
             } else {
                 None
             }

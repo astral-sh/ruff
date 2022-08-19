@@ -129,7 +129,7 @@ mod tests {
             location: Location::new(1, 1),
         }];
         assert_eq!(actual.len(), expected.len());
-        for i in 1..actual.len() {
+        for i in 0..actual.len() {
             assert_eq!(actual[i], expected[i]);
         }
     }

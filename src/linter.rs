@@ -74,7 +74,7 @@ mod tests {
             },
         ];
         assert_eq!(actual.len(), expected.len());
-        for i in 1..actual.len() {
+        for i in 0..actual.len() {
             assert_eq!(actual[i], expected[i]);
         }
 
@@ -105,7 +105,7 @@ mod tests {
             },
         ];
         assert_eq!(actual.len(), expected.len());
-        for i in 1..actual.len() {
+        for i in 0..actual.len() {
             assert_eq!(actual[i], expected[i]);
         }
 
@@ -131,7 +131,7 @@ mod tests {
             },
         ];
         assert_eq!(actual.len(), expected.len());
-        for i in 1..actual.len() {
+        for i in 0..actual.len() {
             assert_eq!(actual[i], expected[i]);
         }
 
@@ -157,7 +157,7 @@ mod tests {
             },
         ];
         assert_eq!(actual.len(), expected.len());
-        for i in 1..actual.len() {
+        for i in 0..actual.len() {
             assert_eq!(actual[i], expected[i]);
         }
 
@@ -172,11 +172,11 @@ mod tests {
         )?;
         let expected = vec![Message {
             kind: LineTooLong,
-            location: Location::new(3, 88),
+            location: Location::new(5, 89),
             filename: "./resources/test/src/line_too_long.py".to_string(),
         }];
         assert_eq!(actual.len(), expected.len());
-        for i in 1..actual.len() {
+        for i in 0..actual.len() {
             assert_eq!(actual[i], expected[i]);
         }
 
