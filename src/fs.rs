@@ -1,10 +1,11 @@
-use anyhow::Result;
-use lazy_static::lazy_static;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+
+use anyhow::Result;
+use lazy_static::lazy_static;
 use walkdir::{DirEntry, WalkDir};
 
 lazy_static! {

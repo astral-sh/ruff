@@ -15,6 +15,8 @@ chrono = { version = "0.4.21" }
 clap = { version = "3.2.16", features = ["derive"] }
 clearscreen = { version = "1.0.10" }
 colored = { version = "2.0.0" }
+common-path = "1.0.0"
+dirs = "4.0.0"
 fern = { version = "0.6.1" }
 lazy_static = { version = "1.4.0" }
 log = { version = "0.4.17" }
@@ -25,6 +27,7 @@ regex = { version = "1.6.0" }
 rustpython-parser = { git = "https://github.com/RustPython/RustPython.git", rev = "dff916d45c5d13074d21ad329a5ab68a6499426a" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
+toml = { version = "0.5.9"}
 walkdir = { version = "2.3.2" }
 
 [profile.release]
