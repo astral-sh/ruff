@@ -18,7 +18,6 @@ colored = { version = "2.0.0" }
 common-path = "1.0.0"
 dirs = "4.0.0"
 fern = { version = "0.6.1" }
-lazy_static = { version = "1.4.0" }
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py37"] }

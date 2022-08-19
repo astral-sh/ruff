@@ -1546,7 +1546,6 @@ dependencies = [
  "common-path",
  "dirs 4.0.0",
  "fern",
- "lazy_static",
  "log",
  "notify",
  "pyo3",

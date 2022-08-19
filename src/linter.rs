@@ -55,7 +55,10 @@ mod tests {
     fn duplicate_argument_name() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/duplicate_argument_name.py"),
-            &settings::Settings { line_length: 88 },
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+            },
             &cache::Mode::None,
         )?;
         let expected = vec![
@@ -87,7 +90,10 @@ mod tests {
     fn f_string_missing_placeholders() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/f_string_missing_placeholders.py"),
-            &settings::Settings { line_length: 88 },
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+            },
             &cache::Mode::None,
         )?;
         let expected = vec![
@@ -119,7 +125,10 @@ mod tests {
     fn if_tuple() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/if_tuple.py"),
-            &settings::Settings { line_length: 88 },
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+            },
             &cache::Mode::None,
         )?;
         let expected = vec![
@@ -146,7 +155,10 @@ mod tests {
     fn import_star_usage() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/import_star_usage.py"),
-            &settings::Settings { line_length: 88 },
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+            },
             &cache::Mode::None,
         )?;
         let expected = vec![
@@ -173,7 +185,10 @@ mod tests {
     fn line_too_long() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/line_too_long.py"),
-            &settings::Settings { line_length: 88 },
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+            },
             &cache::Mode::None,
         )?;
         let expected = vec![Message {
