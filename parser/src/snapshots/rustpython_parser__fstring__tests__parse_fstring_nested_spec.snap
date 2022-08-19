@@ -2,118 +2,52 @@
 source: parser/src/fstring.rs
 expression: parse_ast
 ---
-Located {
-    location: Location {
-        row: 0,
-        column: 0,
-    },
-    custom: (),
-    node: JoinedStr {
-        values: [
-            Located {
+[
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: FormattedValue {
+            value: Located {
                 location: Location {
-                    row: 0,
-                    column: 0,
+                    row: 1,
+                    column: 2,
                 },
                 custom: (),
-                node: FormattedValue {
-                    value: Located {
-                        location: Location {
-                            row: 1,
-                            column: 2,
-                        },
-                        custom: (),
-                        node: Name {
-                            id: "foo",
-                            ctx: Load,
-                        },
-                    },
-                    conversion: 0,
-                    format_spec: Some(
-                        Located {
-                            location: Location {
-                                row: 0,
-                                column: 0,
-                            },
-                            custom: (),
-                            node: JoinedStr {
-                                values: [
-                                    Located {
-                                        location: Location {
-                                            row: 0,
-                                            column: 0,
-                                        },
-                                        custom: (),
-                                        node: Constant {
-                                            value: Str(
-                                                "",
-                                            ),
-                                            kind: None,
-                                        },
-                                    },
-                                    Located {
-                                        location: Location {
-                                            row: 0,
-                                            column: 0,
-                                        },
-                                        custom: (),
-                                        node: FormattedValue {
-                                            value: Located {
-                                                location: Location {
-                                                    row: 0,
-                                                    column: 0,
-                                                },
-                                                custom: (),
-                                                node: JoinedStr {
-                                                    values: [
-                                                        Located {
-                                                            location: Location {
-                                                                row: 0,
-                                                                column: 0,
-                                                            },
-                                                            custom: (),
-                                                            node: FormattedValue {
-                                                                value: Located {
-                                                                    location: Location {
-                                                                        row: 1,
-                                                                        column: 3,
-                                                                    },
-                                                                    custom: (),
-                                                                    node: Name {
-                                                                        id: "spec",
-                                                                        ctx: Load,
-                                                                    },
-                                                                },
-                                                                conversion: 0,
-                                                                format_spec: None,
-                                                            },
-                                                        },
-                                                    ],
-                                                },
-                                            },
-                                            conversion: 0,
-                                            format_spec: None,
-                                        },
-                                    },
-                                    Located {
-                                        location: Location {
-                                            row: 0,
-                                            column: 0,
-                                        },
-                                        custom: (),
-                                        node: Constant {
-                                            value: Str(
-                                                "",
-                                            ),
-                                            kind: None,
-                                        },
-                                    },
-                                ],
-                            },
-                        },
-                    ),
+                node: Name {
+                    id: "foo",
+                    ctx: Load,
                 },
             },
-        ],
+            conversion: 0,
+            format_spec: Some(
+                Located {
+                    location: Location {
+                        row: 0,
+                        column: 0,
+                    },
+                    custom: (),
+                    node: JoinedStr {
+                        values: [
+                            Located {
+                                location: Location {
+                                    row: 0,
+                                    column: 0,
+                                },
+                                custom: (),
+                                node: Constant {
+                                    value: Str(
+                                        "{ spec}",
+                                    ),
+                                    kind: None,
+                                },
+                            },
+                        ],
+                    },
+                },
+            ),
+        },
     },
-}
+]

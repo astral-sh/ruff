@@ -2,65 +2,56 @@
 source: parser/src/fstring.rs
 expression: parse_ast
 ---
-Located {
-    location: Location {
-        row: 0,
-        column: 0,
-    },
-    custom: (),
-    node: JoinedStr {
-        values: [
-            Located {
+[
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: FormattedValue {
+            value: Located {
                 location: Location {
-                    row: 0,
-                    column: 0,
+                    row: 1,
+                    column: 5,
                 },
                 custom: (),
-                node: FormattedValue {
-                    value: Located {
+                node: Compare {
+                    left: Located {
                         location: Location {
                             row: 1,
-                            column: 5,
+                            column: 2,
                         },
                         custom: (),
-                        node: Compare {
-                            left: Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 2,
-                                },
-                                custom: (),
-                                node: Constant {
-                                    value: Int(
-                                        42,
-                                    ),
-                                    kind: None,
-                                },
-                            },
-                            ops: [
-                                Eq,
-                            ],
-                            comparators: [
-                                Located {
-                                    location: Location {
-                                        row: 1,
-                                        column: 8,
-                                    },
-                                    custom: (),
-                                    node: Constant {
-                                        value: Int(
-                                            42,
-                                        ),
-                                        kind: None,
-                                    },
-                                },
-                            ],
+                        node: Constant {
+                            value: Int(
+                                42,
+                            ),
+                            kind: None,
                         },
                     },
-                    conversion: 0,
-                    format_spec: None,
+                    ops: [
+                        Eq,
+                    ],
+                    comparators: [
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 8,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    42,
+                                ),
+                                kind: None,
+                            },
+                        },
+                    ],
                 },
             },
-        ],
+            conversion: 0,
+            format_spec: None,
+        },
     },
-}
+]

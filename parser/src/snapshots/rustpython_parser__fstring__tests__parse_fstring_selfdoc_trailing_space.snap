@@ -2,62 +2,53 @@
 source: parser/src/fstring.rs
 expression: parse_ast
 ---
-Located {
-    location: Location {
-        row: 0,
-        column: 0,
+[
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: Constant {
+            value: Str(
+                "x=",
+            ),
+            kind: None,
+        },
     },
-    custom: (),
-    node: JoinedStr {
-        values: [
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "x=",
-                    ),
-                    kind: None,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "   ",
-                    ),
-                    kind: None,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: FormattedValue {
-                    value: Located {
-                        location: Location {
-                            row: 1,
-                            column: 2,
-                        },
-                        custom: (),
-                        node: Name {
-                            id: "x",
-                            ctx: Load,
-                        },
-                    },
-                    conversion: 114,
-                    format_spec: None,
-                },
-            },
-        ],
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: Constant {
+            value: Str(
+                "   ",
+            ),
+            kind: None,
+        },
     },
-}
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: FormattedValue {
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 2,
+                },
+                custom: (),
+                node: Name {
+                    id: "x",
+                    ctx: Load,
+                },
+            },
+            conversion: 114,
+            format_spec: None,
+        },
+    },
+]
