@@ -13,7 +13,7 @@ use crate::{cache, fs};
 
 pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Result<Vec<Message>> {
     // Check the cache.
-    if let Some(messages) = cache::get(path, mode) {
+    if let Some(messages) = cache::get(path, settings, mode) {
         debug!("Cache hit for: {}", path.to_string_lossy());
         return Ok(messages);
     }
@@ -53,14 +53,14 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
         })
         .filter(|message| !message.is_inline_ignored())
         .collect();
-    cache::set(path, &messages, mode);
+    cache::set(path, settings, &messages, mode);
 
     Ok(messages)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
@@ -81,7 +81,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
-                select: HashSet::from([CheckCode::F831]),
+                select: BTreeSet::from([CheckCode::F831]),
             },
             &cache::Mode::None,
         )?;
@@ -117,7 +117,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
-                select: HashSet::from([CheckCode::F541]),
+                select: BTreeSet::from([CheckCode::F541]),
             },
             &cache::Mode::None,
         )?;
@@ -153,7 +153,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
-                select: HashSet::from([CheckCode::F634]),
+                select: BTreeSet::from([CheckCode::F634]),
             },
             &cache::Mode::None,
         )?;
@@ -184,7 +184,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
-                select: HashSet::from([CheckCode::F403]),
+                select: BTreeSet::from([CheckCode::F403]),
             },
             &cache::Mode::None,
         )?;
@@ -215,7 +215,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
-                select: HashSet::from([CheckCode::E501]),
+                select: BTreeSet::from([CheckCode::E501]),
             },
             &cache::Mode::None,
         )?;

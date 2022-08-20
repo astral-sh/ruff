@@ -1,15 +1,25 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use crate::checks::CheckCode;
 use anyhow::Result;
 
+use crate::checks::CheckCode;
 use crate::pyproject::load_config;
 
 pub struct Settings {
     pub line_length: usize,
     pub exclude: Vec<PathBuf>,
-    pub select: HashSet<CheckCode>,
+    pub select: BTreeSet<CheckCode>,
+}
+
+impl Hash for Settings {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.line_length.hash(state);
+        for value in self.select.iter() {
+            value.hash(state);
+        }
+    }
 }
 
 impl Settings {
@@ -30,7 +40,7 @@ impl Settings {
                 })
                 .collect(),
             select: config.select.unwrap_or_else(|| {
-                HashSet::from([
+                BTreeSet::from([
                     CheckCode::F831,
                     CheckCode::F541,
                     CheckCode::F634,
