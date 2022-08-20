@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use crate::checks::CheckCode;
 use anyhow::Result;
 use common_path::common_path_all;
 use log::debug;
@@ -30,6 +32,7 @@ pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<(Pat
 pub struct Config {
     pub line_length: Option<usize>,
     pub exclude: Option<Vec<PathBuf>>,
+    pub select: Option<HashSet<CheckCode>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -82,8 +85,10 @@ fn find_project_root<'a>(sources: impl IntoIterator<Item = &'a Path>) -> Option<
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::path::Path;
 
+    use crate::checks::CheckCode;
     use anyhow::Result;
 
     use crate::pyproject::{
@@ -113,7 +118,8 @@ mod tests {
             Some(Tools {
                 linter: Some(Config {
                     line_length: None,
-                    exclude: None
+                    exclude: None,
+                    select: None,
                 })
             })
         );
@@ -130,7 +136,8 @@ line-length = 79
             Some(Tools {
                 linter: Some(Config {
                     line_length: Some(79),
-                    exclude: None
+                    exclude: None,
+                    select: None,
                 })
             })
         );
@@ -147,7 +154,26 @@ exclude = ["foo.py"]
             Some(Tools {
                 linter: Some(Config {
                     line_length: None,
-                    exclude: Some(vec![Path::new("foo.py").to_path_buf()])
+                    exclude: Some(vec![Path::new("foo.py").to_path_buf()]),
+                    select: None,
+                })
+            })
+        );
+
+        let pyproject: PyProject = toml::from_str(
+            r#"
+[tool.black]
+[tool.linter]
+select = ["E501"]
+"#,
+        )?;
+        assert_eq!(
+            pyproject.tool,
+            Some(Tools {
+                linter: Some(Config {
+                    line_length: None,
+                    exclude: None,
+                    select: Some(HashSet::from([CheckCode::E501])),
                 })
             })
         );
@@ -157,6 +183,15 @@ exclude = ["foo.py"]
 [tool.black]
 [tool.linter]
 line_length = 79
+"#,
+        )
+        .is_err());
+
+        assert!(toml::from_str::<PyProject>(
+            r#"
+[tool.black]
+[tool.linter]
+select = ["E123"]
 "#,
         )
         .is_err());
@@ -193,7 +228,8 @@ other-attribute = 1
             config,
             Config {
                 line_length: Some(88),
-                exclude: Some(vec![Path::new("excluded.py").to_path_buf()])
+                exclude: Some(vec![Path::new("excluded.py").to_path_buf()]),
+                select: None,
             }
         );
 

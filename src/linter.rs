@@ -6,6 +6,7 @@ use rustpython_parser::parser;
 
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
+use crate::checks::{Check, CheckKind, LintSource};
 use crate::message::Message;
 use crate::settings::Settings;
 use crate::{cache, fs};
@@ -20,11 +21,31 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
-    // Run the linter.
-    let python_ast = parser::parse_program(&contents)?;
-    let messages: Vec<Message> = check_ast(&python_ast)
+    // Aggregate all checks.
+    let mut checks: Vec<Check> = vec![];
+
+    // Run the AST-based checks.
+    if settings
+        .select
+        .iter()
+        .any(|check_code| matches!(CheckKind::new(check_code).lint_source(), LintSource::AST))
+    {
+        let python_ast = parser::parse_program(&contents)?;
+        checks.extend(check_ast(&python_ast, settings));
+    }
+
+    // Run the lines-based checks.
+    if settings
+        .select
+        .iter()
+        .any(|check_code| matches!(CheckKind::new(check_code).lint_source(), LintSource::Lines))
+    {
+        checks.extend(check_lines(&contents, settings));
+    }
+
+    // Convert to messages.
+    let messages: Vec<Message> = checks
         .into_iter()
-        .chain(check_lines(&contents, settings))
         .map(|check| Message {
             kind: check.kind,
             location: check.location,
@@ -39,11 +60,13 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::path::Path;
 
     use anyhow::Result;
     use rustpython_parser::ast::Location;
 
+    use crate::checks::CheckCode;
     use crate::checks::CheckKind::{
         DuplicateArgumentName, FStringMissingPlaceholders, IfTuple, ImportStarUsage, LineTooLong,
     };
@@ -58,6 +81,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                select: HashSet::from([CheckCode::F831]),
             },
             &cache::Mode::None,
         )?;
@@ -93,6 +117,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                select: HashSet::from([CheckCode::F541]),
             },
             &cache::Mode::None,
         )?;
@@ -128,6 +153,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                select: HashSet::from([CheckCode::F634]),
             },
             &cache::Mode::None,
         )?;
@@ -158,6 +184,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                select: HashSet::from([CheckCode::F403]),
             },
             &cache::Mode::None,
         )?;
@@ -188,6 +215,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                select: HashSet::from([CheckCode::E501]),
             },
             &cache::Mode::None,
         )?;
