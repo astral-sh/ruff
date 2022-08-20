@@ -48,7 +48,7 @@ impl Message {
                                 .map(|code| code.trim())
                                 .filter(|code| !code.is_empty())
                             {
-                                if code == self.kind.code() {
+                                if code == self.kind.code().as_str() {
                                     return true;
                                 }
                             }
@@ -75,7 +75,7 @@ impl fmt::Display for Message {
             ":".cyan(),
             self.location.column(),
             ":".cyan(),
-            self.kind.code().red().bold(),
+            self.kind.code().as_str().red().bold(),
             self.kind.body()
         )
     }
