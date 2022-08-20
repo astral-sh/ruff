@@ -1,12 +1,12 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use crate::checks::CheckCode;
 use anyhow::Result;
 use common_path::common_path_all;
 use log::debug;
 use serde::Deserialize;
 
+use crate::checks::CheckCode;
 use crate::fs;
 
 pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<(PathBuf, Config)> {
@@ -32,7 +32,7 @@ pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<(Pat
 pub struct Config {
     pub line_length: Option<usize>,
     pub exclude: Option<Vec<PathBuf>>,
-    pub select: Option<HashSet<CheckCode>>,
+    pub select: Option<BTreeSet<CheckCode>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -85,12 +85,12 @@ fn find_project_root<'a>(sources: impl IntoIterator<Item = &'a Path>) -> Option<
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
     use std::path::Path;
 
-    use crate::checks::CheckCode;
     use anyhow::Result;
 
+    use crate::checks::CheckCode;
     use crate::pyproject::{
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Config, PyProject, Tools,
     };
@@ -173,7 +173,7 @@ select = ["E501"]
                 linter: Some(Config {
                     line_length: None,
                     exclude: None,
-                    select: Some(HashSet::from([CheckCode::E501])),
+                    select: Some(BTreeSet::from([CheckCode::E501])),
                 })
             })
         );

@@ -95,7 +95,7 @@ fn main() -> Result<()> {
 
     set_up_logging(cli.verbose)?;
 
-    // TODO(charlie): Avoid this cast.
+    // TODO(charlie): Can we avoid this cast?
     let paths: Vec<&Path> = cli.files.iter().map(PathBuf::as_path).collect();
     let settings = Settings::from_paths(paths)?;
 

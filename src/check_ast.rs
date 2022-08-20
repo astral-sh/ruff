@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use rustpython_parser::ast::{Arg, Arguments, Expr, ExprKind, Stmt, StmtKind, Suite};
 
@@ -99,7 +99,7 @@ impl Visitor for Checker<'_> {
             }
 
             // Search for duplicates.
-            let mut idents: HashSet<String> = HashSet::new();
+            let mut idents: BTreeSet<String> = BTreeSet::new();
             for arg in all_arguments {
                 let ident = &arg.node.arg;
                 if idents.contains(ident) {
@@ -130,8 +130,9 @@ pub fn check_ast(python_ast: &Suite, settings: &Settings) -> Vec<Check> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use rustpython_parser::ast::{Alias, Location, Stmt, StmtKind};
-    use std::collections::HashSet;
 
     use crate::check_ast::Checker;
     use crate::checks::CheckKind::ImportStarUsage;
@@ -144,7 +145,7 @@ mod tests {
         let settings = Settings {
             line_length: 88,
             exclude: vec![],
-            select: HashSet::from([CheckCode::F403]),
+            select: BTreeSet::from([CheckCode::F403]),
         };
         let mut checker = Checker::new(&settings);
         checker.visit_stmt(&Stmt {

@@ -1,7 +1,7 @@
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub enum CheckCode {
     F831,
     F541,

@@ -1,3 +1,5 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
@@ -6,6 +8,7 @@ use log::error;
 use serde::{Deserialize, Serialize};
 
 use crate::message::Message;
+use crate::settings::Settings;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -67,20 +70,23 @@ fn cache_dir() -> &'static str {
     "./.cache"
 }
 
-fn cache_key(path: &Path) -> String {
+fn cache_key(path: &Path, settings: &Settings) -> String {
+    let mut hasher = DefaultHasher::new();
+    settings.hash(&mut hasher);
     format!(
-        "{}@{}",
+        "{}@{}@{}",
         path.canonicalize().unwrap().to_string_lossy(),
-        VERSION
+        VERSION,
+        hasher.finish()
     )
 }
 
-pub fn get(path: &Path, mode: &Mode) -> Option<Vec<Message>> {
+pub fn get(path: &Path, settings: &Settings, mode: &Mode) -> Option<Vec<Message>> {
     if !mode.allow_read() {
         return None;
     };
 
-    match cacache::read_sync(cache_dir(), cache_key(path)) {
+    match cacache::read_sync(cache_dir(), cache_key(path, settings)) {
         Ok(encoded) => match path.metadata() {
             Ok(m) => match bincode::deserialize::<CheckResult>(&encoded[..]) {
                 Ok(CheckResult { metadata, messages }) => {
@@ -98,7 +104,7 @@ pub fn get(path: &Path, mode: &Mode) -> Option<Vec<Message>> {
     None
 }
 
-pub fn set(path: &Path, messages: &[Message], mode: &Mode) {
+pub fn set(path: &Path, settings: &Settings, messages: &[Message], mode: &Mode) {
     if !mode.allow_write() {
         return;
     };
@@ -113,7 +119,7 @@ pub fn set(path: &Path, messages: &[Message], mode: &Mode) {
         };
         if let Err(e) = cacache::write_sync(
             cache_dir(),
-            cache_key(path),
+            cache_key(path, settings),
             bincode::serialize(&check_result).unwrap(),
         ) {
             error!("Failed to write to cache: {e:?}")
