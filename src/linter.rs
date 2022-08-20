@@ -7,9 +7,10 @@ use rustpython_parser::parser;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
 use crate::message::Message;
+use crate::settings::Settings;
 use crate::{cache, fs};
 
-pub fn check_path(path: &Path, mode: &cache::Mode) -> Result<Vec<Message>> {
+pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Result<Vec<Message>> {
     // Check the cache.
     if let Some(messages) = cache::get(path, mode) {
         debug!("Cache hit for: {}", path.to_string_lossy());
@@ -23,7 +24,7 @@ pub fn check_path(path: &Path, mode: &cache::Mode) -> Result<Vec<Message>> {
     let python_ast = parser::parse_program(&contents)?;
     let messages: Vec<Message> = check_ast(&python_ast)
         .into_iter()
-        .chain(check_lines(&contents))
+        .chain(check_lines(&contents, settings))
         .map(|check| Message {
             kind: check.kind,
             location: check.location,
@@ -43,17 +44,18 @@ mod tests {
     use anyhow::Result;
     use rustpython_parser::ast::Location;
 
-    use crate::cache;
     use crate::checks::CheckKind::{
         DuplicateArgumentName, FStringMissingPlaceholders, IfTuple, ImportStarUsage, LineTooLong,
     };
     use crate::linter::check_path;
     use crate::message::Message;
+    use crate::{cache, settings};
 
     #[test]
     fn duplicate_argument_name() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/duplicate_argument_name.py"),
+            &settings::Settings { line_length: 88 },
             &cache::Mode::None,
         )?;
         let expected = vec![
@@ -85,6 +87,7 @@ mod tests {
     fn f_string_missing_placeholders() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/f_string_missing_placeholders.py"),
+            &settings::Settings { line_length: 88 },
             &cache::Mode::None,
         )?;
         let expected = vec![
@@ -116,6 +119,7 @@ mod tests {
     fn if_tuple() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/if_tuple.py"),
+            &settings::Settings { line_length: 88 },
             &cache::Mode::None,
         )?;
         let expected = vec![
@@ -142,6 +146,7 @@ mod tests {
     fn import_star_usage() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/import_star_usage.py"),
+            &settings::Settings { line_length: 88 },
             &cache::Mode::None,
         )?;
         let expected = vec![
@@ -168,6 +173,7 @@ mod tests {
     fn line_too_long() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/line_too_long.py"),
+            &settings::Settings { line_length: 88 },
             &cache::Mode::None,
         )?;
         let expected = vec![Message {

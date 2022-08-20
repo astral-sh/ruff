@@ -1,7 +1,7 @@
 # Local cache
 .cache
-resources/test
 !resources/test/src
+resources/test
 
 ###
 # Rust.gitignore

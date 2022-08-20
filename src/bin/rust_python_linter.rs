@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
@@ -15,6 +15,7 @@ use ::rust_python_linter::linter::check_path;
 use ::rust_python_linter::logging::set_up_logging;
 use ::rust_python_linter::message::Message;
 use ::rust_python_linter::tell_user;
+use rust_python_linter::settings::Settings;
 
 #[derive(Debug, Parser)]
 #[clap(name = "rust-python-linter")]
@@ -30,7 +31,7 @@ struct Cli {
     no_cache: bool,
 }
 
-fn run_once(files: &[PathBuf], cache: bool) -> Result<Vec<Message>> {
+fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
     let files: Vec<DirEntry> = files.iter().flat_map(iter_python_files).collect();
@@ -41,7 +42,7 @@ fn run_once(files: &[PathBuf], cache: bool) -> Result<Vec<Message>> {
     let messages: Vec<Message> = files
         .par_iter()
         .map(|entry| {
-            check_path(entry.path(), &cache.into()).unwrap_or_else(|e| {
+            check_path(entry.path(), settings, &cache.into()).unwrap_or_else(|e| {
                 error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
                 vec![]
             })
@@ -88,12 +89,16 @@ fn main() -> Result<()> {
 
     set_up_logging(cli.verbose)?;
 
+    // TODO(charlie): Avoid this cast.
+    let paths: Vec<&Path> = cli.files.iter().map(PathBuf::as_path).collect();
+    let settings = Settings::from_paths(paths)?;
+
     if cli.watch {
         // Perform an initial run instantly.
         clearscreen::clear()?;
         tell_user!("Starting linter in watch mode...\n");
 
-        let messages = run_once(&cli.files, !cli.no_cache)?;
+        let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
         report_continuously(&messages)?;
 
         // Configure the file watcher.
@@ -111,7 +116,7 @@ fn main() -> Result<()> {
                             clearscreen::clear()?;
                             tell_user!("File change detected...\n");
 
-                            let messages = run_once(&cli.files, !cli.no_cache)?;
+                            let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
                             report_continuously(&messages)?;
                         }
                     }
@@ -120,7 +125,7 @@ fn main() -> Result<()> {
             }
         }
     } else {
-        let messages = run_once(&cli.files, !cli.no_cache)?;
+        let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
         report_once(&messages)?;
     }
 
