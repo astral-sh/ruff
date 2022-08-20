@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::fs;
 
-pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<Config> {
+pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<(PathBuf, Config)> {
     match find_project_root(paths) {
         Some(project_root) => match find_pyproject_toml(&project_root) {
             Some(path) => {
@@ -17,7 +17,7 @@ pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<Conf
                     .tool
                     .and_then(|tool| tool.linter)
                     .unwrap_or_default();
-                Ok(config)
+                Ok((project_root, config))
             }
             None => Ok(Default::default()),
         },
@@ -29,6 +29,7 @@ pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<Conf
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Config {
     pub line_length: Option<usize>,
+    pub exclude: Option<Vec<PathBuf>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -110,7 +111,10 @@ mod tests {
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                linter: Some(Config { line_length: None })
+                linter: Some(Config {
+                    line_length: None,
+                    exclude: None
+                })
             })
         );
 
@@ -125,7 +129,25 @@ line-length = 79
             pyproject.tool,
             Some(Tools {
                 linter: Some(Config {
-                    line_length: Some(79)
+                    line_length: Some(79),
+                    exclude: None
+                })
+            })
+        );
+
+        let pyproject: PyProject = toml::from_str(
+            r#"
+[tool.black]
+[tool.linter]
+exclude = ["foo.py"]
+"#,
+        )?;
+        assert_eq!(
+            pyproject.tool,
+            Some(Tools {
+                linter: Some(Config {
+                    line_length: None,
+                    exclude: Some(vec![Path::new("foo.py").to_path_buf()])
                 })
             })
         );
@@ -170,7 +192,8 @@ other-attribute = 1
         assert_eq!(
             config,
             Config {
-                line_length: Some(88)
+                line_length: Some(88),
+                exclude: Some(vec![Path::new("excluded.py").to_path_buf()])
             }
         );
 

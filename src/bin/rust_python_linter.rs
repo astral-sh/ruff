@@ -41,6 +41,12 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<M
     let start = Instant::now();
     let messages: Vec<Message> = files
         .par_iter()
+        .filter(|entry| {
+            !settings
+                .exclude
+                .iter()
+                .any(|exclusion| entry.path().starts_with(exclusion))
+        })
         .map(|entry| {
             check_path(entry.path(), settings, &cache.into()).unwrap_or_else(|e| {
                 error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());

@@ -1,2 +1,3 @@
 [tool.linter]
 line-length = 88
+exclude = ["excluded.py"]
