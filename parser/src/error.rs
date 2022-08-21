@@ -1,12 +1,9 @@
 //! Define internal parse error types
 //! The goal is to provide a matching and a safe error API, maksing errors from LALR
+
+use crate::{ast::Location, token::Tok};
 use lalrpop_util::ParseError as LalrpopError;
-
-use crate::ast::Location;
-use crate::token::Tok;
-
-use std::error::Error;
-use std::fmt;
+use std::{error::Error, fmt};
 
 /// Represents an error during lexical scanning.
 #[derive(Debug, PartialEq)]
@@ -186,7 +183,7 @@ impl ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} at {}", self.error, self.location)
+        self.location.fmt_with(f, &self.error)
     }
 }
 

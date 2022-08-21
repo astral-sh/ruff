@@ -5,13 +5,9 @@
 //! parse a whole program, a single statement, or a single
 //! expression.
 
-use std::iter;
-
-use crate::ast;
-use crate::error::ParseError;
-use crate::lexer;
 pub use crate::mode::Mode;
-use crate::python;
+use crate::{ast, error::ParseError, lexer, python};
+use std::iter;
 
 /*
  * Parse python code.

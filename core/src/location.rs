@@ -8,6 +8,16 @@ pub struct Location {
 }
 
 impl Location {
+    pub fn fmt_with(
+        &self,
+        f: &mut std::fmt::Formatter,
+        e: &impl std::fmt::Display,
+    ) -> std::fmt::Result {
+        write!(f, "{} at line {} column {}", e, self.row(), self.column())
+    }
+}
+
+impl Location {
     /// Creates a new Location object at the given row and column.
     ///
     /// # Example

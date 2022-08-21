@@ -3,7 +3,7 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 pub use crate::constant::*;
-pub use crate::location::Location;
+pub use crate::Location;
 
 type Ident = String;
 
