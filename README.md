@@ -5,7 +5,7 @@ in Rust.
 
 Features:
 
-- Python 3.9 compatibility
+- Python 3.10 compatibility
 - [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache semantics
 - [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` semantics
 - `pyproject.toml` support
