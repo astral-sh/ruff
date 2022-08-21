@@ -67,7 +67,7 @@ impl Visitor for Checker<'_> {
                     .contains(CheckKind::ImportStarUsage.code())
                 {
                     for alias in names {
-                        if alias.name == "*" {
+                        if alias.node.name == "*" {
                             self.checks.push(Check {
                                 kind: CheckKind::ImportStarUsage,
                                 location: stmt.location,
@@ -218,7 +218,7 @@ pub fn check_ast(python_ast: &Suite, settings: &Settings) -> Vec<Check> {
 mod tests {
     use std::collections::BTreeSet;
 
-    use rustpython_parser::ast::{Alias, Location, Stmt, StmtKind};
+    use rustpython_parser::ast::{Alias, AliasData, Location, Stmt, StmtKind};
 
     use crate::check_ast::Checker;
     use crate::checks::CheckKind::ImportStarUsage;
@@ -239,11 +239,14 @@ mod tests {
             custom: (),
             node: StmtKind::ImportFrom {
                 module: Some("bar".to_string()),
-                names: vec![Alias {
-                    name: "*".to_string(),
-                    asname: None,
-                }],
-                level: 0,
+                names: vec![Alias::new(
+                    Default::default(),
+                    AliasData {
+                        name: "*".to_string(),
+                        asname: None,
+                    },
+                )],
+                level: None,
             },
         });
 
