@@ -1,7 +1,9 @@
 use rustpython_bytecode::CodeObject;
 use rustpython_compiler_core::{compile, symboltable};
-use rustpython_parser::ast::{fold::Fold, ConstantOptimizer, Location};
-use rustpython_parser::parser;
+use rustpython_parser::{
+    ast::{fold::Fold, ConstantOptimizer, Location},
+    parser,
+};
 use std::fmt;
 
 pub use compile::{CompileOpts, Mode};
