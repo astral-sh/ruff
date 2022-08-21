@@ -2,7 +2,7 @@
 name = "rustpython-parser"
 version = "0.1.2"
 description = "Parser for python code."
-authors = [ "RustPython Team" ]
+authors = ["RustPython Team"]
 build = "build.rs"
 repository = "https://github.com/RustPython/RustPython"
 license = "MIT"
@@ -15,6 +15,8 @@ phf_codegen = "0.10"
 tiny-keccak = { version = "2", features = ["sha3"] }
 
 [dependencies]
+rustpython-ast = { path = "../ast" }
+
 ahash = "0.7.6"
 itertools = "0.10.3"
 lalrpop-util = "0.19.8"
@@ -22,7 +24,6 @@ log = "0.4.16"
 num-bigint = "0.4.3"
 num-traits = "0.2.14"
 phf = "0.10.1"
-rustpython-ast = { path = "../ast" }
 unic-emoji-char = "0.9.0"
 unic-ucd-ident  = "0.9.0"
 unicode_names2 = "0.5.0"

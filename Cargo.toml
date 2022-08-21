@@ -6,8 +6,8 @@ authors = ["RustPython Team"]
 edition = "2021"
 
 [dependencies]
+rustpython-bytecode = { path = "bytecode" }
 rustpython-codegen = { path = "codegen" }
 rustpython-parser = { path = "parser" }
-rustpython-bytecode = { path = "bytecode" }
 
 thiserror = "1.0"
