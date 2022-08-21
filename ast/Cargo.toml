@@ -12,5 +12,5 @@ unparse = ["rustpython-common"]
 
 [dependencies]
 num-bigint = "0.4.3"
-rustpython-bytecode = { path = "../bytecode" }
+rustpython-compiler-core = { path = "../core" }
 rustpython-common = { path = "../../common", optional = true }

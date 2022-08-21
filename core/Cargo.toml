@@ -1,5 +1,5 @@
 [package]
-name = "rustpython-bytecode"
+name = "rustpython-compiler-core"
 description = "RustPython specific bytecode."
 version = "0.1.2"
 authors = ["RustPython Team"]

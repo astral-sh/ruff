@@ -1,12 +1,6 @@
 //! Implement python as a virtual machine with bytecodes. This module
 //! implements bytecode structure.
 
-#![doc(html_logo_url = "https://raw.githubusercontent.com/RustPython/RustPython/main/logo.png")]
-#![doc(html_root_url = "https://docs.rs/rustpython-bytecode/")]
-
-mod mode;
-pub use mode::Mode;
-
 use bitflags::bitflags;
 use bstr::ByteSlice;
 use itertools::Itertools;
@@ -27,7 +21,7 @@ impl Location {
     ///
     /// # Example
     /// ```
-    /// use rustpython_bytecode::Location;
+    /// use rustpython_compiler_core::Location;
     /// let loc = Location::new(10, 10);
     /// ```
     pub fn new(row: usize, column: usize) -> Self {
@@ -433,7 +427,7 @@ bitflags! {
 ///
 /// # Examples
 /// ```
-/// use rustpython_bytecode::ConstantData;
+/// use rustpython_compiler_core::ConstantData;
 /// let a = ConstantData::Float {value: 120f64};
 /// let b = ConstantData::Boolean {value: false};
 /// assert_ne!(a, b);
@@ -599,8 +593,8 @@ pub enum TestOperator {
 /// # Examples
 ///
 /// ```
-/// use rustpython_bytecode::Instruction::BinaryOperation;
-/// use rustpython_bytecode::BinaryOperator::Add;
+/// use rustpython_compiler_core::Instruction::BinaryOperation;
+/// use rustpython_compiler_core::BinaryOperator::Add;
 /// let op = BinaryOperation {op: Add};
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -943,7 +937,7 @@ impl Instruction {
     /// # Examples
     ///
     /// ```
-    /// use rustpython_bytecode::{Instruction, Label};
+    /// use rustpython_compiler_core::{Instruction, Label};
     /// let label = Label(0xF);
     /// let jump_inst = Instruction::Jump {target: label};
     /// assert!(jump_inst.unconditional_branch())
@@ -960,7 +954,7 @@ impl Instruction {
     /// # Examples
     ///
     /// ```
-    /// use rustpython_bytecode::{Instruction, Label, UnaryOperator};
+    /// use rustpython_compiler_core::{Instruction, Label, UnaryOperator};
     /// let jump_instruction = Instruction::Jump {target: Label(0xF)};
     /// let invert_instruction = Instruction::UnaryOperation {op: UnaryOperator::Invert};
     /// assert_eq!(jump_instruction.stack_effect(true), 0);

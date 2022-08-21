@@ -6,7 +6,7 @@ authors = ["RustPython Team"]
 edition = "2021"
 
 [dependencies]
-rustpython-bytecode = { path = "bytecode" }
+rustpython-compiler-core = { path = "core" }
 rustpython-codegen = { path = "codegen" }
 rustpython-parser = { path = "parser" }
 
