@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use crate::check_ast::ScopeKind::{Class, Function, Generator, Module};
 use rustpython_parser::ast::{Arg, Arguments, Expr, ExprKind, Stmt, StmtKind, Suite};
 
 use crate::checks::{Check, CheckKind};
@@ -7,9 +8,21 @@ use crate::settings::Settings;
 use crate::visitor;
 use crate::visitor::Visitor;
 
+enum ScopeKind {
+    Class,
+    Function,
+    Generator,
+    Module,
+}
+
+struct Scope {
+    kind: ScopeKind,
+}
+
 struct Checker<'a> {
     settings: &'a Settings,
     checks: Vec<Check>,
+    scopes: Vec<Scope>,
 }
 
 impl Checker<'_> {
@@ -17,6 +30,7 @@ impl Checker<'_> {
         Checker {
             settings,
             checks: vec![],
+            scopes: vec![Scope { kind: Module }],
         }
     }
 }
@@ -24,6 +38,28 @@ impl Checker<'_> {
 impl Visitor for Checker<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match &stmt.node {
+            StmtKind::FunctionDef { .. } => self.scopes.push(Scope { kind: Function }),
+            StmtKind::AsyncFunctionDef { .. } => self.scopes.push(Scope { kind: Function }),
+            StmtKind::Return { .. } => {
+                if self
+                    .settings
+                    .select
+                    .contains(CheckKind::ReturnOutsideFunction.code())
+                {
+                    if let Some(scope) = self.scopes.last() {
+                        match scope.kind {
+                            Class | Module => {
+                                self.checks.push(Check {
+                                    kind: CheckKind::ReturnOutsideFunction,
+                                    location: stmt.location,
+                                });
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            StmtKind::ClassDef { .. } => self.scopes.push(Scope { kind: Class }),
             StmtKind::ImportFrom { names, .. } => {
                 if self
                     .settings
@@ -85,18 +121,29 @@ impl Visitor for Checker<'_> {
         }
 
         visitor::walk_stmt(self, stmt);
+
+        match &stmt.node {
+            StmtKind::ClassDef { .. }
+            | StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. } => {
+                self.scopes.pop();
+            }
+            _ => {}
+        };
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
-        if self
-            .settings
-            .select
-            .contains(CheckKind::FStringMissingPlaceholders.code())
-        {
-            if let ExprKind::JoinedStr { values } = &expr.node {
-                if !values
-                    .iter()
-                    .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
+        match &expr.node {
+            ExprKind::GeneratorExp { .. } => self.scopes.push(Scope { kind: Generator }),
+            ExprKind::Lambda { .. } => self.scopes.push(Scope { kind: Function }),
+            ExprKind::JoinedStr { values } => {
+                if self
+                    .settings
+                    .select
+                    .contains(CheckKind::FStringMissingPlaceholders.code())
+                    && !values
+                        .iter()
+                        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
                 {
                     self.checks.push(Check {
                         kind: CheckKind::FStringMissingPlaceholders,
@@ -104,9 +151,17 @@ impl Visitor for Checker<'_> {
                     });
                 }
             }
-        }
+            _ => {}
+        };
 
         visitor::walk_expr(self, expr);
+
+        match &expr.node {
+            ExprKind::GeneratorExp { .. } | ExprKind::Lambda { .. } => {
+                self.scopes.pop();
+            }
+            _ => {}
+        };
     }
 
     fn visit_arguments(&mut self, arguments: &Arguments) {
