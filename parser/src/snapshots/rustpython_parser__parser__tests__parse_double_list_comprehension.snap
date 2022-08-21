@@ -1,0 +1,178 @@
+---
+source: parser/src/parser.rs
+expression: parse_ast
+---
+Located {
+    location: Location {
+        row: 1,
+        column: 1,
+    },
+    custom: (),
+    node: ListComp {
+        elt: Located {
+            location: Location {
+                row: 1,
+                column: 2,
+            },
+            custom: (),
+            node: Name {
+                id: "x",
+                ctx: Load,
+            },
+        },
+        generators: [
+            Comprehension {
+                target: Located {
+                    location: Location {
+                        row: 1,
+                        column: 8,
+                    },
+                    custom: (),
+                    node: Tuple {
+                        elts: [
+                            Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 8,
+                                },
+                                custom: (),
+                                node: Name {
+                                    id: "y",
+                                    ctx: Load,
+                                },
+                            },
+                            Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 11,
+                                },
+                                custom: (),
+                                node: Name {
+                                    id: "y2",
+                                    ctx: Load,
+                                },
+                            },
+                        ],
+                        ctx: Load,
+                    },
+                },
+                iter: Located {
+                    location: Location {
+                        row: 1,
+                        column: 17,
+                    },
+                    custom: (),
+                    node: Name {
+                        id: "z",
+                        ctx: Load,
+                    },
+                },
+                ifs: [],
+                is_async: 0,
+            },
+            Comprehension {
+                target: Located {
+                    location: Location {
+                        row: 1,
+                        column: 23,
+                    },
+                    custom: (),
+                    node: Name {
+                        id: "a",
+                        ctx: Load,
+                    },
+                },
+                iter: Located {
+                    location: Location {
+                        row: 1,
+                        column: 28,
+                    },
+                    custom: (),
+                    node: Name {
+                        id: "b",
+                        ctx: Load,
+                    },
+                },
+                ifs: [
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 35,
+                        },
+                        custom: (),
+                        node: Compare {
+                            left: Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 33,
+                                },
+                                custom: (),
+                                node: Name {
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            },
+                            ops: [
+                                Lt,
+                            ],
+                            comparators: [
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 37,
+                                    },
+                                    custom: (),
+                                    node: Constant {
+                                        value: Int(
+                                            5,
+                                        ),
+                                        kind: None,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 44,
+                        },
+                        custom: (),
+                        node: Compare {
+                            left: Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 42,
+                                },
+                                custom: (),
+                                node: Name {
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            },
+                            ops: [
+                                Gt,
+                            ],
+                            comparators: [
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 46,
+                                    },
+                                    custom: (),
+                                    node: Constant {
+                                        value: Int(
+                                            10,
+                                        ),
+                                        kind: None,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                ],
+                is_async: 0,
+            },
+        ],
+    },
+}

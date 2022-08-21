@@ -1,0 +1,30 @@
+---
+source: parser/src/string.rs
+expression: parse_ast
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 3,
+        },
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 3,
+                },
+                custom: (),
+                node: Constant {
+                    value: Str(
+                        "Hello world",
+                    ),
+                    kind: Some(
+                        "u",
+                    ),
+                },
+            },
+        },
+    },
+]

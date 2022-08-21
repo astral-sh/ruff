@@ -1,0 +1,51 @@
+---
+source: parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 1,
+        },
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 6,
+                },
+                custom: (),
+                node: Call {
+                    func: Located {
+                        location: Location {
+                            row: 1,
+                            column: 1,
+                        },
+                        custom: (),
+                        node: Name {
+                            id: "print",
+                            ctx: Load,
+                        },
+                    },
+                    args: [
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 8,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Str(
+                                    "Hello world",
+                                ),
+                                kind: None,
+                            },
+                        },
+                    ],
+                    keywords: [],
+                },
+            },
+        },
+    },
+]

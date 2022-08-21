@@ -1,0 +1,16 @@
+[package]
+name = "rustpython-ast"
+version = "0.1.0"
+authors = ["RustPython Team"]
+edition = "2021"
+
+[features]
+default = ["constant-optimization", "fold"]
+constant-optimization = ["fold"]
+fold = []
+unparse = ["rustpython-common"]
+
+[dependencies]
+num-bigint = "0.4.3"
+rustpython-common = { path = "../../common", optional = true }
+rustpython-bytecode = { path = "../bytecode"}

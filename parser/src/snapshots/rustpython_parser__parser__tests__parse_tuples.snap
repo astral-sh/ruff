@@ -1,0 +1,91 @@
+---
+source: parser/src/parser.rs
+expression: parse_program(&source).unwrap()
+
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 1,
+        },
+        custom: (),
+        node: Assign {
+            targets: [
+                Located {
+                    location: Location {
+                        row: 1,
+                        column: 1,
+                    },
+                    custom: (),
+                    node: Tuple {
+                        elts: [
+                            Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 1,
+                                },
+                                custom: (),
+                                node: Name {
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            },
+                            Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 4,
+                                },
+                                custom: (),
+                                node: Name {
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            },
+                        ],
+                        ctx: Load,
+                    },
+                },
+            ],
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 8,
+                },
+                custom: (),
+                node: Tuple {
+                    elts: [
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 8,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    4,
+                                ),
+                                kind: None,
+                            },
+                        },
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 11,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    5,
+                                ),
+                                kind: None,
+                            },
+                        },
+                    ],
+                    ctx: Load,
+                },
+            },
+            type_comment: None,
+        },
+    },
+]

@@ -1,0 +1,78 @@
+---
+source: parser/src/parser.rs
+expression: parse_ast
+
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 1,
+        },
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 8,
+                },
+                custom: (),
+                node: Call {
+                    func: Located {
+                        location: Location {
+                            row: 1,
+                            column: 1,
+                        },
+                        custom: (),
+                        node: Name {
+                            id: "my_func",
+                            ctx: Load,
+                        },
+                    },
+                    args: [
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 10,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Str(
+                                    "positional",
+                                ),
+                                kind: None,
+                            },
+                        },
+                    ],
+                    keywords: [
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 23,
+                            },
+                            custom: (),
+                            node: KeywordData {
+                                arg: Some(
+                                    "keyword",
+                                ),
+                                value: Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 31,
+                                    },
+                                    custom: (),
+                                    node: Constant {
+                                        value: Int(
+                                            2,
+                                        ),
+                                        kind: None,
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+            },
+        },
+    },
+]

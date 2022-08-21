@@ -1,0 +1,90 @@
+---
+source: parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 1,
+        },
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 1,
+                },
+                custom: (),
+                node: Lambda {
+                    args: Arguments {
+                        posonlyargs: [],
+                        args: [
+                            Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 8,
+                                },
+                                custom: (),
+                                node: ArgData {
+                                    arg: "x",
+                                    annotation: None,
+                                    type_comment: None,
+                                },
+                            },
+                            Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 11,
+                                },
+                                custom: (),
+                                node: ArgData {
+                                    arg: "y",
+                                    annotation: None,
+                                    type_comment: None,
+                                },
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kw_defaults: [],
+                        kwarg: None,
+                        defaults: [],
+                    },
+                    body: Located {
+                        location: Location {
+                            row: 1,
+                            column: 16,
+                        },
+                        custom: (),
+                        node: BinOp {
+                            left: Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 14,
+                                },
+                                custom: (),
+                                node: Name {
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            },
+                            op: Mult,
+                            right: Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 18,
+                                },
+                                custom: (),
+                                node: Name {
+                                    id: "y",
+                                    ctx: Load,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+]

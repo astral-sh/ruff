@@ -1,0 +1,125 @@
+---
+source: parser/src/parser.rs
+expression: parse_ast
+
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 1,
+        },
+        custom: (),
+        node: If {
+            test: Located {
+                location: Location {
+                    row: 1,
+                    column: 4,
+                },
+                custom: (),
+                node: Constant {
+                    value: Int(
+                        1,
+                    ),
+                    kind: None,
+                },
+            },
+            body: [
+                Located {
+                    location: Location {
+                        row: 1,
+                        column: 7,
+                    },
+                    custom: (),
+                    node: Expr {
+                        value: Located {
+                            location: Location {
+                                row: 1,
+                                column: 7,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    10,
+                                ),
+                                kind: None,
+                            },
+                        },
+                    },
+                },
+            ],
+            orelse: [
+                Located {
+                    location: Location {
+                        row: 2,
+                        column: 1,
+                    },
+                    custom: (),
+                    node: If {
+                        test: Located {
+                            location: Location {
+                                row: 2,
+                                column: 6,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    2,
+                                ),
+                                kind: None,
+                            },
+                        },
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 2,
+                                    column: 9,
+                                },
+                                custom: (),
+                                node: Expr {
+                                    value: Located {
+                                        location: Location {
+                                            row: 2,
+                                            column: 9,
+                                        },
+                                        custom: (),
+                                        node: Constant {
+                                            value: Int(
+                                                20,
+                                            ),
+                                            kind: None,
+                                        },
+                                    },
+                                },
+                            },
+                        ],
+                        orelse: [
+                            Located {
+                                location: Location {
+                                    row: 3,
+                                    column: 7,
+                                },
+                                custom: (),
+                                node: Expr {
+                                    value: Located {
+                                        location: Location {
+                                            row: 3,
+                                            column: 7,
+                                        },
+                                        custom: (),
+                                        node: Constant {
+                                            value: Int(
+                                                30,
+                                            ),
+                                            kind: None,
+                                        },
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
+    },
+]

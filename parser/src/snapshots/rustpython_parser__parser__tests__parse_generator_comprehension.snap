@@ -1,0 +1,52 @@
+---
+source: parser/src/parser.rs
+expression: parse_ast
+---
+Located {
+    location: Location {
+        row: 1,
+        column: 1,
+    },
+    custom: (),
+    node: GeneratorExp {
+        elt: Located {
+            location: Location {
+                row: 1,
+                column: 2,
+            },
+            custom: (),
+            node: Name {
+                id: "x",
+                ctx: Load,
+            },
+        },
+        generators: [
+            Comprehension {
+                target: Located {
+                    location: Location {
+                        row: 1,
+                        column: 8,
+                    },
+                    custom: (),
+                    node: Name {
+                        id: "y",
+                        ctx: Load,
+                    },
+                },
+                iter: Located {
+                    location: Location {
+                        row: 1,
+                        column: 13,
+                    },
+                    custom: (),
+                    node: Name {
+                        id: "z",
+                        ctx: Load,
+                    },
+                },
+                ifs: [],
+                is_async: 0,
+            },
+        ],
+    },
+}

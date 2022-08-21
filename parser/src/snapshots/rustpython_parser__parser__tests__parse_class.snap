@@ -1,0 +1,160 @@
+---
+source: parser/src/parser.rs
+expression: parse_program(&source).unwrap()
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 1,
+        },
+        custom: (),
+        node: ClassDef {
+            name: "Foo",
+            bases: [
+                Located {
+                    location: Location {
+                        row: 1,
+                        column: 11,
+                    },
+                    custom: (),
+                    node: Name {
+                        id: "A",
+                        ctx: Load,
+                    },
+                },
+                Located {
+                    location: Location {
+                        row: 1,
+                        column: 14,
+                    },
+                    custom: (),
+                    node: Name {
+                        id: "B",
+                        ctx: Load,
+                    },
+                },
+            ],
+            keywords: [],
+            body: [
+                Located {
+                    location: Location {
+                        row: 2,
+                        column: 2,
+                    },
+                    custom: (),
+                    node: FunctionDef {
+                        name: "__init__",
+                        args: Arguments {
+                            posonlyargs: [],
+                            args: [
+                                Located {
+                                    location: Location {
+                                        row: 2,
+                                        column: 15,
+                                    },
+                                    custom: (),
+                                    node: ArgData {
+                                        arg: "self",
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kw_defaults: [],
+                            kwarg: None,
+                            defaults: [],
+                        },
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 3,
+                                    column: 3,
+                                },
+                                custom: (),
+                                node: Pass,
+                            },
+                        ],
+                        decorator_list: [],
+                        returns: None,
+                        type_comment: None,
+                    },
+                },
+                Located {
+                    location: Location {
+                        row: 4,
+                        column: 2,
+                    },
+                    custom: (),
+                    node: FunctionDef {
+                        name: "method_with_default",
+                        args: Arguments {
+                            posonlyargs: [],
+                            args: [
+                                Located {
+                                    location: Location {
+                                        row: 4,
+                                        column: 26,
+                                    },
+                                    custom: (),
+                                    node: ArgData {
+                                        arg: "self",
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                },
+                                Located {
+                                    location: Location {
+                                        row: 4,
+                                        column: 32,
+                                    },
+                                    custom: (),
+                                    node: ArgData {
+                                        arg: "arg",
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kw_defaults: [],
+                            kwarg: None,
+                            defaults: [
+                                Located {
+                                    location: Location {
+                                        row: 4,
+                                        column: 37,
+                                    },
+                                    custom: (),
+                                    node: Constant {
+                                        value: Str(
+                                            "default",
+                                        ),
+                                        kind: None,
+                                    },
+                                },
+                            ],
+                        },
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 5,
+                                    column: 3,
+                                },
+                                custom: (),
+                                node: Pass,
+                            },
+                        ],
+                        decorator_list: [],
+                        returns: None,
+                        type_comment: None,
+                    },
+                },
+            ],
+            decorator_list: [],
+        },
+    },
+]
