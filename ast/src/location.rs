@@ -4,14 +4,24 @@ use std::fmt;
 
 /// A location somewhere in the sourcecode.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Location {
-    row: usize,
-    column: usize,
+pub struct Location(rustpython_compiler_core::Location);
+
+impl std::ops::Deref for Location {
+    type Target = rustpython_compiler_core::Location;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Location {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "line {} column {}", self.row, self.column)
+        write!(f, "line {} column {}", self.row(), self.column())
     }
 }
 
@@ -33,7 +43,7 @@ impl Location {
                     "{}\n{}{arrow:>pad$}",
                     self.desc,
                     self.line,
-                    pad = self.loc.column,
+                    pad = self.loc.column(),
                     arrow = "^",
                 )
             }
@@ -48,32 +58,6 @@ impl Location {
 
 impl Location {
     pub fn new(row: usize, column: usize) -> Self {
-        Location { row, column }
-    }
-
-    pub fn row(&self) -> usize {
-        self.row
-    }
-
-    pub fn column(&self) -> usize {
-        self.column
-    }
-
-    pub fn reset(&mut self) {
-        self.row = 1;
-        self.column = 1;
-    }
-
-    pub fn go_right(&mut self) {
-        self.column += 1;
-    }
-
-    pub fn go_left(&mut self) {
-        self.column -= 1;
-    }
-
-    pub fn newline(&mut self) {
-        self.row += 1;
-        self.column = 1;
+        Location(rustpython_compiler_core::Location::new(row, column))
     }
 }

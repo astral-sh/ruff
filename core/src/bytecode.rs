@@ -1,6 +1,7 @@
 //! Implement python as a virtual machine with bytecodes. This module
 //! implements bytecode structure.
 
+use crate::Location;
 use bitflags::bitflags;
 use bstr::ByteSlice;
 use itertools::Itertools;
@@ -8,38 +9,6 @@ use num_bigint::BigInt;
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, fmt, hash};
-
-/// Sourcecode location.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Location {
-    row: u32,
-    column: u32,
-}
-
-impl Location {
-    /// Creates a new Location object at the given row and column.
-    ///
-    /// # Example
-    /// ```
-    /// use rustpython_compiler_core::Location;
-    /// let loc = Location::new(10, 10);
-    /// ```
-    pub fn new(row: usize, column: usize) -> Self {
-        let row = row.try_into().expect("Location::row over u32");
-        let column = column.try_into().expect("Location::column over u32");
-        Location { row, column }
-    }
-
-    /// Current row
-    pub fn row(&self) -> usize {
-        self.row as usize
-    }
-
-    /// Current column
-    pub fn column(&self) -> usize {
-        self.column as usize
-    }
-}
 
 pub trait Constant: Sized {
     type Name: AsRef<str>;
