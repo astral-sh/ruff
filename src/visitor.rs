@@ -230,6 +230,10 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_stmt(stmt)
             }
         }
+        StmtKind::Match { subject, .. } => {
+            // TODO(charlie): Handle `cases`.
+            visitor.visit_expr(subject);
+        }
         StmtKind::Raise { exc, cause } => {
             if let Some(expr) = exc {
                 visitor.visit_expr(expr)
@@ -326,7 +330,7 @@ pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
             visitor.visit_expr(orelse);
         }
         ExprKind::Dict { keys, values } => {
-            for expr in keys.iter().flatten() {
+            for expr in keys {
                 visitor.visit_expr(expr)
             }
             for expr in values {
@@ -505,7 +509,7 @@ pub fn walk_arguments<V: Visitor + ?Sized>(visitor: &mut V, arguments: &Argument
     for arg in &arguments.kwonlyargs {
         visitor.visit_arg(arg);
     }
-    for expr in arguments.kw_defaults.iter().flatten() {
+    for expr in &arguments.kw_defaults {
         visitor.visit_expr(expr)
     }
     if let Some(arg) = &arguments.kwarg {
