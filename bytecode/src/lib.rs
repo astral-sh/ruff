@@ -4,6 +4,9 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/RustPython/RustPython/main/logo.png")]
 #![doc(html_root_url = "https://docs.rs/rustpython-bytecode/")]
 
+mod mode;
+pub use mode::Mode;
+
 use bitflags::bitflags;
 use bstr::ByteSlice;
 use itertools::Itertools;
