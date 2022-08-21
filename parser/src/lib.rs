@@ -11,7 +11,7 @@
 //! use rustpython_parser::{parser, ast};
 //!
 //! let python_source = "print('Hello world')";
-//! let python_ast = parser::parse_expression(python_source).unwrap();
+//! let python_ast = parser::parse_expression(python_source, "<embedded>").unwrap();
 //!
 //! ```
 

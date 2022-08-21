@@ -88,56 +88,56 @@ mod tests {
     #[test]
     fn test_parse_string_concat() {
         let source = String::from("'Hello ' 'world'");
-        let parse_ast = parse_program(&source).unwrap();
+        let parse_ast = parse_program(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_u_string_concat_1() {
         let source = String::from("'Hello ' u'world'");
-        let parse_ast = parse_program(&source).unwrap();
+        let parse_ast = parse_program(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_u_string_concat_2() {
         let source = String::from("u'Hello ' 'world'");
-        let parse_ast = parse_program(&source).unwrap();
+        let parse_ast = parse_program(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_f_string_concat_1() {
         let source = String::from("'Hello ' f'world'");
-        let parse_ast = parse_program(&source).unwrap();
+        let parse_ast = parse_program(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_f_string_concat_2() {
         let source = String::from("'Hello ' f'world'");
-        let parse_ast = parse_program(&source).unwrap();
+        let parse_ast = parse_program(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_f_string_concat_3() {
         let source = String::from("'Hello ' f'world{\"!\"}'");
-        let parse_ast = parse_program(&source).unwrap();
+        let parse_ast = parse_program(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_u_f_string_concat_1() {
         let source = String::from("u'Hello ' f'world'");
-        let parse_ast = parse_program(&source).unwrap();
+        let parse_ast = parse_program(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_u_f_string_concat_2() {
         let source = String::from("u'Hello ' f'world' '!'");
-        let parse_ast = parse_program(&source).unwrap();
+        let parse_ast = parse_program(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 }

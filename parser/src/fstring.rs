@@ -293,7 +293,7 @@ impl<'a> FStringParser<'a> {
 
 fn parse_fstring_expr(source: &str) -> Result<Expr, ParseError> {
     let fstring_body = format!("({})", source);
-    parse_expression(&fstring_body)
+    parse_expression(&fstring_body, "<fstring>")
 }
 
 /// Parse an fstring from a string, located at a certain position in the sourcecode.

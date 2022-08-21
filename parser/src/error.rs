@@ -124,6 +124,7 @@ impl From<FStringError> for LalrpopError<Location, Tok, LexicalError> {
 pub struct ParseError {
     pub error: ParseErrorType,
     pub location: Location,
+    pub source_path: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -141,21 +142,28 @@ pub enum ParseErrorType {
 }
 
 /// Convert `lalrpop_util::ParseError` to our internal type
-impl From<LalrpopError<Location, Tok, LexicalError>> for ParseError {
-    fn from(err: LalrpopError<Location, Tok, LexicalError>) -> Self {
+impl ParseError {
+    pub(crate) fn from_lalrpop(
+        err: LalrpopError<Location, Tok, LexicalError>,
+        source_path: &str,
+    ) -> Self {
+        let source_path = source_path.to_owned();
         match err {
             // TODO: Are there cases where this isn't an EOF?
             LalrpopError::InvalidToken { location } => ParseError {
                 error: ParseErrorType::Eof,
                 location,
+                source_path,
             },
             LalrpopError::ExtraToken { token } => ParseError {
                 error: ParseErrorType::ExtraToken(token.1),
                 location: token.0,
+                source_path,
             },
             LalrpopError::User { error } => ParseError {
                 error: ParseErrorType::Lexical(error.error),
                 location: error.location,
+                source_path,
             },
             LalrpopError::UnrecognizedToken { token, expected } => {
                 // Hacky, but it's how CPython does it. See PyParser_AddToken,
@@ -164,11 +172,13 @@ impl From<LalrpopError<Location, Tok, LexicalError>> for ParseError {
                 ParseError {
                     error: ParseErrorType::UnrecognizedToken(token.1, expected),
                     location: token.0,
+                    source_path,
                 }
             }
             LalrpopError::UnrecognizedEOF { location, .. } => ParseError {
                 error: ParseErrorType::Eof,
                 location,
+                source_path,
             },
         }
     }
