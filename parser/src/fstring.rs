@@ -4,6 +4,7 @@ use crate::{
     error::{FStringError, FStringErrorType, ParseError},
     parser::parse_expression,
 };
+use itertools::Itertools;
 use std::{iter, mem, str};
 
 struct FStringParser<'a> {
@@ -105,13 +106,16 @@ impl<'a> FStringParser<'a> {
                                 nested -= 1;
                                 if nested == 0 {
                                     formatted_value_piece.push(next);
-                                    spec_constructor.extend(
-                                        FStringParser::new(
-                                            &format!("{{{}}}", formatted_value_piece),
-                                            Location::default(),
-                                            &self.recurse_lvl + 1,
-                                        )
-                                        .parse()?,
+                                    let values = FStringParser::new(
+                                        &formatted_value_piece,
+                                        Location::default(),
+                                        &self.recurse_lvl + 1,
+                                    )
+                                    .parse()?;
+                                    spec_constructor.push(values
+                                        .into_iter()
+                                        .exactly_one()
+                                        .expect("Expected formatted value to produce exactly one expression.")
                                     );
                                     formatted_value_piece.clear();
                                 } else {

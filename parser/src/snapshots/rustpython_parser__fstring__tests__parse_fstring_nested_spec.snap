@@ -1,5 +1,5 @@
 ---
-source: parser/src/fstring.rs
+source: compiler/parser/src/fstring.rs
 expression: parse_ast
 ---
 [
@@ -37,11 +37,20 @@ expression: parse_ast
                                     column: 0,
                                 },
                                 custom: (),
-                                node: Constant {
-                                    value: Str(
-                                        "{ spec}",
-                                    ),
-                                    kind: None,
+                                node: FormattedValue {
+                                    value: Located {
+                                        location: Location {
+                                            row: 1,
+                                            column: 3,
+                                        },
+                                        custom: (),
+                                        node: Name {
+                                            id: "spec",
+                                            ctx: Load,
+                                        },
+                                    },
+                                    conversion: 0,
+                                    format_spec: None,
                                 },
                             },
                         ],
