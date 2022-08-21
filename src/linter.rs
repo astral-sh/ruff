@@ -66,10 +66,7 @@ mod tests {
     use anyhow::Result;
     use rustpython_parser::ast::Location;
 
-    use crate::checks::CheckCode;
-    use crate::checks::CheckKind::{
-        DuplicateArgumentName, FStringMissingPlaceholders, IfTuple, ImportStarUsage, LineTooLong,
-    };
+    use crate::checks::{CheckCode, CheckKind};
     use crate::linter::check_path;
     use crate::message::Message;
     use crate::{cache, settings};
@@ -87,17 +84,17 @@ mod tests {
         )?;
         let expected = vec![
             Message {
-                kind: DuplicateArgumentName,
+                kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(1, 25),
                 filename: "./resources/test/src/duplicate_argument_name.py".to_string(),
             },
             Message {
-                kind: DuplicateArgumentName,
+                kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(5, 28),
                 filename: "./resources/test/src/duplicate_argument_name.py".to_string(),
             },
             Message {
-                kind: DuplicateArgumentName,
+                kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(9, 27),
                 filename: "./resources/test/src/duplicate_argument_name.py".to_string(),
             },
@@ -123,17 +120,17 @@ mod tests {
         )?;
         let expected = vec![
             Message {
-                kind: FStringMissingPlaceholders,
+                kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(4, 7),
                 filename: "./resources/test/src/f_string_missing_placeholders.py".to_string(),
             },
             Message {
-                kind: FStringMissingPlaceholders,
+                kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(5, 7),
                 filename: "./resources/test/src/f_string_missing_placeholders.py".to_string(),
             },
             Message {
-                kind: FStringMissingPlaceholders,
+                kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(7, 7),
                 filename: "./resources/test/src/f_string_missing_placeholders.py".to_string(),
             },
@@ -159,12 +156,12 @@ mod tests {
         )?;
         let expected = vec![
             Message {
-                kind: IfTuple,
+                kind: CheckKind::IfTuple,
                 location: Location::new(1, 1),
                 filename: "./resources/test/src/if_tuple.py".to_string(),
             },
             Message {
-                kind: IfTuple,
+                kind: CheckKind::IfTuple,
                 location: Location::new(7, 5),
                 filename: "./resources/test/src/if_tuple.py".to_string(),
             },
@@ -190,14 +187,45 @@ mod tests {
         )?;
         let expected = vec![
             Message {
-                kind: ImportStarUsage,
+                kind: CheckKind::ImportStarUsage,
                 location: Location::new(1, 1),
                 filename: "./resources/test/src/import_star_usage.py".to_string(),
             },
             Message {
-                kind: ImportStarUsage,
+                kind: CheckKind::ImportStarUsage,
                 location: Location::new(2, 1),
                 filename: "./resources/test/src/import_star_usage.py".to_string(),
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn raise_not_implemented() -> Result<()> {
+        let actual = check_path(
+            &Path::new("./resources/test/src/raise_not_implemented.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F901]),
+            },
+            &cache::Mode::None,
+        )?;
+        let expected = vec![
+            Message {
+                kind: CheckKind::RaiseNotImplemented,
+                location: Location::new(2, 5),
+                filename: "./resources/test/src/raise_not_implemented.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::RaiseNotImplemented,
+                location: Location::new(6, 5),
+                filename: "./resources/test/src/raise_not_implemented.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -220,7 +248,7 @@ mod tests {
             &cache::Mode::None,
         )?;
         let expected = vec![Message {
-            kind: LineTooLong,
+            kind: CheckKind::LineTooLong,
             location: Location::new(5, 89),
             filename: "./resources/test/src/line_too_long.py".to_string(),
         }];
