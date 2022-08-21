@@ -206,6 +206,37 @@ mod tests {
     }
 
     #[test]
+    fn return_outside_function() -> Result<()> {
+        let actual = check_path(
+            &Path::new("./resources/test/src/return_outside_function.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F706]),
+            },
+            &cache::Mode::None,
+        )?;
+        let expected = vec![
+            Message {
+                kind: CheckKind::ReturnOutsideFunction,
+                location: Location::new(6, 5),
+                filename: "./resources/test/src/return_outside_function.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::ReturnOutsideFunction,
+                location: Location::new(9, 1),
+                filename: "./resources/test/src/return_outside_function.py".to_string(),
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn raise_not_implemented() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/raise_not_implemented.py"),
