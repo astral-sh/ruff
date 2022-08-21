@@ -50,6 +50,37 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
+            StmtKind::Raise { exc, .. } => {
+                if self
+                    .settings
+                    .select
+                    .contains(CheckKind::RaiseNotImplemented.code())
+                {
+                    if let Some(expr) = exc {
+                        match &expr.node {
+                            ExprKind::Call { func, .. } => {
+                                if let ExprKind::Name { id, .. } = &func.node {
+                                    if id == "NotImplemented" {
+                                        self.checks.push(Check {
+                                            kind: CheckKind::RaiseNotImplemented,
+                                            location: stmt.location,
+                                        });
+                                    }
+                                }
+                            }
+                            ExprKind::Name { id, .. } => {
+                                if id == "NotImplemented" {
+                                    self.checks.push(Check {
+                                        kind: CheckKind::RaiseNotImplemented,
+                                        location: stmt.location,
+                                    });
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
             _ => {}
         }
 
