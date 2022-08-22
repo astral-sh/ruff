@@ -186,7 +186,7 @@ impl<'a> FStringParser<'a> {
                         vec![self.expr(ExprKind::FormattedValue {
                             value: Box::new(
                                 parse_fstring_expr(&expression)
-                                    .map_err(|e| InvalidExpression(Box::new(e.into())))?,
+                                    .map_err(|e| InvalidExpression(Box::new(e.error)))?,
                             ),
                             conversion: conversion as _,
                             format_spec: spec,
@@ -204,7 +204,7 @@ impl<'a> FStringParser<'a> {
                             self.expr(ExprKind::FormattedValue {
                                 value: Box::new(
                                     parse_fstring_expr(&expression)
-                                        .map_err(|e| InvalidExpression(Box::new(e.into())))?,
+                                        .map_err(|e| InvalidExpression(Box::new(e.error)))?,
                                 ),
                                 conversion: (if conversion == ConversionFlag::None && spec.is_none()
                                 {

@@ -1,6 +1,5 @@
-use std::fmt::Display;
-
 use crate::Location;
+use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BaseError<T> {
@@ -86,4 +85,25 @@ where
             loc.fmt_with(f, &self.error)
         }
     }
+}
+
+impl<T> CompileError<T> {
+    pub fn from<U>(error: BaseError<U>, source: &str) -> Self
+    where
+        T: From<U>,
+    {
+        let statement = get_statement(source, error.location);
+        CompileError {
+            body: error.into(),
+            statement,
+        }
+    }
+}
+
+fn get_statement(source: &str, loc: Location) -> Option<String> {
+    if loc.column() == 0 || loc.row() == 0 {
+        return None;
+    }
+    let line = source.split('\n').nth(loc.row() - 1)?.to_owned();
+    Some(line + "\n")
 }

@@ -74,7 +74,7 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
 
     python::TopParser::new()
         .parse(tokenizer)
-        .map_err(|e| ParseError::from_lalrpop(e, source_path))
+        .map_err(|e| crate::error::parse_error_from_lalrpop(e, source_path))
 }
 
 #[cfg(test)]
