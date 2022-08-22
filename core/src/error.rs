@@ -16,14 +16,7 @@ impl<T> std::ops::Deref for BaseError<T> {
     }
 }
 
-impl<T> std::error::Error for BaseError<T>
-where
-    T: std::fmt::Display + std::fmt::Debug,
-{
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
+impl<T> std::error::Error for BaseError<T> where T: std::fmt::Display + std::fmt::Debug {}
 
 impl<T> Display for BaseError<T>
 where

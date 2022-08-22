@@ -28,6 +28,7 @@ phf = "0.10.1"
 unic-emoji-char = "0.9.0"
 unic-ucd-ident  = "0.9.0"
 unicode_names2 = "0.5.0"
+thiserror = "1.0"
 
 [dev-dependencies]
 insta = "1.14.0"

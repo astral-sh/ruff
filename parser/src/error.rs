@@ -3,7 +3,7 @@
 
 use crate::{ast::Location, token::Tok};
 use lalrpop_util::ParseError as LalrpopError;
-use std::{error::Error, fmt};
+use std::fmt;
 
 /// Represents an error during lexical scanning.
 #[derive(Debug, PartialEq)]
@@ -119,7 +119,7 @@ impl From<FStringError> for LalrpopError<Location, Tok, LexicalError> {
 /// Represents an error during parsing
 pub type ParseError = rustpython_compiler_core::BaseError<ParseErrorType>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ParseErrorType {
     /// Parser encountered an unexpected end of input
     Eof,
@@ -193,8 +193,6 @@ impl fmt::Display for ParseErrorType {
         }
     }
 }
-
-impl Error for ParseErrorType {}
 
 impl ParseErrorType {
     pub fn is_indentation_error(&self) -> bool {
