@@ -17,6 +17,17 @@ impl Mode {
     }
 }
 
+impl From<rustpython_compiler_core::Mode> for Mode {
+    fn from(mode: rustpython_compiler_core::Mode) -> Self {
+        use rustpython_compiler_core::Mode as CompileMode;
+        match mode {
+            CompileMode::Exec => Self::Module,
+            CompileMode::Eval => Self::Expression,
+            CompileMode::Single | CompileMode::BlockExpr => Self::Interactive,
+        }
+    }
+}
+
 impl std::str::FromStr for Mode {
     type Err = ModeParseError;
     fn from_str(s: &str) -> Result<Self, ModeParseError> {
