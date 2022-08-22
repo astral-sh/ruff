@@ -17,3 +17,4 @@ num-bigint = { version = "0.4.3", features = ["serde"] }
 num-complex = { version = "0.4.0", features = ["serde"] }
 serde = { version = "1.0.136", features = ["derive"] }
 static_assertions = "1.1.0"
+thiserror = "1.0"

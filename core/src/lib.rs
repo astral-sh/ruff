@@ -7,6 +7,6 @@ mod location;
 mod mode;
 
 pub use bytecode::*;
-pub use error::BaseError;
+pub use error::{BaseError, CompileError};
 pub use location::Location;
 pub use mode::Mode;

@@ -58,3 +58,32 @@ impl<T> BaseError<T> {
         BaseError::from(self)
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+pub struct CompileError<T> {
+    pub body: BaseError<T>,
+    pub statement: Option<String>,
+}
+
+impl<T> std::ops::Deref for CompileError<T> {
+    type Target = BaseError<T>;
+    fn deref(&self) -> &Self::Target {
+        &self.body
+    }
+}
+
+impl<T> std::fmt::Display for CompileError<T>
+where
+    T: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let loc = self.location;
+        if let Some(ref stmt) = self.statement {
+            // visualize the error when location and statement are provided
+            loc.fmt_with(f, &self.error)?;
+            write!(f, "\n{stmt}{arrow:>pad$}", pad = loc.column(), arrow = "^")
+        } else {
+            loc.fmt_with(f, &self.error)
+        }
+    }
+}
