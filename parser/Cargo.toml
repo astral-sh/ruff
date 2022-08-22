@@ -16,6 +16,7 @@ tiny-keccak = { version = "2", features = ["sha3"] }
 
 [dependencies]
 rustpython-ast = { path = "../ast" }
+rustpython-compiler-core = { path = "../core" }
 
 ahash = "0.7.6"
 itertools = "0.10.3"

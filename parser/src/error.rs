@@ -118,11 +118,7 @@ impl From<FStringError> for LalrpopError<Location, Tok, LexicalError> {
 
 /// Represents an error during parsing
 #[derive(Debug, PartialEq)]
-pub struct ParseError {
-    pub error: ParseErrorType,
-    pub location: Location,
-    pub source_path: String,
-}
+pub struct ParseError(rustpython_compiler_core::Error<ParseErrorType>);
 
 #[derive(Debug, PartialEq)]
 pub enum ParseErrorType {
@@ -138,8 +134,28 @@ pub enum ParseErrorType {
     Lexical(LexicalErrorType),
 }
 
+impl From<ParseError> for rustpython_compiler_core::Error<ParseErrorType> {
+    fn from(err: ParseError) -> Self {
+        err.0
+    }
+}
+
+impl From<ParseError> for ParseErrorType {
+    fn from(err: ParseError) -> Self {
+        err.0.error
+    }
+}
+
 /// Convert `lalrpop_util::ParseError` to our internal type
 impl ParseError {
+    fn new(error: ParseErrorType, location: Location, source_path: String) -> Self {
+        Self(rustpython_compiler_core::Error {
+            error,
+            location,
+            source_path,
+        })
+    }
+
     pub(crate) fn from_lalrpop(
         err: LalrpopError<Location, Tok, LexicalError>,
         source_path: &str,
@@ -147,36 +163,30 @@ impl ParseError {
         let source_path = source_path.to_owned();
         match err {
             // TODO: Are there cases where this isn't an EOF?
-            LalrpopError::InvalidToken { location } => ParseError {
-                error: ParseErrorType::Eof,
-                location,
+            LalrpopError::InvalidToken { location } => {
+                ParseError::new(ParseErrorType::Eof, location, source_path)
+            }
+            LalrpopError::ExtraToken { token } => {
+                ParseError::new(ParseErrorType::ExtraToken(token.1), token.0, source_path)
+            }
+            LalrpopError::User { error } => ParseError::new(
+                ParseErrorType::Lexical(error.error),
+                error.location,
                 source_path,
-            },
-            LalrpopError::ExtraToken { token } => ParseError {
-                error: ParseErrorType::ExtraToken(token.1),
-                location: token.0,
-                source_path,
-            },
-            LalrpopError::User { error } => ParseError {
-                error: ParseErrorType::Lexical(error.error),
-                location: error.location,
-                source_path,
-            },
+            ),
             LalrpopError::UnrecognizedToken { token, expected } => {
                 // Hacky, but it's how CPython does it. See PyParser_AddToken,
                 // in particular "Only one possible expected token" comment.
                 let expected = (expected.len() == 1).then(|| expected[0].clone());
-                ParseError {
-                    error: ParseErrorType::UnrecognizedToken(token.1, expected),
-                    location: token.0,
+                ParseError::new(
+                    ParseErrorType::UnrecognizedToken(token.1, expected),
+                    token.0,
                     source_path,
-                }
+                )
             }
-            LalrpopError::UnrecognizedEOF { location, .. } => ParseError {
-                error: ParseErrorType::Eof,
-                location,
-                source_path,
-            },
+            LalrpopError::UnrecognizedEOF { location, .. } => {
+                ParseError::new(ParseErrorType::Eof, location, source_path)
+            }
         }
     }
 }
@@ -229,9 +239,9 @@ impl ParseErrorType {
 }
 
 impl std::ops::Deref for ParseError {
-    type Target = ParseErrorType;
+    type Target = rustpython_compiler_core::Error<ParseErrorType>;
     fn deref(&self) -> &Self::Target {
-        &self.error
+        &self.0
     }
 }
 
