@@ -193,7 +193,7 @@ impl ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.location.fmt_with(f, &self.error)
+        self.0.fmt(f)
     }
 }
 
