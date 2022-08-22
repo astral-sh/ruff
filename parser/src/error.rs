@@ -118,7 +118,7 @@ impl From<FStringError> for LalrpopError<Location, Tok, LexicalError> {
 
 /// Represents an error during parsing
 #[derive(Debug, PartialEq)]
-pub struct ParseError(rustpython_compiler_core::Error<ParseErrorType>);
+pub struct ParseError(rustpython_compiler_core::BaseError<ParseErrorType>);
 
 #[derive(Debug, PartialEq)]
 pub enum ParseErrorType {
@@ -134,7 +134,7 @@ pub enum ParseErrorType {
     Lexical(LexicalErrorType),
 }
 
-impl From<ParseError> for rustpython_compiler_core::Error<ParseErrorType> {
+impl From<ParseError> for rustpython_compiler_core::BaseError<ParseErrorType> {
     fn from(err: ParseError) -> Self {
         err.0
     }
@@ -149,7 +149,7 @@ impl From<ParseError> for ParseErrorType {
 /// Convert `lalrpop_util::ParseError` to our internal type
 impl ParseError {
     fn new(error: ParseErrorType, location: Location, source_path: String) -> Self {
-        Self(rustpython_compiler_core::Error {
+        Self(rustpython_compiler_core::BaseError {
             error,
             location,
             source_path,
@@ -239,7 +239,7 @@ impl ParseErrorType {
 }
 
 impl std::ops::Deref for ParseError {
-    type Target = rustpython_compiler_core::Error<ParseErrorType>;
+    type Target = rustpython_compiler_core::BaseError<ParseErrorType>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }

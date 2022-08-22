@@ -3,13 +3,13 @@ use std::fmt::Display;
 use crate::Location;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Error<T> {
+pub struct BaseError<T> {
     pub error: T,
     pub location: Location,
     pub source_path: String,
 }
 
-impl<T> std::ops::Deref for Error<T> {
+impl<T> std::ops::Deref for BaseError<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -17,7 +17,7 @@ impl<T> std::ops::Deref for Error<T> {
     }
 }
 
-impl<T> std::error::Error for Error<T>
+impl<T> std::error::Error for BaseError<T>
 where
     T: std::fmt::Display + std::fmt::Debug,
 {
@@ -26,7 +26,7 @@ where
     }
 }
 
-impl<T> Display for Error<T>
+impl<T> Display for BaseError<T>
 where
     T: std::fmt::Display,
 {
@@ -35,8 +35,26 @@ where
     }
 }
 
-impl<T> Error<T> {
+impl<T> BaseError<T> {
     pub fn error(self) -> T {
         self.error
+    }
+
+    pub fn from<U>(obj: BaseError<U>) -> Self
+    where
+        U: Into<T>,
+    {
+        Self {
+            error: obj.error.into(),
+            location: obj.location,
+            source_path: obj.source_path,
+        }
+    }
+
+    pub fn into<U>(self) -> BaseError<U>
+    where
+        T: Into<U>,
+    {
+        BaseError::from(self)
     }
 }
