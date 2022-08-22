@@ -1,5 +1,4 @@
-use crate::constant;
-use crate::fold::Fold;
+use crate::{constant, fold::Fold};
 
 pub(crate) trait Foldable<T, U> {
     type Mapped;
