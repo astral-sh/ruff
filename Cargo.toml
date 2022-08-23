@@ -15,18 +15,18 @@ chrono = { version = "0.4.21" }
 clap = { version = "3.2.16", features = ["derive"] }
 clearscreen = { version = "1.0.10" }
 colored = { version = "2.0.0" }
-common-path = "1.0.0"
-dirs = "4.0.0"
+common-path = { version = "1.0.0" }
+dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py37"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-rustpython-parser = { features=["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "e9970edd775a617226007d3d3cb0fbbc39ed3948" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "e9970edd775a617226007d3d3cb0fbbc39ed3948" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
-toml = { version = "0.5.9"}
+toml = { version = "0.5.9" }
 walkdir = { version = "2.3.2" }
 
 [profile.release]
