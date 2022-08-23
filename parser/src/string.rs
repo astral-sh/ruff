@@ -34,19 +34,10 @@ pub fn parse_strings(values: Vec<(Location, (String, StringKind))>) -> Result<Ex
             StringKind::Normal | StringKind::U => current.push(string),
             StringKind::F => {
                 has_fstring = true;
-                let values = if let ExprKind::JoinedStr { values } =
-                    parse_located_fstring(&string, location)
-                        .map_err(|e| LexicalError {
-                            location,
-                            error: LexicalErrorType::FStringError(e.error),
-                        })?
-                        .node
-                {
-                    values
-                } else {
-                    unreachable!("parse_located_fstring returned a non-JoinedStr.")
-                };
-                for value in values {
+                for value in parse_located_fstring(&string, location).map_err(|e| LexicalError {
+                    location,
+                    error: LexicalErrorType::FStringError(e.error),
+                })? {
                     match value.node {
                         ExprKind::FormattedValue { .. } => {
                             if !current.is_empty() {

@@ -1,137 +1,128 @@
 ---
-source: parser/src/fstring.rs
+source: compiler/parser/src/fstring.rs
 expression: parse_ast
 ---
-Located {
-    location: Location {
-        row: 0,
-        column: 0,
+[
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: Constant {
+            value: Str(
+                "mix ",
+            ),
+            kind: None,
+        },
     },
-    custom: (),
-    node: JoinedStr {
-        values: [
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "mix ",
-                    ),
-                    kind: None,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "user=",
-                    ),
-                    kind: None,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "",
-                    ),
-                    kind: None,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: FormattedValue {
-                    value: Located {
-                        location: Location {
-                            row: 1,
-                            column: 2,
-                        },
-                        custom: (),
-                        node: Name {
-                            id: "user",
-                            ctx: Load,
-                        },
-                    },
-                    conversion: 114,
-                    format_spec: None,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        " with text and ",
-                    ),
-                    kind: None,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "second=",
-                    ),
-                    kind: None,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "",
-                    ),
-                    kind: None,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 0,
-                    column: 0,
-                },
-                custom: (),
-                node: FormattedValue {
-                    value: Located {
-                        location: Location {
-                            row: 1,
-                            column: 2,
-                        },
-                        custom: (),
-                        node: Name {
-                            id: "second",
-                            ctx: Load,
-                        },
-                    },
-                    conversion: 114,
-                    format_spec: None,
-                },
-            },
-        ],
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: Constant {
+            value: Str(
+                "user=",
+            ),
+            kind: None,
+        },
     },
-}
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: Constant {
+            value: Str(
+                "",
+            ),
+            kind: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: FormattedValue {
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 2,
+                },
+                custom: (),
+                node: Name {
+                    id: "user",
+                    ctx: Load,
+                },
+            },
+            conversion: 114,
+            format_spec: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: Constant {
+            value: Str(
+                " with text and ",
+            ),
+            kind: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: Constant {
+            value: Str(
+                "second=",
+            ),
+            kind: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: Constant {
+            value: Str(
+                "",
+            ),
+            kind: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 0,
+            column: 0,
+        },
+        custom: (),
+        node: FormattedValue {
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 2,
+                },
+                custom: (),
+                node: Name {
+                    id: "second",
+                    ctx: Load,
+                },
+            },
+            conversion: 114,
+            format_spec: None,
+        },
+    },
+]

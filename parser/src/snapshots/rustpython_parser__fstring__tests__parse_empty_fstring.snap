@@ -1,15 +1,5 @@
 ---
-source: parser/src/fstring.rs
+source: compiler/parser/src/fstring.rs
 expression: "parse_fstring(\"\").unwrap()"
-
 ---
-Located {
-    location: Location {
-        row: 0,
-        column: 0,
-    },
-    custom: (),
-    node: JoinedStr {
-        values: [],
-    },
-}
+[]

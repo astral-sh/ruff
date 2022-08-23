@@ -4,6 +4,7 @@ use crate::{
     error::{FStringError, FStringErrorType, ParseError},
     parser::parse_expression,
 };
+use itertools::Itertools;
 use std::{iter, mem, str};
 
 struct FStringParser<'a> {
@@ -105,19 +106,16 @@ impl<'a> FStringParser<'a> {
                                 nested -= 1;
                                 if nested == 0 {
                                     formatted_value_piece.push(next);
-                                    spec_constructor.push(
-                                        self.expr(ExprKind::FormattedValue {
-                                            value: Box::new(
-                                                FStringParser::new(
-                                                    &formatted_value_piece,
-                                                    Location::default(),
-                                                    &self.recurse_lvl + 1,
-                                                )
-                                                .parse()?,
-                                            ),
-                                            conversion: ConversionFlag::None as _,
-                                            format_spec: None,
-                                        }),
+                                    let values = FStringParser::new(
+                                        &formatted_value_piece,
+                                        Location::default(),
+                                        &self.recurse_lvl + 1,
+                                    )
+                                    .parse()?;
+                                    spec_constructor.push(values
+                                        .into_iter()
+                                        .exactly_one()
+                                        .expect("Expected formatted value to produce exactly one expression.")
                                     );
                                     formatted_value_piece.clear();
                                 } else {
@@ -129,11 +127,13 @@ impl<'a> FStringParser<'a> {
                             }
                             '{' => {
                                 nested += 1;
-                                spec_constructor.push(self.expr(ExprKind::Constant {
-                                    value: constant_piece.to_owned().into(),
-                                    kind: None,
-                                }));
-                                constant_piece.clear();
+                                if !constant_piece.is_empty() {
+                                    spec_constructor.push(self.expr(ExprKind::Constant {
+                                        value: constant_piece.to_owned().into(),
+                                        kind: None,
+                                    }));
+                                    constant_piece.clear();
+                                }
                                 formatted_value_piece.push(next);
                                 formatted_value_piece.push(' ');
                             }
@@ -144,11 +144,13 @@ impl<'a> FStringParser<'a> {
                         }
                         self.chars.next();
                     }
-                    spec_constructor.push(self.expr(ExprKind::Constant {
-                        value: constant_piece.to_owned().into(),
-                        kind: None,
-                    }));
-                    constant_piece.clear();
+                    if !constant_piece.is_empty() {
+                        spec_constructor.push(self.expr(ExprKind::Constant {
+                            value: constant_piece.to_owned().into(),
+                            kind: None,
+                        }));
+                        constant_piece.clear();
+                    }
                     if nested > 0 {
                         return Err(UnclosedLbrace);
                     }
@@ -241,7 +243,7 @@ impl<'a> FStringParser<'a> {
         Err(UnclosedLbrace)
     }
 
-    fn parse(mut self) -> Result<Expr, FStringErrorType> {
+    fn parse(mut self) -> Result<Vec<Expr>, FStringErrorType> {
         if self.recurse_lvl >= 2 {
             return Err(ExpressionNestedTooDeeply);
         }
@@ -287,7 +289,7 @@ impl<'a> FStringParser<'a> {
             }))
         }
 
-        Ok(self.expr(ExprKind::JoinedStr { values }))
+        Ok(values)
     }
 }
 
@@ -298,7 +300,7 @@ fn parse_fstring_expr(source: &str) -> Result<Expr, ParseError> {
 
 /// Parse an fstring from a string, located at a certain position in the sourcecode.
 /// In case of errors, we will get the location and the error returned.
-pub fn parse_located_fstring(source: &str, location: Location) -> Result<Expr, FStringError> {
+pub fn parse_located_fstring(source: &str, location: Location) -> Result<Vec<Expr>, FStringError> {
     FStringParser::new(source, location, 0)
         .parse()
         .map_err(|error| FStringError { error, location })
@@ -308,7 +310,7 @@ pub fn parse_located_fstring(source: &str, location: Location) -> Result<Expr, F
 mod tests {
     use super::*;
 
-    fn parse_fstring(source: &str) -> Result<Expr, FStringErrorType> {
+    fn parse_fstring(source: &str) -> Result<Vec<Expr>, FStringErrorType> {
         FStringParser::new(source, Location::default(), 0).parse()
     }
 
