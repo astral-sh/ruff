@@ -1700,7 +1700,7 @@ dependencies = [
 
 [[package]]
 name = "rust-python-linter"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "anyhow",
  "bincode",
@@ -1727,16 +1727,16 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.1.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=f1c7aebfad707526602c8162c8094a67129b6731#f1c7aebfad707526602c8162c8094a67129b6731"
+source = "git+https://github.com/RustPython/RustPython.git?rev=e9970edd775a617226007d3d3cb0fbbc39ed3948#e9970edd775a617226007d3d3cb0fbbc39ed3948"
 dependencies = [
  "num-bigint",
- "rustpython-bytecode",
+ "rustpython-compiler-core",
 ]
 
 [[package]]
-name = "rustpython-bytecode"
+name = "rustpython-compiler-core"
 version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=f1c7aebfad707526602c8162c8094a67129b6731#f1c7aebfad707526602c8162c8094a67129b6731"
+source = "git+https://github.com/RustPython/RustPython.git?rev=e9970edd775a617226007d3d3cb0fbbc39ed3948#e9970edd775a617226007d3d3cb0fbbc39ed3948"
 dependencies = [
  "bincode",
  "bitflags",
@@ -1747,12 +1747,13 @@ dependencies = [
  "num-complex",
  "serde",
  "static_assertions",
+ "thiserror",
 ]
 
 [[package]]
 name = "rustpython-parser"
 version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=f1c7aebfad707526602c8162c8094a67129b6731#f1c7aebfad707526602c8162c8094a67129b6731"
+source = "git+https://github.com/RustPython/RustPython.git?rev=e9970edd775a617226007d3d3cb0fbbc39ed3948#e9970edd775a617226007d3d3cb0fbbc39ed3948"
 dependencies = [
  "ahash",
  "anyhow",
@@ -1765,6 +1766,8 @@ dependencies = [
  "phf 0.10.1",
  "phf_codegen 0.10.0",
  "rustpython-ast",
+ "rustpython-compiler-core",
+ "thiserror",
  "tiny-keccak",
  "unic-emoji-char",
  "unic-ucd-ident",
