@@ -1699,7 +1699,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-python-linter"
+name = "ruff"
 version = "0.0.13"
 dependencies = [
  "anyhow",

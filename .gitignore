@@ -1,7 +1,6 @@
 # Local cache
 .cache
-!resources/test/src
-resources/test
+resources/test/cpython
 
 ###
 # Rust.gitignore

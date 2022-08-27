@@ -1,4 +1,4 @@
-# rust-python-linter
+# ruff
 
 A performance-focused, [Pyflakes](https://github.com/PyCQA/pyflakes)-inspired Python linter, written
 in Rust.
@@ -12,10 +12,10 @@ Features:
 
 ## Installation
 
-Available as [`rust-python-linter`](https://pypi.org/project/rust-python-linter/) on PyPI:
+Available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
 ```shell
-pip install rust-python-linter
+pip install ruff
 ```
 
 ## Usage
@@ -23,22 +23,22 @@ pip install rust-python-linter
 To run the linter, try any of the following:
 
 ```shell
-rust_python_linter path/to/code/to/check.py
+ruff path/to/code/to/check.py
 # ...or...
-rust_python_linter path/to/code/
+ruff path/to/code/
 # ...or...
-rust_python_linter path/to/code/*.py
+ruff path/to/code/*.py
 ```
 
 You can also run in `--watch` mode to automatically re-run the linter on-change with, e.g.:
 
 ```shell
-rust_python_linter path/to/code/ --watch
+ruff path/to/code/ --watch
 ```
 
 ## Development
 
-As the name suggests, `rust-python-linter` is implemented in Rust:
+`ruff` is written in Rust:
 
 ```shell
 cargo fmt
@@ -48,7 +48,7 @@ cargo run resources/test/src
 
 ## Deployment
 
-`rust-python-linter` is released for Python using [`maturin`](https://github.com/PyO3/maturin):
+`ruff` is released for Python using [`maturin`](https://github.com/PyO3/maturin):
 
 ```shell
 maturin publish --skip-existing --target x86_64-apple-darwin
@@ -125,14 +125,14 @@ Next, to benchmark the release build:
 cargo build --release
 
 hyperfine --warmup 5 \
-  "./target/release/rust_python_linter ./resources/test/cpython/ --no-cache" \
-  "./target/release/rust_python_linter ./resources/test/cpython/"
+  "./target/release/ruff ./resources/test/cpython/ --no-cache" \
+  "./target/release/ruff ./resources/test/cpython/"
 
-Benchmark 1: ./target/release/rust_python_linter ./resources/test/cpython/ --no-cache
+Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
   Time (mean ± σ):     353.6 ms ±   7.6 ms    [User: 2868.8 ms, System: 171.5 ms]
   Range (min … max):   344.4 ms … 367.3 ms    10 runs
 
-Benchmark 2: ./target/release/rust_python_linter ./resources/test/cpython/
+Benchmark 2: ./target/release/ruff ./resources/test/cpython/
   Time (mean ± σ):      59.6 ms ±   2.5 ms    [User: 36.4 ms, System: 345.6 ms]
   Range (min … max):    55.9 ms …  67.0 ms    48 runs
 ```
