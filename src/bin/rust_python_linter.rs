@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
 use anyhow::Result;
-use clap::{Parser, ValueHint};
+use clap::Parser;
 use colored::Colorize;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
@@ -27,6 +28,8 @@ struct Cli {
     verbose: bool,
     #[clap(short, long, action)]
     quiet: bool,
+    #[clap(short, long, action)]
+    exit_zero: bool,
     #[clap(short, long, action)]
     watch: bool,
     #[clap(short, long, action)]
@@ -92,7 +95,7 @@ fn report_continuously(messages: &[Message]) -> Result<()> {
     Ok(())
 }
 
-fn main() -> Result<()> {
+fn inner_main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
     set_up_logging(cli.verbose)?;
@@ -141,7 +144,18 @@ fn main() -> Result<()> {
         if !cli.quiet {
             report_once(&messages)?;
         }
+
+        if !messages.is_empty() && !cli.exit_zero {
+            return Ok(ExitCode::FAILURE);
+        }
     }
 
-    Ok(())
+    Ok(ExitCode::SUCCESS)
+}
+
+fn main() -> ExitCode {
+    match inner_main() {
+        Ok(code) => code,
+        Err(_) => ExitCode::FAILURE,
+    }
 }
