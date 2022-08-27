@@ -1,8 +1,10 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+
+use rustpython_parser::ast::{
+    Arg, Arguments, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Suite,
+};
 
 use crate::check_ast::ScopeKind::{Class, Function, Generator, Module};
-use rustpython_parser::ast::{Arg, Arguments, Expr, ExprKind, Stmt, StmtKind, Suite};
-
 use crate::checks::{Check, CheckKind};
 use crate::settings::Settings;
 use crate::visitor;
@@ -17,12 +19,33 @@ enum ScopeKind {
 
 struct Scope {
     kind: ScopeKind,
+    values: BTreeMap<String, Binding>,
+}
+
+enum BindingKind {
+    Argument,
+    Assignment,
+    ClassDefinition,
+    Definition,
+    FutureImportation,
+    Importation,
+    StarImportation,
+    SubmoduleImportation,
+}
+
+struct Binding {
+    kind: BindingKind,
+    name: String,
+    location: Location,
+    used: bool,
 }
 
 struct Checker<'a> {
     settings: &'a Settings,
     checks: Vec<Check>,
     scopes: Vec<Scope>,
+    dead_scopes: Vec<Scope>,
+    in_f_string: bool,
 }
 
 impl Checker<'_> {
@@ -30,7 +53,9 @@ impl Checker<'_> {
         Checker {
             settings,
             checks: vec![],
-            scopes: vec![Scope { kind: Module }],
+            scopes: vec![],
+            dead_scopes: vec![],
+            in_f_string: false,
         }
     }
 }
@@ -38,8 +63,30 @@ impl Checker<'_> {
 impl Visitor for Checker<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match &stmt.node {
-            StmtKind::FunctionDef { .. } => self.scopes.push(Scope { kind: Function }),
-            StmtKind::AsyncFunctionDef { .. } => self.scopes.push(Scope { kind: Function }),
+            StmtKind::FunctionDef { name, .. } => {
+                self.push_scope(Scope {
+                    kind: Function,
+                    values: BTreeMap::new(),
+                });
+                self.add_binding(Binding {
+                    kind: BindingKind::ClassDefinition,
+                    name: name.clone(),
+                    used: false,
+                    location: stmt.location,
+                })
+            }
+            StmtKind::AsyncFunctionDef { name, .. } => {
+                self.push_scope(Scope {
+                    kind: Function,
+                    values: BTreeMap::new(),
+                });
+                self.add_binding(Binding {
+                    kind: BindingKind::ClassDefinition,
+                    name: name.clone(),
+                    used: false,
+                    location: stmt.location,
+                })
+            }
             StmtKind::Return { .. } => {
                 if self
                     .settings
@@ -59,20 +106,76 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
-            StmtKind::ClassDef { .. } => self.scopes.push(Scope { kind: Class }),
-            StmtKind::ImportFrom { names, .. } => {
-                if self
-                    .settings
-                    .select
-                    .contains(CheckKind::ImportStarUsage.code())
-                {
-                    for alias in names {
-                        if alias.node.name == "*" {
+            StmtKind::ClassDef { .. } => self.push_scope(Scope {
+                kind: Class,
+                values: BTreeMap::new(),
+            }),
+            StmtKind::Import { names } => {
+                for alias in names {
+                    if alias.node.name.contains('.') && alias.node.asname.is_none() {
+                        self.add_binding(Binding {
+                            kind: BindingKind::SubmoduleImportation,
+                            name: alias.node.name.clone(),
+                            used: false,
+                            location: stmt.location,
+                        })
+                    } else {
+                        self.add_binding(Binding {
+                            kind: BindingKind::Importation,
+                            name: alias
+                                .node
+                                .asname
+                                .clone()
+                                .unwrap_or_else(|| alias.node.name.clone()),
+                            used: false,
+                            location: stmt.location,
+                        })
+                    }
+                }
+            }
+            StmtKind::ImportFrom { names, module, .. } => {
+                for alias in names {
+                    let name = alias
+                        .node
+                        .asname
+                        .clone()
+                        .unwrap_or_else(|| alias.node.name.clone());
+                    if module
+                        .clone()
+                        .map(|name| name == "future")
+                        .unwrap_or_default()
+                    {
+                        self.add_binding(Binding {
+                            kind: BindingKind::FutureImportation,
+                            name,
+                            used: true,
+                            location: stmt.location,
+                        });
+                    } else if alias.node.name == "*" {
+                        self.add_binding(Binding {
+                            kind: BindingKind::StarImportation,
+                            name,
+                            used: false,
+                            location: stmt.location,
+                        });
+
+                        if self
+                            .settings
+                            .select
+                            .contains(CheckKind::ImportStarUsage.code())
+                        {
                             self.checks.push(Check {
                                 kind: CheckKind::ImportStarUsage,
                                 location: stmt.location,
                             });
                         }
+                    } else {
+                        self.add_binding(Binding {
+                            kind: BindingKind::Importation,
+                            name,
+                            used: false,
+                            location: stmt.location,
+                        });
                     }
                 }
             }
@@ -117,6 +220,9 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
+            StmtKind::AugAssign { target, .. } => {
+                self.handle_node_load(target);
+            }
             _ => {}
         }
 
@@ -126,21 +232,43 @@ impl Visitor for Checker<'_> {
             StmtKind::ClassDef { .. }
             | StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. } => {
-                self.scopes.pop();
+                self.pop_scope();
             }
             _ => {}
         };
+
+        if let StmtKind::ClassDef { name, .. } = &stmt.node {
+            self.add_binding(Binding {
+                kind: BindingKind::Definition,
+                name: name.clone(),
+                used: false,
+                location: stmt.location,
+            });
+        }
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
+        let initial = self.in_f_string;
         match &expr.node {
-            ExprKind::GeneratorExp { .. } => self.scopes.push(Scope { kind: Generator }),
-            ExprKind::Lambda { .. } => self.scopes.push(Scope { kind: Function }),
+            ExprKind::Name { ctx, .. } => match ctx {
+                ExprContext::Load => self.handle_node_load(expr),
+                ExprContext::Store => self.handle_node_store(expr),
+                ExprContext::Del => {}
+            },
+            ExprKind::GeneratorExp { .. } => self.push_scope(Scope {
+                kind: Generator,
+                values: BTreeMap::new(),
+            }),
+            ExprKind::Lambda { .. } => self.push_scope(Scope {
+                kind: Function,
+                values: BTreeMap::new(),
+            }),
             ExprKind::JoinedStr { values } => {
-                if self
-                    .settings
-                    .select
-                    .contains(CheckKind::FStringMissingPlaceholders.code())
+                if !self.in_f_string
+                    && self
+                        .settings
+                        .select
+                        .contains(CheckKind::FStringMissingPlaceholders.code())
                     && !values
                         .iter()
                         .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
@@ -150,6 +278,7 @@ impl Visitor for Checker<'_> {
                         location: expr.location,
                     });
                 }
+                self.in_f_string = true;
             }
             _ => {}
         };
@@ -158,7 +287,12 @@ impl Visitor for Checker<'_> {
 
         match &expr.node {
             ExprKind::GeneratorExp { .. } | ExprKind::Lambda { .. } => {
-                self.scopes.pop();
+                if let Some(scope) = self.scopes.pop() {
+                    self.dead_scopes.push(scope);
+                }
+            }
+            ExprKind::JoinedStr { .. } => {
+                self.in_f_string = initial;
             }
             _ => {}
         };
@@ -201,63 +335,99 @@ impl Visitor for Checker<'_> {
 
         visitor::walk_arguments(self, arguments);
     }
+
+    fn visit_arg(&mut self, arg: &Arg) {
+        self.add_binding(Binding {
+            kind: BindingKind::Argument,
+            name: arg.node.arg.clone(),
+            used: false,
+            location: arg.location,
+        });
+        visitor::walk_arg(self, arg);
+    }
+}
+
+impl Checker<'_> {
+    fn push_scope(&mut self, scope: Scope) {
+        self.scopes.push(scope);
+    }
+
+    fn pop_scope(&mut self) {
+        self.dead_scopes
+            .push(self.scopes.pop().expect("Attempted to pop without scope."));
+    }
+
+    fn add_binding(&mut self, binding: Binding) {
+        // TODO(charlie): Don't treat annotations as assignments if there is an existing value.
+        let scope = self.scopes.last_mut().expect("No current scope found.");
+        scope.values.insert(
+            binding.name.clone(),
+            match scope.values.get(&binding.name) {
+                None => binding,
+                Some(existing) => Binding {
+                    kind: binding.kind,
+                    name: binding.name,
+                    location: binding.location,
+                    used: existing.used,
+                },
+            },
+        );
+    }
+
+    fn handle_node_load(&mut self, expr: &Expr) {
+        if let ExprKind::Name { id, .. } = &expr.node {
+            for scope in self.scopes.iter_mut().rev() {
+                if matches!(scope.kind, Class) {
+                    if id == "__class__" {
+                        return;
+                    } else {
+                        continue;
+                    }
+                }
+                if let Some(binding) = scope.values.get_mut(id) {
+                    binding.used = true;
+                }
+            }
+        }
+    }
+
+    fn handle_node_store(&mut self, expr: &Expr) {
+        if let ExprKind::Name { id, .. } = &expr.node {
+            // TODO(charlie): Handle alternate binding types (like `Annotation`).
+            self.add_binding(Binding {
+                kind: BindingKind::Assignment,
+                name: id.to_string(),
+                used: false,
+                location: expr.location,
+            });
+        }
+    }
+
+    fn check_dead_scopes(&mut self) {
+        // TODO(charlie): Handle `__all__`.
+        for scope in &self.dead_scopes {
+            for (name, binding) in scope.values.iter().rev() {
+                if !binding.used && matches!(binding.kind, BindingKind::Importation) {
+                    self.checks.push(Check {
+                        kind: CheckKind::UnusedImport(name.clone()),
+                        location: binding.location,
+                    });
+                }
+            }
+        }
+    }
 }
 
 pub fn check_ast(python_ast: &Suite, settings: &Settings) -> Vec<Check> {
-    python_ast
-        .iter()
-        .flat_map(|stmt| {
-            let mut checker = Checker::new(settings);
-            checker.visit_stmt(stmt);
-            checker.checks
-        })
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeSet;
-
-    use rustpython_parser::ast::{Alias, AliasData, Location, Stmt, StmtKind};
-
-    use crate::check_ast::Checker;
-    use crate::checks::CheckKind::ImportStarUsage;
-    use crate::checks::{Check, CheckCode};
-    use crate::settings::Settings;
-    use crate::visitor::Visitor;
-
-    #[test]
-    fn import_star_usage() {
-        let settings = Settings {
-            line_length: 88,
-            exclude: vec![],
-            select: BTreeSet::from([CheckCode::F403]),
-        };
-        let mut checker = Checker::new(&settings);
-        checker.visit_stmt(&Stmt {
-            location: Location::new(1, 1),
-            custom: (),
-            node: StmtKind::ImportFrom {
-                module: Some("bar".to_string()),
-                names: vec![Alias::new(
-                    Default::default(),
-                    AliasData {
-                        name: "*".to_string(),
-                        asname: None,
-                    },
-                )],
-                level: None,
-            },
-        });
-
-        let actual = checker.checks;
-        let expected = vec![Check {
-            kind: ImportStarUsage,
-            location: Location::new(1, 1),
-        }];
-        assert_eq!(actual.len(), expected.len());
-        for i in 0..actual.len() {
-            assert_eq!(actual[i], expected[i]);
-        }
+    let mut checker = Checker::new(settings);
+    checker.push_scope(Scope {
+        kind: Module,
+        values: BTreeMap::new(),
+    });
+    for stmt in python_ast {
+        checker.visit_stmt(stmt);
     }
+    checker.pop_scope();
+    checker.check_dead_scopes();
+    checker.checks
 }

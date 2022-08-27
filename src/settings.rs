@@ -7,6 +7,7 @@ use anyhow::Result;
 use crate::checks::CheckCode;
 use crate::pyproject::load_config;
 
+#[derive(Debug)]
 pub struct Settings {
     pub line_length: usize,
     pub exclude: Vec<PathBuf>,
@@ -41,13 +42,14 @@ impl Settings {
                 .collect(),
             select: config.select.unwrap_or_else(|| {
                 BTreeSet::from([
-                    CheckCode::F831,
+                    CheckCode::E501,
+                    CheckCode::F401,
+                    CheckCode::F403,
                     CheckCode::F541,
                     CheckCode::F634,
-                    CheckCode::F403,
                     CheckCode::F706,
+                    CheckCode::F831,
                     CheckCode::F901,
-                    CheckCode::E501,
                 ])
             }),
         })
