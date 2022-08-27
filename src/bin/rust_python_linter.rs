@@ -26,6 +26,8 @@ struct Cli {
     #[clap(short, long, action)]
     verbose: bool,
     #[clap(short, long, action)]
+    quiet: bool,
+    #[clap(short, long, action)]
     watch: bool,
     #[clap(short, long, action)]
     no_cache: bool,
@@ -105,7 +107,9 @@ fn main() -> Result<()> {
         tell_user!("Starting linter in watch mode...\n");
 
         let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
-        report_continuously(&messages)?;
+        if !cli.quiet {
+            report_continuously(&messages)?;
+        }
 
         // Configure the file watcher.
         let (tx, rx) = channel();
@@ -123,7 +127,9 @@ fn main() -> Result<()> {
                             tell_user!("File change detected...\n");
 
                             let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
-                            report_continuously(&messages)?;
+                            if !cli.quiet {
+                                report_continuously(&messages)?;
+                            }
                         }
                     }
                 }
@@ -132,7 +138,9 @@ fn main() -> Result<()> {
         }
     } else {
         let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
-        report_once(&messages)?;
+        if !cli.quiet {
+            report_once(&messages)?;
+        }
     }
 
     Ok(())
