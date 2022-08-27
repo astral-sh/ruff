@@ -1,10 +1,10 @@
 [package]
-name = "rust-python-linter"
+name = "ruff"
 version = "0.0.13"
 edition = "2021"
 
 [lib]
-name = "rust_python_linter"
+name = "ruff"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]

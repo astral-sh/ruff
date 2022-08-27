@@ -27,7 +27,7 @@ jobs:
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
-      - run: cargo build --bin rust_python_linter --release
+      - run: cargo build --release
 
   cargo_fmt:
     name: "cargo fmt"

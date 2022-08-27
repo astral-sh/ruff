@@ -11,16 +11,16 @@ use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
 use walkdir::DirEntry;
 
-use ::rust_python_linter::fs::iter_python_files;
-use ::rust_python_linter::linter::check_path;
-use ::rust_python_linter::logging::set_up_logging;
-use ::rust_python_linter::message::Message;
-use ::rust_python_linter::tell_user;
-use rust_python_linter::settings::Settings;
+use ::ruff::fs::iter_python_files;
+use ::ruff::linter::check_path;
+use ::ruff::logging::set_up_logging;
+use ::ruff::message::Message;
+use ::ruff::settings::Settings;
+use ::ruff::tell_user;
 
 #[derive(Debug, Parser)]
-#[clap(name = "rust-python-linter")]
-#[clap(about = "A bare-bones Python linter written in Rust", long_about = None)]
+#[clap(name = "ruff")]
+#[clap(about = "A Python linter written in Rust", long_about = None)]
 struct Cli {
     #[clap(parse(from_os_str), value_hint = ValueHint::AnyPath, required = true)]
     files: Vec<PathBuf>,
