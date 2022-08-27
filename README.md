@@ -134,3 +134,96 @@ Benchmark 2: ./target/release/rust_python_linter ./resources/test/cpython/
   Time (mean ± σ):      59.6 ms ±   2.5 ms    [User: 36.4 ms, System: 345.6 ms]
   Range (min … max):    55.9 ms …  67.0 ms    48 runs
 ```
+
+To benchmark the ecosystem's existing tools:
+
+```shell
+python -m venv .venv
+source .venv/bin/activate
+pip install pylint pycodestyle flake8 autoflake pyflakes
+
+hyperfine --ignore-failure --warmup 5 \
+  "pycodestyle resources/test/cpython" \
+  "pyflakes resources/test/cpython" \
+  "flake8 resources/test/cpython" \
+  "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
+  "pylint --recursive=y resources/test/cpython/" \
+  "pycodestyle --select E501 resources/test/cpython" \
+  "flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython" \
+  "python -m run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501" \
+  "python -m run_flake8 resources/test/cpython" 
+```
+
+```shell
+∴ hyperfine --ignore-failure --warmup 5 \
+→   "pycodestyle resources/test/cpython" \
+→   "pyflakes resources/test/cpython" \
+→   "flake8 resources/test/cpython" \
+→   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
+→   "pylint --recursive=y resources/test/cpython/" \
+→   "pycodestyle --select E501 resources/test/cpython" \
+→   "flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython" \
+→   "python -m run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501" \
+→   "python -m run_flake8 resources/test/cpython"
+Benchmark 1: pycodestyle resources/test/cpython
+  Time (mean ± σ):     41.921 s ±  1.409 s    [User: 41.451 s, System: 0.194 s]
+  Range (min … max):   41.182 s … 45.894 s    10 runs
+
+  Warning: Ignoring non-zero exit code.
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet PC without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Benchmark 2: pyflakes resources/test/cpython
+  Time (mean ± σ):     27.960 s ±  1.251 s    [User: 27.491 s, System: 0.236 s]
+  Range (min … max):   26.449 s … 29.899 s    10 runs
+
+  Warning: Ignoring non-zero exit code.
+
+Benchmark 3: flake8 resources/test/cpython
+  Time (mean ± σ):     75.320 s ±  0.909 s    [User: 74.625 s, System: 0.610 s]
+  Range (min … max):   74.181 s … 77.336 s    10 runs
+
+  Warning: Ignoring non-zero exit code.
+
+Benchmark 4: autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython
+  Time (mean ± σ):     32.690 s ±  0.585 s    [User: 32.300 s, System: 0.296 s]
+  Range (min … max):   31.948 s … 33.326 s    10 runs
+
+  Warning: Ignoring non-zero exit code.
+
+Benchmark 5: pylint --recursive=y resources/test/cpython/
+  Time (mean ± σ):     27.592 s ±  0.227 s    [User: 26.627 s, System: 0.911 s]
+  Range (min … max):   27.325 s … 27.955 s    10 runs
+
+  Warning: Ignoring non-zero exit code.
+
+Benchmark 6: pycodestyle --select E501 resources/test/cpython
+  Time (mean ± σ):     14.540 s ±  0.156 s    [User: 14.397 s, System: 0.121 s]
+  Range (min … max):   14.384 s … 14.920 s    10 runs
+
+  Warning: Ignoring non-zero exit code.
+
+Benchmark 7: flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython
+  Time (mean ± σ):     75.391 s ±  0.600 s    [User: 74.642 s, System: 0.591 s]
+  Range (min … max):   74.458 s … 76.550 s    10 runs
+
+  Warning: Ignoring non-zero exit code.
+
+Benchmark 8: python -m run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501
+  Time (mean ± σ):     12.542 s ±  0.467 s    [User: 87.891 s, System: 0.816 s]
+  Range (min … max):   11.771 s … 13.034 s    10 runs
+
+Benchmark 9: python -m run_flake8 resources/test/cpython
+  Time (mean ± σ):     12.276 s ±  0.398 s    [User: 86.720 s, System: 0.792 s]
+  Range (min … max):   11.809 s … 12.865 s    10 runs
+
+Summary
+  'python -m run_flake8 resources/test/cpython' ran
+    1.02 ± 0.05 times faster than 'python -m run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501'
+    1.18 ± 0.04 times faster than 'pycodestyle --select E501 resources/test/cpython'
+    2.25 ± 0.08 times faster than 'pylint --recursive=y resources/test/cpython/'
+    2.28 ± 0.13 times faster than 'pyflakes resources/test/cpython'
+    2.66 ± 0.10 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
+    3.41 ± 0.16 times faster than 'pycodestyle resources/test/cpython'
+    6.14 ± 0.21 times faster than 'flake8 resources/test/cpython'
+    6.14 ± 0.21 times faster than 'flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython'
+```

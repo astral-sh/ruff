@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "scripts"
+version = "0.1.0"
+description = ""
+authors = ["Charles Marsh <charlie.r.marsh@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+pylint = "^2.15.0"
+pycodestyle = "^2.9.1"
+flake8 = "^5.0.4"
+autoflake = "^1.4"
+pyflakes = "^2.5.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
