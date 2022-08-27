@@ -4,7 +4,7 @@ use std::sync::mpsc::channel;
 use std::time::Instant;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, ValueHint};
 use colored::Colorize;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
@@ -24,14 +24,19 @@ use rust_python_linter::settings::Settings;
 struct Cli {
     #[clap(parse(from_os_str), value_hint = ValueHint::AnyPath, required = true)]
     files: Vec<PathBuf>,
+    /// Enable verbose logging.
     #[clap(short, long, action)]
     verbose: bool,
+    /// Disable all logging (but still exit with status code "1" upon detecting errors).
     #[clap(short, long, action)]
     quiet: bool,
+    /// Exit with status code "0", even upon detecting errors.
     #[clap(short, long, action)]
     exit_zero: bool,
+    /// Run in watch mode by re-running whenever files change.
     #[clap(short, long, action)]
     watch: bool,
+    /// Disable cache reads.
     #[clap(short, long, action)]
     no_cache: bool,
 }
