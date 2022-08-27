@@ -23,7 +23,7 @@ notify = { version = "4.0.17" }
 pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py37"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "e9970edd775a617226007d3d3cb0fbbc39ed3948" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "7a688e0b6c2904f286acac1e4af3f1628dd38589" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }
