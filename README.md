@@ -58,11 +58,10 @@ maturin publish --skip-existing --target aarch64-apple-darwin
 ## Benchmarking
 
 First, clone [CPython](https://github.com/python/cpython). It's a large and diverse Python codebase,
-which makes it a good target for benchmarking. Note that we clone v3.9, as `RustPython` doesn't yet
-support pattern matching, which was introduced in v3.10.
+which makes it a good target for benchmarking.
 
 ```shell
-git clone --branch 3.9 https://github.com/python/cpython.git resources/test/cpython
+git clone --branch 3.10 https://github.com/python/cpython.git resources/test/cpython
 ```
 
 Add this `pyproject.toml` to the directory:
@@ -93,6 +92,7 @@ exclude = [
     "Lib/test/test_fstring.py",
     "Lib/test/test_genericpath.py",
     "Lib/test/test_getopt.py",
+    "Lib/test/test_grammar.py",
     "Lib/test/test_htmlparser.py",
     "Lib/test/test_importlib/stubs.py",
     "Lib/test/test_importlib/test_files.py",
@@ -100,6 +100,7 @@ exclude = [
     "Lib/test/test_importlib/test_open.py",
     "Lib/test/test_importlib/test_util.py",
     "Lib/test/test_named_expressions.py",
+    "Lib/test/test_patma.py",
     "Lib/test/test_peg_generator/__main__.py",
     "Lib/test/test_pipes.py",
     "Lib/test/test_source_encoding.py",
@@ -109,6 +110,7 @@ exclude = [
     "Lib/tkinter/test/test_tkinter/test_variables.py",
     "Modules/_decimal/libmpdec/literature/fnt.py",
     "Modules/_decimal/tests/deccheck.py",
+    "Tools/c-analyzer/c_parser/parser/_delim.py",
     "Tools/i18n/pygettext.py",
     "Tools/test2to3/maintest.py",
     "Tools/test2to3/setup.py",
