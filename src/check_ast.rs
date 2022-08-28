@@ -146,11 +146,7 @@ impl Visitor for Checker<'_> {
                         .asname
                         .clone()
                         .unwrap_or_else(|| alias.node.name.clone());
-                    if module
-                        .clone()
-                        .map(|name| name == "future")
-                        .unwrap_or_default()
-                    {
+                    if let Some("future") = module.as_deref() {
                         self.add_binding(Binding {
                             kind: BindingKind::FutureImportation,
                             name,
