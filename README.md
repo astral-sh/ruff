@@ -14,14 +14,14 @@ Major features:
 - [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` semantics.
 - `pyproject.toml` support.
 
-`ruff` is a proof-of-concept and not yet intended for production use. It supports only a small
+ruff is a proof-of-concept and not yet intended for production use. It supports only a small
 subset of the Flake8 rules, and may crash on your codebase.
 
 ## Installation and usage
 
 ### Installation
 
-Available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
+Available as [ruff](https://pypi.org/project/ruff/) on PyPI:
 
 ```shell
 pip install ruff
@@ -29,7 +29,7 @@ pip install ruff
 
 ### Usage
 
-To run `ruff`, try any of the following:
+To run ruff, try any of the following:
 
 ```shell
 ruff path/to/code/to/check.py
@@ -37,7 +37,7 @@ ruff path/to/code/
 ruff path/to/code/*.py
 ```
 
-You can run `ruff` in `--watch` mode to automatically re-run on-change:
+You can run ruff in `--watch` mode to automatically re-run on-change:
 
 ```shell
 ruff path/to/code/ --watch
@@ -45,9 +45,9 @@ ruff path/to/code/ --watch
 
 ## Configuration
 
-`ruff` is configurable both via `pyproject.toml` and the command line.
+ruff is configurable both via `pyproject.toml` and the command line.
 
-For example, you could configure `ruff` to only enforce a subset of rules with:
+For example, you could configure ruff to only enforce a subset of rules with:
 
 ```toml
 [tool.ruff]
@@ -90,7 +90,7 @@ OPTIONS:
 
 ## Development
 
-`ruff` is written in Rust (1.63.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
+ruff is written in Rust (1.63.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
 for development.
 
 Assuming you have `cargo` installed, you can run:
@@ -104,11 +104,13 @@ cargo test
 
 ## Deployment
 
-`ruff` is distributed on [PyPI](https://pypi.org/project/ruff/), and published via [`maturin`](https://github.com/PyO3/maturin):
+ruff is distributed on [PyPI](https://pypi.org/project/ruff/), and published via [`maturin`](https://github.com/PyO3/maturin).
+
+For now, releases are cut and published manually:
 
 ```shell
-maturin publish --skip-existing --target x86_64-apple-darwin && \
-  maturin publish --skip-existing --target aarch64-apple-darwin
+maturin publish --username crmarsh --skip-existing --target x86_64-apple-darwin && \
+  maturin publish --username crmarsh --skip-existing --target aarch64-apple-darwin
 ```
 
 ## Benchmarking
@@ -197,27 +199,27 @@ To benchmark the ecosystem's existing tools:
 
 ```shell
 hyperfine --ignore-failure --warmup 5 \
-  "pycodestyle resources/test/cpython" \
-  "pyflakes resources/test/cpython" \
-  "flake8 resources/test/cpython" \
-  "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
   "pylint --recursive=y resources/test/cpython/" \
+  "pyflakes resources/test/cpython" \
+  "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
+  "pycodestyle resources/test/cpython" \
   "pycodestyle --select E501 resources/test/cpython" \
+  "flake8 resources/test/cpython" \
   "flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython" \
   "python -m scripts.run_flake8 resources/test/cpython" \
   "python -m scripts.run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501"
 ```
 
 In order, these evaluate:
-- `pycodestyle`
-- `pyflakes`
-- `flake8`
-- `autoflake`
-- `pylint`
-- `pycodestyle`, limited to the checks supported by Ruff
-- `flake8`, limited to the checks supported by Ruff
-- `flake8`, with a hack to enable multiprocessing on macOS
-- `flake8`, limited to the checks supported by Ruff, with a hack to enable multiprocessing on macOS
+- Pylint
+- PyFlakes
+- autoflake
+- pycodestyle
+- pycodestyle, limited to the checks supported by ruff
+- Flake8
+- Flake8, limited to the checks supported by ruff
+- Flake8, with a hack to enable multiprocessing on macOS
+- Flake8, with a hack to enable multiprocessing on macOS, limited to the checks supported by ruff
 
 (You can `poetry install` from `./scripts` to create a working environment for the above.)
 
