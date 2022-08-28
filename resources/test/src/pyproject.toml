@@ -1,3 +1,13 @@
-[tool.linter]
+[tool.ruff]
 line-length = 88
 exclude = ["excluded.py"]
+select = [
+    "E501",
+    "F401",
+    "F403",
+    "F541",
+    "F634",
+    "F706",
+    "F831",
+    "F901",
+]

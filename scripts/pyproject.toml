@@ -5,7 +5,7 @@ description = ""
 authors = ["Charles Marsh <charlie.r.marsh@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.11"
+python = ">=3.10,<3.11"
 autoflake = "^1.4"
 flake8 = "^5.0.4"
 matplotlib = "^3.5.3"

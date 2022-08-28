@@ -1,16 +1,24 @@
 # ruff
 
-A performance-focused, [Pyflakes](https://github.com/PyCQA/pyflakes)-inspired Python linter, written
-in Rust.
+[![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
+[![PyPI version](https://badge.fury.io/py/ruff.svg)](https://badge.fury.io/py/ruff)
 
-Features:
+An extremely fast Python linter, written in Rust.
 
-- Python 3.10 compatibility
-- [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache semantics
-- [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` semantics
-- `pyproject.toml` support
+Major features:
 
-## Installation
+- 10-100x faster than your current linter.
+- Python 3.10 compatibility.
+- [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache semantics.
+- [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` semantics.
+- `pyproject.toml` support.
+
+`ruff` is a proof-of-concept and not yet intended for production use. It supports only a small
+subset of the Flake8 rules, and may crash on your codebase.
+
+## Installation and usage
+
+### Installation
 
 Available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
@@ -18,22 +26,35 @@ Available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 pip install ruff
 ```
 
-## Usage
+### Usage
 
-To run the linter, try any of the following:
+To run `ruff`, try any of the following:
 
 ```shell
 ruff path/to/code/to/check.py
-# ...or...
 ruff path/to/code/
-# ...or...
 ruff path/to/code/*.py
 ```
 
-You can also run in `--watch` mode to automatically re-run the linter on-change with, e.g.:
+You can run `ruff` in `--watch` mode to automatically re-run on-change:
 
 ```shell
-ruff path/to/code/ --watch
+ruff --watch path/to/code/
+```
+
+## Configuration
+
+`ruff` is configurable both via `pyproject.toml` and the command line.
+
+For example, you could configure `ruff` to only enforce a subset of rules with:
+
+```toml
+[tool.ruff]
+line-length = 88
+select = [
+    "F401",
+    "F403",
+]
 ```
 
 ## Development
@@ -48,7 +69,7 @@ cargo run resources/test/src
 
 ## Deployment
 
-`ruff` is released for Python using [`maturin`](https://github.com/PyO3/maturin):
+`ruff` is distributed on [PyPI](https://pypi.org/project/ruff/), and published via [`maturin`](https://github.com/PyO3/maturin):
 
 ```shell
 maturin publish --skip-existing --target x86_64-apple-darwin && \
@@ -145,6 +166,8 @@ source .venv/bin/activate
 pip install pylint pycodestyle flake8 autoflake pyflakes
 
 hyperfine --ignore-failure --warmup 5 \
+  "./target/release/ruff ./resources/test/cpython/ --no-cache" \
+  "./target/release/ruff ./resources/test/cpython/" \
   "pycodestyle resources/test/cpython" \
   "pyflakes resources/test/cpython" \
   "flake8 resources/test/cpython" \
@@ -229,3 +252,8 @@ Summary
     6.14 ± 0.21 times faster than 'flake8 resources/test/cpython'
     6.14 ± 0.21 times faster than 'flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython'
 ```
+
+
+## License
+
+MIT

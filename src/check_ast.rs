@@ -5,7 +5,7 @@ use rustpython_parser::ast::{
 };
 
 use crate::check_ast::ScopeKind::{Class, Function, Generator, Module};
-use crate::checks::{Check, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
 use crate::visitor;
 use crate::visitor::Visitor;
@@ -413,15 +413,17 @@ impl Checker<'_> {
     }
 
     fn check_dead_scopes(&mut self) {
-        // TODO(charlie): Handle `__all__`.
-        for scope in &self.dead_scopes {
-            for (_, binding) in scope.values.iter().rev() {
-                if !binding.used {
-                    if let BindingKind::Importation(name) = &binding.kind {
-                        self.checks.push(Check {
-                            kind: CheckKind::UnusedImport(name.clone()),
-                            location: binding.location,
-                        });
+        if self.settings.select.contains(&CheckCode::F401) {
+            // TODO(charlie): Handle `__all__`.
+            for scope in &self.dead_scopes {
+                for (_, binding) in scope.values.iter().rev() {
+                    if !binding.used {
+                        if let BindingKind::Importation(name) = &binding.kind {
+                            self.checks.push(Check {
+                                kind: CheckKind::UnusedImport(name.clone()),
+                                location: binding.location,
+                            });
+                        }
                     }
                 }
             }

@@ -20,7 +20,7 @@ classifiers = [
 author = "Charlie Marsh"
 author_email = "charlie.r.marsh@gmail.com"
 url = "https://github.com/charliermarsh/ruff"
-description = "The fastest Python linter, written in Rust."
+description = "An extremely fast Python linter, written in Rust."
 
 [build-system]
 requires = ["maturin>=0.13,<0.14"]

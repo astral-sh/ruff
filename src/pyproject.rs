@@ -17,7 +17,7 @@ pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<(Pat
                 let pyproject = parse_pyproject_toml(&path)?;
                 let config = pyproject
                     .tool
-                    .and_then(|tool| tool.linter)
+                    .and_then(|tool| tool.ruff)
                     .unwrap_or_default();
                 Ok((project_root, config))
             }
@@ -37,7 +37,7 @@ pub struct Config {
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 struct Tools {
-    linter: Option<Config>,
+    ruff: Option<Config>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -50,7 +50,6 @@ fn parse_pyproject_toml(path: &Path) -> Result<PyProject> {
     toml::from_str(&contents).map_err(|e| e.into())
 }
 
-// https://github.com/psf/black/blob/44d5da00b520a05cd56e58b3998660f64ea59ebd/src/black/files.py#L84
 fn find_pyproject_toml(path: &Path) -> Option<PathBuf> {
     let path_pyproject_toml = path.join("pyproject.toml");
     if path_pyproject_toml.is_file() {
@@ -59,12 +58,10 @@ fn find_pyproject_toml(path: &Path) -> Option<PathBuf> {
     find_user_pyproject_toml()
 }
 
-// https://github.com/psf/black/blob/44d5da00b520a05cd56e58b3998660f64ea59ebd/src/black/files.py#L117
 fn find_user_pyproject_toml() -> Option<PathBuf> {
-    dirs::home_dir().map(|path| path.join(".linter"))
+    dirs::home_dir().map(|path| path.join(".ruff"))
 }
 
-// https://github.com/psf/black/blob/44d5da00b520a05cd56e58b3998660f64ea59ebd/src/black/files.py#L42
 fn find_project_root<'a>(sources: impl IntoIterator<Item = &'a Path>) -> Option<PathBuf> {
     if let Some(prefix) = common_path_all(sources) {
         for directory in prefix.ancestors() {
@@ -105,18 +102,18 @@ mod tests {
 [tool.black]
 "#,
         )?;
-        assert_eq!(pyproject.tool, Some(Tools { linter: None }));
+        assert_eq!(pyproject.tool, Some(Tools { ruff: None }));
 
         let pyproject: PyProject = toml::from_str(
             r#"
 [tool.black]
-[tool.linter]
+[tool.ruff]
 "#,
         )?;
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                linter: Some(Config {
+                ruff: Some(Config {
                     line_length: None,
                     exclude: None,
                     select: None,
@@ -127,14 +124,14 @@ mod tests {
         let pyproject: PyProject = toml::from_str(
             r#"
 [tool.black]
-[tool.linter]
+[tool.ruff]
 line-length = 79
 "#,
         )?;
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                linter: Some(Config {
+                ruff: Some(Config {
                     line_length: Some(79),
                     exclude: None,
                     select: None,
@@ -145,14 +142,14 @@ line-length = 79
         let pyproject: PyProject = toml::from_str(
             r#"
 [tool.black]
-[tool.linter]
+[tool.ruff]
 exclude = ["foo.py"]
 "#,
         )?;
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                linter: Some(Config {
+                ruff: Some(Config {
                     line_length: None,
                     exclude: Some(vec![Path::new("foo.py").to_path_buf()]),
                     select: None,
@@ -163,14 +160,14 @@ exclude = ["foo.py"]
         let pyproject: PyProject = toml::from_str(
             r#"
 [tool.black]
-[tool.linter]
+[tool.ruff]
 select = ["E501"]
 "#,
         )?;
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                linter: Some(Config {
+                ruff: Some(Config {
                     line_length: None,
                     exclude: None,
                     select: Some(BTreeSet::from([CheckCode::E501])),
@@ -181,7 +178,7 @@ select = ["E501"]
         assert!(toml::from_str::<PyProject>(
             r#"
 [tool.black]
-[tool.linter]
+[tool.ruff]
 line_length = 79
 "#,
         )
@@ -190,7 +187,7 @@ line_length = 79
         assert!(toml::from_str::<PyProject>(
             r#"
 [tool.black]
-[tool.linter]
+[tool.ruff]
 select = ["E123"]
 "#,
         )
@@ -199,7 +196,7 @@ select = ["E123"]
         assert!(toml::from_str::<PyProject>(
             r#"
 [tool.black]
-[tool.linter]
+[tool.ruff]
 line-length = 79
 other-attribute = 1
 "#,
@@ -221,15 +218,24 @@ other-attribute = 1
         let pyproject = parse_pyproject_toml(&path)?;
         let config = pyproject
             .tool
-            .map(|tool| tool.linter)
+            .map(|tool| tool.ruff)
             .flatten()
-            .expect("Unable to find tool.linter.");
+            .expect("Unable to find tool.ruff.");
         assert_eq!(
             config,
             Config {
                 line_length: Some(88),
                 exclude: Some(vec![Path::new("excluded.py").to_path_buf()]),
-                select: None,
+                select: Some(BTreeSet::from([
+                    CheckCode::E501,
+                    CheckCode::F401,
+                    CheckCode::F403,
+                    CheckCode::F541,
+                    CheckCode::F634,
+                    CheckCode::F706,
+                    CheckCode::F831,
+                    CheckCode::F901,
+                ])),
             }
         );
 
