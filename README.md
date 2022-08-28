@@ -124,7 +124,7 @@ Next, to benchmark the release build:
 ```shell
 cargo build --release
 
-hyperfine --warmup 5 \
+hyperfine --ignore-failure --warmup 5 \
   "./target/release/ruff ./resources/test/cpython/ --no-cache" \
   "./target/release/ruff ./resources/test/cpython/"
 
