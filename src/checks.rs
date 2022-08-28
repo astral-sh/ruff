@@ -1,5 +1,7 @@
+use anyhow::Result;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub enum CheckCode {
@@ -11,6 +13,24 @@ pub enum CheckCode {
     F706,
     F831,
     F901,
+}
+
+impl FromStr for CheckCode {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "E501" => Ok(CheckCode::E501),
+            "F401" => Ok(CheckCode::F401),
+            "F403" => Ok(CheckCode::F403),
+            "F541" => Ok(CheckCode::F541),
+            "F634" => Ok(CheckCode::F634),
+            "F706" => Ok(CheckCode::F706),
+            "F831" => Ok(CheckCode::F831),
+            "F901" => Ok(CheckCode::F901),
+            _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
+        }
+    }
 }
 
 impl CheckCode {

@@ -11,6 +11,7 @@ use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
 use walkdir::DirEntry;
 
+use ::ruff::checks::CheckCode;
 use ::ruff::fs::iter_python_files;
 use ::ruff::linter::check_path;
 use ::ruff::logging::set_up_logging;
@@ -39,6 +40,12 @@ struct Cli {
     /// Disable cache reads.
     #[clap(short, long, action)]
     no_cache: bool,
+    /// Comma-separated list of error codes to enable.
+    #[clap(long)]
+    select: Vec<CheckCode>,
+    /// Comma-separated list of error codes to ignore.
+    #[clap(long)]
+    ignore: Vec<CheckCode>,
 }
 
 fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<Message>> {
@@ -107,7 +114,13 @@ fn inner_main() -> Result<ExitCode> {
 
     // TODO(charlie): Can we avoid this cast?
     let paths: Vec<&Path> = cli.files.iter().map(PathBuf::as_path).collect();
-    let settings = Settings::from_paths(paths)?;
+    let mut settings = Settings::from_paths(paths)?;
+    if !cli.select.is_empty() {
+        settings.select(&cli.select);
+    }
+    if !cli.ignore.is_empty() {
+        settings.ignore(&cli.ignore);
+    }
 
     if cli.watch {
         // Perform an initial run instantly.

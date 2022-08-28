@@ -54,4 +54,12 @@ impl Settings {
             }),
         })
     }
+
+    pub fn select(&mut self, codes: &[CheckCode]) {
+        self.select.retain(|code| codes.contains(code));
+    }
+
+    pub fn ignore(&mut self, codes: &[CheckCode]) {
+        self.select.retain(|code| !codes.contains(code));
+    }
 }
