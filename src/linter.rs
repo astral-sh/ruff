@@ -4,6 +4,7 @@ use anyhow::Result;
 use log::debug;
 use rustpython_parser::parser;
 
+use crate::autofix::autofix;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
 use crate::checks::{Check, LintSource};
@@ -54,6 +55,8 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
         .filter(|message| !message.is_inline_ignored())
         .collect();
     cache::set(path, settings, &messages, mode);
+
+    autofix(path, &contents, &messages);
 
     Ok(messages)
 }

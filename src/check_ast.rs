@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::format;
 
 use rustpython_parser::ast::{
     Arg, Arguments, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Suite,
@@ -172,10 +173,13 @@ impl Visitor for Checker<'_> {
                     } else {
                         self.add_binding(Binding {
                             kind: BindingKind::Importation,
-                            name,
+                            name: match module {
+                                None => name,
+                                Some(parent) => format!("{}.{}", parent, name),
+                            },
                             used: false,
                             location: stmt.location,
-                        });
+                        })
                     }
                 }
             }

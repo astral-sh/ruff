@@ -1,9 +1,6 @@
 import os
 import functools
-from collections import (
-    Counter,
-    OrderedDict,
-)
+from collections import Counter, OrderedDict
 
 
 class X:
