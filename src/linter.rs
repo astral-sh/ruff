@@ -30,8 +30,9 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
     {
-        let python_ast = parser::parse_program(&contents, &path.to_string_lossy())?;
-        checks.extend(check_ast(&python_ast, settings));
+        let path = path.to_string_lossy();
+        let python_ast = parser::parse_program(&contents, &path)?;
+        checks.extend(check_ast(&python_ast, settings, &path));
     }
 
     // Run the lines-based checks.

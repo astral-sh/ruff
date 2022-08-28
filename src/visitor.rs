@@ -8,6 +8,9 @@ pub trait Visitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         walk_stmt(self, stmt);
     }
+    fn visit_annotation(&mut self, expr: &Expr) {
+        walk_expr(self, expr);
+    }
     fn visit_expr(&mut self, expr: &Expr) {
         walk_expr(self, expr);
     }
@@ -80,7 +83,7 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_expr(expr)
             }
             for expr in returns {
-                visitor.visit_expr(expr);
+                visitor.visit_annotation(expr);
             }
         }
         StmtKind::AsyncFunctionDef {
@@ -100,7 +103,7 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_expr(expr)
             }
             for expr in returns {
-                visitor.visit_expr(expr);
+                visitor.visit_annotation(expr);
             }
         }
         StmtKind::ClassDef {
@@ -152,7 +155,7 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
             ..
         } => {
             visitor.visit_expr(target);
-            visitor.visit_expr(annotation);
+            visitor.visit_annotation(annotation);
             if let Some(expr) = value {
                 visitor.visit_expr(expr)
             }
@@ -513,7 +516,7 @@ pub fn walk_arguments<V: Visitor + ?Sized>(visitor: &mut V, arguments: &Argument
 
 pub fn walk_arg<V: Visitor + ?Sized>(visitor: &mut V, arg: &Arg) {
     if let Some(expr) = &arg.node.annotation {
-        visitor.visit_expr(expr)
+        visitor.visit_annotation(expr)
     }
 }
 
