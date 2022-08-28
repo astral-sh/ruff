@@ -28,7 +28,7 @@ enum BindingKind {
     ClassDefinition,
     Definition,
     FutureImportation,
-    Importation,
+    Importation(String),
     StarImportation,
     SubmoduleImportation,
 }
@@ -121,7 +121,13 @@ impl Visitor for Checker<'_> {
                         })
                     } else {
                         self.add_binding(Binding {
-                            kind: BindingKind::Importation,
+                            kind: BindingKind::Importation(
+                                alias
+                                    .node
+                                    .asname
+                                    .clone()
+                                    .unwrap_or_else(|| alias.node.name.clone()),
+                            ),
                             name: alias
                                 .node
                                 .asname
@@ -171,11 +177,14 @@ impl Visitor for Checker<'_> {
                         }
                     } else {
                         self.add_binding(Binding {
-                            kind: BindingKind::Importation,
+                            kind: BindingKind::Importation(match module {
+                                None => name.clone(),
+                                Some(parent) => format!("{}.{}", parent, name),
+                            }),
                             name,
                             used: false,
                             location: stmt.location,
-                        });
+                        })
                     }
                 }
             }
@@ -406,12 +415,14 @@ impl Checker<'_> {
     fn check_dead_scopes(&mut self) {
         // TODO(charlie): Handle `__all__`.
         for scope in &self.dead_scopes {
-            for (name, binding) in scope.values.iter().rev() {
-                if !binding.used && matches!(binding.kind, BindingKind::Importation) {
-                    self.checks.push(Check {
-                        kind: CheckKind::UnusedImport(name.clone()),
-                        location: binding.location,
-                    });
+            for (_, binding) in scope.values.iter().rev() {
+                if !binding.used {
+                    if let BindingKind::Importation(name) = &binding.kind {
+                        self.checks.push(Check {
+                            kind: CheckKind::UnusedImport(name.clone()),
+                            location: binding.location,
+                        });
+                    }
                 }
             }
         }
