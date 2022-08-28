@@ -8,6 +8,7 @@ An extremely fast Python linter, written in Rust.
 Major features:
 
 - 10-100x faster than your current linter.
+- Installable via `pip`.
 - Python 3.10 compatibility.
 - [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache semantics.
 - [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` semantics.
@@ -39,7 +40,7 @@ ruff path/to/code/*.py
 You can run `ruff` in `--watch` mode to automatically re-run on-change:
 
 ```shell
-ruff --watch path/to/code/
+ruff path/to/code/ --watch
 ```
 
 ## Configuration
@@ -57,14 +58,48 @@ select = [
 ]
 ```
 
-## Development
-
-`ruff` is written in Rust:
+Alternatively, on the command-line:
 
 ```shell
+ruff path/to/code/ --select F401 F403
+```
+
+See `ruff --help` for more:
+
+```shell
+ruff
+A Python linter written in Rust
+
+USAGE:
+    ruff [OPTIONS] <FILES>...
+
+ARGS:
+    <FILES>...
+
+OPTIONS:
+    -e, --exit-zero             Exit with status code "0", even upon detecting errors
+    -h, --help                  Print help information
+        --ignore <IGNORE>...    Comma-separated list of error codes to ignore
+    -n, --no-cache              Disable cache reads
+    -q, --quiet                 Disable all logging (but still exit with status code "1" upon
+                                detecting errors)
+        --select <SELECT>...    Comma-separated list of error codes to enable
+    -v, --verbose               Enable verbose logging
+    -w, --watch                 Run in watch mode by re-running whenever files change
+```
+
+## Development
+
+`ruff` is written in Rust (1.63.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
+for development.
+
+Assuming you have `cargo` installed, you can run:
+
+```shell
+cargo run resources/test/src
 cargo fmt
 cargo clippy
-cargo run resources/test/src
+cargo test
 ```
 
 ## Deployment
@@ -85,7 +120,7 @@ which makes it a good target for benchmarking.
 git clone --branch 3.10 https://github.com/python/cpython.git resources/test/cpython
 ```
 
-Add this `pyproject.toml` to the directory:
+Add this `pyproject.toml` to the CPython directory:
 
 ```toml
 [tool.linter]
@@ -161,13 +196,7 @@ Benchmark 2: ./target/release/ruff ./resources/test/cpython/
 To benchmark the ecosystem's existing tools:
 
 ```shell
-python -m venv .venv
-source .venv/bin/activate
-pip install pylint pycodestyle flake8 autoflake pyflakes
-
 hyperfine --ignore-failure --warmup 5 \
-  "./target/release/ruff ./resources/test/cpython/ --no-cache" \
-  "./target/release/ruff ./resources/test/cpython/" \
   "pycodestyle resources/test/cpython" \
   "pyflakes resources/test/cpython" \
   "flake8 resources/test/cpython" \
@@ -175,9 +204,22 @@ hyperfine --ignore-failure --warmup 5 \
   "pylint --recursive=y resources/test/cpython/" \
   "pycodestyle --select E501 resources/test/cpython" \
   "flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython" \
-  "python -m run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501" \
-  "python -m run_flake8 resources/test/cpython" 
+  "python -m scripts.run_flake8 resources/test/cpython" \
+  "python -m scripts.run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501"
 ```
+
+In order, these evaluate:
+- `pycodestyle`
+- `pyflakes`
+- `flake8`
+- `autoflake`
+- `pylint`
+- `pycodestyle`, limited to the checks supported by Ruff
+- `flake8`, limited to the checks supported by Ruff
+- `flake8`, with a hack to enable multiprocessing on macOS
+- `flake8`, limited to the checks supported by Ruff, with a hack to enable multiprocessing on macOS
+
+(You can `poetry install` from `./scripts` to create a working environment for the above.)
 
 ```shell
 ∴ hyperfine --ignore-failure --warmup 5 \
@@ -252,7 +294,6 @@ Summary
     6.14 ± 0.21 times faster than 'flake8 resources/test/cpython'
     6.14 ± 0.21 times faster than 'flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython'
 ```
-
 
 ## License
 

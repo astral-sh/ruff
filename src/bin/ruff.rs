@@ -41,10 +41,10 @@ struct Cli {
     #[clap(short, long, action)]
     no_cache: bool,
     /// Comma-separated list of error codes to enable.
-    #[clap(long)]
+    #[clap(long, multiple = true)]
     select: Vec<CheckCode>,
     /// Comma-separated list of error codes to ignore.
-    #[clap(long)]
+    #[clap(long, multiple = true)]
     ignore: Vec<CheckCode>,
 }
 
