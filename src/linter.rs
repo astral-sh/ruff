@@ -113,7 +113,7 @@ mod tests {
                 filename: "./resources/test/src/F401.py".to_string(),
             },
             Message {
-                kind: CheckKind::UnusedImport("OrderedDict".to_string()),
+                kind: CheckKind::UnusedImport("collections.OrderedDict".to_string()),
                 location: Location::new(3, 1),
                 filename: "./resources/test/src/F401.py".to_string(),
             },
