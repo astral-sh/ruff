@@ -55,11 +55,16 @@ impl Settings {
         })
     }
 
-    pub fn select(&mut self, codes: &[CheckCode]) {
-        self.select.retain(|code| codes.contains(code));
+    pub fn select(&mut self, codes: Vec<CheckCode>) {
+        self.select.clear();
+        for code in codes {
+            self.select.insert(code);
+        }
     }
 
     pub fn ignore(&mut self, codes: &[CheckCode]) {
-        self.select.retain(|code| !codes.contains(code));
+        for code in codes {
+            self.select.remove(code);
+        }
     }
 }

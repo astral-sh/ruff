@@ -116,7 +116,7 @@ fn inner_main() -> Result<ExitCode> {
     let paths: Vec<&Path> = cli.files.iter().map(PathBuf::as_path).collect();
     let mut settings = Settings::from_paths(paths)?;
     if !cli.select.is_empty() {
-        settings.select(&cli.select);
+        settings.select(cli.select);
     }
     if !cli.ignore.is_empty() {
         settings.ignore(&cli.ignore);
