@@ -6,10 +6,7 @@
 An extremely fast Python linter, written in Rust.
 
 <p align="center">
-  <picture>
-    <source srcset="https://user-images.githubusercontent.com/1309177/187221271-9db38ced-c622-406a-abf3-dec27ebc1b08.svg">
-    <img alt="Bar chart with benchmark results" src="https://user-images.githubusercontent.com/1309177/187221271-9db38ced-c622-406a-abf3-dec27ebc1b08.svg">
-  </picture>
+  <img alt="Bar chart with benchmark results" src="https://user-images.githubusercontent.com/1309177/187221271-9db38ced-c622-406a-abf3-dec27ebc1b08.svg">
 </p>
 
 <p align="center">
@@ -18,7 +15,7 @@ An extremely fast Python linter, written in Rust.
 
 Major features:
 
-- 10-100x faster than your current linter (parallelized by-default).
+- 10-100x faster than your current linter.
 - Installable via `pip`.
 - Python 3.10 compatibility.
 - [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache semantics.
