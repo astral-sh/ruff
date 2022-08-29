@@ -115,7 +115,7 @@ Located {
                     custom: (),
                     node: Name {
                         id: "y",
-                        ctx: Load,
+                        ctx: Store,
                     },
                 },
                 iter: Located {

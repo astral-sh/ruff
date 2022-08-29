@@ -8,33 +8,35 @@ expression: parse_ast
             row: 1,
             column: 1,
         },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 6,
-            },
-        ),
         custom: (),
-        node: Delete {
+        node: Assign {
             targets: [
                 Located {
                     location: Location {
                         row: 1,
-                        column: 5,
+                        column: 1,
                     },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 6,
-                        },
-                    ),
                     custom: (),
                     node: Name {
                         id: "x",
-                        ctx: Del,
+                        ctx: Store,
                     },
                 },
             ],
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 5,
+                },
+                custom: (),
+                node: Constant {
+                    value: Int(
+                        1,
+                    ),
+                    kind: None,
+                },
+            },
+            type_comment: None,
         },
     },
 ]

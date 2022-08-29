@@ -4,36 +4,42 @@ expression: parse_ast
 ---
 [
     Located {
-        start: Location {
+        location: Location {
             row: 1,
             column: 1,
         },
-        end: Location {
-            row: 1,
-            column: 18,
-        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 18,
+            },
+        ),
         custom: (),
         node: AugAssign {
             target: Located {
-                start: Location {
+                location: Location {
                     row: 1,
-                    column: 2,
+                    column: 1,
                 },
-                end: Location {
-                    row: 1,
-                    column: 5,
-                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 5,
+                    },
+                ),
                 custom: (),
                 node: Subscript {
                     value: Located {
-                        start: Location {
+                        location: Location {
                             row: 1,
                             column: 1,
                         },
-                        end: Location {
-                            row: 1,
-                            column: 2,
-                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 2,
+                            },
+                        ),
                         custom: (),
                         node: Name {
                             id: "x",
@@ -41,14 +47,16 @@ expression: parse_ast
                         },
                     },
                     slice: Located {
-                        start: Location {
+                        location: Location {
                             row: 1,
                             column: 3,
                         },
-                        end: Location {
-                            row: 1,
-                            column: 4,
-                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 4,
+                            },
+                        ),
                         custom: (),
                         node: Name {
                             id: "y",
@@ -60,26 +68,30 @@ expression: parse_ast
             },
             op: Add,
             value: Located {
-                start: Location {
+                location: Location {
                     row: 1,
                     column: 10,
                 },
-                end: Location {
-                    row: 1,
-                    column: 17,
-                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 17,
+                    },
+                ),
                 custom: (),
                 node: Tuple {
                     elts: [
                         Located {
-                            start: Location {
+                            location: Location {
                                 row: 1,
                                 column: 10,
                             },
-                            end: Location {
-                                row: 1,
-                                column: 11,
-                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 11,
+                                },
+                            ),
                             custom: (),
                             node: Constant {
                                 value: Int(
@@ -89,14 +101,16 @@ expression: parse_ast
                             },
                         },
                         Located {
-                            start: Location {
+                            location: Location {
                                 row: 1,
                                 column: 13,
                             },
-                            end: Location {
-                                row: 1,
-                                column: 14,
-                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 14,
+                                },
+                            ),
                             custom: (),
                             node: Constant {
                                 value: Int(
@@ -106,14 +120,16 @@ expression: parse_ast
                             },
                         },
                         Located {
-                            start: Location {
+                            location: Location {
                                 row: 1,
                                 column: 16,
                             },
-                            end: Location {
-                                row: 1,
-                                column: 17,
-                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 17,
+                                },
+                            ),
                             custom: (),
                             node: Constant {
                                 value: Int(

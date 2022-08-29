@@ -4,25 +4,29 @@ expression: parse_ast
 ---
 [
     Located {
-        start: Location {
+        location: Location {
             row: 1,
             column: 1,
         },
-        end: Location {
-            row: 1,
-            column: 7,
-        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 7,
+            },
+        ),
         custom: (),
         node: AugAssign {
             target: Located {
-                start: Location {
+                location: Location {
                     row: 1,
                     column: 1,
                 },
-                end: Location {
-                    row: 1,
-                    column: 2,
-                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 2,
+                    },
+                ),
                 custom: (),
                 node: Name {
                     id: "x",
@@ -31,14 +35,16 @@ expression: parse_ast
             },
             op: Add,
             value: Located {
-                start: Location {
+                location: Location {
                     row: 1,
                     column: 6,
                 },
-                end: Location {
-                    row: 1,
-                    column: 7,
-                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 7,
+                    },
+                ),
                 custom: (),
                 node: Constant {
                     value: Int(

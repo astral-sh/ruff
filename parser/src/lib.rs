@@ -30,5 +30,6 @@ pub mod mode;
 pub mod parser;
 #[rustfmt::skip]
 mod python;
+mod context;
 mod string;
 pub mod token;

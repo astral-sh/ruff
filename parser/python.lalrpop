@@ -8,6 +8,7 @@ use crate::{
     error::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, parse_params},
     lexer,
+    context::set_context,
     string::parse_strings,
     token::StringKind
 };
@@ -82,7 +83,7 @@ DelStatement: ast::Stmt = {
             location,
             end_location: Some(end_location),
             custom: (),
-            node: ast::StmtKind::Delete { targets },
+            node: ast::StmtKind::Delete { targets: targets.into_iter().map(|expr| set_context(expr, ast::ExprContext::Del)).collect() },
         }
     },
 };
@@ -98,11 +99,11 @@ ExpressionStatement: ast::Stmt = {
                 node: ast::StmtKind::Expr { value: Box::new(expression) }
             }
         } else {
-            let mut targets = vec![expression];
+            let mut targets = vec![set_context(expression, ast::ExprContext::Store)];
             let mut values = suffix;
 
             while values.len() > 1 {
-                targets.push(values.remove(0));
+                targets.push(set_context(values.remove(0), ast::ExprContext::Store));
             }
 
             let value = Box::new(values.into_iter().next().unwrap());
@@ -121,7 +122,7 @@ ExpressionStatement: ast::Stmt = {
             location,
             end_location: Some(end_location),
             node: ast::StmtKind::AugAssign {
-                target: Box::new(target),
+                target: Box::new(set_context(target, ast::ExprContext::Store)),
                 op,
                 value: Box::new(rhs)
             },
@@ -134,7 +135,7 @@ ExpressionStatement: ast::Stmt = {
             location,
             end_location: Some(end_location),
             node: ast::StmtKind::AnnAssign {
-                target: Box::new(target),
+                target: Box::new(set_context(target, ast::ExprContext::Store)),
                 annotation: Box::new(annotation),
                 value: rhs.map(Box::new),
                 simple: if simple { 1 } else { 0 },
@@ -399,7 +400,7 @@ WhileStatement: ast::Stmt = {
 ForStatement: ast::Stmt = {
     <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:TestList> ":" <body:Suite> <s2:("else" ":" Suite)?> <end_location:@R> => {
         let orelse = s2.map(|s| s.2).unwrap_or_default();
-        let target = Box::new(target);
+        let target = Box::new(set_context(target, ast::ExprContext::Store));
         let iter = Box::new(iter);
         let type_comment = None;
         let node = if is_async.is_some() {
@@ -484,7 +485,7 @@ WithStatement: ast::Stmt = {
 
 WithItem: ast::Withitem = {
     <context_expr:Test> <n:("as" Expression)?> => {
-        let optional_vars = n.map(|val| Box::new(val.1));
+        let optional_vars = n.map(|val| Box::new(set_context(val.1, ast::ExprContext::Store)));
         let context_expr = Box::new(context_expr);
         ast::Withitem { context_expr, optional_vars }
     },
@@ -1233,7 +1234,7 @@ SingleForComprehension: ast::Comprehension = {
     <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:OrTest> <ifs:ComprehensionIf*> <end_location:@R> => {
         let is_async = is_async.is_some();
         ast::Comprehension {
-            target: Box::new(target),
+            target: Box::new(set_context(target, ast::ExprContext::Store)),
             iter: Box::new(iter),
             ifs,
             is_async: if is_async { 1 } else { 0 },

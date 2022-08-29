@@ -45,7 +45,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name {
                                     id: "a",
-                                    ctx: Load,
+                                    ctx: Store,
                                 },
                             },
                             Located {
@@ -62,11 +62,11 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name {
                                     id: "b",
-                                    ctx: Load,
+                                    ctx: Store,
                                 },
                             },
                         ],
-                        ctx: Load,
+                        ctx: Store,
                     },
                 },
             ],
