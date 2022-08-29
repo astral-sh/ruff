@@ -17,7 +17,7 @@ colored = { version = "2.0.0" }
 common-path = { version = "1.0.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
-filetime = "0.2.17"
+filetime = { version = "0.2.17" }
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 pyo3 = { version = "0.17.1", features = ["auto-initialize"] }
