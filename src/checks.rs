@@ -13,6 +13,7 @@ pub enum CheckCode {
     F634,
     F706,
     F831,
+    F832,
     F901,
 }
 
@@ -28,6 +29,7 @@ impl FromStr for CheckCode {
             "F634" => Ok(CheckCode::F634),
             "F706" => Ok(CheckCode::F706),
             "F831" => Ok(CheckCode::F831),
+            "F832" => Ok(CheckCode::F832),
             "F901" => Ok(CheckCode::F901),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
         }
@@ -44,6 +46,7 @@ impl CheckCode {
             CheckCode::F634 => "F634",
             CheckCode::F706 => "F706",
             CheckCode::F831 => "F831",
+            CheckCode::F832 => "F832",
             CheckCode::F901 => "F901",
         }
     }
@@ -58,6 +61,7 @@ impl CheckCode {
             CheckCode::F634 => &LintSource::AST,
             CheckCode::F706 => &LintSource::AST,
             CheckCode::F831 => &LintSource::AST,
+            CheckCode::F832 => &LintSource::AST,
             CheckCode::F901 => &LintSource::AST,
         }
     }
@@ -78,6 +82,7 @@ pub enum CheckKind {
     LineTooLong,
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    UndefinedLocal(String),
     UnusedImport(String),
 }
 
@@ -92,6 +97,7 @@ impl CheckKind {
             CheckKind::LineTooLong => &CheckCode::E501,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::UndefinedLocal(_) => &CheckCode::F832,
             CheckKind::UnusedImport(_) => &CheckCode::F401,
         }
     }
@@ -115,6 +121,9 @@ impl CheckKind {
             }
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
+            }
+            CheckKind::UndefinedLocal(name) => {
+                format!("Local variable `{name}` referenced before assignment")
             }
             CheckKind::UnusedImport(name) => format!("`{name}` imported but unused"),
         }

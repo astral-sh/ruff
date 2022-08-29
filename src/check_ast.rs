@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Suite,
@@ -11,6 +12,11 @@ use crate::settings::Settings;
 use crate::visitor;
 use crate::visitor::Visitor;
 
+fn id() -> usize {
+    static COUNTER: AtomicUsize = AtomicUsize::new(1);
+    COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
 enum ScopeKind {
     Class,
     Function,
@@ -19,8 +25,19 @@ enum ScopeKind {
 }
 
 struct Scope {
+    id: usize,
     kind: ScopeKind,
     values: BTreeMap<String, Binding>,
+}
+
+impl Scope {
+    fn new(kind: ScopeKind) -> Self {
+        Scope {
+            id: id(),
+            kind,
+            values: BTreeMap::new(),
+        }
+    }
 }
 
 enum BindingKind {
@@ -38,7 +55,7 @@ struct Binding {
     kind: BindingKind,
     name: String,
     location: Location,
-    used: bool,
+    used: Option<usize>,
 }
 
 struct Checker<'a> {
@@ -68,27 +85,42 @@ impl Checker<'_> {
 impl Visitor for Checker<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match &stmt.node {
+            StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
+                // TODO(charlie): Handle doctests.
+                let global_scope_index = 0;
+                let global_scope_id = self.scopes[global_scope_index].id;
+                let current_scope_id = self.scopes.last().expect("No current scope found.").id;
+                if current_scope_id != global_scope_id {
+                    for name in names {
+                        for scope in self.scopes.iter_mut().skip(global_scope_index + 1) {
+                            scope.values.insert(
+                                name.to_string(),
+                                Binding {
+                                    kind: BindingKind::Assignment,
+                                    name: name.clone(),
+                                    used: Some(global_scope_id),
+                                    location: stmt.location,
+                                },
+                            );
+                        }
+                    }
+                }
+            }
             StmtKind::FunctionDef { name, .. } => {
-                self.push_scope(Scope {
-                    kind: Function,
-                    values: BTreeMap::new(),
-                });
+                self.push_scope(Scope::new(Function));
                 self.add_binding(Binding {
                     kind: BindingKind::ClassDefinition,
                     name: name.clone(),
-                    used: false,
+                    used: None,
                     location: stmt.location,
                 })
             }
             StmtKind::AsyncFunctionDef { name, .. } => {
-                self.push_scope(Scope {
-                    kind: Function,
-                    values: BTreeMap::new(),
-                });
+                self.push_scope(Scope::new(Function));
                 self.add_binding(Binding {
                     kind: BindingKind::ClassDefinition,
                     name: name.clone(),
-                    used: false,
+                    used: None,
                     location: stmt.location,
                 })
             }
@@ -111,17 +143,14 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
-            StmtKind::ClassDef { .. } => self.push_scope(Scope {
-                kind: Class,
-                values: BTreeMap::new(),
-            }),
+            StmtKind::ClassDef { .. } => self.push_scope(Scope::new(Class)),
             StmtKind::Import { names } => {
                 for alias in names {
                     if alias.node.name.contains('.') && alias.node.asname.is_none() {
                         self.add_binding(Binding {
                             kind: BindingKind::SubmoduleImportation,
                             name: alias.node.name.clone(),
-                            used: false,
+                            used: None,
                             location: stmt.location,
                         })
                     } else {
@@ -138,7 +167,7 @@ impl Visitor for Checker<'_> {
                                 .asname
                                 .clone()
                                 .unwrap_or_else(|| alias.node.name.clone()),
-                            used: false,
+                            used: None,
                             location: stmt.location,
                         })
                     }
@@ -155,14 +184,14 @@ impl Visitor for Checker<'_> {
                         self.add_binding(Binding {
                             kind: BindingKind::FutureImportation,
                             name,
-                            used: true,
+                            used: Some(self.scopes.last().expect("No current scope found.").id),
                             location: stmt.location,
                         });
                     } else if alias.node.name == "*" {
                         self.add_binding(Binding {
                             kind: BindingKind::StarImportation,
                             name,
-                            used: false,
+                            used: None,
                             location: stmt.location,
                         });
 
@@ -183,7 +212,7 @@ impl Visitor for Checker<'_> {
                                 Some(parent) => format!("{}.{}", parent, name),
                             }),
                             name,
-                            used: false,
+                            used: None,
                             location: stmt.location,
                         })
                     }
@@ -251,7 +280,7 @@ impl Visitor for Checker<'_> {
             self.add_binding(Binding {
                 kind: BindingKind::Definition,
                 name: name.clone(),
-                used: false,
+                used: None,
                 location: stmt.location,
             });
         }
@@ -272,14 +301,11 @@ impl Visitor for Checker<'_> {
                 ExprContext::Store => self.handle_node_store(expr),
                 ExprContext::Del => {}
             },
-            ExprKind::GeneratorExp { .. } => self.push_scope(Scope {
-                kind: Generator,
-                values: BTreeMap::new(),
-            }),
-            ExprKind::Lambda { .. } => self.push_scope(Scope {
-                kind: Function,
-                values: BTreeMap::new(),
-            }),
+            ExprKind::GeneratorExp { .. }
+            | ExprKind::ListComp { .. }
+            | ExprKind::DictComp { .. }
+            | ExprKind::SetComp { .. } => self.push_scope(Scope::new(Generator)),
+            ExprKind::Lambda { .. } => self.push_scope(Scope::new(Function)),
             ExprKind::JoinedStr { values } => {
                 if !self.in_f_string
                     && self
@@ -307,7 +333,11 @@ impl Visitor for Checker<'_> {
         visitor::walk_expr(self, expr);
 
         match &expr.node {
-            ExprKind::GeneratorExp { .. } | ExprKind::Lambda { .. } => {
+            ExprKind::GeneratorExp { .. }
+            | ExprKind::ListComp { .. }
+            | ExprKind::DictComp { .. }
+            | ExprKind::SetComp { .. }
+            | ExprKind::Lambda { .. } => {
                 if let Some(scope) = self.scopes.pop() {
                     self.dead_scopes.push(scope);
                 }
@@ -361,7 +391,7 @@ impl Visitor for Checker<'_> {
         self.add_binding(Binding {
             kind: BindingKind::Argument,
             name: arg.node.arg.clone(),
-            used: false,
+            used: None,
             location: arg.location,
         });
         visitor::walk_arg(self, arg);
@@ -379,9 +409,9 @@ impl Checker<'_> {
     }
 
     fn add_binding(&mut self, binding: Binding) {
-        // TODO(charlie): Don't treat annotations as assignments if there is an existing value.
         let scope = self.scopes.last_mut().expect("No current scope found.");
 
+        // TODO(charlie): Don't treat annotations as assignments if there is an existing value.
         scope.values.insert(
             binding.name.clone(),
             match scope.values.get(&binding.name) {
@@ -398,6 +428,7 @@ impl Checker<'_> {
 
     fn handle_node_load(&mut self, expr: &Expr) {
         if let ExprKind::Name { id, .. } = &expr.node {
+            let scope_id = self.scopes.last_mut().expect("No current scope found.").id;
             for scope in self.scopes.iter_mut().rev() {
                 if matches!(scope.kind, Class) {
                     if id == "__class__" {
@@ -407,7 +438,7 @@ impl Checker<'_> {
                     }
                 }
                 if let Some(binding) = scope.values.get_mut(id) {
-                    binding.used = true;
+                    binding.used = Some(scope_id);
                 }
             }
         }
@@ -415,11 +446,35 @@ impl Checker<'_> {
 
     fn handle_node_store(&mut self, expr: &Expr) {
         if let ExprKind::Name { id, .. } = &expr.node {
+            if self.settings.select.contains(&CheckCode::F832) {
+                let current = self.scopes.last().expect("No current scope found.");
+                if matches!(current.kind, ScopeKind::Function) && !current.values.contains_key(id) {
+                    for scope in self.scopes.iter().rev().skip(1) {
+                        if matches!(scope.kind, ScopeKind::Function) || matches!(scope.kind, Module)
+                        {
+                            let used = scope
+                                .values
+                                .get(id)
+                                .map(|binding| binding.used)
+                                .unwrap_or_default();
+                            if let Some(scope_id) = used {
+                                if scope_id == current.id {
+                                    self.checks.push(Check {
+                                        kind: CheckKind::UndefinedLocal(id.clone()),
+                                        location: expr.location,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // TODO(charlie): Handle alternate binding types (like `Annotation`).
             self.add_binding(Binding {
                 kind: BindingKind::Assignment,
                 name: id.to_string(),
-                used: false,
+                used: None,
                 location: expr.location,
             });
         }
@@ -438,7 +493,7 @@ impl Checker<'_> {
             // TODO(charlie): Handle `__all__`.
             for scope in &self.dead_scopes {
                 for (_, binding) in scope.values.iter().rev() {
-                    if !binding.used {
+                    if binding.used.is_none() {
                         if let BindingKind::Importation(name) = &binding.kind {
                             self.checks.push(Check {
                                 kind: CheckKind::UnusedImport(name.clone()),
@@ -454,10 +509,7 @@ impl Checker<'_> {
 
 pub fn check_ast(python_ast: &Suite, settings: &Settings, path: &str) -> Vec<Check> {
     let mut checker = Checker::new(settings);
-    checker.push_scope(Scope {
-        kind: Module,
-        values: BTreeMap::new(),
-    });
+    checker.push_scope(Scope::new(Module));
 
     for stmt in python_ast {
         checker.visit_stmt(stmt);
