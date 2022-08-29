@@ -125,10 +125,13 @@ ruff is distributed on [PyPI](https://pypi.org/project/ruff/), and published via
 For now, releases are cut and published manually:
 
 ```shell
-for PYTHON_VERSION in 3.7 3.8 3.9 3.10
+for TARGET in x86_64-apple-darwin aarch64-apple-darwin
 do
-  maturin publish --username crmarsh --skip-existing --target x86_64-apple-darwin -i /usr/local/opt/python@${PYTHON_VERSION}/libexec/bin/python
-  maturin publish --username crmarsh --skip-existing --target aarch64-apple-darwin -i /usr/local/opt/python@${PYTHON_VERSION}/libexec/bin/python
+  maturin publish --username crmarsh --skip-existing --target ${TARGET} -i \
+    /usr/local/opt/python@3.7/libexec/bin/python \
+    /usr/local/opt/python@3.8/libexec/bin/python \
+    /usr/local/opt/python@3.9/libexec/bin/python \
+    /usr/local/opt/python@3.10/libexec/bin/python
 done
 ```
 

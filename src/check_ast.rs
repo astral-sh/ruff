@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use rustpython_parser::ast::{
-    Arg, Arguments, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Suite,
+    Arg, Arguments, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Suite,
 };
+use rustpython_parser::parser;
 
 use crate::check_ast::ScopeKind::{Class, Function, Generator, Module};
 use crate::checks::{Check, CheckCode, CheckKind};
@@ -45,7 +46,9 @@ struct Checker<'a> {
     checks: Vec<Check>,
     scopes: Vec<Scope>,
     dead_scopes: Vec<Scope>,
+    deferred: Vec<String>,
     in_f_string: bool,
+    in_annotation: bool,
 }
 
 impl Checker<'_> {
@@ -55,7 +58,9 @@ impl Checker<'_> {
             checks: vec![],
             scopes: vec![],
             dead_scopes: vec![],
+            deferred: vec![],
             in_f_string: false,
+            in_annotation: false,
         }
     }
 }
@@ -252,6 +257,13 @@ impl Visitor for Checker<'_> {
         }
     }
 
+    fn visit_annotation(&mut self, expr: &Expr) {
+        let initial = self.in_annotation;
+        self.in_annotation = true;
+        self.visit_expr(expr);
+        self.in_annotation = initial;
+    }
+
     fn visit_expr(&mut self, expr: &Expr) {
         let initial = self.in_f_string;
         match &expr.node {
@@ -285,6 +297,10 @@ impl Visitor for Checker<'_> {
                 }
                 self.in_f_string = true;
             }
+            ExprKind::Constant {
+                value: Constant::Str(value),
+                ..
+            } if self.in_annotation => self.deferred.push(value.to_string()),
             _ => {}
         };
 
@@ -365,6 +381,7 @@ impl Checker<'_> {
     fn add_binding(&mut self, binding: Binding) {
         // TODO(charlie): Don't treat annotations as assignments if there is an existing value.
         let scope = self.scopes.last_mut().expect("No current scope found.");
+
         scope.values.insert(
             binding.name.clone(),
             match scope.values.get(&binding.name) {
@@ -408,6 +425,14 @@ impl Checker<'_> {
         }
     }
 
+    fn check_deferred(&mut self, path: &str) {
+        for value in self.deferred.clone() {
+            if let Ok(expr) = &parser::parse_expression(&value, path) {
+                self.visit_expr(expr);
+            }
+        }
+    }
+
     fn check_dead_scopes(&mut self) {
         if self.settings.select.contains(&CheckCode::F401) {
             // TODO(charlie): Handle `__all__`.
@@ -427,15 +452,18 @@ impl Checker<'_> {
     }
 }
 
-pub fn check_ast(python_ast: &Suite, settings: &Settings) -> Vec<Check> {
+pub fn check_ast(python_ast: &Suite, settings: &Settings, path: &str) -> Vec<Check> {
     let mut checker = Checker::new(settings);
     checker.push_scope(Scope {
         kind: Module,
         values: BTreeMap::new(),
     });
+
     for stmt in python_ast {
         checker.visit_stmt(stmt);
     }
+    checker.check_deferred(path);
+
     checker.pop_scope();
     checker.check_dead_scopes();
     checker.checks
