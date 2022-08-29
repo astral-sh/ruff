@@ -1712,6 +1712,7 @@ dependencies = [
  "common-path",
  "dirs 4.0.0",
  "fern",
+ "filetime",
  "log",
  "notify",
  "pyo3",

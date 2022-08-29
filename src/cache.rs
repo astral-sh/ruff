@@ -1,9 +1,9 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 use cacache::Error::EntryNotFound;
+use filetime::FileTime;
 use log::error;
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +14,6 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize, Deserialize)]
 struct CacheMetadata {
-    size: u64,
     mtime: i64,
 }
 
@@ -90,7 +89,7 @@ pub fn get(path: &Path, settings: &Settings, mode: &Mode) -> Option<Vec<Message>
         Ok(encoded) => match path.metadata() {
             Ok(m) => match bincode::deserialize::<CheckResult>(&encoded[..]) {
                 Ok(CheckResult { metadata, messages }) => {
-                    if m.size() == metadata.size && m.mtime() == metadata.mtime {
+                    if FileTime::from_last_modification_time(&m).unix_seconds() == metadata.mtime {
                         return Some(messages);
                     }
                 }
@@ -112,8 +111,7 @@ pub fn set(path: &Path, settings: &Settings, messages: &[Message], mode: &Mode) 
     if let Ok(metadata) = path.metadata() {
         let check_result = CheckResultRef {
             metadata: &CacheMetadata {
-                size: metadata.size(),
-                mtime: metadata.mtime(),
+                mtime: FileTime::from_last_modification_time(&metadata).unix_seconds(),
             },
             messages,
         };
