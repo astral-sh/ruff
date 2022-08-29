@@ -38,6 +38,11 @@ Available as [ruff](https://pypi.org/project/ruff/) on PyPI:
 pip install ruff
 ```
 
+For now, wheels are only available for macOS (on Python 3.7, 3.8, 3.9, and 3.10). If you're using a
+different operating system or Python version, you'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
+prior to running `pip install ruff`. (This is an effort limitation on my part, not a technical
+limitation.)
+
 ### Usage
 
 To run ruff, try any of the following:
@@ -120,8 +125,11 @@ ruff is distributed on [PyPI](https://pypi.org/project/ruff/), and published via
 For now, releases are cut and published manually:
 
 ```shell
-maturin publish --username crmarsh --skip-existing --target x86_64-apple-darwin && \
-  maturin publish --username crmarsh --skip-existing --target aarch64-apple-darwin
+for PYTHON_VERSION in 3.7 3.8 3.9 3.10
+do
+  maturin publish --username crmarsh --skip-existing --target x86_64-apple-darwin -i /usr/local/opt/python@${PYTHON_VERSION}/libexec/bin/python
+  maturin publish --username crmarsh --skip-existing --target aarch64-apple-darwin -i /usr/local/opt/python@${PYTHON_VERSION}/libexec/bin/python
+done
 ```
 
 ## Benchmarking

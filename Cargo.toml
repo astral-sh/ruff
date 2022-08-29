@@ -5,7 +5,6 @@ edition = "2021"
 
 [lib]
 name = "ruff"
-crate-type = ["cdylib", "lib"]
 
 [dependencies]
 anyhow = { version = "1.0.60" }
@@ -20,7 +19,7 @@ dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
-pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py37"] }
+pyo3 = { version = "0.17.1", features = ["auto-initialize"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "7a688e0b6c2904f286acac1e4af3f1628dd38589" }
@@ -32,3 +31,4 @@ walkdir = { version = "2.3.2" }
 [profile.release]
 lto = true
 panic = "abort"
+
