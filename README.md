@@ -6,7 +6,7 @@
 An extremely fast Python linter, written in Rust.
 
 <p align="center">
-  <img alt="Bar chart with benchmark results" src="https://user-images.githubusercontent.com/1309177/187330134-ac05076c-8d16-4451-a300-986692b34abf.svg">
+  <img alt="Bar chart with benchmark results" src="https://user-images.githubusercontent.com/1309177/187504482-6d9df992-a81d-4e86-9f6a-d958741c8182.svg">
 </p>
 
 <p align="center">
@@ -22,6 +22,8 @@ An extremely fast Python linter, written in Rust.
 
 _ruff is a proof-of-concept and not yet intended for production use. It supports only a small subset
 of the Flake8 rules, and may crash on your codebase._
+
+Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Installation and usage
 
