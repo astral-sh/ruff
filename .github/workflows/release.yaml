@@ -260,7 +260,6 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     needs:
-      - lint
       - macos
       - windows
       - linux
