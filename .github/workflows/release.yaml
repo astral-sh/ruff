@@ -264,7 +264,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: "3.x"
       - name: Install Rust toolchain
@@ -293,7 +293,7 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: wheels
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
       - name: Publish to PyPi
         env:
           TWINE_USERNAME: __token__
