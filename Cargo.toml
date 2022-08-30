@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.18"
+version = "0.0.19"
 edition = "2021"
 
 [lib]
@@ -20,7 +20,6 @@ fern = { version = "0.6.1" }
 filetime = { version = "0.2.17" }
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
-pyo3 = { version = "0.17.1", features = ["auto-initialize"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "7a688e0b6c2904f286acac1e4af3f1628dd38589" }

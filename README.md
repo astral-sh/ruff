@@ -119,18 +119,7 @@ cargo test
 
 ruff is distributed on [PyPI](https://pypi.org/project/ruff/), and published via [`maturin`](https://github.com/PyO3/maturin).
 
-For now, releases are cut and published manually:
-
-```shell
-for TARGET in x86_64-apple-darwin aarch64-apple-darwin
-do
-  maturin publish --username crmarsh --skip-existing --target ${TARGET} -i \
-    /usr/local/opt/python@3.7/libexec/bin/python \
-    /usr/local/opt/python@3.8/libexec/bin/python \
-    /usr/local/opt/python@3.9/libexec/bin/python \
-    /usr/local/opt/python@3.10/libexec/bin/python
-done
-```
+See: `.github/workflows/release.yaml`.
 
 ## Benchmarking
 

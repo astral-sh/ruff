@@ -8,14 +8,11 @@ on:
 jobs:
   macos:
     runs-on: macos-latest
-    strategy:
-      matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10']
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.10
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -32,12 +29,10 @@ jobs:
         run: |
           pip install ruff --no-index --find-links dist --force-reinstall
       - name: Build wheels - universal2
-        if: ${{ matrix.python-version >= '3.8' || matrix.python-version == '3.10' }}
         uses: messense/maturin-action@v1
         with:
           args: -i python --release --universal2 --out dist
       - name: Install built wheel - universal2
-        if: ${{ matrix.python-version >= '3.8' }}
         run: |
           pip install ruff --no-index --find-links dist --force-reinstall
       - name: Upload wheels
@@ -50,13 +45,12 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10']
         target: [x64, x86]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.10
           architecture: ${{ matrix.target }}
       - name: Update rustup
         run: rustup self update
@@ -84,7 +78,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10']
         target: [x86_64, i686]
     steps:
     - uses: actions/checkout@v2
@@ -96,13 +89,13 @@ jobs:
         default: true
     - uses: actions/setup-python@v2
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: 3.10
     - name: Build Wheels
       uses: messense/maturin-action@v1
       with:
         target: ${{ matrix.target }}
         manylinux: auto
-        args: -i ${{ matrix.python-version }} --release --out dist
+        args: -i 3.10 --release --out dist
     - name: Install built wheel
       if: matrix.target == 'x86_64'
       run: |
@@ -117,7 +110,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10']
         target: [aarch64, armv7, s390x, ppc64le]
     steps:
     - uses: actions/checkout@v2
@@ -126,7 +118,7 @@ jobs:
       with:
         target: ${{ matrix.target }}
         manylinux: auto
-        args: -i ${{ matrix.python-version }} --release --out dist
+        args: -i 3.10 --release --out dist
     - uses: uraimo/run-on-arch-action@v2.2.0
       name: Install built wheel
       with:
@@ -143,7 +135,7 @@ jobs:
           apt-get install -y curl python3.7-venv python3.9-venv python3.10-venv
         run: |
           ls -lrth /artifacts
-          PYTHON=python${{ matrix.python-version }}
+          PYTHON=python3.10
           $PYTHON -m venv venv
           venv/bin/pip install -U pip
           venv/bin/pip install ruff --no-index --find-links /artifacts --force-reinstall
