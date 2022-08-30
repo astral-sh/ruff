@@ -36,13 +36,7 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
     }
 
     // Run the lines-based checks.
-    if settings
-        .select
-        .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::Lines))
-    {
-        checks.extend(check_lines(&contents, settings));
-    }
+    check_lines(&mut checks, &contents, settings);
 
     // Convert to messages.
     let messages: Vec<Message> = checks
@@ -52,7 +46,6 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
             location: check.location,
             filename: path.to_string_lossy().to_string(),
         })
-        .filter(|message| !message.is_inline_ignored())
         .collect();
     cache::set(path, settings, &messages, mode);
 

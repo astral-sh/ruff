@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -20,16 +20,6 @@ pub fn iter_python_files(path: &PathBuf) -> impl Iterator<Item = DirEntry> {
         .filter_entry(is_not_hidden)
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.path().to_string_lossy().ends_with(".py"))
-}
-
-pub fn read_line(path: &Path, row: &usize) -> Result<String> {
-    let file = File::open(path)?;
-    let buf_reader = BufReader::new(file);
-    buf_reader
-        .lines()
-        .nth(*row - 1)
-        .unwrap()
-        .map_err(|e| e.into())
 }
 
 pub fn read_file(path: &Path) -> Result<String> {

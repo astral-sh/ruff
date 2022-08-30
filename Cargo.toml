@@ -8,7 +8,6 @@ name = "ruff"
 
 [dependencies]
 anyhow = { version = "1.0.60" }
-autoincrement = "1.0.1"
 bincode = { version = "1.3.3" }
 cacache = { version = "10.0.1" }
 chrono = { version = "0.4.21" }
