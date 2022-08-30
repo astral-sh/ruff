@@ -13,14 +13,12 @@ An extremely fast Python linter, written in Rust.
   <i>Linting the CPython codebase from scratch.</i>
 </p>
 
-Major features:
-
-- 10-100x faster than existing linters.
-- Installable via `pip`.
-- Python 3.10 compatibility.
-- [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache semantics.
-- [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` semantics.
-- `pyproject.toml` support.
+- ⚡️ 10-100x faster than existing linters
+- 🐍 Installable via `pip`
+- 🤝 Python 3.10 compatibility
+- 🛠️ `pyproject.toml` support
+- 📦 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache semantics
+- 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` semantics
 
 _ruff is a proof-of-concept and not yet intended for production use. It supports only a small subset
 of the Flake8 rules, and may crash on your codebase._
