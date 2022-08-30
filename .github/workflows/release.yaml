@@ -267,7 +267,7 @@ jobs:
       - musllinux
       - musllinux-cross
       - pypy
-    if: "github.ref == 'refs/heads/main' && startsWith(github.ref, 'refs/tags/')"
+    if: "startsWith(github.ref, 'refs/tags/')"
     steps:
       - uses: actions/download-artifact@v2
         with:
