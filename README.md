@@ -35,11 +35,6 @@ Available as [ruff](https://pypi.org/project/ruff/) on PyPI:
 pip install ruff
 ```
 
-For now, wheels are available for Python 3.7, 3.8, 3.9, and 3.10 on macOS, Windows, and Linux. If a
-wheel isn't available for your Python version or platform, you'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
-prior to running `pip install ruff`. (This is an effort limitation on my part, not a technical
-limitation.)
-
 ### Usage
 
 To run ruff, try any of the following:
@@ -81,7 +76,7 @@ See `ruff --help` for more:
 
 ```shell
 ruff
-A Python linter written in Rust
+An extremely fast Python linter.
 
 USAGE:
     ruff [OPTIONS] <FILES>...
