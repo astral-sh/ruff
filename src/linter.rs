@@ -249,6 +249,42 @@ mod tests {
     }
 
     #[test]
+    fn f821() -> Result<()> {
+        let actual = check_path(
+            &Path::new("./resources/test/src/F821.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F821]),
+            },
+            &cache::Mode::None,
+        )?;
+        let expected = vec![
+            Message {
+                kind: CheckKind::UndefinedName("self".to_string()),
+                location: Location::new(2, 12),
+                filename: "./resources/test/src/F821.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::UndefinedName("self".to_string()),
+                location: Location::new(6, 13),
+                filename: "./resources/test/src/F821.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::UndefinedName("self".to_string()),
+                location: Location::new(10, 9),
+                filename: "./resources/test/src/F821.py".to_string(),
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f831() -> Result<()> {
         let actual = check_path(
             &Path::new("./resources/test/src/F831.py"),
