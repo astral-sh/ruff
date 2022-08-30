@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  push:
   create:
     tags:
       - v*
@@ -259,7 +260,6 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     needs:
-      - lint
       - macos
       - windows
       - linux
