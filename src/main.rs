@@ -21,7 +21,7 @@ use ::ruff::tell_user;
 
 #[derive(Debug, Parser)]
 #[clap(name = "ruff")]
-#[clap(about = "A Python linter written in Rust", long_about = None)]
+#[clap(about = "An extremely fast Python linter.", long_about = None)]
 struct Cli {
     #[clap(parse(from_os_str), value_hint = ValueHint::AnyPath, required = true)]
     files: Vec<PathBuf>,
