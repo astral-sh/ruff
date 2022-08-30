@@ -299,7 +299,7 @@ impl Visitor for Checker<'_> {
             ExprKind::Name { ctx, .. } => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => self.handle_node_store(expr),
-                ExprContext::Del => {}
+                ExprContext::Del => self.handle_node_delete(expr),
             },
             ExprKind::GeneratorExp { .. }
             | ExprKind::ListComp { .. }
@@ -439,7 +439,15 @@ impl Checker<'_> {
                 }
                 if let Some(binding) = scope.values.get_mut(id) {
                     binding.used = Some(scope_id);
+                    return;
                 }
+            }
+
+            if self.settings.select.contains(&CheckCode::F821) {
+                self.checks.push(Check {
+                    kind: CheckKind::UndefinedName(id.clone()),
+                    location: expr.location,
+                })
             }
         }
     }
@@ -477,6 +485,20 @@ impl Checker<'_> {
                 used: None,
                 location: expr.location,
             });
+        }
+    }
+
+    fn handle_node_delete(&mut self, expr: &Expr) {
+        if let ExprKind::Name { id, .. } = &expr.node {
+            let current = self.scopes.last_mut().expect("No current scope found.");
+            if current.values.remove(id).is_none()
+                && self.settings.select.contains(&CheckCode::F821)
+            {
+                self.checks.push(Check {
+                    kind: CheckKind::UndefinedName(id.clone()),
+                    location: expr.location,
+                })
+            }
         }
     }
 
