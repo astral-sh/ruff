@@ -189,25 +189,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "autoincrement"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc81b6ad0c9122715c741113fb97ba283f723b1dd86e186dd7df00a2b6877bfe"
-dependencies = [
- "autoincrement_derive",
-]
-
-[[package]]
-name = "autoincrement_derive"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1259ce9b9a586a3f5ada3d236800ad0aa446b0d4c3dbac4158084a1dd704a228"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
 name = "base64"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1657,7 +1638,6 @@ name = "ruff"
 version = "0.0.19"
 dependencies = [
  "anyhow",
- "autoincrement",
  "bincode",
  "cacache",
  "chrono",

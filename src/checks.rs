@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::Result;
+use regex::Regex;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
@@ -134,4 +135,29 @@ impl CheckKind {
 pub struct Check {
     pub kind: CheckKind,
     pub location: Location,
+}
+
+impl Check {
+    pub fn is_inline_ignored(&self, line: &str) -> bool {
+        let re = Regex::new(r"(?i)# noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap();
+        match re.captures(line) {
+            Some(caps) => match caps.name("codes") {
+                Some(codes) => {
+                    let re = Regex::new(r"[,\s]").unwrap();
+                    for code in re
+                        .split(codes.as_str())
+                        .map(|code| code.trim())
+                        .filter(|code| !code.is_empty())
+                    {
+                        if code == self.kind.code().as_str() {
+                            return true;
+                        }
+                    }
+                    false
+                }
+                None => true,
+            },
+            None => false,
+        }
+    }
 }
