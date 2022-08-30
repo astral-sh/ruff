@@ -1,7 +1,8 @@
+use std::str::FromStr;
+
 use anyhow::Result;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub enum CheckCode {

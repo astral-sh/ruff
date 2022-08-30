@@ -31,4 +31,3 @@ walkdir = { version = "2.3.2" }
 [profile.release]
 lto = true
 panic = "abort"
-
