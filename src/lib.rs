@@ -1,3 +1,4 @@
+mod builtins;
 mod cache;
 pub mod check_ast;
 mod check_lines;
