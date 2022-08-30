@@ -255,27 +255,6 @@ jobs:
           name: wheels
           path: dist
 
-  lint:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # Lint on earliest and latest
-        python: ["3.7", "3.x"]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          default: true
-      - name: Lint
-        run: |
-          make lint
   release:
     name: Release
     runs-on: ubuntu-latest
