@@ -6,7 +6,7 @@
 An extremely fast Python linter, written in Rust.
 
 <p align="center">
-  <img alt="Bar chart with benchmark results" src="https://user-images.githubusercontent.com/1309177/187221271-9db38ced-c622-406a-abf3-dec27ebc1b08.svg">
+  <img alt="Bar chart with benchmark results" src="https://user-images.githubusercontent.com/1309177/187330134-ac05076c-8d16-4451-a300-986692b34abf.svg">
 </p>
 
 <p align="center">
@@ -15,7 +15,7 @@ An extremely fast Python linter, written in Rust.
 
 Major features:
 
-- 10-100x faster than your current linter.
+- 10-100x faster than existing linters.
 - Installable via `pip`.
 - Python 3.10 compatibility.
 - [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache semantics.
@@ -35,8 +35,8 @@ Available as [ruff](https://pypi.org/project/ruff/) on PyPI:
 pip install ruff
 ```
 
-For now, wheels are only available for macOS (on Python 3.7, 3.8, 3.9, and 3.10). If you're using a
-different operating system or Python version, you'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
+For now, wheels are available for Python 3.7, 3.8, 3.9, and 3.10 on macOS, Windows, and Linux. If a
+wheel isn't available for your Python version or platform, you'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
 prior to running `pip install ruff`. (This is an effort limitation on my part, not a technical
 limitation.)
 
@@ -214,10 +214,11 @@ Benchmark 2: ./target/release/ruff ./resources/test/cpython/
   Range (min … max):    55.9 ms …  67.0 ms    48 runs
 ```
 
-To benchmark the ecosystem's existing tools:
+To benchmark against the ecosystem's existing tools:
 
 ```shell
-hyperfine --ignore-failure --warmup 1 \
+hyperfine --ignore-failure --warmup 5 \
+  "./target/release/ruff ./resources/test/cpython/ --no-cache" \
   "pylint --recursive=y resources/test/cpython/" \
   "pyflakes resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
@@ -230,6 +231,7 @@ hyperfine --ignore-failure --warmup 1 \
 ```
 
 In order, these evaluate:
+- ruff
 - Pylint
 - PyFlakes
 - autoflake
@@ -244,79 +246,56 @@ In order, these evaluate:
 
 ```shell
 Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
-  Time (mean ± σ):     566.9 ms ±  36.6 ms    [User: 2618.0 ms, System: 992.0 ms]
-  Range (min … max):   504.8 ms … 634.0 ms    10 runs
+  Time (mean ± σ):     469.3 ms ±  16.3 ms    [User: 2663.0 ms, System: 972.5 ms]
+  Range (min … max):   445.2 ms … 494.8 ms    10 runs
 
-  Warning: Ignoring non-zero exit code.
+Benchmark 2: pylint --recursive=y resources/test/cpython/
+  Time (mean ± σ):     27.211 s ±  0.097 s    [User: 26.405 s, System: 0.799 s]
+  Range (min … max):   27.056 s … 27.349 s    10 runs
 
-Benchmark 2: ./target/release/ruff ./resources/test/cpython/
-  Time (mean ± σ):      79.5 ms ±   2.3 ms    [User: 330.1 ms, System: 254.3 ms]
-  Range (min … max):    75.6 ms …  85.2 ms    35 runs
+Benchmark 3: pyflakes resources/test/cpython
+  Time (mean ± σ):     27.309 s ±  0.033 s    [User: 27.137 s, System: 0.169 s]
+  Range (min … max):   27.267 s … 27.372 s    10 runs
 
-  Warning: Ignoring non-zero exit code.
+Benchmark 4: autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython
+  Time (mean ± σ):      8.027 s ±  0.024 s    [User: 74.255 s, System: 0.953 s]
+  Range (min … max):    7.969 s …  8.052 s    10 runs
 
-Benchmark 3: pylint --recursive=y resources/test/cpython/
-  Time (mean ± σ):     27.532 s ±  0.207 s    [User: 26.606 s, System: 0.899 s]
-  Range (min … max):   27.344 s … 28.064 s    10 runs
+Benchmark 5: pycodestyle resources/test/cpython
+  Time (mean ± σ):     41.666 s ±  0.266 s    [User: 41.531 s, System: 0.132 s]
+  Range (min … max):   41.295 s … 41.980 s    10 runs
 
-  Warning: Ignoring non-zero exit code.
+Benchmark 6: pycodestyle --select E501 resources/test/cpython
+  Time (mean ± σ):     14.547 s ±  0.077 s    [User: 14.466 s, System: 0.079 s]
+  Range (min … max):   14.429 s … 14.695 s    10 runs
 
-Benchmark 4: pyflakes resources/test/cpython
-  Time (mean ± σ):     28.074 s ±  0.551 s    [User: 27.845 s, System: 0.212 s]
-  Range (min … max):   27.479 s … 29.467 s    10 runs
+Benchmark 7: flake8 resources/test/cpython
+  Time (mean ± σ):     75.700 s ±  0.152 s    [User: 75.254 s, System: 0.440 s]
+  Range (min … max):   75.513 s … 76.014 s    10 runs
 
-  Warning: Ignoring non-zero exit code.
+Benchmark 8: flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython
+  Time (mean ± σ):     75.122 s ±  0.532 s    [User: 74.677 s, System: 0.440 s]
+  Range (min … max):   74.130 s … 75.606 s    10 runs
 
-Benchmark 5: autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython
-  Time (mean ± σ):      4.986 s ±  0.190 s    [User: 43.257 s, System: 0.801 s]
-  Range (min … max):    4.837 s …  5.462 s    10 runs
+Benchmark 9: python -m scripts.run_flake8 resources/test/cpython
+  Time (mean ± σ):     12.794 s ±  0.147 s    [User: 90.792 s, System: 0.738 s]
+  Range (min … max):   12.606 s … 13.030 s    10 runs
 
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 6: pycodestyle resources/test/cpython
-  Time (mean ± σ):     42.400 s ±  0.211 s    [User: 42.177 s, System: 0.213 s]
-  Range (min … max):   42.106 s … 42.677 s    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 7: pycodestyle --select E501 resources/test/cpython
-  Time (mean ± σ):     14.578 s ±  0.068 s    [User: 14.466 s, System: 0.108 s]
-  Range (min … max):   14.475 s … 14.726 s    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 8: flake8 resources/test/cpython
-  Time (mean ± σ):     76.414 s ±  0.461 s    [User: 75.611 s, System: 0.652 s]
-  Range (min … max):   75.691 s … 77.180 s    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 9: flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython
-  Time (mean ± σ):     75.960 s ±  0.610 s    [User: 75.255 s, System: 0.634 s]
-  Range (min … max):   75.159 s … 77.066 s    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 10: python -m scripts.run_flake8 resources/test/cpython
-  Time (mean ± σ):     13.536 s ±  0.584 s    [User: 90.911 s, System: 0.934 s]
-  Range (min … max):   12.831 s … 14.699 s    10 runs
-
-Benchmark 11: python -m scripts.run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501
-  Time (mean ± σ):     12.781 s ±  0.192 s    [User: 89.525 s, System: 0.882 s]
-  Range (min … max):   12.568 s … 13.119 s    10 runs
+Benchmark 10: python -m scripts.run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501
+  Time (mean ± σ):     12.487 s ±  0.118 s    [User: 90.052 s, System: 0.714 s]
+  Range (min … max):   12.265 s … 12.665 s    10 runs
 
 Summary
-  './target/release/ruff ./resources/test/cpython/' ran
-    7.13 ± 0.50 times faster than './target/release/ruff ./resources/test/cpython/ --no-cache'
-   62.69 ± 3.01 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
-  160.71 ± 5.26 times faster than 'python -m scripts.run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501'
-  170.21 ± 8.86 times faster than 'python -m scripts.run_flake8 resources/test/cpython'
-  183.30 ± 5.40 times faster than 'pycodestyle --select E501 resources/test/cpython'
-  346.19 ± 10.40 times faster than 'pylint --recursive=y resources/test/cpython/'
-  353.00 ± 12.39 times faster than 'pyflakes resources/test/cpython'
-  533.14 ± 15.74 times faster than 'pycodestyle resources/test/cpython'
-  955.13 ± 28.83 times faster than 'flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython'
-  960.82 ± 28.55 times faster than 'flake8 resources/test/cpython'
+  './target/release/ruff ./resources/test/cpython/ --no-cache' ran
+   17.10 ± 0.60 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
+   26.60 ± 0.96 times faster than 'python -m scripts.run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501'
+   27.26 ± 1.00 times faster than 'python -m scripts.run_flake8 resources/test/cpython'
+   30.99 ± 1.09 times faster than 'pycodestyle --select E501 resources/test/cpython'
+   57.98 ± 2.03 times faster than 'pylint --recursive=y resources/test/cpython/'
+   58.19 ± 2.02 times faster than 'pyflakes resources/test/cpython'
+   88.77 ± 3.14 times faster than 'pycodestyle resources/test/cpython'
+  160.06 ± 5.68 times faster than 'flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython'
+  161.29 ± 5.61 times faster than 'flake8 resources/test/cpython'
 ```
 
 ## License
