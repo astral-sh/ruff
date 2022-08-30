@@ -12,3 +12,5 @@ def get_name():
 
 def get_name(self):
     return self.name
+
+x = list()

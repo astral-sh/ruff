@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Suite,
 };
@@ -45,6 +46,7 @@ enum BindingKind {
     Assignment,
     ClassDefinition,
     Definition,
+    Builtin,
     FutureImportation,
     Importation(String),
     StarImportation,
@@ -408,6 +410,25 @@ impl Checker<'_> {
             .push(self.scopes.pop().expect("Attempted to pop without scope."));
     }
 
+    fn bind_builtins(&mut self) {
+        for builtin in BUILTINS {
+            self.add_binding(Binding {
+                kind: BindingKind::Builtin,
+                name: builtin.to_string(),
+                location: Default::default(),
+                used: None,
+            })
+        }
+        for builtin in MAGIC_GLOBALS {
+            self.add_binding(Binding {
+                kind: BindingKind::Builtin,
+                name: builtin.to_string(),
+                location: Default::default(),
+                used: None,
+            })
+        }
+    }
+
     fn add_binding(&mut self, binding: Binding) {
         let scope = self.scopes.last_mut().expect("No current scope found.");
 
@@ -532,6 +553,7 @@ impl Checker<'_> {
 pub fn check_ast(python_ast: &Suite, settings: &Settings, path: &str) -> Vec<Check> {
     let mut checker = Checker::new(settings);
     checker.push_scope(Scope::new(Module));
+    checker.bind_builtins();
 
     for stmt in python_ast {
         checker.visit_stmt(stmt);
