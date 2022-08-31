@@ -12,6 +12,7 @@ pub enum CheckCode {
     F403,
     F541,
     F634,
+    F704,
     F706,
     F821,
     F831,
@@ -30,6 +31,7 @@ impl FromStr for CheckCode {
             "F403" => Ok(CheckCode::F403),
             "F541" => Ok(CheckCode::F541),
             "F634" => Ok(CheckCode::F634),
+            "F704" => Ok(CheckCode::F704),
             "F706" => Ok(CheckCode::F706),
             "F821" => Ok(CheckCode::F821),
             "F831" => Ok(CheckCode::F831),
@@ -49,6 +51,7 @@ impl CheckCode {
             CheckCode::F403 => "F403",
             CheckCode::F541 => "F541",
             CheckCode::F634 => "F634",
+            CheckCode::F704 => "F704",
             CheckCode::F706 => "F706",
             CheckCode::F821 => "F821",
             CheckCode::F831 => "F831",
@@ -66,6 +69,7 @@ impl CheckCode {
             CheckCode::F403 => &LintSource::AST,
             CheckCode::F541 => &LintSource::AST,
             CheckCode::F634 => &LintSource::AST,
+            CheckCode::F704 => &LintSource::AST,
             CheckCode::F706 => &LintSource::AST,
             CheckCode::F821 => &LintSource::AST,
             CheckCode::F831 => &LintSource::AST,
@@ -90,6 +94,7 @@ pub enum CheckKind {
     ImportStarUsage,
     LineTooLong,
     RaiseNotImplemented,
+    YieldOutsideFunction,
     ReturnOutsideFunction,
     UndefinedName(String),
     UndefinedLocal(String),
@@ -107,6 +112,7 @@ impl CheckKind {
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LineTooLong => &CheckCode::E501,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
+            CheckKind::YieldOutsideFunction => &CheckCode::F704,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UndefinedLocal(_) => &CheckCode::F832,
@@ -131,6 +137,9 @@ impl CheckKind {
             CheckKind::LineTooLong => "Line too long".to_string(),
             CheckKind::RaiseNotImplemented => {
                 "'raise NotImplemented' should be 'raise NotImplementedError".to_string()
+            }
+            CheckKind::YieldOutsideFunction => {
+                "a `yield` or `yield from` statement outside of a function/method".to_string()
             }
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
