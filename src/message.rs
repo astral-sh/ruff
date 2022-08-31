@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt;
 
 use colored::Colorize;
@@ -27,6 +28,22 @@ pub struct Message {
     #[serde(with = "LocationDef")]
     pub location: Location,
     pub filename: String,
+}
+
+impl Ord for Message {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (&self.filename, self.location.row(), self.location.column()).cmp(&(
+            &other.filename,
+            other.location.row(),
+            self.location.column(),
+        ))
+    }
+}
+
+impl PartialOrd for Message {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl fmt::Display for Message {
