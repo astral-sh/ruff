@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Result;
+use glob::Pattern;
 
 use crate::checks::CheckCode;
 use crate::pyproject::load_config;
@@ -10,7 +11,7 @@ use crate::pyproject::load_config;
 #[derive(Debug)]
 pub struct Settings {
     pub line_length: usize,
-    pub exclude: Vec<PathBuf>,
+    pub exclude: Vec<Pattern>,
     pub select: BTreeSet<CheckCode>,
 }
 
@@ -39,6 +40,7 @@ impl Settings {
                         path
                     }
                 })
+                .map(|path| Pattern::new(&path.to_string_lossy()).expect("Invalid pattern."))
                 .collect(),
             select: config.select.unwrap_or_else(|| {
                 BTreeSet::from([

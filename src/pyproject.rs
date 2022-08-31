@@ -225,7 +225,10 @@ other-attribute = 1
             config,
             Config {
                 line_length: Some(88),
-                exclude: Some(vec![Path::new("excluded.py").to_path_buf()]),
+                exclude: Some(vec![
+                    Path::new("excluded.py").to_path_buf(),
+                    Path::new("**/migrations").to_path_buf()
+                ]),
                 select: Some(BTreeSet::from([
                     CheckCode::E501,
                     CheckCode::F401,
