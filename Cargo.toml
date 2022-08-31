@@ -7,6 +7,7 @@ edition = "2021"
 name = "ruff"
 
 [dependencies]
+libcst = { path = "../LibCST/native/libcst" }
 anyhow = { version = "1.0.60" }
 bincode = { version = "1.3.3" }
 cacache = { version = "10.0.1" }
