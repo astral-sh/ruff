@@ -349,6 +349,21 @@ impl Visitor for Checker<'_> {
             | ExprKind::DictComp { .. }
             | ExprKind::SetComp { .. } => self.push_scope(Scope::new(Generator)),
             ExprKind::Lambda { .. } => self.push_scope(Scope::new(Function)),
+            ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } => {
+                let scope = self.scopes.last().expect("No current scope found.");
+                if self
+                    .settings
+                    .select
+                    .contains(CheckKind::YieldOutsideFunction.code())
+                    && matches!(scope.kind, ScopeKind::Class)
+                    || matches!(scope.kind, ScopeKind::Module)
+                {
+                    self.checks.push(Check {
+                        kind: CheckKind::YieldOutsideFunction,
+                        location: expr.location,
+                    });
+                }
+            }
             ExprKind::JoinedStr { values } => {
                 if !self.in_f_string
                     && self
