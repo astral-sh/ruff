@@ -5,10 +5,14 @@ from collections import (
     OrderedDict,
     namedtuple,
 )
+import multiprocessing.pool
+import multiprocessing.process
+import logging.config
+import logging.handlers
 
 
 class X:
     def a(self) -> "namedtuple":
         x = os.environ["1"]
         y = Counter()
-        return X
+        z = multiprocessing.pool.ThreadPool()

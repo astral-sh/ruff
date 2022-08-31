@@ -50,12 +50,11 @@ enum BindingKind {
     FutureImportation,
     Importation(String),
     StarImportation,
-    SubmoduleImportation,
+    SubmoduleImportation(String),
 }
 
 struct Binding {
     kind: BindingKind,
-    name: String,
     location: Location,
     used: Option<usize>,
 }
@@ -99,7 +98,6 @@ impl Visitor for Checker<'_> {
                                 name.to_string(),
                                 Binding {
                                     kind: BindingKind::Assignment,
-                                    name: name.clone(),
                                     used: Some(global_scope_id),
                                     location: stmt.location,
                                 },
@@ -109,21 +107,27 @@ impl Visitor for Checker<'_> {
                 }
             }
             StmtKind::FunctionDef { name, .. } => {
-                self.add_binding(Binding {
-                    kind: BindingKind::Definition,
-                    name: name.clone(),
-                    used: None,
-                    location: stmt.location,
-                });
+                self.add_binding(
+                    name.to_string(),
+                    Binding {
+                        kind: BindingKind::Definition,
+
+                        used: None,
+                        location: stmt.location,
+                    },
+                );
                 self.push_scope(Scope::new(Function));
             }
             StmtKind::AsyncFunctionDef { name, .. } => {
-                self.add_binding(Binding {
-                    kind: BindingKind::Definition,
-                    name: name.clone(),
-                    used: None,
-                    location: stmt.location,
-                });
+                self.add_binding(
+                    name.to_string(),
+                    Binding {
+                        kind: BindingKind::Definition,
+
+                        used: None,
+                        location: stmt.location,
+                    },
+                );
                 self.push_scope(Scope::new(Function));
             }
             StmtKind::Return { .. } => {
@@ -149,29 +153,35 @@ impl Visitor for Checker<'_> {
             StmtKind::Import { names } => {
                 for alias in names {
                     if alias.node.name.contains('.') && alias.node.asname.is_none() {
-                        self.add_binding(Binding {
-                            kind: BindingKind::SubmoduleImportation,
-                            name: alias.node.name.clone(),
-                            used: None,
-                            location: stmt.location,
-                        })
+                        self.add_binding(
+                            alias.node.name.split('.').next().unwrap().to_string(),
+                            Binding {
+                                kind: BindingKind::SubmoduleImportation(
+                                    alias.node.name.to_string(),
+                                ),
+                                used: None,
+                                location: stmt.location,
+                            },
+                        )
                     } else {
-                        self.add_binding(Binding {
-                            kind: BindingKind::Importation(
-                                alias
-                                    .node
-                                    .asname
-                                    .clone()
-                                    .unwrap_or_else(|| alias.node.name.clone()),
-                            ),
-                            name: alias
+                        self.add_binding(
+                            alias
                                 .node
                                 .asname
                                 .clone()
                                 .unwrap_or_else(|| alias.node.name.clone()),
-                            used: None,
-                            location: stmt.location,
-                        })
+                            Binding {
+                                kind: BindingKind::Importation(
+                                    alias
+                                        .node
+                                        .asname
+                                        .clone()
+                                        .unwrap_or_else(|| alias.node.name.clone()),
+                                ),
+                                used: None,
+                                location: stmt.location,
+                            },
+                        )
                     }
                 }
             }
@@ -183,19 +193,25 @@ impl Visitor for Checker<'_> {
                         .clone()
                         .unwrap_or_else(|| alias.node.name.clone());
                     if let Some("future") = module.as_deref() {
-                        self.add_binding(Binding {
-                            kind: BindingKind::FutureImportation,
+                        self.add_binding(
                             name,
-                            used: Some(self.scopes.last().expect("No current scope found.").id),
-                            location: stmt.location,
-                        });
+                            Binding {
+                                kind: BindingKind::FutureImportation,
+
+                                used: Some(self.scopes.last().expect("No current scope found.").id),
+                                location: stmt.location,
+                            },
+                        );
                     } else if alias.node.name == "*" {
-                        self.add_binding(Binding {
-                            kind: BindingKind::StarImportation,
+                        self.add_binding(
                             name,
-                            used: None,
-                            location: stmt.location,
-                        });
+                            Binding {
+                                kind: BindingKind::StarImportation,
+
+                                used: None,
+                                location: stmt.location,
+                            },
+                        );
 
                         if self
                             .settings
@@ -208,15 +224,15 @@ impl Visitor for Checker<'_> {
                             });
                         }
                     } else {
-                        self.add_binding(Binding {
+                        let binding = Binding {
                             kind: BindingKind::Importation(match module {
                                 None => name.clone(),
-                                Some(parent) => format!("{}.{}", parent, name),
+                                Some(parent) => format!("{}.{}", parent, name.clone()),
                             }),
-                            name,
                             used: None,
                             location: stmt.location,
-                        })
+                        };
+                        self.add_binding(name, binding)
                     }
                 }
             }
@@ -279,12 +295,15 @@ impl Visitor for Checker<'_> {
         };
 
         if let StmtKind::ClassDef { name, .. } = &stmt.node {
-            self.add_binding(Binding {
-                kind: BindingKind::ClassDefinition,
-                name: name.clone(),
-                used: None,
-                location: stmt.location,
-            });
+            self.add_binding(
+                name.to_string(),
+                Binding {
+                    kind: BindingKind::ClassDefinition,
+
+                    used: None,
+                    location: stmt.location,
+                },
+            );
         }
     }
 
@@ -390,12 +409,14 @@ impl Visitor for Checker<'_> {
     }
 
     fn visit_arg(&mut self, arg: &Arg) {
-        self.add_binding(Binding {
-            kind: BindingKind::Argument,
-            name: arg.node.arg.clone(),
-            used: None,
-            location: arg.location,
-        });
+        self.add_binding(
+            arg.node.arg.to_string(),
+            Binding {
+                kind: BindingKind::Argument,
+                used: None,
+                location: arg.location,
+            },
+        );
         visitor::walk_arg(self, arg);
     }
 }
@@ -412,39 +433,40 @@ impl Checker<'_> {
 
     fn bind_builtins(&mut self) {
         for builtin in BUILTINS {
-            self.add_binding(Binding {
-                kind: BindingKind::Builtin,
-                name: builtin.to_string(),
-                location: Default::default(),
-                used: None,
-            })
+            self.add_binding(
+                builtin.to_string(),
+                Binding {
+                    kind: BindingKind::Builtin,
+                    location: Default::default(),
+                    used: None,
+                },
+            )
         }
         for builtin in MAGIC_GLOBALS {
-            self.add_binding(Binding {
-                kind: BindingKind::Builtin,
-                name: builtin.to_string(),
-                location: Default::default(),
-                used: None,
-            })
+            self.add_binding(
+                builtin.to_string(),
+                Binding {
+                    kind: BindingKind::Builtin,
+                    location: Default::default(),
+                    used: None,
+                },
+            )
         }
     }
 
-    fn add_binding(&mut self, binding: Binding) {
+    fn add_binding(&mut self, name: String, binding: Binding) {
         let scope = self.scopes.last_mut().expect("No current scope found.");
 
         // TODO(charlie): Don't treat annotations as assignments if there is an existing value.
-        scope.values.insert(
-            binding.name.clone(),
-            match scope.values.get(&binding.name) {
-                None => binding,
-                Some(existing) => Binding {
-                    kind: binding.kind,
-                    name: binding.name,
-                    location: binding.location,
-                    used: existing.used,
-                },
+        let binding = match scope.values.get(&name) {
+            None => binding,
+            Some(existing) => Binding {
+                kind: binding.kind,
+                location: binding.location,
+                used: existing.used,
             },
-        );
+        };
+        scope.values.insert(name, binding);
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
@@ -505,12 +527,14 @@ impl Checker<'_> {
             }
 
             // TODO(charlie): Handle alternate binding types (like `Annotation`).
-            self.add_binding(Binding {
-                kind: BindingKind::Assignment,
-                name: id.to_string(),
-                used: None,
-                location: expr.location,
-            });
+            self.add_binding(
+                id.to_string(),
+                Binding {
+                    kind: BindingKind::Assignment,
+                    used: None,
+                    location: expr.location,
+                },
+            );
         }
     }
 
@@ -542,11 +566,15 @@ impl Checker<'_> {
             for scope in &self.dead_scopes {
                 for (_, binding) in scope.values.iter().rev() {
                     if binding.used.is_none() {
-                        if let BindingKind::Importation(name) = &binding.kind {
-                            self.checks.push(Check {
-                                kind: CheckKind::UnusedImport(name.clone()),
-                                location: binding.location,
-                            });
+                        match &binding.kind {
+                            BindingKind::Importation(full_name)
+                            | BindingKind::SubmoduleImportation(full_name) => {
+                                self.checks.push(Check {
+                                    kind: CheckKind::UnusedImport(full_name.to_string()),
+                                    location: binding.location,
+                                });
+                            }
+                            _ => {}
                         }
                     }
                 }
