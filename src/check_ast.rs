@@ -44,8 +44,8 @@ impl Scope {
 enum BindingKind {
     Argument,
     Assignment,
-    ClassDefinition,
     Definition,
+    ClassDefinition,
     Builtin,
     FutureImportation,
     Importation(String),
@@ -109,22 +109,22 @@ impl Visitor for Checker<'_> {
                 }
             }
             StmtKind::FunctionDef { name, .. } => {
-                self.push_scope(Scope::new(Function));
                 self.add_binding(Binding {
-                    kind: BindingKind::ClassDefinition,
+                    kind: BindingKind::Definition,
                     name: name.clone(),
                     used: None,
                     location: stmt.location,
-                })
+                });
+                self.push_scope(Scope::new(Function));
             }
             StmtKind::AsyncFunctionDef { name, .. } => {
-                self.push_scope(Scope::new(Function));
                 self.add_binding(Binding {
-                    kind: BindingKind::ClassDefinition,
+                    kind: BindingKind::Definition,
                     name: name.clone(),
                     used: None,
                     location: stmt.location,
-                })
+                });
+                self.push_scope(Scope::new(Function));
             }
             StmtKind::Return { .. } => {
                 if self
@@ -280,7 +280,7 @@ impl Visitor for Checker<'_> {
 
         if let StmtKind::ClassDef { name, .. } = &stmt.node {
             self.add_binding(Binding {
-                kind: BindingKind::Definition,
+                kind: BindingKind::ClassDefinition,
                 name: name.clone(),
                 used: None,
                 location: stmt.location,
@@ -450,11 +450,13 @@ impl Checker<'_> {
     fn handle_node_load(&mut self, expr: &Expr) {
         if let ExprKind::Name { id, .. } = &expr.node {
             let scope_id = self.scopes.last_mut().expect("No current scope found.").id;
+            let mut first_iter = true;
+            let mut in_generators = false;
             for scope in self.scopes.iter_mut().rev() {
                 if matches!(scope.kind, Class) {
                     if id == "__class__" {
                         return;
-                    } else {
+                    } else if !first_iter && !in_generators {
                         continue;
                     }
                 }
@@ -462,6 +464,9 @@ impl Checker<'_> {
                     binding.used = Some(scope_id);
                     return;
                 }
+
+                first_iter = false;
+                in_generators = matches!(scope.kind, Generator);
             }
 
             if self.settings.select.contains(&CheckCode::F821) {

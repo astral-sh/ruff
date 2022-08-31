@@ -22,7 +22,7 @@ log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "97a9d9de687227595932d6c8a04014dcfc892ff4" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "1613f6c6990011a4bc559e79aaf28d715f9f729b" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }
