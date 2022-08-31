@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
 
+use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::check_ast::ScopeKind::{Class, Function, Generator, Module};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
@@ -111,7 +111,6 @@ impl Visitor for Checker<'_> {
                     name.to_string(),
                     Binding {
                         kind: BindingKind::Definition,
-
                         used: None,
                         location: stmt.location,
                     },
@@ -123,7 +122,6 @@ impl Visitor for Checker<'_> {
                     name.to_string(),
                     Binding {
                         kind: BindingKind::Definition,
-
                         used: None,
                         location: stmt.location,
                     },
@@ -153,6 +151,8 @@ impl Visitor for Checker<'_> {
             StmtKind::Import { names } => {
                 for alias in names {
                     if alias.node.name.contains('.') && alias.node.asname.is_none() {
+                        // TODO(charlie): Multiple submodule imports with the same parent module
+                        // will be merged into a single binding.
                         self.add_binding(
                             alias.node.name.split('.').next().unwrap().to_string(),
                             Binding {
@@ -277,9 +277,7 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
-            StmtKind::AugAssign { target, .. } => {
-                self.handle_node_load(target);
-            }
+            StmtKind::AugAssign { target, .. } => self.handle_node_load(target),
             _ => {}
         }
 
@@ -288,9 +286,7 @@ impl Visitor for Checker<'_> {
         match &stmt.node {
             StmtKind::ClassDef { .. }
             | StmtKind::FunctionDef { .. }
-            | StmtKind::AsyncFunctionDef { .. } => {
-                self.pop_scope();
-            }
+            | StmtKind::AsyncFunctionDef { .. } => self.pop_scope(),
             _ => {}
         };
 
@@ -299,7 +295,6 @@ impl Visitor for Checker<'_> {
                 name.to_string(),
                 Binding {
                     kind: BindingKind::ClassDefinition,
-
                     used: None,
                     location: stmt.location,
                 },
