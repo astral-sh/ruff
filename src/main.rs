@@ -56,7 +56,7 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<M
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
-    let messages: Vec<Message> = files
+    let mut messages: Vec<Message> = files
         .par_iter()
         .filter(|entry| {
             !settings
@@ -72,6 +72,7 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<M
         })
         .flatten()
         .collect();
+    messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked files in: {:?}", duration);
 
