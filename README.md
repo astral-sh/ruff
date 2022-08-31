@@ -51,6 +51,16 @@ You can run ruff in `--watch` mode to automatically re-run on-change:
 ruff path/to/code/ --watch
 ```
 
+ruff also works with [Pre-Commit](https://pre-commit.com) (requires Cargo on system):
+
+```yaml
+repos:
+- repo: https://github.com/charliermarsh/ruff
+  rev: # See latest release
+  hooks:
+    - id: lint
+```
+
 ## Configuration
 
 ruff is configurable both via `pyproject.toml` and the command line.

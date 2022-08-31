@@ -1,0 +1,5 @@
+repos:
+- repo: https://github.com/arichtman/ruff
+  rev: ft-pre-commit-hook
+  hooks:
+    - id: lint
