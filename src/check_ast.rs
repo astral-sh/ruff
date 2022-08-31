@@ -372,17 +372,17 @@ impl Visitor for Checker<'_> {
             }
 
             // Search for duplicates.
-            let mut idents: BTreeSet<String> = BTreeSet::new();
+            let mut idents: BTreeSet<&str> = BTreeSet::new();
             for arg in all_arguments {
                 let ident = &arg.node.arg;
-                if idents.contains(ident) {
+                if idents.contains(ident.as_str()) {
                     self.checks.push(Check {
                         kind: CheckKind::DuplicateArgumentName,
                         location: arg.location,
                     });
                     break;
                 }
-                idents.insert(ident.clone());
+                idents.insert(ident);
             }
         }
 
