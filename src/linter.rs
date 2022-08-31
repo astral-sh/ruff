@@ -365,11 +365,18 @@ mod tests {
             },
             &cache::Mode::None,
         )?;
-        let expected = vec![Message {
-            kind: CheckKind::UnusedVariable("e".to_string()),
-            location: Location::new(3, 1),
-            filename: "./resources/test/src/F841.py".to_string(),
-        }];
+        let expected = vec![
+            Message {
+                kind: CheckKind::UnusedVariable("e".to_string()),
+                location: Location::new(3, 1),
+                filename: "./resources/test/src/F841.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::UnusedVariable("z".to_string()),
+                location: Location::new(16, 5),
+                filename: "./resources/test/src/F841.py".to_string(),
+            },
+        ];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
             assert_eq!(actual[i], expected[i]);

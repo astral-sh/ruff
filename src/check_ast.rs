@@ -287,9 +287,34 @@ impl Visitor for Checker<'_> {
         visitor::walk_stmt(self, stmt);
 
         match &stmt.node {
-            StmtKind::ClassDef { .. }
-            | StmtKind::FunctionDef { .. }
-            | StmtKind::AsyncFunctionDef { .. } => self.pop_scope(),
+            StmtKind::ClassDef { .. } => {
+                if let Some(scope) = self.scopes.pop() {
+                    self.dead_scopes.push(scope);
+                }
+            }
+            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                let scope = self.scopes.last().expect("No current scope found.");
+                for (name, binding) in scope.values.iter() {
+                    // TODO(charlie): Ignore if using `locals`.
+                    if self.settings.select.contains(&CheckCode::F841)
+                        && binding.used.is_none()
+                        && name != "_"
+                        && name != "__tracebackhide__"
+                        && name != "__traceback_info__"
+                        && name != "__traceback_supplement__"
+                        && matches!(binding.kind, BindingKind::Assignment)
+                    {
+                        self.checks.push(Check {
+                            kind: CheckKind::UnusedVariable(name.to_string()),
+                            location: binding.location,
+                        });
+                    }
+                }
+
+                if let Some(scope) = self.scopes.pop() {
+                    self.dead_scopes.push(scope);
+                }
+            }
             _ => {}
         };
 
