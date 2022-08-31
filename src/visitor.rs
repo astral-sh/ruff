@@ -340,33 +340,33 @@ pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
             }
         }
         ExprKind::ListComp { elt, generators } => {
-            visitor.visit_expr(elt);
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension)
             }
+            visitor.visit_expr(elt);
         }
         ExprKind::SetComp { elt, generators } => {
-            visitor.visit_expr(elt);
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension)
             }
+            visitor.visit_expr(elt);
         }
         ExprKind::DictComp {
             key,
             value,
             generators,
         } => {
+            for comprehension in generators {
+                visitor.visit_comprehension(comprehension)
+            }
             visitor.visit_expr(key);
             visitor.visit_expr(value);
-            for comprehension in generators {
-                visitor.visit_comprehension(comprehension)
-            }
         }
         ExprKind::GeneratorExp { elt, generators } => {
-            visitor.visit_expr(elt);
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension)
             }
+            visitor.visit_expr(elt);
         }
         ExprKind::Await { value } => visitor.visit_expr(value),
         ExprKind::Yield { value } => {

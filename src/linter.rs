@@ -275,6 +275,11 @@ mod tests {
                 location: Location::new(10, 9),
                 filename: "./resources/test/src/F821.py".to_string(),
             },
+            Message {
+                kind: CheckKind::UndefinedName("numeric_string".to_string()),
+                location: Location::new(21, 12),
+                filename: "./resources/test/src/F821.py".to_string(),
+            },
         ];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
