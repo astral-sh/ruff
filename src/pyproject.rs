@@ -236,6 +236,7 @@ other-attribute = 1
                     CheckCode::F821,
                     CheckCode::F831,
                     CheckCode::F832,
+                    CheckCode::F841,
                     CheckCode::F901,
                 ])),
             }

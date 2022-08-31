@@ -42,6 +42,7 @@ impl Scope {
     }
 }
 
+#[derive(Clone)]
 enum BindingKind {
     Argument,
     Assignment,
@@ -54,6 +55,7 @@ enum BindingKind {
     SubmoduleImportation(String),
 }
 
+#[derive(Clone)]
 struct Binding {
     kind: BindingKind,
     location: Location,
@@ -380,6 +382,8 @@ impl Visitor for Checker<'_> {
                         ));
                     }
 
+                    let scope = self.scopes.last().expect("No current scope found.");
+                    let prev_definition = scope.values.get(name).cloned();
                     self.handle_node_store(&Expr::new(
                         excepthandler.location,
                         ExprKind::Name {
@@ -391,7 +395,19 @@ impl Visitor for Checker<'_> {
                     walk_excepthandler(self, excepthandler);
 
                     let scope = self.scopes.last_mut().expect("No current scope found.");
-                    scope.values.remove(name);
+                    if let Some(binding) = scope.values.remove(name) {
+                        if self.settings.select.contains(&CheckCode::F841) && binding.used.is_none()
+                        {
+                            self.checks.push(Check {
+                                kind: CheckKind::UnusedVariable(name.to_string()),
+                                location: excepthandler.location,
+                            });
+                        }
+                    }
+
+                    if let Some(binding) = prev_definition {
+                        scope.values.insert(name.to_string(), binding);
+                    }
                 }
                 None => walk_excepthandler(self, excepthandler),
             },
