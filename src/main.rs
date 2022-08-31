@@ -51,19 +51,16 @@ struct Cli {
 fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
-    let files: Vec<DirEntry> = files.iter().flat_map(iter_python_files).collect();
+    let files: Vec<DirEntry> = files
+        .iter()
+        .flat_map(|path| iter_python_files(path, &settings.exclude))
+        .collect();
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
     let mut messages: Vec<Message> = files
         .par_iter()
-        .filter(|entry| {
-            !settings
-                .exclude
-                .iter()
-                .any(|exclusion| entry.path().starts_with(exclusion))
-        })
         .map(|entry| {
             check_path(entry.path(), settings, &cache.into()).unwrap_or_else(|e| {
                 error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());

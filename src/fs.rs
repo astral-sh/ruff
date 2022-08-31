@@ -3,21 +3,33 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use glob::Pattern;
 use walkdir::{DirEntry, WalkDir};
 
 fn is_not_hidden(entry: &DirEntry) -> bool {
     entry
         .file_name()
         .to_str()
-        .map(|s| entry.depth() == 0 || !s.starts_with('.'))
+        .map(|s| (entry.depth() == 0 || !s.starts_with('.')))
         .unwrap_or(false)
 }
 
-pub fn iter_python_files(path: &PathBuf) -> impl Iterator<Item = DirEntry> {
+fn is_not_excluded(entry: &DirEntry, exclude: &[Pattern]) -> bool {
+    entry
+        .path()
+        .to_str()
+        .map(|s| !exclude.iter().any(|pattern| pattern.matches(s)))
+        .unwrap_or(false)
+}
+
+pub fn iter_python_files<'a>(
+    path: &'a PathBuf,
+    exclude: &'a [Pattern],
+) -> impl Iterator<Item = DirEntry> + 'a {
     WalkDir::new(path)
         .follow_links(true)
         .into_iter()
-        .filter_entry(is_not_hidden)
+        .filter_entry(|entry| is_not_hidden(entry) && is_not_excluded(entry, exclude))
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.path().to_string_lossy().ends_with(".py"))
 }
