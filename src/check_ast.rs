@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rustpython_parser::ast::{
-    Arg, Arguments, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Suite,
+    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
+    Location, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
 
@@ -11,7 +12,7 @@ use crate::check_ast::ScopeKind::{Class, Function, Generator, Module};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
 use crate::visitor;
-use crate::visitor::Visitor;
+use crate::visitor::{walk_excepthandler, Visitor};
 
 fn id() -> usize {
     static COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -301,7 +302,6 @@ impl Visitor for Checker<'_> {
             );
         }
     }
-
     fn visit_annotation(&mut self, expr: &Expr) {
         let initial = self.in_annotation;
         self.in_annotation = true;
@@ -363,6 +363,39 @@ impl Visitor for Checker<'_> {
             }
             _ => {}
         };
+    }
+
+    fn visit_excepthandler(&mut self, excepthandler: &Excepthandler) {
+        match &excepthandler.node {
+            ExcepthandlerKind::ExceptHandler { name, .. } => match name {
+                Some(name) => {
+                    let scope = self.scopes.last().expect("No current scope found.");
+                    if scope.values.contains_key(name) {
+                        self.handle_node_store(&Expr::new(
+                            excepthandler.location,
+                            ExprKind::Name {
+                                id: name.to_string(),
+                                ctx: ExprContext::Store,
+                            },
+                        ));
+                    }
+
+                    self.handle_node_store(&Expr::new(
+                        excepthandler.location,
+                        ExprKind::Name {
+                            id: name.to_string(),
+                            ctx: ExprContext::Store,
+                        },
+                    ));
+
+                    walk_excepthandler(self, excepthandler);
+
+                    let scope = self.scopes.last_mut().expect("No current scope found.");
+                    scope.values.remove(name);
+                }
+                None => walk_excepthandler(self, excepthandler),
+            },
+        }
     }
 
     fn visit_arguments(&mut self, arguments: &Arguments) {
