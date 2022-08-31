@@ -31,8 +31,9 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
             }
         }
     }
+    ignored.sort();
     for index in ignored.iter().rev() {
-        checks.remove(*index);
+        checks.swap_remove(*index);
     }
     checks.extend(line_checks);
 }
