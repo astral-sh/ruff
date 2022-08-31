@@ -1,7 +1,6 @@
 name: Release
 
 on:
-  push:
   create:
     tags:
       - v*
