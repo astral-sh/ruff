@@ -40,9 +40,7 @@ class Class:
         # TODO(charlie): This should be recognized as a defined variable.
         Class  # noqa: F821
 
-
 try:
     x = 1 / 0
 except Exception as e:
-    # TODO(charlie): This should be recognized as a defined variable.
-    print(e)  # noqa: F821
+    print(e)

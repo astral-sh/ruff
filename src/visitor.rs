@@ -14,9 +14,6 @@ pub trait Visitor {
     fn visit_expr(&mut self, expr: &Expr) {
         walk_expr(self, expr);
     }
-    fn visit_ident(&mut self, ident: &str) {
-        walk_ident(self, ident);
-    }
     fn visit_constant(&mut self, constant: &Constant) {
         walk_constant(self, constant);
     }
@@ -67,53 +64,48 @@ pub trait Visitor {
 pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::FunctionDef {
-            name,
             args,
             body,
             decorator_list,
             returns,
             ..
         } => {
-            visitor.visit_ident(name);
             visitor.visit_arguments(args);
-            for stmt in body {
-                visitor.visit_stmt(stmt)
-            }
             for expr in decorator_list {
                 visitor.visit_expr(expr)
             }
             for expr in returns {
                 visitor.visit_annotation(expr);
+            }
+            for stmt in body {
+                visitor.visit_stmt(stmt)
             }
         }
         StmtKind::AsyncFunctionDef {
-            name,
             args,
             body,
             decorator_list,
             returns,
             ..
         } => {
-            visitor.visit_ident(name);
             visitor.visit_arguments(args);
-            for stmt in body {
-                visitor.visit_stmt(stmt)
-            }
             for expr in decorator_list {
                 visitor.visit_expr(expr)
             }
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
+            for stmt in body {
+                visitor.visit_stmt(stmt)
+            }
         }
         StmtKind::ClassDef {
-            name,
             bases,
             keywords,
             body,
             decorator_list,
+            ..
         } => {
-            visitor.visit_ident(name);
             for expr in bases {
                 visitor.visit_expr(expr)
             }
@@ -271,24 +263,13 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_alias(alias);
             }
         }
-        StmtKind::ImportFrom { module, names, .. } => {
-            if let Some(ident) = module {
-                visitor.visit_ident(ident);
-            }
+        StmtKind::ImportFrom { names, .. } => {
             for alias in names {
                 visitor.visit_alias(alias);
             }
         }
-        StmtKind::Global { names } => {
-            for ident in names {
-                visitor.visit_ident(ident)
-            }
-        }
-        StmtKind::Nonlocal { names } => {
-            for ident in names {
-                visitor.visit_ident(ident)
-            }
-        }
+        StmtKind::Global { .. } => {}
+        StmtKind::Nonlocal { .. } => {}
         StmtKind::Expr { value } => visitor.visit_expr(value),
         StmtKind::Pass => {}
         StmtKind::Break => {}
@@ -428,8 +409,7 @@ pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
             visitor.visit_expr(value);
             visitor.visit_expr_context(ctx);
         }
-        ExprKind::Name { id, ctx } => {
-            visitor.visit_ident(id);
+        ExprKind::Name { ctx, .. } => {
             visitor.visit_expr_context(ctx);
         }
         ExprKind::List { elts, ctx } => {
@@ -476,12 +456,9 @@ pub fn walk_comprehension<V: Visitor + ?Sized>(visitor: &mut V, comprehension: &
 
 pub fn walk_excepthandler<V: Visitor + ?Sized>(visitor: &mut V, excepthandler: &Excepthandler) {
     match &excepthandler.node {
-        ExcepthandlerKind::ExceptHandler { type_, name, body } => {
+        ExcepthandlerKind::ExceptHandler { type_, body, .. } => {
             if let Some(expr) = type_ {
                 visitor.visit_expr(expr);
-            }
-            if let Some(ident) = name {
-                visitor.visit_ident(ident);
             }
             for stmt in body {
                 visitor.visit_stmt(stmt);
@@ -550,49 +527,33 @@ pub fn walk_pattern<V: Visitor + ?Sized>(visitor: &mut V, pattern: &Pattern) {
                 visitor.visit_pattern(pattern)
             }
         }
-        PatternKind::MatchMapping {
-            keys,
-            patterns,
-            rest,
-        } => {
+        PatternKind::MatchMapping { keys, patterns, .. } => {
             for expr in keys {
                 visitor.visit_expr(expr);
             }
             for pattern in patterns {
                 visitor.visit_pattern(pattern);
             }
-            if let Some(ident) = rest {
-                visitor.visit_ident(ident);
-            }
         }
         PatternKind::MatchClass {
             cls,
             patterns,
-            kwd_attrs,
             kwd_patterns,
+            ..
         } => {
             visitor.visit_expr(cls);
             for pattern in patterns {
                 visitor.visit_pattern(pattern);
             }
-            for ident in kwd_attrs {
-                visitor.visit_ident(ident);
-            }
+
             for pattern in kwd_patterns {
                 visitor.visit_pattern(pattern);
             }
         }
-        PatternKind::MatchStar { name } => {
-            if let Some(ident) = name {
-                visitor.visit_ident(ident)
-            }
-        }
-        PatternKind::MatchAs { pattern, name } => {
+        PatternKind::MatchStar { .. } => {}
+        PatternKind::MatchAs { pattern, .. } => {
             if let Some(pattern) = pattern {
                 visitor.visit_pattern(pattern)
-            }
-            if let Some(ident) = name {
-                visitor.visit_ident(ident)
             }
         }
         PatternKind::MatchOr { patterns } => {
@@ -604,22 +565,25 @@ pub fn walk_pattern<V: Visitor + ?Sized>(visitor: &mut V, pattern: &Pattern) {
 }
 
 #[allow(unused_variables)]
-pub fn walk_ident<V: Visitor + ?Sized>(visitor: &mut V, ident: &str) {}
-
-#[allow(unused_variables)]
+#[inline(always)]
 pub fn walk_expr_context<V: Visitor + ?Sized>(visitor: &mut V, expr_context: &ExprContext) {}
 
 #[allow(unused_variables)]
+#[inline(always)]
 pub fn walk_boolop<V: Visitor + ?Sized>(visitor: &mut V, boolop: &Boolop) {}
 
 #[allow(unused_variables)]
+#[inline(always)]
 pub fn walk_operator<V: Visitor + ?Sized>(visitor: &mut V, operator: &Operator) {}
 
 #[allow(unused_variables)]
+#[inline(always)]
 pub fn walk_unaryop<V: Visitor + ?Sized>(visitor: &mut V, unaryop: &Unaryop) {}
 
 #[allow(unused_variables)]
+#[inline(always)]
 pub fn walk_cmpop<V: Visitor + ?Sized>(visitor: &mut V, cmpop: &Cmpop) {}
 
 #[allow(unused_variables)]
+#[inline(always)]
 pub fn walk_alias<V: Visitor + ?Sized>(visitor: &mut V, alias: &Alias) {}
