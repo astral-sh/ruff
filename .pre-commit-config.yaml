@@ -1,5 +1,5 @@
 repos:
-- repo: https://github.com/arichtman/ruff
-  rev: ft-pre-commit-hook
-  hooks:
-    - id: lint
+  - repo: https://github.com/charliermarsh/ruff
+    rev: v0.0.23
+    hooks:
+      - id: lint
