@@ -21,6 +21,7 @@ filetime = { version = "0.2.17" }
 glob = { version = "0.3.0"}
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
+once_cell = { version = "1.13.1" }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "1613f6c6990011a4bc559e79aaf28d715f9f729b" }
