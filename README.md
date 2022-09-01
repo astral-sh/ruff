@@ -56,7 +56,7 @@ ruff also works with [Pre-Commit](https://pre-commit.com) (requires Cargo on sys
 ```yaml
 repos:
 - repo: https://github.com/charliermarsh/ruff
-  rev: # See latest release
+  rev: v0.0.23
   hooks:
     - id: lint
 ```
