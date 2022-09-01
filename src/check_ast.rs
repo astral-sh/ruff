@@ -586,7 +586,7 @@ impl Checker<'_> {
 
     fn handle_node_store(&mut self, expr: &Expr) {
         if let ExprKind::Name { id, .. } = &expr.node {
-            if self.settings.select.contains(&CheckCode::F832) {
+            if self.settings.select.contains(&CheckCode::F823) {
                 let current = self.scopes.last().expect("No current scope found.");
                 if matches!(current.kind, ScopeKind::Function) && !current.values.contains_key(id) {
                     for scope in self.scopes.iter().rev().skip(1) {

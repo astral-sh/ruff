@@ -367,20 +367,20 @@ mod tests {
     }
 
     #[test]
-    fn f832() -> Result<()> {
+    fn f823() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F832.py"),
+            &Path::new("./resources/test/src/F823.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
-                select: BTreeSet::from([CheckCode::F832]),
+                select: BTreeSet::from([CheckCode::F823]),
             },
             &cache::Mode::None,
         )?;
         let expected = vec![Message {
             kind: CheckKind::UndefinedLocal("my_var".to_string()),
             location: Location::new(6, 5),
-            filename: "./resources/test/src/F832.py".to_string(),
+            filename: "./resources/test/src/F823.py".to_string(),
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {

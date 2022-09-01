@@ -16,7 +16,7 @@ pub enum CheckCode {
     F706,
     F821,
     F831,
-    F832,
+    F823,
     F841,
     F901,
 }
@@ -35,7 +35,7 @@ impl FromStr for CheckCode {
             "F706" => Ok(CheckCode::F706),
             "F821" => Ok(CheckCode::F821),
             "F831" => Ok(CheckCode::F831),
-            "F832" => Ok(CheckCode::F832),
+            "F823" => Ok(CheckCode::F823),
             "F841" => Ok(CheckCode::F841),
             "F901" => Ok(CheckCode::F901),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
@@ -55,7 +55,7 @@ impl CheckCode {
             CheckCode::F706 => "F706",
             CheckCode::F821 => "F821",
             CheckCode::F831 => "F831",
-            CheckCode::F832 => "F832",
+            CheckCode::F823 => "F823",
             CheckCode::F841 => "F841",
             CheckCode::F901 => "F901",
         }
@@ -73,7 +73,7 @@ impl CheckCode {
             CheckCode::F706 => &LintSource::AST,
             CheckCode::F821 => &LintSource::AST,
             CheckCode::F831 => &LintSource::AST,
-            CheckCode::F832 => &LintSource::AST,
+            CheckCode::F823 => &LintSource::AST,
             CheckCode::F841 => &LintSource::AST,
             CheckCode::F901 => &LintSource::AST,
         }
@@ -115,7 +115,7 @@ impl CheckKind {
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
-            CheckKind::UndefinedLocal(_) => &CheckCode::F832,
+            CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
             CheckKind::UnusedImport(_) => &CheckCode::F401,
         }
