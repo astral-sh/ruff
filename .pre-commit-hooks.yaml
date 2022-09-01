@@ -1,0 +1,7 @@
+- id: lint
+  name: ruff lint
+  description: Run ruff to lint Python files.
+  entry: ruff
+  language: python
+  types_or: [python]
+  pass_filenames: true
