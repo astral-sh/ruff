@@ -66,7 +66,7 @@ impl From<bool> for Mode {
 }
 
 fn cache_dir() -> &'static str {
-    "./.cache"
+    "./.ruff_cache"
 }
 
 fn cache_key(path: &Path, settings: &Settings) -> String {
