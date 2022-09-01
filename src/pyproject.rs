@@ -13,16 +13,20 @@ pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<(Pat
     match find_project_root(paths) {
         Some(project_root) => match find_pyproject_toml(&project_root) {
             Some(path) => {
+                debug!("Found pyproject.toml at: {}", path.to_string_lossy());
                 match parse_pyproject_toml(&path) {
                     Ok(pyproject) => {
-                        debug!("Found pyproject.toml at: {}", path.to_string_lossy());
                         let config = pyproject
                             .tool
                             .and_then(|tool| tool.ruff)
                             .unwrap_or_default();
                         Ok((project_root, config))
-                    },
-                    Err(_) => Ok(Default::default())
+                    }
+                    Err(e) => {
+                        println!("Failed to load pyproject.toml: {:?}", e);
+                        println!("Falling back to default configuration...");
+                        Ok(Default::default())
+                    }
                 }
             }
             None => Ok(Default::default()),
