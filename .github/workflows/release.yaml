@@ -227,9 +227,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         target: [x86_64, aarch64]
         python-version:
-          - '3.7'
-          - '3.8'
-          - '3.9'
+          - "3.7"
+          - "3.8"
+          - "3.9"
         exclude:
           - os: macos-latest
             target: aarch64

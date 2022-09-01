@@ -215,6 +215,7 @@ hyperfine --ignore-failure --warmup 5 \
 ```
 
 In order, these evaluate:
+
 - ruff
 - Pylint
 - PyFlakes
