@@ -131,7 +131,7 @@ impl CheckKind {
                 "f-string without any placeholders".to_string()
             }
             CheckKind::IfTuple => {
-                "If test is a tuple.to_string(), which is always `True`".to_string()
+                "If test is a tuple, which is always `True`".to_string()
             }
             CheckKind::ImportStarUsage => "Unable to detect undefined names".to_string(),
             CheckKind::LineTooLong => "Line too long".to_string(),
