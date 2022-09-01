@@ -15,8 +15,8 @@ pub enum CheckCode {
     F704,
     F706,
     F821,
-    F831,
     F823,
+    F831,
     F841,
     F901,
 }
@@ -34,8 +34,8 @@ impl FromStr for CheckCode {
             "F704" => Ok(CheckCode::F704),
             "F706" => Ok(CheckCode::F706),
             "F821" => Ok(CheckCode::F821),
-            "F831" => Ok(CheckCode::F831),
             "F823" => Ok(CheckCode::F823),
+            "F831" => Ok(CheckCode::F831),
             "F841" => Ok(CheckCode::F841),
             "F901" => Ok(CheckCode::F901),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
@@ -54,8 +54,8 @@ impl CheckCode {
             CheckCode::F704 => "F704",
             CheckCode::F706 => "F706",
             CheckCode::F821 => "F821",
-            CheckCode::F831 => "F831",
             CheckCode::F823 => "F823",
+            CheckCode::F831 => "F831",
             CheckCode::F841 => "F841",
             CheckCode::F901 => "F901",
         }
@@ -72,8 +72,8 @@ impl CheckCode {
             CheckCode::F704 => &LintSource::AST,
             CheckCode::F706 => &LintSource::AST,
             CheckCode::F821 => &LintSource::AST,
-            CheckCode::F831 => &LintSource::AST,
             CheckCode::F823 => &LintSource::AST,
+            CheckCode::F831 => &LintSource::AST,
             CheckCode::F841 => &LintSource::AST,
             CheckCode::F901 => &LintSource::AST,
         }
@@ -94,12 +94,12 @@ pub enum CheckKind {
     ImportStarUsage,
     LineTooLong,
     RaiseNotImplemented,
-    YieldOutsideFunction,
     ReturnOutsideFunction,
-    UndefinedName(String),
     UndefinedLocal(String),
-    UnusedVariable(String),
+    UndefinedName(String),
     UnusedImport(String),
+    UnusedVariable(String),
+    YieldOutsideFunction,
 }
 
 impl CheckKind {
@@ -112,12 +112,12 @@ impl CheckKind {
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LineTooLong => &CheckCode::E501,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
-            CheckKind::YieldOutsideFunction => &CheckCode::F704,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
-            CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
-            CheckKind::UnusedVariable(_) => &CheckCode::F841,
+            CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(_) => &CheckCode::F401,
+            CheckKind::UnusedVariable(_) => &CheckCode::F841,
+            CheckKind::YieldOutsideFunction => &CheckCode::F704,
         }
     }
 
@@ -136,22 +136,22 @@ impl CheckKind {
             CheckKind::RaiseNotImplemented => {
                 "'raise NotImplemented' should be 'raise NotImplementedError".to_string()
             }
-            CheckKind::YieldOutsideFunction => {
-                "a `yield` or `yield from` statement outside of a function/method".to_string()
-            }
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
             }
             CheckKind::UndefinedName(name) => {
                 format!("Undefined name `{name}`")
             }
-            CheckKind::UnusedVariable(name) => {
-                format!("Local variable `{name}` is assigned to but never used")
-            }
             CheckKind::UndefinedLocal(name) => {
                 format!("Local variable `{name}` referenced before assignment")
             }
             CheckKind::UnusedImport(name) => format!("`{name}` imported but unused"),
+            CheckKind::UnusedVariable(name) => {
+                format!("Local variable `{name}` is assigned to but never used")
+            }
+            CheckKind::YieldOutsideFunction => {
+                "a `yield` or `yield from` statement outside of a function/method".to_string()
+            }
         }
     }
 }
