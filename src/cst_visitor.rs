@@ -18,32 +18,56 @@ use libcst_native::{
 };
 
 pub trait CSTVisitor {
-    fn visit_Module<'a>(&mut self, node: &'a Module<'a>) -> Module<'a> {
+    fn visit_Module<'a, 'b>(&'b mut self, node: &'a Module<'a>) -> Module<'a>
+    where
+        'b: 'a,
+    {
         walk_Module(self, node)
     }
-    fn visit_Statement<'a>(&mut self, node: &'a Statement<'a>) -> Option<Statement<'a>> {
+    fn visit_Statement<'a, 'b>(&'b mut self, node: &'a Statement<'a>) -> Option<Statement<'a>>
+    where
+        'b: 'a,
+    {
         walk_Statement(self, node)
     }
-    fn visit_SimpleStatementLine<'a>(
-        &mut self,
+    fn visit_SimpleStatementLine<'a, 'b>(
+        &'b mut self,
         node: &'a SimpleStatementLine<'a>,
-    ) -> Option<SimpleStatementLine<'a>> {
+    ) -> Option<SimpleStatementLine<'a>>
+    where
+        'b: 'a,
+    {
         walk_SimpleStatementLine(self, node)
     }
-    fn visit_CompoundStatement<'a>(
-        &mut self,
+    fn visit_CompoundStatement<'a, 'b>(
+        &'b mut self,
         node: &'a CompoundStatement<'a>,
-    ) -> Option<CompoundStatement<'a>> {
+    ) -> Option<CompoundStatement<'a>>
+    where
+        'b: 'a,
+    {
         walk_CompoundStatement(self, node)
     }
-    fn visit_SmallStatement(&mut self, node: &SmallStatement) {
-        walk_SmallStatement(self, node);
+    fn visit_SmallStatement<'a, 'b>(
+        &'b mut self,
+        node: &'a SmallStatement<'a>,
+    ) -> SmallStatement<'a>
+    where
+        'b: 'a,
+    {
+        walk_SmallStatement(self, node)
     }
-    fn visit_Expression(&mut self, node: &Expression) {
-        walk_Expression(self, node);
+    fn visit_Expression<'a, 'b>(&'b mut self, node: &'a Expression<'a>) -> Expression<'a>
+    where
+        'b: 'a,
+    {
+        walk_Expression(self, node)
     }
-    fn visit_AnnAssign(&mut self, node: &AnnAssign) {
-        walk_AnnAssign(self, node);
+    fn visit_AnnAssign<'a, 'b>(&'b mut self, node: &'a AnnAssign<'a>) -> AnnAssign<'a>
+    where
+        'b: 'a,
+    {
+        walk_AnnAssign(self, node)
     }
     fn visit_Annotation(&mut self, node: &Annotation) {
         walk_Annotation(self, node);
@@ -81,11 +105,20 @@ pub trait CSTVisitor {
     fn visit_Await(&mut self, node: &Await) {
         walk_Await(self, node);
     }
-    fn visit_BinaryOperation(&mut self, node: &BinaryOperation) {
-        walk_BinaryOperation(self, node);
+    fn visit_BinaryOperation<'a, 'b>(
+        &'b mut self,
+        node: &'a BinaryOperation<'a>,
+    ) -> BinaryOperation<'a>
+    where
+        'b: 'a,
+    {
+        walk_BinaryOperation(self, node)
     }
-    fn visit_BinaryOp(&mut self, node: &BinaryOp) {
-        walk_BinaryOp(self, node);
+    fn visit_BinaryOp<'a, 'b>(&'b mut self, node: &'a BinaryOp<'a>) -> BinaryOp<'a>
+    where
+        'b: 'a,
+    {
+        walk_BinaryOp(self, node)
     }
     fn visit_BooleanOperation(&mut self, node: &BooleanOperation) {
         walk_BooleanOperation(self, node);
@@ -341,11 +374,14 @@ pub trait CSTVisitor {
     }
 }
 
-pub fn walk_Module<'a, V: CSTVisitor + ?Sized>(visitor: &mut V, node: &'a Module<'a>) -> Module<'a>
+pub fn walk_Module<'a, 'b, V: CSTVisitor + ?Sized>(
+    visitor: &'b mut V,
+    node: &'a Module<'a>,
+) -> Module<'a>
 where
-    'a: 'a,
+    'b: 'a,
 {
-    let mut body: Vec<Statement> = vec![];
+    let mut body: Vec<Statement<'a>> = vec![];
     for node in &node.body {
         if let Some(node) = visitor.visit_Statement(node) {
             body.push(node)
@@ -356,11 +392,13 @@ where
     transformed.body = body;
     transformed
 }
-
-pub fn walk_Statement<'a, V: CSTVisitor + ?Sized>(
-    visitor: &mut V,
+pub fn walk_Statement<'a, 'b, V: CSTVisitor + ?Sized>(
+    visitor: &'b mut V,
     node: &'a Statement<'a>,
-) -> Option<Statement<'a>> {
+) -> Option<Statement<'a>>
+where
+    'b: 'a,
+{
     match node {
         Statement::Simple(node) => visitor
             .visit_SimpleStatementLine(node)
@@ -370,21 +408,29 @@ pub fn walk_Statement<'a, V: CSTVisitor + ?Sized>(
             .map(Statement::Compound),
     }
 }
-
-pub fn walk_SimpleStatementLine<'a, V: CSTVisitor + ?Sized>(
-    visitor: &mut V,
+pub fn walk_SimpleStatementLine<'a, 'b, V: CSTVisitor + ?Sized>(
+    visitor: &'b mut V,
     node: &'a SimpleStatementLine<'a>,
-) -> Option<SimpleStatementLine<'a>> {
+) -> Option<SimpleStatementLine<'a>>
+where
+    'b: 'a,
+{
+    println!("{:?}", node);
+    let mut body: Vec<SmallStatement> = vec![];
     for node in &node.body {
-        visitor.visit_SmallStatement(node);
+        body.push(visitor.visit_SmallStatement(node).clone());
     }
-    Some(node.clone())
+    let mut transformed = node.clone();
+    transformed.body = body;
+    Some(transformed)
 }
-
-pub fn walk_CompoundStatement<'a, V: CSTVisitor + ?Sized>(
-    visitor: &mut V,
+pub fn walk_CompoundStatement<'a, 'b, V: CSTVisitor + ?Sized>(
+    visitor: &'b mut V,
     node: &'a CompoundStatement<'a>,
-) -> Option<CompoundStatement<'a>> {
+) -> Option<CompoundStatement<'a>>
+where
+    'b: 'a,
+{
     match node {
         CompoundStatement::If(node) => {
             visitor.visit_If(node);
@@ -404,8 +450,13 @@ pub fn walk_CompoundStatement<'a, V: CSTVisitor + ?Sized>(
 
     Some(node.clone())
 }
-
-pub fn walk_SmallStatement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &SmallStatement) {
+pub fn walk_SmallStatement<'a, 'b, V: CSTVisitor + ?Sized>(
+    visitor: &'b mut V,
+    node: &'a SmallStatement<'a>,
+) -> SmallStatement<'a>
+where
+    'b: 'a,
+{
     match node {
         SmallStatement::Pass(node) => visitor.visit_Pass(node),
         SmallStatement::Break(node) => visitor.visit_Break(node),
@@ -416,16 +467,22 @@ pub fn walk_SmallStatement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Small
         SmallStatement::Import(node) => visitor.visit_Import(node),
         SmallStatement::ImportFrom(node) => visitor.visit_ImportFrom(node),
         SmallStatement::Assign(node) => visitor.visit_Assign(node),
-        SmallStatement::AnnAssign(node) => visitor.visit_AnnAssign(node),
+        SmallStatement::AnnAssign(node) => {
+            return SmallStatement::AnnAssign(visitor.visit_AnnAssign(node));
+        }
         SmallStatement::Raise(node) => visitor.visit_Raise(node),
         SmallStatement::Global(node) => visitor.visit_Global(node),
         SmallStatement::Nonlocal(node) => visitor.visit_Nonlocal(node),
         SmallStatement::AugAssign(node) => visitor.visit_AugAssign(node),
         SmallStatement::Del(node) => visitor.visit_Del(node),
     }
-}
 
-pub fn walk_Expression<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Expression) {
+    node.clone()
+}
+pub fn walk_Expression<'a, 'b, V: CSTVisitor + ?Sized>(
+    visitor: &'b mut V,
+    node: &'a Expression<'a>,
+) -> Expression<'a> {
     match node {
         Expression::Name(node) => visitor.visit_Name(node),
         Expression::Ellipsis(node) => visitor.visit_Ellipsis(node),
@@ -434,7 +491,9 @@ pub fn walk_Expression<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Expressio
         Expression::Imaginary(node) => visitor.visit_Imaginary(node),
         Expression::Comparison(node) => visitor.visit_Comparison(node),
         Expression::UnaryOperation(node) => visitor.visit_UnaryOperation(node),
-        Expression::BinaryOperation(node) => visitor.visit_BinaryOperation(node),
+        Expression::BinaryOperation(node) => {
+            return Expression::BinaryOperation(Box::new(visitor.visit_BinaryOperation(node)))
+        }
         Expression::BooleanOperation(node) => visitor.visit_BooleanOperation(node),
         Expression::Attribute(node) => visitor.visit_Attribute(node),
         Expression::Tuple(node) => visitor.visit_Tuple(node),
@@ -457,6 +516,8 @@ pub fn walk_Expression<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Expressio
         Expression::FormattedString(node) => visitor.visit_FormattedString(node),
         Expression::NamedExpr(node) => visitor.visit_NamedExpr(node),
     }
+
+    node.clone()
 }
 pub fn walk_AssignEqual<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AssignEqual) {
     // Nothing to do.
@@ -477,11 +538,22 @@ pub fn walk_AssignTargetExpression<V: CSTVisitor + ?Sized>(
         AssignTargetExpression::Subscript(node) => visitor.visit_Subscript(node),
     }
 }
-pub fn walk_AnnAssign<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AnnAssign) {
+pub fn walk_AnnAssign<'a, 'b, V: CSTVisitor + ?Sized>(
+    visitor: &'b mut V,
+    node: &'a AnnAssign<'a>,
+) -> AnnAssign<'a>
+where
+    'b: 'a,
+{
+    println!("walk_AnnAssign");
+    let mut transformed: AnnAssign<'a> = node.clone();
     visitor.visit_AssignTargetExpression(&node.target);
     if let Some(node) = &node.value {
-        visitor.visit_Expression(node)
+        println!("Before: {:?}", node);
+        transformed.value = Some(visitor.visit_Expression(node));
+        println!("After: {:?}", transformed.value);
     }
+    transformed
 }
 pub fn walk_Annotation<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Annotation) {
     visitor.visit_Expression(&node.annotation);
@@ -508,13 +580,13 @@ pub fn walk_Assign<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Assign) {
     for target in &node.targets {
         visitor.visit_AssignTarget(target)
     }
-    visitor.visit_Expression(&node.value)
+    visitor.visit_Expression(&node.value);
 }
 pub fn walk_Asynchronous<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Asynchronous) {
     // Nothing to do.
 }
 pub fn walk_Attribute<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Attribute) {
-    visitor.visit_Expression(&node.value)
+    visitor.visit_Expression(&node.value);
 }
 pub fn walk_AugAssign<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AugAssign) {
     visitor.visit_AssignTargetExpression(&node.target);
@@ -523,13 +595,24 @@ pub fn walk_AugAssign<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AugAssign)
 pub fn walk_Await<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Await) {
     visitor.visit_Expression(&node.expression);
 }
-pub fn walk_BinaryOperation<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &BinaryOperation) {
-    visitor.visit_Expression(&node.left);
+pub fn walk_BinaryOperation<'a, 'b, V: CSTVisitor + ?Sized>(
+    visitor: &'b mut V,
+    node: &'a BinaryOperation<'a>,
+) -> BinaryOperation<'a>
+where
+    'b: 'a,
+{
+    let mut transformed: BinaryOperation = node.clone();
+
+    transformed.left = Box::new(visitor.visit_Expression(&node.left));
+    transformed.right = Box::new(visitor.visit_Expression(&node.right));
     visitor.visit_BinaryOp(&node.operator);
-    visitor.visit_Expression(&node.right);
+
+    transformed
 }
-pub fn walk_BinaryOp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &BinaryOp) {
+pub fn walk_BinaryOp<'a, 'b, V: CSTVisitor + ?Sized>(visitor: &'b mut V, node: &'a BinaryOp<'a>) -> BinaryOp<'a> {
     // Nothing to do.
+    node.clone()
 }
 pub fn walk_BooleanOperation<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &BooleanOperation) {
     visitor.visit_Expression(&node.left);
@@ -546,7 +629,7 @@ pub fn walk_Call<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Call) {
     for node in &node.args {
         visitor.visit_Arg(node)
     }
-    visitor.visit_Expression(&node.func)
+    visitor.visit_Expression(&node.func);
 }
 pub fn walk_ClassDef<'a, V: CSTVisitor + ?Sized>(
     visitor: &mut V,
@@ -583,7 +666,7 @@ pub fn walk_CompFor<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &CompFor) {
     }
 }
 pub fn walk_CompIf<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &CompIf) {
-    visitor.visit_Expression(&node.test)
+    visitor.visit_Expression(&node.test);
 }
 pub fn walk_Comparison<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Comparison) {
     visitor.visit_Expression(&node.left);
@@ -605,7 +688,7 @@ pub fn walk_Continue<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Continue) {
     // Nothing to do.
 }
 pub fn walk_Decorator<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Decorator) {
-    visitor.visit_Expression(&node.decorator)
+    visitor.visit_Expression(&node.decorator);
 }
 pub fn walk_Del<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Del) {
     visitor.visit_DelTargetExpression(&node.target)
@@ -643,9 +726,13 @@ pub fn walk_DictElement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &DictElem
 }
 pub fn walk_Element<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Element) {
     match node {
-        Element::Simple { value: node, .. } => visitor.visit_Expression(node),
-        Element::Starred(node) => visitor.visit_StarredElement(node),
-    }
+        Element::Simple { value: node, .. } => {
+            visitor.visit_Expression(node);
+        }
+        Element::Starred(node) => {
+            visitor.visit_StarredElement(node);
+        }
+    };
 }
 pub fn walk_Ellipsis<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Ellipsis) {
     // Nothing to do.
@@ -679,7 +766,7 @@ pub fn walk_ExceptStarHandler<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Ex
     }
 }
 pub fn walk_Expr<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Expr) {
-    visitor.visit_Expression(&node.value)
+    visitor.visit_Expression(&node.value);
 }
 pub fn walk_Finally<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Finally) {
     match &node.body {
@@ -727,7 +814,7 @@ pub fn walk_FormattedStringText<V: CSTVisitor + ?Sized>(
     // Nothing to do.
 }
 pub fn walk_From<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &From) {
-    visitor.visit_Expression(&node.item)
+    visitor.visit_Expression(&node.item);
 }
 pub fn walk_FunctionDef<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &FunctionDef) {
     visitor.visit_Name(&node.name);
@@ -908,25 +995,25 @@ pub fn walk_SimpleStatementSuite<V: CSTVisitor + ?Sized>(
     node: &SimpleStatementSuite,
 ) {
     for node in &node.body {
-        visitor.visit_SmallStatement(node)
+        visitor.visit_SmallStatement(node);
     }
 }
 pub fn walk_Slice<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Slice) {
     if let Some(node) = &node.lower {
-        visitor.visit_Expression(node)
+        visitor.visit_Expression(node);
     }
     if let Some(node) = &node.upper {
-        visitor.visit_Expression(node)
+        visitor.visit_Expression(node);
     }
     if let Some(node) = &node.step {
-        visitor.visit_Expression(node)
+        visitor.visit_Expression(node);
     }
 }
 pub fn walk_StarredDictElement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &StarredDictElement) {
-    visitor.visit_Expression(&node.value)
+    visitor.visit_Expression(&node.value);
 }
 pub fn walk_StarredElement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &StarredElement) {
-    visitor.visit_Expression(&node.value)
+    visitor.visit_Expression(&node.value);
 }
 pub fn walk_Subscript<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Subscript) {
     visitor.visit_Expression(&node.value);
@@ -1017,7 +1104,11 @@ pub fn walk_Yield<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Yield) {
 }
 pub fn walk_YieldValue<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &YieldValue) {
     match node {
-        YieldValue::Expression(node) => visitor.visit_Expression(node),
-        YieldValue::From(node) => visitor.visit_From(node),
-    }
+        YieldValue::Expression(node) => {
+            visitor.visit_Expression(node);
+        }
+        YieldValue::From(node) => {
+            visitor.visit_From(node);
+        }
+    };
 }

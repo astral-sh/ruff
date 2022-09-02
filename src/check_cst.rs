@@ -1,9 +1,24 @@
+use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
-use libcst_native::{Arg, ClassDef, Codegen, Expression, If, Module};
-use rustpython_parser::ast::Location;
 use bat::PrettyPrinter;
-
+use bumpalo::Bump;
+use libcst_native::{
+    AnnAssign, Annotation, Arg, AsName, Assert, Assign, AssignEqual, AssignTarget,
+    AssignTargetExpression, Asynchronous, Attribute, AugAssign, Await, BinaryOp, BinaryOperation,
+    BooleanOp, BooleanOperation, Break, Call, ClassDef, Codegen, CompFor, CompIf, CompOp,
+    Comparison, ComparisonTarget, CompoundStatement, ConcatenatedString, Continue, Decorator, Del,
+    DelTargetExpression, Dict, DictComp, DictElement, Element, Ellipsis, Else, ExceptHandler,
+    ExceptStarHandler, Expr, Expression, Finally, Float, For, FormattedString,
+    FormattedStringContent, FormattedStringExpression, FormattedStringText, FunctionDef,
+    GeneratorExp, Global, If, IfExp, Imaginary, Import, ImportAlias, ImportFrom, ImportStar,
+    IndentedBlock, Index, Integer, Lambda, List, ListComp, Match, Module, Name, NameItem,
+    NamedExpr, Nonlocal, OrElse, Param, ParamStar, Parameters, Pass, Raise, Return, Set, SetComp,
+    SimpleStatementLine, SimpleStatementSuite, SimpleString, Slice, SmallStatement,
+    StarredDictElement, StarredElement, Statement, Subscript, SubscriptElement, Try, TryStar,
+    Tuple, UnaryOp, UnaryOperation, While, With, WithItem, Yield, YieldValue,
+};
+use rustpython_parser::ast::Location;
 
 use crate::checks::{Check, CheckKind};
 use crate::cst_visitor;
@@ -41,6 +56,7 @@ struct Binding {
 }
 
 struct Checker<'a> {
+    bump: Bump,
     settings: &'a Settings,
     checks: Vec<Check>,
 }
@@ -48,6 +64,7 @@ struct Checker<'a> {
 impl Checker<'_> {
     pub fn new(settings: &Settings) -> Checker {
         Checker {
+            bump: Bump::new(),
             settings,
             checks: vec![],
         }
@@ -63,6 +80,32 @@ impl CSTVisitor for Checker<'_> {
             });
         }
         cst_visitor::walk_If(self, node);
+    }
+
+    fn visit_Expression<'a, 'b>(&'b mut self, node: &'a Expression<'a>) -> Expression<'a>
+    where
+        'b: 'a,
+    {
+        match node {
+            Expression::FormattedString(node) => match &node.parts[..] {
+                [node] => match node {
+                    FormattedStringContent::Text(node) => {
+                        let x = node.value.to_string();
+                        println!("Found: {:?}", node);
+                        return Expression::SimpleString(Box::new(SimpleString {
+                            value: self.bump.alloc(format!("\"{}\"", x)),
+                            lpar: vec![],
+                            rpar: vec![],
+                        }));
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
+            _ => {}
+        }
+
+        cst_visitor::walk_Expression(self, node)
     }
 
     fn visit_ClassDef<'a>(&mut self, node: &'a ClassDef<'a>) -> ClassDef<'a> {
@@ -107,10 +150,10 @@ pub fn check_cst<'a>(python_cst: &'a Module<'a>, settings: &Settings) -> Vec<Che
     println!("```");
     let source = s.to_string().into_bytes();
     PrettyPrinter::new()
-    .input_from_bytes(&source)
-    .language("python")
-    .print()
-    .unwrap();
+        .input_from_bytes(&source)
+        .language("python")
+        .print()
+        .unwrap();
     println!("```");
 
     let mut checker = Checker::new(settings);
@@ -121,13 +164,13 @@ pub fn check_cst<'a>(python_cst: &'a Module<'a>, settings: &Settings) -> Vec<Che
 
     println!("");
     println!("Generated output:");
-println!("```");
+    println!("```");
     let source = state.to_string().into_bytes();
     PrettyPrinter::new()
-    .input_from_bytes(&source)
-    .language("python")
-    .print()
-    .unwrap();
+        .input_from_bytes(&source)
+        .language("python")
+        .print()
+        .unwrap();
     println!("```");
 
     checker.checks
