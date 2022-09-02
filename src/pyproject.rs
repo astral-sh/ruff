@@ -226,8 +226,7 @@ other-attribute = 1
         let pyproject = parse_pyproject_toml(&path)?;
         let config = pyproject
             .tool
-            .map(|tool| tool.ruff)
-            .flatten()
+            .and_then(|tool| tool.ruff)
             .expect("Unable to find tool.ruff.");
         assert_eq!(
             config,
