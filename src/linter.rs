@@ -103,17 +103,17 @@ mod tests {
         let expected = vec![
             Message {
                 kind: CheckKind::UnusedImport("logging.handlers".to_string()),
-                location: Location::new(11, 1),
+                location: Location::new(12, 1),
                 filename: "./resources/test/src/F401.py".to_string(),
             },
             Message {
                 kind: CheckKind::UnusedImport("functools".to_string()),
-                location: Location::new(2, 1),
+                location: Location::new(3, 1),
                 filename: "./resources/test/src/F401.py".to_string(),
             },
             Message {
                 kind: CheckKind::UnusedImport("collections.OrderedDict".to_string()),
-                location: Location::new(3, 1),
+                location: Location::new(4, 1),
                 filename: "./resources/test/src/F401.py".to_string(),
             },
         ];

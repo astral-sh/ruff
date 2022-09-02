@@ -1,3 +1,4 @@
+from __future__ import all_feature_names
 import os
 import functools
 from collections import (
