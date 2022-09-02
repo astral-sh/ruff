@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn e501() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/E501.py"),
+            Path::new("./resources/test/src/E501.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn f401() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F401.py"),
+            Path::new("./resources/test/src/F401.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn f403() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F403.py"),
+            Path::new("./resources/test/src/F403.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn f541() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F541.py"),
+            Path::new("./resources/test/src/F541.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn f634() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F634.py"),
+            Path::new("./resources/test/src/F634.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn f704() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F704.py"),
+            Path::new("./resources/test/src/F704.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn f706() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F706.py"),
+            Path::new("./resources/test/src/F706.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn f821() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F821.py"),
+            Path::new("./resources/test/src/F821.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn f831() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F831.py"),
+            Path::new("./resources/test/src/F831.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn f823() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F823.py"),
+            Path::new("./resources/test/src/F823.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     fn f841() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F841.py"),
+            Path::new("./resources/test/src/F841.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -424,7 +424,7 @@ mod tests {
     #[test]
     fn f901() -> Result<()> {
         let actual = check_path(
-            &Path::new("./resources/test/src/F901.py"),
+            Path::new("./resources/test/src/F901.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
