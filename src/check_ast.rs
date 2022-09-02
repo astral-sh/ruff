@@ -195,12 +195,11 @@ impl Visitor for Checker<'_> {
                         .asname
                         .clone()
                         .unwrap_or_else(|| alias.node.name.clone());
-                    if let Some("future") = module.as_deref() {
+                    if let Some("__future__") = module.as_deref() {
                         self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
-
                                 used: Some(self.scopes.last().expect("No current scope found.").id),
                                 location: stmt.location,
                             },
@@ -210,7 +209,6 @@ impl Visitor for Checker<'_> {
                             name,
                             Binding {
                                 kind: BindingKind::StarImportation,
-
                                 used: None,
                                 location: stmt.location,
                             },
