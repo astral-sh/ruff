@@ -1708,6 +1708,7 @@ version = "0.0.24"
 dependencies = [
  "anyhow",
  "bincode",
+ "bumpalo",
  "cacache",
  "chrono",
  "clap",

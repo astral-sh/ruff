@@ -2,12 +2,9 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
-use rustpython_parser::parser;
 
-use crate::check_ast::check_ast;
 use crate::check_cst::check_cst;
-use crate::check_lines::check_lines;
-use crate::checks::{Check, LintSource};
+use crate::checks::Check;
 use crate::message::Message;
 use crate::settings::Settings;
 use crate::{cache, fs};

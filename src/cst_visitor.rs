@@ -9,23 +9,32 @@ use libcst_native::{
     ExceptStarHandler, Expr, Expression, Finally, Float, For, FormattedString,
     FormattedStringContent, FormattedStringExpression, FormattedStringText, From, FunctionDef,
     GeneratorExp, Global, If, IfExp, Imaginary, Import, ImportAlias, ImportFrom, ImportNames,
-    ImportStar, IndentedBlock, Index, Integer, Lambda, List, ListComp, Match, Name, NameItem,
-    NameOrAttribute, NamedExpr, Nonlocal, OrElse, Param, ParamStar, Parameters, Pass, Raise,
-    Return, Set, SetComp, SimpleStatementLine, SimpleStatementSuite, SimpleString, Slice,
+    ImportStar, IndentedBlock, Index, Integer, Lambda, List, ListComp, Match, Module, Name,
+    NameItem, NameOrAttribute, NamedExpr, Nonlocal, OrElse, Param, ParamStar, Parameters, Pass,
+    Raise, Return, Set, SetComp, SimpleStatementLine, SimpleStatementSuite, SimpleString, Slice,
     SmallStatement, StarArg, StarredDictElement, StarredElement, Statement, Subscript,
     SubscriptElement, Suite, Try, TryStar, Tuple, UnaryOp, UnaryOperation, While, With, WithItem,
     Yield, YieldValue,
 };
 
 pub trait CSTVisitor {
-    fn visit_Statement(&mut self, node: &Statement) {
-        walk_Statement(self, node);
+    fn visit_Module<'a>(&mut self, node: &'a Module<'a>) -> Module<'a> {
+        walk_Module(self, node)
     }
-    fn visit_SimpleStatementLine(&mut self, node: &SimpleStatementLine) {
-        walk_SimpleStatementLine(self, node);
+    fn visit_Statement<'a>(&mut self, node: &'a Statement<'a>) -> Option<Statement<'a>> {
+        walk_Statement(self, node)
     }
-    fn visit_CompoundStatement(&mut self, node: &CompoundStatement) {
-        walk_CompoundStatement(self, node);
+    fn visit_SimpleStatementLine<'a>(
+        &mut self,
+        node: &'a SimpleStatementLine<'a>,
+    ) -> Option<SimpleStatementLine<'a>> {
+        walk_SimpleStatementLine(self, node)
+    }
+    fn visit_CompoundStatement<'a>(
+        &mut self,
+        node: &'a CompoundStatement<'a>,
+    ) -> Option<CompoundStatement<'a>> {
+        walk_CompoundStatement(self, node)
     }
     fn visit_SmallStatement(&mut self, node: &SmallStatement) {
         walk_SmallStatement(self, node);
@@ -90,8 +99,8 @@ pub trait CSTVisitor {
     fn visit_Call(&mut self, node: &Call) {
         walk_Call(self, node);
     }
-    fn visit_ClassDef(&mut self, node: &ClassDef) {
-        walk_ClassDef(self, node);
+    fn visit_ClassDef<'a>(&mut self, node: &'a ClassDef<'a>) -> ClassDef<'a> {
+        walk_ClassDef(self, node)
     }
     fn visit_CompFor(&mut self, node: &CompFor) {
         walk_CompFor(self, node);
@@ -180,9 +189,8 @@ pub trait CSTVisitor {
     fn visit_Global(&mut self, node: &Global) {
         walk_Global(self, node);
     }
-    fn visit_If<'a>(&'a mut self, node: &'a If) -> &'a If {
+    fn visit_If(&mut self, node: &If) {
         walk_If(self, node);
-        return node;
     }
     fn visit_IfExp(&mut self, node: &IfExp) {
         walk_IfExp(self, node);
@@ -333,36 +341,68 @@ pub trait CSTVisitor {
     }
 }
 
-pub fn walk_Statement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Statement) {
+pub fn walk_Module<'a, V: CSTVisitor + ?Sized>(visitor: &mut V, node: &'a Module<'a>) -> Module<'a>
+where
+    'a: 'a,
+{
+    let mut body: Vec<Statement> = vec![];
+    for node in &node.body {
+        if let Some(node) = visitor.visit_Statement(node) {
+            body.push(node)
+        }
+    }
+
+    let mut transformed: Module<'a> = node.clone();
+    transformed.body = body;
+    transformed
+}
+
+pub fn walk_Statement<'a, V: CSTVisitor + ?Sized>(
+    visitor: &mut V,
+    node: &'a Statement<'a>,
+) -> Option<Statement<'a>> {
     match node {
-        Statement::Simple(node) => visitor.visit_SimpleStatementLine(node),
-        Statement::Compound(node) => visitor.visit_CompoundStatement(node),
+        Statement::Simple(node) => visitor
+            .visit_SimpleStatementLine(node)
+            .map(Statement::Simple),
+        Statement::Compound(node) => visitor
+            .visit_CompoundStatement(node)
+            .map(Statement::Compound),
     }
 }
 
-pub fn walk_SimpleStatementLine<V: CSTVisitor + ?Sized>(
+pub fn walk_SimpleStatementLine<'a, V: CSTVisitor + ?Sized>(
     visitor: &mut V,
-    node: &SimpleStatementLine,
-) {
+    node: &'a SimpleStatementLine<'a>,
+) -> Option<SimpleStatementLine<'a>> {
     for node in &node.body {
         visitor.visit_SmallStatement(node);
     }
+    Some(node.clone())
 }
 
-pub fn walk_CompoundStatement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &CompoundStatement) {
+pub fn walk_CompoundStatement<'a, V: CSTVisitor + ?Sized>(
+    visitor: &mut V,
+    node: &'a CompoundStatement<'a>,
+) -> Option<CompoundStatement<'a>> {
     match node {
-        CompoundStatement::FunctionDef(node) => visitor.visit_FunctionDef(node),
         CompoundStatement::If(node) => {
             visitor.visit_If(node);
+            return None;
         }
+        CompoundStatement::FunctionDef(node) => visitor.visit_FunctionDef(node),
         CompoundStatement::For(node) => visitor.visit_For(node),
         CompoundStatement::While(node) => visitor.visit_While(node),
-        CompoundStatement::ClassDef(node) => visitor.visit_ClassDef(node),
+        CompoundStatement::ClassDef(node) => {
+            return Some(CompoundStatement::ClassDef(visitor.visit_ClassDef(node)))
+        }
         CompoundStatement::Try(node) => visitor.visit_Try(node),
         CompoundStatement::TryStar(node) => visitor.visit_TryStar(node),
         CompoundStatement::With(node) => visitor.visit_With(node),
         CompoundStatement::Match(node) => visitor.visit_Match(node),
     }
+
+    Some(node.clone())
 }
 
 pub fn walk_SmallStatement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &SmallStatement) {
@@ -428,7 +468,7 @@ pub fn walk_AssignTargetExpression<V: CSTVisitor + ?Sized>(
     visitor: &mut V,
     node: &AssignTargetExpression,
 ) {
-    match &node {
+    match node {
         AssignTargetExpression::Name(node) => visitor.visit_Name(node),
         AssignTargetExpression::Attribute(node) => visitor.visit_Attribute(node),
         AssignTargetExpression::StarredElement(node) => visitor.visit_StarredElement(node),
@@ -439,8 +479,8 @@ pub fn walk_AssignTargetExpression<V: CSTVisitor + ?Sized>(
 }
 pub fn walk_AnnAssign<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AnnAssign) {
     visitor.visit_AssignTargetExpression(&node.target);
-    if let Some(expression) = &node.value {
-        visitor.visit_Expression(expression)
+    if let Some(node) = &node.value {
+        visitor.visit_Expression(node)
     }
 }
 pub fn walk_Annotation<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Annotation) {
@@ -508,7 +548,10 @@ pub fn walk_Call<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Call) {
     }
     visitor.visit_Expression(&node.func)
 }
-pub fn walk_ClassDef<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ClassDef) {
+pub fn walk_ClassDef<'a, V: CSTVisitor + ?Sized>(
+    visitor: &mut V,
+    node: &'a ClassDef<'a>,
+) -> ClassDef<'a> {
     visitor.visit_Name(&node.name);
     for node in &node.bases {
         visitor.visit_Arg(node);
@@ -523,6 +566,8 @@ pub fn walk_ClassDef<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ClassDef) {
         Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
         Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
     }
+
+    node.clone()
 }
 pub fn walk_CompFor<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &CompFor) {
     if let Some(node) = &node.asynchronous {
@@ -569,7 +614,7 @@ pub fn walk_DelTargetExpression<V: CSTVisitor + ?Sized>(
     visitor: &mut V,
     node: &DelTargetExpression,
 ) {
-    match &node {
+    match node {
         DelTargetExpression::Name(node) => visitor.visit_Name(node),
         DelTargetExpression::Attribute(node) => visitor.visit_Attribute(node),
         DelTargetExpression::Tuple(node) => visitor.visit_Tuple(node),
@@ -588,7 +633,7 @@ pub fn walk_DictComp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &DictComp) {
     visitor.visit_CompFor(&node.for_in);
 }
 pub fn walk_DictElement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &DictElement) {
-    match &node {
+    match node {
         DictElement::Simple { key, value, .. } => {
             visitor.visit_Expression(key);
             visitor.visit_Expression(value);
@@ -597,7 +642,7 @@ pub fn walk_DictElement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &DictElem
     }
 }
 pub fn walk_Element<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Element) {
-    match &node {
+    match node {
         Element::Simple { value: node, .. } => visitor.visit_Expression(node),
         Element::Starred(node) => visitor.visit_StarredElement(node),
     }
@@ -707,7 +752,7 @@ pub fn walk_GeneratorExp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Generat
 }
 pub fn walk_Global<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Global) {
     for node in &node.names {
-        visitor.visit_NameItem(&node)
+        visitor.visit_NameItem(node)
     }
 }
 pub fn walk_If<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &If) {
@@ -757,7 +802,7 @@ pub fn walk_ImportStar<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ImportSta
 }
 pub fn walk_IndentedBlock<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &IndentedBlock) {
     for node in &node.body {
-        visitor.visit_Statement(node)
+        visitor.visit_Statement(node);
     }
 }
 pub fn walk_Index<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Index) {
@@ -831,7 +876,7 @@ pub fn walk_Parameters<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Parameter
         visitor.visit_Param(node);
     }
     if let Some(node) = &node.star_arg {
-        match &node {
+        match node {
             StarArg::Star(node) => visitor.visit_ParamStar(node),
             StarArg::Param(node) => visitor.visit_Param(node),
         }
@@ -971,7 +1016,7 @@ pub fn walk_Yield<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Yield) {
     }
 }
 pub fn walk_YieldValue<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &YieldValue) {
-    match &node {
+    match node {
         YieldValue::Expression(node) => visitor.visit_Expression(node),
         YieldValue::From(node) => visitor.visit_From(node),
     }
