@@ -1,325 +1,978 @@
+#![allow(non_snake_case)]
+
 use libcst_native::{
-    AnnAssign, Annotation, Arg, AsName, Assert, Assign, AssignEqual, AssignTarget, Asynchronous,
-    Attribute, AugAssign, AugOp, Await, BinaryOperation, BitAnd, BitAndAssign, BitInvert,
-    BitOrAssign, BitXor, BitXorAssign, BooleanOperation, Break, Call, ClassDef, Colon, Comma,
-    Comment, CompFor, CompIf, Comparison, ComparisonTarget, CompoundStatement, ConcatenatedString,
-    Continue, Decorator, Del, Dict, DictComp, DictElement, Divide, DivideAssign, Dot, Element,
-    Ellipsis, Else, EmptyLine, Equal, ExceptHandler, ExceptStarHandler, Expr, Expression, Finally,
-    Float, FloorDivide, FloorDivideAssign, For, FormattedString, FormattedStringExpression,
-    FormattedStringText, From, FunctionDef, GeneratorExp, Global, GreaterThan, GreaterThanEqual,
-    If, IfExp, Imaginary, Import, ImportAlias, ImportFrom, ImportStar, In, IndentedBlock, Index,
-    Integer, Is, IsNot, Lambda, LeftCurlyBrace, LeftParen, LeftShift, LeftShiftAssign,
-    LeftSquareBracket, LessThan, LessThanEqual, List, ListComp, Match, MatchAs, MatchCase,
-    MatchClass, MatchKeywordElement, MatchList, MatchMapping, MatchMappingElement, MatchOr,
-    MatchOrElement, MatchPattern, MatchSequence, MatchSequenceElement, MatchSingleton, MatchStar,
-    MatchTuple, MatchValue, MatrixMultiply, MatrixMultiplyAssign, Minus, Module, Modulo,
-    ModuloAssign, Multiply, MultiplyAssign, Name, NameItem, NamedExpr, Newline, Nonlocal, Not,
-    NotEqual, NotIn, Or, Param, ParamSlash, ParamStar, Parameters, ParenthesizedWhitespace, Pass,
-    Plus, Power, PowerAssign, Raise, Return, RightCurlyBrace, RightParen, RightShift,
-    RightShiftAssign, RightSquareBracket, Semicolon, Set, SetComp, SimpleStatementLine,
-    SimpleStatementSuite, SimpleString, SimpleWhitespace, Slice, SmallStatement,
-    StarredDictElement, StarredElement, Statement, Subscript, SubscriptElement, Subtract,
-    SubtractAssign, TrailingWhitespace, Try, TryStar, Tuple, UnaryOperation, While, With, WithItem,
-    Yield,
+    AnnAssign, Annotation, Arg, AsName, Assert, Assign, AssignEqual, AssignTarget,
+    AssignTargetExpression, Asynchronous, Attribute, AugAssign, Await, BaseSlice, BinaryOp,
+    BinaryOperation, BooleanOp, BooleanOperation, Break, Call, ClassDef, CompFor, CompIf, CompOp,
+    Comparison, ComparisonTarget, CompoundStatement, ConcatenatedString, Continue, Decorator, Del,
+    DelTargetExpression, Dict, DictComp, DictElement, Element, Ellipsis, Else, ExceptHandler,
+    ExceptStarHandler, Expr, Expression, Finally, Float, For, FormattedString,
+    FormattedStringContent, FormattedStringExpression, FormattedStringText, From, FunctionDef,
+    GeneratorExp, Global, If, IfExp, Imaginary, Import, ImportAlias, ImportFrom, ImportNames,
+    ImportStar, IndentedBlock, Index, Integer, Lambda, List, ListComp, Match, Name, NameItem,
+    NameOrAttribute, NamedExpr, Nonlocal, OrElse, Param, ParamStar, Parameters, Pass, Raise,
+    Return, Set, SetComp, SimpleStatementLine, SimpleStatementSuite, SimpleString, Slice,
+    SmallStatement, StarArg, StarredDictElement, StarredElement, Statement, Subscript,
+    SubscriptElement, Suite, Try, TryStar, Tuple, UnaryOp, UnaryOperation, While, With, WithItem,
+    Yield, YieldValue,
 };
 
 pub trait CSTVisitor {
-    // fn visit_statement(&mut self, statement: &Statement) {
-    //     walk_statement(self, statement);
-    // }
-    // fn visit_simple_statement_line(&mut self, simple_statement_line: &SimpleStatementLine) {
-    //     walk_simple_statement_line(self, simple_statement_line);
-    // }
-    // fn visit_compound_statement(&mut self, compound_statement: &CompoundStatement) {
-    //     walk_compound_statement(self, compound_statement);
-    // }
-    // fn visit_small_statement(&mut self, small_statement: &SmallStatement) {
-    //     walk_small_statement(self, small_statement);
-    // }
-    // fn visit_expression(&mut self, expression: &Expression) {
-    //     walk_expression(self, expression);
-    // }
-    // fn visit_Add(&mut self, node: &Add) {}
-    // fn visit_AddAssign(&mut self, node: &AddAssign) {}
-    // fn visit_And(&mut self, node: &And) {}
-    fn visit_AnnAssign(&mut self, node: &AnnAssign) {}
-    fn visit_Annotation(&mut self, node: &Annotation) {}
-    fn visit_Arg(&mut self, node: &Arg) {}
-    fn visit_AsName(&mut self, node: &AsName) {}
-    fn visit_Assert(&mut self, node: &Assert) {}
-    fn visit_Assign(&mut self, node: &Assign) {}
-    fn visit_AssignEqual(&mut self, node: &AssignEqual) {}
-    fn visit_AssignTarget(&mut self, node: &AssignTarget) {}
-    fn visit_Asynchronous(&mut self, node: &Asynchronous) {}
-    fn visit_Attribute(&mut self, node: &Attribute) {}
-    fn visit_AugAssign(&mut self, node: &AugAssign) {}
-    fn visit_AugOp(&mut self, node: &AugOp) {}
-    fn visit_Await(&mut self, node: &Await) {}
-    fn visit_BinaryOperation(&mut self, node: &BinaryOperation) {}
-    // fn visit_BitAnd(&mut self, node: &BitAnd) {}
-    // fn visit_BitAndAssign(&mut self, node: &BitAndAssign) {}
-    // fn visit_BitInvert(&mut self, node: &BitInvert) {}
-    // fn visit_BitOr(&mut self, node: &BitOr) {}
-    // fn visit_BitOrAssign(&mut self, node: &BitOrAssign) {}
-    // fn visit_BitXor(&mut self, node: &BitXor) {}
-    // fn visit_BitXorAssign(&mut self, node: &BitXorAssign) {}
-    fn visit_BooleanOperation(&mut self, node: &BooleanOperation) {}
-    fn visit_Break(&mut self, node: &Break) {}
-    fn visit_Call(&mut self, node: &Call) {}
-    fn visit_ClassDef(&mut self, node: &ClassDef) {}
-    fn visit_Colon(&mut self, node: &Colon) {}
-    fn visit_Comma(&mut self, node: &Comma) {}
-    fn visit_Comment(&mut self, node: &Comment) {}
-    fn visit_CompFor(&mut self, node: &CompFor) {}
-    fn visit_CompIf(&mut self, node: &CompIf) {}
-    fn visit_Comparison(&mut self, node: &Comparison) {}
-    fn visit_ComparisonTarget(&mut self, node: &ComparisonTarget) {}
-    fn visit_ConcatenatedString(&mut self, node: &ConcatenatedString) {}
-    fn visit_Continue(&mut self, node: &Continue) {}
-    fn visit_Decorator(&mut self, node: &Decorator) {}
-    fn visit_Del(&mut self, node: &Del) {}
-    fn visit_Dict(&mut self, node: &Dict) {}
-    fn visit_DictComp(&mut self, node: &DictComp) {}
-    fn visit_DictElement(&mut self, node: &DictElement) {}
-    fn visit_Divide(&mut self, node: &Divide) {}
-    fn visit_DivideAssign(&mut self, node: &DivideAssign) {}
-    fn visit_Dot(&mut self, node: &Dot) {}
-    fn visit_Element(&mut self, node: &Element) {}
-    fn visit_Ellipsis(&mut self, node: &Ellipsis) {}
-    fn visit_Else(&mut self, node: &Else) {}
-    fn visit_EmptyLine(&mut self, node: &EmptyLine) {}
-    fn visit_Equal(&mut self, node: &Equal) {}
-    fn visit_ExceptHandler(&mut self, node: &ExceptHandler) {}
-    fn visit_ExceptStarHandler(&mut self, node: &ExceptStarHandler) {}
-    fn visit_Expr(&mut self, node: &Expr) {}
-    fn visit_Finally(&mut self, node: &Finally) {}
-    fn visit_Float(&mut self, node: &Float) {}
-    fn visit_FloorDivide(&mut self, node: &FloorDivide) {}
-    fn visit_FloorDivideAssign(&mut self, node: &FloorDivideAssign) {}
-    fn visit_For(&mut self, node: &For) {}
-    fn visit_FormattedString(&mut self, node: &FormattedString) {}
+    fn visit_Statement(&mut self, node: &Statement) {
+        walk_Statement(self, node);
+    }
+    fn visit_SimpleStatementLine(&mut self, node: &SimpleStatementLine) {
+        walk_SimpleStatementLine(self, node);
+    }
+    fn visit_CompoundStatement(&mut self, node: &CompoundStatement) {
+        walk_CompoundStatement(self, node);
+    }
+    fn visit_SmallStatement(&mut self, node: &SmallStatement) {
+        walk_SmallStatement(self, node);
+    }
+    fn visit_Expression(&mut self, node: &Expression) {
+        walk_Expression(self, node);
+    }
+    fn visit_AnnAssign(&mut self, node: &AnnAssign) {
+        walk_AnnAssign(self, node);
+    }
+    fn visit_Annotation(&mut self, node: &Annotation) {
+        walk_Annotation(self, node);
+    }
+    fn visit_Arg(&mut self, node: &Arg) {
+        walk_Arg(self, node);
+    }
+    fn visit_AsName(&mut self, node: &AsName) {
+        walk_AsName(self, node);
+    }
+    fn visit_Assert(&mut self, node: &Assert) {
+        walk_Assert(self, node);
+    }
+    fn visit_Assign(&mut self, node: &Assign) {
+        walk_Assign(self, node);
+    }
+    fn visit_AssignEqual(&mut self, node: &AssignEqual) {
+        walk_AssignEqual(self, node);
+    }
+    fn visit_AssignTarget(&mut self, node: &AssignTarget) {
+        walk_AssignTarget(self, node);
+    }
+    fn visit_AssignTargetExpression(&mut self, node: &AssignTargetExpression) {
+        walk_AssignTargetExpression(self, node);
+    }
+    fn visit_Asynchronous(&mut self, node: &Asynchronous) {
+        walk_Asynchronous(self, node);
+    }
+    fn visit_Attribute(&mut self, node: &Attribute) {
+        walk_Attribute(self, node);
+    }
+    fn visit_AugAssign(&mut self, node: &AugAssign) {
+        walk_AugAssign(self, node);
+    }
+    fn visit_Await(&mut self, node: &Await) {
+        walk_Await(self, node);
+    }
+    fn visit_BinaryOperation(&mut self, node: &BinaryOperation) {
+        walk_BinaryOperation(self, node);
+    }
+    fn visit_BinaryOp(&mut self, node: &BinaryOp) {
+        walk_BinaryOp(self, node);
+    }
+    fn visit_BooleanOperation(&mut self, node: &BooleanOperation) {
+        walk_BooleanOperation(self, node);
+    }
+    fn visit_BooleanOp(&mut self, node: &BooleanOp) {
+        walk_BooleanOp(self, node);
+    }
+    fn visit_Break(&mut self, node: &Break) {
+        walk_Break(self, node);
+    }
+    fn visit_Call(&mut self, node: &Call) {
+        walk_Call(self, node);
+    }
+    fn visit_ClassDef(&mut self, node: &ClassDef) {
+        walk_ClassDef(self, node);
+    }
+    fn visit_CompFor(&mut self, node: &CompFor) {
+        walk_CompFor(self, node);
+    }
+    fn visit_CompIf(&mut self, node: &CompIf) {
+        walk_CompIf(self, node);
+    }
+    fn visit_Comparison(&mut self, node: &Comparison) {
+        walk_Comparison(self, node);
+    }
+    fn visit_ComparisonTarget(&mut self, node: &ComparisonTarget) {
+        walk_ComparisonTarget(self, node);
+    }
+    fn visit_CompOp(&mut self, node: &CompOp) {
+        walk_CompOp(self, node);
+    }
+    fn visit_ConcatenatedString(&mut self, node: &ConcatenatedString) {
+        walk_ConcatenatedString(self, node);
+    }
+    fn visit_Continue(&mut self, node: &Continue) {
+        walk_Continue(self, node);
+    }
+    fn visit_Decorator(&mut self, node: &Decorator) {
+        walk_Decorator(self, node);
+    }
+    fn visit_Del(&mut self, node: &Del) {
+        walk_Del(self, node);
+    }
+    fn visit_DelTargetExpression(&mut self, node: &DelTargetExpression) {
+        walk_DelTargetExpression(self, node);
+    }
+    fn visit_Dict(&mut self, node: &Dict) {
+        walk_Dict(self, node);
+    }
+    fn visit_DictComp(&mut self, node: &DictComp) {
+        walk_DictComp(self, node);
+    }
+    fn visit_DictElement(&mut self, node: &DictElement) {
+        walk_DictElement(self, node);
+    }
+    fn visit_Element(&mut self, node: &Element) {
+        walk_Element(self, node);
+    }
+    fn visit_Ellipsis(&mut self, node: &Ellipsis) {
+        walk_Ellipsis(self, node);
+    }
+    fn visit_Else(&mut self, node: &Else) {
+        walk_Else(self, node);
+    }
+    fn visit_ExceptHandler(&mut self, node: &ExceptHandler) {
+        walk_ExceptHandler(self, node);
+    }
+    fn visit_ExceptStarHandler(&mut self, node: &ExceptStarHandler) {
+        walk_ExceptStarHandler(self, node);
+    }
+    fn visit_Expr(&mut self, node: &Expr) {
+        walk_Expr(self, node);
+    }
+    fn visit_Finally(&mut self, node: &Finally) {
+        walk_Finally(self, node);
+    }
+    fn visit_Float(&mut self, node: &Float) {
+        walk_Float(self, node);
+    }
+    fn visit_For(&mut self, node: &For) {
+        walk_For(self, node);
+    }
+    fn visit_FormattedString(&mut self, node: &FormattedString) {
+        walk_FormattedString(self, node);
+    }
+    fn visit_FormattedStringExpression(&mut self, node: &FormattedStringExpression) {
+        walk_FormattedStringExpression(self, node);
+    }
+    fn visit_FormattedStringText(&mut self, node: &FormattedStringText) {
+        walk_FormattedStringText(self, node);
+    }
+    fn visit_From(&mut self, node: &From) {
+        walk_From(self, node);
+    }
+    fn visit_FunctionDef(&mut self, node: &FunctionDef) {
+        walk_FunctionDef(self, node);
+    }
+    fn visit_GeneratorExp(&mut self, node: &GeneratorExp) {
+        walk_GeneratorExp(self, node);
+    }
+    fn visit_Global(&mut self, node: &Global) {
+        walk_Global(self, node);
+    }
+    fn visit_If<'a>(&'a mut self, node: &'a If) -> &'a If {
+        walk_If(self, node);
+        return node;
+    }
+    fn visit_IfExp(&mut self, node: &IfExp) {
+        walk_IfExp(self, node);
+    }
+    fn visit_Imaginary(&mut self, node: &Imaginary) {
+        walk_Imaginary(self, node);
+    }
+    fn visit_Import(&mut self, node: &Import) {
+        walk_Import(self, node);
+    }
+    fn visit_ImportAlias(&mut self, node: &ImportAlias) {
+        walk_ImportAlias(self, node);
+    }
+    fn visit_ImportFrom(&mut self, node: &ImportFrom) {
+        walk_ImportFrom(self, node);
+    }
+    fn visit_ImportStar(&mut self, node: &ImportStar) {
+        walk_ImportStar(self, node);
+    }
+    fn visit_IndentedBlock(&mut self, node: &IndentedBlock) {
+        walk_IndentedBlock(self, node);
+    }
+    fn visit_Index(&mut self, node: &Index) {
+        walk_Index(self, node);
+    }
+    fn visit_Integer(&mut self, node: &Integer) {
+        walk_Integer(self, node);
+    }
+    fn visit_Lambda(&mut self, node: &Lambda) {
+        walk_Lambda(self, node);
+    }
+    fn visit_List(&mut self, node: &List) {
+        walk_List(self, node);
+    }
+    fn visit_ListComp(&mut self, node: &ListComp) {
+        walk_ListComp(self, node);
+    }
+    fn visit_Match(&mut self, node: &Match) {
+        walk_Match(self, node);
+    }
 
-    fn visit_FormattedStringExpression(&mut self, node: &FormattedStringExpression) {}
-    fn visit_FormattedStringText(&mut self, node: &FormattedStringText) {}
-    fn visit_From(&mut self, node: &From) {}
-    fn visit_FunctionDef(&mut self, node: &FunctionDef) {}
-    fn visit_GeneratorExp(&mut self, node: &GeneratorExp) {}
-    fn visit_Global(&mut self, node: &Global) {}
-    fn visit_GreaterThan(&mut self, node: &GreaterThan) {}
-    fn visit_GreaterThanEqual(&mut self, node: &GreaterThanEqual) {}
-    fn visit_If(&mut self, node: &If) {}
-    fn visit_IfExp(&mut self, node: &IfExp) {}
-    fn visit_Imaginary(&mut self, node: &Imaginary) {}
-    fn visit_Import(&mut self, node: &Import) {}
-    fn visit_ImportAlias(&mut self, node: &ImportAlias) {}
-    fn visit_ImportFrom(&mut self, node: &ImportFrom) {}
-    fn visit_ImportStar(&mut self, node: &ImportStar) {}
-    fn visit_In(&mut self, node: &In) {}
-    fn visit_IndentedBlock(&mut self, node: &IndentedBlock) {}
-    fn visit_Index(&mut self, node: &Index) {}
-    fn visit_Integer(&mut self, node: &Integer) {}
-    fn visit_Is(&mut self, node: &Is) {}
-    fn visit_IsNot(&mut self, node: &IsNot) {}
-    fn visit_Lambda(&mut self, node: &Lambda) {}
-    fn visit_LeftCurlyBrace(&mut self, node: &LeftCurlyBrace) {}
-    fn visit_LeftParen(&mut self, node: &LeftParen) {}
-    fn visit_LeftShift(&mut self, node: &LeftShift) {}
-    fn visit_LeftShiftAssign(&mut self, node: &LeftShiftAssign) {}
-    fn visit_LeftSquareBracket(&mut self, node: &LeftSquareBracket) {}
-    fn visit_LessThan(&mut self, node: &LessThan) {}
-    fn visit_LessThanEqual(&mut self, node: &LessThanEqual) {}
-    fn visit_List(&mut self, node: &List) {}
-    fn visit_ListComp(&mut self, node: &ListComp) {}
-    fn visit_Match(&mut self, node: &Match) {}
-    fn visit_MatchAs(&mut self, node: &MatchAs) {}
-    fn visit_MatchCase(&mut self, node: &MatchCase) {}
-    fn visit_MatchClass(&mut self, node: &MatchClass) {}
-    fn visit_MatchKeywordElement(&mut self, node: &MatchKeywordElement) {}
-    fn visit_MatchList(&mut self, node: &MatchList) {}
-    fn visit_MatchMapping(&mut self, node: &MatchMapping) {}
-    fn visit_MatchMappingElement(&mut self, node: &MatchMappingElement) {}
-    fn visit_MatchOr(&mut self, node: &MatchOr) {}
-    fn visit_MatchOrElement(&mut self, node: &MatchOrElement) {}
-    fn visit_MatchPattern(&mut self, node: &MatchPattern) {}
-    fn visit_MatchSequence(&mut self, node: &MatchSequence) {}
+    // fn visit_MatchAs(&mut self, node: &MatchAs) { walk_MatchAs(self, node); }
+    // fn visit_MatchCase(&mut self, node: &MatchCase) { walk_MatchCase(self, node); }
+    // fn visit_MatchClass(&mut self, node: &MatchClass) { walk_MatchClass(self, node); }
+    // fn visit_MatchKeywordElement(&mut self, node: &MatchKeywordElement) { walk_MatchKeywordElement(self, node); }
+    // fn visit_MatchList(&mut self, node: &MatchList) { walk_MatchList(self, node); }
+    // fn visit_MatchMapping(&mut self, node: &MatchMapping) { walk_MatchMapping(self, node); }
+    // fn visit_MatchMappingElement(&mut self, node: &MatchMappingElement) { walk_MatchMappingElement(self, node); }
+    // fn visit_MatchOr(&mut self, node: &MatchOr) { walk_MatchOr(self, node); }
+    // fn visit_MatchOrElement(&mut self, node: &MatchOrElement) { walk_MatchOrElement(self, node); }
+    // fn visit_MatchPattern(&mut self, node: &MatchPattern) { walk_MatchPattern(self, node); }
+    // fn visit_MatchSequence(&mut self, node: &MatchSequence) { walk_MatchSequence(self, node); }
+    // fn visit_MatchSequenceElement(&mut self, node: &MatchSequenceElement) { walk_MatchSequenceElement(self, node); }
+    // fn visit_MatchSingleton(&mut self, node: &MatchSingleton) { walk_MatchSingleton(self, node); }
+    // fn visit_MatchStar(&mut self, node: &MatchStar) { walk_MatchStar(self, node); }
+    // fn visit_MatchTuple(&mut self, node: &MatchTuple) { walk_MatchTuple(self, node); }
+    // fn visit_MatchValue(&mut self, node: &MatchValue) { walk_MatchValue(self, node); }
 
-    fn visit_MatchSequenceElement(&mut self, node: &MatchSequenceElement) {}
-    fn visit_MatchSingleton(&mut self, node: &MatchSingleton) {}
-    fn visit_MatchStar(&mut self, node: &MatchStar) {}
-    fn visit_MatchTuple(&mut self, node: &MatchTuple) {}
-    fn visit_MatchValue(&mut self, node: &MatchValue) {}
-    fn visit_MatrixMultiply(&mut self, node: &MatrixMultiply) {}
-
-    fn visit_MatrixMultiplyAssign(&mut self, node: &MatrixMultiplyAssign) {}
-    fn visit_Minus(&mut self, node: &Minus) {}
-    fn visit_Module(&mut self, node: &Module) {}
-    fn visit_Modulo(&mut self, node: &Modulo) {}
-    fn visit_ModuloAssign(&mut self, node: &ModuloAssign) {}
-    fn visit_Multiply(&mut self, node: &Multiply) {}
-    fn visit_MultiplyAssign(&mut self, node: &MultiplyAssign) {}
-    fn visit_Name(&mut self, node: &Name) {}
-    fn visit_NameItem(&mut self, node: &NameItem) {}
-    fn visit_NamedExpr(&mut self, node: &NamedExpr) {}
-    fn visit_Newline(&mut self, node: &Newline) {}
-    fn visit_Nonlocal(&mut self, node: &Nonlocal) {}
-    fn visit_Not(&mut self, node: &Not) {}
-    fn visit_NotEqual(&mut self, node: &NotEqual) {}
-    fn visit_NotIn(&mut self, node: &NotIn) {}
-    fn visit_Or(&mut self, node: &Or) {}
-    fn visit_Param(&mut self, node: &Param) {}
-    fn visit_ParamSlash(&mut self, node: &ParamSlash) {}
-    fn visit_ParamStar(&mut self, node: &ParamStar) {}
-    fn visit_Parameters(&mut self, node: &Parameters) {}
-
-    fn visit_ParenthesizedWhitespace(&mut self, node: &ParenthesizedWhitespace) {}
-    fn visit_Pass(&mut self, node: &Pass) {}
-    fn visit_Plus(&mut self, node: &Plus) {}
-    fn visit_Power(&mut self, node: &Power) {}
-    fn visit_PowerAssign(&mut self, node: &PowerAssign) {}
-    fn visit_Raise(&mut self, node: &Raise) {}
-    fn visit_Return(&mut self, node: &Return) {}
-    fn visit_RightCurlyBrace(&mut self, node: &RightCurlyBrace) {}
-    fn visit_RightParen(&mut self, node: &RightParen) {}
-    fn visit_RightShift(&mut self, node: &RightShift) {}
-    fn visit_RightShiftAssign(&mut self, node: &RightShiftAssign) {}
-    fn visit_RightSquareBracket(&mut self, node: &RightSquareBracket) {}
-    fn visit_Semicolon(&mut self, node: &Semicolon) {}
-    fn visit_Set(&mut self, node: &Set) {}
-    fn visit_SetComp(&mut self, node: &SetComp) {}
-    fn visit_SimpleStatementLine(&mut self, node: &SimpleStatementLine) {}
-
-    fn visit_SimpleStatementSuite(&mut self, node: &SimpleStatementSuite) {}
-    fn visit_SimpleString(&mut self, node: &SimpleString) {}
-    fn visit_SimpleWhitespace(&mut self, node: &SimpleWhitespace) {}
-    fn visit_Slice(&mut self, node: &Slice) {}
-    fn visit_StarredDictElement(&mut self, node: &StarredDictElement) {}
-    fn visit_StarredElement(&mut self, node: &StarredElement) {}
-    fn visit_Subscript(&mut self, node: &Subscript) {}
-    fn visit_SubscriptElement(&mut self, node: &SubscriptElement) {}
-    fn visit_Subtract(&mut self, node: &Subtract) {}
-    fn visit_SubtractAssign(&mut self, node: &SubtractAssign) {}
-    fn visit_TrailingWhitespace(&mut self, node: &TrailingWhitespace) {}
-    fn visit_Try(&mut self, node: &Try) {}
-    fn visit_TryStar(&mut self, node: &TryStar) {}
-    fn visit_Tuple(&mut self, node: &Tuple) {}
-    fn visit_UnaryOperation(&mut self, node: &UnaryOperation) {}
-    fn visit_While(&mut self, node: &While) {}
-    fn visit_With(&mut self, node: &With) {}
-    fn visit_WithItem(&mut self, node: &WithItem) {}
-    fn visit_Yield(&mut self, node: &Yield) {}
-}
-
-pub fn walk_statement<V: CSTVisitor + ?Sized>(visitor: &mut V, statement: &Statement) {
-    match statement {
-        Statement::Simple(simple_statement_line) => {
-            visitor.visit_simple_statement_line(simple_statement_line)
-        }
-        Statement::Compound(compound_statement) => {
-            visitor.visit_compound_statement(compound_statement)
-        }
+    fn visit_Name(&mut self, node: &Name) {
+        walk_Name(self, node);
+    }
+    fn visit_NameItem(&mut self, node: &NameItem) {
+        walk_NameItem(self, node);
+    }
+    fn visit_NamedExpr(&mut self, node: &NamedExpr) {
+        walk_NamedExpr(self, node);
+    }
+    fn visit_Nonlocal(&mut self, node: &Nonlocal) {
+        walk_Nonlocal(self, node);
+    }
+    fn visit_OrElse(&mut self, node: &OrElse) {
+        walk_OrElse(self, node);
+    }
+    fn visit_Param(&mut self, node: &Param) {
+        walk_Param(self, node);
+    }
+    fn visit_ParamStar(&mut self, node: &ParamStar) {
+        walk_ParamStar(self, node);
+    }
+    fn visit_Parameters(&mut self, node: &Parameters) {
+        walk_Parameters(self, node);
+    }
+    fn visit_Pass(&mut self, node: &Pass) {
+        walk_Pass(self, node);
+    }
+    fn visit_Raise(&mut self, node: &Raise) {
+        walk_Raise(self, node);
+    }
+    fn visit_Return(&mut self, node: &Return) {
+        walk_Return(self, node);
+    }
+    fn visit_Set(&mut self, node: &Set) {
+        walk_Set(self, node);
+    }
+    fn visit_SetComp(&mut self, node: &SetComp) {
+        walk_SetComp(self, node);
+    }
+    fn visit_SimpleStatementSuite(&mut self, node: &SimpleStatementSuite) {
+        walk_SimpleStatementSuite(self, node);
+    }
+    fn visit_SimpleString(&mut self, node: &SimpleString) {
+        walk_SimpleString(self, node);
+    }
+    fn visit_Slice(&mut self, node: &Slice) {
+        walk_Slice(self, node);
+    }
+    fn visit_StarredDictElement(&mut self, node: &StarredDictElement) {
+        walk_StarredDictElement(self, node);
+    }
+    fn visit_StarredElement(&mut self, node: &StarredElement) {
+        walk_StarredElement(self, node);
+    }
+    fn visit_Subscript(&mut self, node: &Subscript) {
+        walk_Subscript(self, node);
+    }
+    fn visit_SubscriptElement(&mut self, node: &SubscriptElement) {
+        walk_SubscriptElement(self, node);
+    }
+    fn visit_Try(&mut self, node: &Try) {
+        walk_Try(self, node);
+    }
+    fn visit_TryStar(&mut self, node: &TryStar) {
+        walk_TryStar(self, node);
+    }
+    fn visit_Tuple(&mut self, node: &Tuple) {
+        walk_Tuple(self, node);
+    }
+    fn visit_UnaryOp(&mut self, node: &UnaryOp) {
+        walk_UnaryOp(self, node);
+    }
+    fn visit_UnaryOperation(&mut self, node: &UnaryOperation) {
+        walk_UnaryOperation(self, node);
+    }
+    fn visit_While(&mut self, node: &While) {
+        walk_While(self, node);
+    }
+    fn visit_With(&mut self, node: &With) {
+        walk_With(self, node);
+    }
+    fn visit_WithItem(&mut self, node: &WithItem) {
+        walk_WithItem(self, node);
+    }
+    fn visit_Yield(&mut self, node: &Yield) {
+        walk_Yield(self, node);
+    }
+    fn visit_YieldValue(&mut self, node: &YieldValue) {
+        walk_YieldValue(self, node);
     }
 }
 
-pub fn walk_simple_statement_line<V: CSTVisitor + ?Sized>(
+pub fn walk_Statement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Statement) {
+    match node {
+        Statement::Simple(node) => visitor.visit_SimpleStatementLine(node),
+        Statement::Compound(node) => visitor.visit_CompoundStatement(node),
+    }
+}
+
+pub fn walk_SimpleStatementLine<V: CSTVisitor + ?Sized>(
     visitor: &mut V,
-    simple_statement_line: &SimpleStatementLine,
+    node: &SimpleStatementLine,
 ) {
-    for small_statement in &simple_statement_line.body {
-        visitor.visit_small_statement(small_statement);
+    for node in &node.body {
+        visitor.visit_SmallStatement(node);
     }
 }
 
-pub fn walk_compound_statement<V: CSTVisitor + ?Sized>(
+pub fn walk_CompoundStatement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &CompoundStatement) {
+    match node {
+        CompoundStatement::FunctionDef(node) => visitor.visit_FunctionDef(node),
+        CompoundStatement::If(node) => {
+            visitor.visit_If(node);
+        }
+        CompoundStatement::For(node) => visitor.visit_For(node),
+        CompoundStatement::While(node) => visitor.visit_While(node),
+        CompoundStatement::ClassDef(node) => visitor.visit_ClassDef(node),
+        CompoundStatement::Try(node) => visitor.visit_Try(node),
+        CompoundStatement::TryStar(node) => visitor.visit_TryStar(node),
+        CompoundStatement::With(node) => visitor.visit_With(node),
+        CompoundStatement::Match(node) => visitor.visit_Match(node),
+    }
+}
+
+pub fn walk_SmallStatement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &SmallStatement) {
+    match node {
+        SmallStatement::Pass(node) => visitor.visit_Pass(node),
+        SmallStatement::Break(node) => visitor.visit_Break(node),
+        SmallStatement::Continue(node) => visitor.visit_Continue(node),
+        SmallStatement::Return(node) => visitor.visit_Return(node),
+        SmallStatement::Expr(node) => visitor.visit_Expr(node),
+        SmallStatement::Assert(node) => visitor.visit_Assert(node),
+        SmallStatement::Import(node) => visitor.visit_Import(node),
+        SmallStatement::ImportFrom(node) => visitor.visit_ImportFrom(node),
+        SmallStatement::Assign(node) => visitor.visit_Assign(node),
+        SmallStatement::AnnAssign(node) => visitor.visit_AnnAssign(node),
+        SmallStatement::Raise(node) => visitor.visit_Raise(node),
+        SmallStatement::Global(node) => visitor.visit_Global(node),
+        SmallStatement::Nonlocal(node) => visitor.visit_Nonlocal(node),
+        SmallStatement::AugAssign(node) => visitor.visit_AugAssign(node),
+        SmallStatement::Del(node) => visitor.visit_Del(node),
+    }
+}
+
+pub fn walk_Expression<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Expression) {
+    match node {
+        Expression::Name(node) => visitor.visit_Name(node),
+        Expression::Ellipsis(node) => visitor.visit_Ellipsis(node),
+        Expression::Integer(node) => visitor.visit_Integer(node),
+        Expression::Float(node) => visitor.visit_Float(node),
+        Expression::Imaginary(node) => visitor.visit_Imaginary(node),
+        Expression::Comparison(node) => visitor.visit_Comparison(node),
+        Expression::UnaryOperation(node) => visitor.visit_UnaryOperation(node),
+        Expression::BinaryOperation(node) => visitor.visit_BinaryOperation(node),
+        Expression::BooleanOperation(node) => visitor.visit_BooleanOperation(node),
+        Expression::Attribute(node) => visitor.visit_Attribute(node),
+        Expression::Tuple(node) => visitor.visit_Tuple(node),
+        Expression::Call(node) => visitor.visit_Call(node),
+        Expression::GeneratorExp(node) => visitor.visit_GeneratorExp(node),
+        Expression::ListComp(node) => visitor.visit_ListComp(node),
+        Expression::SetComp(node) => visitor.visit_SetComp(node),
+        Expression::DictComp(node) => visitor.visit_DictComp(node),
+        Expression::List(node) => visitor.visit_List(node),
+        Expression::Set(node) => visitor.visit_Set(node),
+        Expression::Dict(node) => visitor.visit_Dict(node),
+        Expression::Subscript(node) => visitor.visit_Subscript(node),
+        Expression::StarredElement(node) => visitor.visit_StarredElement(node),
+        Expression::IfExp(node) => visitor.visit_IfExp(node),
+        Expression::Lambda(node) => visitor.visit_Lambda(node),
+        Expression::Yield(node) => visitor.visit_Yield(node),
+        Expression::Await(node) => visitor.visit_Await(node),
+        Expression::SimpleString(node) => visitor.visit_SimpleString(node),
+        Expression::ConcatenatedString(node) => visitor.visit_ConcatenatedString(node),
+        Expression::FormattedString(node) => visitor.visit_FormattedString(node),
+        Expression::NamedExpr(node) => visitor.visit_NamedExpr(node),
+    }
+}
+pub fn walk_AssignEqual<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AssignEqual) {
+    // Nothing to do.
+}
+pub fn walk_AssignTarget<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AssignTarget) {
+    visitor.visit_AssignTargetExpression(&node.target);
+}
+pub fn walk_AssignTargetExpression<V: CSTVisitor + ?Sized>(
     visitor: &mut V,
-    compound_statement: &CompoundStatement,
+    node: &AssignTargetExpression,
 ) {
-    match compound_statement {
-        CompoundStatement::FunctionDef(_) => {}
-        CompoundStatement::If(_) => {}
-        CompoundStatement::For(_) => {}
-        CompoundStatement::While(_) => {}
-        CompoundStatement::ClassDef(_) => {}
-        CompoundStatement::Try(_) => {}
-        CompoundStatement::TryStar(_) => {}
-        CompoundStatement::With(_) => {}
-        CompoundStatement::Match(_) => {}
+    match &node {
+        AssignTargetExpression::Name(node) => visitor.visit_Name(node),
+        AssignTargetExpression::Attribute(node) => visitor.visit_Attribute(node),
+        AssignTargetExpression::StarredElement(node) => visitor.visit_StarredElement(node),
+        AssignTargetExpression::Tuple(node) => visitor.visit_Tuple(node),
+        AssignTargetExpression::List(node) => visitor.visit_List(node),
+        AssignTargetExpression::Subscript(node) => visitor.visit_Subscript(node),
     }
 }
-
-pub fn walk_small_statement<V: CSTVisitor + ?Sized>(
+pub fn walk_AnnAssign<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AnnAssign) {
+    visitor.visit_AssignTargetExpression(&node.target);
+    if let Some(expression) = &node.value {
+        visitor.visit_Expression(expression)
+    }
+}
+pub fn walk_Annotation<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Annotation) {
+    visitor.visit_Expression(&node.annotation);
+}
+pub fn walk_Arg<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Arg) {
+    visitor.visit_Expression(&node.value);
+    if let Some(node) = &node.keyword {
+        visitor.visit_Name(node)
+    }
+    if let Some(node) = &node.equal {
+        visitor.visit_AssignEqual(node)
+    }
+}
+pub fn walk_AsName<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AsName) {
+    visitor.visit_AssignTargetExpression(&node.name)
+}
+pub fn walk_Assert<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Assert) {
+    visitor.visit_Expression(&node.test);
+    if let Some(expression) = &node.msg {
+        visitor.visit_Expression(expression);
+    }
+}
+pub fn walk_Assign<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Assign) {
+    for target in &node.targets {
+        visitor.visit_AssignTarget(target)
+    }
+    visitor.visit_Expression(&node.value)
+}
+pub fn walk_Asynchronous<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Asynchronous) {
+    // Nothing to do.
+}
+pub fn walk_Attribute<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Attribute) {
+    visitor.visit_Expression(&node.value)
+}
+pub fn walk_AugAssign<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &AugAssign) {
+    visitor.visit_AssignTargetExpression(&node.target);
+    visitor.visit_Expression(&node.value);
+}
+pub fn walk_Await<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Await) {
+    visitor.visit_Expression(&node.expression);
+}
+pub fn walk_BinaryOperation<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &BinaryOperation) {
+    visitor.visit_Expression(&node.left);
+    visitor.visit_BinaryOp(&node.operator);
+    visitor.visit_Expression(&node.right);
+}
+pub fn walk_BinaryOp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &BinaryOp) {
+    // Nothing to do.
+}
+pub fn walk_BooleanOperation<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &BooleanOperation) {
+    visitor.visit_Expression(&node.left);
+    visitor.visit_BooleanOp(&node.operator);
+    visitor.visit_Expression(&node.right);
+}
+pub fn walk_BooleanOp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &BooleanOp) {
+    // Nothing to do.
+}
+pub fn walk_Break<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Break) {
+    // Nothing to do.
+}
+pub fn walk_Call<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Call) {
+    for node in &node.args {
+        visitor.visit_Arg(node)
+    }
+    visitor.visit_Expression(&node.func)
+}
+pub fn walk_ClassDef<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ClassDef) {
+    visitor.visit_Name(&node.name);
+    for node in &node.bases {
+        visitor.visit_Arg(node);
+    }
+    for node in &node.keywords {
+        visitor.visit_Arg(node);
+    }
+    for node in &node.decorators {
+        visitor.visit_Decorator(node);
+    }
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+}
+pub fn walk_CompFor<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &CompFor) {
+    if let Some(node) = &node.asynchronous {
+        visitor.visit_Asynchronous(node);
+    }
+    visitor.visit_AssignTargetExpression(&node.target);
+    visitor.visit_Expression(&node.iter);
+    for node in &node.ifs {
+        visitor.visit_CompIf(node);
+    }
+    if let Some(node) = &node.inner_for_in {
+        visitor.visit_CompFor(node);
+    }
+}
+pub fn walk_CompIf<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &CompIf) {
+    visitor.visit_Expression(&node.test)
+}
+pub fn walk_Comparison<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Comparison) {
+    visitor.visit_Expression(&node.left);
+    for node in &node.comparisons {
+        visitor.visit_ComparisonTarget(node);
+    }
+}
+pub fn walk_ComparisonTarget<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ComparisonTarget) {
+    visitor.visit_CompOp(&node.operator);
+    visitor.visit_Expression(&node.comparator);
+}
+pub fn walk_CompOp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &CompOp) {
+    // Nothing to do.
+}
+pub fn walk_ConcatenatedString<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ConcatenatedString) {
+    // Nothing to do.
+}
+pub fn walk_Continue<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Continue) {
+    // Nothing to do.
+}
+pub fn walk_Decorator<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Decorator) {
+    visitor.visit_Expression(&node.decorator)
+}
+pub fn walk_Del<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Del) {
+    visitor.visit_DelTargetExpression(&node.target)
+}
+pub fn walk_DelTargetExpression<V: CSTVisitor + ?Sized>(
     visitor: &mut V,
-    small_statement: &SmallStatement,
+    node: &DelTargetExpression,
 ) {
-    match small_statement {
-        SmallStatement::Pass(_) => {}
-        SmallStatement::Break(_) => {}
-        SmallStatement::Continue(_) => {}
-        SmallStatement::Return(inner) => {
-            if let Some(expression) = &inner.value {
-                visitor.visit_expression(expression);
-            }
-        }
-        SmallStatement::Expr(inner) => {
-            visitor.visit_expression(&inner.value);
-        }
-        SmallStatement::Assert(inner) => {
-            visitor.visit_expression(&inner.test);
-            if let Some(expression) = &inner.msg {
-                visitor.visit_expression(expression);
-            }
-        }
-        SmallStatement::Import(inner) => {
-            // Do I really need to recurse here?
-            for name in &inner.names {
-                visitor.visit_ImportAlias(name);
-            }
-        }
-        SmallStatement::ImportFrom(inner) => {
-            // Do I really need to recurse here?
-            for name in &inner.names {
-                visitor.visit_Name(name);
-            }
-        }
-        SmallStatement::Assign(_) => {}
-        SmallStatement::AnnAssign(_) => {}
-        SmallStatement::Raise(_) => {}
-        SmallStatement::Global(_) => {}
-        SmallStatement::Nonlocal(_) => {}
-        SmallStatement::AugAssign(_) => {}
-        SmallStatement::Del(_) => {}
+    match &node {
+        DelTargetExpression::Name(node) => visitor.visit_Name(node),
+        DelTargetExpression::Attribute(node) => visitor.visit_Attribute(node),
+        DelTargetExpression::Tuple(node) => visitor.visit_Tuple(node),
+        DelTargetExpression::List(node) => visitor.visit_List(node),
+        DelTargetExpression::Subscript(node) => visitor.visit_Subscript(node),
     }
 }
-
-pub fn walk_expression<V: CSTVisitor + ?Sized>(visitor: &mut V, expression: &Expression) {
-    match expression {
-        Expression::Name(_) => {}
-        Expression::Ellipsis(_) => {}
-        Expression::Integer(_) => {}
-        Expression::Float(_) => {}
-        Expression::Imaginary(_) => {}
-        Expression::Comparison(_) => {}
-        Expression::UnaryOperation(_) => {}
-        Expression::BinaryOperation(_) => {}
-        Expression::BooleanOperation(_) => {}
-        Expression::Attribute(_) => {}
-        Expression::Tuple(_) => {}
-        Expression::Call(_) => {}
-        Expression::GeneratorExp(_) => {}
-        Expression::ListComp(_) => {}
-        Expression::SetComp(_) => {}
-        Expression::DictComp(_) => {}
-        Expression::List(_) => {}
-        Expression::Set(_) => {}
-        Expression::Dict(_) => {}
-        Expression::Subscript(_) => {}
-        Expression::StarredElement(_) => {}
-        Expression::IfExp(_) => {}
-        Expression::Lambda(_) => {}
-        Expression::Yield(_) => {}
-        Expression::Await(_) => {}
-        Expression::SimpleString(_) => {}
-        Expression::ConcatenatedString(_) => {}
-        Expression::FormattedString(_) => {}
-        Expression::NamedExpr(_) => {}
+pub fn walk_Dict<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Dict) {
+    for node in &node.elements {
+        visitor.visit_DictElement(node)
+    }
+}
+pub fn walk_DictComp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &DictComp) {
+    visitor.visit_Expression(&node.key);
+    visitor.visit_Expression(&node.value);
+    visitor.visit_CompFor(&node.for_in);
+}
+pub fn walk_DictElement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &DictElement) {
+    match &node {
+        DictElement::Simple { key, value, .. } => {
+            visitor.visit_Expression(key);
+            visitor.visit_Expression(value);
+        }
+        DictElement::Starred(node) => visitor.visit_StarredDictElement(node),
+    }
+}
+pub fn walk_Element<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Element) {
+    match &node {
+        Element::Simple { value: node, .. } => visitor.visit_Expression(node),
+        Element::Starred(node) => visitor.visit_StarredElement(node),
+    }
+}
+pub fn walk_Ellipsis<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Ellipsis) {
+    // Nothing to do.
+}
+pub fn walk_Else<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Else) {
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+}
+pub fn walk_ExceptHandler<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ExceptHandler) {
+    if let Some(node) = &node.r#type {
+        visitor.visit_Expression(node);
+    }
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+    if let Some(node) = &node.name {
+        visitor.visit_AsName(node)
+    }
+}
+pub fn walk_ExceptStarHandler<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ExceptStarHandler) {
+    visitor.visit_Expression(&node.r#type);
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+    if let Some(node) = &node.name {
+        visitor.visit_AsName(node)
+    }
+}
+pub fn walk_Expr<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Expr) {
+    visitor.visit_Expression(&node.value)
+}
+pub fn walk_Finally<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Finally) {
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+}
+pub fn walk_Float<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Float) {
+    // Nothing to do.
+}
+pub fn walk_For<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &For) {
+    visitor.visit_AssignTargetExpression(&node.target);
+    visitor.visit_Expression(&node.iter);
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+    if let Some(node) = &node.orelse {
+        visitor.visit_Else(node);
+    }
+    if let Some(node) = &node.asynchronous {
+        visitor.visit_Asynchronous(node);
+    }
+}
+pub fn walk_FormattedString<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &FormattedString) {
+    for node in &node.parts {
+        match node {
+            FormattedStringContent::Text(node) => visitor.visit_FormattedStringText(node),
+            FormattedStringContent::Expression(node) => {
+                visitor.visit_FormattedStringExpression(node)
+            }
+        }
+    }
+}
+pub fn walk_FormattedStringExpression<V: CSTVisitor + ?Sized>(
+    visitor: &mut V,
+    node: &FormattedStringExpression,
+) {
+    visitor.visit_Expression(&node.expression);
+}
+pub fn walk_FormattedStringText<V: CSTVisitor + ?Sized>(
+    visitor: &mut V,
+    node: &FormattedStringText,
+) {
+    // Nothing to do.
+}
+pub fn walk_From<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &From) {
+    visitor.visit_Expression(&node.item)
+}
+pub fn walk_FunctionDef<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &FunctionDef) {
+    visitor.visit_Name(&node.name);
+    visitor.visit_Parameters(&node.params);
+    for node in &node.decorators {
+        visitor.visit_Decorator(node);
+    }
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+    if let Some(node) = &node.returns {
+        visitor.visit_Annotation(node);
+    }
+    if let Some(node) = &node.asynchronous {
+        visitor.visit_Asynchronous(node);
+    }
+}
+pub fn walk_GeneratorExp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &GeneratorExp) {
+    visitor.visit_Expression(&node.elt);
+    visitor.visit_CompFor(&node.for_in);
+}
+pub fn walk_Global<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Global) {
+    for node in &node.names {
+        visitor.visit_NameItem(&node)
+    }
+}
+pub fn walk_If<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &If) {
+    visitor.visit_Expression(&node.test);
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+    if let Some(node) = &node.orelse {
+        visitor.visit_OrElse(node);
+    }
+}
+pub fn walk_IfExp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &IfExp) {
+    visitor.visit_Expression(&node.test);
+    visitor.visit_Expression(&node.body);
+    visitor.visit_Expression(&node.orelse);
+}
+pub fn walk_Imaginary<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Imaginary) {
+    // Nothing to do.
+}
+pub fn walk_Import<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Import) {
+    for node in &node.names {
+        visitor.visit_ImportAlias(node)
+    }
+}
+pub fn walk_ImportAlias<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ImportAlias) {
+    match &node.name {
+        NameOrAttribute::N(node) => visitor.visit_Name(node),
+        NameOrAttribute::A(node) => visitor.visit_Attribute(node),
+    }
+    if let Some(node) = &node.asname {
+        visitor.visit_AsName(node)
+    }
+}
+pub fn walk_ImportFrom<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ImportFrom) {
+    match &node.names {
+        ImportNames::Star(node) => visitor.visit_ImportStar(node),
+        ImportNames::Aliases(node) => {
+            for node in node {
+                visitor.visit_ImportAlias(node)
+            }
+        }
+    }
+}
+pub fn walk_ImportStar<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ImportStar) {
+    // Nothing to do.
+}
+pub fn walk_IndentedBlock<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &IndentedBlock) {
+    for node in &node.body {
+        visitor.visit_Statement(node)
+    }
+}
+pub fn walk_Index<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Index) {
+    visitor.visit_Expression(&node.value);
+}
+pub fn walk_Integer<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Integer) {
+    // Nothing to do.
+}
+pub fn walk_Lambda<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Lambda) {
+    visitor.visit_Parameters(&node.params);
+    visitor.visit_Expression(&node.body);
+}
+pub fn walk_List<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &List) {
+    for node in &node.elements {
+        visitor.visit_Element(node)
+    }
+}
+pub fn walk_ListComp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ListComp) {
+    visitor.visit_Expression(&node.elt);
+    visitor.visit_CompFor(&node.for_in);
+}
+pub fn walk_Match<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Match) {
+    visitor.visit_Expression(&node.subject);
+    // TODO
+    // for node in &node.cases {
+    //     visitor.visit_MatchCase(node);
+    // }
+}
+pub fn walk_Name<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Name) {
+    // Nothing to do.
+}
+pub fn walk_NameItem<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &NameItem) {
+    visitor.visit_Name(&node.name);
+}
+pub fn walk_NamedExpr<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &NamedExpr) {}
+pub fn walk_Nonlocal<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Nonlocal) {}
+pub fn walk_OrElse<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &OrElse) {
+    match node {
+        OrElse::Elif(node) => {
+            visitor.visit_If(node);
+        }
+        OrElse::Else(node) => visitor.visit_Else(node),
+    }
+}
+pub fn walk_Param<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Param) {
+    visitor.visit_Name(&node.name);
+    if let Some(node) = &node.annotation {
+        visitor.visit_Annotation(node);
+    }
+    if let Some(node) = &node.equal {
+        visitor.visit_AssignEqual(node);
+    }
+    if let Some(node) = &node.default {
+        visitor.visit_Expression(node);
+    }
+}
+pub fn walk_ParamStar<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &ParamStar) {
+    // Nothing to do.
+}
+pub fn walk_Parameters<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Parameters) {
+    for node in &node.posonly_params {
+        visitor.visit_Param(node);
+    }
+    for node in &node.params {
+        visitor.visit_Param(node);
+    }
+    if let Some(node) = &node.star_kwarg {
+        visitor.visit_Param(node);
+    }
+    for node in &node.kwonly_params {
+        visitor.visit_Param(node);
+    }
+    if let Some(node) = &node.star_arg {
+        match &node {
+            StarArg::Star(node) => visitor.visit_ParamStar(node),
+            StarArg::Param(node) => visitor.visit_Param(node),
+        }
+    }
+}
+pub fn walk_Pass<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Pass) {
+    // Nothing to do.
+}
+pub fn walk_Raise<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Raise) {}
+pub fn walk_Return<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Return) {
+    if let Some(expression) = &node.value {
+        visitor.visit_Expression(expression);
+    }
+}
+pub fn walk_Set<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Set) {
+    for node in &node.elements {
+        visitor.visit_Element(node)
+    }
+}
+pub fn walk_SetComp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &SetComp) {
+    visitor.visit_Expression(&node.elt);
+    visitor.visit_CompFor(&node.for_in);
+}
+pub fn walk_SimpleString<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &SimpleString) {
+    // Nothing to do.
+}
+pub fn walk_SimpleStatementSuite<V: CSTVisitor + ?Sized>(
+    visitor: &mut V,
+    node: &SimpleStatementSuite,
+) {
+    for node in &node.body {
+        visitor.visit_SmallStatement(node)
+    }
+}
+pub fn walk_Slice<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Slice) {
+    if let Some(node) = &node.lower {
+        visitor.visit_Expression(node)
+    }
+    if let Some(node) = &node.upper {
+        visitor.visit_Expression(node)
+    }
+    if let Some(node) = &node.step {
+        visitor.visit_Expression(node)
+    }
+}
+pub fn walk_StarredDictElement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &StarredDictElement) {
+    visitor.visit_Expression(&node.value)
+}
+pub fn walk_StarredElement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &StarredElement) {
+    visitor.visit_Expression(&node.value)
+}
+pub fn walk_Subscript<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Subscript) {
+    visitor.visit_Expression(&node.value);
+    for node in &node.slice {
+        visitor.visit_SubscriptElement(node)
+    }
+}
+pub fn walk_SubscriptElement<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &SubscriptElement) {
+    match &node.slice {
+        BaseSlice::Index(node) => visitor.visit_Index(node),
+        BaseSlice::Slice(node) => visitor.visit_Slice(node),
+    }
+}
+pub fn walk_Try<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Try) {
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+    for node in &node.handlers {
+        visitor.visit_ExceptHandler(node)
+    }
+    if let Some(node) = &node.orelse {
+        visitor.visit_Else(node)
+    }
+    if let Some(node) = &node.finalbody {
+        visitor.visit_Finally(node)
+    }
+}
+pub fn walk_TryStar<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &TryStar) {
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+    for node in &node.handlers {
+        visitor.visit_ExceptStarHandler(node)
+    }
+    if let Some(node) = &node.orelse {
+        visitor.visit_Else(node)
+    }
+    if let Some(node) = &node.finalbody {
+        visitor.visit_Finally(node)
+    }
+}
+pub fn walk_Tuple<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Tuple) {
+    for node in &node.elements {
+        visitor.visit_Element(node)
+    }
+}
+pub fn walk_UnaryOp<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &UnaryOp) {
+    // Nothing to do.
+}
+pub fn walk_UnaryOperation<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &UnaryOperation) {
+    visitor.visit_UnaryOp(&node.operator);
+    visitor.visit_Expression(&node.expression);
+}
+pub fn walk_While<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &While) {
+    visitor.visit_Expression(&node.test);
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+    if let Some(node) = &node.orelse {
+        visitor.visit_Else(node)
+    }
+}
+pub fn walk_With<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &With) {
+    if let Some(node) = &node.asynchronous {
+        visitor.visit_Asynchronous(node);
+    }
+    for node in &node.items {
+        visitor.visit_WithItem(node)
+    }
+    match &node.body {
+        Suite::IndentedBlock(node) => visitor.visit_IndentedBlock(node),
+        Suite::SimpleStatementSuite(node) => visitor.visit_SimpleStatementSuite(node),
+    }
+}
+pub fn walk_WithItem<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &WithItem) {
+    visitor.visit_Expression(&node.item);
+    if let Some(node) = &node.asname {
+        visitor.visit_AsName(node)
+    }
+}
+pub fn walk_Yield<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &Yield) {
+    if let Some(node) = &node.value {
+        visitor.visit_YieldValue(node);
+    }
+}
+pub fn walk_YieldValue<V: CSTVisitor + ?Sized>(visitor: &mut V, node: &YieldValue) {
+    match &node {
+        YieldValue::Expression(node) => visitor.visit_Expression(node),
+        YieldValue::From(node) => visitor.visit_From(node),
     }
 }

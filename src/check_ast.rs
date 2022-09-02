@@ -7,11 +7,11 @@ use rustpython_parser::ast::{
 use rustpython_parser::parser;
 
 use crate::ast_ops::{extract_all_names, Binding, BindingKind, Scope, ScopeKind};
+use crate::ast_visitor;
+use crate::ast_visitor::{walk_excepthandler, ASTVisitor};
 use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
-use crate::visitor;
-use crate::visitor::{walk_excepthandler, Visitor};
 
 struct Checker<'a> {
     settings: &'a Settings,
@@ -37,7 +37,7 @@ impl Checker<'_> {
     }
 }
 
-impl Visitor for Checker<'_> {
+impl ASTVisitor for Checker<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match &stmt.node {
             StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
@@ -255,7 +255,7 @@ impl Visitor for Checker<'_> {
             _ => {}
         }
 
-        visitor::walk_stmt(self, stmt);
+        ast_visitor::walk_stmt(self, stmt);
 
         match &stmt.node {
             StmtKind::ClassDef { .. } => {
@@ -359,7 +359,7 @@ impl Visitor for Checker<'_> {
             _ => {}
         };
 
-        visitor::walk_expr(self, expr);
+        ast_visitor::walk_expr(self, expr);
 
         match &expr.node {
             ExprKind::GeneratorExp { .. }
@@ -466,7 +466,7 @@ impl Visitor for Checker<'_> {
             }
         }
 
-        visitor::walk_arguments(self, arguments);
+        ast_visitor::walk_arguments(self, arguments);
     }
 
     fn visit_arg(&mut self, arg: &Arg) {
@@ -478,7 +478,7 @@ impl Visitor for Checker<'_> {
                 location: arg.location,
             },
         );
-        visitor::walk_arg(self, arg);
+        ast_visitor::walk_arg(self, arg);
     }
 }
 

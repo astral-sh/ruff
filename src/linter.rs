@@ -5,6 +5,7 @@ use log::debug;
 use rustpython_parser::parser;
 
 use crate::check_ast::check_ast;
+use crate::check_cst::check_cst;
 use crate::check_lines::check_lines;
 use crate::checks::{Check, LintSource};
 use crate::message::Message;
@@ -24,19 +25,26 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
-    // Run the AST-based checks.
-    if settings
-        .select
-        .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
-    {
-        let path = path.to_string_lossy();
-        let python_ast = parser::parse_program(&contents, &path)?;
-        checks.extend(check_ast(&python_ast, settings, &path));
-    }
+    // Run the CST-based checks.
+    let python_cst = match libcst_native::parse_module(&contents, None) {
+        Ok(m) => m,
+        Err(e) => panic!("Failed to parse CST."),
+    };
+    checks.extend(check_cst(&python_cst, settings));
 
-    // Run the lines-based checks.
-    check_lines(&mut checks, &contents, settings);
+    // // Run the AST-based checks.
+    // if settings
+    //     .select
+    //     .iter()
+    //     .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
+    // {
+    //     let path = path.to_string_lossy();
+    //     let python_ast = parser::parse_program(&contents, &path)?;
+    //     checks.extend(check_ast(&python_ast, settings, &path));
+    // }
+    //
+    // // Run the lines-based checks.
+    // check_lines(&mut checks, &contents, settings);
 
     // Convert to messages.
     let messages: Vec<Message> = checks
@@ -47,6 +55,7 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
             filename: path.to_string_lossy().to_string(),
         })
         .collect();
+
     cache::set(path, settings, &messages, mode);
 
     Ok(messages)

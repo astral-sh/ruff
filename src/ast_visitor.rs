@@ -4,7 +4,7 @@ use rustpython_parser::ast::{
     PatternKind, Stmt, StmtKind, Unaryop, Withitem,
 };
 
-pub trait Visitor {
+pub trait ASTVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         walk_stmt(self, stmt);
     }
@@ -61,7 +61,7 @@ pub trait Visitor {
     }
 }
 
-pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
+pub fn walk_stmt<V: ASTVisitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::FunctionDef { args, body, .. } => {
             visitor.visit_arguments(args);
@@ -238,7 +238,7 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
     }
 }
 
-pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
+pub fn walk_expr<V: ASTVisitor + ?Sized>(visitor: &mut V, expr: &Expr) {
     match &expr.node {
         ExprKind::BoolOp { op, values } => {
             visitor.visit_boolop(op);
@@ -399,7 +399,7 @@ pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
     }
 }
 
-pub fn walk_constant<V: Visitor + ?Sized>(visitor: &mut V, constant: &Constant) {
+pub fn walk_constant<V: ASTVisitor + ?Sized>(visitor: &mut V, constant: &Constant) {
     if let Constant::Tuple(constants) = constant {
         for constant in constants {
             visitor.visit_constant(constant)
@@ -407,7 +407,7 @@ pub fn walk_constant<V: Visitor + ?Sized>(visitor: &mut V, constant: &Constant) 
     }
 }
 
-pub fn walk_comprehension<V: Visitor + ?Sized>(visitor: &mut V, comprehension: &Comprehension) {
+pub fn walk_comprehension<V: ASTVisitor + ?Sized>(visitor: &mut V, comprehension: &Comprehension) {
     visitor.visit_expr(&comprehension.target, None);
     visitor.visit_expr(&comprehension.iter, None);
     for expr in &comprehension.ifs {
@@ -415,7 +415,7 @@ pub fn walk_comprehension<V: Visitor + ?Sized>(visitor: &mut V, comprehension: &
     }
 }
 
-pub fn walk_excepthandler<V: Visitor + ?Sized>(visitor: &mut V, excepthandler: &Excepthandler) {
+pub fn walk_excepthandler<V: ASTVisitor + ?Sized>(visitor: &mut V, excepthandler: &Excepthandler) {
     match &excepthandler.node {
         ExcepthandlerKind::ExceptHandler { type_, body, .. } => {
             if let Some(expr) = type_ {
@@ -428,7 +428,7 @@ pub fn walk_excepthandler<V: Visitor + ?Sized>(visitor: &mut V, excepthandler: &
     }
 }
 
-pub fn walk_arguments<V: Visitor + ?Sized>(visitor: &mut V, arguments: &Arguments) {
+pub fn walk_arguments<V: ASTVisitor + ?Sized>(visitor: &mut V, arguments: &Arguments) {
     for arg in &arguments.posonlyargs {
         visitor.visit_arg(arg);
     }
@@ -452,24 +452,24 @@ pub fn walk_arguments<V: Visitor + ?Sized>(visitor: &mut V, arguments: &Argument
     }
 }
 
-pub fn walk_arg<V: Visitor + ?Sized>(visitor: &mut V, arg: &Arg) {
+pub fn walk_arg<V: ASTVisitor + ?Sized>(visitor: &mut V, arg: &Arg) {
     if let Some(expr) = &arg.node.annotation {
         visitor.visit_annotation(expr)
     }
 }
 
-pub fn walk_keyword<V: Visitor + ?Sized>(visitor: &mut V, keyword: &Keyword) {
+pub fn walk_keyword<V: ASTVisitor + ?Sized>(visitor: &mut V, keyword: &Keyword) {
     visitor.visit_expr(&keyword.node.value, None);
 }
 
-pub fn walk_withitem<V: Visitor + ?Sized>(visitor: &mut V, withitem: &Withitem) {
+pub fn walk_withitem<V: ASTVisitor + ?Sized>(visitor: &mut V, withitem: &Withitem) {
     visitor.visit_expr(&withitem.context_expr, None);
     if let Some(expr) = &withitem.optional_vars {
         visitor.visit_expr(expr, None);
     }
 }
 
-pub fn walk_match_case<V: Visitor + ?Sized>(visitor: &mut V, match_case: &MatchCase) {
+pub fn walk_match_case<V: ASTVisitor + ?Sized>(visitor: &mut V, match_case: &MatchCase) {
     visitor.visit_pattern(&match_case.pattern);
     if let Some(expr) = &match_case.guard {
         visitor.visit_expr(expr, None);
@@ -479,7 +479,7 @@ pub fn walk_match_case<V: Visitor + ?Sized>(visitor: &mut V, match_case: &MatchC
     }
 }
 
-pub fn walk_pattern<V: Visitor + ?Sized>(visitor: &mut V, pattern: &Pattern) {
+pub fn walk_pattern<V: ASTVisitor + ?Sized>(visitor: &mut V, pattern: &Pattern) {
     match &pattern.node {
         PatternKind::MatchValue { value } => visitor.visit_expr(value, None),
         PatternKind::MatchSingleton { value } => visitor.visit_constant(value),
@@ -527,24 +527,24 @@ pub fn walk_pattern<V: Visitor + ?Sized>(visitor: &mut V, pattern: &Pattern) {
 
 #[allow(unused_variables)]
 #[inline(always)]
-pub fn walk_expr_context<V: Visitor + ?Sized>(visitor: &mut V, expr_context: &ExprContext) {}
+pub fn walk_expr_context<V: ASTVisitor + ?Sized>(visitor: &mut V, expr_context: &ExprContext) {}
 
 #[allow(unused_variables)]
 #[inline(always)]
-pub fn walk_boolop<V: Visitor + ?Sized>(visitor: &mut V, boolop: &Boolop) {}
+pub fn walk_boolop<V: ASTVisitor + ?Sized>(visitor: &mut V, boolop: &Boolop) {}
 
 #[allow(unused_variables)]
 #[inline(always)]
-pub fn walk_operator<V: Visitor + ?Sized>(visitor: &mut V, operator: &Operator) {}
+pub fn walk_operator<V: ASTVisitor + ?Sized>(visitor: &mut V, operator: &Operator) {}
 
 #[allow(unused_variables)]
 #[inline(always)]
-pub fn walk_unaryop<V: Visitor + ?Sized>(visitor: &mut V, unaryop: &Unaryop) {}
+pub fn walk_unaryop<V: ASTVisitor + ?Sized>(visitor: &mut V, unaryop: &Unaryop) {}
 
 #[allow(unused_variables)]
 #[inline(always)]
-pub fn walk_cmpop<V: Visitor + ?Sized>(visitor: &mut V, cmpop: &Cmpop) {}
+pub fn walk_cmpop<V: ASTVisitor + ?Sized>(visitor: &mut V, cmpop: &Cmpop) {}
 
 #[allow(unused_variables)]
 #[inline(always)]
-pub fn walk_alias<V: Visitor + ?Sized>(visitor: &mut V, alias: &Alias) {}
+pub fn walk_alias<V: ASTVisitor + ?Sized>(visitor: &mut V, alias: &Alias) {}
