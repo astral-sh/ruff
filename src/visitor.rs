@@ -63,60 +63,21 @@ pub trait Visitor {
 
 pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
     match &stmt.node {
-        StmtKind::FunctionDef {
-            args,
-            body,
-            decorator_list,
-            returns,
-            ..
-        } => {
+        StmtKind::FunctionDef { args, body, .. } => {
             visitor.visit_arguments(args);
-            for expr in decorator_list {
-                visitor.visit_expr(expr)
-            }
-            for expr in returns {
-                visitor.visit_annotation(expr);
-            }
             for stmt in body {
                 visitor.visit_stmt(stmt)
             }
         }
-        StmtKind::AsyncFunctionDef {
-            args,
-            body,
-            decorator_list,
-            returns,
-            ..
-        } => {
+        StmtKind::AsyncFunctionDef { args, body, .. } => {
             visitor.visit_arguments(args);
-            for expr in decorator_list {
-                visitor.visit_expr(expr)
-            }
-            for expr in returns {
-                visitor.visit_annotation(expr);
-            }
             for stmt in body {
                 visitor.visit_stmt(stmt)
             }
         }
-        StmtKind::ClassDef {
-            bases,
-            keywords,
-            body,
-            decorator_list,
-            ..
-        } => {
-            for expr in bases {
-                visitor.visit_expr(expr)
-            }
-            for keyword in keywords {
-                visitor.visit_keyword(keyword)
-            }
+        StmtKind::ClassDef { body, .. } => {
             for stmt in body {
                 visitor.visit_stmt(stmt)
-            }
-            for expr in decorator_list {
-                visitor.visit_expr(expr)
             }
         }
         StmtKind::Return { value } => {
