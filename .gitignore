@@ -1,5 +1,5 @@
 # Local cache
-.cache
+.ruff_cache
 resources/test/cpython
 
 ###
