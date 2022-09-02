@@ -88,6 +88,7 @@ impl Checker<'_> {
 
 impl Visitor for Checker<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
+        println!("stmt: {:?}", stmt);
         match &stmt.node {
             StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
                 // TODO(charlie): Handle doctests.
@@ -109,18 +110,24 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
-            StmtKind::FunctionDef { name, .. } => {
-                self.add_binding(
-                    name.to_string(),
-                    Binding {
-                        kind: BindingKind::Definition,
-                        used: None,
-                        location: stmt.location,
-                    },
-                );
-                self.push_scope(Scope::new(Function));
+            StmtKind::FunctionDef {
+                name,
+                decorator_list,
+                returns,
+                ..
             }
-            StmtKind::AsyncFunctionDef { name, .. } => {
+            | StmtKind::AsyncFunctionDef {
+                name,
+                decorator_list,
+                returns,
+                ..
+            } => {
+                for expr in decorator_list {
+                    self.visit_expr(expr);
+                }
+                for expr in returns {
+                    self.visit_annotation(expr);
+                }
                 self.add_binding(
                     name.to_string(),
                     Binding {
@@ -150,7 +157,23 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
-            StmtKind::ClassDef { .. } => self.push_scope(Scope::new(Class)),
+            StmtKind::ClassDef {
+                bases,
+                keywords,
+                decorator_list,
+                ..
+            } => {
+                for expr in bases {
+                    self.visit_expr(expr)
+                }
+                for keyword in keywords {
+                    self.visit_keyword(keyword)
+                }
+                for expr in decorator_list {
+                    self.visit_expr(expr)
+                }
+                self.push_scope(Scope::new(Class))
+            }
             StmtKind::Import { names } => {
                 for alias in names {
                     if alias.node.name.contains('.') && alias.node.asname.is_none() {
