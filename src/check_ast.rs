@@ -39,7 +39,6 @@ impl Checker<'_> {
 
 impl Visitor for Checker<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        println!("stmt: {:?}", stmt);
         match &stmt.node {
             StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
                 // TODO(charlie): Handle doctests.
@@ -657,8 +656,6 @@ impl Checker<'_> {
                     },
                     _ => None,
                 };
-
-                println!("{:?}", all_binding);
 
                 for (name, binding) in scope.values.iter().rev() {
                     let used = binding.used.is_some()
