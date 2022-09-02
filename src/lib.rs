@@ -1,3 +1,4 @@
+mod ast_ops;
 mod builtins;
 mod cache;
 pub mod check_ast;

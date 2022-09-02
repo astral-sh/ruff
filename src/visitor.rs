@@ -11,7 +11,7 @@ pub trait Visitor {
     fn visit_annotation(&mut self, expr: &Expr) {
         walk_expr(self, expr);
     }
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_expr(&mut self, expr: &Expr, _parent: Option<&Stmt>) {
         walk_expr(self, expr);
     }
     fn visit_constant(&mut self, constant: &Constant) {
@@ -82,24 +82,24 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
         }
         StmtKind::Return { value } => {
             if let Some(expr) = value {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, Some(stmt))
             }
         }
         StmtKind::Delete { targets } => {
             for expr in targets {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, Some(stmt))
             }
         }
         StmtKind::Assign { targets, value, .. } => {
             for expr in targets {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, Some(stmt))
             }
-            visitor.visit_expr(value)
+            visitor.visit_expr(value, Some(stmt))
         }
         StmtKind::AugAssign { target, op, value } => {
-            visitor.visit_expr(target);
+            visitor.visit_expr(target, Some(stmt));
             visitor.visit_operator(op);
-            visitor.visit_expr(value);
+            visitor.visit_expr(value, Some(stmt));
         }
         StmtKind::AnnAssign {
             target,
@@ -107,10 +107,10 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
             value,
             ..
         } => {
-            visitor.visit_expr(target);
+            visitor.visit_expr(target, Some(stmt));
             visitor.visit_annotation(annotation);
             if let Some(expr) = value {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, Some(stmt))
             }
         }
         StmtKind::For {
@@ -120,8 +120,8 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
             orelse,
             ..
         } => {
-            visitor.visit_expr(target);
-            visitor.visit_expr(iter);
+            visitor.visit_expr(target, Some(stmt));
+            visitor.visit_expr(iter, Some(stmt));
             for stmt in body {
                 visitor.visit_stmt(stmt)
             }
@@ -136,8 +136,8 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
             orelse,
             ..
         } => {
-            visitor.visit_expr(target);
-            visitor.visit_expr(iter);
+            visitor.visit_expr(target, Some(stmt));
+            visitor.visit_expr(iter, Some(stmt));
             for stmt in body {
                 visitor.visit_stmt(stmt)
             }
@@ -146,7 +146,7 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
             }
         }
         StmtKind::While { test, body, orelse } => {
-            visitor.visit_expr(test);
+            visitor.visit_expr(test, Some(stmt));
             for stmt in body {
                 visitor.visit_stmt(stmt)
             }
@@ -155,7 +155,7 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
             }
         }
         StmtKind::If { test, body, orelse } => {
-            visitor.visit_expr(test);
+            visitor.visit_expr(test, Some(stmt));
             for stmt in body {
                 visitor.visit_stmt(stmt)
             }
@@ -181,17 +181,17 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
         }
         StmtKind::Match { subject, cases } => {
             // TODO(charlie): Handle `cases`.
-            visitor.visit_expr(subject);
+            visitor.visit_expr(subject, Some(stmt));
             for match_case in cases {
                 visitor.visit_match_case(match_case);
             }
         }
         StmtKind::Raise { exc, cause } => {
             if let Some(expr) = exc {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, Some(stmt))
             };
             if let Some(expr) = cause {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, Some(stmt))
             };
         }
         StmtKind::Try {
@@ -214,9 +214,9 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
             }
         }
         StmtKind::Assert { test, msg } => {
-            visitor.visit_expr(test);
+            visitor.visit_expr(test, None);
             if let Some(expr) = msg {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, Some(stmt))
             }
         }
         StmtKind::Import { names } => {
@@ -231,7 +231,7 @@ pub fn walk_stmt<V: Visitor + ?Sized>(visitor: &mut V, stmt: &Stmt) {
         }
         StmtKind::Global { .. } => {}
         StmtKind::Nonlocal { .. } => {}
-        StmtKind::Expr { value } => visitor.visit_expr(value),
+        StmtKind::Expr { value } => visitor.visit_expr(value, Some(stmt)),
         StmtKind::Pass => {}
         StmtKind::Break => {}
         StmtKind::Continue => {}
@@ -243,55 +243,55 @@ pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
         ExprKind::BoolOp { op, values } => {
             visitor.visit_boolop(op);
             for expr in values {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, None)
             }
         }
         ExprKind::NamedExpr { target, value } => {
-            visitor.visit_expr(target);
-            visitor.visit_expr(value);
+            visitor.visit_expr(target, None);
+            visitor.visit_expr(value, None);
         }
         ExprKind::BinOp { left, op, right } => {
-            visitor.visit_expr(left);
+            visitor.visit_expr(left, None);
             visitor.visit_operator(op);
-            visitor.visit_expr(right);
+            visitor.visit_expr(right, None);
         }
         ExprKind::UnaryOp { op, operand } => {
             visitor.visit_unaryop(op);
-            visitor.visit_expr(operand);
+            visitor.visit_expr(operand, None);
         }
         ExprKind::Lambda { args, body } => {
             visitor.visit_arguments(args);
-            visitor.visit_expr(body);
+            visitor.visit_expr(body, None);
         }
         ExprKind::IfExp { test, body, orelse } => {
-            visitor.visit_expr(test);
-            visitor.visit_expr(body);
-            visitor.visit_expr(orelse);
+            visitor.visit_expr(test, None);
+            visitor.visit_expr(body, None);
+            visitor.visit_expr(orelse, None);
         }
         ExprKind::Dict { keys, values } => {
             for expr in keys {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, None)
             }
             for expr in values {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, None)
             }
         }
         ExprKind::Set { elts } => {
             for expr in elts {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, None)
             }
         }
         ExprKind::ListComp { elt, generators } => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension)
             }
-            visitor.visit_expr(elt);
+            visitor.visit_expr(elt, None);
         }
         ExprKind::SetComp { elt, generators } => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension)
             }
-            visitor.visit_expr(elt);
+            visitor.visit_expr(elt, None);
         }
         ExprKind::DictComp {
             key,
@@ -301,33 +301,33 @@ pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension)
             }
-            visitor.visit_expr(key);
-            visitor.visit_expr(value);
+            visitor.visit_expr(key, None);
+            visitor.visit_expr(value, None);
         }
         ExprKind::GeneratorExp { elt, generators } => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension)
             }
-            visitor.visit_expr(elt);
+            visitor.visit_expr(elt, None);
         }
-        ExprKind::Await { value } => visitor.visit_expr(value),
+        ExprKind::Await { value } => visitor.visit_expr(value, None),
         ExprKind::Yield { value } => {
             if let Some(expr) = value {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, None)
             }
         }
-        ExprKind::YieldFrom { value } => visitor.visit_expr(value),
+        ExprKind::YieldFrom { value } => visitor.visit_expr(value, None),
         ExprKind::Compare {
             left,
             ops,
             comparators,
         } => {
-            visitor.visit_expr(left);
+            visitor.visit_expr(left, None);
             for cmpop in ops {
                 visitor.visit_cmpop(cmpop);
             }
             for expr in comparators {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, None)
             }
         }
         ExprKind::Call {
@@ -335,9 +335,9 @@ pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
             args,
             keywords,
         } => {
-            visitor.visit_expr(func);
+            visitor.visit_expr(func, None);
             for expr in args {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(expr, None);
             }
             for keyword in keywords {
                 visitor.visit_keyword(keyword);
@@ -346,28 +346,28 @@ pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
         ExprKind::FormattedValue {
             value, format_spec, ..
         } => {
-            visitor.visit_expr(value);
+            visitor.visit_expr(value, None);
             if let Some(expr) = format_spec {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, None)
             }
         }
         ExprKind::JoinedStr { values } => {
             for expr in values {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr, None)
             }
         }
         ExprKind::Constant { value, .. } => visitor.visit_constant(value),
         ExprKind::Attribute { value, ctx, .. } => {
-            visitor.visit_expr(value);
+            visitor.visit_expr(value, None);
             visitor.visit_expr_context(ctx);
         }
         ExprKind::Subscript { value, slice, ctx } => {
-            visitor.visit_expr(value);
-            visitor.visit_expr(slice);
+            visitor.visit_expr(value, None);
+            visitor.visit_expr(slice, None);
             visitor.visit_expr_context(ctx);
         }
         ExprKind::Starred { value, ctx } => {
-            visitor.visit_expr(value);
+            visitor.visit_expr(value, None);
             visitor.visit_expr_context(ctx);
         }
         ExprKind::Name { ctx, .. } => {
@@ -375,25 +375,25 @@ pub fn walk_expr<V: Visitor + ?Sized>(visitor: &mut V, expr: &Expr) {
         }
         ExprKind::List { elts, ctx } => {
             for expr in elts {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(expr, None);
             }
             visitor.visit_expr_context(ctx);
         }
         ExprKind::Tuple { elts, ctx } => {
             for expr in elts {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(expr, None);
             }
             visitor.visit_expr_context(ctx);
         }
         ExprKind::Slice { lower, upper, step } => {
             if let Some(expr) = lower {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(expr, None);
             }
             if let Some(expr) = upper {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(expr, None);
             }
             if let Some(expr) = step {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(expr, None);
             }
         }
     }
@@ -408,10 +408,10 @@ pub fn walk_constant<V: Visitor + ?Sized>(visitor: &mut V, constant: &Constant) 
 }
 
 pub fn walk_comprehension<V: Visitor + ?Sized>(visitor: &mut V, comprehension: &Comprehension) {
-    visitor.visit_expr(&comprehension.target);
-    visitor.visit_expr(&comprehension.iter);
+    visitor.visit_expr(&comprehension.target, None);
+    visitor.visit_expr(&comprehension.iter, None);
     for expr in &comprehension.ifs {
-        visitor.visit_expr(expr);
+        visitor.visit_expr(expr, None);
     }
 }
 
@@ -419,7 +419,7 @@ pub fn walk_excepthandler<V: Visitor + ?Sized>(visitor: &mut V, excepthandler: &
     match &excepthandler.node {
         ExcepthandlerKind::ExceptHandler { type_, body, .. } => {
             if let Some(expr) = type_ {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(expr, None);
             }
             for stmt in body {
                 visitor.visit_stmt(stmt);
@@ -442,13 +442,13 @@ pub fn walk_arguments<V: Visitor + ?Sized>(visitor: &mut V, arguments: &Argument
         visitor.visit_arg(arg);
     }
     for expr in &arguments.kw_defaults {
-        visitor.visit_expr(expr)
+        visitor.visit_expr(expr, None)
     }
     if let Some(arg) = &arguments.kwarg {
         visitor.visit_arg(arg)
     }
     for expr in &arguments.defaults {
-        visitor.visit_expr(expr)
+        visitor.visit_expr(expr, None)
     }
 }
 
@@ -459,20 +459,20 @@ pub fn walk_arg<V: Visitor + ?Sized>(visitor: &mut V, arg: &Arg) {
 }
 
 pub fn walk_keyword<V: Visitor + ?Sized>(visitor: &mut V, keyword: &Keyword) {
-    visitor.visit_expr(&keyword.node.value);
+    visitor.visit_expr(&keyword.node.value, None);
 }
 
 pub fn walk_withitem<V: Visitor + ?Sized>(visitor: &mut V, withitem: &Withitem) {
-    visitor.visit_expr(&withitem.context_expr);
+    visitor.visit_expr(&withitem.context_expr, None);
     if let Some(expr) = &withitem.optional_vars {
-        visitor.visit_expr(expr);
+        visitor.visit_expr(expr, None);
     }
 }
 
 pub fn walk_match_case<V: Visitor + ?Sized>(visitor: &mut V, match_case: &MatchCase) {
     visitor.visit_pattern(&match_case.pattern);
     if let Some(expr) = &match_case.guard {
-        visitor.visit_expr(expr);
+        visitor.visit_expr(expr, None);
     }
     for stmt in &match_case.body {
         visitor.visit_stmt(stmt);
@@ -481,7 +481,7 @@ pub fn walk_match_case<V: Visitor + ?Sized>(visitor: &mut V, match_case: &MatchC
 
 pub fn walk_pattern<V: Visitor + ?Sized>(visitor: &mut V, pattern: &Pattern) {
     match &pattern.node {
-        PatternKind::MatchValue { value } => visitor.visit_expr(value),
+        PatternKind::MatchValue { value } => visitor.visit_expr(value, None),
         PatternKind::MatchSingleton { value } => visitor.visit_constant(value),
         PatternKind::MatchSequence { patterns } => {
             for pattern in patterns {
@@ -490,7 +490,7 @@ pub fn walk_pattern<V: Visitor + ?Sized>(visitor: &mut V, pattern: &Pattern) {
         }
         PatternKind::MatchMapping { keys, patterns, .. } => {
             for expr in keys {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(expr, None);
             }
             for pattern in patterns {
                 visitor.visit_pattern(pattern);
@@ -502,7 +502,7 @@ pub fn walk_pattern<V: Visitor + ?Sized>(visitor: &mut V, pattern: &Pattern) {
             kwd_patterns,
             ..
         } => {
-            visitor.visit_expr(cls);
+            visitor.visit_expr(cls, None);
             for pattern in patterns {
                 visitor.visit_pattern(pattern);
             }
