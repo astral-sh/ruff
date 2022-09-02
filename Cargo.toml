@@ -31,6 +31,7 @@ serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }
 walkdir = { version = "2.3.2" }
 bumpalo = "3.11.0"
+bat = "0.21.0"
 
 [profile.release]
 panic = "abort"

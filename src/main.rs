@@ -77,7 +77,7 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<M
 }
 
 fn report_once(messages: &[Message]) -> Result<()> {
-    println!("Found {} error(s).", messages.len());
+    // println!("Found {} error(s).", messages.len());
 
     if !messages.is_empty() {
         println!();

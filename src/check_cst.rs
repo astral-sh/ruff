@@ -1,9 +1,12 @@
 use std::collections::BTreeMap;
 
-use libcst_native::{Codegen, Module};
+use libcst_native::{Arg, ClassDef, Codegen, Expression, If, Module};
 use rustpython_parser::ast::Location;
+use bat::PrettyPrinter;
 
-use crate::checks::Check;
+
+use crate::checks::{Check, CheckKind};
+use crate::cst_visitor;
 use crate::cst_visitor::CSTVisitor;
 use crate::settings::Settings;
 
@@ -63,7 +66,7 @@ impl CSTVisitor for Checker<'_> {
     }
 
     fn visit_ClassDef<'a>(&mut self, node: &'a ClassDef<'a>) -> ClassDef<'a> {
-        let bases: Vec<Arg<'a>> = node
+        let mut bases: Vec<Arg<'a>> = node
             .bases
             .clone()
             .into_iter()
@@ -77,9 +80,14 @@ impl CSTVisitor for Checker<'_> {
             .collect();
 
         let mut transformed: ClassDef<'a> = node.clone();
+        if bases.is_empty() {
+            transformed.lpar = None;
+            transformed.rpar = None;
+        } else {
+            let node = bases.last_mut().unwrap();
+            node.comma = None;
+        }
         transformed.bases = bases;
-        transformed.lpar = None;
-        transformed.rpar = None;
         transformed
     }
 }
@@ -91,12 +99,36 @@ pub fn check_cst<'a>(python_cst: &'a Module<'a>, settings: &Settings) -> Vec<Che
     // // Allocate values into the arena.
     // let scooter = bump.alloc(python_cst.clone());
 
+    let mut x = python_cst.clone();
+    let mut s = Default::default();
+    x.codegen(&mut s);
+
+    println!("Starting from source:");
+    println!("```");
+    let source = s.to_string().into_bytes();
+    PrettyPrinter::new()
+    .input_from_bytes(&source)
+    .language("python")
+    .print()
+    .unwrap();
+    println!("```");
+
     let mut checker = Checker::new(settings);
     let mut transformed = checker.visit_Module(python_cst);
 
     let mut state = Default::default();
     transformed.codegen(&mut state);
-    println!("{}", state);
+
+    println!("");
+    println!("Generated output:");
+println!("```");
+    let source = state.to_string().into_bytes();
+    PrettyPrinter::new()
+    .input_from_bytes(&source)
+    .language("python")
+    .print()
+    .unwrap();
+    println!("```");
 
     checker.checks
 }
