@@ -10,11 +10,11 @@ use crate::settings::Settings;
 use crate::{cache, fs};
 
 pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Result<Vec<Message>> {
-    // Check the cache.
-    if let Some(messages) = cache::get(path, settings, mode) {
-        debug!("Cache hit for: {}", path.to_string_lossy());
-        return Ok(messages);
-    }
+    // // Check the cache.
+    // if let Some(messages) = cache::get(path, settings, mode) {
+    //     debug!("Cache hit for: {}", path.to_string_lossy());
+    //     return Ok(messages);
+    // }
 
     // Read the file from disk.
     let contents = fs::read_file(path)?;
@@ -23,11 +23,15 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
     let mut checks: Vec<Check> = vec![];
 
     // Run the CST-based checks.
-    let python_cst = match libcst_native::parse_module(&contents, None) {
+    let _ = match libcst_native::parse_module(&contents, None) {
         Ok(m) => m,
-        Err(e) => panic!("Failed to parse CST."),
+        Err(e) => {
+            return Err(anyhow::anyhow!("Failed to parse"));
+        }
     };
-    checks.extend(check_cst(&python_cst, settings));
+
+    Ok(vec![])
+    // checks.extend(check_cst(&python_cst, settings));
 
     // // Run the AST-based checks.
     // if settings
@@ -42,20 +46,20 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
     //
     // // Run the lines-based checks.
     // check_lines(&mut checks, &contents, settings);
-
-    // Convert to messages.
-    let messages: Vec<Message> = checks
-        .into_iter()
-        .map(|check| Message {
-            kind: check.kind,
-            location: check.location,
-            filename: path.to_string_lossy().to_string(),
-        })
-        .collect();
-
-    cache::set(path, settings, &messages, mode);
-
-    Ok(messages)
+    //
+    // // Convert to messages.
+    // let messages: Vec<Message> = checks
+    //     .into_iter()
+    //     .map(|check| Message {
+    //         kind: check.kind,
+    //         location: check.location,
+    //         filename: path.to_string_lossy().to_string(),
+    //     })
+    //     .collect();
+    //
+    // cache::set(path, settings, &messages, mode);
+    //
+    // Ok(messages)
 }
 
 #[cfg(test)]

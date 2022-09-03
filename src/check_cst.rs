@@ -1,22 +1,11 @@
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use bat::PrettyPrinter;
 use bumpalo::Bump;
 use libcst_native::{
-    AnnAssign, Annotation, Arg, AsName, Assert, Assign, AssignEqual, AssignTarget,
-    AssignTargetExpression, Asynchronous, Attribute, AugAssign, Await, BinaryOp, BinaryOperation,
-    BooleanOp, BooleanOperation, Break, Call, ClassDef, Codegen, CompFor, CompIf, CompOp,
-    Comparison, ComparisonTarget, CompoundStatement, ConcatenatedString, Continue, Decorator, Del,
-    DelTargetExpression, Dict, DictComp, DictElement, Element, Ellipsis, Else, ExceptHandler,
-    ExceptStarHandler, Expr, Expression, Finally, Float, For, FormattedString,
-    FormattedStringContent, FormattedStringExpression, FormattedStringText, FunctionDef,
-    GeneratorExp, Global, If, IfExp, Imaginary, Import, ImportAlias, ImportFrom, ImportStar,
-    IndentedBlock, Index, Integer, Lambda, List, ListComp, Match, Module, Name, NameItem,
-    NamedExpr, Nonlocal, OrElse, Param, ParamStar, Parameters, Pass, Raise, Return, Set, SetComp,
-    SimpleStatementLine, SimpleStatementSuite, SimpleString, Slice, SmallStatement,
-    StarredDictElement, StarredElement, Statement, Subscript, SubscriptElement, Try, TryStar,
-    Tuple, UnaryOp, UnaryOperation, While, With, WithItem, Yield, YieldValue,
+    Arg, ClassDef, Codegen, Expression, FormattedStringContent, If, Module, SimpleString,
 };
 use rustpython_parser::ast::Location;
 
@@ -56,44 +45,32 @@ struct Binding {
 }
 
 struct Checker<'a> {
-    bump: Bump,
     settings: &'a Settings,
     checks: Vec<Check>,
+    arena: Vec<String>,
 }
 
 impl Checker<'_> {
     pub fn new(settings: &Settings) -> Checker {
         Checker {
-            bump: Bump::new(),
             settings,
             checks: vec![],
+            arena: vec![],
         }
     }
 }
 
-impl CSTVisitor for Checker<'_> {
-    fn visit_If(&mut self, node: &If) {
-        if let Expression::Tuple { .. } = node.test {
-            self.checks.push(Check {
-                kind: CheckKind::IfTuple,
-                location: Default::default(),
-            });
-        }
-        cst_visitor::walk_If(self, node);
-    }
+const QUOTE: &str = "\"";
 
-    fn visit_Expression<'a, 'b>(&'b mut self, node: &'a Expression<'a>) -> Expression<'a>
-    where
-        'b: 'a,
-    {
+impl<'b> CSTVisitor for Checker<'_> {
+    fn visit_Expression<'a>(&mut self, node: &'a Expression<'a>) -> Expression<'a> {
         match node {
             Expression::FormattedString(node) => match &node.parts[..] {
                 [node] => match node {
                     FormattedStringContent::Text(node) => {
-                        let x = node.value.to_string();
-                        println!("Found: {:?}", node);
+                        self.arena.push(format!("\"{}\"", node.value));
                         return Expression::SimpleString(Box::new(SimpleString {
-                            value: self.bump.alloc(format!("\"{}\"", x)),
+                            value: node.value,
                             lpar: vec![],
                             rpar: vec![],
                         }));
@@ -132,6 +109,16 @@ impl CSTVisitor for Checker<'_> {
         }
         transformed.bases = bases;
         transformed
+    }
+
+    fn visit_If(&mut self, node: &If) {
+        if let Expression::Tuple { .. } = node.test {
+            self.checks.push(Check {
+                kind: CheckKind::IfTuple,
+                location: Default::default(),
+            });
+        }
+        cst_visitor::walk_If(self, node);
     }
 }
 
