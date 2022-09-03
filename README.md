@@ -106,6 +106,24 @@ OPTIONS:
     -w, --watch                 Run in watch mode by re-running whenever files change
 ```
 
+## Rules
+
+| Code | Name | Message |
+| ---- | ----- | ------- |
+| E501 | LineTooLong | Line too long |
+| F401 | UnusedImport | `...` imported but unused |
+| F403 | ImportStarUsage | Unable to detect undefined names |
+| F541 | FStringMissingPlaceholders | f-string without any placeholders |
+| F634 | IfTuple | If test is a tuple, which is always `True` |
+| F704 | YieldOutsideFunction | a `yield` or `yield from` statement outside of a function/method |
+| F706 | ReturnOutsideFunction | a `return` statement outside of a function/method |
+| F821 | UndefinedName | Undefined name `...` |
+| F823 | UndefinedLocal | Local variable `...` referenced before assignment |
+| F831 | DuplicateArgumentName | Duplicate argument name in function definition |
+| F841 | UnusedVariable | Local variable `...` is assigned to but never used |
+| F901 | RaiseNotImplemented | 'raise NotImplemented' should be 'raise NotImplementedError |
+| R0205 | UselessObjectInheritance | Class ... inherits from object |
+
 ## Development
 
 ruff is written in Rust (1.63.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
