@@ -161,12 +161,38 @@ fn inner_main() -> Result<ExitCode> {
             report_once(&messages)?;
         }
 
+        check_for_updates();
+
         if !messages.is_empty() && !cli.exit_zero {
             return Ok(ExitCode::FAILURE);
         }
     }
 
     Ok(ExitCode::SUCCESS)
+}
+
+fn check_for_updates() {
+    use update_informer::{registry, Check};
+
+    let pkg_name = env!("CARGO_PKG_NAME");
+    let pkg_version = env!("CARGO_PKG_VERSION");
+    let informer = update_informer::new(registry::PyPI, pkg_name, pkg_version);
+
+    if let Some(new_version) = informer.check_version().ok().flatten() {
+        let msg = format!(
+            "A new version of {pkg_name} is available: v{pkg_version} -> {new_version}",
+            pkg_name = pkg_name.italic().cyan(),
+            new_version = new_version.to_string().green()
+        );
+
+        let cmd = format!(
+            "Run to update: {cmd} {pkg_name}",
+            cmd = "pip3 install --upgrade".green(),
+            pkg_name = pkg_name.green()
+        );
+
+        println!("\n{msg}\n{cmd}");
+    }
 }
 
 fn main() -> ExitCode {
