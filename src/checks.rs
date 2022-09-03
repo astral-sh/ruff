@@ -109,6 +109,25 @@ pub enum CheckKind {
 }
 
 impl CheckKind {
+    /// The name of the check.
+    pub fn name(&self) -> &'static str {
+        match self {
+            CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
+            CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
+            CheckKind::IfTuple => "IfTuple",
+            CheckKind::ImportStarUsage => "ImportStarUsage",
+            CheckKind::LineTooLong => "LineTooLong",
+            CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
+            CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
+            CheckKind::UndefinedLocal(_) => "UndefinedLocal",
+            CheckKind::UndefinedName(_) => "UndefinedName",
+            CheckKind::UnusedImport(_) => "UnusedImport",
+            CheckKind::UnusedVariable(_) => "UnusedVariable",
+            CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
+            CheckKind::YieldOutsideFunction => "YieldOutsideFunction",
+        }
+    }
+
     /// A four-letter shorthand code for the check.
     pub fn code(&self) -> &'static CheckCode {
         match self {
