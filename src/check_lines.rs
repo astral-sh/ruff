@@ -20,7 +20,7 @@ fn should_enforce_line_length(line: &str, limit: usize) -> bool {
 }
 
 pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings) {
-    let enforce_line_too_ling = settings.select.contains(CheckKind::LineTooLong.code());
+    let enforce_line_too_long = settings.select.contains(CheckKind::LineTooLong.code());
 
     let mut line_checks = vec![];
     let mut ignored = vec![];
@@ -34,7 +34,7 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
         }
 
         // Enforce line length.
-        if enforce_line_too_ling && should_enforce_line_length(line, settings.line_length) {
+        if enforce_line_too_long && should_enforce_line_length(line, settings.line_length) {
             let check = Check {
                 kind: CheckKind::LineTooLong,
                 location: Location::new(row + 1, settings.line_length + 1),
