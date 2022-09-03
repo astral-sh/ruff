@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Stmt,
@@ -15,6 +16,7 @@ use crate::visitor::{walk_excepthandler, Visitor};
 
 struct Checker<'a> {
     settings: &'a Settings,
+    path: &'a str,
     checks: Vec<Check>,
     scopes: Vec<Scope>,
     dead_scopes: Vec<Scope>,
@@ -24,9 +26,10 @@ struct Checker<'a> {
 }
 
 impl Checker<'_> {
-    pub fn new(settings: &Settings) -> Checker {
+    pub fn new<'a>(settings: &'a Settings, path: &'a str) -> Checker<'a> {
         Checker {
             settings,
+            path,
             checks: vec![],
             scopes: vec![],
             dead_scopes: vec![],
@@ -673,19 +676,40 @@ impl Checker<'_> {
     }
 
     fn check_dead_scopes(&mut self) {
-        if self.settings.select.contains(&CheckCode::F401) {
-            for scope in &self.dead_scopes {
-                let all_binding = match scope.values.get("__all__") {
-                    Some(binding) => match &binding.kind {
-                        BindingKind::Export(names) => Some(names),
-                        _ => None,
-                    },
-                    _ => None,
-                };
+        if !self.settings.select.contains(&CheckCode::F822)
+            && !self.settings.select.contains(&CheckCode::F401)
+        {
+            return;
+        }
 
+        for scope in &self.dead_scopes {
+            let all_binding = scope.values.get("__all__");
+            let all_names = all_binding.and_then(|binding| match &binding.kind {
+                BindingKind::Export(names) => Some(names),
+                _ => None,
+            });
+
+            if self.settings.select.contains(&CheckCode::F822)
+                && !Path::new(self.path).ends_with("__init__.py")
+            {
+                if let Some(binding) = all_binding {
+                    if let Some(names) = all_names {
+                        for name in names {
+                            if !scope.values.contains_key(name) {
+                                self.checks.push(Check {
+                                    kind: CheckKind::UndefinedExport(name.to_string()),
+                                    location: binding.location,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            if self.settings.select.contains(&CheckCode::F401) {
                 for (name, binding) in scope.values.iter().rev() {
                     let used = binding.used.is_some()
-                        || all_binding
+                        || all_names
                             .map(|names| names.contains(name))
                             .unwrap_or_default();
 
@@ -708,7 +732,7 @@ impl Checker<'_> {
 }
 
 pub fn check_ast(python_ast: &Suite, settings: &Settings, path: &str) -> Vec<Check> {
-    let mut checker = Checker::new(settings);
+    let mut checker = Checker::new(settings, path);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 
