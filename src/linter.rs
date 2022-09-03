@@ -451,4 +451,40 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn r0205() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/src/R0205.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::R0205]),
+            },
+            &cache::Mode::None,
+        )?;
+        let expected = vec![
+            Message {
+                kind: CheckKind::UselessObjectInheritance("B".to_string()),
+                location: Location::new(5, 1),
+                filename: "./resources/test/src/R0205.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::UselessObjectInheritance("C".to_string()),
+                location: Location::new(9, 1),
+                filename: "./resources/test/src/R0205.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::UselessObjectInheritance("D".to_string()),
+                location: Location::new(14, 5),
+                filename: "./resources/test/src/R0205.py".to_string(),
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
 }

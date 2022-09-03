@@ -20,6 +20,7 @@ pub enum CheckCode {
     F831,
     F841,
     F901,
+    R0205,
 }
 
 impl FromStr for CheckCode {
@@ -39,6 +40,7 @@ impl FromStr for CheckCode {
             "F831" => Ok(CheckCode::F831),
             "F841" => Ok(CheckCode::F841),
             "F901" => Ok(CheckCode::F901),
+            "R0205" => Ok(CheckCode::R0205),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
         }
     }
@@ -59,6 +61,7 @@ impl CheckCode {
             CheckCode::F831 => "F831",
             CheckCode::F841 => "F841",
             CheckCode::F901 => "F901",
+            CheckCode::R0205 => "R0205",
         }
     }
 
@@ -77,6 +80,7 @@ impl CheckCode {
             CheckCode::F831 => &LintSource::AST,
             CheckCode::F841 => &LintSource::AST,
             CheckCode::F901 => &LintSource::AST,
+            CheckCode::R0205 => &LintSource::AST,
         }
     }
 }
@@ -100,6 +104,7 @@ pub enum CheckKind {
     UndefinedName(String),
     UnusedImport(String),
     UnusedVariable(String),
+    UselessObjectInheritance(String),
     YieldOutsideFunction,
 }
 
@@ -118,6 +123,7 @@ impl CheckKind {
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(_) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
+            CheckKind::UselessObjectInheritance(_) => &CheckCode::R0205,
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
         }
     }
@@ -149,6 +155,9 @@ impl CheckKind {
             CheckKind::UnusedImport(name) => format!("`{name}` imported but unused"),
             CheckKind::UnusedVariable(name) => {
                 format!("Local variable `{name}` is assigned to but never used")
+            }
+            CheckKind::UselessObjectInheritance(name) => {
+                format!("Class {name} inherits from object")
             }
             CheckKind::YieldOutsideFunction => {
                 "a `yield` or `yield from` statement outside of a function/method".to_string()
