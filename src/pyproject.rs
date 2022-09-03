@@ -216,12 +216,12 @@ other-attribute = 1
 
     #[test]
     fn find_and_parse_pyproject_toml() -> Result<()> {
-        let project_root = find_project_root([Path::new("resources/test/src/__init__.py")])
+        let project_root = find_project_root([Path::new("resources/test/fixtures/__init__.py")])
             .expect("Unable to find project root.");
-        assert_eq!(project_root, Path::new("resources/test/src"));
+        assert_eq!(project_root, Path::new("resources/test/fixtures"));
 
         let path = find_pyproject_toml(&project_root).expect("Unable to find pyproject.toml.");
-        assert_eq!(path, Path::new("resources/test/src/pyproject.toml"));
+        assert_eq!(path, Path::new("resources/test/fixtures/pyproject.toml"));
 
         let pyproject = parse_pyproject_toml(&path)?;
         let config = pyproject
