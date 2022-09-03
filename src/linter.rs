@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn e501() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/E501.py"),
+            Path::new("./resources/test/fixtures/E501.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -79,7 +79,7 @@ mod tests {
         let expected = vec![Message {
             kind: CheckKind::LineTooLong,
             location: Location::new(5, 89),
-            filename: "./resources/test/src/E501.py".to_string(),
+            filename: "./resources/test/fixtures/E501.py".to_string(),
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn f401() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F401.py"),
+            Path::new("./resources/test/fixtures/F401.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -104,17 +104,17 @@ mod tests {
             Message {
                 kind: CheckKind::UnusedImport("logging.handlers".to_string()),
                 location: Location::new(12, 1),
-                filename: "./resources/test/src/F401.py".to_string(),
+                filename: "./resources/test/fixtures/F401.py".to_string(),
             },
             Message {
                 kind: CheckKind::UnusedImport("functools".to_string()),
                 location: Location::new(3, 1),
-                filename: "./resources/test/src/F401.py".to_string(),
+                filename: "./resources/test/fixtures/F401.py".to_string(),
             },
             Message {
                 kind: CheckKind::UnusedImport("collections.OrderedDict".to_string()),
                 location: Location::new(4, 1),
-                filename: "./resources/test/src/F401.py".to_string(),
+                filename: "./resources/test/fixtures/F401.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn f403() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F403.py"),
+            Path::new("./resources/test/fixtures/F403.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -140,12 +140,12 @@ mod tests {
             Message {
                 kind: CheckKind::ImportStarUsage,
                 location: Location::new(1, 1),
-                filename: "./resources/test/src/F403.py".to_string(),
+                filename: "./resources/test/fixtures/F403.py".to_string(),
             },
             Message {
                 kind: CheckKind::ImportStarUsage,
                 location: Location::new(2, 1),
-                filename: "./resources/test/src/F403.py".to_string(),
+                filename: "./resources/test/fixtures/F403.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn f541() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F541.py"),
+            Path::new("./resources/test/fixtures/F541.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -170,17 +170,17 @@ mod tests {
             Message {
                 kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(4, 7),
-                filename: "./resources/test/src/F541.py".to_string(),
+                filename: "./resources/test/fixtures/F541.py".to_string(),
             },
             Message {
                 kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(5, 7),
-                filename: "./resources/test/src/F541.py".to_string(),
+                filename: "./resources/test/fixtures/F541.py".to_string(),
             },
             Message {
                 kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(7, 7),
-                filename: "./resources/test/src/F541.py".to_string(),
+                filename: "./resources/test/fixtures/F541.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn f634() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F634.py"),
+            Path::new("./resources/test/fixtures/F634.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -206,12 +206,12 @@ mod tests {
             Message {
                 kind: CheckKind::IfTuple,
                 location: Location::new(1, 1),
-                filename: "./resources/test/src/F634.py".to_string(),
+                filename: "./resources/test/fixtures/F634.py".to_string(),
             },
             Message {
                 kind: CheckKind::IfTuple,
                 location: Location::new(7, 5),
-                filename: "./resources/test/src/F634.py".to_string(),
+                filename: "./resources/test/fixtures/F634.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn f704() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F704.py"),
+            Path::new("./resources/test/fixtures/F704.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -237,17 +237,17 @@ mod tests {
             Message {
                 kind: CheckKind::YieldOutsideFunction,
                 location: Location::new(6, 5),
-                filename: "./resources/test/src/F704.py".to_string(),
+                filename: "./resources/test/fixtures/F704.py".to_string(),
             },
             Message {
                 kind: CheckKind::YieldOutsideFunction,
                 location: Location::new(9, 1),
-                filename: "./resources/test/src/F704.py".to_string(),
+                filename: "./resources/test/fixtures/F704.py".to_string(),
             },
             Message {
                 kind: CheckKind::YieldOutsideFunction,
                 location: Location::new(10, 1),
-                filename: "./resources/test/src/F704.py".to_string(),
+                filename: "./resources/test/fixtures/F704.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn f706() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F706.py"),
+            Path::new("./resources/test/fixtures/F706.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -273,12 +273,12 @@ mod tests {
             Message {
                 kind: CheckKind::ReturnOutsideFunction,
                 location: Location::new(6, 5),
-                filename: "./resources/test/src/F706.py".to_string(),
+                filename: "./resources/test/fixtures/F706.py".to_string(),
             },
             Message {
                 kind: CheckKind::ReturnOutsideFunction,
                 location: Location::new(9, 1),
-                filename: "./resources/test/src/F706.py".to_string(),
+                filename: "./resources/test/fixtures/F706.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn f821() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F821.py"),
+            Path::new("./resources/test/fixtures/F821.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -304,22 +304,22 @@ mod tests {
             Message {
                 kind: CheckKind::UndefinedName("self".to_string()),
                 location: Location::new(2, 12),
-                filename: "./resources/test/src/F821.py".to_string(),
+                filename: "./resources/test/fixtures/F821.py".to_string(),
             },
             Message {
                 kind: CheckKind::UndefinedName("self".to_string()),
                 location: Location::new(6, 13),
-                filename: "./resources/test/src/F821.py".to_string(),
+                filename: "./resources/test/fixtures/F821.py".to_string(),
             },
             Message {
                 kind: CheckKind::UndefinedName("self".to_string()),
                 location: Location::new(10, 9),
-                filename: "./resources/test/src/F821.py".to_string(),
+                filename: "./resources/test/fixtures/F821.py".to_string(),
             },
             Message {
                 kind: CheckKind::UndefinedName("numeric_string".to_string()),
                 location: Location::new(21, 12),
-                filename: "./resources/test/src/F821.py".to_string(),
+                filename: "./resources/test/fixtures/F821.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn f831() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F831.py"),
+            Path::new("./resources/test/fixtures/F831.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -345,17 +345,17 @@ mod tests {
             Message {
                 kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(1, 25),
-                filename: "./resources/test/src/F831.py".to_string(),
+                filename: "./resources/test/fixtures/F831.py".to_string(),
             },
             Message {
                 kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(5, 28),
-                filename: "./resources/test/src/F831.py".to_string(),
+                filename: "./resources/test/fixtures/F831.py".to_string(),
             },
             Message {
                 kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(9, 27),
-                filename: "./resources/test/src/F831.py".to_string(),
+                filename: "./resources/test/fixtures/F831.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn f823() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F823.py"),
+            Path::new("./resources/test/fixtures/F823.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -380,7 +380,7 @@ mod tests {
         let expected = vec![Message {
             kind: CheckKind::UndefinedLocal("my_var".to_string()),
             location: Location::new(6, 5),
-            filename: "./resources/test/src/F823.py".to_string(),
+            filename: "./resources/test/fixtures/F823.py".to_string(),
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     fn f841() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F841.py"),
+            Path::new("./resources/test/fixtures/F841.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -405,12 +405,12 @@ mod tests {
             Message {
                 kind: CheckKind::UnusedVariable("e".to_string()),
                 location: Location::new(3, 1),
-                filename: "./resources/test/src/F841.py".to_string(),
+                filename: "./resources/test/fixtures/F841.py".to_string(),
             },
             Message {
                 kind: CheckKind::UnusedVariable("z".to_string()),
                 location: Location::new(16, 5),
-                filename: "./resources/test/src/F841.py".to_string(),
+                filename: "./resources/test/fixtures/F841.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -424,7 +424,7 @@ mod tests {
     #[test]
     fn f901() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/F901.py"),
+            Path::new("./resources/test/fixtures/F901.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -436,12 +436,12 @@ mod tests {
             Message {
                 kind: CheckKind::RaiseNotImplemented,
                 location: Location::new(2, 5),
-                filename: "./resources/test/src/F901.py".to_string(),
+                filename: "./resources/test/fixtures/F901.py".to_string(),
             },
             Message {
                 kind: CheckKind::RaiseNotImplemented,
                 location: Location::new(6, 5),
-                filename: "./resources/test/src/F901.py".to_string(),
+                filename: "./resources/test/fixtures/F901.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -455,7 +455,7 @@ mod tests {
     #[test]
     fn r0205() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/src/R0205.py"),
+            Path::new("./resources/test/fixtures/R0205.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
@@ -467,17 +467,17 @@ mod tests {
             Message {
                 kind: CheckKind::UselessObjectInheritance("B".to_string()),
                 location: Location::new(5, 1),
-                filename: "./resources/test/src/R0205.py".to_string(),
+                filename: "./resources/test/fixtures/R0205.py".to_string(),
             },
             Message {
                 kind: CheckKind::UselessObjectInheritance("C".to_string()),
                 location: Location::new(9, 1),
-                filename: "./resources/test/src/R0205.py".to_string(),
+                filename: "./resources/test/fixtures/R0205.py".to_string(),
             },
             Message {
                 kind: CheckKind::UselessObjectInheritance("D".to_string()),
                 location: Location::new(14, 5),
-                filename: "./resources/test/src/R0205.py".to_string(),
+                filename: "./resources/test/fixtures/R0205.py".to_string(),
             },
         ];
         assert_eq!(actual.len(), expected.len());

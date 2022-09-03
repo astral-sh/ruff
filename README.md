@@ -114,7 +114,7 @@ for development.
 Assuming you have `cargo` installed, you can run:
 
 ```shell
-cargo run resources/test/src
+cargo run resources/test/fixtures
 cargo fmt
 cargo clippy
 cargo test
