@@ -10,6 +10,7 @@ use crate::checks::CheckKind;
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
     pub kind: CheckKind,
+    pub fixed: bool,
     pub location: Location,
     pub filename: String,
 }

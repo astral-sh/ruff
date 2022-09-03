@@ -11,10 +11,11 @@ use crate::ast_ops::{extract_all_names, Binding, BindingKind, Scope, ScopeKind};
 use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
-use crate::visitor;
 use crate::visitor::{walk_excepthandler, Visitor};
+use crate::{fixer, visitor};
 
 struct Checker<'a> {
+    lines: &'a [&'a str],
     settings: &'a Settings,
     path: &'a str,
     checks: Vec<Check>,
@@ -28,10 +29,11 @@ struct Checker<'a> {
 }
 
 impl Checker<'_> {
-    pub fn new<'a>(settings: &'a Settings, path: &'a str) -> Checker<'a> {
+    pub fn new<'a>(settings: &'a Settings, path: &'a str, lines: &'a [&'a str]) -> Checker<'a> {
         Checker {
             settings,
             path,
+            lines,
             checks: vec![],
             scopes: vec![],
             dead_scopes: vec![],
@@ -107,6 +109,8 @@ impl Visitor for Checker<'_> {
                                 self.checks.push(Check {
                                     kind: CheckKind::ReturnOutsideFunction,
                                     location: stmt.location,
+                                    fix: None,
+                                    fixed: false,
                                 });
                             }
                             _ => {}
@@ -136,7 +140,15 @@ impl Visitor for Checker<'_> {
                                             kind: CheckKind::UselessObjectInheritance(
                                                 name.to_string(),
                                             ),
-                                            location: stmt.location,
+                                            location: expr.location,
+                                            fix: fixer::remove_object_base(
+                                                self.lines,
+                                                &stmt.location,
+                                                expr.location,
+                                                bases,
+                                                keywords,
+                                            ),
+                                            fixed: false,
                                         });
                                     }
                                     _ => {}
@@ -254,6 +266,8 @@ impl Visitor for Checker<'_> {
                             self.checks.push(Check {
                                 kind: CheckKind::ImportStarUsage,
                                 location: stmt.location,
+                                fix: None,
+                                fixed: false,
                             });
                         }
                     } else {
@@ -276,6 +290,8 @@ impl Visitor for Checker<'_> {
                             self.checks.push(Check {
                                 kind: CheckKind::IfTuple,
                                 location: stmt.location,
+                                fix: None,
+                                fixed: false,
                             });
                         }
                     }
@@ -295,6 +311,8 @@ impl Visitor for Checker<'_> {
                                         self.checks.push(Check {
                                             kind: CheckKind::RaiseNotImplemented,
                                             location: stmt.location,
+                                            fix: None,
+                                            fixed: false,
                                         });
                                     }
                                 }
@@ -304,6 +322,8 @@ impl Visitor for Checker<'_> {
                                     self.checks.push(Check {
                                         kind: CheckKind::RaiseNotImplemented,
                                         location: stmt.location,
+                                        fix: None,
+                                        fixed: false,
                                     });
                                 }
                             }
@@ -324,6 +344,8 @@ impl Visitor for Checker<'_> {
                             self.checks.push(Check {
                                 kind: CheckKind::AssertTuple,
                                 location: stmt.location,
+                                fix: None,
+                                fixed: false,
                             });
                         }
                     }
@@ -388,6 +410,8 @@ impl Visitor for Checker<'_> {
                         self.checks.push(Check {
                             kind: CheckKind::UnusedVariable(name.to_string()),
                             location: binding.location,
+                            fix: None,
+                            fixed: false,
                         });
                     }
                 }
@@ -442,6 +466,8 @@ impl Visitor for Checker<'_> {
                     self.checks.push(Check {
                         kind: CheckKind::YieldOutsideFunction,
                         location: expr.location,
+                        fix: None,
+                        fixed: false,
                     });
                 }
             }
@@ -458,6 +484,8 @@ impl Visitor for Checker<'_> {
                     self.checks.push(Check {
                         kind: CheckKind::FStringMissingPlaceholders,
                         location: expr.location,
+                        fix: None,
+                        fixed: false,
                     });
                 }
                 self.in_f_string = true;
@@ -528,6 +556,8 @@ impl Visitor for Checker<'_> {
                             self.checks.push(Check {
                                 kind: CheckKind::UnusedVariable(name.to_string()),
                                 location: excepthandler.location,
+                                fix: None,
+                                fixed: false,
                             });
                         }
                     }
@@ -569,6 +599,8 @@ impl Visitor for Checker<'_> {
                     self.checks.push(Check {
                         kind: CheckKind::DuplicateArgumentName,
                         location: arg.location,
+                        fix: None,
+                        fixed: false,
                     });
                     break;
                 }
@@ -666,6 +698,8 @@ impl Checker<'_> {
                 self.checks.push(Check {
                     kind: CheckKind::UndefinedName(id.clone()),
                     location: expr.location,
+                    fix: None,
+                    fixed: false,
                 })
             }
         }
@@ -693,6 +727,8 @@ impl Checker<'_> {
                                 self.checks.push(Check {
                                     kind: CheckKind::UndefinedLocal(id.clone()),
                                     location: expr.location,
+                                    fix: None,
+                                    fixed: false,
                                 });
                             }
                         }
@@ -743,6 +779,8 @@ impl Checker<'_> {
                 self.checks.push(Check {
                     kind: CheckKind::UndefinedName(id.clone()),
                     location: expr.location,
+                    fix: None,
+                    fixed: false,
                 })
             }
         }
@@ -780,6 +818,8 @@ impl Checker<'_> {
                                 self.checks.push(Check {
                                     kind: CheckKind::UndefinedExport(name.to_string()),
                                     location: binding.location,
+                                    fix: None,
+                                    fixed: false,
                                 });
                             }
                         }
@@ -801,6 +841,8 @@ impl Checker<'_> {
                                 self.checks.push(Check {
                                     kind: CheckKind::UnusedImport(full_name.to_string()),
                                     location: binding.location,
+                                    fix: None,
+                                    fixed: false,
                                 });
                             }
                             _ => {}
@@ -812,8 +854,9 @@ impl Checker<'_> {
     }
 }
 
-pub fn check_ast(python_ast: &Suite, settings: &Settings, path: &str) -> Vec<Check> {
-    let mut checker = Checker::new(settings, path);
+pub fn check_ast(python_ast: &Suite, content: &str, settings: &Settings, path: &str) -> Vec<Check> {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut checker = Checker::new(settings, path, &lines);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 

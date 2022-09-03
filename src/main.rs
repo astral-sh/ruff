@@ -28,6 +28,9 @@ struct Cli {
     /// Enable verbose logging.
     #[clap(short, long, action)]
     verbose: bool,
+    /// Enable autofix.
+    #[clap(short, long, action)]
+    autofix: bool,
     /// Disable all logging (but still exit with status code "1" upon detecting errors).
     #[clap(short, long, action)]
     quiet: bool,
@@ -48,7 +51,12 @@ struct Cli {
     ignore: Vec<CheckCode>,
 }
 
-fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<Message>> {
+fn run_once(
+    files: &[PathBuf],
+    settings: &Settings,
+    cache: bool,
+    autofix: bool,
+) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
     let files: Vec<DirEntry> = files
@@ -62,7 +70,7 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<M
     let mut messages: Vec<Message> = files
         .par_iter()
         .map(|entry| {
-            check_path(entry.path(), settings, &cache.into()).unwrap_or_else(|e| {
+            check_path(entry.path(), settings, &cache.into(), autofix).unwrap_or_else(|e| {
                 error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
                 vec![]
             })
@@ -77,11 +85,17 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<M
 }
 
 fn report_once(messages: &[Message]) -> Result<()> {
-    println!("Found {} error(s).", messages.len());
+    let (fixed, outstanding): (Vec<&Message>, Vec<&Message>) =
+        messages.iter().partition(|message| message.fixed);
+    if fixed.is_empty() {
+        println!("Found {} error(s).", messages.len());
+    } else {
+        println!("Found {} error(s) (fixed {}).", messages.len(), fixed.len());
+    }
 
-    if !messages.is_empty() {
+    if !outstanding.is_empty() {
         println!();
-        for message in messages {
+        for message in outstanding {
             println!("{}", message);
         }
     }
@@ -121,11 +135,15 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     if cli.watch {
+        if cli.autofix {
+            println!("Warning: autofix is not enabled in watch mode.")
+        }
+
         // Perform an initial run instantly.
         clearscreen::clear()?;
         tell_user!("Starting linter in watch mode...\n");
 
-        let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
+        let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
         if !cli.quiet {
             report_continuously(&messages)?;
         }
@@ -145,7 +163,7 @@ fn inner_main() -> Result<ExitCode> {
                             clearscreen::clear()?;
                             tell_user!("File change detected...\n");
 
-                            let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
+                            let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
                             if !cli.quiet {
                                 report_continuously(&messages)?;
                             }
@@ -156,7 +174,7 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else {
-        let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
+        let messages = run_once(&cli.files, &settings, !cli.no_cache, cli.autofix)?;
         if !cli.quiet {
             report_once(&messages)?;
         }

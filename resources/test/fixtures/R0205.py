@@ -10,13 +10,20 @@ class C(B, object):
     ...
 
 
+class D(
+    object,
+    B,
+):
+    ...
+
+
 def f():
-    class D(object):
+    class E(object):
         ...
 
 
 object = A
 
 
-class E(object):
+class F(object):
     ...

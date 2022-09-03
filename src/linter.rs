@@ -4,6 +4,7 @@ use anyhow::Result;
 use log::debug;
 use rustpython_parser::parser;
 
+use crate::autofix::apply_fixes;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
 use crate::checks::{Check, LintSource};
@@ -11,7 +12,12 @@ use crate::message::Message;
 use crate::settings::Settings;
 use crate::{cache, fs};
 
-pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Result<Vec<Message>> {
+pub fn check_path(
+    path: &Path,
+    settings: &Settings,
+    mode: &cache::Mode,
+    autofix: bool,
+) -> Result<Vec<Message>> {
     // Check the cache.
     if let Some(messages) = cache::get(path, settings, mode) {
         debug!("Cache hit for: {}", path.to_string_lossy());
@@ -32,17 +38,23 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
     {
         let path = path.to_string_lossy();
         let python_ast = parser::parse_program(&contents, &path)?;
-        checks.extend(check_ast(&python_ast, settings, &path));
+        checks.extend(check_ast(&python_ast, &contents, settings, &path));
     }
 
     // Run the lines-based checks.
     check_lines(&mut checks, &contents, settings);
+
+    // Apply autofix.
+    if autofix {
+        apply_fixes(&mut checks, &contents, path)?;
+    }
 
     // Convert to messages.
     let messages: Vec<Message> = checks
         .into_iter()
         .map(|check| Message {
             kind: check.kind,
+            fixed: check.fixed,
             location: check.location,
             filename: path.to_string_lossy().to_string(),
         })
@@ -99,11 +111,13 @@ mod tests {
                 select: BTreeSet::from([CheckCode::E501]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![Message {
             kind: CheckKind::LineTooLong,
             location: Location::new(5, 89),
             filename: "./resources/test/fixtures/E501.py".to_string(),
+            fixed: false,
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
@@ -123,22 +137,26 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F401]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::UnusedImport("logging.handlers".to_string()),
                 location: Location::new(12, 1),
                 filename: "./resources/test/fixtures/F401.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::UnusedImport("functools".to_string()),
                 location: Location::new(3, 1),
                 filename: "./resources/test/fixtures/F401.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::UnusedImport("collections.OrderedDict".to_string()),
                 location: Location::new(4, 1),
                 filename: "./resources/test/fixtures/F401.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -159,17 +177,20 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F403]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::ImportStarUsage,
                 location: Location::new(1, 1),
                 filename: "./resources/test/fixtures/F403.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::ImportStarUsage,
                 location: Location::new(2, 1),
                 filename: "./resources/test/fixtures/F403.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -189,22 +210,26 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F541]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(4, 7),
                 filename: "./resources/test/fixtures/F541.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(5, 7),
                 filename: "./resources/test/fixtures/F541.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(7, 7),
                 filename: "./resources/test/fixtures/F541.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -256,17 +281,20 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F634]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::IfTuple,
                 location: Location::new(1, 1),
                 filename: "./resources/test/fixtures/F634.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::IfTuple,
                 location: Location::new(7, 5),
                 filename: "./resources/test/fixtures/F634.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -287,22 +315,26 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F704]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::YieldOutsideFunction,
                 location: Location::new(6, 5),
                 filename: "./resources/test/fixtures/F704.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::YieldOutsideFunction,
                 location: Location::new(9, 1),
                 filename: "./resources/test/fixtures/F704.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::YieldOutsideFunction,
                 location: Location::new(10, 1),
                 filename: "./resources/test/fixtures/F704.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -323,17 +355,20 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F706]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::ReturnOutsideFunction,
                 location: Location::new(6, 5),
                 filename: "./resources/test/fixtures/F706.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::ReturnOutsideFunction,
                 location: Location::new(9, 1),
                 filename: "./resources/test/fixtures/F706.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -390,27 +425,32 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F821]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::UndefinedName("self".to_string()),
                 location: Location::new(2, 12),
                 filename: "./resources/test/fixtures/F821.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::UndefinedName("self".to_string()),
                 location: Location::new(6, 13),
                 filename: "./resources/test/fixtures/F821.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::UndefinedName("self".to_string()),
                 location: Location::new(10, 9),
                 filename: "./resources/test/fixtures/F821.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::UndefinedName("numeric_string".to_string()),
                 location: Location::new(21, 12),
                 filename: "./resources/test/fixtures/F821.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -431,11 +471,13 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F822]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![Message {
             kind: CheckKind::UndefinedExport("b".to_string()),
             location: Location::new(3, 1),
             filename: "./resources/test/fixtures/F822.py".to_string(),
+            fixed: false,
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
@@ -455,11 +497,13 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F823]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![Message {
             kind: CheckKind::UndefinedLocal("my_var".to_string()),
             location: Location::new(6, 5),
             filename: "./resources/test/fixtures/F823.py".to_string(),
+            fixed: false,
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
@@ -479,22 +523,26 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F831]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(1, 25),
                 filename: "./resources/test/fixtures/F831.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(5, 28),
                 filename: "./resources/test/fixtures/F831.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(9, 27),
                 filename: "./resources/test/fixtures/F831.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -515,17 +563,20 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F841]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::UnusedVariable("e".to_string()),
                 location: Location::new(3, 1),
                 filename: "./resources/test/fixtures/F841.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::UnusedVariable("z".to_string()),
                 location: Location::new(16, 5),
                 filename: "./resources/test/fixtures/F841.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -546,17 +597,20 @@ mod tests {
                 select: BTreeSet::from([CheckCode::F901]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::RaiseNotImplemented,
                 location: Location::new(2, 5),
                 filename: "./resources/test/fixtures/F901.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::RaiseNotImplemented,
                 location: Location::new(6, 5),
                 filename: "./resources/test/fixtures/F901.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -577,22 +631,32 @@ mod tests {
                 select: BTreeSet::from([CheckCode::R0205]),
             },
             &cache::Mode::None,
+            false,
         )?;
         let expected = vec![
             Message {
                 kind: CheckKind::UselessObjectInheritance("B".to_string()),
-                location: Location::new(5, 1),
+                location: Location::new(5, 9),
                 filename: "./resources/test/fixtures/R0205.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::UselessObjectInheritance("C".to_string()),
-                location: Location::new(9, 1),
+                location: Location::new(9, 12),
                 filename: "./resources/test/fixtures/R0205.py".to_string(),
+                fixed: false,
             },
             Message {
                 kind: CheckKind::UselessObjectInheritance("D".to_string()),
                 location: Location::new(14, 5),
                 filename: "./resources/test/fixtures/R0205.py".to_string(),
+                fixed: false,
+            },
+            Message {
+                kind: CheckKind::UselessObjectInheritance("E".to_string()),
+                location: Location::new(21, 13),
+                filename: "./resources/test/fixtures/R0205.py".to_string(),
+                fixed: false,
             },
         ];
         assert_eq!(actual.len(), expected.len());

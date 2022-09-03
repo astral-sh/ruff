@@ -38,6 +38,8 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
             let check = Check {
                 kind: CheckKind::LineTooLong,
                 location: Location::new(row + 1, settings.line_length + 1),
+                fix: None,
+                fixed: false,
             };
             if !check.is_inline_ignored(line) {
                 line_checks.push(check);
