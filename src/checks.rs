@@ -16,6 +16,7 @@ pub enum CheckCode {
     F704,
     F706,
     F821,
+    F822,
     F823,
     F831,
     F841,
@@ -36,6 +37,7 @@ impl FromStr for CheckCode {
             "F704" => Ok(CheckCode::F704),
             "F706" => Ok(CheckCode::F706),
             "F821" => Ok(CheckCode::F821),
+            "F822" => Ok(CheckCode::F822),
             "F823" => Ok(CheckCode::F823),
             "F831" => Ok(CheckCode::F831),
             "F841" => Ok(CheckCode::F841),
@@ -58,6 +60,7 @@ impl CheckCode {
             CheckCode::F706 => "F706",
             CheckCode::F821 => "F821",
             CheckCode::F823 => "F823",
+            CheckCode::F822 => "F822",
             CheckCode::F831 => "F831",
             CheckCode::F841 => "F841",
             CheckCode::F901 => "F901",
@@ -76,6 +79,7 @@ impl CheckCode {
             CheckCode::F704 => &LintSource::AST,
             CheckCode::F706 => &LintSource::AST,
             CheckCode::F821 => &LintSource::AST,
+            CheckCode::F822 => &LintSource::AST,
             CheckCode::F823 => &LintSource::AST,
             CheckCode::F831 => &LintSource::AST,
             CheckCode::F841 => &LintSource::AST,
@@ -101,6 +105,7 @@ pub enum CheckKind {
     RaiseNotImplemented,
     ReturnOutsideFunction,
     UndefinedLocal(String),
+    UndefinedExport(String),
     UndefinedName(String),
     UnusedImport(String),
     UnusedVariable(String),
@@ -120,6 +125,7 @@ impl CheckKind {
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
             CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
             CheckKind::UndefinedLocal(_) => "UndefinedLocal",
+            CheckKind::UndefinedExport(_) => "UndefinedExport",
             CheckKind::UndefinedName(_) => "UndefinedName",
             CheckKind::UnusedImport(_) => "UnusedImport",
             CheckKind::UnusedVariable(_) => "UnusedVariable",
@@ -138,6 +144,7 @@ impl CheckKind {
             CheckKind::LineTooLong => &CheckCode::E501,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::UndefinedExport(_) => &CheckCode::F822,
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(_) => &CheckCode::F401,
@@ -164,6 +171,9 @@ impl CheckKind {
             }
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
+            }
+            CheckKind::UndefinedExport(name) => {
+                format!("Undefined name `{name}` in __all__")
             }
             CheckKind::UndefinedName(name) => {
                 format!("Undefined name `{name}`")

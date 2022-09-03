@@ -12,6 +12,7 @@ fn main() {
         CheckKind::ReturnOutsideFunction,
         CheckKind::UndefinedLocal("...".to_string()),
         CheckKind::UndefinedName("...".to_string()),
+        CheckKind::UndefinedExport("...".to_string()),
         CheckKind::UnusedImport("...".to_string()),
         CheckKind::UnusedVariable("...".to_string()),
         CheckKind::UselessObjectInheritance("...".to_string()),
