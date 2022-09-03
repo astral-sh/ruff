@@ -108,11 +108,37 @@ impl Visitor for Checker<'_> {
                 }
             }
             StmtKind::ClassDef {
+                name,
                 bases,
                 keywords,
                 decorator_list,
                 ..
             } => {
+                if self.settings.select.contains(&CheckCode::R0205) {
+                    for expr in bases {
+                        if let ExprKind::Name { id, .. } = &expr.node {
+                            if id == "object" {
+                                let scope = self.scopes.last().expect("No current scope found.");
+                                match scope.values.get(id) {
+                                    None
+                                    | Some(Binding {
+                                        kind: BindingKind::Builtin,
+                                        ..
+                                    }) => {
+                                        self.checks.push(Check {
+                                            kind: CheckKind::UselessObjectInheritance(
+                                                name.to_string(),
+                                            ),
+                                            location: stmt.location,
+                                        });
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                }
+
                 for expr in bases {
                     self.visit_expr(expr, Some(stmt))
                 }
