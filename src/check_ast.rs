@@ -23,6 +23,8 @@ struct Checker<'a> {
     deferred: Vec<String>,
     in_f_string: bool,
     in_annotation: bool,
+    seen_non_import: bool,
+    seen_docstring: bool,
 }
 
 impl Checker<'_> {
@@ -36,6 +38,8 @@ impl Checker<'_> {
             deferred: vec![],
             in_f_string: false,
             in_annotation: false,
+            seen_non_import: false,
+            seen_docstring: false,
         }
     }
 }
@@ -154,6 +158,19 @@ impl Visitor for Checker<'_> {
                 self.push_scope(Scope::new(ScopeKind::Class))
             }
             StmtKind::Import { names } => {
+                if self
+                    .settings
+                    .select
+                    .contains(CheckKind::ModuleImportNotAtTopOfFile.code())
+                    && self.seen_non_import
+                    && stmt.location.column() == 1
+                {
+                    self.checks.push(Check {
+                        kind: CheckKind::ModuleImportNotAtTopOfFile,
+                        location: stmt.location,
+                    });
+                }
+
                 for alias in names {
                     if alias.node.name.contains('.') && alias.node.asname.is_none() {
                         // TODO(charlie): Multiple submodule imports with the same parent module
@@ -191,6 +208,19 @@ impl Visitor for Checker<'_> {
                 }
             }
             StmtKind::ImportFrom { names, module, .. } => {
+                if self
+                    .settings
+                    .select
+                    .contains(CheckKind::ModuleImportNotAtTopOfFile.code())
+                    && self.seen_non_import
+                    && stmt.location.column() == 1
+                {
+                    self.checks.push(Check {
+                        kind: CheckKind::ModuleImportNotAtTopOfFile,
+                        location: stmt.location,
+                    });
+                }
+
                 for alias in names {
                     let name = alias
                         .node
@@ -282,8 +312,12 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
-            StmtKind::AugAssign { target, .. } => self.handle_node_load(target),
+            StmtKind::AugAssign { target, .. } => {
+                self.seen_non_import = true;
+                self.handle_node_load(target);
+            }
             StmtKind::Assert { test, .. } => {
+                self.seen_non_import = true;
                 if self.settings.select.contains(CheckKind::AssertTuple.code()) {
                     if let ExprKind::Tuple { elts, .. } = &test.node {
                         if !elts.is_empty() {
@@ -311,6 +345,22 @@ impl Visitor for Checker<'_> {
                         }
                     }
                 }
+            }
+            StmtKind::Expr { value } => {
+                if !self.seen_docstring {
+                    if let ExprKind::Constant {
+                        value: Constant::Str(_),
+                        ..
+                    } = &value.node
+                    {
+                        self.seen_docstring = true;
+                    }
+                } else {
+                    self.seen_non_import = true;
+                }
+            }
+            StmtKind::Delete { .. } | StmtKind::Assign { .. } | StmtKind::AnnAssign { .. } => {
+                self.seen_non_import = true;
             }
             _ => {}
         }

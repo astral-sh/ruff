@@ -44,6 +44,7 @@ impl Settings {
                 .collect(),
             select: config.select.unwrap_or_else(|| {
                 BTreeSet::from([
+                    CheckCode::E402,
                     CheckCode::E501,
                     CheckCode::F401,
                     CheckCode::F403,
@@ -52,8 +53,8 @@ impl Settings {
                     CheckCode::F634,
                     CheckCode::F706,
                     CheckCode::F707,
-                    CheckCode::F831,
                     CheckCode::F823,
+                    CheckCode::F831,
                     CheckCode::F901,
                 ])
             }),

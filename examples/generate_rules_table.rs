@@ -10,6 +10,7 @@ fn main() {
         CheckKind::IfTuple,
         CheckKind::ImportStarUsage,
         CheckKind::LineTooLong,
+        CheckKind::ModuleImportNotAtTopOfFile,
         CheckKind::RaiseNotImplemented,
         CheckKind::ReturnOutsideFunction,
         CheckKind::UndefinedExport("...".to_string()),

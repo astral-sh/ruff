@@ -2,6 +2,7 @@
 line-length = 88
 exclude = ["excluded.py", "**/migrations"]
 select = [
+    "E402",
     "E501",
     "F401",
     "F403",

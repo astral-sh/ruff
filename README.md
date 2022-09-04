@@ -110,6 +110,7 @@ OPTIONS:
 
 | Code | Name | Message |
 | ---- | ----- | ------- |
+| E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |
 | E501 | LineTooLong | Line too long |
 | F401 | UnusedImport | `...` imported but unused |
 | F403 | ImportStarUsage | Unable to detect undefined names |

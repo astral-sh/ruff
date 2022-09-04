@@ -237,6 +237,7 @@ other-attribute = 1
                     Path::new("**/migrations").to_path_buf()
                 ]),
                 select: Some(BTreeSet::from([
+                    CheckCode::E402,
                     CheckCode::E501,
                     CheckCode::F401,
                     CheckCode::F403,
