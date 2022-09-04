@@ -295,6 +295,23 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
+            StmtKind::Try { handlers, .. } => {
+                if self
+                    .settings
+                    .select
+                    .contains(CheckKind::DefaultExceptNotLast.code())
+                {
+                    for (idx, handler) in handlers.iter().enumerate() {
+                        let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
+                        if type_.is_none() && idx < handlers.len() - 1 {
+                            self.checks.push(Check {
+                                kind: CheckKind::DefaultExceptNotLast,
+                                location: handler.location,
+                            });
+                        }
+                    }
+                }
+            }
             _ => {}
         }
 

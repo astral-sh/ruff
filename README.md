@@ -118,6 +118,7 @@ OPTIONS:
 | F634 | IfTuple | If test is a tuple, which is always `True` |
 | F704 | YieldOutsideFunction | a `yield` or `yield from` statement outside of a function/method |
 | F706 | ReturnOutsideFunction | a `return` statement outside of a function/method |
+| F707 | DefaultExceptNotLast | an `except:` block as not the last exception handler |
 | F821 | UndefinedName | Undefined name `...` |
 | F822 | UndefinedExport | Undefined name `...` in `__all__` |
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |
