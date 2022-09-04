@@ -591,13 +591,13 @@ mod tests {
     }
 
     #[test]
-    fn r0205() -> Result<()> {
+    fn r001() -> Result<()> {
         let actual = check_path(
-            Path::new("./resources/test/fixtures/R0205.py"),
+            Path::new("./resources/test/fixtures/R001.py"),
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
-                select: BTreeSet::from([CheckCode::R0205]),
+                select: BTreeSet::from([CheckCode::R001]),
             },
             &autofix::Mode::Generate,
         )?;
@@ -799,6 +799,47 @@ mod tests {
                     content: "".to_string(),
                     start: Location::new(130, 8),
                     end: Location::new(133, 2),
+                    applied: false,
+                }),
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn r002() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/R002.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::R002]),
+            },
+            &autofix::Mode::Generate,
+        )?;
+        let expected = vec![
+            Check {
+                kind: CheckKind::NoAssertEquals,
+                location: Location::new(1, 19),
+                fix: Some(Fix {
+                    content: "assertEqual".to_string(),
+                    start: Location::new(1, 6),
+                    end: Location::new(1, 18),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::NoAssertEquals,
+                location: Location::new(2, 18),
+                fix: Some(Fix {
+                    content: "assertEqual".to_string(),
+                    start: Location::new(2, 6),
+                    end: Location::new(2, 18),
                     applied: false,
                 }),
             },
