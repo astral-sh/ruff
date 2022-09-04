@@ -347,11 +347,6 @@ mod tests {
                 location: Location::new(19, 1),
                 filename: "./resources/test/fixtures/F707.py".to_string(),
             },
-            Message {
-                kind: CheckKind::DefaultExceptNotLast,
-                location: Location::new(28, 1),
-                filename: "./resources/test/fixtures/F707.py".to_string(),
-            },
         ];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
