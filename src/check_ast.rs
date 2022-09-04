@@ -12,11 +12,12 @@ use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
 use crate::visitor::{walk_excepthandler, Visitor};
-use crate::{fixer, visitor};
+use crate::{autofix, fixer, visitor};
 
 struct Checker<'a> {
-    lines: &'a [&'a str],
+    content: &'a str,
     settings: &'a Settings,
+    autofix: &'a autofix::Mode,
     path: &'a str,
     checks: Vec<Check>,
     scopes: Vec<Scope>,
@@ -29,11 +30,17 @@ struct Checker<'a> {
 }
 
 impl Checker<'_> {
-    pub fn new<'a>(settings: &'a Settings, path: &'a str, lines: &'a [&'a str]) -> Checker<'a> {
+    pub fn new<'a>(
+        settings: &'a Settings,
+        autofix: &'a autofix::Mode,
+        path: &'a str,
+        content: &'a str,
+    ) -> Checker<'a> {
         Checker {
             settings,
+            autofix,
             path,
-            lines,
+            content,
             checks: vec![],
             scopes: vec![],
             dead_scopes: vec![],
@@ -138,16 +145,18 @@ impl Visitor for Checker<'_> {
                                             CheckKind::UselessObjectInheritance(name.to_string()),
                                             expr.location,
                                         );
-                                        // TODO(charlie): Only bother to do this if autofix is
-                                        // enabled.
-                                        if let Some(fix) = fixer::remove_object_base(
-                                            self.lines,
-                                            &stmt.location,
-                                            expr.location,
-                                            bases,
-                                            keywords,
-                                        ) {
-                                            check.amend(fix);
+                                        if matches!(self.autofix, autofix::Mode::Generate)
+                                            || matches!(self.autofix, autofix::Mode::Apply)
+                                        {
+                                            if let Some(fix) = fixer::remove_class_def_base(
+                                                self.content,
+                                                &stmt.location,
+                                                expr.location,
+                                                bases,
+                                                keywords,
+                                            ) {
+                                                check.amend(fix);
+                                            }
                                         }
                                         self.checks.push(check);
                                     }
@@ -344,10 +353,10 @@ impl Visitor for Checker<'_> {
                     for (idx, handler) in handlers.iter().enumerate() {
                         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
                         if type_.is_none() && idx < handlers.len() - 1 {
-                            self.checks.push(Check {
-                                kind: CheckKind::DefaultExceptNotLast,
-                                location: handler.location,
-                            });
+                            self.checks.push(Check::new(
+                                CheckKind::DefaultExceptNotLast,
+                                handler.location,
+                            ));
                         }
                     }
                 }
@@ -814,9 +823,14 @@ impl Checker<'_> {
     }
 }
 
-pub fn check_ast(python_ast: &Suite, content: &str, settings: &Settings, path: &str) -> Vec<Check> {
-    let lines: Vec<&str> = content.lines().collect();
-    let mut checker = Checker::new(settings, path, &lines);
+pub fn check_ast(
+    python_ast: &Suite,
+    content: &str,
+    settings: &Settings,
+    autofix: &autofix::Mode,
+    path: &str,
+) -> Vec<Check> {
+    let mut checker = Checker::new(settings, autofix, path, content);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 

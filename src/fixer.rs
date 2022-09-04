@@ -4,43 +4,62 @@ use rustpython_parser::token::Tok;
 
 use crate::checks::Fix;
 
-fn to_absolute(location: &Location, base: &Location) -> Location {
-    if location.row() == 1 {
+/// Convert a location within a file (relative to `base`) to an absolute position.
+fn to_absolute(relative: &Location, base: &Location) -> Location {
+    if relative.row() == 1 {
         Location::new(
-            location.row() + base.row() - 1,
-            location.column() + base.column() - 1,
+            relative.row() + base.row() - 1,
+            relative.column() + base.column() - 1,
         )
     } else {
-        Location::new(location.row() + base.row() - 1, location.column())
+        Location::new(relative.row() + base.row() - 1, relative.column())
     }
 }
 
-pub fn remove_object_base(
-    lines: &[&str],
+/// Generate a fix to remove a base from a ClassDef statement.
+pub fn remove_class_def_base(
+    content: &str,
     stmt_at: &Location,
     expr_at: Location,
     bases: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Fix> {
+    // TODO(charlie): Pre-compute these offsets.
+    let mut offset = 0;
+    for i in content.lines().take(stmt_at.row() - 1) {
+        offset += i.len();
+        offset += 1;
+    }
+    offset += stmt_at.column() - 1;
+    let output = &content[offset..];
+
     // Case 1: `object` is the only base.
     if bases.len() == 1 && keywords.is_empty() {
-        let lxr = lexer::make_tokenizer(&lines[stmt_at.row() - 1][stmt_at.column() - 1..]);
         let mut fix_start = None;
         let mut fix_end = None;
         let mut count: usize = 0;
-        for (start, tok, end) in lxr.flatten() {
-            if matches!(tok, Tok::Lpar) {
-                if count == 0 {
-                    fix_start = Some(to_absolute(&start, stmt_at));
-                }
-                count += 1;
-            }
+        for result in lexer::make_tokenizer(output) {
+            match result {
+                Ok((start, tok, end)) => {
+                    if matches!(tok, Tok::Lpar) {
+                        if count == 0 {
+                            fix_start = Some(to_absolute(&start, stmt_at));
+                        }
+                        count += 1;
+                    }
 
-            if matches!(tok, Tok::Rpar) {
-                count -= 1;
-                if count == 0 {
-                    fix_end = Some(to_absolute(&end, stmt_at));
+                    if matches!(tok, Tok::Rpar) {
+                        count -= 1;
+                        if count == 0 {
+                            fix_end = Some(to_absolute(&end, stmt_at));
+                        }
+                    }
+
+                    if fix_start.is_some() && fix_end.is_some() {
+                        break;
+                    };
                 }
+                Err(_) => break,
             }
 
             if fix_start.is_some() && fix_end.is_some() {
@@ -48,72 +67,99 @@ pub fn remove_object_base(
             };
         }
 
-        return Some(Fix {
-            content: "".to_string(),
-            start: fix_start.unwrap(),
-            end: fix_end.unwrap(),
-        });
+        return match (fix_start, fix_end) {
+            (Some(start), Some(end)) => Some(Fix {
+                content: "".to_string(),
+                start,
+                end,
+                applied: false,
+            }),
+            _ => None,
+        };
     }
 
-    // Case 2: `object` is _not_ the last node.
-    let mut closest_after_expr: Option<Location> = None;
-    for location in bases
+    if bases
         .iter()
         .map(|node| node.location)
         .chain(keywords.iter().map(|node| node.location))
+        .any(|location| location > expr_at)
     {
-        // If the node comes after the node we're removing...
-        if location.row() > expr_at.row()
-            || (location.row() == expr_at.row() && location.column() > expr_at.column())
-        {
-            match closest_after_expr {
-                None => closest_after_expr = Some(location),
-                Some(existing) => {
-                    // And before the next closest node...
-                    if location.row() < existing.row()
-                        || (location.row() == existing.row()
-                            && location.column() < existing.column())
+        // Case 2: `object` is _not_ the last node.
+        let mut fix_start: Option<Location> = None;
+        let mut fix_end: Option<Location> = None;
+        let mut seen_comma = false;
+        for result in lexer::make_tokenizer(output) {
+            match result {
+                Ok((start, tok, _)) => {
+                    let start = to_absolute(&start, stmt_at);
+                    if seen_comma
+                        && !matches!(tok, Tok::Newline)
+                        && !matches!(tok, Tok::Indent)
+                        && !matches!(tok, Tok::Dedent)
+                        && !matches!(tok, Tok::StartExpression)
+                        && !matches!(tok, Tok::StartModule)
+                        && !matches!(tok, Tok::StartInteractive)
                     {
-                        closest_after_expr = Some(location);
+                        fix_end = Some(start);
+                        break;
+                    }
+                    if start == expr_at {
+                        fix_start = Some(start);
+                    }
+                    if fix_start.is_some() && matches!(tok, Tok::Comma) {
+                        seen_comma = true;
                     }
                 }
+                Err(_) => break,
+            }
+
+            if fix_start.is_some() && fix_end.is_some() {
+                break;
             };
         }
-    }
 
-    match closest_after_expr {
-        Some(end) => {
-            return Some(Fix {
+        match (fix_start, fix_end) {
+            (Some(start), Some(end)) => Some(Fix {
                 content: "".to_string(),
-                start: expr_at,
+                start,
                 end,
-            });
+                applied: false,
+            }),
+            _ => None,
         }
-        None => {}
-    }
+    } else {
+        // Case 3: `object` is the last node, so we have to find the last token that isn't a comma.
+        let mut fix_start: Option<Location> = None;
+        let mut fix_end: Option<Location> = None;
+        for result in lexer::make_tokenizer(output) {
+            match result {
+                Ok((start, tok, end)) => {
+                    let start = to_absolute(&start, stmt_at);
+                    let end = to_absolute(&end, stmt_at);
+                    if start == expr_at {
+                        fix_end = Some(end);
+                        break;
+                    }
+                    if matches!(tok, Tok::Comma) {
+                        fix_start = Some(start);
+                    }
+                }
+                Err(_) => break,
+            }
 
-    // Case 3: `object` is the last node, so we have to find the last token that isn't a comma.
-    let lxr = lexer::make_tokenizer(&lines[stmt_at.row() - 1][stmt_at.column() - 1..]);
-    let mut fix_start: Option<Location> = None;
-    let mut fix_end: Option<Location> = None;
-    for (start, tok, end) in lxr.flatten() {
-        let start = to_absolute(&start, stmt_at);
-        let end = to_absolute(&end, stmt_at);
-        if start == expr_at {
-            fix_end = Some(end);
-            break;
+            if fix_start.is_some() && fix_end.is_some() {
+                break;
+            };
         }
-        if matches!(tok, Tok::Comma) {
-            fix_start = Some(start);
-        }
-    }
 
-    match (fix_start, fix_end) {
-        (Some(start), Some(end)) => Some(Fix {
-            content: "".to_string(),
-            start,
-            end,
-        }),
-        _ => None,
+        match (fix_start, fix_end) {
+            (Some(start), Some(end)) => Some(Fix {
+                content: "".to_string(),
+                start,
+                end,
+                applied: false,
+            }),
+            _ => None,
+        }
     }
 }

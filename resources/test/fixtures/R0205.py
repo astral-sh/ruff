@@ -22,8 +22,20 @@ def f():
         ...
 
 
+class F(
+    object,
+):
+    ...
+
+
+class G(
+    object,  # )
+):
+    ...
+
+
 object = A
 
 
-class F(object):
+class H(object):
     ...

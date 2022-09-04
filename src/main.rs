@@ -70,7 +70,7 @@ fn run_once(
     let mut messages: Vec<Message> = files
         .par_iter()
         .map(|entry| {
-            check_path(entry.path(), settings, &cache.into(), autofix).unwrap_or_else(|e| {
+            check_path(entry.path(), settings, &cache.into(), &autofix.into()).unwrap_or_else(|e| {
                 error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
                 vec![]
             })
@@ -86,7 +86,13 @@ fn run_once(
 
 fn report_once(messages: &[Message]) -> Result<()> {
     let (fixed, outstanding): (Vec<&Message>, Vec<&Message>) =
-        messages.iter().partition(|message| message.fixed);
+        messages.iter().partition(|message| {
+            message
+                .fix
+                .as_ref()
+                .map(|fix| fix.applied)
+                .unwrap_or_default()
+        });
 
     // TODO(charlie): If autofix is disabled, but some rules are fixable, tell the user.
     if fixed.is_empty() {

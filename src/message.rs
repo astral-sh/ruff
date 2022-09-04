@@ -5,12 +5,12 @@ use colored::Colorize;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-use crate::checks::CheckKind;
+use crate::checks::{CheckKind, Fix};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
     pub kind: CheckKind,
-    pub fixed: bool,
+    pub fix: Option<Fix>,
     pub location: Location,
     pub filename: String,
 }

@@ -225,19 +225,19 @@ impl CheckKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fix {
     pub content: String,
     pub start: Location,
     pub end: Location,
+    pub applied: bool,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Check {
     pub kind: CheckKind,
     pub location: Location,
     pub fix: Option<Fix>,
-    pub fixed: bool,
 }
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -251,7 +251,6 @@ impl Check {
             kind,
             location,
             fix: None,
-            fixed: false,
         }
     }
 
