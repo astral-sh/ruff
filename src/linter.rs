@@ -192,6 +192,37 @@ mod tests {
     }
 
     #[test]
+    fn f631() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/F631.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F631]),
+            },
+            &cache::Mode::None,
+        )?;
+        let expected = vec![
+            Message {
+                kind: CheckKind::AssertTuple,
+                location: Location::new(1, 1),
+                filename: "./resources/test/fixtures/F631.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::AssertTuple,
+                location: Location::new(2, 1),
+                filename: "./resources/test/fixtures/F631.py".to_string(),
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f634() -> Result<()> {
         let actual = check_path(
             Path::new("./resources/test/fixtures/F634.py"),

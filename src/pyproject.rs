@@ -241,6 +241,7 @@ other-attribute = 1
                     CheckCode::F401,
                     CheckCode::F403,
                     CheckCode::F541,
+                    CheckCode::F631,
                     CheckCode::F634,
                     CheckCode::F704,
                     CheckCode::F706,

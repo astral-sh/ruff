@@ -12,6 +12,7 @@ pub enum CheckCode {
     F401,
     F403,
     F541,
+    F631,
     F634,
     F704,
     F706,
@@ -33,6 +34,7 @@ impl FromStr for CheckCode {
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
             "F541" => Ok(CheckCode::F541),
+            "F631" => Ok(CheckCode::F631),
             "F634" => Ok(CheckCode::F634),
             "F704" => Ok(CheckCode::F704),
             "F706" => Ok(CheckCode::F706),
@@ -55,6 +57,7 @@ impl CheckCode {
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
             CheckCode::F541 => "F541",
+            CheckCode::F631 => "F631",
             CheckCode::F634 => "F634",
             CheckCode::F704 => "F704",
             CheckCode::F706 => "F706",
@@ -75,6 +78,7 @@ impl CheckCode {
             CheckCode::F401 => &LintSource::AST,
             CheckCode::F403 => &LintSource::AST,
             CheckCode::F541 => &LintSource::AST,
+            CheckCode::F631 => &LintSource::AST,
             CheckCode::F634 => &LintSource::AST,
             CheckCode::F704 => &LintSource::AST,
             CheckCode::F706 => &LintSource::AST,
@@ -99,6 +103,7 @@ pub enum LintSource {
 pub enum CheckKind {
     DuplicateArgumentName,
     FStringMissingPlaceholders,
+    AssertTuple,
     IfTuple,
     ImportStarUsage,
     LineTooLong,
@@ -119,6 +124,7 @@ impl CheckKind {
         match self {
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
+            CheckKind::AssertTuple => "AssertTuple",
             CheckKind::IfTuple => "IfTuple",
             CheckKind::ImportStarUsage => "ImportStarUsage",
             CheckKind::LineTooLong => "LineTooLong",
@@ -139,6 +145,7 @@ impl CheckKind {
         match self {
             CheckKind::DuplicateArgumentName => &CheckCode::F831,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
+            CheckKind::AssertTuple => &CheckCode::F631,
             CheckKind::IfTuple => &CheckCode::F634,
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LineTooLong => &CheckCode::E501,
@@ -162,6 +169,9 @@ impl CheckKind {
             }
             CheckKind::FStringMissingPlaceholders => {
                 "f-string without any placeholders".to_string()
+            }
+            CheckKind::AssertTuple => {
+                "Assert test is a non-empty tuple, which is always `True`".to_string()
             }
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
             CheckKind::ImportStarUsage => "Unable to detect undefined names".to_string(),

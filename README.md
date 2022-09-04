@@ -114,6 +114,7 @@ OPTIONS:
 | F401 | UnusedImport | `...` imported but unused |
 | F403 | ImportStarUsage | Unable to detect undefined names |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders |
+| F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |
 | F634 | IfTuple | If test is a tuple, which is always `True` |
 | F704 | YieldOutsideFunction | a `yield` or `yield from` statement outside of a function/method |
 | F706 | ReturnOutsideFunction | a `return` statement outside of a function/method |
