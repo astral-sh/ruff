@@ -87,6 +87,8 @@ fn run_once(
 fn report_once(messages: &[Message]) -> Result<()> {
     let (fixed, outstanding): (Vec<&Message>, Vec<&Message>) =
         messages.iter().partition(|message| message.fixed);
+
+    // TODO(charlie): If autofix is disabled, but some rules are fixable, tell the user.
     if fixed.is_empty() {
         println!("Found {} error(s).", messages.len());
     } else {

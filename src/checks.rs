@@ -246,6 +246,19 @@ static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").expect("Invalid regex"));
 
 impl Check {
+    pub fn new(kind: CheckKind, location: Location) -> Self {
+        Self {
+            kind,
+            location,
+            fix: None,
+            fixed: false,
+        }
+    }
+
+    pub fn amend(&mut self, fix: Fix) {
+        self.fix = Some(fix);
+    }
+
     pub fn is_inline_ignored(&self, line: &str) -> bool {
         match NO_QA_REGEX.captures(line) {
             Some(caps) => match caps.name("codes") {

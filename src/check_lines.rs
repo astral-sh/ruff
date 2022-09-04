@@ -35,12 +35,10 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
 
         // Enforce line length.
         if enforce_line_too_long && should_enforce_line_length(line, settings.line_length) {
-            let check = Check {
-                kind: CheckKind::LineTooLong,
-                location: Location::new(row + 1, settings.line_length + 1),
-                fix: None,
-                fixed: false,
-            };
+            let check = Check::new(
+                CheckKind::LineTooLong,
+                Location::new(row + 1, settings.line_length + 1),
+            );
             if !check.is_inline_ignored(line) {
                 line_checks.push(check);
             }

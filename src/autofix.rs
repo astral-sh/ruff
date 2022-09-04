@@ -6,6 +6,8 @@ use rustpython_parser::ast::Location;
 
 use crate::checks::Check;
 
+// TODO(charlie): This should take Vec<Fix>.
+// TODO(charlie): Add tests.
 pub fn apply_fixes(checks: &mut Vec<Check>, contents: &str, path: &Path) -> Result<()> {
     if checks.iter().all(|check| check.fix.is_none()) {
         return Ok(());
