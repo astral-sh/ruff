@@ -283,6 +283,18 @@ impl Visitor for Checker<'_> {
                 }
             }
             StmtKind::AugAssign { target, .. } => self.handle_node_load(target),
+            StmtKind::Assert { test, .. } => {
+                if self.settings.select.contains(CheckKind::AssertTuple.code()) {
+                    if let ExprKind::Tuple { elts, .. } = &test.node {
+                        if !elts.is_empty() {
+                            self.checks.push(Check {
+                                kind: CheckKind::AssertTuple,
+                                location: stmt.location,
+                            });
+                        }
+                    }
+                }
+            }
             _ => {}
         }
 
