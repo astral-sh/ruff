@@ -66,6 +66,30 @@ mod tests {
     use crate::{cache, settings};
 
     #[test]
+    fn e402() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/E402.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::E402]),
+            },
+            &cache::Mode::None,
+        )?;
+        let expected = vec![Message {
+            kind: CheckKind::ModuleImportNotAtTopOfFile,
+            location: Location::new(20, 1),
+            filename: "./resources/test/fixtures/E402.py".to_string(),
+        }];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn e501() -> Result<()> {
         let actual = check_path(
             Path::new("./resources/test/fixtures/E501.py"),

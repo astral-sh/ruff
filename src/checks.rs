@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub enum CheckCode {
+    E402,
     E501,
     F401,
     F403,
@@ -31,6 +32,7 @@ impl FromStr for CheckCode {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
+            "E402" => Ok(CheckCode::E402),
             "E501" => Ok(CheckCode::E501),
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
@@ -55,6 +57,7 @@ impl FromStr for CheckCode {
 impl CheckCode {
     pub fn as_str(&self) -> &str {
         match self {
+            CheckCode::E402 => "E402",
             CheckCode::E501 => "E501",
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
@@ -77,6 +80,7 @@ impl CheckCode {
     /// The source for the check (either the AST, or the physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
+            CheckCode::E402 => &LintSource::AST,
             CheckCode::E501 => &LintSource::Lines,
             CheckCode::F401 => &LintSource::AST,
             CheckCode::F403 => &LintSource::AST,
@@ -105,17 +109,18 @@ pub enum LintSource {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckKind {
+    AssertTuple,
+    DefaultExceptNotLast,
     DuplicateArgumentName,
     FStringMissingPlaceholders,
-    AssertTuple,
     IfTuple,
     ImportStarUsage,
     LineTooLong,
+    ModuleImportNotAtTopOfFile,
     RaiseNotImplemented,
     ReturnOutsideFunction,
-    DefaultExceptNotLast,
-    UndefinedLocal(String),
     UndefinedExport(String),
+    UndefinedLocal(String),
     UndefinedName(String),
     UnusedImport(String),
     UnusedVariable(String),
@@ -127,17 +132,18 @@ impl CheckKind {
     /// The name of the check.
     pub fn name(&self) -> &'static str {
         match self {
+            CheckKind::AssertTuple => "AssertTuple",
+            CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
-            CheckKind::AssertTuple => "AssertTuple",
             CheckKind::IfTuple => "IfTuple",
             CheckKind::ImportStarUsage => "ImportStarUsage",
             CheckKind::LineTooLong => "LineTooLong",
+            CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
             CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
-            CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
-            CheckKind::UndefinedLocal(_) => "UndefinedLocal",
             CheckKind::UndefinedExport(_) => "UndefinedExport",
+            CheckKind::UndefinedLocal(_) => "UndefinedLocal",
             CheckKind::UndefinedName(_) => "UndefinedName",
             CheckKind::UnusedImport(_) => "UnusedImport",
             CheckKind::UnusedVariable(_) => "UnusedVariable",
@@ -149,15 +155,16 @@ impl CheckKind {
     /// A four-letter shorthand code for the check.
     pub fn code(&self) -> &'static CheckCode {
         match self {
+            CheckKind::AssertTuple => &CheckCode::F631,
+            CheckKind::DefaultExceptNotLast => &CheckCode::F707,
             CheckKind::DuplicateArgumentName => &CheckCode::F831,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
-            CheckKind::AssertTuple => &CheckCode::F631,
             CheckKind::IfTuple => &CheckCode::F634,
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LineTooLong => &CheckCode::E501,
+            CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
-            CheckKind::DefaultExceptNotLast => &CheckCode::F707,
             CheckKind::UndefinedExport(_) => &CheckCode::F822,
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
@@ -171,26 +178,29 @@ impl CheckKind {
     /// The body text for the check.
     pub fn body(&self) -> String {
         match self {
+            CheckKind::AssertTuple => {
+                "Assert test is a non-empty tuple, which is always `True`".to_string()
+            }
+            CheckKind::DefaultExceptNotLast => {
+                "an `except:` block as not the last exception handler".to_string()
+            }
             CheckKind::DuplicateArgumentName => {
                 "Duplicate argument name in function definition".to_string()
             }
             CheckKind::FStringMissingPlaceholders => {
                 "f-string without any placeholders".to_string()
             }
-            CheckKind::AssertTuple => {
-                "Assert test is a non-empty tuple, which is always `True`".to_string()
-            }
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
             CheckKind::ImportStarUsage => "Unable to detect undefined names".to_string(),
             CheckKind::LineTooLong => "Line too long".to_string(),
+            CheckKind::ModuleImportNotAtTopOfFile => {
+                "Module level import not at top of file".to_string()
+            }
             CheckKind::RaiseNotImplemented => {
                 "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
             }
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
-            }
-            CheckKind::DefaultExceptNotLast => {
-                "an `except:` block as not the last exception handler".to_string()
             }
             CheckKind::UndefinedExport(name) => {
                 format!("Undefined name `{name}` in `__all__`")
