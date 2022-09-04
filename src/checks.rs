@@ -177,13 +177,13 @@ impl CheckKind {
             CheckKind::ImportStarUsage => "Unable to detect undefined names".to_string(),
             CheckKind::LineTooLong => "Line too long".to_string(),
             CheckKind::RaiseNotImplemented => {
-                "'raise NotImplemented' should be 'raise NotImplementedError".to_string()
+                "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
             }
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
             }
             CheckKind::UndefinedExport(name) => {
-                format!("Undefined name `{name}` in __all__")
+                format!("Undefined name `{name}` in `__all__`")
             }
             CheckKind::UndefinedName(name) => {
                 format!("Undefined name `{name}`")
@@ -196,7 +196,7 @@ impl CheckKind {
                 format!("Local variable `{name}` is assigned to but never used")
             }
             CheckKind::UselessObjectInheritance(name) => {
-                format!("Class {name} inherits from object")
+                format!("Class `{name}` inherits from object")
             }
             CheckKind::YieldOutsideFunction => {
                 "a `yield` or `yield from` statement outside of a function/method".to_string()

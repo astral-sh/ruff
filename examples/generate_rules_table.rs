@@ -3,6 +3,7 @@ use ruff::checks::CheckKind;
 
 fn main() {
     let mut check_kinds: Vec<CheckKind> = vec![
+        CheckKind::AssertTuple,
         CheckKind::DuplicateArgumentName,
         CheckKind::FStringMissingPlaceholders,
         CheckKind::IfTuple,
@@ -10,9 +11,9 @@ fn main() {
         CheckKind::LineTooLong,
         CheckKind::RaiseNotImplemented,
         CheckKind::ReturnOutsideFunction,
+        CheckKind::UndefinedExport("...".to_string()),
         CheckKind::UndefinedLocal("...".to_string()),
         CheckKind::UndefinedName("...".to_string()),
-        CheckKind::UndefinedExport("...".to_string()),
         CheckKind::UnusedImport("...".to_string()),
         CheckKind::UnusedVariable("...".to_string()),
         CheckKind::UselessObjectInheritance("...".to_string()),

@@ -119,12 +119,12 @@ OPTIONS:
 | F704 | YieldOutsideFunction | a `yield` or `yield from` statement outside of a function/method |
 | F706 | ReturnOutsideFunction | a `return` statement outside of a function/method |
 | F821 | UndefinedName | Undefined name `...` |
-| F822 | UndefinedExport | Undefined name `...` in __all__ |
+| F822 | UndefinedExport | Undefined name `...` in `__all__` |
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |
 | F831 | DuplicateArgumentName | Duplicate argument name in function definition |
 | F841 | UnusedVariable | Local variable `...` is assigned to but never used |
-| F901 | RaiseNotImplemented | 'raise NotImplemented' should be 'raise NotImplementedError |
-| R0205 | UselessObjectInheritance | Class ... inherits from object |
+| F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` |
+| R0205 | UselessObjectInheritance | Class `...` inherits from object |
 
 ## Development
 
