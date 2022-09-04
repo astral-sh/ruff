@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Sourcecode location.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Location {
     pub(super) row: u32,
     pub(super) column: u32,
@@ -57,5 +57,24 @@ impl Location {
     pub fn newline(&mut self) {
         self.row += 1;
         self.column = 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Location;
+
+    #[test]
+    fn test_gt() {
+        assert!(Location::new(1, 2) > Location::new(1, 1));
+        assert!(Location::new(2, 1) > Location::new(1, 1));
+        assert!(Location::new(2, 1) > Location::new(1, 2));
+    }
+
+    #[test]
+    fn test_lt() {
+        assert!(Location::new(1, 1) < Location::new(1, 2));
+        assert!(Location::new(1, 1) < Location::new(2, 1));
+        assert!(Location::new(1, 2) < Location::new(2, 1));
     }
 }
