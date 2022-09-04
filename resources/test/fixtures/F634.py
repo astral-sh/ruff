@@ -6,3 +6,5 @@ for _ in range(5):
         pass
     elif (3, 4):
         pass
+    elif ():
+        pass

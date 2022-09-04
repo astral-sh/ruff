@@ -241,11 +241,13 @@ impl Visitor for Checker<'_> {
             }
             StmtKind::If { test, .. } => {
                 if self.settings.select.contains(CheckKind::IfTuple.code()) {
-                    if let ExprKind::Tuple { .. } = test.node {
-                        self.checks.push(Check {
-                            kind: CheckKind::IfTuple,
-                            location: stmt.location,
-                        });
+                    if let ExprKind::Tuple { elts, .. } = &test.node {
+                        if elts.len() > 0 {
+                            self.checks.push(Check {
+                                kind: CheckKind::IfTuple,
+                                location: stmt.location,
+                            });
+                        }
                     }
                 }
             }
