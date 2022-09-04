@@ -4,6 +4,7 @@ use ruff::checks::CheckKind;
 fn main() {
     let mut check_kinds: Vec<CheckKind> = vec![
         CheckKind::AssertTuple,
+        CheckKind::DefaultExceptNotLast,
         CheckKind::DuplicateArgumentName,
         CheckKind::FStringMissingPlaceholders,
         CheckKind::IfTuple,

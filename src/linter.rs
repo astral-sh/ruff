@@ -321,6 +321,47 @@ mod tests {
     }
 
     #[test]
+    fn f707() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/F707.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F707]),
+            },
+            &cache::Mode::None,
+        )?;
+        let expected = vec![
+            Message {
+                kind: CheckKind::DefaultExceptNotLast,
+                location: Location::new(3, 1),
+                filename: "./resources/test/fixtures/F707.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::DefaultExceptNotLast,
+                location: Location::new(10, 1),
+                filename: "./resources/test/fixtures/F707.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::DefaultExceptNotLast,
+                location: Location::new(19, 1),
+                filename: "./resources/test/fixtures/F707.py".to_string(),
+            },
+            Message {
+                kind: CheckKind::DefaultExceptNotLast,
+                location: Location::new(28, 1),
+                filename: "./resources/test/fixtures/F707.py".to_string(),
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f821() -> Result<()> {
         let actual = check_path(
             Path::new("./resources/test/fixtures/F821.py"),

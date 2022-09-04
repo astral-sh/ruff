@@ -16,6 +16,7 @@ pub enum CheckCode {
     F634,
     F704,
     F706,
+    F707,
     F821,
     F822,
     F823,
@@ -38,6 +39,7 @@ impl FromStr for CheckCode {
             "F634" => Ok(CheckCode::F634),
             "F704" => Ok(CheckCode::F704),
             "F706" => Ok(CheckCode::F706),
+            "F707" => Ok(CheckCode::F707),
             "F821" => Ok(CheckCode::F821),
             "F822" => Ok(CheckCode::F822),
             "F823" => Ok(CheckCode::F823),
@@ -61,6 +63,7 @@ impl CheckCode {
             CheckCode::F634 => "F634",
             CheckCode::F704 => "F704",
             CheckCode::F706 => "F706",
+            CheckCode::F707 => "F707",
             CheckCode::F821 => "F821",
             CheckCode::F823 => "F823",
             CheckCode::F822 => "F822",
@@ -82,6 +85,7 @@ impl CheckCode {
             CheckCode::F634 => &LintSource::AST,
             CheckCode::F704 => &LintSource::AST,
             CheckCode::F706 => &LintSource::AST,
+            CheckCode::F707 => &LintSource::AST,
             CheckCode::F821 => &LintSource::AST,
             CheckCode::F822 => &LintSource::AST,
             CheckCode::F823 => &LintSource::AST,
@@ -109,6 +113,7 @@ pub enum CheckKind {
     LineTooLong,
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    DefaultExceptNotLast,
     UndefinedLocal(String),
     UndefinedExport(String),
     UndefinedName(String),
@@ -130,6 +135,7 @@ impl CheckKind {
             CheckKind::LineTooLong => "LineTooLong",
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
             CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
+            CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
             CheckKind::UndefinedLocal(_) => "UndefinedLocal",
             CheckKind::UndefinedExport(_) => "UndefinedExport",
             CheckKind::UndefinedName(_) => "UndefinedName",
@@ -151,6 +157,7 @@ impl CheckKind {
             CheckKind::LineTooLong => &CheckCode::E501,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::DefaultExceptNotLast => &CheckCode::F707,
             CheckKind::UndefinedExport(_) => &CheckCode::F822,
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
@@ -181,6 +188,9 @@ impl CheckKind {
             }
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
+            }
+            CheckKind::DefaultExceptNotLast => {
+                "an `except:` block as not the last exception handler".to_string()
             }
             CheckKind::UndefinedExport(name) => {
                 format!("Undefined name `{name}` in `__all__`")
