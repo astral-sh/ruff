@@ -242,7 +242,7 @@ impl Visitor for Checker<'_> {
             StmtKind::If { test, .. } => {
                 if self.settings.select.contains(CheckKind::IfTuple.code()) {
                     if let ExprKind::Tuple { elts, .. } = &test.node {
-                        if elts.len() > 0 {
+                        if !elts.is_empty() {
                             self.checks.push(Check {
                                 kind: CheckKind::IfTuple,
                                 location: stmt.location,
