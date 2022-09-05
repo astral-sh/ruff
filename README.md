@@ -122,6 +122,7 @@ lint rules that are obviated by Black (e.g., stylistic rules).
 | ---- | ----- | ------- |
 | E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |
 | E501 | LineTooLong | Line too long |
+| E902 | IOError | No such file or directory: `...` |
 | F401 | UnusedImport | `...` imported but unused |
 | F403 | ImportStarUsage | Unable to detect undefined names |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders |

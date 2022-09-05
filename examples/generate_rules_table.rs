@@ -8,6 +8,7 @@ fn main() {
         CheckKind::DuplicateArgumentName,
         CheckKind::FStringMissingPlaceholders,
         CheckKind::IfTuple,
+        CheckKind::IOError("...".to_string()),
         CheckKind::ImportStarUsage,
         CheckKind::LineTooLong,
         CheckKind::ModuleImportNotAtTopOfFile,

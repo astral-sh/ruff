@@ -18,6 +18,7 @@ use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::settings::Settings;
 use ::ruff::tell_user;
+use ruff::checks::CheckKind;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -62,7 +63,7 @@ fn run_once(
 ) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
-    let files: Vec<DirEntry> = files
+    let paths: Vec<DirEntry> = files
         .iter()
         .flat_map(|path| iter_python_files(path, &settings.exclude))
         .collect();
@@ -70,7 +71,7 @@ fn run_once(
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
-    let mut messages: Vec<Message> = files
+    let mut messages: Vec<Message> = paths
         .par_iter()
         .map(|entry| {
             lint_path(entry.path(), settings, &cache.into(), &autofix.into()).unwrap_or_else(|e| {
@@ -80,6 +81,20 @@ fn run_once(
         })
         .flatten()
         .collect();
+
+    if settings.select.contains(&CheckCode::E902) {
+        for file in files {
+            if !file.exists() {
+                messages.push(Message {
+                    kind: CheckKind::IOError(file.to_string_lossy().to_string()),
+                    fixed: false,
+                    location: Default::default(),
+                    filename: file.to_string_lossy().to_string(),
+                })
+            }
+        }
+    }
+
     messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked files in: {:?}", duration);
