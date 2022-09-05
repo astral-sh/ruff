@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub enum CheckCode {
     E402,
     E501,
+    E902,
     F401,
     F403,
     F541,
@@ -35,6 +36,7 @@ impl FromStr for CheckCode {
         match s {
             "E402" => Ok(CheckCode::E402),
             "E501" => Ok(CheckCode::E501),
+            "E902" => Ok(CheckCode::E902),
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
             "F541" => Ok(CheckCode::F541),
@@ -61,6 +63,7 @@ impl CheckCode {
         match self {
             CheckCode::E402 => "E402",
             CheckCode::E501 => "E501",
+            CheckCode::E902 => "E902",
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
             CheckCode::F541 => "F541",
@@ -85,6 +88,7 @@ impl CheckCode {
         match self {
             CheckCode::E402 => &LintSource::AST,
             CheckCode::E501 => &LintSource::Lines,
+            CheckCode::E902 => &LintSource::FileSystem,
             CheckCode::F401 => &LintSource::AST,
             CheckCode::F403 => &LintSource::AST,
             CheckCode::F541 => &LintSource::AST,
@@ -109,6 +113,7 @@ impl CheckCode {
 pub enum LintSource {
     AST,
     Lines,
+    FileSystem,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,6 +122,7 @@ pub enum CheckKind {
     DefaultExceptNotLast,
     DuplicateArgumentName,
     FStringMissingPlaceholders,
+    IOError(String),
     IfTuple,
     ImportStarUsage,
     LineTooLong,
@@ -141,6 +147,7 @@ impl CheckKind {
             CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
+            CheckKind::IOError(_) => "IOError",
             CheckKind::IfTuple => "IfTuple",
             CheckKind::ImportStarUsage => "ImportStarUsage",
             CheckKind::LineTooLong => "LineTooLong",
@@ -165,6 +172,7 @@ impl CheckKind {
             CheckKind::DefaultExceptNotLast => &CheckCode::F707,
             CheckKind::DuplicateArgumentName => &CheckCode::F831,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
+            CheckKind::IOError(_) => &CheckCode::E902,
             CheckKind::IfTuple => &CheckCode::F634,
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LineTooLong => &CheckCode::E501,
@@ -196,6 +204,9 @@ impl CheckKind {
             }
             CheckKind::FStringMissingPlaceholders => {
                 "f-string without any placeholders".to_string()
+            }
+            CheckKind::IOError(name) => {
+                format!("No such file or directory: `{name}`")
             }
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
             CheckKind::ImportStarUsage => "Unable to detect undefined names".to_string(),
@@ -242,6 +253,7 @@ impl CheckKind {
             CheckKind::DuplicateArgumentName => false,
             CheckKind::FStringMissingPlaceholders => false,
             CheckKind::IfTuple => false,
+            CheckKind::IOError(_) => false,
             CheckKind::ImportStarUsage => false,
             CheckKind::LineTooLong => false,
             CheckKind::ModuleImportNotAtTopOfFile => false,

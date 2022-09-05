@@ -239,6 +239,7 @@ other-attribute = 1
                 select: Some(BTreeSet::from([
                     CheckCode::E402,
                     CheckCode::E501,
+                    CheckCode::E902,
                     CheckCode::F401,
                     CheckCode::F403,
                     CheckCode::F541,
