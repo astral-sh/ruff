@@ -7,15 +7,19 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast_ops::{extract_all_names, Binding, BindingKind, Scope, ScopeKind};
+use crate::ast_ops::{
+    extract_all_names, Binding, BindingKind, Scope, ScopeKind, SourceCodeLocator,
+};
 use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
-use crate::visitor;
 use crate::visitor::{walk_excepthandler, Visitor};
+use crate::{autofix, fixer, visitor};
 
 struct Checker<'a> {
+    locator: SourceCodeLocator<'a>,
     settings: &'a Settings,
+    autofix: &'a autofix::Mode,
     path: &'a str,
     checks: Vec<Check>,
     scopes: Vec<Scope>,
@@ -28,10 +32,17 @@ struct Checker<'a> {
 }
 
 impl Checker<'_> {
-    pub fn new<'a>(settings: &'a Settings, path: &'a str) -> Checker<'a> {
+    pub fn new<'a>(
+        settings: &'a Settings,
+        autofix: &'a autofix::Mode,
+        path: &'a str,
+        content: &'a str,
+    ) -> Checker<'a> {
         Checker {
             settings,
+            autofix,
             path,
+            locator: SourceCodeLocator::new(content),
             checks: vec![],
             scopes: vec![],
             dead_scopes: vec![],
@@ -104,10 +115,10 @@ impl Visitor for Checker<'_> {
                     if let Some(scope) = self.scopes.last() {
                         match scope.kind {
                             ScopeKind::Class | ScopeKind::Module => {
-                                self.checks.push(Check {
-                                    kind: CheckKind::ReturnOutsideFunction,
-                                    location: stmt.location,
-                                });
+                                self.checks.push(Check::new(
+                                    CheckKind::ReturnOutsideFunction,
+                                    stmt.location,
+                                ));
                             }
                             _ => {}
                         }
@@ -132,12 +143,24 @@ impl Visitor for Checker<'_> {
                                         kind: BindingKind::Builtin,
                                         ..
                                     }) => {
-                                        self.checks.push(Check {
-                                            kind: CheckKind::UselessObjectInheritance(
-                                                name.to_string(),
-                                            ),
-                                            location: stmt.location,
-                                        });
+                                        let mut check = Check::new(
+                                            CheckKind::UselessObjectInheritance(name.to_string()),
+                                            expr.location,
+                                        );
+                                        if matches!(self.autofix, autofix::Mode::Generate)
+                                            || matches!(self.autofix, autofix::Mode::Apply)
+                                        {
+                                            if let Some(fix) = fixer::remove_class_def_base(
+                                                &mut self.locator,
+                                                &stmt.location,
+                                                expr.location,
+                                                bases,
+                                                keywords,
+                                            ) {
+                                                check.amend(fix);
+                                            }
+                                        }
+                                        self.checks.push(check);
                                     }
                                     _ => {}
                                 }
@@ -165,10 +188,10 @@ impl Visitor for Checker<'_> {
                     && self.seen_non_import
                     && stmt.location.column() == 1
                 {
-                    self.checks.push(Check {
-                        kind: CheckKind::ModuleImportNotAtTopOfFile,
-                        location: stmt.location,
-                    });
+                    self.checks.push(Check::new(
+                        CheckKind::ModuleImportNotAtTopOfFile,
+                        stmt.location,
+                    ));
                 }
 
                 for alias in names {
@@ -215,10 +238,10 @@ impl Visitor for Checker<'_> {
                     && self.seen_non_import
                     && stmt.location.column() == 1
                 {
-                    self.checks.push(Check {
-                        kind: CheckKind::ModuleImportNotAtTopOfFile,
-                        location: stmt.location,
-                    });
+                    self.checks.push(Check::new(
+                        CheckKind::ModuleImportNotAtTopOfFile,
+                        stmt.location,
+                    ));
                 }
 
                 for alias in names {
@@ -251,10 +274,8 @@ impl Visitor for Checker<'_> {
                             .select
                             .contains(CheckKind::ImportStarUsage.code())
                         {
-                            self.checks.push(Check {
-                                kind: CheckKind::ImportStarUsage,
-                                location: stmt.location,
-                            });
+                            self.checks
+                                .push(Check::new(CheckKind::ImportStarUsage, stmt.location));
                         }
                     } else {
                         let binding = Binding {
@@ -273,10 +294,8 @@ impl Visitor for Checker<'_> {
                 if self.settings.select.contains(CheckKind::IfTuple.code()) {
                     if let ExprKind::Tuple { elts, .. } = &test.node {
                         if !elts.is_empty() {
-                            self.checks.push(Check {
-                                kind: CheckKind::IfTuple,
-                                location: stmt.location,
-                            });
+                            self.checks
+                                .push(Check::new(CheckKind::IfTuple, stmt.location));
                         }
                     }
                 }
@@ -292,19 +311,19 @@ impl Visitor for Checker<'_> {
                             ExprKind::Call { func, .. } => {
                                 if let ExprKind::Name { id, .. } = &func.node {
                                     if id == "NotImplemented" {
-                                        self.checks.push(Check {
-                                            kind: CheckKind::RaiseNotImplemented,
-                                            location: stmt.location,
-                                        });
+                                        self.checks.push(Check::new(
+                                            CheckKind::RaiseNotImplemented,
+                                            stmt.location,
+                                        ));
                                     }
                                 }
                             }
                             ExprKind::Name { id, .. } => {
                                 if id == "NotImplemented" {
-                                    self.checks.push(Check {
-                                        kind: CheckKind::RaiseNotImplemented,
-                                        location: stmt.location,
-                                    });
+                                    self.checks.push(Check::new(
+                                        CheckKind::RaiseNotImplemented,
+                                        stmt.location,
+                                    ));
                                 }
                             }
                             _ => {}
@@ -321,10 +340,8 @@ impl Visitor for Checker<'_> {
                 if self.settings.select.contains(CheckKind::AssertTuple.code()) {
                     if let ExprKind::Tuple { elts, .. } = &test.node {
                         if !elts.is_empty() {
-                            self.checks.push(Check {
-                                kind: CheckKind::AssertTuple,
-                                location: stmt.location,
-                            });
+                            self.checks
+                                .push(Check::new(CheckKind::AssertTuple, stmt.location));
                         }
                     }
                 }
@@ -338,10 +355,10 @@ impl Visitor for Checker<'_> {
                     for (idx, handler) in handlers.iter().enumerate() {
                         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
                         if type_.is_none() && idx < handlers.len() - 1 {
-                            self.checks.push(Check {
-                                kind: CheckKind::DefaultExceptNotLast,
-                                location: handler.location,
-                            });
+                            self.checks.push(Check::new(
+                                CheckKind::DefaultExceptNotLast,
+                                handler.location,
+                            ));
                         }
                     }
                 }
@@ -385,10 +402,10 @@ impl Visitor for Checker<'_> {
                         && name != "__traceback_supplement__"
                         && matches!(binding.kind, BindingKind::Assignment)
                     {
-                        self.checks.push(Check {
-                            kind: CheckKind::UnusedVariable(name.to_string()),
-                            location: binding.location,
-                        });
+                        self.checks.push(Check::new(
+                            CheckKind::UnusedVariable(name.to_string()),
+                            binding.location,
+                        ));
                     }
                 }
 
@@ -439,10 +456,8 @@ impl Visitor for Checker<'_> {
                     && matches!(scope.kind, ScopeKind::Class)
                     || matches!(scope.kind, ScopeKind::Module)
                 {
-                    self.checks.push(Check {
-                        kind: CheckKind::YieldOutsideFunction,
-                        location: expr.location,
-                    });
+                    self.checks
+                        .push(Check::new(CheckKind::YieldOutsideFunction, expr.location));
                 }
             }
             ExprKind::JoinedStr { values } => {
@@ -455,10 +470,10 @@ impl Visitor for Checker<'_> {
                         .iter()
                         .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
                 {
-                    self.checks.push(Check {
-                        kind: CheckKind::FStringMissingPlaceholders,
-                        location: expr.location,
-                    });
+                    self.checks.push(Check::new(
+                        CheckKind::FStringMissingPlaceholders,
+                        expr.location,
+                    ));
                 }
                 self.in_f_string = true;
             }
@@ -525,10 +540,10 @@ impl Visitor for Checker<'_> {
                     if let Some(binding) = scope.values.remove(name) {
                         if self.settings.select.contains(&CheckCode::F841) && binding.used.is_none()
                         {
-                            self.checks.push(Check {
-                                kind: CheckKind::UnusedVariable(name.to_string()),
-                                location: excepthandler.location,
-                            });
+                            self.checks.push(Check::new(
+                                CheckKind::UnusedVariable(name.to_string()),
+                                excepthandler.location,
+                            ));
                         }
                     }
 
@@ -566,10 +581,8 @@ impl Visitor for Checker<'_> {
             for arg in all_arguments {
                 let ident = &arg.node.arg;
                 if idents.contains(ident.as_str()) {
-                    self.checks.push(Check {
-                        kind: CheckKind::DuplicateArgumentName,
-                        location: arg.location,
-                    });
+                    self.checks
+                        .push(Check::new(CheckKind::DuplicateArgumentName, arg.location));
                     break;
                 }
                 idents.insert(ident);
@@ -663,10 +676,10 @@ impl Checker<'_> {
             }
 
             if self.settings.select.contains(&CheckCode::F821) {
-                self.checks.push(Check {
-                    kind: CheckKind::UndefinedName(id.clone()),
-                    location: expr.location,
-                })
+                self.checks.push(Check::new(
+                    CheckKind::UndefinedName(id.clone()),
+                    expr.location,
+                ))
             }
         }
     }
@@ -690,10 +703,10 @@ impl Checker<'_> {
                             .unwrap_or_default();
                         if let Some(scope_id) = used {
                             if scope_id == current.id {
-                                self.checks.push(Check {
-                                    kind: CheckKind::UndefinedLocal(id.clone()),
-                                    location: expr.location,
-                                });
+                                self.checks.push(Check::new(
+                                    CheckKind::UndefinedLocal(id.clone()),
+                                    expr.location,
+                                ));
                             }
                         }
                     }
@@ -740,10 +753,10 @@ impl Checker<'_> {
             if current.values.remove(id).is_none()
                 && self.settings.select.contains(&CheckCode::F821)
             {
-                self.checks.push(Check {
-                    kind: CheckKind::UndefinedName(id.clone()),
-                    location: expr.location,
-                })
+                self.checks.push(Check::new(
+                    CheckKind::UndefinedName(id.clone()),
+                    expr.location,
+                ))
             }
         }
     }
@@ -777,10 +790,10 @@ impl Checker<'_> {
                     if let Some(names) = all_names {
                         for name in names {
                             if !scope.values.contains_key(name) {
-                                self.checks.push(Check {
-                                    kind: CheckKind::UndefinedExport(name.to_string()),
-                                    location: binding.location,
-                                });
+                                self.checks.push(Check::new(
+                                    CheckKind::UndefinedExport(name.to_string()),
+                                    binding.location,
+                                ));
                             }
                         }
                     }
@@ -798,10 +811,10 @@ impl Checker<'_> {
                         match &binding.kind {
                             BindingKind::Importation(full_name)
                             | BindingKind::SubmoduleImportation(full_name) => {
-                                self.checks.push(Check {
-                                    kind: CheckKind::UnusedImport(full_name.to_string()),
-                                    location: binding.location,
-                                });
+                                self.checks.push(Check::new(
+                                    CheckKind::UnusedImport(full_name.to_string()),
+                                    binding.location,
+                                ));
                             }
                             _ => {}
                         }
@@ -812,8 +825,14 @@ impl Checker<'_> {
     }
 }
 
-pub fn check_ast(python_ast: &Suite, settings: &Settings, path: &str) -> Vec<Check> {
-    let mut checker = Checker::new(settings, path);
+pub fn check_ast(
+    python_ast: &Suite,
+    content: &str,
+    settings: &Settings,
+    autofix: &autofix::Mode,
+    path: &str,
+) -> Vec<Check> {
+    let mut checker = Checker::new(settings, autofix, path, content);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 

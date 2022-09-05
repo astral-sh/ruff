@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
-use rustpython_parser::{lexer, parser};
+use rustpython_parser::lexer;
 
 use ruff::fs;
 

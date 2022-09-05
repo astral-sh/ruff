@@ -13,14 +13,17 @@ use walkdir::DirEntry;
 
 use ::ruff::checks::CheckCode;
 use ::ruff::fs::iter_python_files;
-use ::ruff::linter::check_path;
+use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::settings::Settings;
 use ::ruff::tell_user;
 
+const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
+const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Debug, Parser)]
-#[clap(name = "ruff")]
+#[clap(name = format!("{CARGO_PKG_NAME} (v{CARGO_PKG_VERSION})"))]
 #[clap(about = "An extremely fast Python linter.", long_about = None)]
 struct Cli {
     #[clap(parse(from_os_str), value_hint = ValueHint::AnyPath, required = true)]
@@ -37,6 +40,9 @@ struct Cli {
     /// Run in watch mode by re-running whenever files change.
     #[clap(short, long, action)]
     watch: bool,
+    /// Attempt to automatically fix lint errors.
+    #[clap(short, long, action)]
+    fix: bool,
     /// Disable cache reads.
     #[clap(short, long, action)]
     no_cache: bool,
@@ -48,7 +54,12 @@ struct Cli {
     ignore: Vec<CheckCode>,
 }
 
-fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<Message>> {
+fn run_once(
+    files: &[PathBuf],
+    settings: &Settings,
+    cache: bool,
+    autofix: bool,
+) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
     let files: Vec<DirEntry> = files
@@ -62,7 +73,7 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<M
     let mut messages: Vec<Message> = files
         .par_iter()
         .map(|entry| {
-            check_path(entry.path(), settings, &cache.into()).unwrap_or_else(|e| {
+            lint_path(entry.path(), settings, &cache.into(), &autofix.into()).unwrap_or_else(|e| {
                 error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
                 vec![]
             })
@@ -77,13 +88,32 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool) -> Result<Vec<M
 }
 
 fn report_once(messages: &[Message]) -> Result<()> {
-    println!("Found {} error(s).", messages.len());
+    let (fixed, outstanding): (Vec<&Message>, Vec<&Message>) =
+        messages.iter().partition(|message| message.fixed);
+    let num_fixable = outstanding
+        .iter()
+        .filter(|message| message.kind.fixable())
+        .count();
 
-    if !messages.is_empty() {
-        println!();
-        for message in messages {
+    if !outstanding.is_empty() {
+        for message in &outstanding {
             println!("{}", message);
         }
+        println!();
+    }
+
+    if !fixed.is_empty() {
+        println!(
+            "Found {} error(s) ({} fixed).",
+            outstanding.len(),
+            fixed.len()
+        );
+    } else {
+        println!("Found {} error(s).", outstanding.len());
+    }
+
+    if num_fixable > 0 {
+        println!("{num_fixable} potentially fixable with the --fix option.");
     }
 
     Ok(())
@@ -121,11 +151,15 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     if cli.watch {
+        if cli.fix {
+            println!("Warning: --fix is not enabled in watch mode.")
+        }
+
         // Perform an initial run instantly.
         clearscreen::clear()?;
         tell_user!("Starting linter in watch mode...\n");
 
-        let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
+        let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
         if !cli.quiet {
             report_continuously(&messages)?;
         }
@@ -145,7 +179,7 @@ fn inner_main() -> Result<ExitCode> {
                             clearscreen::clear()?;
                             tell_user!("File change detected...\n");
 
-                            let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
+                            let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
                             if !cli.quiet {
                                 report_continuously(&messages)?;
                             }
@@ -156,7 +190,7 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else {
-        let messages = run_once(&cli.files, &settings, !cli.no_cache)?;
+        let messages = run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?;
         if !cli.quiet {
             report_once(&messages)?;
         }
@@ -174,21 +208,20 @@ fn inner_main() -> Result<ExitCode> {
 fn check_for_updates() {
     use update_informer::{registry, Check};
 
-    let pkg_name = env!("CARGO_PKG_NAME");
-    let pkg_version = env!("CARGO_PKG_VERSION");
-    let informer = update_informer::new(registry::PyPI, pkg_name, pkg_version);
+    let informer = update_informer::new(registry::PyPI, CARGO_PKG_NAME, CARGO_PKG_VERSION);
 
     if let Some(new_version) = informer.check_version().ok().flatten() {
         let msg = format!(
             "A new version of {pkg_name} is available: v{pkg_version} -> {new_version}",
-            pkg_name = pkg_name.italic().cyan(),
+            pkg_name = CARGO_PKG_NAME.italic().cyan(),
+            pkg_version = CARGO_PKG_VERSION,
             new_version = new_version.to_string().green()
         );
 
         let cmd = format!(
             "Run to update: {cmd} {pkg_name}",
             cmd = "pip3 install --upgrade".green(),
-            pkg_name = pkg_name.green()
+            pkg_name = CARGO_PKG_NAME.green()
         );
 
         println!("\n{msg}\n{cmd}");

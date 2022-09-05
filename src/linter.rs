@@ -4,20 +4,15 @@ use anyhow::Result;
 use log::debug;
 use rustpython_parser::parser;
 
+use crate::autofix::fix_file;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
 use crate::checks::{Check, LintSource};
 use crate::message::Message;
 use crate::settings::Settings;
-use crate::{cache, fs};
+use crate::{autofix, cache, fs};
 
-pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Result<Vec<Message>> {
-    // Check the cache.
-    if let Some(messages) = cache::get(path, settings, mode) {
-        debug!("Cache hit for: {}", path.to_string_lossy());
-        return Ok(messages);
-    }
-
+fn check_path(path: &Path, settings: &Settings, autofix: &autofix::Mode) -> Result<Vec<Check>> {
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
@@ -32,22 +27,51 @@ pub fn check_path(path: &Path, settings: &Settings, mode: &cache::Mode) -> Resul
     {
         let path = path.to_string_lossy();
         let python_ast = parser::parse_program(&contents, &path)?;
-        checks.extend(check_ast(&python_ast, settings, &path));
+        checks.extend(check_ast(&python_ast, &contents, settings, autofix, &path));
     }
 
     // Run the lines-based checks.
     check_lines(&mut checks, &contents, settings);
+
+    Ok(checks)
+}
+
+pub fn lint_path(
+    path: &Path,
+    settings: &Settings,
+    mode: &cache::Mode,
+    autofix: &autofix::Mode,
+) -> Result<Vec<Message>> {
+    let metadata = path.metadata()?;
+
+    // Check the cache.
+    if let Some(messages) = cache::get(path, &metadata, settings, autofix, mode) {
+        debug!("Cache hit for: {}", path.to_string_lossy());
+        return Ok(messages);
+    }
+
+    // Read the file from disk.
+    let contents = fs::read_file(path)?;
+
+    // Generate checks.
+    let mut checks = check_path(path, settings, autofix)?;
+
+    // Apply autofix.
+    if matches!(autofix, autofix::Mode::Apply) {
+        fix_file(&mut checks, &contents, path)?;
+    };
 
     // Convert to messages.
     let messages: Vec<Message> = checks
         .into_iter()
         .map(|check| Message {
             kind: check.kind,
+            fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
             location: check.location,
             filename: path.to_string_lossy().to_string(),
         })
         .collect();
-    cache::set(path, settings, &messages, mode);
+    cache::set(path, &metadata, settings, autofix, &messages, mode);
 
     Ok(messages)
 }
@@ -60,10 +84,9 @@ mod tests {
     use anyhow::Result;
     use rustpython_parser::ast::Location;
 
-    use crate::checks::{CheckCode, CheckKind};
+    use crate::checks::{Check, CheckCode, CheckKind, Fix};
     use crate::linter::check_path;
-    use crate::message::Message;
-    use crate::{cache, settings};
+    use crate::{autofix, settings};
 
     #[test]
     fn e402() -> Result<()> {
@@ -74,12 +97,12 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::E402]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
-        let expected = vec![Message {
+        let expected = vec![Check {
             kind: CheckKind::ModuleImportNotAtTopOfFile,
             location: Location::new(20, 1),
-            filename: "./resources/test/fixtures/E402.py".to_string(),
+            fix: None,
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
@@ -98,12 +121,12 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::E501]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
-        let expected = vec![Message {
+        let expected = vec![Check {
             kind: CheckKind::LineTooLong,
             location: Location::new(5, 89),
-            filename: "./resources/test/fixtures/E501.py".to_string(),
+            fix: None,
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
@@ -122,23 +145,23 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F401]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::UnusedImport("logging.handlers".to_string()),
                 location: Location::new(12, 1),
-                filename: "./resources/test/fixtures/F401.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::UnusedImport("functools".to_string()),
                 location: Location::new(3, 1),
-                filename: "./resources/test/fixtures/F401.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::UnusedImport("collections.OrderedDict".to_string()),
                 location: Location::new(4, 1),
-                filename: "./resources/test/fixtures/F401.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -158,18 +181,18 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F403]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::ImportStarUsage,
                 location: Location::new(1, 1),
-                filename: "./resources/test/fixtures/F403.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::ImportStarUsage,
                 location: Location::new(2, 1),
-                filename: "./resources/test/fixtures/F403.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -188,23 +211,23 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F541]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(4, 7),
-                filename: "./resources/test/fixtures/F541.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(5, 7),
-                filename: "./resources/test/fixtures/F541.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::FStringMissingPlaceholders,
                 location: Location::new(7, 7),
-                filename: "./resources/test/fixtures/F541.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -224,18 +247,18 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F631]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::AssertTuple,
                 location: Location::new(1, 1),
-                filename: "./resources/test/fixtures/F631.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::AssertTuple,
                 location: Location::new(2, 1),
-                filename: "./resources/test/fixtures/F631.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -255,18 +278,18 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F634]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::IfTuple,
                 location: Location::new(1, 1),
-                filename: "./resources/test/fixtures/F634.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::IfTuple,
                 location: Location::new(7, 5),
-                filename: "./resources/test/fixtures/F634.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -286,23 +309,23 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F704]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::YieldOutsideFunction,
                 location: Location::new(6, 5),
-                filename: "./resources/test/fixtures/F704.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::YieldOutsideFunction,
                 location: Location::new(9, 1),
-                filename: "./resources/test/fixtures/F704.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::YieldOutsideFunction,
                 location: Location::new(10, 1),
-                filename: "./resources/test/fixtures/F704.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -322,18 +345,18 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F706]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::ReturnOutsideFunction,
                 location: Location::new(6, 5),
-                filename: "./resources/test/fixtures/F706.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::ReturnOutsideFunction,
                 location: Location::new(9, 1),
-                filename: "./resources/test/fixtures/F706.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -353,23 +376,23 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F707]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::DefaultExceptNotLast,
                 location: Location::new(3, 1),
-                filename: "./resources/test/fixtures/F707.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::DefaultExceptNotLast,
                 location: Location::new(10, 1),
-                filename: "./resources/test/fixtures/F707.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::DefaultExceptNotLast,
                 location: Location::new(19, 1),
-                filename: "./resources/test/fixtures/F707.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -389,28 +412,28 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F821]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::UndefinedName("self".to_string()),
                 location: Location::new(2, 12),
-                filename: "./resources/test/fixtures/F821.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::UndefinedName("self".to_string()),
                 location: Location::new(6, 13),
-                filename: "./resources/test/fixtures/F821.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::UndefinedName("self".to_string()),
                 location: Location::new(10, 9),
-                filename: "./resources/test/fixtures/F821.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::UndefinedName("numeric_string".to_string()),
                 location: Location::new(21, 12),
-                filename: "./resources/test/fixtures/F821.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -430,12 +453,12 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F822]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
-        let expected = vec![Message {
+        let expected = vec![Check {
             kind: CheckKind::UndefinedExport("b".to_string()),
             location: Location::new(3, 1),
-            filename: "./resources/test/fixtures/F822.py".to_string(),
+            fix: None,
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
@@ -454,12 +477,12 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F823]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
-        let expected = vec![Message {
+        let expected = vec![Check {
             kind: CheckKind::UndefinedLocal("my_var".to_string()),
             location: Location::new(6, 5),
-            filename: "./resources/test/fixtures/F823.py".to_string(),
+            fix: None,
         }];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
@@ -478,23 +501,23 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F831]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(1, 25),
-                filename: "./resources/test/fixtures/F831.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(5, 28),
-                filename: "./resources/test/fixtures/F831.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::DuplicateArgumentName,
                 location: Location::new(9, 27),
-                filename: "./resources/test/fixtures/F831.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -514,18 +537,18 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F841]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::UnusedVariable("e".to_string()),
                 location: Location::new(3, 1),
-                filename: "./resources/test/fixtures/F841.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::UnusedVariable("z".to_string()),
                 location: Location::new(16, 5),
-                filename: "./resources/test/fixtures/F841.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -545,18 +568,18 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F901]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
                 kind: CheckKind::RaiseNotImplemented,
                 location: Location::new(2, 5),
-                filename: "./resources/test/fixtures/F901.py".to_string(),
+                fix: None,
             },
-            Message {
+            Check {
                 kind: CheckKind::RaiseNotImplemented,
                 location: Location::new(6, 5),
-                filename: "./resources/test/fixtures/F901.py".to_string(),
+                fix: None,
             },
         ];
         assert_eq!(actual.len(), expected.len());
@@ -576,23 +599,208 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::R0205]),
             },
-            &cache::Mode::None,
+            &autofix::Mode::Generate,
         )?;
         let expected = vec![
-            Message {
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(5, 9),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(5, 8),
+                    end: Location::new(5, 16),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(10, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(9, 8),
+                    end: Location::new(11, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(16, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(15, 8),
+                    end: Location::new(18, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(24, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(22, 8),
+                    end: Location::new(25, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(31, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(29, 8),
+                    end: Location::new(32, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(37, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(36, 8),
+                    end: Location::new(39, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(45, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(43, 8),
+                    end: Location::new(47, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(53, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(51, 8),
+                    end: Location::new(55, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(61, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(59, 8),
+                    end: Location::new(63, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(69, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(67, 8),
+                    end: Location::new(71, 2),
+                    applied: false,
+                }),
+            },
+            Check {
                 kind: CheckKind::UselessObjectInheritance("B".to_string()),
-                location: Location::new(5, 1),
-                filename: "./resources/test/fixtures/R0205.py".to_string(),
+                location: Location::new(75, 12),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(75, 10),
+                    end: Location::new(75, 18),
+                    applied: false,
+                }),
             },
-            Message {
-                kind: CheckKind::UselessObjectInheritance("C".to_string()),
-                location: Location::new(9, 1),
-                filename: "./resources/test/fixtures/R0205.py".to_string(),
+            Check {
+                kind: CheckKind::UselessObjectInheritance("B".to_string()),
+                location: Location::new(79, 9),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(79, 9),
+                    end: Location::new(79, 17),
+                    applied: false,
+                }),
             },
-            Message {
-                kind: CheckKind::UselessObjectInheritance("D".to_string()),
-                location: Location::new(14, 5),
-                filename: "./resources/test/fixtures/R0205.py".to_string(),
+            Check {
+                kind: CheckKind::UselessObjectInheritance("B".to_string()),
+                location: Location::new(84, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(84, 5),
+                    end: Location::new(85, 5),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("B".to_string()),
+                location: Location::new(92, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(91, 6),
+                    end: Location::new(92, 11),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("B".to_string()),
+                location: Location::new(98, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(98, 5),
+                    end: Location::new(100, 5),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("B".to_string()),
+                location: Location::new(108, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(107, 6),
+                    end: Location::new(108, 11),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(114, 13),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(114, 12),
+                    end: Location::new(114, 20),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(119, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(118, 8),
+                    end: Location::new(120, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(125, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(124, 8),
+                    end: Location::new(126, 2),
+                    applied: false,
+                }),
+            },
+            Check {
+                kind: CheckKind::UselessObjectInheritance("A".to_string()),
+                location: Location::new(131, 5),
+                fix: Some(Fix {
+                    content: "".to_string(),
+                    start: Location::new(130, 8),
+                    end: Location::new(133, 2),
+                    applied: false,
+                }),
             },
         ];
         assert_eq!(actual.len(), expected.len());

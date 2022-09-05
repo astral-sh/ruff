@@ -223,12 +223,26 @@ impl CheckKind {
             }
         }
     }
+
+    /// Whether the check kind is (potentially) fixable.
+    pub fn fixable(&self) -> bool {
+        matches!(self, CheckKind::UselessObjectInheritance(_))
+    }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Fix {
+    pub content: String,
+    pub start: Location,
+    pub end: Location,
+    pub applied: bool,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Check {
     pub kind: CheckKind,
     pub location: Location,
+    pub fix: Option<Fix>,
 }
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -237,6 +251,18 @@ static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").expect("Invalid regex"));
 
 impl Check {
+    pub fn new(kind: CheckKind, location: Location) -> Self {
+        Self {
+            kind,
+            location,
+            fix: None,
+        }
+    }
+
+    pub fn amend(&mut self, fix: Fix) {
+        self.fix = Some(fix);
+    }
+
     pub fn is_inline_ignored(&self, line: &str) -> bool {
         match NO_QA_REGEX.captures(line) {
             Some(caps) => match caps.name("codes") {

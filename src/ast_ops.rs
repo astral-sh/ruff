@@ -115,3 +115,34 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
 
     names
 }
+
+/// Struct used to efficiently slice source code at (row, column) Locations.
+pub struct SourceCodeLocator<'a> {
+    content: &'a str,
+    offsets: Vec<usize>,
+    initialized: bool,
+}
+
+impl<'a> SourceCodeLocator<'a> {
+    pub fn new(content: &'a str) -> Self {
+        SourceCodeLocator {
+            content,
+            offsets: vec![],
+            initialized: false,
+        }
+    }
+
+    pub fn slice_source_code(&mut self, location: &Location) -> &'a str {
+        if !self.initialized {
+            let mut offset = 0;
+            for i in self.content.lines() {
+                self.offsets.push(offset);
+                offset += i.len();
+                offset += 1;
+            }
+            self.initialized = true;
+        }
+        let offset = self.offsets[location.row() - 1] + location.column() - 1;
+        &self.content[offset..]
+    }
+}
