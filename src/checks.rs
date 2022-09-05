@@ -223,6 +223,11 @@ impl CheckKind {
             }
         }
     }
+
+    /// Whether the check kind is (potentially) fixable.
+    pub fn fixable(&self) -> bool {
+        matches!(self, CheckKind::UselessObjectInheritance(_))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

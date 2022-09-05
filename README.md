@@ -17,8 +17,9 @@ An extremely fast Python linter, written in Rust.
 - 🐍 Installable via `pip`
 - 🤝 Python 3.10 compatibility
 - 🛠️ `pyproject.toml` support
-- 📦 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache semantics
-- 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` semantics
+- 📦 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache support
+- 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired `--fix` support
+- 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` support
 
 _ruff is a proof-of-concept and not yet intended for production use. It supports only a small subset
 of the Flake8 rules, and may crash on your codebase._
@@ -85,7 +86,7 @@ ruff path/to/code/ --select F401 F403
 See `ruff --help` for more:
 
 ```shell
-ruff
+ruff (v0.0.25)
 An extremely fast Python linter.
 
 USAGE:
@@ -96,6 +97,7 @@ ARGS:
 
 OPTIONS:
     -e, --exit-zero             Exit with status code "0", even upon detecting errors
+    -f, --fix                   Attempt to automatically fix lint errors
     -h, --help                  Print help information
         --ignore <IGNORE>...    Comma-separated list of error codes to ignore
     -n, --no-cache              Disable cache reads

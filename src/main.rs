@@ -13,14 +13,17 @@ use walkdir::DirEntry;
 
 use ::ruff::checks::CheckCode;
 use ::ruff::fs::iter_python_files;
-use ::ruff::linter::check_path;
+use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::settings::Settings;
 use ::ruff::tell_user;
 
+const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
+const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Debug, Parser)]
-#[clap(name = "ruff")]
+#[clap(name = format!("{CARGO_PKG_NAME} (v{CARGO_PKG_VERSION})"))]
 #[clap(about = "An extremely fast Python linter.", long_about = None)]
 struct Cli {
     #[clap(parse(from_os_str), value_hint = ValueHint::AnyPath, required = true)]
@@ -28,9 +31,6 @@ struct Cli {
     /// Enable verbose logging.
     #[clap(short, long, action)]
     verbose: bool,
-    /// Enable autofix.
-    #[clap(short, long, action)]
-    autofix: bool,
     /// Disable all logging (but still exit with status code "1" upon detecting errors).
     #[clap(short, long, action)]
     quiet: bool,
@@ -40,6 +40,9 @@ struct Cli {
     /// Run in watch mode by re-running whenever files change.
     #[clap(short, long, action)]
     watch: bool,
+    /// Attempt to automatically fix lint errors.
+    #[clap(short, long, action)]
+    fix: bool,
     /// Disable cache reads.
     #[clap(short, long, action)]
     no_cache: bool,
@@ -70,7 +73,7 @@ fn run_once(
     let mut messages: Vec<Message> = files
         .par_iter()
         .map(|entry| {
-            check_path(entry.path(), settings, &cache.into(), &autofix.into()).unwrap_or_else(|e| {
+            lint_path(entry.path(), settings, &cache.into(), &autofix.into()).unwrap_or_else(|e| {
                 error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
                 vec![]
             })
@@ -86,26 +89,31 @@ fn run_once(
 
 fn report_once(messages: &[Message]) -> Result<()> {
     let (fixed, outstanding): (Vec<&Message>, Vec<&Message>) =
-        messages.iter().partition(|message| {
-            message
-                .fix
-                .as_ref()
-                .map(|fix| fix.applied)
-                .unwrap_or_default()
-        });
-
-    // TODO(charlie): If autofix is disabled, but some rules are fixable, tell the user.
-    if fixed.is_empty() {
-        println!("Found {} error(s).", messages.len());
-    } else {
-        println!("Found {} error(s) (fixed {}).", messages.len(), fixed.len());
-    }
+        messages.iter().partition(|message| message.fixed);
+    let num_fixable = outstanding
+        .iter()
+        .filter(|message| message.kind.fixable())
+        .count();
 
     if !outstanding.is_empty() {
-        println!();
-        for message in outstanding {
+        for message in &outstanding {
             println!("{}", message);
         }
+        println!();
+    }
+
+    if !fixed.is_empty() {
+        println!(
+            "Found {} error(s) ({} fixed).",
+            outstanding.len(),
+            fixed.len()
+        );
+    } else {
+        println!("Found {} error(s).", outstanding.len());
+    }
+
+    if num_fixable > 0 {
+        println!("{num_fixable} potentially fixable with the --fix option.");
     }
 
     Ok(())
@@ -143,8 +151,8 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     if cli.watch {
-        if cli.autofix {
-            println!("Warning: autofix is not enabled in watch mode.")
+        if cli.fix {
+            println!("Warning: --fix is not enabled in watch mode.")
         }
 
         // Perform an initial run instantly.
@@ -182,7 +190,7 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else {
-        let messages = run_once(&cli.files, &settings, !cli.no_cache, cli.autofix)?;
+        let messages = run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?;
         if !cli.quiet {
             report_once(&messages)?;
         }
@@ -200,21 +208,20 @@ fn inner_main() -> Result<ExitCode> {
 fn check_for_updates() {
     use update_informer::{registry, Check};
 
-    let pkg_name = env!("CARGO_PKG_NAME");
-    let pkg_version = env!("CARGO_PKG_VERSION");
-    let informer = update_informer::new(registry::PyPI, pkg_name, pkg_version);
+    let informer = update_informer::new(registry::PyPI, CARGO_PKG_NAME, CARGO_PKG_VERSION);
 
     if let Some(new_version) = informer.check_version().ok().flatten() {
         let msg = format!(
             "A new version of {pkg_name} is available: v{pkg_version} -> {new_version}",
-            pkg_name = pkg_name.italic().cyan(),
+            pkg_name = CARGO_PKG_NAME.italic().cyan(),
+            pkg_version = CARGO_PKG_VERSION,
             new_version = new_version.to_string().green()
         );
 
         let cmd = format!(
             "Run to update: {cmd} {pkg_name}",
             cmd = "pip3 install --upgrade".green(),
-            pkg_name = pkg_name.green()
+            pkg_name = CARGO_PKG_NAME.green()
         );
 
         println!("\n{msg}\n{cmd}");

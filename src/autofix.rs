@@ -6,6 +6,7 @@ use rustpython_parser::ast::Location;
 
 use crate::checks::{Check, Fix};
 
+#[derive(Hash)]
 pub enum Mode {
     Generate,
     Apply,
@@ -22,11 +23,7 @@ impl From<bool> for Mode {
 }
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file(checks: &mut [Check], contents: &str, path: &Path, mode: &Mode) -> Result<()> {
-    if !matches!(mode, Mode::Apply) {
-        return Ok(());
-    };
-
+pub fn fix_file(checks: &mut [Check], contents: &str, path: &Path) -> Result<()> {
     if checks.iter().all(|check| check.fix.is_none()) {
         return Ok(());
     }

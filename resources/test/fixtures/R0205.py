@@ -2,34 +2,134 @@ class A:
     ...
 
 
-class B(object):
+class A(object):
     ...
 
 
-class C(B, object):
-    ...
-
-
-class D(
+class A(
     object,
-    B,
+):
+    ...
+
+
+class A(
+    object,
+    #
+):
+    ...
+
+
+class A(
+    #
+    object,
+):
+    ...
+
+
+class A(
+    #
+    object
+):
+    ...
+
+
+class A(
+    object
+    #
+):
+    ...
+
+
+class A(
+    #
+    object,
+    #
+):
+    ...
+
+
+class A(
+    #
+    object,
+    #
+):
+    ...
+
+
+class A(
+    #
+    object
+    #
+):
+    ...
+
+
+class A(
+    #
+    object
+    #
+):
+    ...
+
+
+class B(A, object):
+    ...
+
+
+class B(object, A):
+    ...
+
+
+class B(
+    object,
+    A,
+):
+    ...
+
+
+class B(
+    A,
+    object,
+):
+    ...
+
+
+class B(
+    object,
+    # Comment on A.
+    A,
+):
+    ...
+
+
+class B(
+    # Comment on A.
+    A,
+    object,
 ):
     ...
 
 
 def f():
-    class E(object):
+    class A(object):
         ...
 
 
-class F(
+class A(
     object,
 ):
     ...
 
 
-class G(
+class A(
     object,  # )
+):
+    ...
+
+
+class A(
+    object  # )
+    ,
 ):
     ...
 
@@ -37,5 +137,5 @@ class G(
 object = A
 
 
-class H(object):
+class B(object):
     ...

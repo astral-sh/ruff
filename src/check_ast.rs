@@ -7,7 +7,9 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast_ops::{extract_all_names, Binding, BindingKind, Scope, ScopeKind};
+use crate::ast_ops::{
+    extract_all_names, Binding, BindingKind, Scope, ScopeKind, SourceCodeLocator,
+};
 use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
@@ -15,7 +17,7 @@ use crate::visitor::{walk_excepthandler, Visitor};
 use crate::{autofix, fixer, visitor};
 
 struct Checker<'a> {
-    content: &'a str,
+    locator: SourceCodeLocator<'a>,
     settings: &'a Settings,
     autofix: &'a autofix::Mode,
     path: &'a str,
@@ -40,7 +42,7 @@ impl Checker<'_> {
             settings,
             autofix,
             path,
-            content,
+            locator: SourceCodeLocator::new(content),
             checks: vec![],
             scopes: vec![],
             dead_scopes: vec![],
@@ -149,7 +151,7 @@ impl Visitor for Checker<'_> {
                                             || matches!(self.autofix, autofix::Mode::Apply)
                                         {
                                             if let Some(fix) = fixer::remove_class_def_base(
-                                                self.content,
+                                                &mut self.locator,
                                                 &stmt.location,
                                                 expr.location,
                                                 bases,
@@ -186,10 +188,10 @@ impl Visitor for Checker<'_> {
                     && self.seen_non_import
                     && stmt.location.column() == 1
                 {
-                    self.checks.push(Check {
-                        kind: CheckKind::ModuleImportNotAtTopOfFile,
-                        location: stmt.location,
-                    });
+                    self.checks.push(Check::new(
+                        CheckKind::ModuleImportNotAtTopOfFile,
+                        stmt.location,
+                    ));
                 }
 
                 for alias in names {
@@ -236,10 +238,10 @@ impl Visitor for Checker<'_> {
                     && self.seen_non_import
                     && stmt.location.column() == 1
                 {
-                    self.checks.push(Check {
-                        kind: CheckKind::ModuleImportNotAtTopOfFile,
-                        location: stmt.location,
-                    });
+                    self.checks.push(Check::new(
+                        CheckKind::ModuleImportNotAtTopOfFile,
+                        stmt.location,
+                    ));
                 }
 
                 for alias in names {

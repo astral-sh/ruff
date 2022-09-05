@@ -1,7 +1,9 @@
 use std::collections::hash_map::DefaultHasher;
+use std::fs::Metadata;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
+use crate::autofix;
 use cacache::Error::EntryNotFound;
 use filetime::FileTime;
 use log::error;
@@ -69,9 +71,10 @@ fn cache_dir() -> &'static str {
     "./.ruff_cache"
 }
 
-fn cache_key(path: &Path, settings: &Settings) -> String {
+fn cache_key(path: &Path, settings: &Settings, autofix: &autofix::Mode) -> String {
     let mut hasher = DefaultHasher::new();
     settings.hash(&mut hasher);
+    autofix.hash(&mut hasher);
     format!(
         "{}@{}@{}",
         path.canonicalize().unwrap().to_string_lossy(),
@@ -80,22 +83,28 @@ fn cache_key(path: &Path, settings: &Settings) -> String {
     )
 }
 
-pub fn get(path: &Path, settings: &Settings, mode: &Mode) -> Option<Vec<Message>> {
+pub fn get(
+    path: &Path,
+    metadata: &Metadata,
+    settings: &Settings,
+    autofix: &autofix::Mode,
+    mode: &Mode,
+) -> Option<Vec<Message>> {
     if !mode.allow_read() {
         return None;
     };
 
-    match cacache::read_sync(cache_dir(), cache_key(path, settings)) {
-        Ok(encoded) => match path.metadata() {
-            Ok(m) => match bincode::deserialize::<CheckResult>(&encoded[..]) {
-                Ok(CheckResult { metadata, messages }) => {
-                    if FileTime::from_last_modification_time(&m).unix_seconds() == metadata.mtime {
-                        return Some(messages);
-                    }
+    match cacache::read_sync(cache_dir(), cache_key(path, settings, autofix)) {
+        Ok(encoded) => match bincode::deserialize::<CheckResult>(&encoded[..]) {
+            Ok(CheckResult {
+                metadata: CacheMetadata { mtime },
+                messages,
+            }) => {
+                if FileTime::from_last_modification_time(metadata).unix_seconds() == mtime {
+                    return Some(messages);
                 }
-                Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
-            },
-            Err(e) => error!("Failed to read metadata from path: {e:?}"),
+            }
+            Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
         },
         Err(EntryNotFound(_, _)) => {}
         Err(e) => error!("Failed to read from cache: {e:?}"),
@@ -103,24 +112,29 @@ pub fn get(path: &Path, settings: &Settings, mode: &Mode) -> Option<Vec<Message>
     None
 }
 
-pub fn set(path: &Path, settings: &Settings, messages: &[Message], mode: &Mode) {
+pub fn set(
+    path: &Path,
+    metadata: &Metadata,
+    settings: &Settings,
+    autofix: &autofix::Mode,
+    messages: &[Message],
+    mode: &Mode,
+) {
     if !mode.allow_write() {
         return;
     };
 
-    if let Ok(metadata) = path.metadata() {
-        let check_result = CheckResultRef {
-            metadata: &CacheMetadata {
-                mtime: FileTime::from_last_modification_time(&metadata).unix_seconds(),
-            },
-            messages,
-        };
-        if let Err(e) = cacache::write_sync(
-            cache_dir(),
-            cache_key(path, settings),
-            bincode::serialize(&check_result).unwrap(),
-        ) {
-            error!("Failed to write to cache: {e:?}")
-        }
+    let check_result = CheckResultRef {
+        metadata: &CacheMetadata {
+            mtime: FileTime::from_last_modification_time(metadata).unix_seconds(),
+        },
+        messages,
+    };
+    if let Err(e) = cacache::write_sync(
+        cache_dir(),
+        cache_key(path, settings, autofix),
+        bincode::serialize(&check_result).unwrap(),
+    ) {
+        error!("Failed to write to cache: {e:?}")
     }
 }
