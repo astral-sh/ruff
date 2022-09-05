@@ -108,6 +108,14 @@ OPTIONS:
     -w, --watch                 Run in watch mode by re-running whenever files change
 ```
 
+### Compatibility with Black
+
+ruff is intended to be compatible with [Black](https://github.com/psf/black), and should be
+compatible out-of-the-box as long as the `line-length` setting is consistent between the two.
+
+As a project, ruff is designed to be used alongside Black and, as such, will defer implementing
+lint rules that are obviated by Black (e.g., stylistic rules).
+
 ## Rules
 
 | Code | Name | Message |
