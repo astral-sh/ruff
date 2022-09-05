@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use rustpython_parser::ast::{
-    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Stmt,
-    StmtKind, Suite,
+    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
+    Location, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
 
@@ -11,7 +11,7 @@ use crate::ast_ops::{
     extract_all_names, Binding, BindingKind, Scope, ScopeKind, SourceCodeLocator,
 };
 use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind, Fix};
 use crate::settings::Settings;
 use crate::visitor::{walk_excepthandler, Visitor};
 use crate::{autofix, fixer, visitor};
@@ -132,7 +132,7 @@ impl Visitor for Checker<'_> {
                 decorator_list,
                 ..
             } => {
-                if self.settings.select.contains(&CheckCode::R0205) {
+                if self.settings.select.contains(&CheckCode::R001) {
                     for expr in bases {
                         if let ExprKind::Name { id, .. } = &expr.node {
                             if id == "object" {
@@ -159,6 +159,7 @@ impl Visitor for Checker<'_> {
                                             ) {
                                                 check.amend(fix);
                                             }
+                                        } else {
                                         }
                                         self.checks.push(check);
                                     }
@@ -442,6 +443,37 @@ impl Visitor for Checker<'_> {
                 ExprContext::Store => self.handle_node_store(expr, parent),
                 ExprContext::Del => self.handle_node_delete(expr),
             },
+            ExprKind::Call { func, .. } => {
+                if self.settings.select.contains(&CheckCode::R002) {
+                    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+                        if attr == "assertEquals" {
+                            if let ExprKind::Name { id, .. } = &value.node {
+                                if id == "self" {
+                                    let mut check =
+                                        Check::new(CheckKind::NoAssertEquals, expr.location);
+                                    if matches!(self.autofix, autofix::Mode::Generate)
+                                        || matches!(self.autofix, autofix::Mode::Apply)
+                                    {
+                                        check.amend(Fix {
+                                            content: "assertEqual".to_string(),
+                                            start: Location::new(
+                                                func.location.row(),
+                                                func.location.column() + 1,
+                                            ),
+                                            end: Location::new(
+                                                func.location.row(),
+                                                func.location.column() + 1 + "assertEquals".len(),
+                                            ),
+                                            applied: false,
+                                        });
+                                    }
+                                    self.checks.push(check);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             ExprKind::GeneratorExp { .. }
             | ExprKind::ListComp { .. }
             | ExprKind::DictComp { .. }

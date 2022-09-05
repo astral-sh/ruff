@@ -136,7 +136,8 @@ lint rules that are obviated by Black (e.g., stylistic rules).
 | F831 | DuplicateArgumentName | Duplicate argument name in function definition |
 | F841 | UnusedVariable | Local variable `...` is assigned to but never used |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` |
-| R0205 | UselessObjectInheritance | Class `...` inherits from object |
+| R001 | UselessObjectInheritance | Class `...` inherits from object |
+| R002 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |
 
 ## Development
 

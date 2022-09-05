@@ -253,7 +253,8 @@ other-attribute = 1
                     CheckCode::F831,
                     CheckCode::F841,
                     CheckCode::F901,
-                    CheckCode::R0205,
+                    CheckCode::R001,
+                    CheckCode::R002,
                 ])),
             }
         );

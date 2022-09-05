@@ -11,6 +11,7 @@ fn main() {
         CheckKind::ImportStarUsage,
         CheckKind::LineTooLong,
         CheckKind::ModuleImportNotAtTopOfFile,
+        CheckKind::NoAssertEquals,
         CheckKind::RaiseNotImplemented,
         CheckKind::ReturnOutsideFunction,
         CheckKind::UndefinedExport("...".to_string()),

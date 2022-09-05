@@ -24,7 +24,8 @@ pub enum CheckCode {
     F831,
     F841,
     F901,
-    R0205,
+    R001,
+    R002,
 }
 
 impl FromStr for CheckCode {
@@ -48,7 +49,8 @@ impl FromStr for CheckCode {
             "F831" => Ok(CheckCode::F831),
             "F841" => Ok(CheckCode::F841),
             "F901" => Ok(CheckCode::F901),
-            "R0205" => Ok(CheckCode::R0205),
+            "R001" => Ok(CheckCode::R001),
+            "R002" => Ok(CheckCode::R002),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
         }
     }
@@ -68,12 +70,13 @@ impl CheckCode {
             CheckCode::F706 => "F706",
             CheckCode::F707 => "F707",
             CheckCode::F821 => "F821",
-            CheckCode::F823 => "F823",
             CheckCode::F822 => "F822",
+            CheckCode::F823 => "F823",
             CheckCode::F831 => "F831",
             CheckCode::F841 => "F841",
             CheckCode::F901 => "F901",
-            CheckCode::R0205 => "R0205",
+            CheckCode::R001 => "R001",
+            CheckCode::R002 => "R002",
         }
     }
 
@@ -96,7 +99,8 @@ impl CheckCode {
             CheckCode::F831 => &LintSource::AST,
             CheckCode::F841 => &LintSource::AST,
             CheckCode::F901 => &LintSource::AST,
-            CheckCode::R0205 => &LintSource::AST,
+            CheckCode::R001 => &LintSource::AST,
+            CheckCode::R002 => &LintSource::AST,
         }
     }
 }
@@ -117,6 +121,7 @@ pub enum CheckKind {
     ImportStarUsage,
     LineTooLong,
     ModuleImportNotAtTopOfFile,
+    NoAssertEquals,
     RaiseNotImplemented,
     ReturnOutsideFunction,
     UndefinedExport(String),
@@ -140,6 +145,7 @@ impl CheckKind {
             CheckKind::ImportStarUsage => "ImportStarUsage",
             CheckKind::LineTooLong => "LineTooLong",
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
+            CheckKind::NoAssertEquals => "NoAssertEquals",
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
             CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
             CheckKind::UndefinedExport(_) => "UndefinedExport",
@@ -163,6 +169,7 @@ impl CheckKind {
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LineTooLong => &CheckCode::E501,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
+            CheckKind::NoAssertEquals => &CheckCode::R002,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
             CheckKind::UndefinedExport(_) => &CheckCode::F822,
@@ -170,7 +177,7 @@ impl CheckKind {
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(_) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
-            CheckKind::UselessObjectInheritance(_) => &CheckCode::R0205,
+            CheckKind::UselessObjectInheritance(_) => &CheckCode::R001,
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
         }
     }
@@ -195,6 +202,9 @@ impl CheckKind {
             CheckKind::LineTooLong => "Line too long".to_string(),
             CheckKind::ModuleImportNotAtTopOfFile => {
                 "Module level import not at top of file".to_string()
+            }
+            CheckKind::NoAssertEquals => {
+                "`assertEquals` is deprecated, use `assertEqual` instead".to_string()
             }
             CheckKind::RaiseNotImplemented => {
                 "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
@@ -226,7 +236,26 @@ impl CheckKind {
 
     /// Whether the check kind is (potentially) fixable.
     pub fn fixable(&self) -> bool {
-        matches!(self, CheckKind::UselessObjectInheritance(_))
+        match self {
+            CheckKind::AssertTuple => false,
+            CheckKind::DefaultExceptNotLast => false,
+            CheckKind::DuplicateArgumentName => false,
+            CheckKind::FStringMissingPlaceholders => false,
+            CheckKind::IfTuple => false,
+            CheckKind::ImportStarUsage => false,
+            CheckKind::LineTooLong => false,
+            CheckKind::ModuleImportNotAtTopOfFile => false,
+            CheckKind::NoAssertEquals => true,
+            CheckKind::RaiseNotImplemented => false,
+            CheckKind::ReturnOutsideFunction => false,
+            CheckKind::UndefinedExport(_) => false,
+            CheckKind::UndefinedLocal(_) => false,
+            CheckKind::UndefinedName(_) => false,
+            CheckKind::UnusedImport(_) => false,
+            CheckKind::UnusedVariable(_) => false,
+            CheckKind::UselessObjectInheritance(_) => true,
+            CheckKind::YieldOutsideFunction => false,
+        }
     }
 }
 
