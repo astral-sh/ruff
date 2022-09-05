@@ -1,5 +1,5 @@
 repos:
   - repo: https://github.com/charliermarsh/ruff
-    rev: v0.0.25
+    rev: v0.0.26
     hooks:
       - id: lint
