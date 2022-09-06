@@ -46,6 +46,10 @@ impl Settings {
                 BTreeSet::from([
                     CheckCode::E402,
                     CheckCode::E501,
+                    CheckCode::E711,
+                    CheckCode::E712,
+                    CheckCode::E713,
+                    CheckCode::E714,
                     CheckCode::E731,
                     CheckCode::E902,
                     CheckCode::F401,
@@ -53,11 +57,18 @@ impl Settings {
                     CheckCode::F541,
                     CheckCode::F631,
                     CheckCode::F634,
+                    CheckCode::F704,
                     CheckCode::F706,
                     CheckCode::F707,
+                    CheckCode::F821,
+                    CheckCode::F822,
                     CheckCode::F823,
                     CheckCode::F831,
+                    CheckCode::F841,
                     CheckCode::F901,
+                    // Disable refactoring codes by default.
+                    // CheckCode::R001,
+                    // CheckCode::R002,
                 ])
             }),
         })

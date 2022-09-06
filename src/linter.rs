@@ -210,6 +210,54 @@ mod tests {
     }
 
     #[test]
+    fn e713() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/E713.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::E713]),
+            },
+            &autofix::Mode::Generate,
+        )?;
+        let expected = vec![Check {
+            kind: CheckKind::NotInTest,
+            location: Location::new(2, 12),
+            fix: None,
+        }];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn e714() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/E714.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::E714]),
+            },
+            &autofix::Mode::Generate,
+        )?;
+        let expected = vec![Check {
+            kind: CheckKind::NotIsTest,
+            location: Location::new(1, 13),
+            fix: None,
+        }];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn e731() -> Result<()> {
         let actual = check_path(
             Path::new("./resources/test/fixtures/E731.py"),

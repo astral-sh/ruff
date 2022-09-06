@@ -124,6 +124,8 @@ lint rules that are obviated by Black (e.g., stylistic rules).
 | E501 | LineTooLong | Line too long |
 | E711 | NoneComparison | Comparison to `None` should be `cond is None` |
 | E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |
+| E713 | NotInTest | Test for membership should be `not in` |
+| E714 | NotIsTest | Test for object identity should be `is not` |
 | E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |
 | E902 | IOError | No such file or directory: `...` |
 | F401 | UnusedImport | `...` imported but unused |

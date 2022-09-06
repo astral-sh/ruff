@@ -241,6 +241,8 @@ other-attribute = 1
                     CheckCode::E501,
                     CheckCode::E711,
                     CheckCode::E712,
+                    CheckCode::E713,
+                    CheckCode::E714,
                     CheckCode::E731,
                     CheckCode::E902,
                     CheckCode::F401,
