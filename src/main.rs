@@ -12,13 +12,13 @@ use rayon::prelude::*;
 use walkdir::DirEntry;
 
 use ::ruff::checks::CheckCode;
+use ::ruff::checks::CheckKind;
 use ::ruff::fs::iter_python_files;
 use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::settings::Settings;
 use ::ruff::tell_user;
-use ruff::checks::CheckKind;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -53,6 +53,30 @@ struct Cli {
     /// Comma-separated list of error codes to ignore.
     #[clap(long, multiple = true)]
     ignore: Vec<CheckCode>,
+}
+
+#[cfg(feature = "update-informer")]
+fn check_for_updates() {
+    use update_informer::{registry, Check};
+
+    let informer = update_informer::new(registry::PyPI, CARGO_PKG_NAME, CARGO_PKG_VERSION);
+
+    if let Some(new_version) = informer.check_version().ok().flatten() {
+        let msg = format!(
+            "A new version of {pkg_name} is available: v{pkg_version} -> {new_version}",
+            pkg_name = CARGO_PKG_NAME.italic().cyan(),
+            pkg_version = CARGO_PKG_VERSION,
+            new_version = new_version.to_string().green()
+        );
+
+        let cmd = format!(
+            "Run to update: {cmd} {pkg_name}",
+            cmd = "pip3 install --upgrade".green(),
+            pkg_name = CARGO_PKG_NAME.green()
+        );
+
+        println!("\n{msg}\n{cmd}");
+    }
 }
 
 fn run_once(
@@ -210,6 +234,7 @@ fn inner_main() -> Result<ExitCode> {
             report_once(&messages)?;
         }
 
+        #[cfg(feature = "update-informer")]
         check_for_updates();
 
         if !messages.is_empty() && !cli.exit_zero {
@@ -218,29 +243,6 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     Ok(ExitCode::SUCCESS)
-}
-
-fn check_for_updates() {
-    use update_informer::{registry, Check};
-
-    let informer = update_informer::new(registry::PyPI, CARGO_PKG_NAME, CARGO_PKG_VERSION);
-
-    if let Some(new_version) = informer.check_version().ok().flatten() {
-        let msg = format!(
-            "A new version of {pkg_name} is available: v{pkg_version} -> {new_version}",
-            pkg_name = CARGO_PKG_NAME.italic().cyan(),
-            pkg_version = CARGO_PKG_VERSION,
-            new_version = new_version.to_string().green()
-        );
-
-        let cmd = format!(
-            "Run to update: {cmd} {pkg_name}",
-            cmd = "pip3 install --upgrade".green(),
-            pkg_name = CARGO_PKG_NAME.green()
-        );
-
-        println!("\n{msg}\n{cmd}");
-    }
 }
 
 fn main() -> ExitCode {
