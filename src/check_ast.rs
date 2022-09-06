@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use itertools::izip;
 use rustpython_parser::ast::{
-    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
+    Arg, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     Location, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
@@ -11,7 +12,7 @@ use crate::ast_ops::{
     extract_all_names, Binding, BindingKind, Scope, ScopeKind, SourceCodeLocator,
 };
 use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
-use crate::checks::{Check, CheckCode, CheckKind, Fix};
+use crate::checks::{Check, CheckCode, CheckKind, Fix, RejectedCmpop};
 use crate::settings::Settings;
 use crate::visitor::{walk_excepthandler, Visitor};
 use crate::{autofix, fixer, visitor};
@@ -521,6 +522,106 @@ impl Visitor for Checker<'_> {
                     ));
                 }
                 self.in_f_string = true;
+            }
+            ExprKind::Compare {
+                left,
+                ops,
+                comparators,
+            } => {
+                let op = ops.first().unwrap();
+                let comparator = left;
+
+                // Check `left`.
+                if self.settings.select.contains(&CheckCode::E711)
+                    && matches!(
+                        comparator.node,
+                        ExprKind::Constant {
+                            value: Constant::None,
+                            kind: None
+                        }
+                    )
+                {
+                    if matches!(op, Cmpop::Eq) {
+                        self.checks.push(Check::new(
+                            CheckKind::NoneComparison(RejectedCmpop::Eq),
+                            comparator.location,
+                        ));
+                    }
+                    if matches!(op, Cmpop::NotEq) {
+                        self.checks.push(Check::new(
+                            CheckKind::NoneComparison(RejectedCmpop::NotEq),
+                            comparator.location,
+                        ));
+                    }
+                }
+
+                if self.settings.select.contains(&CheckCode::E712) {
+                    if let ExprKind::Constant {
+                        value: Constant::Bool(value),
+                        kind: None,
+                    } = comparator.node
+                    {
+                        if matches!(op, Cmpop::Eq) {
+                            self.checks.push(Check::new(
+                                CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
+                                comparator.location,
+                            ));
+                        }
+                        if matches!(op, Cmpop::NotEq) {
+                            self.checks.push(Check::new(
+                                CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
+                                comparator.location,
+                            ));
+                        }
+                    }
+                }
+
+                // Check each comparator in order.
+                for (op, comparator) in izip!(ops, comparators) {
+                    if self.settings.select.contains(&CheckCode::E711)
+                        && matches!(
+                            comparator.node,
+                            ExprKind::Constant {
+                                value: Constant::None,
+                                kind: None
+                            }
+                        )
+                    {
+                        if matches!(op, Cmpop::Eq) {
+                            self.checks.push(Check::new(
+                                CheckKind::NoneComparison(RejectedCmpop::Eq),
+                                comparator.location,
+                            ));
+                        }
+                        if matches!(op, Cmpop::NotEq) {
+                            self.checks.push(Check::new(
+                                CheckKind::NoneComparison(RejectedCmpop::NotEq),
+                                comparator.location,
+                            ));
+                        }
+                    }
+
+                    if self.settings.select.contains(&CheckCode::E712) {
+                        if let ExprKind::Constant {
+                            value: Constant::Bool(value),
+                            kind: None,
+                        } = comparator.node
+                        {
+                            if matches!(op, Cmpop::Eq) {
+                                self.checks.push(Check::new(
+                                    CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
+                                    comparator.location,
+                                ));
+                            }
+                            if matches!(op, Cmpop::NotEq) {
+                                self.checks.push(Check::new(
+                                    CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
+                                    comparator.location,
+                                ));
+                            }
+                        }
+                    }
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),

@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 pub enum CheckCode {
     E402,
     E501,
+    E711,
+    E712,
     E731,
     E902,
     F401,
@@ -37,6 +39,8 @@ impl FromStr for CheckCode {
         match s {
             "E402" => Ok(CheckCode::E402),
             "E501" => Ok(CheckCode::E501),
+            "E711" => Ok(CheckCode::E711),
+            "E712" => Ok(CheckCode::E712),
             "E731" => Ok(CheckCode::E731),
             "E902" => Ok(CheckCode::E902),
             "F401" => Ok(CheckCode::F401),
@@ -65,6 +69,8 @@ impl CheckCode {
         match self {
             CheckCode::E402 => "E402",
             CheckCode::E501 => "E501",
+            CheckCode::E711 => "E711",
+            CheckCode::E712 => "E712",
             CheckCode::E731 => "E731",
             CheckCode::E902 => "E902",
             CheckCode::F401 => "F401",
@@ -91,6 +97,8 @@ impl CheckCode {
         match self {
             CheckCode::E402 => &LintSource::AST,
             CheckCode::E501 => &LintSource::Lines,
+            CheckCode::E711 => &LintSource::AST,
+            CheckCode::E712 => &LintSource::AST,
             CheckCode::E731 => &LintSource::AST,
             CheckCode::E902 => &LintSource::FileSystem,
             CheckCode::F401 => &LintSource::AST,
@@ -121,6 +129,12 @@ pub enum LintSource {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RejectedCmpop {
+    Eq,
+    NotEq,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckKind {
     AssertTuple,
     DefaultExceptNotLast,
@@ -133,8 +147,10 @@ pub enum CheckKind {
     DoNotAssignLambda,
     ModuleImportNotAtTopOfFile,
     NoAssertEquals,
+    NoneComparison(RejectedCmpop),
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    TrueFalseComparison(bool, RejectedCmpop),
     UndefinedExport(String),
     UndefinedLocal(String),
     UndefinedName(String),
@@ -159,8 +175,10 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
             CheckKind::NoAssertEquals => "NoAssertEquals",
+            CheckKind::NoneComparison(_) => "NoneComparison",
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
             CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
+            CheckKind::TrueFalseComparison(_, _) => "TrueFalseComparison",
             CheckKind::UndefinedExport(_) => "UndefinedExport",
             CheckKind::UndefinedLocal(_) => "UndefinedLocal",
             CheckKind::UndefinedName(_) => "UndefinedName",
@@ -185,8 +203,10 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => &CheckCode::E731,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
             CheckKind::NoAssertEquals => &CheckCode::R002,
+            CheckKind::NoneComparison(_) => &CheckCode::E711,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::TrueFalseComparison(_, _) => &CheckCode::E712,
             CheckKind::UndefinedExport(_) => &CheckCode::F822,
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
@@ -227,12 +247,36 @@ impl CheckKind {
             CheckKind::NoAssertEquals => {
                 "`assertEquals` is deprecated, use `assertEqual` instead".to_string()
             }
+            CheckKind::NoneComparison(op) => match op {
+                RejectedCmpop::Eq => "Comparison to `None` should be `cond is None`".to_string(),
+                RejectedCmpop::NotEq => {
+                    "Comparison to `None` should be `cond is not None`".to_string()
+                }
+            },
             CheckKind::RaiseNotImplemented => {
                 "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
             }
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
             }
+            CheckKind::TrueFalseComparison(value, op) => match *value {
+                true => match op {
+                    RejectedCmpop::Eq => {
+                        "Comparison to `True` should be `cond is True`".to_string()
+                    }
+                    RejectedCmpop::NotEq => {
+                        "Comparison to `True` should be `cond is not True`".to_string()
+                    }
+                },
+                false => match op {
+                    RejectedCmpop::Eq => {
+                        "Comparison to `False` should be `cond is False`".to_string()
+                    }
+                    RejectedCmpop::NotEq => {
+                        "Comparison to `False` should be `cond is not False`".to_string()
+                    }
+                },
+            },
             CheckKind::UndefinedExport(name) => {
                 format!("Undefined name `{name}` in `__all__`")
             }
@@ -262,15 +306,17 @@ impl CheckKind {
             CheckKind::DefaultExceptNotLast => false,
             CheckKind::DuplicateArgumentName => false,
             CheckKind::FStringMissingPlaceholders => false,
-            CheckKind::IfTuple => false,
             CheckKind::IOError(_) => false,
+            CheckKind::IfTuple => false,
             CheckKind::ImportStarUsage => false,
             CheckKind::DoNotAssignLambda => false,
             CheckKind::LineTooLong => false,
             CheckKind::ModuleImportNotAtTopOfFile => false,
             CheckKind::NoAssertEquals => true,
+            CheckKind::NoneComparison(_) => false,
             CheckKind::RaiseNotImplemented => false,
             CheckKind::ReturnOutsideFunction => false,
+            CheckKind::TrueFalseComparison(_, _) => false,
             CheckKind::UndefinedExport(_) => false,
             CheckKind::UndefinedLocal(_) => false,
             CheckKind::UndefinedName(_) => false,

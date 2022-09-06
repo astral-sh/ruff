@@ -1758,6 +1758,7 @@ dependencies = [
  "fern",
  "filetime",
  "glob",
+ "itertools",
  "log",
  "notify",
  "once_cell",

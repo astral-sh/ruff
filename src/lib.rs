@@ -1,3 +1,5 @@
+extern crate core;
+
 mod ast_ops;
 mod autofix;
 mod builtins;

@@ -84,7 +84,7 @@ mod tests {
     use anyhow::Result;
     use rustpython_parser::ast::Location;
 
-    use crate::checks::{Check, CheckCode, CheckKind, Fix};
+    use crate::checks::{Check, CheckCode, CheckKind, Fix, RejectedCmpop};
     use crate::linter::check_path;
     use crate::{autofix, settings};
 
@@ -137,6 +137,79 @@ mod tests {
     }
 
     #[test]
+    fn e711() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/E711.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::E711]),
+            },
+            &autofix::Mode::Generate,
+        )?;
+        let expected = vec![
+            Check {
+                kind: CheckKind::NoneComparison(RejectedCmpop::Eq),
+                location: Location::new(1, 11),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::NoneComparison(RejectedCmpop::NotEq),
+                location: Location::new(4, 4),
+                fix: None,
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn e712() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/E712.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::E712]),
+            },
+            &autofix::Mode::Generate,
+        )?;
+        let expected = vec![
+            Check {
+                kind: CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq),
+                location: Location::new(1, 11),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TrueFalseComparison(false, RejectedCmpop::NotEq),
+                location: Location::new(4, 4),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TrueFalseComparison(false, RejectedCmpop::NotEq),
+                location: Location::new(7, 11),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TrueFalseComparison(true, RejectedCmpop::NotEq),
+                location: Location::new(7, 20),
+                fix: None,
+            },
+        ];
+
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn e731() -> Result<()> {
         let actual = check_path(
             Path::new("./resources/test/fixtures/E731.py"),
@@ -152,6 +225,7 @@ mod tests {
             location: Location::new(1, 1),
             fix: None,
         }];
+
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
             assert_eq!(actual[i], expected[i]);
