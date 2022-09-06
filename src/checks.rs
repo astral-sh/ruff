@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub enum CheckCode {
     E402,
     E501,
+    E731,
     E902,
     F401,
     F403,
@@ -36,6 +37,7 @@ impl FromStr for CheckCode {
         match s {
             "E402" => Ok(CheckCode::E402),
             "E501" => Ok(CheckCode::E501),
+            "E731" => Ok(CheckCode::E731),
             "E902" => Ok(CheckCode::E902),
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
@@ -63,6 +65,7 @@ impl CheckCode {
         match self {
             CheckCode::E402 => "E402",
             CheckCode::E501 => "E501",
+            CheckCode::E731 => "E731",
             CheckCode::E902 => "E902",
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
@@ -88,6 +91,7 @@ impl CheckCode {
         match self {
             CheckCode::E402 => &LintSource::AST,
             CheckCode::E501 => &LintSource::Lines,
+            CheckCode::E731 => &LintSource::AST,
             CheckCode::E902 => &LintSource::FileSystem,
             CheckCode::F401 => &LintSource::AST,
             CheckCode::F403 => &LintSource::AST,
@@ -126,6 +130,7 @@ pub enum CheckKind {
     IfTuple,
     ImportStarUsage,
     LineTooLong,
+    DoNotAssignLambda,
     ModuleImportNotAtTopOfFile,
     NoAssertEquals,
     RaiseNotImplemented,
@@ -151,6 +156,7 @@ impl CheckKind {
             CheckKind::IfTuple => "IfTuple",
             CheckKind::ImportStarUsage => "ImportStarUsage",
             CheckKind::LineTooLong => "LineTooLong",
+            CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
             CheckKind::NoAssertEquals => "NoAssertEquals",
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
@@ -176,6 +182,7 @@ impl CheckKind {
             CheckKind::IfTuple => &CheckCode::F634,
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LineTooLong => &CheckCode::E501,
+            CheckKind::DoNotAssignLambda => &CheckCode::E731,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
             CheckKind::NoAssertEquals => &CheckCode::R002,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
@@ -211,6 +218,9 @@ impl CheckKind {
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
             CheckKind::ImportStarUsage => "Unable to detect undefined names".to_string(),
             CheckKind::LineTooLong => "Line too long".to_string(),
+            CheckKind::DoNotAssignLambda => {
+                "Do not assign a lambda expression, use a def".to_string()
+            }
             CheckKind::ModuleImportNotAtTopOfFile => {
                 "Module level import not at top of file".to_string()
             }
@@ -255,6 +265,7 @@ impl CheckKind {
             CheckKind::IfTuple => false,
             CheckKind::IOError(_) => false,
             CheckKind::ImportStarUsage => false,
+            CheckKind::DoNotAssignLambda => false,
             CheckKind::LineTooLong => false,
             CheckKind::ModuleImportNotAtTopOfFile => false,
             CheckKind::NoAssertEquals => true,
