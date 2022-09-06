@@ -1,21 +1,23 @@
 /// Generate a Markdown-compatible table of supported lint rules.
-use ruff::checks::CheckKind;
+use ruff::checks::{CheckKind, RejectedCmpop};
 
 fn main() {
     let mut check_kinds: Vec<CheckKind> = vec![
         CheckKind::AssertTuple,
         CheckKind::DefaultExceptNotLast,
+        CheckKind::DoNotAssignLambda,
         CheckKind::DuplicateArgumentName,
         CheckKind::FStringMissingPlaceholders,
-        CheckKind::IfTuple,
         CheckKind::IOError("...".to_string()),
+        CheckKind::IfTuple,
         CheckKind::ImportStarUsage,
         CheckKind::LineTooLong,
-        CheckKind::DoNotAssignLambda,
         CheckKind::ModuleImportNotAtTopOfFile,
         CheckKind::NoAssertEquals,
+        CheckKind::NoneComparison(RejectedCmpop::Eq),
         CheckKind::RaiseNotImplemented,
         CheckKind::ReturnOutsideFunction,
+        CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq),
         CheckKind::UndefinedExport("...".to_string()),
         CheckKind::UndefinedLocal("...".to_string()),
         CheckKind::UndefinedName("...".to_string()),
