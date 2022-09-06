@@ -4,7 +4,7 @@ use std::path::Path;
 use itertools::izip;
 use rustpython_parser::ast::{
     Arg, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
-    Location, Stmt, StmtKind, Suite,
+    Location, Stmt, StmtKind, Suite, Unaryop,
 };
 use rustpython_parser::parser;
 
@@ -522,6 +522,27 @@ impl Visitor for Checker<'_> {
                     ));
                 }
                 self.in_f_string = true;
+            }
+            ExprKind::UnaryOp { op, operand } => {
+                if matches!(op, Unaryop::Not) {
+                    if let ExprKind::Compare { ops, .. } = &operand.node {
+                        match ops[..] {
+                            [Cmpop::In] => {
+                                if self.settings.select.contains(CheckKind::NotInTest.code()) {
+                                    self.checks
+                                        .push(Check::new(CheckKind::NotInTest, operand.location));
+                                }
+                            }
+                            [Cmpop::Is] => {
+                                if self.settings.select.contains(CheckKind::NotIsTest.code()) {
+                                    self.checks
+                                        .push(Check::new(CheckKind::NotIsTest, operand.location));
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
             ExprKind::Compare {
                 left,

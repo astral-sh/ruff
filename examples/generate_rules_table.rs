@@ -15,6 +15,8 @@ fn main() {
         CheckKind::ModuleImportNotAtTopOfFile,
         CheckKind::NoAssertEquals,
         CheckKind::NoneComparison(RejectedCmpop::Eq),
+        CheckKind::NotInTest,
+        CheckKind::NotIsTest,
         CheckKind::RaiseNotImplemented,
         CheckKind::ReturnOutsideFunction,
         CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq),
