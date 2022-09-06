@@ -4,6 +4,7 @@ exclude = ["excluded.py", "**/migrations"]
 select = [
     "E402",
     "E501",
+    "E731",
     "E902",
     "F401",
     "F403",
