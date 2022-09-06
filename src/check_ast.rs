@@ -377,7 +377,20 @@ impl Visitor for Checker<'_> {
                     self.seen_non_import = true;
                 }
             }
-            StmtKind::Delete { .. } | StmtKind::Assign { .. } | StmtKind::AnnAssign { .. } => {
+            StmtKind::Assign { value, .. } => {
+                self.seen_non_import = true;
+                if self
+                    .settings
+                    .select
+                    .contains(CheckKind::DoNotAssignLambda.code())
+                {
+                    if let ExprKind::Lambda { .. } = &value.node {
+                        self.checks
+                            .push(Check::new(CheckKind::DoNotAssignLambda, stmt.location));
+                    }
+                }
+            }
+            StmtKind::Delete { .. } | StmtKind::AnnAssign { .. } => {
                 self.seen_non_import = true;
             }
             _ => {}

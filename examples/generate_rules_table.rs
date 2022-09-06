@@ -11,6 +11,7 @@ fn main() {
         CheckKind::IOError("...".to_string()),
         CheckKind::ImportStarUsage,
         CheckKind::LineTooLong,
+        CheckKind::DoNotAssignLambda,
         CheckKind::ModuleImportNotAtTopOfFile,
         CheckKind::NoAssertEquals,
         CheckKind::RaiseNotImplemented,

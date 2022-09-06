@@ -122,6 +122,7 @@ lint rules that are obviated by Black (e.g., stylistic rules).
 | ---- | ----- | ------- |
 | E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |
 | E501 | LineTooLong | Line too long |
+| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |
 | E902 | IOError | No such file or directory: `...` |
 | F401 | UnusedImport | `...` imported but unused |
 | F403 | ImportStarUsage | Unable to detect undefined names |
