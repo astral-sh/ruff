@@ -29,8 +29,12 @@ rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charlier
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }
-update-informer = { version = "0.5.0", default_features = false, features = ["pypi"] }
+update-informer = { version = "0.5.0", default_features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
+
+[features]
+default = ["update-informer"]
+update-informer = ["dep:update-informer"]
 
 [profile.release]
 panic = "abort"

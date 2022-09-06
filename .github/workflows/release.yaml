@@ -1,6 +1,8 @@
 name: Release
 
 on:
+  pull_request:
+    branches: [main]
   create:
     tags:
       - v*
@@ -127,7 +129,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist
+          args: --no-default-features --release --out dist
           maturin-version: "v0.13.0"
       - uses: uraimo/run-on-arch-action@v2.0.5
         if: matrix.target != 'ppc64'
