@@ -19,6 +19,8 @@ pub enum CheckCode {
     F401,
     F403,
     F541,
+    F601,
+    F602,
     F631,
     F634,
     F704,
@@ -50,6 +52,8 @@ impl FromStr for CheckCode {
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
             "F541" => Ok(CheckCode::F541),
+            "F601" => Ok(CheckCode::F601),
+            "F602" => Ok(CheckCode::F602),
             "F631" => Ok(CheckCode::F631),
             "F634" => Ok(CheckCode::F634),
             "F704" => Ok(CheckCode::F704),
@@ -82,6 +86,8 @@ impl CheckCode {
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
             CheckCode::F541 => "F541",
+            CheckCode::F601 => "F601",
+            CheckCode::F602 => "F602",
             CheckCode::F631 => "F631",
             CheckCode::F634 => "F634",
             CheckCode::F704 => "F704",
@@ -112,6 +118,8 @@ impl CheckCode {
             CheckCode::F401 => &LintSource::AST,
             CheckCode::F403 => &LintSource::AST,
             CheckCode::F541 => &LintSource::AST,
+            CheckCode::F601 => &LintSource::AST,
+            CheckCode::F602 => &LintSource::AST,
             CheckCode::F631 => &LintSource::AST,
             CheckCode::F634 => &LintSource::AST,
             CheckCode::F704 => &LintSource::AST,
@@ -154,6 +162,8 @@ pub enum CheckKind {
     ImportStarUsage,
     LineTooLong,
     ModuleImportNotAtTopOfFile,
+    MultiValueRepeatedKeyLiteral,
+    MultiValueRepeatedKeyVariable(String),
     NoAssertEquals,
     NoneComparison(RejectedCmpop),
     NotInTest,
@@ -184,6 +194,8 @@ impl CheckKind {
             CheckKind::LineTooLong => "LineTooLong",
             CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
+            CheckKind::MultiValueRepeatedKeyLiteral => "MultiValueRepeatedKeyLiteral",
+            CheckKind::MultiValueRepeatedKeyVariable(_) => "MultiValueRepeatedKeyVariable",
             CheckKind::NoAssertEquals => "NoAssertEquals",
             CheckKind::NoneComparison(_) => "NoneComparison",
             CheckKind::NotInTest => "NotInTest",
@@ -214,6 +226,8 @@ impl CheckKind {
             CheckKind::LineTooLong => &CheckCode::E501,
             CheckKind::DoNotAssignLambda => &CheckCode::E731,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
+            CheckKind::MultiValueRepeatedKeyLiteral => &CheckCode::F601,
+            CheckKind::MultiValueRepeatedKeyVariable(_) => &CheckCode::F602,
             CheckKind::NoAssertEquals => &CheckCode::R002,
             CheckKind::NoneComparison(_) => &CheckCode::E711,
             CheckKind::NotInTest => &CheckCode::E713,
@@ -257,6 +271,12 @@ impl CheckKind {
             }
             CheckKind::ModuleImportNotAtTopOfFile => {
                 "Module level import not at top of file".to_string()
+            }
+            CheckKind::MultiValueRepeatedKeyLiteral => {
+                "Dictionary key literal repeated".to_string()
+            }
+            CheckKind::MultiValueRepeatedKeyVariable(name) => {
+                format!("Dictionary key `{name}` repeated")
             }
             CheckKind::NoAssertEquals => {
                 "`assertEquals` is deprecated, use `assertEqual` instead".to_string()
@@ -328,6 +348,8 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => false,
             CheckKind::LineTooLong => false,
             CheckKind::ModuleImportNotAtTopOfFile => false,
+            CheckKind::MultiValueRepeatedKeyLiteral => false,
+            CheckKind::MultiValueRepeatedKeyVariable(_) => false,
             CheckKind::NoAssertEquals => true,
             CheckKind::NotInTest => false,
             CheckKind::NotIsTest => false,
