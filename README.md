@@ -57,7 +57,7 @@ ruff also works with [Pre-Commit](https://pre-commit.com) (requires Cargo on sys
 ```yaml
 repos:
 - repo: https://github.com/charliermarsh/ruff
-  rev: v0.0.28
+  rev: v0.0.29
   hooks:
     - id: lint
 ```
@@ -86,7 +86,7 @@ ruff path/to/code/ --select F401 F403
 See `ruff --help` for more:
 
 ```shell
-ruff (v0.0.28)
+ruff (v0.0.29)
 An extremely fast Python linter.
 
 USAGE:
