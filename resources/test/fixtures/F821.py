@@ -33,6 +33,8 @@ def ternary_optarg(prec, exp_range, itr):
 class Foo:
     CLASS_VAR = 1
     REFERENCES_CLASS_VAR = {"CLASS_VAR": CLASS_VAR}
+    # TODO: This should be recognized as a defined variable.
+    ANNOTATED_CLASS_VAR: int = 2  # noqa: F821
 
 
 class Class:
@@ -44,3 +46,7 @@ try:
     x = 1 / 0
 except Exception as e:
     print(e)
+
+
+# TODO: This should be recognized as a defined variable.
+y: int = 1  # noqa: F821
