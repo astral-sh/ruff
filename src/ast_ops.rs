@@ -8,6 +8,7 @@ fn id() -> usize {
     COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
+#[derive(Clone, Debug)]
 pub enum ScopeKind {
     Class,
     Function,
@@ -15,6 +16,7 @@ pub enum ScopeKind {
     Module,
 }
 
+#[derive(Clone, Debug)]
 pub struct Scope {
     pub id: usize,
     pub kind: ScopeKind,

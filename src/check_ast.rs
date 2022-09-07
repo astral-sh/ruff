@@ -25,15 +25,20 @@ struct Checker<'a> {
     checks: Vec<Check>,
     scopes: Vec<Scope>,
     dead_scopes: Vec<Scope>,
-    deferred: Vec<String>,
+    deferred_annotations: Vec<&'a str>,
+    // I think I need to track the list of scope indexes...
+    // And then store all scopes.
+    // And track the current scope stack by index?
+    deferred_functions: Vec<(&'a Stmt, &'a [Scope])>,
+    stack: Vec<&'a Stmt>,
     in_f_string: bool,
     in_annotation: bool,
     seen_non_import: bool,
     seen_docstring: bool,
 }
 
-impl Checker<'_> {
-    pub fn new<'a>(
+impl<'a> Checker<'a> {
+    pub fn new(
         settings: &'a Settings,
         autofix: &'a autofix::Mode,
         path: &'a str,
@@ -47,7 +52,9 @@ impl Checker<'_> {
             checks: vec![],
             scopes: vec![],
             dead_scopes: vec![],
-            deferred: vec![],
+            deferred_annotations: vec![],
+            deferred_functions: vec![],
+            stack: vec![],
             in_f_string: false,
             in_annotation: false,
             seen_non_import: false,
@@ -70,8 +77,13 @@ fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {
     }
 }
 
-impl Visitor for Checker<'_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'a, 'b> Visitor<'b> for Checker<'a>
+where
+    'b: 'a,
+{
+    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        self.stack.push(stmt);
+
         match &stmt.node {
             StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
                 // TODO(charlie): Handle doctests.
@@ -119,7 +131,10 @@ impl Visitor for Checker<'_> {
                         location: stmt.location,
                     },
                 );
-                self.push_scope(Scope::new(ScopeKind::Function));
+
+                self.deferred_functions.push((stmt, &self.scopes));
+
+                // self.push_scope(Scope::new(ScopeKind::Function));
             }
             StmtKind::Return { .. } => {
                 if self
@@ -434,29 +449,29 @@ impl Visitor for Checker<'_> {
                     self.dead_scopes.push(scope);
                 }
             }
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                let scope = self.scopes.last().expect("No current scope found.");
-                for (name, binding) in scope.values.iter() {
-                    // TODO(charlie): Ignore if using `locals`.
-                    if self.settings.select.contains(&CheckCode::F841)
-                        && binding.used.is_none()
-                        && name != "_"
-                        && name != "__tracebackhide__"
-                        && name != "__traceback_info__"
-                        && name != "__traceback_supplement__"
-                        && matches!(binding.kind, BindingKind::Assignment)
-                    {
-                        self.checks.push(Check::new(
-                            CheckKind::UnusedVariable(name.to_string()),
-                            binding.location,
-                        ));
-                    }
-                }
-
-                if let Some(scope) = self.scopes.pop() {
-                    self.dead_scopes.push(scope);
-                }
-            }
+            // StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+            //     let scope = self.scopes.last().expect("No current scope found.");
+            //     for (name, binding) in scope.values.iter() {
+            //         // TODO(charlie): Ignore if using `locals`.
+            //         if self.settings.select.contains(&CheckCode::F841)
+            //             && binding.used.is_none()
+            //             && name != "_"
+            //             && name != "__tracebackhide__"
+            //             && name != "__traceback_info__"
+            //             && name != "__traceback_supplement__"
+            //             && matches!(binding.kind, BindingKind::Assignment)
+            //         {
+            //             self.checks.push(Check::new(
+            //                 CheckKind::UnusedVariable(name.to_string()),
+            //                 binding.location,
+            //             ));
+            //         }
+            //     }
+            //
+            //     if let Some(scope) = self.scopes.pop() {
+            //         self.dead_scopes.push(scope);
+            //     }
+            // }
             _ => {}
         };
 
@@ -471,14 +486,15 @@ impl Visitor for Checker<'_> {
             );
         }
     }
-    fn visit_annotation(&mut self, expr: &Expr) {
+
+    fn visit_annotation(&mut self, expr: &'b Expr) {
         let initial = self.in_annotation;
         self.in_annotation = true;
         self.visit_expr(expr, None);
         self.in_annotation = initial;
     }
 
-    fn visit_expr(&mut self, expr: &Expr, parent: Option<&Stmt>) {
+    fn visit_expr(&mut self, expr: &'b Expr, parent: Option<&Stmt>) {
         let initial = self.in_f_string;
         match &expr.node {
             ExprKind::Name { ctx, .. } => match ctx {
@@ -718,7 +734,7 @@ impl Visitor for Checker<'_> {
             ExprKind::Constant {
                 value: Constant::Str(value),
                 ..
-            } if self.in_annotation => self.deferred.push(value.to_string()),
+            } if self.in_annotation => self.deferred_annotations.push(value),
             _ => {}
         };
 
@@ -741,7 +757,7 @@ impl Visitor for Checker<'_> {
         };
     }
 
-    fn visit_excepthandler(&mut self, excepthandler: &Excepthandler) {
+    fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         match &excepthandler.node {
             ExcepthandlerKind::ExceptHandler { name, .. } => match name {
                 Some(name) => {
@@ -794,7 +810,7 @@ impl Visitor for Checker<'_> {
         }
     }
 
-    fn visit_arguments(&mut self, arguments: &Arguments) {
+    fn visit_arguments(&mut self, arguments: &'b Arguments) {
         if self
             .settings
             .select
@@ -830,7 +846,7 @@ impl Visitor for Checker<'_> {
         visitor::walk_arguments(self, arguments);
     }
 
-    fn visit_arg(&mut self, arg: &Arg) {
+    fn visit_arg(&mut self, arg: &'b Arg) {
         self.add_binding(
             arg.node.arg.to_string(),
             Binding {
@@ -1000,11 +1016,12 @@ impl Checker<'_> {
     }
 
     fn check_deferred(&mut self, path: &str) {
-        for value in self.deferred.clone() {
-            if let Ok(expr) = &parser::parse_expression(&value, path) {
-                self.visit_expr(expr, None);
-            }
-        }
+        // while !self.deferred.is_empty() {
+        //     let value = self.deferred.pop().unwrap();
+        //     if let Ok(expr) = parser::parse_expression(&value, path) {
+        //         self.visit_expr(&expr, None);
+        //     }
+        // }
     }
 
     fn check_dead_scopes(&mut self) {
@@ -1069,6 +1086,8 @@ pub fn check_ast(
     settings: &Settings,
     autofix: &autofix::Mode,
     path: &str,
+    stmt_allocator: &mut Vec<Stmt>,
+    expr_allocator: &mut Vec<Expr>,
 ) -> Vec<Check> {
     let mut checker = Checker::new(settings, autofix, path, content);
     checker.push_scope(Scope::new(ScopeKind::Module));
@@ -1077,7 +1096,36 @@ pub fn check_ast(
     for stmt in python_ast {
         checker.visit_stmt(stmt);
     }
-    checker.check_deferred(path);
+
+    // Check deferred annotations.
+    while !checker.deferred_annotations.is_empty() {
+        let value = checker.deferred_annotations.pop().unwrap();
+        if let Ok(expr) = parser::parse_expression(&value, path) {
+            expr_allocator.push(expr);
+        }
+    }
+    for expr in expr_allocator {
+        checker.visit_expr(expr, None);
+    }
+
+    // Check deferred annotations.
+    while !checker.deferred_functions.is_empty() {
+        let (stmt, scopes) = checker.deferred_functions.pop().unwrap();
+
+        checker.scopes = scopes.to_vec();
+        checker.scopes.push(Scope::new(ScopeKind::Function));
+        match &stmt.node {
+            StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
+                for stmt in body {
+                    checker.visit_stmt(stmt);
+                }
+            }
+            _ => {}
+        }
+        if let Some(scope) = checker.scopes.pop() {
+            checker.dead_scopes.push(scope);
+        }
+    }
 
     checker.pop_scope();
     checker.check_dead_scopes();

@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
+use rustpython_parser::ast::{Expr, Stmt};
 use rustpython_parser::parser;
 
 use crate::autofix::fix_file;
@@ -27,7 +28,17 @@ fn check_path(path: &Path, settings: &Settings, autofix: &autofix::Mode) -> Resu
     {
         let path = path.to_string_lossy();
         let python_ast = parser::parse_program(&contents, &path)?;
-        checks.extend(check_ast(&python_ast, &contents, settings, autofix, &path));
+        let mut stmt_allocator: Vec<Stmt> = vec![];
+        let mut expr_allocator: Vec<Expr> = vec![];
+        checks.extend(check_ast(
+            &python_ast,
+            &contents,
+            settings,
+            autofix,
+            &path,
+            &mut stmt_allocator,
+            &mut expr_allocator,
+        ));
     }
 
     // Run the lines-based checks.
