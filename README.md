@@ -116,6 +116,31 @@ compatible out-of-the-box as long as the `line-length` setting is consistent bet
 As a project, ruff is designed to be used alongside Black and, as such, will defer implementing
 lint rules that are obviated by Black (e.g., stylistic rules).
 
+### Parity with Flake8
+
+ruff's goal is to achieve feature-parity with Flake8 when used (1) without any plugins,
+(2) alongside Black, and (3) on Python 3 code. (Using Black obviates the need for many of Flake8's
+stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
+
+Under those conditions, Flake8 implements about 58 rules, give or take. At time of writing, ruff
+implements 24 rules. (Note that these 24 rules likely cover a disproportionate share of errors:
+unused imports, undefined variables, etc.)
+
+Of the unimplemented rules, ruff is missing:
+
+- 15 rules related to string `.format` calls.
+- 6 rules related to misplaced `yield`, `break`, and `return` statements.
+- 3 rules related to syntax errors in doctests and annotations.
+- 2 rules related to redefining unused names.
+
+...along with a variety of others that don't fit neatly into any specific category.
+
+Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
+
+1. Flake8 supports a wider range of `noqa` patterns, such as per-file ignores defined in `.flake8`.
+2. Flake8 has a plugin architecture and supports writing custom lint rules.
+3. ruff does not yet support parenthesized context managers.
+
 ## Rules
 
 | Code | Name | Message |
