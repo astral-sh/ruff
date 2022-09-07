@@ -25,7 +25,7 @@ notify = { version = "4.0.17" }
 once_cell = { version = "1.13.1" }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "ff6112d7c70729be76eaad8c9e5b8ef24d13de99" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "8cc3d23ddaa6339bf56608adaeefabff3ad329e7" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }
