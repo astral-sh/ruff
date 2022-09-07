@@ -391,7 +391,22 @@ impl Visitor for Checker<'_> {
                     }
                 }
             }
-            StmtKind::Delete { .. } | StmtKind::AnnAssign { .. } => {
+            StmtKind::AnnAssign { value, .. } => {
+                self.seen_non_import = true;
+                if self
+                    .settings
+                    .select
+                    .contains(CheckKind::DoNotAssignLambda.code())
+                {
+                    if let Some(v) = value {
+                        if let ExprKind::Lambda { .. } = v.node {
+                            self.checks
+                                .push(Check::new(CheckKind::DoNotAssignLambda, stmt.location));
+                        }
+                    }
+                }
+            }
+            StmtKind::Delete { .. } => {
                 self.seen_non_import = true;
             }
             _ => {}

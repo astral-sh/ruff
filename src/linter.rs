@@ -268,11 +268,18 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
-        let expected = vec![Check {
-            kind: CheckKind::DoNotAssignLambda,
-            location: Location::new(1, 1),
-            fix: None,
-        }];
+        let expected = vec![
+            Check {
+                kind: CheckKind::DoNotAssignLambda,
+                location: Location::new(3, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::DoNotAssignLambda,
+                location: Location::new(5, 1),
+                fix: None,
+            },
+        ];
 
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
