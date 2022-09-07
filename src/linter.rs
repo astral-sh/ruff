@@ -392,6 +392,66 @@ mod tests {
     }
 
     #[test]
+    fn f601() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/F601.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F601]),
+            },
+            &autofix::Mode::Generate,
+        )?;
+        let expected = vec![
+            Check {
+                kind: CheckKind::MultiValueRepeatedKeyLiteral,
+                location: Location::new(3, 6),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::MultiValueRepeatedKeyLiteral,
+                location: Location::new(9, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::MultiValueRepeatedKeyLiteral,
+                location: Location::new(11, 7),
+                fix: None,
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn f602() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/F602.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F602]),
+            },
+            &autofix::Mode::Generate,
+        )?;
+        let expected = vec![Check {
+            kind: CheckKind::MultiValueRepeatedKeyVariable("a".to_string()),
+            location: Location::new(5, 5),
+            fix: None,
+        }];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f631() -> Result<()> {
         let actual = check_path(
             Path::new("./resources/test/fixtures/F631.py"),

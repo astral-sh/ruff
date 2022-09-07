@@ -13,6 +13,8 @@ fn main() {
         CheckKind::ImportStarUsage,
         CheckKind::LineTooLong,
         CheckKind::ModuleImportNotAtTopOfFile,
+        CheckKind::MultiValueRepeatedKeyLiteral,
+        CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
         CheckKind::NoAssertEquals,
         CheckKind::NoneComparison(RejectedCmpop::Eq),
         CheckKind::NotInTest,

@@ -56,6 +56,20 @@ impl Checker<'_> {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum DictionaryKey<'a> {
+    Constant(&'a Constant),
+    Variable(&'a String),
+}
+
+fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {
+    match &expr.node {
+        ExprKind::Constant { value, .. } => Some(DictionaryKey::Constant(value)),
+        ExprKind::Name { id, .. } => Some(DictionaryKey::Variable(id)),
+        _ => None,
+    }
+}
+
 impl Visitor for Checker<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match &stmt.node {
@@ -498,6 +512,48 @@ impl Visitor for Checker<'_> {
                                     }
                                     self.checks.push(check);
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            ExprKind::Dict { keys, .. } => {
+                if self.settings.select.contains(&CheckCode::F601)
+                    || self.settings.select.contains(&CheckCode::F602)
+                {
+                    let num_keys = keys.len();
+                    for i in 0..num_keys {
+                        let k1 = &keys[i];
+                        let v1 = convert_to_value(k1);
+                        for k2 in keys.iter().take(num_keys).skip(i + 1) {
+                            let v2 = convert_to_value(k2);
+                            match (&v1, &v2) {
+                                (
+                                    Some(DictionaryKey::Constant(v1)),
+                                    Some(DictionaryKey::Constant(v2)),
+                                ) => {
+                                    if self.settings.select.contains(&CheckCode::F601) && v1 == v2 {
+                                        self.checks.push(Check::new(
+                                            CheckKind::MultiValueRepeatedKeyLiteral,
+                                            k2.location,
+                                        ))
+                                    }
+                                }
+                                (
+                                    Some(DictionaryKey::Variable(v1)),
+                                    Some(DictionaryKey::Variable(v2)),
+                                ) => {
+                                    if self.settings.select.contains(&CheckCode::F602) && v1 == v2 {
+                                        self.checks.push(Check::new(
+                                            CheckKind::MultiValueRepeatedKeyVariable(
+                                                v2.to_string(),
+                                            ),
+                                            k2.location,
+                                        ))
+                                    }
+                                }
+                                _ => {}
                             }
                         }
                     }
