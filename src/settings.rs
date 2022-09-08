@@ -27,7 +27,7 @@ impl Hash for Settings {
 impl Settings {
     pub fn from_paths<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<Self> {
         let (project_root, config) = load_config(paths)?;
-        Ok(Settings {
+        let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
             exclude: config
                 .exclude
@@ -42,8 +42,8 @@ impl Settings {
                 })
                 .map(|path| Pattern::new(&path.to_string_lossy()).expect("Invalid pattern."))
                 .collect(),
-            select: config.select.unwrap_or_else(|| {
-                BTreeSet::from([
+            select: BTreeSet::from_iter(config.select.unwrap_or_else(|| {
+                vec![
                     CheckCode::E402,
                     CheckCode::E501,
                     CheckCode::E711,
@@ -71,9 +71,13 @@ impl Settings {
                     // Disable refactoring codes by default.
                     // CheckCode::R001,
                     // CheckCode::R002,
-                ])
-            }),
-        })
+                ]
+            })),
+        };
+        if let Some(ignore) = &config.ignore {
+            settings.ignore(ignore);
+        }
+        Ok(settings)
     }
 
     pub fn select(&mut self, codes: Vec<CheckCode>) {
