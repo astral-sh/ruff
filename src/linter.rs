@@ -664,6 +664,11 @@ mod tests {
                 location: Location::new(21, 12),
                 fix: None,
             },
+            Check {
+                kind: CheckKind::UndefinedName("Bar".to_string()),
+                location: Location::new(58, 5),
+                fix: None,
+            },
         ];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {

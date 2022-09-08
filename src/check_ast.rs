@@ -13,6 +13,7 @@ use crate::ast_ops::{
 };
 use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::checks::{Check, CheckCode, CheckKind, Fix, RejectedCmpop};
+use crate::relocator::relocate_expr;
 use crate::settings::Settings;
 use crate::visitor::{walk_excepthandler, Visitor};
 use crate::{autofix, fixer, visitor};
@@ -34,7 +35,7 @@ struct Checker<'a> {
     scopes: Vec<Scope>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
-    deferred_annotations: Vec<&'a str>,
+    deferred_annotations: Vec<(Location, &'a str)>,
     deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>)>,
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     // Derivative state.
@@ -759,7 +760,7 @@ where
                 value: Constant::Str(value),
                 ..
             } if self.in_annotation && !self.in_literal => {
-                self.deferred_annotations.push(value);
+                self.deferred_annotations.push((expr.location, value));
             }
             _ => {}
         };
@@ -1074,7 +1075,6 @@ impl<'a> Checker<'a> {
                     })
                     .unwrap_or_default()
             {
-                // Really need parent here.
                 self.add_binding(
                     id.to_string(),
                     Binding {
@@ -1115,8 +1115,9 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         while !self.deferred_annotations.is_empty() {
-            let value = self.deferred_annotations.pop().unwrap();
-            if let Ok(expr) = parser::parse_expression(value, path) {
+            let (location, expression) = self.deferred_annotations.pop().unwrap();
+            if let Ok(mut expr) = parser::parse_expression(expression, path) {
+                relocate_expr(&mut expr, location);
                 allocator.push(expr);
             }
         }
