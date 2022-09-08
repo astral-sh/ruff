@@ -316,12 +316,12 @@ mod tests {
             },
             Check {
                 kind: CheckKind::UnusedImport("collections.OrderedDict".to_string()),
-                location: Location::new(4, 1),
+                location: Location::new(5, 1),
                 fix: None,
             },
             Check {
                 kind: CheckKind::UnusedImport("logging.handlers".to_string()),
-                location: Location::new(12, 1),
+                location: Location::new(13, 1),
                 fix: None,
             },
         ];

@@ -1,6 +1,7 @@
 from __future__ import all_feature_names
 import os
 import functools
+from datetime import datetime
 from collections import (
     Counter,
     OrderedDict,
@@ -15,6 +16,8 @@ from blah import ClassA, ClassB, ClassC
 
 
 class X:
+    datetime: datetime
+
     def a(self) -> "namedtuple":
         x = os.environ["1"]
         y = Counter()

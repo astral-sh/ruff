@@ -72,13 +72,13 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         } => {
             visitor.visit_arguments(args);
             for expr in decorator_list {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::AsyncFunctionDef {
@@ -90,13 +90,13 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         } => {
             visitor.visit_arguments(args);
             for expr in decorator_list {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::ClassDef {
@@ -107,33 +107,33 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             ..
         } => {
             for expr in bases {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
             for keyword in keywords {
-                visitor.visit_keyword(keyword)
+                visitor.visit_keyword(keyword);
             }
             for expr in decorator_list {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::Return { value } => {
             if let Some(expr) = value {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         StmtKind::Delete { targets } => {
             for expr in targets {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         StmtKind::Assign { targets, value, .. } => {
+            visitor.visit_expr(value);
             for expr in targets {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
-            visitor.visit_expr(value)
         }
         StmtKind::AugAssign { target, op, value } => {
             visitor.visit_expr(target);
@@ -146,11 +146,11 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             value,
             ..
         } => {
-            visitor.visit_expr(target);
             visitor.visit_annotation(annotation);
             if let Some(expr) = value {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
+            visitor.visit_expr(target);
         }
         StmtKind::For {
             target,
@@ -162,10 +162,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_expr(target);
             visitor.visit_expr(iter);
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
             for stmt in orelse {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::AsyncFor {
@@ -178,28 +178,28 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_expr(target);
             visitor.visit_expr(iter);
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
             for stmt in orelse {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::While { test, body, orelse } => {
             visitor.visit_expr(test);
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
             for stmt in orelse {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::If { test, body, orelse } => {
             visitor.visit_expr(test);
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
             for stmt in orelse {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::With { items, body, .. } => {
@@ -207,7 +207,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
                 visitor.visit_withitem(withitem);
             }
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::AsyncWith { items, body, .. } => {
@@ -215,7 +215,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
                 visitor.visit_withitem(withitem);
             }
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::Match { subject, cases } => {
@@ -227,10 +227,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         }
         StmtKind::Raise { exc, cause } => {
             if let Some(expr) = exc {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             };
             if let Some(expr) = cause {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             };
         }
         StmtKind::Try {
@@ -240,22 +240,22 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             finalbody,
         } => {
             for stmt in body {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
             for excepthandler in handlers {
                 visitor.visit_excepthandler(excepthandler)
             }
             for stmt in orelse {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
             for stmt in finalbody {
-                visitor.visit_stmt(stmt)
+                visitor.visit_stmt(stmt);
             }
         }
         StmtKind::Assert { test, msg } => {
             visitor.visit_expr(test);
             if let Some(expr) = msg {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         StmtKind::Import { names } => {
@@ -282,7 +282,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         ExprKind::BoolOp { op, values } => {
             visitor.visit_boolop(op);
             for expr in values {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         ExprKind::NamedExpr { target, value } => {
@@ -309,26 +309,26 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         }
         ExprKind::Dict { keys, values } => {
             for expr in keys {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
             for expr in values {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         ExprKind::Set { elts } => {
             for expr in elts {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         ExprKind::ListComp { elt, generators } => {
             for comprehension in generators {
-                visitor.visit_comprehension(comprehension)
+                visitor.visit_comprehension(comprehension);
             }
             visitor.visit_expr(elt);
         }
         ExprKind::SetComp { elt, generators } => {
             for comprehension in generators {
-                visitor.visit_comprehension(comprehension)
+                visitor.visit_comprehension(comprehension);
             }
             visitor.visit_expr(elt);
         }
@@ -338,21 +338,21 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             generators,
         } => {
             for comprehension in generators {
-                visitor.visit_comprehension(comprehension)
+                visitor.visit_comprehension(comprehension);
             }
             visitor.visit_expr(key);
             visitor.visit_expr(value);
         }
         ExprKind::GeneratorExp { elt, generators } => {
             for comprehension in generators {
-                visitor.visit_comprehension(comprehension)
+                visitor.visit_comprehension(comprehension);
             }
             visitor.visit_expr(elt);
         }
         ExprKind::Await { value } => visitor.visit_expr(value),
         ExprKind::Yield { value } => {
             if let Some(expr) = value {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         ExprKind::YieldFrom { value } => visitor.visit_expr(value),
@@ -366,7 +366,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_cmpop(cmpop);
             }
             for expr in comparators {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         ExprKind::Call {
@@ -387,12 +387,12 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         } => {
             visitor.visit_expr(value);
             if let Some(expr) = format_spec {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         ExprKind::JoinedStr { values } => {
             for expr in values {
-                visitor.visit_expr(expr)
+                visitor.visit_expr(expr);
             }
         }
         ExprKind::Constant { value, .. } => visitor.visit_constant(value),
@@ -481,25 +481,25 @@ pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &
         visitor.visit_arg(arg);
     }
     if let Some(arg) = &arguments.vararg {
-        visitor.visit_arg(arg)
+        visitor.visit_arg(arg);
     }
     for arg in &arguments.kwonlyargs {
         visitor.visit_arg(arg);
     }
     for expr in &arguments.kw_defaults {
-        visitor.visit_expr(expr)
+        visitor.visit_expr(expr);
     }
     if let Some(arg) = &arguments.kwarg {
-        visitor.visit_arg(arg)
+        visitor.visit_arg(arg);
     }
     for expr in &arguments.defaults {
-        visitor.visit_expr(expr)
+        visitor.visit_expr(expr);
     }
 }
 
 pub fn walk_arg<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arg: &'a Arg) {
     if let Some(expr) = &arg.node.annotation {
-        visitor.visit_annotation(expr)
+        visitor.visit_annotation(expr);
     }
 }
 
@@ -530,7 +530,7 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
         PatternKind::MatchSingleton { value } => visitor.visit_constant(value),
         PatternKind::MatchSequence { patterns } => {
             for pattern in patterns {
-                visitor.visit_pattern(pattern)
+                visitor.visit_pattern(pattern);
             }
         }
         PatternKind::MatchMapping { keys, patterns, .. } => {
@@ -559,7 +559,7 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
         PatternKind::MatchStar { .. } => {}
         PatternKind::MatchAs { pattern, .. } => {
             if let Some(pattern) = pattern {
-                visitor.visit_pattern(pattern)
+                visitor.visit_pattern(pattern);
             }
         }
         PatternKind::MatchOr { patterns } => {
