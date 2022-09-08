@@ -500,9 +500,11 @@ where
             ExprKind::Name { ctx, .. } => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => {
-                    let parent = self.parents.pop().expect("No parnet statement found.");
-                    self.handle_node_store(expr, Some(parent));
-                    self.parents.push(parent);
+                    let parent = self.parents.pop();
+                    self.handle_node_store(expr, parent);
+                    if let Some(parent) = parent {
+                        self.parents.push(parent);
+                    }
                 }
                 ExprContext::Del => self.handle_node_delete(expr),
             },
@@ -772,7 +774,7 @@ where
                     let scope =
                         &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                     if scope.values.contains_key(name) {
-                        let parent = self.parents.pop().expect("No parnet statement found.");
+                        let parent = self.parents.pop();
                         self.handle_node_store(
                             &Expr::new(
                                 excepthandler.location,
@@ -781,12 +783,14 @@ where
                                     ctx: ExprContext::Store,
                                 },
                             ),
-                            Some(parent),
+                            parent,
                         );
-                        self.parents.push(parent);
+                        if let Some(parent) = parent {
+                            self.parents.push(parent);
+                        }
                     }
 
-                    let parent = self.parents.pop().expect("No parnet statement found.");
+                    let parent = self.parents.pop();
                     let scope =
                         &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                     let definition = scope.values.get(name).cloned();
@@ -798,9 +802,11 @@ where
                                 ctx: ExprContext::Store,
                             },
                         ),
-                        Some(parent),
+                        parent,
                     );
-                    self.parents.push(parent);
+                    if let Some(parent) = parent {
+                        self.parents.push(parent);
+                    }
 
                     walk_excepthandler(self, excepthandler);
 

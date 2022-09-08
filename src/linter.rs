@@ -13,6 +13,7 @@ use crate::settings::Settings;
 use crate::{autofix, cache, fs};
 
 fn check_path(path: &Path, settings: &Settings, autofix: &autofix::Mode) -> Result<Vec<Check>> {
+    println!("{:?}", path);
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
