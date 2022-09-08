@@ -4,7 +4,7 @@ use std::path::Path;
 use itertools::izip;
 use rustpython_parser::ast::{
     Arg, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
-    Location, Stmt, StmtKind, Suite, Unaryop,
+    KeywordData, Location, Stmt, StmtKind, Suite, Unaryop,
 };
 use rustpython_parser::parser;
 
@@ -40,6 +40,7 @@ struct Checker<'a> {
     // Derivative state.
     in_f_string: bool,
     in_annotation: bool,
+    in_literal: bool,
     seen_non_import: bool,
     seen_docstring: bool,
 }
@@ -67,6 +68,7 @@ impl<'a> Checker<'a> {
             deferred_lambdas: vec![],
             in_f_string: false,
             in_annotation: false,
+            in_literal: false,
             seen_non_import: false,
             seen_docstring: false,
         }
@@ -84,6 +86,14 @@ fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {
         ExprKind::Constant { value, .. } => Some(DictionaryKey::Constant(value)),
         ExprKind::Name { id, .. } => Some(DictionaryKey::Variable(id)),
         _ => None,
+    }
+}
+
+fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
+    match &expr.node {
+        ExprKind::Attribute { attr, .. } => target == attr,
+        ExprKind::Name { id, .. } => target == id,
+        _ => false,
     }
 }
 
@@ -491,17 +501,23 @@ where
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
-        let initial = self.in_annotation;
+        let prev_in_annotation = self.in_annotation;
         self.in_annotation = true;
         self.visit_expr(expr);
-        self.in_annotation = initial;
+        self.in_annotation = prev_in_annotation;
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        let initial = self.in_f_string;
+        let prev_in_f_string = self.in_f_string;
+        let prev_in_literal = self.in_literal;
 
         // Pre-visit.
         match &expr.node {
+            ExprKind::Subscript { value, .. } => {
+                if match_name_or_attr(value, "Literal") {
+                    self.in_literal = true;
+                }
+            }
             ExprKind::Name { ctx, .. } => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => {
@@ -542,7 +558,6 @@ where
                     }
                 }
             }
-
             ExprKind::Dict { keys, .. } => {
                 if self.settings.select.contains(&CheckCode::F601)
                     || self.settings.select.contains(&CheckCode::F602)
@@ -743,7 +758,9 @@ where
             ExprKind::Constant {
                 value: Constant::Str(value),
                 ..
-            } if self.in_annotation => self.deferred_annotations.push(value),
+            } if self.in_annotation && !self.in_literal => {
+                self.deferred_annotations.push(value);
+            }
             _ => {}
         };
 
@@ -756,6 +773,39 @@ where
                     self.parent_stack.clone(),
                 ));
             }
+            ExprKind::Call {
+                func,
+                args,
+                keywords,
+            } => {
+                if match_name_or_attr(func, "TypeVar") {
+                    self.visit_expr(func);
+                    for expr in &args[1..] {
+                        self.visit_annotation(expr);
+                    }
+                    for keyword in &keywords[..] {
+                        let KeywordData { arg, value } = &keyword.node;
+                        if let Some(id) = arg {
+                            if id == "bound" {
+                                self.visit_annotation(value);
+                            } else {
+                                self.visit_expr(value);
+                            }
+                        }
+                    }
+                } else {
+                    visitor::walk_expr(self, expr);
+                }
+            }
+            ExprKind::Subscript { value, slice, ctx } => {
+                if match_name_or_attr(value, "Type") {
+                    self.visit_expr(value);
+                    self.visit_annotation(slice);
+                    self.visit_expr_context(ctx);
+                } else {
+                    visitor::walk_expr(self, expr);
+                }
+            }
             _ => visitor::walk_expr(self, expr),
         }
 
@@ -767,11 +817,10 @@ where
             | ExprKind::SetComp { .. } => {
                 self.pop_scope();
             }
-            ExprKind::JoinedStr { .. } => {
-                self.in_f_string = initial;
-            }
             _ => {}
         };
+        self.in_literal = prev_in_literal;
+        self.in_f_string = prev_in_f_string;
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
@@ -1227,10 +1276,10 @@ pub fn check_ast(
     }
 
     // Check any deferred statements.
-    let mut allocator = vec![];
-    checker.check_deferred_annotations(path, &mut allocator);
     checker.check_deferred_functions();
     checker.check_deferred_lambdas();
+    let mut allocator = vec![];
+    checker.check_deferred_annotations(path, &mut allocator);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.scope_stack = vec![GLOBAL_SCOPE_INDEX];
