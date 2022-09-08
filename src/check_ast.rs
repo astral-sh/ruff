@@ -781,10 +781,10 @@ where
             } => {
                 if match_name_or_attr(func, "TypeVar") {
                     self.visit_expr(func);
-                    for expr in &args[1..] {
+                    for expr in args.iter().skip(1) {
                         self.visit_annotation(expr);
                     }
-                    for keyword in &keywords[..] {
+                    for keyword in keywords {
                         let KeywordData { arg, value } = &keyword.node;
                         if let Some(id) = arg {
                             if id == "bound" {
