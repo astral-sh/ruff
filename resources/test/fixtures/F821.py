@@ -36,7 +36,13 @@ class Foo:
     ANNOTATED_CLASS_VAR: int = 2
 
 
+from typing import Literal
+
+
 class Class:
+    copy_on_model_validation: Literal["none", "deep", "shallow"]
+    post_init_call: Literal["before_validation", "after_validation"]
+
     def __init__(self):
         Class
 
