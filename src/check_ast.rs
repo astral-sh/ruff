@@ -27,15 +27,16 @@ struct Checker<'a> {
     path: &'a str,
     // Computed checks.
     checks: Vec<Check>,
-    // Scope tracking: retain all scopes, along with a stack of indexes to track which scopes are
-    // active.
+    // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
+    // at various points in time.
+    parents: Vec<&'a Stmt>,
+    parent_stack: Vec<usize>,
     scopes: Vec<Scope>,
     scope_stack: Vec<usize>,
-    parents: Vec<&'a Stmt>,
     dead_scopes: Vec<usize>,
     deferred_annotations: Vec<&'a str>,
-    deferred_functions: Vec<(&'a Stmt, Vec<usize>)>,
-    deferred_lambdas: Vec<(&'a Expr, Vec<usize>)>,
+    deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>)>,
+    deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     // Derivative state.
     in_f_string: bool,
     in_annotation: bool,
@@ -56,13 +57,14 @@ impl<'a> Checker<'a> {
             path,
             locator: SourceCodeLocator::new(content),
             checks: vec![],
-            scope_stack: vec![],
+            parents: vec![],
+            parent_stack: vec![],
             scopes: vec![],
+            scope_stack: vec![],
             dead_scopes: vec![],
             deferred_annotations: vec![],
             deferred_functions: vec![],
             deferred_lambdas: vec![],
-            parents: vec![],
             in_f_string: false,
             in_annotation: false,
             seen_non_import: false,
@@ -90,7 +92,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        self.parents.push(stmt);
+        self.push_parent(stmt);
 
         // Pre-visit.
         match &stmt.node {
@@ -458,8 +460,11 @@ where
         // Recurse.
         match &stmt.node {
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                self.deferred_functions
-                    .push((stmt, self.scope_stack.clone()));
+                self.deferred_functions.push((
+                    stmt,
+                    self.scope_stack.clone(),
+                    self.parent_stack.clone(),
+                ));
             }
             StmtKind::ClassDef { body, .. } => {
                 for stmt in body {
@@ -482,7 +487,7 @@ where
             );
         };
 
-        self.parents.pop();
+        self.pop_parent();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -500,11 +505,9 @@ where
             ExprKind::Name { ctx, .. } => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => {
-                    let parent = self.parents.pop();
-                    self.handle_node_store(expr, parent);
-                    if let Some(parent) = parent {
-                        self.parents.push(parent);
-                    }
+                    let parent =
+                        self.parents[*(self.parent_stack.last().expect("No parent found."))];
+                    self.handle_node_store(expr, Some(parent));
                 }
                 ExprContext::Del => self.handle_node_delete(expr),
             },
@@ -747,7 +750,11 @@ where
         // Recurse.
         match &expr.node {
             ExprKind::Lambda { .. } => {
-                self.deferred_lambdas.push((expr, self.scope_stack.clone()));
+                self.deferred_lambdas.push((
+                    expr,
+                    self.scope_stack.clone(),
+                    self.parent_stack.clone(),
+                ));
             }
             _ => visitor::walk_expr(self, expr),
         }
@@ -774,7 +781,8 @@ where
                     let scope =
                         &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                     if scope.values.contains_key(name) {
-                        let parent = self.parents.pop();
+                        let parent =
+                            self.parents[*(self.parent_stack.last().expect("No parent found."))];
                         self.handle_node_store(
                             &Expr::new(
                                 excepthandler.location,
@@ -783,14 +791,13 @@ where
                                     ctx: ExprContext::Store,
                                 },
                             ),
-                            parent,
+                            Some(parent),
                         );
-                        if let Some(parent) = parent {
-                            self.parents.push(parent);
-                        }
+                        self.parents.push(parent);
                     }
 
-                    let parent = self.parents.pop();
+                    let parent =
+                        self.parents[*(self.parent_stack.last().expect("No parent found."))];
                     let scope =
                         &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                     let definition = scope.values.get(name).cloned();
@@ -802,11 +809,9 @@ where
                                 ctx: ExprContext::Store,
                             },
                         ),
-                        parent,
+                        Some(parent),
                     );
-                    if let Some(parent) = parent {
-                        self.parents.push(parent);
-                    }
+                    self.parents.push(parent);
 
                     walk_excepthandler(self, excepthandler);
 
@@ -881,6 +886,17 @@ where
 }
 
 impl<'a> Checker<'a> {
+    fn push_parent(&mut self, parent: &'a Stmt) {
+        self.parent_stack.push(self.parents.len());
+        self.parents.push(parent);
+    }
+
+    fn pop_parent(&mut self) {
+        self.parent_stack
+            .pop()
+            .expect("Attempted to pop without scope.");
+    }
+
     fn push_scope(&mut self, scope: Scope) {
         self.scope_stack.push(self.scopes.len());
         self.scopes.push(scope);
@@ -1062,8 +1078,9 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_functions(&mut self) {
         while !self.deferred_functions.is_empty() {
-            let (stmt, scopes) = self.deferred_functions.pop().unwrap();
+            let (stmt, scopes, parents) = self.deferred_functions.pop().unwrap();
 
+            self.parent_stack = parents;
             self.scope_stack = scopes;
             self.push_scope(Scope::new(ScopeKind::Function));
 
@@ -1102,8 +1119,9 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_lambdas(&mut self) {
         while !self.deferred_lambdas.is_empty() {
-            let (expr, scopes) = self.deferred_lambdas.pop().unwrap();
+            let (expr, scopes, parents) = self.deferred_lambdas.pop().unwrap();
 
+            self.parent_stack = parents;
             self.scope_stack = scopes;
             self.push_scope(Scope::new(ScopeKind::Function));
 
