@@ -38,8 +38,7 @@ class Foo:
 
 class Class:
     def __init__(self):
-        # TODO(charlie): This should be recognized as a defined variable.
-        Class  # noqa: F821
+        Class
 
 
 try:
