@@ -13,5 +13,6 @@ pub mod linter;
 pub mod logging;
 pub mod message;
 mod pyproject;
+mod relocator;
 pub mod settings;
 mod visitor;

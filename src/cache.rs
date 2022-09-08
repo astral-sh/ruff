@@ -3,12 +3,12 @@ use std::fs::Metadata;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
-use crate::autofix;
 use cacache::Error::EntryNotFound;
 use filetime::FileTime;
 use log::error;
 use serde::{Deserialize, Serialize};
 
+use crate::autofix;
 use crate::message::Message;
 use crate::settings::Settings;
 

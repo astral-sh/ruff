@@ -54,3 +54,5 @@ except Exception as e:
 
 
 y: int = 1
+
+x: "Bar" = 1
