@@ -2,7 +2,6 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
-use rustpython_parser::ast::{Expr, Stmt};
 use rustpython_parser::parser;
 
 use crate::autofix::fix_file;
@@ -28,17 +27,7 @@ fn check_path(path: &Path, settings: &Settings, autofix: &autofix::Mode) -> Resu
     {
         let path = path.to_string_lossy();
         let python_ast = parser::parse_program(&contents, &path)?;
-        let mut stmt_allocator: Vec<Stmt> = vec![];
-        let mut expr_allocator: Vec<Expr> = vec![];
-        checks.extend(check_ast(
-            &python_ast,
-            &contents,
-            settings,
-            autofix,
-            &path,
-            &mut stmt_allocator,
-            &mut expr_allocator,
-        ));
+        checks.extend(check_ast(&python_ast, &contents, settings, autofix, &path));
     }
 
     // Run the lines-based checks.
@@ -101,7 +90,7 @@ mod tests {
 
     #[test]
     fn e402() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/E402.py"),
             &settings::Settings {
                 line_length: 88,
@@ -110,6 +99,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
             kind: CheckKind::ModuleImportNotAtTopOfFile,
             location: Location::new(20, 1),
@@ -125,7 +115,7 @@ mod tests {
 
     #[test]
     fn e501() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/E501.py"),
             &settings::Settings {
                 line_length: 88,
@@ -134,6 +124,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
             kind: CheckKind::LineTooLong,
             location: Location::new(5, 89),
@@ -149,7 +140,7 @@ mod tests {
 
     #[test]
     fn e711() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/E711.py"),
             &settings::Settings {
                 line_length: 88,
@@ -158,6 +149,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::NoneComparison(RejectedCmpop::Eq),
@@ -180,7 +172,7 @@ mod tests {
 
     #[test]
     fn e712() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/E712.py"),
             &settings::Settings {
                 line_length: 88,
@@ -189,6 +181,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq),
@@ -222,7 +215,7 @@ mod tests {
 
     #[test]
     fn e713() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/E713.py"),
             &settings::Settings {
                 line_length: 88,
@@ -231,6 +224,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
             kind: CheckKind::NotInTest,
             location: Location::new(2, 12),
@@ -246,7 +240,7 @@ mod tests {
 
     #[test]
     fn e714() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/E714.py"),
             &settings::Settings {
                 line_length: 88,
@@ -255,6 +249,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
             kind: CheckKind::NotIsTest,
             location: Location::new(1, 13),
@@ -270,7 +265,7 @@ mod tests {
 
     #[test]
     fn e731() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/E731.py"),
             &settings::Settings {
                 line_length: 88,
@@ -279,6 +274,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::DoNotAssignLambda,
@@ -302,7 +298,7 @@ mod tests {
 
     #[test]
     fn f401() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F401.py"),
             &settings::Settings {
                 line_length: 88,
@@ -311,12 +307,8 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
-            Check {
-                kind: CheckKind::UnusedImport("logging.handlers".to_string()),
-                location: Location::new(12, 1),
-                fix: None,
-            },
             Check {
                 kind: CheckKind::UnusedImport("functools".to_string()),
                 location: Location::new(3, 1),
@@ -325,6 +317,11 @@ mod tests {
             Check {
                 kind: CheckKind::UnusedImport("collections.OrderedDict".to_string()),
                 location: Location::new(4, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::UnusedImport("logging.handlers".to_string()),
+                location: Location::new(12, 1),
                 fix: None,
             },
         ];
@@ -338,7 +335,7 @@ mod tests {
 
     #[test]
     fn f403() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F403.py"),
             &settings::Settings {
                 line_length: 88,
@@ -347,6 +344,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::ImportStarUsage,
@@ -368,7 +366,7 @@ mod tests {
     }
     #[test]
     fn f541() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F541.py"),
             &settings::Settings {
                 line_length: 88,
@@ -377,6 +375,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::FStringMissingPlaceholders,
@@ -464,7 +463,7 @@ mod tests {
 
     #[test]
     fn f631() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F631.py"),
             &settings::Settings {
                 line_length: 88,
@@ -473,6 +472,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::AssertTuple,
@@ -495,7 +495,7 @@ mod tests {
 
     #[test]
     fn f634() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F634.py"),
             &settings::Settings {
                 line_length: 88,
@@ -504,6 +504,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::IfTuple,
@@ -526,7 +527,7 @@ mod tests {
 
     #[test]
     fn f704() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F704.py"),
             &settings::Settings {
                 line_length: 88,
@@ -535,6 +536,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::YieldOutsideFunction,
@@ -562,7 +564,7 @@ mod tests {
 
     #[test]
     fn f706() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F706.py"),
             &settings::Settings {
                 line_length: 88,
@@ -571,6 +573,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::ReturnOutsideFunction,
@@ -593,7 +596,7 @@ mod tests {
 
     #[test]
     fn f707() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F707.py"),
             &settings::Settings {
                 line_length: 88,
@@ -602,6 +605,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::DefaultExceptNotLast,
@@ -629,7 +633,7 @@ mod tests {
 
     #[test]
     fn f821() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F821.py"),
             &settings::Settings {
                 line_length: 88,
@@ -638,6 +642,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::UndefinedName("self".to_string()),
@@ -670,7 +675,7 @@ mod tests {
 
     #[test]
     fn f822() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F822.py"),
             &settings::Settings {
                 line_length: 88,
@@ -679,6 +684,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
             kind: CheckKind::UndefinedExport("b".to_string()),
             location: Location::new(3, 1),
@@ -694,7 +700,7 @@ mod tests {
 
     #[test]
     fn f823() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F823.py"),
             &settings::Settings {
                 line_length: 88,
@@ -703,6 +709,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
             kind: CheckKind::UndefinedLocal("my_var".to_string()),
             location: Location::new(6, 5),
@@ -718,7 +725,7 @@ mod tests {
 
     #[test]
     fn f831() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F831.py"),
             &settings::Settings {
                 line_length: 88,
@@ -727,6 +734,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::DuplicateArgumentName,
@@ -754,7 +762,7 @@ mod tests {
 
     #[test]
     fn f841() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F841.py"),
             &settings::Settings {
                 line_length: 88,
@@ -763,6 +771,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::UnusedVariable("e".to_string()),
@@ -785,7 +794,7 @@ mod tests {
 
     #[test]
     fn f901() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/F901.py"),
             &settings::Settings {
                 line_length: 88,
@@ -794,6 +803,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::RaiseNotImplemented,
@@ -816,7 +826,7 @@ mod tests {
 
     #[test]
     fn r001() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/R001.py"),
             &settings::Settings {
                 line_length: 88,
@@ -825,6 +835,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::UselessObjectInheritance("A".to_string()),
@@ -1037,7 +1048,7 @@ mod tests {
 
     #[test]
     fn r002() -> Result<()> {
-        let actual = check_path(
+        let mut actual = check_path(
             Path::new("./resources/test/fixtures/R002.py"),
             &settings::Settings {
                 line_length: 88,
@@ -1046,6 +1057,7 @@ mod tests {
             },
             &autofix::Mode::Generate,
         )?;
+        actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::NoAssertEquals,
