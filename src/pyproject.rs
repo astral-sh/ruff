@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -40,7 +39,8 @@ pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<(Pat
 pub struct Config {
     pub line_length: Option<usize>,
     pub exclude: Option<Vec<PathBuf>>,
-    pub select: Option<BTreeSet<CheckCode>>,
+    pub select: Option<Vec<CheckCode>>,
+    pub ignore: Option<Vec<CheckCode>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -90,7 +90,6 @@ fn find_project_root<'a>(sources: impl IntoIterator<Item = &'a Path>) -> Option<
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
@@ -125,6 +124,7 @@ mod tests {
                     line_length: None,
                     exclude: None,
                     select: None,
+                    ignore: None,
                 })
             })
         );
@@ -143,6 +143,7 @@ line-length = 79
                     line_length: Some(79),
                     exclude: None,
                     select: None,
+                    ignore: None,
                 })
             })
         );
@@ -161,6 +162,7 @@ exclude = ["foo.py"]
                     line_length: None,
                     exclude: Some(vec![Path::new("foo.py").to_path_buf()]),
                     select: None,
+                    ignore: None,
                 })
             })
         );
@@ -178,7 +180,27 @@ select = ["E501"]
                 ruff: Some(Config {
                     line_length: None,
                     exclude: None,
-                    select: Some(BTreeSet::from([CheckCode::E501])),
+                    select: Some(vec![CheckCode::E501]),
+                    ignore: None,
+                })
+            })
+        );
+
+        let pyproject: PyProject = toml::from_str(
+            r#"
+[tool.black]
+[tool.ruff]
+ignore = ["E501"]
+"#,
+        )?;
+        assert_eq!(
+            pyproject.tool,
+            Some(Tools {
+                ruff: Some(Config {
+                    line_length: None,
+                    exclude: None,
+                    select: None,
+                    ignore: Some(vec![CheckCode::E501]),
                 })
             })
         );
@@ -236,7 +258,7 @@ other-attribute = 1
                     Path::new("excluded.py").to_path_buf(),
                     Path::new("**/migrations").to_path_buf()
                 ]),
-                select: Some(BTreeSet::from([
+                select: Some(vec![
                     CheckCode::E402,
                     CheckCode::E501,
                     CheckCode::E711,
@@ -263,7 +285,8 @@ other-attribute = 1
                     CheckCode::F901,
                     CheckCode::R001,
                     CheckCode::R002,
-                ])),
+                ]),
+                ignore: None,
             }
         );
 
