@@ -8,7 +8,7 @@ use filetime::FileTime;
 use log::error;
 use serde::{Deserialize, Serialize};
 
-use crate::autofix;
+use crate::autofix::fixer;
 use crate::message::Message;
 use crate::settings::Settings;
 
@@ -71,7 +71,7 @@ fn cache_dir() -> &'static str {
     "./.ruff_cache"
 }
 
-fn cache_key(path: &Path, settings: &Settings, autofix: &autofix::Mode) -> String {
+fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> String {
     let mut hasher = DefaultHasher::new();
     settings.hash(&mut hasher);
     autofix.hash(&mut hasher);
@@ -87,7 +87,7 @@ pub fn get(
     path: &Path,
     metadata: &Metadata,
     settings: &Settings,
-    autofix: &autofix::Mode,
+    autofix: &fixer::Mode,
     mode: &Mode,
 ) -> Option<Vec<Message>> {
     if !mode.allow_read() {
@@ -116,7 +116,7 @@ pub fn set(
     path: &Path,
     metadata: &Metadata,
     settings: &Settings,
-    autofix: &autofix::Mode,
+    autofix: &fixer::Mode,
     messages: &[Message],
     mode: &Mode,
 ) {

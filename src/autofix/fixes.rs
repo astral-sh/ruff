@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Expr, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
-use crate::ast_ops::SourceCodeLocator;
+use crate::ast::operations::SourceCodeLocator;
 use crate::checks::Fix;
 
 /// Convert a location within a file (relative to `base`) to an absolute position.
