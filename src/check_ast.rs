@@ -457,7 +457,7 @@ where
                     ));
                 }
             }
-            ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } => {
+            ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. } => {
                 let scope =
                     &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                 if self
