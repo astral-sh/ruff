@@ -4,15 +4,16 @@ use anyhow::Result;
 use log::debug;
 use rustpython_parser::parser;
 
-use crate::autofix::fix_file;
+use crate::autofix::fixer;
+use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
 use crate::checks::{Check, LintSource};
 use crate::message::Message;
 use crate::settings::Settings;
-use crate::{autofix, cache, fs};
+use crate::{cache, fs};
 
-fn check_path(path: &Path, settings: &Settings, autofix: &autofix::Mode) -> Result<Vec<Check>> {
+fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
@@ -40,7 +41,7 @@ pub fn lint_path(
     path: &Path,
     settings: &Settings,
     mode: &cache::Mode,
-    autofix: &autofix::Mode,
+    autofix: &fixer::Mode,
 ) -> Result<Vec<Message>> {
     let metadata = path.metadata()?;
 
@@ -57,7 +58,7 @@ pub fn lint_path(
     let mut checks = check_path(path, settings, autofix)?;
 
     // Apply autofix.
-    if matches!(autofix, autofix::Mode::Apply) {
+    if matches!(autofix, fixer::Mode::Apply) {
         fix_file(&mut checks, &contents, path)?;
     };
 
@@ -84,9 +85,10 @@ mod tests {
     use anyhow::Result;
     use rustpython_parser::ast::Location;
 
+    use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode, CheckKind, Fix, RejectedCmpop};
     use crate::linter::check_path;
-    use crate::{autofix, settings};
+    use crate::settings;
 
     #[test]
     fn e402() -> Result<()> {
@@ -97,7 +99,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::E402]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
@@ -122,7 +124,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::E501]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
@@ -147,7 +149,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::E711]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -179,7 +181,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::E712]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -222,7 +224,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::E713]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
@@ -247,7 +249,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::E714]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
@@ -272,7 +274,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::E731]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -305,7 +307,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F401]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -342,7 +344,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F403]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -373,7 +375,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F541]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -410,7 +412,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F601]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         let expected = vec![
             Check {
@@ -446,7 +448,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F602]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         let expected = vec![Check {
             kind: CheckKind::MultiValueRepeatedKeyVariable("a".to_string()),
@@ -470,7 +472,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F631]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -502,7 +504,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F634]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -534,7 +536,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F704]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -571,7 +573,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F706]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -603,7 +605,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F707]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -640,7 +642,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F821]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -687,7 +689,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F822]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
@@ -712,7 +714,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F823]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
@@ -737,7 +739,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F831]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -774,7 +776,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F841]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -806,18 +808,18 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::F901]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::RaiseNotImplemented,
-                location: Location::new(2, 5),
+                location: Location::new(2, 25),
                 fix: None,
             },
             Check {
                 kind: CheckKind::RaiseNotImplemented,
-                location: Location::new(6, 5),
+                location: Location::new(6, 11),
                 fix: None,
             },
         ];
@@ -838,7 +840,7 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::R001]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
@@ -1060,13 +1062,13 @@ mod tests {
                 exclude: vec![],
                 select: BTreeSet::from([CheckCode::R002]),
             },
-            &autofix::Mode::Generate,
+            &fixer::Mode::Generate,
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
                 kind: CheckKind::NoAssertEquals,
-                location: Location::new(1, 19),
+                location: Location::new(1, 5),
                 fix: Some(Fix {
                     content: "assertEqual".to_string(),
                     start: Location::new(1, 6),
@@ -1076,7 +1078,7 @@ mod tests {
             },
             Check {
                 kind: CheckKind::NoAssertEquals,
-                location: Location::new(2, 18),
+                location: Location::new(2, 5),
                 fix: Some(Fix {
                     content: "assertEqual".to_string(),
                     start: Location::new(2, 6),

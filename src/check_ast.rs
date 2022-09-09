@@ -1,22 +1,20 @@
-use std::collections::BTreeSet;
 use std::path::Path;
 
-use itertools::izip;
 use rustpython_parser::ast::{
-    Arg, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
-    KeywordData, Location, Stmt, StmtKind, Suite, Unaryop,
+    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
+    KeywordData, Location, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
 
-use crate::ast_ops::{
-    extract_all_names, Binding, BindingKind, Scope, ScopeKind, SourceCodeLocator,
-};
+use crate::ast::operations::{extract_all_names, SourceCodeLocator};
+use crate::ast::relocate::relocate_expr;
+use crate::ast::types::{Binding, BindingKind, Scope, ScopeKind};
+use crate::ast::visitor::{walk_excepthandler, Visitor};
+use crate::ast::{checks, visitor};
+use crate::autofix::fixer;
 use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
-use crate::checks::{Check, CheckCode, CheckKind, Fix, RejectedCmpop};
-use crate::relocator::relocate_expr;
+use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
-use crate::visitor::{walk_excepthandler, Visitor};
-use crate::{autofix, fixer, visitor};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
@@ -24,7 +22,7 @@ struct Checker<'a> {
     // Input data.
     locator: SourceCodeLocator<'a>,
     settings: &'a Settings,
-    autofix: &'a autofix::Mode,
+    autofix: &'a fixer::Mode,
     path: &'a str,
     // Computed checks.
     checks: Vec<Check>,
@@ -49,7 +47,7 @@ struct Checker<'a> {
 impl<'a> Checker<'a> {
     pub fn new(
         settings: &'a Settings,
-        autofix: &'a autofix::Mode,
+        autofix: &'a fixer::Mode,
         path: &'a str,
         content: &'a str,
     ) -> Checker<'a> {
@@ -73,20 +71,6 @@ impl<'a> Checker<'a> {
             seen_non_import: false,
             seen_docstring: false,
         }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-enum DictionaryKey<'a> {
-    Constant(&'a Constant),
-    Variable(&'a String),
-}
-
-fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {
-    match &expr.node {
-        ExprKind::Constant { value, .. } => Some(DictionaryKey::Constant(value)),
-        ExprKind::Name { id, .. } => Some(DictionaryKey::Variable(id)),
-        _ => None,
     }
 }
 
@@ -183,41 +167,18 @@ where
                 ..
             } => {
                 if self.settings.select.contains(&CheckCode::R001) {
-                    for expr in bases {
-                        if let ExprKind::Name { id, .. } = &expr.node {
-                            if id == "object" {
-                                let scope = &self.scopes
-                                    [*(self.scope_stack.last().expect("No current scope found."))];
-                                match scope.values.get(id) {
-                                    None
-                                    | Some(Binding {
-                                        kind: BindingKind::Builtin,
-                                        ..
-                                    }) => {
-                                        let mut check = Check::new(
-                                            CheckKind::UselessObjectInheritance(name.to_string()),
-                                            expr.location,
-                                        );
-                                        if matches!(self.autofix, autofix::Mode::Generate)
-                                            || matches!(self.autofix, autofix::Mode::Apply)
-                                        {
-                                            if let Some(fix) = fixer::remove_class_def_base(
-                                                &mut self.locator,
-                                                &stmt.location,
-                                                expr.location,
-                                                bases,
-                                                keywords,
-                                            ) {
-                                                check.amend(fix);
-                                            }
-                                        } else {
-                                        }
-                                        self.checks.push(check);
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
+                    let scope =
+                        &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+                    if let Some(check) = checks::check_useless_object_inheritance(
+                        stmt,
+                        name,
+                        bases,
+                        keywords,
+                        scope,
+                        &mut self.locator,
+                        self.autofix,
+                    ) {
+                        self.checks.push(check);
                     }
                 }
 
@@ -327,11 +288,7 @@ where
                             },
                         );
 
-                        if self
-                            .settings
-                            .select
-                            .contains(CheckKind::ImportStarUsage.code())
-                        {
+                        if self.settings.select.contains(&CheckCode::F403) {
                             self.checks
                                 .push(Check::new(CheckKind::ImportStarUsage, stmt.location));
                         }
@@ -348,43 +305,11 @@ where
                     }
                 }
             }
-            StmtKind::If { test, .. } => {
-                if self.settings.select.contains(CheckKind::IfTuple.code()) {
-                    if let ExprKind::Tuple { elts, .. } = &test.node {
-                        if !elts.is_empty() {
-                            self.checks
-                                .push(Check::new(CheckKind::IfTuple, stmt.location));
-                        }
-                    }
-                }
-            }
             StmtKind::Raise { exc, .. } => {
-                if self
-                    .settings
-                    .select
-                    .contains(CheckKind::RaiseNotImplemented.code())
-                {
+                if self.settings.select.contains(&CheckCode::F901) {
                     if let Some(expr) = exc {
-                        match &expr.node {
-                            ExprKind::Call { func, .. } => {
-                                if let ExprKind::Name { id, .. } = &func.node {
-                                    if id == "NotImplemented" {
-                                        self.checks.push(Check::new(
-                                            CheckKind::RaiseNotImplemented,
-                                            stmt.location,
-                                        ));
-                                    }
-                                }
-                            }
-                            ExprKind::Name { id, .. } => {
-                                if id == "NotImplemented" {
-                                    self.checks.push(Check::new(
-                                        CheckKind::RaiseNotImplemented,
-                                        stmt.location,
-                                    ));
-                                }
-                            }
-                            _ => {}
+                        if let Some(check) = checks::check_raise_not_implemented(expr) {
+                            self.checks.push(check);
                         }
                     }
                 }
@@ -393,31 +318,25 @@ where
                 self.seen_non_import = true;
                 self.handle_node_load(target);
             }
+            StmtKind::If { test, .. } => {
+                if self.settings.select.contains(&CheckCode::F634) {
+                    if let Some(check) = checks::check_if_tuple(test, stmt.location) {
+                        self.checks.push(check);
+                    }
+                }
+            }
             StmtKind::Assert { test, .. } => {
                 self.seen_non_import = true;
                 if self.settings.select.contains(CheckKind::AssertTuple.code()) {
-                    if let ExprKind::Tuple { elts, .. } = &test.node {
-                        if !elts.is_empty() {
-                            self.checks
-                                .push(Check::new(CheckKind::AssertTuple, stmt.location));
-                        }
+                    if let Some(check) = checks::check_assert_tuple(test, stmt.location) {
+                        self.checks.push(check);
                     }
                 }
             }
             StmtKind::Try { handlers, .. } => {
-                if self
-                    .settings
-                    .select
-                    .contains(CheckKind::DefaultExceptNotLast.code())
-                {
-                    for (idx, handler) in handlers.iter().enumerate() {
-                        let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
-                        if type_.is_none() && idx < handlers.len() - 1 {
-                            self.checks.push(Check::new(
-                                CheckKind::DefaultExceptNotLast,
-                                handler.location,
-                            ));
-                        }
+                if self.settings.select.contains(&CheckCode::F707) {
+                    if let Some(check) = checks::check_default_except_not_last(handlers) {
+                        self.checks.push(check);
                     }
                 }
             }
@@ -436,28 +355,20 @@ where
             }
             StmtKind::Assign { value, .. } => {
                 self.seen_non_import = true;
-                if self
-                    .settings
-                    .select
-                    .contains(CheckKind::DoNotAssignLambda.code())
-                {
-                    if let ExprKind::Lambda { .. } = &value.node {
-                        self.checks
-                            .push(Check::new(CheckKind::DoNotAssignLambda, stmt.location));
+                if self.settings.select.contains(&CheckCode::E731) {
+                    if let Some(check) = checks::check_do_not_assign_lambda(value, stmt.location) {
+                        self.checks.push(check);
                     }
                 }
             }
             StmtKind::AnnAssign { value, .. } => {
                 self.seen_non_import = true;
-                if self
-                    .settings
-                    .select
-                    .contains(CheckKind::DoNotAssignLambda.code())
-                {
-                    if let Some(v) = value {
-                        if let ExprKind::Lambda { .. } = v.node {
-                            self.checks
-                                .push(Check::new(CheckKind::DoNotAssignLambda, stmt.location));
+                if self.settings.select.contains(&CheckCode::E731) {
+                    if let Some(value) = value {
+                        if let Some(check) =
+                            checks::check_do_not_assign_lambda(value, stmt.location)
+                        {
+                            self.checks.push(check);
                         }
                     }
                 }
@@ -530,80 +441,22 @@ where
             },
             ExprKind::Call { func, .. } => {
                 if self.settings.select.contains(&CheckCode::R002) {
-                    if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                        if attr == "assertEquals" {
-                            if let ExprKind::Name { id, .. } = &value.node {
-                                if id == "self" {
-                                    let mut check =
-                                        Check::new(CheckKind::NoAssertEquals, expr.location);
-                                    if matches!(self.autofix, autofix::Mode::Generate)
-                                        || matches!(self.autofix, autofix::Mode::Apply)
-                                    {
-                                        check.amend(Fix {
-                                            content: "assertEqual".to_string(),
-                                            start: Location::new(
-                                                func.location.row(),
-                                                func.location.column() + 1,
-                                            ),
-                                            end: Location::new(
-                                                func.location.row(),
-                                                func.location.column() + 1 + "assertEquals".len(),
-                                            ),
-                                            applied: false,
-                                        });
-                                    }
-                                    self.checks.push(check);
-                                }
-                            }
-                        }
+                    if let Some(check) = checks::check_assert_equals(func, self.autofix) {
+                        self.checks.push(check)
                     }
                 }
             }
             ExprKind::Dict { keys, .. } => {
-                if self.settings.select.contains(&CheckCode::F601)
-                    || self.settings.select.contains(&CheckCode::F602)
-                {
-                    let num_keys = keys.len();
-                    for i in 0..num_keys {
-                        let k1 = &keys[i];
-                        let v1 = convert_to_value(k1);
-                        for k2 in keys.iter().take(num_keys).skip(i + 1) {
-                            let v2 = convert_to_value(k2);
-                            match (&v1, &v2) {
-                                (
-                                    Some(DictionaryKey::Constant(v1)),
-                                    Some(DictionaryKey::Constant(v2)),
-                                ) => {
-                                    if self.settings.select.contains(&CheckCode::F601) && v1 == v2 {
-                                        self.checks.push(Check::new(
-                                            CheckKind::MultiValueRepeatedKeyLiteral,
-                                            k2.location,
-                                        ))
-                                    }
-                                }
-                                (
-                                    Some(DictionaryKey::Variable(v1)),
-                                    Some(DictionaryKey::Variable(v2)),
-                                ) => {
-                                    if self.settings.select.contains(&CheckCode::F602) && v1 == v2 {
-                                        self.checks.push(Check::new(
-                                            CheckKind::MultiValueRepeatedKeyVariable(
-                                                v2.to_string(),
-                                            ),
-                                            k2.location,
-                                        ))
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
+                let check_repeated_literals = self.settings.select.contains(&CheckCode::F601);
+                let check_repeated_variables = self.settings.select.contains(&CheckCode::F602);
+                if check_repeated_literals || check_repeated_variables {
+                    self.checks.extend(checks::check_repeated_keys(
+                        keys,
+                        check_repeated_literals,
+                        check_repeated_variables,
+                    ));
                 }
             }
-            ExprKind::GeneratorExp { .. }
-            | ExprKind::ListComp { .. }
-            | ExprKind::DictComp { .. }
-            | ExprKind::SetComp { .. } => self.push_scope(Scope::new(ScopeKind::Generator)),
             ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } => {
                 let scope =
                     &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
@@ -636,24 +489,15 @@ where
                 self.in_f_string = true;
             }
             ExprKind::UnaryOp { op, operand } => {
-                if matches!(op, Unaryop::Not) {
-                    if let ExprKind::Compare { ops, .. } = &operand.node {
-                        match ops[..] {
-                            [Cmpop::In] => {
-                                if self.settings.select.contains(CheckKind::NotInTest.code()) {
-                                    self.checks
-                                        .push(Check::new(CheckKind::NotInTest, operand.location));
-                                }
-                            }
-                            [Cmpop::Is] => {
-                                if self.settings.select.contains(CheckKind::NotIsTest.code()) {
-                                    self.checks
-                                        .push(Check::new(CheckKind::NotIsTest, operand.location));
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
+                let check_not_in = self.settings.select.contains(&CheckCode::E713);
+                let check_not_is = self.settings.select.contains(&CheckCode::E714);
+                if check_not_in || check_not_is {
+                    self.checks.extend(checks::check_not_tests(
+                        op,
+                        operand,
+                        check_not_in,
+                        check_not_is,
+                    ));
                 }
             }
             ExprKind::Compare {
@@ -661,99 +505,16 @@ where
                 ops,
                 comparators,
             } => {
-                let op = ops.first().unwrap();
-                let comparator = left;
-
-                // Check `left`.
-                if self.settings.select.contains(&CheckCode::E711)
-                    && matches!(
-                        comparator.node,
-                        ExprKind::Constant {
-                            value: Constant::None,
-                            kind: None
-                        }
-                    )
-                {
-                    if matches!(op, Cmpop::Eq) {
-                        self.checks.push(Check::new(
-                            CheckKind::NoneComparison(RejectedCmpop::Eq),
-                            comparator.location,
-                        ));
-                    }
-                    if matches!(op, Cmpop::NotEq) {
-                        self.checks.push(Check::new(
-                            CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                            comparator.location,
-                        ));
-                    }
-                }
-
-                if self.settings.select.contains(&CheckCode::E712) {
-                    if let ExprKind::Constant {
-                        value: Constant::Bool(value),
-                        kind: None,
-                    } = comparator.node
-                    {
-                        if matches!(op, Cmpop::Eq) {
-                            self.checks.push(Check::new(
-                                CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                                comparator.location,
-                            ));
-                        }
-                        if matches!(op, Cmpop::NotEq) {
-                            self.checks.push(Check::new(
-                                CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                                comparator.location,
-                            ));
-                        }
-                    }
-                }
-
-                // Check each comparator in order.
-                for (op, comparator) in izip!(ops, comparators) {
-                    if self.settings.select.contains(&CheckCode::E711)
-                        && matches!(
-                            comparator.node,
-                            ExprKind::Constant {
-                                value: Constant::None,
-                                kind: None
-                            }
-                        )
-                    {
-                        if matches!(op, Cmpop::Eq) {
-                            self.checks.push(Check::new(
-                                CheckKind::NoneComparison(RejectedCmpop::Eq),
-                                comparator.location,
-                            ));
-                        }
-                        if matches!(op, Cmpop::NotEq) {
-                            self.checks.push(Check::new(
-                                CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                                comparator.location,
-                            ));
-                        }
-                    }
-
-                    if self.settings.select.contains(&CheckCode::E712) {
-                        if let ExprKind::Constant {
-                            value: Constant::Bool(value),
-                            kind: None,
-                        } = comparator.node
-                        {
-                            if matches!(op, Cmpop::Eq) {
-                                self.checks.push(Check::new(
-                                    CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                                    comparator.location,
-                                ));
-                            }
-                            if matches!(op, Cmpop::NotEq) {
-                                self.checks.push(Check::new(
-                                    CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                                    comparator.location,
-                                ));
-                            }
-                        }
-                    }
+                let check_none_comparisons = self.settings.select.contains(&CheckCode::E711);
+                let check_true_false_comparisons = self.settings.select.contains(&CheckCode::E712);
+                if check_none_comparisons || check_true_false_comparisons {
+                    self.checks.extend(checks::check_literal_comparisons(
+                        left,
+                        ops,
+                        comparators,
+                        check_none_comparisons,
+                        check_true_false_comparisons,
+                    ));
                 }
             }
             ExprKind::Constant {
@@ -762,6 +523,10 @@ where
             } if self.in_annotation && !self.in_literal => {
                 self.deferred_annotations.push((expr.location, value));
             }
+            ExprKind::GeneratorExp { .. }
+            | ExprKind::ListComp { .. }
+            | ExprKind::DictComp { .. }
+            | ExprKind::SetComp { .. } => self.push_scope(Scope::new(ScopeKind::Generator)),
             _ => {}
         };
 
@@ -887,38 +652,10 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        if self
-            .settings
-            .select
-            .contains(CheckKind::DuplicateArgumentName.code())
-        {
-            // Collect all the arguments into a single vector.
-            let mut all_arguments: Vec<&Arg> = arguments
-                .args
-                .iter()
-                .chain(arguments.posonlyargs.iter())
-                .chain(arguments.kwonlyargs.iter())
-                .collect();
-            if let Some(arg) = &arguments.vararg {
-                all_arguments.push(arg);
-            }
-            if let Some(arg) = &arguments.kwarg {
-                all_arguments.push(arg);
-            }
-
-            // Search for duplicates.
-            let mut idents: BTreeSet<&str> = BTreeSet::new();
-            for arg in all_arguments {
-                let ident = &arg.node.arg;
-                if idents.contains(ident.as_str()) {
-                    self.checks
-                        .push(Check::new(CheckKind::DuplicateArgumentName, arg.location));
-                    break;
-                }
-                idents.insert(ident);
-            }
+        if self.settings.select.contains(&CheckCode::F831) {
+            self.checks
+                .extend(checks::check_duplicate_arguments(arguments));
         }
-
         visitor::walk_arguments(self, arguments);
     }
 
@@ -1146,21 +883,8 @@ impl<'a> Checker<'a> {
             }
 
             let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-            for (name, binding) in scope.values.iter() {
-                // TODO(charlie): Ignore if using `locals`.
-                if self.settings.select.contains(&CheckCode::F841)
-                    && binding.used.is_none()
-                    && name != "_"
-                    && name != "__tracebackhide__"
-                    && name != "__traceback_info__"
-                    && name != "__traceback_supplement__"
-                    && matches!(binding.kind, BindingKind::Assignment)
-                {
-                    self.checks.push(Check::new(
-                        CheckKind::UnusedVariable(name.to_string()),
-                        binding.location,
-                    ));
-                }
+            if self.settings.select.contains(&CheckCode::F841) {
+                self.checks.extend(checks::check_unused_variables(scope));
             }
 
             self.pop_scope();
@@ -1181,21 +905,8 @@ impl<'a> Checker<'a> {
             }
 
             let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-            for (name, binding) in scope.values.iter() {
-                // TODO(charlie): Ignore if using `locals`.
-                if self.settings.select.contains(&CheckCode::F841)
-                    && binding.used.is_none()
-                    && name != "_"
-                    && name != "__tracebackhide__"
-                    && name != "__traceback_info__"
-                    && name != "__traceback_supplement__"
-                    && matches!(binding.kind, BindingKind::Assignment)
-                {
-                    self.checks.push(Check::new(
-                        CheckKind::UnusedVariable(name.to_string()),
-                        binding.location,
-                    ));
-                }
+            if self.settings.select.contains(&CheckCode::F841) {
+                self.checks.extend(checks::check_unused_variables(scope));
             }
 
             self.pop_scope();
@@ -1264,7 +975,7 @@ pub fn check_ast(
     python_ast: &Suite,
     content: &str,
     settings: &Settings,
-    autofix: &autofix::Mode,
+    autofix: &fixer::Mode,
     path: &str,
 ) -> Vec<Check> {
     let mut checker = Checker::new(settings, autofix, path, content);
