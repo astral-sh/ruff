@@ -11,9 +11,12 @@ import multiprocessing.pool
 import multiprocessing.process
 import logging.config
 import logging.handlers
-from typing import NamedTuple, Dict, Type, TypeVar, List, Set
+from typing import TYPING_CHECK, NamedTuple, Dict, Type, TypeVar, List, Set, Union, cast
 
 from blah import ClassA, ClassB, ClassC
+
+if TYPING_CHECK:
+    from models import Fruit, Nut, Vegetable
 
 
 class X:
@@ -32,3 +35,7 @@ __all__ += ["ClassC"]
 X = TypeVar("X")
 Y = TypeVar("Y", bound="Dict")
 Z = TypeVar("Z", "List", "Set")
+
+a = list["Fruit"]
+b = Union["Nut", None]
+c = cast("Vegetable", b)

@@ -12,8 +12,9 @@ use crate::ast::types::{Binding, BindingKind, Scope, ScopeKind};
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, visitor};
 use crate::autofix::fixer;
-use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::checks::{Check, CheckCode, CheckKind};
+use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use crate::python::typing;
 use crate::settings::Settings;
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -78,6 +79,14 @@ fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
     match &expr.node {
         ExprKind::Attribute { attr, .. } => target == attr,
         ExprKind::Name { id, .. } => target == id,
+        _ => false,
+    }
+}
+
+fn is_annotated_subscript(expr: &Expr) -> bool {
+    match &expr.node {
+        ExprKind::Attribute { attr, .. } => typing::is_annotated_subscript(attr),
+        ExprKind::Name { id, .. } => typing::is_annotated_subscript(id),
         _ => false,
     }
 }
@@ -544,7 +553,25 @@ where
                 args,
                 keywords,
             } => {
-                if match_name_or_attr(func, "TypeVar") {
+                if match_name_or_attr(func, "ForwardRef") {
+                    self.visit_expr(func);
+                    for expr in args {
+                        self.visit_annotation(expr);
+                    }
+                } else if match_name_or_attr(func, "cast") {
+                    self.visit_expr(func);
+                    if !args.is_empty() {
+                        self.visit_annotation(&args[0]);
+                    }
+                    for expr in args.iter().skip(1) {
+                        self.visit_expr(expr);
+                    }
+                } else if match_name_or_attr(func, "NewType") {
+                    self.visit_expr(func);
+                    for expr in args.iter().skip(1) {
+                        self.visit_annotation(expr);
+                    }
+                } else if match_name_or_attr(func, "TypeVar") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.visit_annotation(expr);
@@ -559,7 +586,38 @@ where
                             }
                         }
                     }
+                } else if match_name_or_attr(func, "NamedTuple") {
+                    self.visit_expr(func);
+
+                    // NamedTuple("a", [("a", int)])
+                    if args.len() > 1 {
+                        match &args[1].node {
+                            ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
+                                for elt in elts {
+                                    match &elt.node {
+                                        ExprKind::List { elts, .. }
+                                        | ExprKind::Tuple { elts, .. } => {
+                                            if elts.len() == 2 {
+                                                self.visit_expr(&elts[0]);
+                                                self.visit_annotation(&elts[1]);
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    // NamedTuple("a", a=int)
+                    for keyword in keywords {
+                        let KeywordData { value, .. } = &keyword.node;
+                        self.visit_annotation(value);
+                    }
                 } else if match_name_or_attr(func, "TypedDict") {
+                    self.visit_expr(func);
+
                     // TypedDict("a", {"a": int})
                     if args.len() > 1 {
                         if let ExprKind::Dict { keys, values } = &args[1].node {
@@ -582,7 +640,7 @@ where
                 }
             }
             ExprKind::Subscript { value, slice, ctx } => {
-                if match_name_or_attr(value, "Type") {
+                if is_annotated_subscript(value) {
                     self.visit_expr(value);
                     self.visit_annotation(slice);
                     self.visit_expr_context(ctx);
