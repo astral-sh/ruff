@@ -431,6 +431,7 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         let prev_in_f_string = self.in_f_string;
         let prev_in_literal = self.in_literal;
+        let prev_in_annotation = self.in_annotation;
 
         // Pre-visit.
         match &expr.node {
@@ -598,7 +599,9 @@ where
                             if id == "bound" {
                                 self.visit_annotation(value);
                             } else {
+                                self.in_annotation = false;
                                 self.visit_expr(value);
+                                self.in_annotation = prev_in_annotation;
                             }
                         }
                     }
@@ -614,7 +617,10 @@ where
                                         ExprKind::List { elts, .. }
                                         | ExprKind::Tuple { elts, .. } => {
                                             if elts.len() == 2 {
+                                                self.in_annotation = false;
                                                 self.visit_expr(&elts[0]);
+                                                self.in_annotation = prev_in_annotation;
+
                                                 self.visit_annotation(&elts[1]);
                                             }
                                         }
@@ -638,7 +644,9 @@ where
                     if args.len() > 1 {
                         if let ExprKind::Dict { keys, values } = &args[1].node {
                             for key in keys {
+                                self.in_annotation = false;
                                 self.visit_expr(key);
+                                self.in_annotation = prev_in_annotation;
                             }
                             for value in values {
                                 self.visit_annotation(value);
@@ -677,6 +685,8 @@ where
             }
             _ => {}
         };
+
+        self.in_annotation = prev_in_annotation;
         self.in_literal = prev_in_literal;
         self.in_f_string = prev_in_f_string;
     }

@@ -64,4 +64,4 @@ from typing import List, TypedDict
 
 
 class Item(TypedDict):
-    nodes: List[TypedDict("Node", {"id": str})]
+    nodes: List[TypedDict("Node", {"name": str})]
