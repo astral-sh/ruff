@@ -65,3 +65,15 @@ from typing import List, TypedDict
 
 class Item(TypedDict):
     nodes: List[TypedDict("Node", {"name": str})]
+
+
+from enum import Enum
+
+
+class Ticket:
+    class Status(Enum):
+        OPEN = "OPEN"
+        CLOSED = "CLOSED"
+
+    def set_status(self, status: Status):
+        self.status = status

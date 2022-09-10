@@ -126,19 +126,52 @@ where
                 name,
                 decorator_list,
                 returns,
+                args,
                 ..
             }
             | StmtKind::AsyncFunctionDef {
                 name,
                 decorator_list,
                 returns,
+                args,
                 ..
             } => {
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
+                for arg in &args.posonlyargs {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                for arg in &args.args {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                if let Some(arg) = &args.vararg {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                for arg in &args.kwonlyargs {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                if let Some(arg) = &args.kwarg {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
                 for expr in returns {
                     self.visit_annotation(expr);
+                }
+                for expr in &args.kw_defaults {
+                    self.visit_expr(expr);
+                }
+                for expr in &args.defaults {
+                    self.visit_expr(expr);
                 }
                 self.add_binding(
                     name.to_string(),
@@ -758,10 +791,27 @@ where
             self.checks
                 .extend(checks::check_duplicate_arguments(arguments));
         }
-        visitor::walk_arguments(self, arguments);
+
+        // Bind, but intentionally avoid walking default expressions, as we handle them upstream.
+        for arg in &arguments.posonlyargs {
+            self.visit_arg(arg);
+        }
+        for arg in &arguments.args {
+            self.visit_arg(arg);
+        }
+        if let Some(arg) = &arguments.vararg {
+            self.visit_arg(arg);
+        }
+        for arg in &arguments.kwonlyargs {
+            self.visit_arg(arg);
+        }
+        if let Some(arg) = &arguments.kwarg {
+            self.visit_arg(arg);
+        }
     }
 
     fn visit_arg(&mut self, arg: &'b Arg) {
+        // Bind, but intentionally avoid walking the annotation, as we handle it upstream.
         self.add_binding(
             arg.node.arg.to_string(),
             Binding {
@@ -770,7 +820,6 @@ where
                 location: arg.location,
             },
         );
-        visitor::walk_arg(self, arg);
     }
 }
 
@@ -984,8 +1033,9 @@ impl<'a> Checker<'a> {
                 _ => {}
             }
 
-            let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if self.settings.select.contains(&CheckCode::F841) {
+                let scope =
+                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                 self.checks.extend(checks::check_unused_variables(scope));
             }
 
@@ -1006,8 +1056,9 @@ impl<'a> Checker<'a> {
                 self.visit_expr(body);
             }
 
-            let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if self.settings.select.contains(&CheckCode::F841) {
+                let scope =
+                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                 self.checks.extend(checks::check_unused_variables(scope));
             }
 
