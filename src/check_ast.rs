@@ -112,6 +112,12 @@ where
                         }
                     }
                 }
+
+                if self.settings.select.contains(&CheckCode::E741) {
+                    self.checks.extend(names.iter().filter_map(|name| {
+                        checks::check_ambiguous_variable_name_str(name, stmt.location)
+                    }));
+                }
             }
             StmtKind::FunctionDef {
                 name,
@@ -339,6 +345,16 @@ where
                         self.checks.push(check);
                     }
                 }
+                if self.settings.select.contains(&CheckCode::E741) {
+                    self.checks.extend(handlers.iter().filter_map(|handler| {
+                        let ExcepthandlerKind::ExceptHandler { name, .. } = &handler.node;
+                        if let Some(name) = name {
+                            checks::check_ambiguous_variable_name_str(name, handler.location)
+                        } else {
+                            None
+                        }
+                    }));
+                }
             }
             StmtKind::Expr { value } => {
                 if !self.seen_docstring {
@@ -353,15 +369,23 @@ where
                     self.seen_non_import = true;
                 }
             }
-            StmtKind::Assign { value, .. } => {
+            StmtKind::Assign { value, targets, .. } => {
                 self.seen_non_import = true;
                 if self.settings.select.contains(&CheckCode::E731) {
                     if let Some(check) = checks::check_do_not_assign_lambda(value, stmt.location) {
                         self.checks.push(check);
                     }
                 }
+                if self.settings.select.contains(&CheckCode::E741) {
+                    self.checks.extend(
+                        targets
+                            .iter()
+                            .map(|target| checks::check_ambiguous_variable_name(target))
+                            .flatten(),
+                    );
+                }
             }
-            StmtKind::AnnAssign { value, .. } => {
+            StmtKind::AnnAssign { value, target, .. } => {
                 self.seen_non_import = true;
                 if self.settings.select.contains(&CheckCode::E731) {
                     if let Some(value) = value {
@@ -372,9 +396,29 @@ where
                         }
                     }
                 }
+                if self.settings.select.contains(&CheckCode::E741) {
+                    self.checks
+                        .extend(checks::check_ambiguous_variable_name(target));
+                }
             }
             StmtKind::Delete { .. } => {
                 self.seen_non_import = true;
+            }
+            StmtKind::For { target, .. } => {
+                if self.settings.select.contains(&CheckCode::E741) {
+                    self.checks
+                        .extend(checks::check_ambiguous_variable_name(&target));
+                }
+            }
+            StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
+                if self.settings.select.contains(&CheckCode::E741) {
+                    for item in items {
+                        if let Some(optional_vars) = &item.optional_vars {
+                            self.checks
+                                .extend(checks::check_ambiguous_variable_name(optional_vars))
+                        }
+                    }
+                }
             }
             _ => {}
         }
@@ -655,6 +699,10 @@ where
         if self.settings.select.contains(&CheckCode::F831) {
             self.checks
                 .extend(checks::check_duplicate_arguments(arguments));
+        }
+        if self.settings.select.contains(&CheckCode::E741) {
+            self.checks
+                .extend(checks::check_ambiguous_variable_name_arguments(arguments));
         }
         visitor::walk_arguments(self, arguments);
     }

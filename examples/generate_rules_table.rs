@@ -3,6 +3,7 @@ use ruff::checks::{CheckKind, RejectedCmpop};
 
 fn main() {
     let mut check_kinds: Vec<CheckKind> = vec![
+        CheckKind::AmbiguousVariableName("...".to_string()),
         CheckKind::AssertTuple,
         CheckKind::DefaultExceptNotLast,
         CheckKind::DoNotAssignLambda,

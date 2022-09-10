@@ -93,6 +93,75 @@ pub fn check_do_not_assign_lambda(value: &Expr, location: Location) -> Option<Ch
     }
 }
 
+pub fn is_ambiguous_name(name: &str) -> bool {
+    name == "l" || name == "I" || name == "O"
+}
+
+pub fn check_ambiguous_variable_name_str(name: &str, location: Location) -> Option<Check> {
+    if is_ambiguous_name(name) {
+        Some(Check::new(
+            CheckKind::AmbiguousVariableName(name.to_string()),
+            location,
+        ))
+    } else {
+        None
+    }
+}
+
+pub fn check_ambiguous_variable_name_arguments(arguments: &Arguments) -> Vec<Check> {
+    // Collect all the arguments into a single vector.
+    let mut all_arguments: Vec<&Arg> = arguments
+        .args
+        .iter()
+        .chain(arguments.posonlyargs.iter())
+        .chain(arguments.kwonlyargs.iter())
+        .collect();
+    if let Some(arg) = &arguments.vararg {
+        all_arguments.push(arg);
+    }
+    if let Some(arg) = &arguments.kwarg {
+        all_arguments.push(arg);
+    }
+    all_arguments
+        .iter()
+        .filter_map(|arg| check_ambiguous_variable_name_str(&arg.node.arg, arg.location))
+        .collect()
+}
+
+fn check_target(target: &Expr) -> Option<Check> {
+    match &target.node {
+        ExprKind::Name { id, .. } => check_ambiguous_variable_name_str(id, target.location),
+        ExprKind::Starred { value, .. } => {
+            if let ExprKind::Name { id, .. } = &value.node {
+                check_ambiguous_variable_name_str(id, value.location)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Check AmbiguousVariableName compliance.
+pub fn check_ambiguous_variable_name(target: &Expr) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+    match &target.node {
+        ExprKind::Tuple { elts, .. } | ExprKind::List { elts, .. } => {
+            for elt in elts {
+                if let Some(check) = check_target(&elt) {
+                    checks.push(check);
+                };
+            }
+        }
+        _ => {
+            if let Some(check) = check_target(&target) {
+                checks.push(check);
+            };
+        }
+    }
+    checks
+}
+
 /// Check UselessObjectInheritance compliance.
 pub fn check_useless_object_inheritance(
     stmt: &Stmt,

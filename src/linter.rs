@@ -299,6 +299,124 @@ mod tests {
     }
 
     #[test]
+    fn e741() -> Result<()> {
+        let mut actual = check_path(
+            Path::new("./resources/test/fixtures/E741.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::E741]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        actual.sort_by_key(|check| check.location);
+        let expected = vec![
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(3, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("I".to_string()),
+                location: Location::new(4, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("O".to_string()),
+                location: Location::new(5, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(6, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(8, 4),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(9, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(10, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(11, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(16, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(20, 8),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(25, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(26, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(30, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(33, 9),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(34, 9),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(40, 8),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(49, 16),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(58, 20),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(63, 1),
+                fix: None,
+            },
+        ];
+
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f401() -> Result<()> {
         let mut actual = check_path(
             Path::new("./resources/test/fixtures/F401.py"),

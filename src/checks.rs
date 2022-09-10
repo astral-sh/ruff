@@ -15,6 +15,7 @@ pub enum CheckCode {
     E713,
     E714,
     E731,
+    E741,
     E902,
     F401,
     F403,
@@ -48,6 +49,7 @@ impl FromStr for CheckCode {
             "E713" => Ok(CheckCode::E713),
             "E714" => Ok(CheckCode::E714),
             "E731" => Ok(CheckCode::E731),
+            "E741" => Ok(CheckCode::E741),
             "E902" => Ok(CheckCode::E902),
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
@@ -82,6 +84,7 @@ impl CheckCode {
             CheckCode::E713 => "E713",
             CheckCode::E714 => "E714",
             CheckCode::E731 => "E731",
+            CheckCode::E741 => "E741",
             CheckCode::E902 => "E902",
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
@@ -114,6 +117,7 @@ impl CheckCode {
             CheckCode::E713 => &LintSource::AST,
             CheckCode::E714 => &LintSource::AST,
             CheckCode::E731 => &LintSource::AST,
+            CheckCode::E741 => &LintSource::AST,
             CheckCode::E902 => &LintSource::FileSystem,
             CheckCode::F401 => &LintSource::AST,
             CheckCode::F403 => &LintSource::AST,
@@ -153,6 +157,7 @@ pub enum RejectedCmpop {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckKind {
     AssertTuple,
+    AmbiguousVariableName(String),
     DefaultExceptNotLast,
     DoNotAssignLambda,
     DuplicateArgumentName,
@@ -185,6 +190,7 @@ impl CheckKind {
     pub fn name(&self) -> &'static str {
         match self {
             CheckKind::AssertTuple => "AssertTuple",
+            CheckKind::AmbiguousVariableName(_) => "AmbiguousVariableName",
             CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
@@ -225,6 +231,7 @@ impl CheckKind {
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LineTooLong => &CheckCode::E501,
             CheckKind::DoNotAssignLambda => &CheckCode::E731,
+            CheckKind::AmbiguousVariableName(_) => &CheckCode::E741,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
             CheckKind::MultiValueRepeatedKeyLiteral => &CheckCode::F601,
             CheckKind::MultiValueRepeatedKeyVariable(_) => &CheckCode::F602,
@@ -268,6 +275,9 @@ impl CheckKind {
             CheckKind::LineTooLong => "Line too long".to_string(),
             CheckKind::DoNotAssignLambda => {
                 "Do not assign a lambda expression, use a def".to_string()
+            }
+            CheckKind::AmbiguousVariableName(name) => {
+                format!("ambiguous variable name '{}'", name)
             }
             CheckKind::ModuleImportNotAtTopOfFile => {
                 "Module level import not at top of file".to_string()
@@ -346,6 +356,7 @@ impl CheckKind {
             CheckKind::IfTuple => false,
             CheckKind::ImportStarUsage => false,
             CheckKind::DoNotAssignLambda => false,
+            CheckKind::AmbiguousVariableName(_) => false,
             CheckKind::LineTooLong => false,
             CheckKind::ModuleImportNotAtTopOfFile => false,
             CheckKind::MultiValueRepeatedKeyLiteral => false,
