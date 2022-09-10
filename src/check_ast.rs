@@ -380,8 +380,7 @@ where
                     self.checks.extend(
                         targets
                             .iter()
-                            .map(|target| checks::check_ambiguous_variable_name(target))
-                            .flatten(),
+                            .flat_map(checks::check_ambiguous_variable_name),
                     );
                 }
             }
