@@ -559,6 +559,24 @@ where
                             }
                         }
                     }
+                } else if match_name_or_attr(func, "TypedDict") {
+                    // TypedDict("a", {"a": int})
+                    if args.len() > 1 {
+                        if let ExprKind::Dict { keys, values } = &args[1].node {
+                            for key in keys {
+                                self.visit_expr(key);
+                            }
+                            for value in values {
+                                self.visit_annotation(value);
+                            }
+                        }
+                    }
+
+                    // TypedDict("a", a=int)
+                    for keyword in keywords {
+                        let KeywordData { value, .. } = &keyword.node;
+                        self.visit_annotation(value);
+                    }
                 } else {
                     visitor::walk_expr(self, expr);
                 }

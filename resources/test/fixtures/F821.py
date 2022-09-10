@@ -58,3 +58,10 @@ y: int = 1
 x: "Bar" = 1
 
 [first] = ["yup"]
+
+
+from typing import List, TypedDict
+
+
+class Item(TypedDict):
+    nodes: List[TypedDict("Node", {"id": str})]
