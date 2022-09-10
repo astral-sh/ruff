@@ -439,6 +439,22 @@ where
                     self.in_literal = true;
                 }
             }
+            ExprKind::Tuple { elts, ctx } => {
+                if matches!(ctx, ExprContext::Store) {
+                    let check_too_many_expressions =
+                        self.settings.select.contains(&CheckCode::F621);
+                    let check_two_starred_expressions =
+                        self.settings.select.contains(&CheckCode::F622);
+                    if let Some(check) = checks::check_starred_expressions(
+                        elts,
+                        expr.location,
+                        check_too_many_expressions,
+                        check_two_starred_expressions,
+                    ) {
+                        self.checks.push(check);
+                    }
+                }
+            }
             ExprKind::Name { ctx, .. } => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => {

@@ -464,6 +464,30 @@ mod tests {
     }
 
     #[test]
+    fn f622() -> Result<()> {
+        let actual = check_path(
+            Path::new("./resources/test/fixtures/F622.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F622]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        let expected = vec![Check {
+            kind: CheckKind::TwoStarredExpressions,
+            location: Location::new(1, 1),
+            fix: None,
+        }];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f631() -> Result<()> {
         let mut actual = check_path(
             Path::new("./resources/test/fixtures/F631.py"),
