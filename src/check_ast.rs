@@ -345,16 +345,6 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.select.contains(&CheckCode::E741) {
-                    self.checks.extend(handlers.iter().filter_map(|handler| {
-                        let ExcepthandlerKind::ExceptHandler { name, .. } = &handler.node;
-                        if let Some(name) = name {
-                            checks::check_ambiguous_variable_name_str(name, handler.location)
-                        } else {
-                            None
-                        }
-                    }));
-                }
             }
             StmtKind::Expr { value } => {
                 if !self.seen_docstring {
@@ -682,6 +672,14 @@ where
                                 CheckKind::UnusedVariable(name.to_string()),
                                 excepthandler.location,
                             ));
+                        }
+                    }
+
+                    if self.settings.select.contains(&CheckCode::E741) {
+                        if let Some(check) =
+                            checks::check_ambiguous_variable_name_str(name, excepthandler.location)
+                        {
+                            self.checks.push(check);
                         }
                     }
 
