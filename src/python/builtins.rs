@@ -156,8 +156,8 @@ pub const BUILTINS: &[&str] = &[
 // Globally defined names which are not attributes of the builtins module, or are only present on
 // some platforms.
 pub const MAGIC_GLOBALS: &[&str] = &[
-    "__file__",
-    "__builtins__",
-    "__annotations__",
     "WindowsError",
+    "__annotations__",
+    "__builtins__",
+    "__file__",
 ];
