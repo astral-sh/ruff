@@ -21,6 +21,8 @@ pub enum CheckCode {
     F541,
     F601,
     F602,
+    F621,
+    F622,
     F631,
     F634,
     F704,
@@ -54,6 +56,8 @@ impl FromStr for CheckCode {
             "F541" => Ok(CheckCode::F541),
             "F601" => Ok(CheckCode::F601),
             "F602" => Ok(CheckCode::F602),
+            "F621" => Ok(CheckCode::F621),
+            "F622" => Ok(CheckCode::F622),
             "F631" => Ok(CheckCode::F631),
             "F634" => Ok(CheckCode::F634),
             "F704" => Ok(CheckCode::F704),
@@ -88,6 +92,8 @@ impl CheckCode {
             CheckCode::F541 => "F541",
             CheckCode::F601 => "F601",
             CheckCode::F602 => "F602",
+            CheckCode::F621 => "F621",
+            CheckCode::F622 => "F622",
             CheckCode::F631 => "F631",
             CheckCode::F634 => "F634",
             CheckCode::F704 => "F704",
@@ -120,6 +126,8 @@ impl CheckCode {
             CheckCode::F541 => &LintSource::AST,
             CheckCode::F601 => &LintSource::AST,
             CheckCode::F602 => &LintSource::AST,
+            CheckCode::F621 => &LintSource::AST,
+            CheckCode::F622 => &LintSource::AST,
             CheckCode::F631 => &LintSource::AST,
             CheckCode::F634 => &LintSource::AST,
             CheckCode::F704 => &LintSource::AST,
@@ -170,7 +178,9 @@ pub enum CheckKind {
     NotIsTest,
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    TooManyExpressionsInStarredAssignment,
     TrueFalseComparison(bool, RejectedCmpop),
+    TwoStarredExpressions,
     UndefinedExport(String),
     UndefinedLocal(String),
     UndefinedName(String),
@@ -202,7 +212,11 @@ impl CheckKind {
             CheckKind::NotIsTest => "NotIsTest",
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
             CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
+            CheckKind::TooManyExpressionsInStarredAssignment => {
+                "TooManyExpressionsInStarredAssignment"
+            }
             CheckKind::TrueFalseComparison(_, _) => "TrueFalseComparison",
+            CheckKind::TwoStarredExpressions => "TwoStarredExpressions",
             CheckKind::UndefinedExport(_) => "UndefinedExport",
             CheckKind::UndefinedLocal(_) => "UndefinedLocal",
             CheckKind::UndefinedName(_) => "UndefinedName",
@@ -234,7 +248,9 @@ impl CheckKind {
             CheckKind::NotIsTest => &CheckCode::E714,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::TooManyExpressionsInStarredAssignment => &CheckCode::F621,
             CheckKind::TrueFalseComparison(_, _) => &CheckCode::E712,
+            CheckKind::TwoStarredExpressions => &CheckCode::F622,
             CheckKind::UndefinedExport(_) => &CheckCode::F822,
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
@@ -295,6 +311,9 @@ impl CheckKind {
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
             }
+            CheckKind::TooManyExpressionsInStarredAssignment => {
+                "too many expressions in star-unpacking assignment".to_string()
+            }
             CheckKind::TrueFalseComparison(value, op) => match *value {
                 true => match op {
                     RejectedCmpop::Eq => {
@@ -313,6 +332,7 @@ impl CheckKind {
                     }
                 },
             },
+            CheckKind::TwoStarredExpressions => "two starred expressions in assignment".to_string(),
             CheckKind::UndefinedExport(name) => {
                 format!("Undefined name `{name}` in `__all__`")
             }
@@ -356,7 +376,9 @@ impl CheckKind {
             CheckKind::NoneComparison(_) => false,
             CheckKind::RaiseNotImplemented => false,
             CheckKind::ReturnOutsideFunction => false,
+            CheckKind::TooManyExpressionsInStarredAssignment => false,
             CheckKind::TrueFalseComparison(_, _) => false,
+            CheckKind::TwoStarredExpressions => false,
             CheckKind::UndefinedExport(_) => false,
             CheckKind::UndefinedLocal(_) => false,
             CheckKind::UndefinedName(_) => false,
