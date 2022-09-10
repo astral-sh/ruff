@@ -407,15 +407,15 @@ where
             StmtKind::For { target, .. } => {
                 if self.settings.select.contains(&CheckCode::E741) {
                     self.checks
-                        .extend(checks::check_ambiguous_variable_name(&target));
+                        .extend(checks::check_ambiguous_variable_name(target));
                 }
             }
             StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
                 if self.settings.select.contains(&CheckCode::E741) {
                     for item in items {
-                        if let Some(optional_vars) = &item.optional_vars {
+                        if let Some(vars) = &item.optional_vars {
                             self.checks
-                                .extend(checks::check_ambiguous_variable_name(optional_vars))
+                                .extend(checks::check_ambiguous_variable_name(vars))
                         }
                     }
                 }

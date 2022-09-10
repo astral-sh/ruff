@@ -148,13 +148,13 @@ pub fn check_ambiguous_variable_name(target: &Expr) -> Vec<Check> {
     match &target.node {
         ExprKind::Tuple { elts, .. } | ExprKind::List { elts, .. } => {
             for elt in elts {
-                if let Some(check) = check_target(&elt) {
+                if let Some(check) = check_target(elt) {
                     checks.push(check);
                 };
             }
         }
         _ => {
-            if let Some(check) = check_target(&target) {
+            if let Some(check) = check_target(target) {
                 checks.push(check);
             };
         }
