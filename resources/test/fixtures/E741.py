@@ -37,8 +37,16 @@ def f2():
     return l
 
 
-def f4(l):
-    return l
+def f4(l, /, I):
+    return l, I, O
+
+
+def f5(l=0, *, I=1):
+    return l, I
+
+
+def f6(*l, **I):
+    return l, I
 
 
 @contextmanager

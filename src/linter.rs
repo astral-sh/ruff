@@ -392,18 +392,43 @@ mod tests {
                 fix: None,
             },
             Check {
-                kind: CheckKind::AmbiguousVariableName("l".to_string()),
-                location: Location::new(49, 16),
+                kind: CheckKind::AmbiguousVariableName("I".to_string()),
+                location: Location::new(40, 14),
                 fix: None,
             },
             Check {
                 kind: CheckKind::AmbiguousVariableName("l".to_string()),
-                location: Location::new(58, 20),
+                location: Location::new(44, 8),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("I".to_string()),
+                location: Location::new(44, 16),
                 fix: None,
             },
             Check {
                 kind: CheckKind::AmbiguousVariableName("l".to_string()),
-                location: Location::new(63, 1),
+                location: Location::new(48, 9),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("I".to_string()),
+                location: Location::new(48, 14),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(57, 16),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(66, 20),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(71, 1),
                 fix: None,
             },
         ];
