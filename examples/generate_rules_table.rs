@@ -12,6 +12,7 @@ fn main() {
         CheckKind::IOError("...".to_string()),
         CheckKind::IfTuple,
         CheckKind::ImportStarUsage,
+        CheckKind::LateFutureImport,
         CheckKind::LineTooLong,
         CheckKind::ModuleImportNotAtTopOfFile,
         CheckKind::MultiValueRepeatedKeyLiteral,

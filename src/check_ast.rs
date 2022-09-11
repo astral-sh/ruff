@@ -44,6 +44,7 @@ struct Checker<'a> {
     in_literal: bool,
     seen_non_import: bool,
     seen_docstring: bool,
+    futures_allowed: bool,
 }
 
 impl<'a> Checker<'a> {
@@ -73,6 +74,7 @@ impl<'a> Checker<'a> {
             in_literal: false,
             seen_non_import: false,
             seen_docstring: false,
+            futures_allowed: true,
         }
     }
 }
@@ -102,32 +104,57 @@ where
 
         // Track whether we've seen docstrings, non-imports, etc.
         match &stmt.node {
-            StmtKind::Import { .. } => {}
-            StmtKind::ImportFrom { .. } => {}
-            StmtKind::Expr { value } => {
-                if !self.seen_docstring
-                    && stmt.location.column() == 1
-                    && !operations::in_nested_block(&self.parent_stack, &self.parents)
-                {
-                    if let ExprKind::Constant {
-                        value: Constant::Str(_),
-                        ..
-                    } = &value.node
-                    {
-                        self.seen_docstring = true;
+            StmtKind::ImportFrom { module, .. } => {
+                // Allow __future__ imports until we see a non-__future__ import.
+                if self.futures_allowed {
+                    if let Some(module) = module {
+                        if module != "__future__" {
+                            self.futures_allowed = false;
+                        }
                     }
                 }
-
-                if !self.seen_non_import
-                    && stmt.location.column() == 1
+            }
+            StmtKind::Import { .. } => {
+                self.futures_allowed = false;
+            }
+            StmtKind::Expr { value } => {
+                if self.seen_docstring
+                    && !self.seen_non_import
                     && !operations::in_nested_block(&self.parent_stack, &self.parents)
                 {
                     self.seen_non_import = true;
                 }
+
+                if !self.seen_docstring
+                    && !operations::in_nested_block(&self.parent_stack, &self.parents)
+                    && matches!(
+                        &value.node,
+                        ExprKind::Constant {
+                            value: Constant::Str(_),
+                            ..
+                        },
+                    )
+                {
+                    self.seen_docstring = true;
+                }
+
+                // Allow docstrings to interrupt __future__ imports.
+                if self.futures_allowed
+                    && !matches!(
+                        &value.node,
+                        ExprKind::Constant {
+                            value: Constant::Str(_),
+                            ..
+                        },
+                    )
+                {
+                    self.futures_allowed = false;
+                }
             }
             _ => {
+                self.futures_allowed = false;
+
                 if !self.seen_non_import
-                    && stmt.location.column() == 1
                     && !operations::in_nested_block(&self.parent_stack, &self.parents)
                 {
                     self.seen_non_import = true;
@@ -363,6 +390,12 @@ where
                                 location: stmt.location,
                             },
                         );
+
+                        if !self.futures_allowed && self.settings.select.contains(&CheckCode::F404)
+                        {
+                            self.checks
+                                .push(Check::new(CheckKind::LateFutureImport, stmt.location));
+                        }
                     } else if alias.node.name == "*" {
                         self.add_binding(
                             name,
