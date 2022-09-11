@@ -37,6 +37,7 @@ struct Checker<'a> {
     deferred_annotations: Vec<(Location, &'a str)>,
     deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>)>,
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
+    deferred_assignments: Vec<usize>,
     // Derivative state.
     in_f_string: bool,
     in_annotation: bool,
@@ -66,6 +67,7 @@ impl<'a> Checker<'a> {
             deferred_annotations: vec![],
             deferred_functions: vec![],
             deferred_lambdas: vec![],
+            deferred_assignments: vec![],
             in_f_string: false,
             in_annotation: false,
             in_literal: false,
@@ -1038,11 +1040,8 @@ impl<'a> Checker<'a> {
                 _ => {}
             }
 
-            if self.settings.select.contains(&CheckCode::F841) {
-                let scope =
-                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-                self.checks.extend(checks::check_unused_variables(scope));
-            }
+            self.deferred_assignments
+                .push(*self.scope_stack.last().expect("No current scope found."));
 
             self.pop_scope();
         }
@@ -1061,13 +1060,20 @@ impl<'a> Checker<'a> {
                 self.visit_expr(body);
             }
 
-            if self.settings.select.contains(&CheckCode::F841) {
-                let scope =
-                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-                self.checks.extend(checks::check_unused_variables(scope));
-            }
+            self.deferred_assignments
+                .push(*self.scope_stack.last().expect("No current scope found."));
 
             self.pop_scope();
+        }
+    }
+
+    fn check_deferred_assignments(&mut self) {
+        while !self.deferred_assignments.is_empty() {
+            let index = self.deferred_assignments.pop().unwrap();
+            if self.settings.select.contains(&CheckCode::F841) {
+                self.checks
+                    .extend(checks::check_unused_variables(&self.scopes[index]));
+            }
         }
     }
 
@@ -1148,6 +1154,7 @@ pub fn check_ast(
     // Check any deferred statements.
     checker.check_deferred_functions();
     checker.check_deferred_lambdas();
+    checker.check_deferred_assignments();
     let mut allocator = vec![];
     checker.check_deferred_annotations(path, &mut allocator);
 
