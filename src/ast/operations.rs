@@ -85,6 +85,21 @@ pub fn on_conditional_branch(parent_stack: &[usize], parents: &[&Stmt]) -> bool 
     false
 }
 
+/// Check if a node is in a nested block.
+pub fn in_nested_block(parent_stack: &[usize], parents: &[&Stmt]) -> bool {
+    for index in parent_stack.iter().rev() {
+        let parent = parents[*index];
+        if matches!(parent.node, StmtKind::Try { .. })
+            || matches!(parent.node, StmtKind::If { .. })
+            || matches!(parent.node, StmtKind::With { .. })
+        {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Struct used to efficiently slice source code at (row, column) Locations.
 pub struct SourceCodeLocator<'a> {
     content: &'a str,
