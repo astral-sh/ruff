@@ -20,6 +20,7 @@ pub enum CheckCode {
     F401,
     F403,
     F404,
+    F407,
     F541,
     F601,
     F602,
@@ -57,6 +58,7 @@ impl FromStr for CheckCode {
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
             "F404" => Ok(CheckCode::F404),
+            "F407" => Ok(CheckCode::F407),
             "F541" => Ok(CheckCode::F541),
             "F601" => Ok(CheckCode::F601),
             "F602" => Ok(CheckCode::F602),
@@ -95,6 +97,7 @@ impl CheckCode {
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
             CheckCode::F404 => "F404",
+            CheckCode::F407 => "F407",
             CheckCode::F541 => "F541",
             CheckCode::F601 => "F601",
             CheckCode::F602 => "F602",
@@ -131,6 +134,7 @@ impl CheckCode {
             CheckCode::F401 => &LintSource::AST,
             CheckCode::F403 => &LintSource::AST,
             CheckCode::F404 => &LintSource::AST,
+            CheckCode::F407 => &LintSource::AST,
             CheckCode::F541 => &LintSource::AST,
             CheckCode::F601 => &LintSource::AST,
             CheckCode::F602 => &LintSource::AST,
@@ -174,6 +178,7 @@ pub enum CheckKind {
     DoNotAssignLambda,
     DuplicateArgumentName,
     FStringMissingPlaceholders,
+    FutureFeatureNotDefined(String),
     IOError(String),
     IfTuple,
     ImportStarUsage,
@@ -209,6 +214,7 @@ impl CheckKind {
             CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
+            CheckKind::FutureFeatureNotDefined(_) => "FutureFeatureNotDefined",
             CheckKind::IOError(_) => "IOError",
             CheckKind::IfTuple => "IfTuple",
             CheckKind::ImportStarUsage => "ImportStarUsage",
@@ -246,6 +252,7 @@ impl CheckKind {
             CheckKind::DefaultExceptNotLast => &CheckCode::F707,
             CheckKind::DuplicateArgumentName => &CheckCode::F831,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
+            CheckKind::FutureFeatureNotDefined(_) => &CheckCode::F407,
             CheckKind::IOError(_) => &CheckCode::E902,
             CheckKind::IfTuple => &CheckCode::F634,
             CheckKind::ImportStarUsage => &CheckCode::F403,
@@ -289,6 +296,9 @@ impl CheckKind {
             }
             CheckKind::FStringMissingPlaceholders => {
                 "f-string without any placeholders".to_string()
+            }
+            CheckKind::FutureFeatureNotDefined(name) => {
+                format!("future feature '{name}' is not defined")
             }
             CheckKind::IOError(name) => {
                 format!("No such file or directory: `{name}`")
@@ -384,6 +394,7 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => false,
             CheckKind::DuplicateArgumentName => false,
             CheckKind::FStringMissingPlaceholders => false,
+            CheckKind::FutureFeatureNotDefined(_) => false,
             CheckKind::IOError(_) => false,
             CheckKind::IfTuple => false,
             CheckKind::ImportStarUsage => false,
