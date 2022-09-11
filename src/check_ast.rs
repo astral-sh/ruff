@@ -124,7 +124,7 @@ where
 
                 if self.settings.select.contains(&CheckCode::E741) {
                     self.checks.extend(names.iter().filter_map(|name| {
-                        checks::check_ambiguous_variable_name_str(name, stmt.location)
+                        checks::check_ambiguous_variable_name(name, stmt.location)
                     }));
                 }
             }
@@ -401,22 +401,15 @@ where
                     self.seen_non_import = true;
                 }
             }
-            StmtKind::Assign { value, targets, .. } => {
+            StmtKind::Assign { value, .. } => {
                 self.seen_non_import = true;
                 if self.settings.select.contains(&CheckCode::E731) {
                     if let Some(check) = checks::check_do_not_assign_lambda(value, stmt.location) {
                         self.checks.push(check);
                     }
                 }
-                if self.settings.select.contains(&CheckCode::E741) {
-                    self.checks.extend(
-                        targets
-                            .iter()
-                            .flat_map(checks::check_ambiguous_variable_name),
-                    );
-                }
             }
-            StmtKind::AnnAssign { value, target, .. } => {
+            StmtKind::AnnAssign { value, .. } => {
                 self.seen_non_import = true;
                 if self.settings.select.contains(&CheckCode::E731) {
                     if let Some(value) = value {
@@ -427,29 +420,9 @@ where
                         }
                     }
                 }
-                if self.settings.select.contains(&CheckCode::E741) {
-                    self.checks
-                        .extend(checks::check_ambiguous_variable_name(target));
-                }
             }
             StmtKind::Delete { .. } => {
                 self.seen_non_import = true;
-            }
-            StmtKind::For { target, .. } => {
-                if self.settings.select.contains(&CheckCode::E741) {
-                    self.checks
-                        .extend(checks::check_ambiguous_variable_name(target));
-                }
-            }
-            StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
-                if self.settings.select.contains(&CheckCode::E741) {
-                    for item in items {
-                        if let Some(vars) = &item.optional_vars {
-                            self.checks
-                                .extend(checks::check_ambiguous_variable_name(vars))
-                        }
-                    }
-                }
             }
             _ => {}
         }
@@ -810,14 +783,6 @@ where
                         }
                     }
 
-                    if self.settings.select.contains(&CheckCode::E741) {
-                        if let Some(check) =
-                            checks::check_ambiguous_variable_name_str(name, excepthandler.location)
-                        {
-                            self.checks.push(check);
-                        }
-                    }
-
                     if let Some(binding) = definition {
                         scope.values.insert(name.to_string(), binding);
                     }
@@ -861,6 +826,13 @@ where
                 location: arg.location,
             },
         );
+
+        if self.settings.select.contains(&CheckCode::E741) {
+            if let Some(check) = checks::check_ambiguous_variable_name(&arg.node.arg, arg.location)
+            {
+                self.checks.push(check);
+            }
+        }
     }
 }
 
@@ -991,6 +963,13 @@ impl<'a> Checker<'a> {
                         }
                     }
                 }
+            }
+
+            if self.settings.select.contains(&CheckCode::E741) && checks::is_ambiguous_name(id) {
+                self.checks.push(Check::new(
+                    CheckKind::AmbiguousVariableName(id.to_string()),
+                    expr.location,
+                ));
             }
 
             // TODO(charlie): Handle alternate binding types (like `Annotation`).
