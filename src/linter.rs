@@ -442,6 +442,44 @@ mod tests {
     }
 
     #[test]
+    fn e742() -> Result<()> {
+        let mut actual = check_path(
+            Path::new("./resources/test/fixtures/E742.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::E742]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        actual.sort_by_key(|check| check.location);
+        let expected = vec![
+            Check {
+                kind: CheckKind::AmbiguousClassName("l".to_string()),
+                location: Location::new(1, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousClassName("I".to_string()),
+                location: Location::new(5, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousClassName("O".to_string()),
+                location: Location::new(9, 1),
+                fix: None,
+            },
+        ];
+
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f401() -> Result<()> {
         let mut actual = check_path(
             Path::new("./resources/test/fixtures/F401.py"),

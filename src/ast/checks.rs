@@ -109,6 +109,18 @@ pub fn check_ambiguous_variable_name(name: &str, location: Location) -> Option<C
     }
 }
 
+/// Check AmbiguousClassName compliance.
+pub fn check_ambiguous_class_name(name: &str, location: Location) -> Option<Check> {
+    if is_ambiguous_name(name) {
+        Some(Check::new(
+            CheckKind::AmbiguousClassName(name.to_string()),
+            location,
+        ))
+    } else {
+        None
+    }
+}
+
 /// Check UselessObjectInheritance compliance.
 pub fn check_useless_object_inheritance(
     stmt: &Stmt,
