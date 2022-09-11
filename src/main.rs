@@ -6,6 +6,7 @@ use std::time::Instant;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
+use glob::Pattern;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
@@ -47,12 +48,15 @@ struct Cli {
     /// Disable cache reads.
     #[clap(short, long, action)]
     no_cache: bool,
-    /// Comma-separated list of error codes to enable.
+    /// List of error codes to enable.
     #[clap(long, multiple = true)]
     select: Vec<CheckCode>,
-    /// Comma-separated list of error codes to ignore.
+    /// List of error codes to ignore.
     #[clap(long, multiple = true)]
     ignore: Vec<CheckCode>,
+    /// List of file and/or directory patterns to exclude from checks.
+    #[clap(long, multiple = true)]
+    exclude: Vec<Pattern>,
 }
 
 #[cfg(feature = "update-informer")]
@@ -187,6 +191,9 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !cli.ignore.is_empty() {
         settings.ignore(&cli.ignore);
+    }
+    if !cli.exclude.is_empty() {
+        settings.exclude(cli.exclude);
     }
 
     if cli.watch {

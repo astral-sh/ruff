@@ -96,16 +96,17 @@ ARGS:
     <FILES>...
 
 OPTIONS:
-    -e, --exit-zero             Exit with status code "0", even upon detecting errors
-    -f, --fix                   Attempt to automatically fix lint errors
-    -h, --help                  Print help information
-        --ignore <IGNORE>...    Comma-separated list of error codes to ignore
-    -n, --no-cache              Disable cache reads
-    -q, --quiet                 Disable all logging (but still exit with status code "1" upon
-                                detecting errors)
-        --select <SELECT>...    Comma-separated list of error codes to enable
-    -v, --verbose               Enable verbose logging
-    -w, --watch                 Run in watch mode by re-running whenever files change
+    -e, --exit-zero               Exit with status code "0", even upon detecting errors
+        --exclude <EXCLUDE>...    List of file and/or directory patterns to exclude from checks
+    -f, --fix                     Attempt to automatically fix lint errors
+    -h, --help                    Print help information
+        --ignore <IGNORE>...      List of error codes to ignore
+    -n, --no-cache                Disable cache reads
+    -q, --quiet                   Disable all logging (but still exit with status code "1" upon
+                                  detecting errors)
+        --select <SELECT>...      List of error codes to enable
+    -v, --verbose                 Enable verbose logging
+    -w, --watch                   Run in watch mode by re-running whenever files change
 ```
 
 ### Compatibility with Black
