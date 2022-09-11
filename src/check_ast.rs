@@ -965,11 +965,10 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.select.contains(&CheckCode::E741) && checks::is_ambiguous_name(id) {
-                self.checks.push(Check::new(
-                    CheckKind::AmbiguousVariableName(id.to_string()),
-                    expr.location,
-                ));
+            if self.settings.select.contains(&CheckCode::E741) {
+                if let Some(check) = checks::check_ambiguous_variable_name(id, expr.location) {
+                    self.checks.push(check);
+                }
             }
 
             // TODO(charlie): Handle alternate binding types (like `Annotation`).
