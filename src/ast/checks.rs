@@ -93,6 +93,22 @@ pub fn check_do_not_assign_lambda(value: &Expr, location: Location) -> Option<Ch
     }
 }
 
+fn is_ambiguous_name(name: &str) -> bool {
+    name == "l" || name == "I" || name == "O"
+}
+
+/// Check AmbiguousVariableName compliance.
+pub fn check_ambiguous_variable_name(name: &str, location: Location) -> Option<Check> {
+    if is_ambiguous_name(name) {
+        Some(Check::new(
+            CheckKind::AmbiguousVariableName(name.to_string()),
+            location,
+        ))
+    } else {
+        None
+    }
+}
+
 /// Check UselessObjectInheritance compliance.
 pub fn check_useless_object_inheritance(
     stmt: &Stmt,
