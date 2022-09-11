@@ -94,4 +94,8 @@ impl Settings {
             self.select.remove(code);
         }
     }
+
+    pub fn exclude(&mut self, exclude: Vec<Pattern>) {
+        self.exclude = exclude;
+    }
 }
