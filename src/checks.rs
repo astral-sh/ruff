@@ -19,6 +19,7 @@ pub enum CheckCode {
     E902,
     F401,
     F403,
+    F404,
     F541,
     F601,
     F602,
@@ -55,6 +56,7 @@ impl FromStr for CheckCode {
             "E902" => Ok(CheckCode::E902),
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
+            "F404" => Ok(CheckCode::F404),
             "F541" => Ok(CheckCode::F541),
             "F601" => Ok(CheckCode::F601),
             "F602" => Ok(CheckCode::F602),
@@ -92,6 +94,7 @@ impl CheckCode {
             CheckCode::E902 => "E902",
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
+            CheckCode::F404 => "F404",
             CheckCode::F541 => "F541",
             CheckCode::F601 => "F601",
             CheckCode::F602 => "F602",
@@ -127,6 +130,7 @@ impl CheckCode {
             CheckCode::E902 => &LintSource::FileSystem,
             CheckCode::F401 => &LintSource::AST,
             CheckCode::F403 => &LintSource::AST,
+            CheckCode::F404 => &LintSource::AST,
             CheckCode::F541 => &LintSource::AST,
             CheckCode::F601 => &LintSource::AST,
             CheckCode::F602 => &LintSource::AST,
@@ -173,6 +177,7 @@ pub enum CheckKind {
     IOError(String),
     IfTuple,
     ImportStarUsage,
+    LateFutureImport,
     LineTooLong,
     ModuleImportNotAtTopOfFile,
     MultiValueRepeatedKeyLiteral,
@@ -207,6 +212,7 @@ impl CheckKind {
             CheckKind::IOError(_) => "IOError",
             CheckKind::IfTuple => "IfTuple",
             CheckKind::ImportStarUsage => "ImportStarUsage",
+            CheckKind::LateFutureImport => "LateFutureImport",
             CheckKind::LineTooLong => "LineTooLong",
             CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
@@ -243,6 +249,7 @@ impl CheckKind {
             CheckKind::IOError(_) => &CheckCode::E902,
             CheckKind::IfTuple => &CheckCode::F634,
             CheckKind::ImportStarUsage => &CheckCode::F403,
+            CheckKind::LateFutureImport => &CheckCode::F404,
             CheckKind::LineTooLong => &CheckCode::E501,
             CheckKind::DoNotAssignLambda => &CheckCode::E731,
             CheckKind::AmbiguousVariableName(_) => &CheckCode::E741,
@@ -288,6 +295,9 @@ impl CheckKind {
             }
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
             CheckKind::ImportStarUsage => "Unable to detect undefined names".to_string(),
+            CheckKind::LateFutureImport => {
+                "from __future__ imports must occur at the beginning of the file".to_string()
+            }
             CheckKind::LineTooLong => "Line too long".to_string(),
             CheckKind::DoNotAssignLambda => {
                 "Do not assign a lambda expression, use a def".to_string()
@@ -368,23 +378,24 @@ impl CheckKind {
     /// Whether the check kind is (potentially) fixable.
     pub fn fixable(&self) -> bool {
         match self {
+            CheckKind::AmbiguousVariableName(_) => false,
             CheckKind::AssertTuple => false,
             CheckKind::DefaultExceptNotLast => false,
+            CheckKind::DoNotAssignLambda => false,
             CheckKind::DuplicateArgumentName => false,
             CheckKind::FStringMissingPlaceholders => false,
             CheckKind::IOError(_) => false,
             CheckKind::IfTuple => false,
             CheckKind::ImportStarUsage => false,
-            CheckKind::DoNotAssignLambda => false,
-            CheckKind::AmbiguousVariableName(_) => false,
+            CheckKind::LateFutureImport => false,
             CheckKind::LineTooLong => false,
             CheckKind::ModuleImportNotAtTopOfFile => false,
             CheckKind::MultiValueRepeatedKeyLiteral => false,
             CheckKind::MultiValueRepeatedKeyVariable(_) => false,
             CheckKind::NoAssertEquals => true,
+            CheckKind::NoneComparison(_) => false,
             CheckKind::NotInTest => false,
             CheckKind::NotIsTest => false,
-            CheckKind::NoneComparison(_) => false,
             CheckKind::RaiseNotImplemented => false,
             CheckKind::ReturnOutsideFunction => false,
             CheckKind::TooManyExpressionsInStarredAssignment => false,
