@@ -57,7 +57,7 @@ ruff also works with [Pre-Commit](https://pre-commit.com) (requires Cargo on sys
 ```yaml
 repos:
 - repo: https://github.com/charliermarsh/ruff
-  rev: v0.0.30
+  rev: v0.0.32
   hooks:
     - id: lint
 ```
@@ -86,7 +86,7 @@ ruff path/to/code/ --select F401 F403
 See `ruff --help` for more:
 
 ```shell
-ruff (v0.0.30)
+ruff (v0.0.32)
 An extremely fast Python linter.
 
 USAGE:
@@ -123,7 +123,7 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
 Under those conditions, Flake8 implements about 58 rules, give or take. At time of writing, ruff
-implements 24 rules. (Note that these 24 rules likely cover a disproportionate share of errors:
+implements 28 rules. (Note that these 28 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
 Of the unimplemented rules, ruff is missing:
@@ -159,6 +159,8 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | F541 | FStringMissingPlaceholders | f-string without any placeholders |
 | F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |
 | F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |
+| F621 | TooManyExpressionsInStarredAssignment | too many expressions in star-unpacking assignment |
+| F622 | TwoStarredExpressions | two starred expressions in assignment |
 | F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |
 | F634 | IfTuple | If test is a tuple, which is always `True` |
 | F704 | YieldOutsideFunction | a `yield` or `yield from` statement outside of a function/method |

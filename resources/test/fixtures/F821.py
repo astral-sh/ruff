@@ -56,3 +56,24 @@ except Exception as e:
 y: int = 1
 
 x: "Bar" = 1
+
+[first] = ["yup"]
+
+
+from typing import List, TypedDict
+
+
+class Item(TypedDict):
+    nodes: List[TypedDict("Node", {"name": str})]
+
+
+from enum import Enum
+
+
+class Ticket:
+    class Status(Enum):
+        OPEN = "OPEN"
+        CLOSED = "CLOSED"
+
+    def set_status(self, status: Status):
+        self.status = status

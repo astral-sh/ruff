@@ -58,6 +58,8 @@ impl Settings {
                     CheckCode::F541,
                     CheckCode::F601,
                     CheckCode::F602,
+                    CheckCode::F621,
+                    CheckCode::F622,
                     CheckCode::F631,
                     CheckCode::F634,
                     CheckCode::F704,

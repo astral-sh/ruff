@@ -464,3 +464,36 @@ pub fn check_literal_comparisons(
 
     checks
 }
+
+/// Check TwoStarredExpressions and TooManyExpressionsInStarredAssignment compliance.
+pub fn check_starred_expressions(
+    elts: &[Expr],
+    location: Location,
+    check_too_many_expressions: bool,
+    check_two_starred_expressions: bool,
+) -> Option<Check> {
+    let mut has_starred: bool = false;
+    let mut starred_index: Option<usize> = None;
+    for (index, elt) in elts.iter().enumerate() {
+        if matches!(elt.node, ExprKind::Starred { .. }) {
+            if has_starred && check_two_starred_expressions {
+                return Some(Check::new(CheckKind::TwoStarredExpressions, location));
+            }
+            has_starred = true;
+            starred_index = Some(index);
+        }
+    }
+
+    if check_too_many_expressions {
+        if let Some(starred_index) = starred_index {
+            if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
+                return Some(Check::new(
+                    CheckKind::TooManyExpressionsInStarredAssignment,
+                    location,
+                ));
+            }
+        }
+    }
+
+    None
+}

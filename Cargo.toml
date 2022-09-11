@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.30"
+version = "0.0.32"
 edition = "2021"
 
 [lib]
@@ -20,12 +20,13 @@ fern = { version = "0.6.1" }
 filetime = { version = "0.2.17" }
 glob = { version = "0.3.0" }
 itertools = "0.10.3"
+lazy_static = "1.4.0"
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 once_cell = { version = "1.13.1" }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "8cc3d23ddaa6339bf56608adaeefabff3ad329e7" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "7d21c6923a506e79cc041708d83cef925efd33f4" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }

@@ -12,8 +12,9 @@ use crate::ast::types::{Binding, BindingKind, Scope, ScopeKind};
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, visitor};
 use crate::autofix::fixer;
-use crate::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::checks::{Check, CheckCode, CheckKind};
+use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use crate::python::typing;
 use crate::settings::Settings;
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -82,6 +83,14 @@ fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
     }
 }
 
+fn is_annotated_subscript(expr: &Expr) -> bool {
+    match &expr.node {
+        ExprKind::Attribute { attr, .. } => typing::is_annotated_subscript(attr),
+        ExprKind::Name { id, .. } => typing::is_annotated_subscript(id),
+        _ => false,
+    }
+}
+
 impl<'a, 'b> Visitor<'b> for Checker<'a>
 where
     'b: 'a,
@@ -123,19 +132,52 @@ where
                 name,
                 decorator_list,
                 returns,
+                args,
                 ..
             }
             | StmtKind::AsyncFunctionDef {
                 name,
                 decorator_list,
                 returns,
+                args,
                 ..
             } => {
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
+                for arg in &args.posonlyargs {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                for arg in &args.args {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                if let Some(arg) = &args.vararg {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                for arg in &args.kwonlyargs {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                if let Some(arg) = &args.kwarg {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
                 for expr in returns {
                     self.visit_annotation(expr);
+                }
+                for expr in &args.kw_defaults {
+                    self.visit_expr(expr);
+                }
+                for expr in &args.defaults {
+                    self.visit_expr(expr);
                 }
                 self.add_binding(
                     name.to_string(),
@@ -455,12 +497,29 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         let prev_in_f_string = self.in_f_string;
         let prev_in_literal = self.in_literal;
+        let prev_in_annotation = self.in_annotation;
 
         // Pre-visit.
         match &expr.node {
             ExprKind::Subscript { value, .. } => {
                 if match_name_or_attr(value, "Literal") {
                     self.in_literal = true;
+                }
+            }
+            ExprKind::Tuple { elts, ctx } => {
+                if matches!(ctx, ExprContext::Store) {
+                    let check_too_many_expressions =
+                        self.settings.select.contains(&CheckCode::F621);
+                    let check_two_starred_expressions =
+                        self.settings.select.contains(&CheckCode::F622);
+                    if let Some(check) = checks::check_starred_expressions(
+                        elts,
+                        expr.location,
+                        check_too_many_expressions,
+                        check_two_starred_expressions,
+                    ) {
+                        self.checks.push(check);
+                    }
                 }
             }
             ExprKind::Name { ctx, .. } => match ctx {
@@ -577,7 +636,25 @@ where
                 args,
                 keywords,
             } => {
-                if match_name_or_attr(func, "TypeVar") {
+                if match_name_or_attr(func, "ForwardRef") {
+                    self.visit_expr(func);
+                    for expr in args {
+                        self.visit_annotation(expr);
+                    }
+                } else if match_name_or_attr(func, "cast") {
+                    self.visit_expr(func);
+                    if !args.is_empty() {
+                        self.visit_annotation(&args[0]);
+                    }
+                    for expr in args.iter().skip(1) {
+                        self.visit_expr(expr);
+                    }
+                } else if match_name_or_attr(func, "NewType") {
+                    self.visit_expr(func);
+                    for expr in args.iter().skip(1) {
+                        self.visit_annotation(expr);
+                    }
+                } else if match_name_or_attr(func, "TypeVar") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.visit_annotation(expr);
@@ -588,16 +665,72 @@ where
                             if id == "bound" {
                                 self.visit_annotation(value);
                             } else {
+                                self.in_annotation = false;
                                 self.visit_expr(value);
+                                self.in_annotation = prev_in_annotation;
                             }
                         }
+                    }
+                } else if match_name_or_attr(func, "NamedTuple") {
+                    self.visit_expr(func);
+
+                    // NamedTuple("a", [("a", int)])
+                    if args.len() > 1 {
+                        match &args[1].node {
+                            ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
+                                for elt in elts {
+                                    match &elt.node {
+                                        ExprKind::List { elts, .. }
+                                        | ExprKind::Tuple { elts, .. } => {
+                                            if elts.len() == 2 {
+                                                self.in_annotation = false;
+                                                self.visit_expr(&elts[0]);
+                                                self.in_annotation = prev_in_annotation;
+
+                                                self.visit_annotation(&elts[1]);
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    // NamedTuple("a", a=int)
+                    for keyword in keywords {
+                        let KeywordData { value, .. } = &keyword.node;
+                        self.visit_annotation(value);
+                    }
+                } else if match_name_or_attr(func, "TypedDict") {
+                    self.visit_expr(func);
+
+                    // TypedDict("a", {"a": int})
+                    if args.len() > 1 {
+                        if let ExprKind::Dict { keys, values } = &args[1].node {
+                            for key in keys {
+                                self.in_annotation = false;
+                                self.visit_expr(key);
+                                self.in_annotation = prev_in_annotation;
+                            }
+                            for value in values {
+                                self.visit_annotation(value);
+                            }
+                        }
+                    }
+
+                    // TypedDict("a", a=int)
+                    for keyword in keywords {
+                        let KeywordData { value, .. } = &keyword.node;
+                        self.visit_annotation(value);
                     }
                 } else {
                     visitor::walk_expr(self, expr);
                 }
             }
             ExprKind::Subscript { value, slice, ctx } => {
-                if match_name_or_attr(value, "Type") {
+                if is_annotated_subscript(value) {
                     self.visit_expr(value);
                     self.visit_annotation(slice);
                     self.visit_expr_context(ctx);
@@ -618,6 +751,8 @@ where
             }
             _ => {}
         };
+
+        self.in_annotation = prev_in_annotation;
         self.in_literal = prev_in_literal;
         self.in_f_string = prev_in_f_string;
     }
@@ -697,14 +832,27 @@ where
             self.checks
                 .extend(checks::check_duplicate_arguments(arguments));
         }
-        if self.settings.select.contains(&CheckCode::E741) {
-            self.checks
-                .extend(checks::check_ambiguous_variable_name_arguments(arguments));
+
+        // Bind, but intentionally avoid walking default expressions, as we handle them upstream.
+        for arg in &arguments.posonlyargs {
+            self.visit_arg(arg);
         }
-        visitor::walk_arguments(self, arguments);
+        for arg in &arguments.args {
+            self.visit_arg(arg);
+        }
+        if let Some(arg) = &arguments.vararg {
+            self.visit_arg(arg);
+        }
+        for arg in &arguments.kwonlyargs {
+            self.visit_arg(arg);
+        }
+        if let Some(arg) = &arguments.kwarg {
+            self.visit_arg(arg);
+        }
     }
 
     fn visit_arg(&mut self, arg: &'b Arg) {
+        // Bind, but intentionally avoid walking the annotation, as we handle it upstream.
         self.add_binding(
             arg.node.arg.to_string(),
             Binding {
@@ -713,7 +861,6 @@ where
                 location: arg.location,
             },
         );
-        visitor::walk_arg(self, arg);
     }
 }
 
@@ -927,8 +1074,9 @@ impl<'a> Checker<'a> {
                 _ => {}
             }
 
-            let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if self.settings.select.contains(&CheckCode::F841) {
+                let scope =
+                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                 self.checks.extend(checks::check_unused_variables(scope));
             }
 
@@ -949,8 +1097,9 @@ impl<'a> Checker<'a> {
                 self.visit_expr(body);
             }
 
-            let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if self.settings.select.contains(&CheckCode::F841) {
+                let scope =
+                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                 self.checks.extend(checks::check_unused_variables(scope));
             }
 
