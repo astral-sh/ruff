@@ -495,9 +495,16 @@ where
                     }
                 }
             }
-            ExprKind::Name { ctx, .. } => match ctx {
+            ExprKind::Name { id, ctx } => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => {
+                    if self.settings.select.contains(&CheckCode::E741) {
+                        if let Some(check) =
+                            checks::check_ambiguous_variable_name(id, expr.location)
+                        {
+                            self.checks.push(check);
+                        }
+                    }
                     let parent =
                         self.parents[*(self.parent_stack.last().expect("No parent found."))];
                     self.handle_node_store(expr, Some(parent));
@@ -734,6 +741,13 @@ where
         match &excepthandler.node {
             ExcepthandlerKind::ExceptHandler { name, .. } => match name {
                 Some(name) => {
+                    if self.settings.select.contains(&CheckCode::E741) {
+                        if let Some(check) =
+                            checks::check_ambiguous_variable_name(name, excepthandler.location)
+                        {
+                            self.checks.push(check);
+                        }
+                    }
                     let scope =
                         &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                     if scope.values.contains_key(name) {
@@ -962,12 +976,6 @@ impl<'a> Checker<'a> {
                             }
                         }
                     }
-                }
-            }
-
-            if self.settings.select.contains(&CheckCode::E741) {
-                if let Some(check) = checks::check_ambiguous_variable_name(id, expr.location) {
-                    self.checks.push(check);
                 }
             }
 
