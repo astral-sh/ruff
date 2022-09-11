@@ -20,7 +20,7 @@ impl Ord for Message {
         (&self.filename, self.location.row(), self.location.column()).cmp(&(
             &other.filename,
             other.location.row(),
-            self.location.column(),
+            other.location.column(),
         ))
     }
 }
