@@ -206,7 +206,7 @@ git clone --branch 3.10 https://github.com/python/cpython.git resources/test/cpy
 Add this `pyproject.toml` to the CPython directory:
 
 ```toml
-[tool.linter]
+[tool.ruff]
 line-length = 88
 exclude = [
     "Lib/lib2to3/tests/data/bom.py",
