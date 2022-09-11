@@ -9,6 +9,7 @@ fn main() {
         CheckKind::DoNotAssignLambda,
         CheckKind::DuplicateArgumentName,
         CheckKind::FStringMissingPlaceholders,
+        CheckKind::FutureFeatureNotDefined("...".to_string()),
         CheckKind::IOError("...".to_string()),
         CheckKind::IfTuple,
         CheckKind::ImportStarUsage,

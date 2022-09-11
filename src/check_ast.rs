@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::path::Path;
 
 use rustpython_parser::ast::{
@@ -14,6 +15,7 @@ use crate::ast::{checks, operations, visitor};
 use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
 use crate::settings::Settings;
 
@@ -391,7 +393,16 @@ where
                             },
                         );
 
-                        if !self.futures_allowed && self.settings.select.contains(&CheckCode::F404)
+                        if self.settings.select.contains(&CheckCode::F407)
+                            && !ALL_FEATURE_NAMES.contains(&alias.node.name.deref())
+                        {
+                            self.checks.push(Check::new(
+                                CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
+                                stmt.location,
+                            ));
+                        }
+
+                        if self.settings.select.contains(&CheckCode::F404) && !self.futures_allowed
                         {
                             self.checks
                                 .push(Check::new(CheckKind::LateFutureImport, stmt.location));
