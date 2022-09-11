@@ -66,6 +66,25 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
     names
 }
 
+/// Check if a node is parent of a conditional branch.
+pub fn on_conditional_branch(parent_stack: &[usize], parents: &[&Stmt]) -> bool {
+    for index in parent_stack.iter().rev() {
+        let parent = parents[*index];
+        if matches!(parent.node, StmtKind::If { .. })
+            || matches!(parent.node, StmtKind::While { .. })
+        {
+            return true;
+        }
+        if let StmtKind::Expr { value } = &parent.node {
+            if matches!(value.node, ExprKind::IfExp { .. }) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 /// Struct used to efficiently slice source code at (row, column) Locations.
 pub struct SourceCodeLocator<'a> {
     content: &'a str,

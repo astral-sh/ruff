@@ -10,7 +10,7 @@ use crate::ast::operations::{extract_all_names, SourceCodeLocator};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{Binding, BindingKind, Scope, ScopeKind};
 use crate::ast::visitor::{walk_excepthandler, Visitor};
-use crate::ast::{checks, visitor};
+use crate::ast::{checks, operations, visitor};
 use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -986,6 +986,11 @@ impl<'a> Checker<'a> {
 
     fn handle_node_delete(&mut self, expr: &Expr) {
         if let ExprKind::Name { id, .. } = &expr.node {
+            // Check if we're on a conditional branch.
+            if operations::on_conditional_branch(&self.parent_stack, &self.parents) {
+                return;
+            }
+
             let scope =
                 &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if scope.values.remove(id).is_none() && self.settings.select.contains(&CheckCode::F821)
