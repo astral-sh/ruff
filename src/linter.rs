@@ -254,7 +254,7 @@ mod tests {
         actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
             kind: CheckKind::DoNotUseBareExcept,
-            location: Location::new(5, 1),
+            location: Location::new(3, 1),
             fix: None,
         }];
         assert_eq!(actual.len(), expected.len());

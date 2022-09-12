@@ -1,6 +1,9 @@
 try:
     pass
-except ValueError:
-    pass
 except:
+    pass
+
+try:
+    pass
+except Exception:
     pass
