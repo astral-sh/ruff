@@ -14,6 +14,7 @@ pub enum CheckCode {
     E712,
     E713,
     E714,
+    E722,
     E731,
     E741,
     E742,
@@ -53,6 +54,7 @@ impl FromStr for CheckCode {
             "E711" => Ok(CheckCode::E711),
             "E712" => Ok(CheckCode::E712),
             "E713" => Ok(CheckCode::E713),
+            "E722" => Ok(CheckCode::E722),
             "E714" => Ok(CheckCode::E714),
             "E731" => Ok(CheckCode::E731),
             "E741" => Ok(CheckCode::E741),
@@ -95,6 +97,7 @@ impl CheckCode {
             CheckCode::E712 => "E712",
             CheckCode::E713 => "E713",
             CheckCode::E714 => "E714",
+            CheckCode::E722 => "E722",
             CheckCode::E731 => "E731",
             CheckCode::E741 => "E741",
             CheckCode::E742 => "E742",
@@ -134,6 +137,7 @@ impl CheckCode {
             CheckCode::E712 => &LintSource::AST,
             CheckCode::E713 => &LintSource::AST,
             CheckCode::E714 => &LintSource::AST,
+            CheckCode::E722 => &LintSource::AST,
             CheckCode::E731 => &LintSource::AST,
             CheckCode::E741 => &LintSource::AST,
             CheckCode::E742 => &LintSource::AST,
@@ -186,6 +190,7 @@ pub enum CheckKind {
     AmbiguousFunctionName(String),
     DefaultExceptNotLast,
     DoNotAssignLambda,
+    DoNotUseBareExcept,
     DuplicateArgumentName,
     FStringMissingPlaceholders,
     FutureFeatureNotDefined(String),
@@ -224,6 +229,7 @@ impl CheckKind {
             CheckKind::AmbiguousClassName(_) => "AmbiguousClassName",
             CheckKind::AmbiguousFunctionName(_) => "AmbiguousFunctionName",
             CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
+            CheckKind::DoNotUseBareExcept => "DoNotUseBareExcept",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
             CheckKind::FutureFeatureNotDefined(_) => "FutureFeatureNotDefined",
@@ -262,6 +268,7 @@ impl CheckKind {
         match self {
             CheckKind::AssertTuple => &CheckCode::F631,
             CheckKind::DefaultExceptNotLast => &CheckCode::F707,
+            CheckKind::DoNotUseBareExcept => &CheckCode::E722,
             CheckKind::DuplicateArgumentName => &CheckCode::F831,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
             CheckKind::FutureFeatureNotDefined(_) => &CheckCode::F407,
@@ -302,6 +309,7 @@ impl CheckKind {
             CheckKind::AssertTuple => {
                 "Assert test is a non-empty tuple, which is always `True`".to_string()
             }
+            CheckKind::DoNotUseBareExcept => "Do not use bare `except`".to_string(),
             CheckKind::DefaultExceptNotLast => {
                 "an `except:` block as not the last exception handler".to_string()
             }
@@ -416,6 +424,7 @@ impl CheckKind {
             CheckKind::AssertTuple => false,
             CheckKind::DefaultExceptNotLast => false,
             CheckKind::DoNotAssignLambda => false,
+            CheckKind::DoNotUseBareExcept => false,
             CheckKind::DuplicateArgumentName => false,
             CheckKind::FStringMissingPlaceholders => false,
             CheckKind::FutureFeatureNotDefined(_) => false,

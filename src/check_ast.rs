@@ -813,20 +813,45 @@ where
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         match &excepthandler.node {
-            ExcepthandlerKind::ExceptHandler { name, .. } => match name {
-                Some(name) => {
-                    if self.settings.select.contains(&CheckCode::E741) {
-                        if let Some(check) =
-                            checks::check_ambiguous_variable_name(name, excepthandler.location)
-                        {
-                            self.checks.push(check);
+            ExcepthandlerKind::ExceptHandler { type_, name, .. } => {
+                if self.settings.select.contains(&CheckCode::E722) && type_.is_none() {
+                    self.checks.push(Check::new(
+                        CheckKind::DoNotUseBareExcept,
+                        excepthandler.location,
+                    ));
+                }
+                match name {
+                    Some(name) => {
+                        if self.settings.select.contains(&CheckCode::E741) {
+                            if let Some(check) =
+                                checks::check_ambiguous_variable_name(name, excepthandler.location)
+                            {
+                                self.checks.push(check);
+                            }
                         }
-                    }
-                    let scope =
-                        &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-                    if scope.values.contains_key(name) {
+                        let scope = &self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
+                        if scope.values.contains_key(name) {
+                            let parent = self.parents
+                                [*(self.parent_stack.last().expect("No parent found."))];
+                            self.handle_node_store(
+                                &Expr::new(
+                                    excepthandler.location,
+                                    ExprKind::Name {
+                                        id: name.to_string(),
+                                        ctx: ExprContext::Store,
+                                    },
+                                ),
+                                parent,
+                            );
+                            self.parents.push(parent);
+                        }
+
                         let parent =
                             self.parents[*(self.parent_stack.last().expect("No parent found."))];
+                        let scope = &self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
+                        let definition = scope.values.get(name).cloned();
                         self.handle_node_store(
                             &Expr::new(
                                 excepthandler.location,
@@ -838,45 +863,29 @@ where
                             parent,
                         );
                         self.parents.push(parent);
-                    }
 
-                    let parent =
-                        self.parents[*(self.parent_stack.last().expect("No parent found."))];
-                    let scope =
-                        &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-                    let definition = scope.values.get(name).cloned();
-                    self.handle_node_store(
-                        &Expr::new(
-                            excepthandler.location,
-                            ExprKind::Name {
-                                id: name.to_string(),
-                                ctx: ExprContext::Store,
-                            },
-                        ),
-                        parent,
-                    );
-                    self.parents.push(parent);
+                        walk_excepthandler(self, excepthandler);
 
-                    walk_excepthandler(self, excepthandler);
+                        let scope = &mut self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
+                        if let Some(binding) = &scope.values.remove(name) {
+                            if self.settings.select.contains(&CheckCode::F841)
+                                && binding.used.is_none()
+                            {
+                                self.checks.push(Check::new(
+                                    CheckKind::UnusedVariable(name.to_string()),
+                                    excepthandler.location,
+                                ));
+                            }
+                        }
 
-                    let scope = &mut self.scopes
-                        [*(self.scope_stack.last().expect("No current scope found."))];
-                    if let Some(binding) = &scope.values.remove(name) {
-                        if self.settings.select.contains(&CheckCode::F841) && binding.used.is_none()
-                        {
-                            self.checks.push(Check::new(
-                                CheckKind::UnusedVariable(name.to_string()),
-                                excepthandler.location,
-                            ));
+                        if let Some(binding) = definition {
+                            scope.values.insert(name.to_string(), binding);
                         }
                     }
-
-                    if let Some(binding) = definition {
-                        scope.values.insert(name.to_string(), binding);
-                    }
+                    None => walk_excepthandler(self, excepthandler),
                 }
-                None => walk_excepthandler(self, excepthandler),
-            },
+            }
         }
     }
 
