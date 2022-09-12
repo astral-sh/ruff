@@ -70,3 +70,6 @@ try:
     pass
 except ValueError as l:
     pass
+
+if (l := 5) > 0:
+    pass

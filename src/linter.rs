@@ -431,6 +431,11 @@ mod tests {
                 location: Location::new(71, 1),
                 fix: None,
             },
+            Check {
+                kind: CheckKind::AmbiguousVariableName("l".to_string()),
+                location: Location::new(74, 5),
+                fix: None,
+            },
         ];
 
         assert_eq!(actual.len(), expected.len());
