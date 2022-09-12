@@ -16,7 +16,7 @@ env:
   PYTHON_VERSION: "3.7" # to build abi3 wheels
 
 jobs:
-  macos:
+  macos-x86_64:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
@@ -39,6 +39,25 @@ jobs:
       - name: Install built wheel - x86_64
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+      - name: Upload wheels
+        uses: actions/upload-artifact@v2
+        with:
+          name: wheels
+          path: dist
+  macos-universal:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: x64
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          default: true
       - name: Build wheels - universal2
         uses: messense/maturin-action@v1
         with:
@@ -261,7 +280,8 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     needs:
-      - macos
+      - macos-universal
+      - macos-x86_64
       - windows
       - linux
       - linux-cross
