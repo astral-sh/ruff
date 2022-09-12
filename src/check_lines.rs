@@ -1,11 +1,11 @@
 use rustpython_parser::ast::Location;
 
-use crate::checks::{Check, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind};
 use crate::settings::Settings;
 
 /// Whether the given line is too long and should be reported.
-fn should_enforce_line_length(line: &str, limit: usize) -> bool {
-    if line.len() > limit {
+fn should_enforce_line_length(line: &str, length: usize, limit: usize) -> bool {
+    if length > limit {
         let mut chunks = line.split_whitespace();
         if let (Some(first), Some(_)) = (chunks.next(), chunks.next()) {
             // Do not enforce the line length for commented lines with a single word
@@ -20,7 +20,7 @@ fn should_enforce_line_length(line: &str, limit: usize) -> bool {
 }
 
 pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings) {
-    let enforce_line_too_long = settings.select.contains(CheckKind::LineTooLong.code());
+    let enforce_line_too_long = settings.select.contains(&CheckCode::E501);
 
     let mut line_checks = vec![];
     let mut ignored = vec![];
@@ -34,13 +34,16 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
         }
 
         // Enforce line length.
-        if enforce_line_too_long && should_enforce_line_length(line, settings.line_length) {
-            let check = Check::new(
-                CheckKind::LineTooLong,
-                Location::new(row + 1, settings.line_length + 1),
-            );
-            if !check.is_inline_ignored(line) {
-                line_checks.push(check);
+        if enforce_line_too_long {
+            let line_length = line.len();
+            if should_enforce_line_length(line, line_length, settings.line_length) {
+                let check = Check::new(
+                    CheckKind::LineTooLong(line_length, settings.line_length),
+                    Location::new(row + 1, settings.line_length + 1),
+                );
+                if !check.is_inline_ignored(line) {
+                    line_checks.push(check);
+                }
             }
         }
     }

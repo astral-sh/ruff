@@ -193,7 +193,7 @@ pub enum CheckKind {
     IfTuple,
     ImportStarUsage,
     LateFutureImport,
-    LineTooLong,
+    LineTooLong(usize, usize),
     ModuleImportNotAtTopOfFile,
     MultiValueRepeatedKeyLiteral,
     MultiValueRepeatedKeyVariable(String),
@@ -231,7 +231,7 @@ impl CheckKind {
             CheckKind::IfTuple => "IfTuple",
             CheckKind::ImportStarUsage => "ImportStarUsage",
             CheckKind::LateFutureImport => "LateFutureImport",
-            CheckKind::LineTooLong => "LineTooLong",
+            CheckKind::LineTooLong(_, _) => "LineTooLong",
             CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
             CheckKind::MultiValueRepeatedKeyLiteral => "MultiValueRepeatedKeyLiteral",
@@ -269,7 +269,7 @@ impl CheckKind {
             CheckKind::IfTuple => &CheckCode::F634,
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LateFutureImport => &CheckCode::F404,
-            CheckKind::LineTooLong => &CheckCode::E501,
+            CheckKind::LineTooLong(_, _) => &CheckCode::E501,
             CheckKind::DoNotAssignLambda => &CheckCode::E731,
             CheckKind::AmbiguousVariableName(_) => &CheckCode::E741,
             CheckKind::AmbiguousClassName(_) => &CheckCode::E742,
@@ -322,7 +322,9 @@ impl CheckKind {
             CheckKind::LateFutureImport => {
                 "from __future__ imports must occur at the beginning of the file".to_string()
             }
-            CheckKind::LineTooLong => "Line too long".to_string(),
+            CheckKind::LineTooLong(length, limit) => {
+                format!("Line too long ({length} > {limit} characters)")
+            }
             CheckKind::DoNotAssignLambda => {
                 "Do not assign a lambda expression, use a def".to_string()
             }
@@ -421,7 +423,7 @@ impl CheckKind {
             CheckKind::IfTuple => false,
             CheckKind::ImportStarUsage => false,
             CheckKind::LateFutureImport => false,
-            CheckKind::LineTooLong => false,
+            CheckKind::LineTooLong(_, _) => false,
             CheckKind::ModuleImportNotAtTopOfFile => false,
             CheckKind::MultiValueRepeatedKeyLiteral => false,
             CheckKind::MultiValueRepeatedKeyVariable(_) => false,

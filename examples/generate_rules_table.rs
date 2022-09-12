@@ -16,7 +16,7 @@ fn main() {
         CheckKind::IfTuple,
         CheckKind::ImportStarUsage,
         CheckKind::LateFutureImport,
-        CheckKind::LineTooLong,
+        CheckKind::LineTooLong(89, 88),
         CheckKind::ModuleImportNotAtTopOfFile,
         CheckKind::MultiValueRepeatedKeyLiteral,
         CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
