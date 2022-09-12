@@ -53,6 +53,7 @@ impl Settings {
                     CheckCode::E731,
                     CheckCode::E741,
                     CheckCode::E742,
+                    CheckCode::E743,
                     CheckCode::E902,
                     CheckCode::F401,
                     CheckCode::F403,

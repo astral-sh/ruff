@@ -208,6 +208,12 @@ where
                 args,
                 ..
             } => {
+                if self.settings.select.contains(&CheckCode::E743) {
+                    if let Some(check) = checks::check_ambiguous_function_name(name, stmt.location)
+                    {
+                        self.checks.push(check);
+                    }
+                }
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }

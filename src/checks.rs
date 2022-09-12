@@ -17,6 +17,7 @@ pub enum CheckCode {
     E731,
     E741,
     E742,
+    E743,
     E902,
     F401,
     F403,
@@ -56,6 +57,7 @@ impl FromStr for CheckCode {
             "E731" => Ok(CheckCode::E731),
             "E741" => Ok(CheckCode::E741),
             "E742" => Ok(CheckCode::E742),
+            "E743" => Ok(CheckCode::E743),
             "E902" => Ok(CheckCode::E902),
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
@@ -96,6 +98,7 @@ impl CheckCode {
             CheckCode::E731 => "E731",
             CheckCode::E741 => "E741",
             CheckCode::E742 => "E742",
+            CheckCode::E743 => "E743",
             CheckCode::E902 => "E902",
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
@@ -134,6 +137,7 @@ impl CheckCode {
             CheckCode::E731 => &LintSource::AST,
             CheckCode::E741 => &LintSource::AST,
             CheckCode::E742 => &LintSource::AST,
+            CheckCode::E743 => &LintSource::AST,
             CheckCode::E902 => &LintSource::FileSystem,
             CheckCode::F401 => &LintSource::AST,
             CheckCode::F403 => &LintSource::AST,
@@ -179,6 +183,7 @@ pub enum CheckKind {
     AssertTuple,
     AmbiguousVariableName(String),
     AmbiguousClassName(String),
+    AmbiguousFunctionName(String),
     DefaultExceptNotLast,
     DoNotAssignLambda,
     DuplicateArgumentName,
@@ -217,6 +222,7 @@ impl CheckKind {
             CheckKind::AssertTuple => "AssertTuple",
             CheckKind::AmbiguousVariableName(_) => "AmbiguousVariableName",
             CheckKind::AmbiguousClassName(_) => "AmbiguousClassName",
+            CheckKind::AmbiguousFunctionName(_) => "AmbiguousFunctionName",
             CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
@@ -267,6 +273,7 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => &CheckCode::E731,
             CheckKind::AmbiguousVariableName(_) => &CheckCode::E741,
             CheckKind::AmbiguousClassName(_) => &CheckCode::E742,
+            CheckKind::AmbiguousFunctionName(_) => &CheckCode::E743,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
             CheckKind::MultiValueRepeatedKeyLiteral => &CheckCode::F601,
             CheckKind::MultiValueRepeatedKeyVariable(_) => &CheckCode::F602,
@@ -321,6 +328,9 @@ impl CheckKind {
             }
             CheckKind::AmbiguousClassName(name) => {
                 format!("ambiguous class name '{}'", name)
+            }
+            CheckKind::AmbiguousFunctionName(name) => {
+                format!("ambiguous function name '{}'", name)
             }
             CheckKind::AmbiguousVariableName(name) => {
                 format!("ambiguous variable name '{}'", name)
@@ -399,6 +409,7 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         match self {
             CheckKind::AmbiguousClassName(_) => true,
+            CheckKind::AmbiguousFunctionName(_) => true,
             CheckKind::AmbiguousVariableName(_) => false,
             CheckKind::AssertTuple => false,
             CheckKind::DefaultExceptNotLast => false,
