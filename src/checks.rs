@@ -134,45 +134,12 @@ impl CheckCode {
         }
     }
 
-    /// The source for the check (either the AST, or the physical lines).
+    /// The source for the check (either the AST, the filesystem, or the physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            CheckCode::E402 => &LintSource::AST,
             CheckCode::E501 => &LintSource::Lines,
-            CheckCode::E711 => &LintSource::AST,
-            CheckCode::E712 => &LintSource::AST,
-            CheckCode::E713 => &LintSource::AST,
-            CheckCode::E714 => &LintSource::AST,
-            CheckCode::E722 => &LintSource::AST,
-            CheckCode::E731 => &LintSource::AST,
-            CheckCode::E741 => &LintSource::AST,
-            CheckCode::E742 => &LintSource::AST,
-            CheckCode::E743 => &LintSource::AST,
             CheckCode::E902 => &LintSource::FileSystem,
-            CheckCode::F401 => &LintSource::AST,
-            CheckCode::F403 => &LintSource::AST,
-            CheckCode::F404 => &LintSource::AST,
-            CheckCode::F407 => &LintSource::AST,
-            CheckCode::F541 => &LintSource::AST,
-            CheckCode::F601 => &LintSource::AST,
-            CheckCode::F602 => &LintSource::AST,
-            CheckCode::F621 => &LintSource::AST,
-            CheckCode::F622 => &LintSource::AST,
-            CheckCode::F631 => &LintSource::AST,
-            CheckCode::F634 => &LintSource::AST,
-            CheckCode::F701 => &LintSource::AST,
-            CheckCode::F702 => &LintSource::AST,
-            CheckCode::F704 => &LintSource::AST,
-            CheckCode::F706 => &LintSource::AST,
-            CheckCode::F707 => &LintSource::AST,
-            CheckCode::F821 => &LintSource::AST,
-            CheckCode::F822 => &LintSource::AST,
-            CheckCode::F823 => &LintSource::AST,
-            CheckCode::F831 => &LintSource::AST,
-            CheckCode::F841 => &LintSource::AST,
-            CheckCode::F901 => &LintSource::AST,
-            CheckCode::R001 => &LintSource::AST,
-            CheckCode::R002 => &LintSource::AST,
+            _ => &LintSource::AST,
         }
     }
 }
