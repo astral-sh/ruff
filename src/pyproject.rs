@@ -265,6 +265,7 @@ other-attribute = 1
                     CheckCode::E712,
                     CheckCode::E713,
                     CheckCode::E714,
+                    CheckCode::E722,
                     CheckCode::E731,
                     CheckCode::E741,
                     CheckCode::E742,

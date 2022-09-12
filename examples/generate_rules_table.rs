@@ -9,6 +9,7 @@ fn main() {
         CheckKind::AssertTuple,
         CheckKind::DefaultExceptNotLast,
         CheckKind::DoNotAssignLambda,
+        CheckKind::DoNotUseBareExcept,
         CheckKind::DuplicateArgumentName,
         CheckKind::FStringMissingPlaceholders,
         CheckKind::FutureFeatureNotDefined("...".to_string()),
