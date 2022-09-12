@@ -480,6 +480,44 @@ mod tests {
     }
 
     #[test]
+    fn e743() -> Result<()> {
+        let mut actual = check_path(
+            Path::new("./resources/test/fixtures/E743.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::E743]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        actual.sort_by_key(|check| check.location);
+        let expected = vec![
+            Check {
+                kind: CheckKind::AmbiguousFunctionName("l".to_string()),
+                location: Location::new(1, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousFunctionName("I".to_string()),
+                location: Location::new(5, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::AmbiguousFunctionName("O".to_string()),
+                location: Location::new(10, 5),
+                fix: None,
+            },
+        ];
+
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f401() -> Result<()> {
         let mut actual = check_path(
             Path::new("./resources/test/fixtures/F401.py"),
