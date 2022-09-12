@@ -448,8 +448,25 @@ where
                         );
 
                         if self.settings.select.contains(&CheckCode::F403) {
-                            self.checks
-                                .push(Check::new(CheckKind::ImportStarUsage, stmt.location));
+                            self.checks.push(Check::new(
+                                CheckKind::ImportStarUsage(
+                                    module.clone().unwrap_or_else(|| "module".to_string()),
+                                ),
+                                stmt.location,
+                            ));
+                        }
+
+                        if self.settings.select.contains(&CheckCode::F406) {
+                            let scope = &self.scopes
+                                [*(self.scope_stack.last().expect("No current scope found."))];
+                            if !matches!(scope.kind, ScopeKind::Module) {
+                                self.checks.push(Check::new(
+                                    CheckKind::ImportStarNotPermitted(
+                                        module.clone().unwrap_or_else(|| "module".to_string()),
+                                    ),
+                                    stmt.location,
+                                ));
+                            }
                         }
                     } else {
                         let binding = Binding {

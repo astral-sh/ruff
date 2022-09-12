@@ -23,6 +23,7 @@ pub enum CheckCode {
     F401,
     F403,
     F404,
+    F406,
     F407,
     F541,
     F601,
@@ -66,6 +67,7 @@ impl FromStr for CheckCode {
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
             "F404" => Ok(CheckCode::F404),
+            "F406" => Ok(CheckCode::F406),
             "F407" => Ok(CheckCode::F407),
             "F541" => Ok(CheckCode::F541),
             "F601" => Ok(CheckCode::F601),
@@ -110,6 +112,7 @@ impl CheckCode {
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
             CheckCode::F404 => "F404",
+            CheckCode::F406 => "F406",
             CheckCode::F407 => "F407",
             CheckCode::F541 => "F541",
             CheckCode::F601 => "F601",
@@ -173,7 +176,8 @@ pub enum CheckKind {
     FutureFeatureNotDefined(String),
     IOError(String),
     IfTuple,
-    ImportStarUsage,
+    ImportStarNotPermitted(String),
+    ImportStarUsage(String),
     LateFutureImport,
     LineTooLong(usize, usize),
     ModuleImportNotAtTopOfFile,
@@ -215,7 +219,8 @@ impl CheckKind {
             CheckKind::FutureFeatureNotDefined(_) => "FutureFeatureNotDefined",
             CheckKind::IOError(_) => "IOError",
             CheckKind::IfTuple => "IfTuple",
-            CheckKind::ImportStarUsage => "ImportStarUsage",
+            CheckKind::ImportStarNotPermitted(_) => "ImportStarNotPermitted",
+            CheckKind::ImportStarUsage(_) => "ImportStarUsage",
             CheckKind::LateFutureImport => "LateFutureImport",
             CheckKind::LineTooLong(_, _) => "LineTooLong",
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
@@ -259,7 +264,8 @@ impl CheckKind {
             CheckKind::FutureFeatureNotDefined(_) => &CheckCode::F407,
             CheckKind::IOError(_) => &CheckCode::E902,
             CheckKind::IfTuple => &CheckCode::F634,
-            CheckKind::ImportStarUsage => &CheckCode::F403,
+            CheckKind::ImportStarNotPermitted(_) => &CheckCode::F406,
+            CheckKind::ImportStarUsage(_) => &CheckCode::F403,
             CheckKind::LateFutureImport => &CheckCode::F404,
             CheckKind::LineTooLong(_, _) => &CheckCode::E501,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
@@ -321,7 +327,12 @@ impl CheckKind {
                 format!("No such file or directory: `{name}`")
             }
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
-            CheckKind::ImportStarUsage => "Unable to detect undefined names".to_string(),
+            CheckKind::ImportStarNotPermitted(name) => {
+                format!("`from {name} import *` only allowed at module level")
+            }
+            CheckKind::ImportStarUsage(name) => {
+                format!("`from {name} import *` used; unable to detect undefined names")
+            }
             CheckKind::LateFutureImport => {
                 "from __future__ imports must occur at the beginning of the file".to_string()
             }

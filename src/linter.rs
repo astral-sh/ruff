@@ -598,12 +598,12 @@ mod tests {
         actual.sort_by_key(|check| check.location);
         let expected = vec![
             Check {
-                kind: CheckKind::ImportStarUsage,
+                kind: CheckKind::ImportStarUsage("F634".to_string()),
                 location: Location::new(1, 1),
                 fix: None,
             },
             Check {
-                kind: CheckKind::ImportStarUsage,
+                kind: CheckKind::ImportStarUsage("F634".to_string()),
                 location: Location::new(2, 1),
                 fix: None,
             },
@@ -633,6 +633,38 @@ mod tests {
             location: Location::new(7, 1),
             fix: None,
         }];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn f406() -> Result<()> {
+        let mut actual = check_path(
+            Path::new("./resources/test/fixtures/F406.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F406]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        actual.sort_by_key(|check| check.location);
+        let expected = vec![
+            Check {
+                kind: CheckKind::ImportStarNotPermitted("F634".to_string()),
+                location: Location::new(5, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::ImportStarNotPermitted("F634".to_string()),
+                location: Location::new(9, 5),
+                fix: None,
+            },
+        ];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {
             assert_eq!(actual[i], expected[i]);

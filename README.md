@@ -123,15 +123,15 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 (2) alongside Black, and (3) on Python 3 code. (Using Black obviates the need for many of Flake8's
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
-Under those conditions, Flake8 implements about 61 rules, give or take. At time of writing, ruff
-implements 36 rules. (Note that these 36 rules likely cover a disproportionate share of errors:
+Under those conditions, Flake8 implements about 60 rules, give or take. At time of writing, ruff
+implements 37 rules. (Note that these 37 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
-The 25 unimplemented rules are tracked in #170, and include:
+The 23 unimplemented rules are tracked in #170, and include:
 
 - 14 rules related to string `.format` calls.
 - 3 rules related to parsing and syntax errors.
-- 8 logical rules.
+- 6 logical rules.
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -156,8 +156,9 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | E743 | AmbiguousFunctionName | ambiguous function name '...' |
 | E902 | IOError | No such file or directory: `...` |
 | F401 | UnusedImport | `...` imported but unused |
-| F403 | ImportStarUsage | Unable to detect undefined names |
+| F403 | ImportStarUsage | `from ... import *` used; unable to detect undefined names |
 | F404 | LateFutureImport | from __future__ imports must occur at the beginning of the file |
+| F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |
 | F407 | FutureFeatureNotDefined | future feature '...' is not defined |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders |
 | F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |
