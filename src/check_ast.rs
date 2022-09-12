@@ -553,7 +553,7 @@ where
                     self.in_literal = true;
                 }
             }
-            ExprKind::Tuple { elts, ctx } => {
+            ExprKind::Tuple { elts, ctx } | ExprKind::List { elts, ctx } => {
                 if matches!(ctx, ExprContext::Store) {
                     let check_too_many_expressions =
                         self.settings.select.contains(&CheckCode::F621);
@@ -581,7 +581,7 @@ where
                     }
                     let parent =
                         self.parents[*(self.parent_stack.last().expect("No parent found."))];
-                    self.handle_node_store(expr, Some(parent));
+                    self.handle_node_store(expr, parent);
                 }
                 ExprContext::Del => self.handle_node_delete(expr),
             },
@@ -835,7 +835,7 @@ where
                                     ctx: ExprContext::Store,
                                 },
                             ),
-                            Some(parent),
+                            parent,
                         );
                         self.parents.push(parent);
                     }
@@ -853,7 +853,7 @@ where
                                 ctx: ExprContext::Store,
                             },
                         ),
-                        Some(parent),
+                        parent,
                     );
                     self.parents.push(parent);
 
@@ -1023,7 +1023,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn handle_node_store(&mut self, expr: &Expr, parent: Option<&Stmt>) {
+    fn handle_node_store(&mut self, expr: &Expr, parent: &Stmt) {
         if let ExprKind::Name { id, .. } = &expr.node {
             let current =
                 &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
@@ -1053,35 +1053,59 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            // TODO(charlie): Handle alternate binding types (like `Annotation`).
-            if id == "__all__"
-                && matches!(current.kind, ScopeKind::Module)
-                && parent
-                    .map(|stmt| {
-                        matches!(stmt.node, StmtKind::Assign { .. })
-                            || matches!(stmt.node, StmtKind::AugAssign { .. })
-                            || matches!(stmt.node, StmtKind::AnnAssign { .. })
-                    })
-                    .unwrap_or_default()
+            if matches!(parent.node, StmtKind::AnnAssign { value: None, .. }) {
+                self.add_binding(
+                    id.to_string(),
+                    Binding {
+                        kind: BindingKind::Annotation,
+                        used: None,
+                        location: expr.location,
+                    },
+                );
+                return;
+            }
+
+            // TODO(charlie): Include comprehensions here.
+            if matches!(parent.node, StmtKind::For { .. })
+                || matches!(parent.node, StmtKind::AsyncFor { .. })
+                || operations::is_unpacking_assignment(parent)
             {
                 self.add_binding(
                     id.to_string(),
                     Binding {
-                        kind: BindingKind::Export(extract_all_names(parent.unwrap(), current)),
+                        kind: BindingKind::Binding,
                         used: None,
                         location: expr.location,
                     },
                 );
-            } else {
+                return;
+            }
+
+            if id == "__all__"
+                && matches!(current.kind, ScopeKind::Module)
+                && (matches!(parent.node, StmtKind::Assign { .. })
+                    || matches!(parent.node, StmtKind::AugAssign { .. })
+                    || matches!(parent.node, StmtKind::AnnAssign { .. }))
+            {
                 self.add_binding(
                     id.to_string(),
                     Binding {
-                        kind: BindingKind::Assignment,
+                        kind: BindingKind::Export(extract_all_names(parent, current)),
                         used: None,
                         location: expr.location,
                     },
                 );
+                return;
             }
+
+            self.add_binding(
+                id.to_string(),
+                Binding {
+                    kind: BindingKind::Assignment,
+                    used: None,
+                    location: expr.location,
+                },
+            );
         }
     }
 

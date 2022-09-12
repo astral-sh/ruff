@@ -1084,6 +1084,21 @@ mod tests {
                 location: Location::new(16, 5),
                 fix: None,
             },
+            Check {
+                kind: CheckKind::UnusedVariable("foo".to_string()),
+                location: Location::new(20, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::UnusedVariable("a".to_string()),
+                location: Location::new(21, 6),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::UnusedVariable("b".to_string()),
+                location: Location::new(21, 9),
+                fix: None,
+            },
         ];
         assert_eq!(actual.len(), expected.len());
         for i in 0..actual.len() {

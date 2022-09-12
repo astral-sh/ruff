@@ -35,8 +35,10 @@ impl Scope {
 
 #[derive(Clone, Debug)]
 pub enum BindingKind {
+    Annotation,
     Argument,
     Assignment,
+    Binding,
     Builtin,
     ClassDefinition,
     Definition,
