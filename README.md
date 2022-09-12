@@ -123,17 +123,15 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 (2) alongside Black, and (3) on Python 3 code. (Using Black obviates the need for many of Flake8's
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
-Under those conditions, Flake8 implements about 58 rules, give or take. At time of writing, ruff
+Under those conditions, Flake8 implements about 63 rules, give or take. At time of writing, ruff
 implements 36 rules. (Note that these 36 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
-Of the unimplemented rules, ruff is missing:
+The 27 unimplemented rules are tracked in #170, and include:
 
-- 15 rules related to string `.format` calls.
-- 3 rules related to syntax errors in doctests and annotations.
-- 2 rules related to redefining unused names.
-
-...along with a variety of others that don't fit neatly into any specific category.
+- 14 rules related to string `.format` calls.
+- 5 rules related to parsing and syntax errors.
+- 8 logical rules.
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
