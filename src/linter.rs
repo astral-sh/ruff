@@ -128,7 +128,7 @@ mod tests {
         )?;
         actual.sort_by_key(|check| check.location);
         let expected = vec![Check {
-            kind: CheckKind::LineTooLong,
+            kind: CheckKind::LineTooLong(123, 88),
             location: Location::new(5, 89),
             fix: None,
         }];
