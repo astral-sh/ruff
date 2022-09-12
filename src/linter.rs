@@ -852,6 +852,90 @@ mod tests {
     }
 
     #[test]
+    fn f701() -> Result<()> {
+        let mut actual = check_path(
+            Path::new("./resources/test/fixtures/F701.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F701]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        actual.sort_by_key(|check| check.location);
+        let expected = vec![
+            Check {
+                kind: CheckKind::BreakOutsideLoop,
+                location: Location::new(4, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::BreakOutsideLoop,
+                location: Location::new(16, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::BreakOutsideLoop,
+                location: Location::new(20, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::BreakOutsideLoop,
+                location: Location::new(23, 1),
+                fix: None,
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn f702() -> Result<()> {
+        let mut actual = check_path(
+            Path::new("./resources/test/fixtures/F702.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F702]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        actual.sort_by_key(|check| check.location);
+        let expected = vec![
+            Check {
+                kind: CheckKind::ContinueOutsideLoop,
+                location: Location::new(4, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::ContinueOutsideLoop,
+                location: Location::new(16, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::ContinueOutsideLoop,
+                location: Location::new(20, 5),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::ContinueOutsideLoop,
+                location: Location::new(23, 1),
+                fix: None,
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f704() -> Result<()> {
         let mut actual = check_path(
             Path::new("./resources/test/fixtures/F704.py"),

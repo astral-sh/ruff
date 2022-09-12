@@ -124,13 +124,12 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
 Under those conditions, Flake8 implements about 58 rules, give or take. At time of writing, ruff
-implements 34 rules. (Note that these 34 rules likely cover a disproportionate share of errors:
+implements 36 rules. (Note that these 36 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
 Of the unimplemented rules, ruff is missing:
 
 - 15 rules related to string `.format` calls.
-- 6 rules related to misplaced `yield`, `break`, and `return` statements.
 - 3 rules related to syntax errors in doctests and annotations.
 - 2 rules related to redefining unused names.
 
@@ -169,6 +168,8 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | F622 | TwoStarredExpressions | two starred expressions in assignment |
 | F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |
 | F634 | IfTuple | If test is a tuple, which is always `True` |
+| F701 | BreakOutsideLoop | `break` outside loop |
+| F702 | ContinueOutsideLoop | `continue` not properly in loop |
 | F704 | YieldOutsideFunction | a `yield` or `yield from` statement outside of a function/method |
 | F706 | ReturnOutsideFunction | a `return` statement outside of a function/method |
 | F707 | DefaultExceptNotLast | an `except:` block as not the last exception handler |

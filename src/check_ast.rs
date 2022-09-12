@@ -194,6 +194,24 @@ where
                     }));
                 }
             }
+            StmtKind::Break => {
+                if self.settings.select.contains(&CheckCode::F701) {
+                    if let Some(check) =
+                        checks::check_break_outside_loop(stmt, &self.parents, &self.parent_stack)
+                    {
+                        self.checks.push(check);
+                    }
+                }
+            }
+            StmtKind::Continue => {
+                if self.settings.select.contains(&CheckCode::F702) {
+                    if let Some(check) =
+                        checks::check_continue_outside_loop(stmt, &self.parents, &self.parent_stack)
+                    {
+                        self.checks.push(check);
+                    }
+                }
+            }
             StmtKind::FunctionDef {
                 name,
                 decorator_list,
