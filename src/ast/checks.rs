@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use itertools::izip;
 use rustpython_parser::ast::{
     Arg, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword,
-    Location, Stmt, Unaryop,
+    Location, Stmt, StmtKind, Unaryop,
 };
 
 use crate::ast::operations::SourceCodeLocator;
@@ -467,4 +467,78 @@ pub fn check_starred_expressions(
     }
 
     None
+}
+
+/// Check BreakOutsideLoop compliance.
+pub fn check_break_outside_loop(
+    stmt: &Stmt,
+    parents: &[&Stmt],
+    parent_stack: &[usize],
+) -> Option<Check> {
+    let mut allowed: bool = false;
+    let mut parent = stmt;
+    for index in parent_stack.iter().rev() {
+        let child = parent;
+        parent = parents[*index];
+        match &parent.node {
+            StmtKind::For { orelse, .. }
+            | StmtKind::AsyncFor { orelse, .. }
+            | StmtKind::While { orelse, .. } => {
+                if !orelse.contains(child) {
+                    allowed = true;
+                    break;
+                }
+            }
+
+            StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+            | StmtKind::ClassDef { .. } => {
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    if !allowed {
+        Some(Check::new(CheckKind::BreakOutsideLoop, stmt.location))
+    } else {
+        None
+    }
+}
+
+/// Check ContinueOutsideLoop compliance.
+pub fn check_continue_outside_loop(
+    stmt: &Stmt,
+    parents: &[&Stmt],
+    parent_stack: &[usize],
+) -> Option<Check> {
+    let mut allowed: bool = false;
+    let mut parent = stmt;
+    for index in parent_stack.iter().rev() {
+        let child = parent;
+        parent = parents[*index];
+        match &parent.node {
+            StmtKind::For { orelse, .. }
+            | StmtKind::AsyncFor { orelse, .. }
+            | StmtKind::While { orelse, .. } => {
+                if !orelse.contains(child) {
+                    allowed = true;
+                    break;
+                }
+            }
+
+            StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+            | StmtKind::ClassDef { .. } => {
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    if !allowed {
+        Some(Check::new(CheckKind::ContinueOutsideLoop, stmt.location))
+    } else {
+        None
+    }
 }

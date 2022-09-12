@@ -31,6 +31,8 @@ pub enum CheckCode {
     F622,
     F631,
     F634,
+    F701,
+    F702,
     F704,
     F706,
     F707,
@@ -72,6 +74,8 @@ impl FromStr for CheckCode {
             "F622" => Ok(CheckCode::F622),
             "F631" => Ok(CheckCode::F631),
             "F634" => Ok(CheckCode::F634),
+            "F701" => Ok(CheckCode::F701),
+            "F702" => Ok(CheckCode::F702),
             "F704" => Ok(CheckCode::F704),
             "F706" => Ok(CheckCode::F706),
             "F707" => Ok(CheckCode::F707),
@@ -114,6 +118,8 @@ impl CheckCode {
             CheckCode::F622 => "F622",
             CheckCode::F631 => "F631",
             CheckCode::F634 => "F634",
+            CheckCode::F701 => "F701",
+            CheckCode::F702 => "F702",
             CheckCode::F704 => "F704",
             CheckCode::F706 => "F706",
             CheckCode::F707 => "F707",
@@ -154,6 +160,8 @@ impl CheckCode {
             CheckCode::F622 => &LintSource::AST,
             CheckCode::F631 => &LintSource::AST,
             CheckCode::F634 => &LintSource::AST,
+            CheckCode::F701 => &LintSource::AST,
+            CheckCode::F702 => &LintSource::AST,
             CheckCode::F704 => &LintSource::AST,
             CheckCode::F706 => &LintSource::AST,
             CheckCode::F707 => &LintSource::AST,
@@ -184,10 +192,12 @@ pub enum RejectedCmpop {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckKind {
-    AssertTuple,
-    AmbiguousVariableName(String),
     AmbiguousClassName(String),
     AmbiguousFunctionName(String),
+    AmbiguousVariableName(String),
+    AssertTuple,
+    BreakOutsideLoop,
+    ContinueOutsideLoop,
     DefaultExceptNotLast,
     DoNotAssignLambda,
     DoNotUseBareExcept,
@@ -224,11 +234,14 @@ impl CheckKind {
     /// The name of the check.
     pub fn name(&self) -> &'static str {
         match self {
-            CheckKind::AssertTuple => "AssertTuple",
-            CheckKind::AmbiguousVariableName(_) => "AmbiguousVariableName",
             CheckKind::AmbiguousClassName(_) => "AmbiguousClassName",
             CheckKind::AmbiguousFunctionName(_) => "AmbiguousFunctionName",
+            CheckKind::AmbiguousVariableName(_) => "AmbiguousVariableName",
+            CheckKind::AssertTuple => "AssertTuple",
+            CheckKind::BreakOutsideLoop => "BreakOutsideLoop",
+            CheckKind::ContinueOutsideLoop => "ContinueOutsideLoop",
             CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
+            CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::DoNotUseBareExcept => "DoNotUseBareExcept",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
@@ -238,7 +251,6 @@ impl CheckKind {
             CheckKind::ImportStarUsage => "ImportStarUsage",
             CheckKind::LateFutureImport => "LateFutureImport",
             CheckKind::LineTooLong(_, _) => "LineTooLong",
-            CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
             CheckKind::MultiValueRepeatedKeyLiteral => "MultiValueRepeatedKeyLiteral",
             CheckKind::MultiValueRepeatedKeyVariable(_) => "MultiValueRepeatedKeyVariable",
@@ -266,8 +278,14 @@ impl CheckKind {
     /// A four-letter shorthand code for the check.
     pub fn code(&self) -> &'static CheckCode {
         match self {
+            CheckKind::AmbiguousClassName(_) => &CheckCode::E742,
+            CheckKind::AmbiguousFunctionName(_) => &CheckCode::E743,
+            CheckKind::AmbiguousVariableName(_) => &CheckCode::E741,
             CheckKind::AssertTuple => &CheckCode::F631,
+            CheckKind::BreakOutsideLoop => &CheckCode::F701,
+            CheckKind::ContinueOutsideLoop => &CheckCode::F702,
             CheckKind::DefaultExceptNotLast => &CheckCode::F707,
+            CheckKind::DoNotAssignLambda => &CheckCode::E731,
             CheckKind::DoNotUseBareExcept => &CheckCode::E722,
             CheckKind::DuplicateArgumentName => &CheckCode::F831,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
@@ -277,10 +295,6 @@ impl CheckKind {
             CheckKind::ImportStarUsage => &CheckCode::F403,
             CheckKind::LateFutureImport => &CheckCode::F404,
             CheckKind::LineTooLong(_, _) => &CheckCode::E501,
-            CheckKind::DoNotAssignLambda => &CheckCode::E731,
-            CheckKind::AmbiguousVariableName(_) => &CheckCode::E741,
-            CheckKind::AmbiguousClassName(_) => &CheckCode::E742,
-            CheckKind::AmbiguousFunctionName(_) => &CheckCode::E743,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
             CheckKind::MultiValueRepeatedKeyLiteral => &CheckCode::F601,
             CheckKind::MultiValueRepeatedKeyVariable(_) => &CheckCode::F602,
@@ -306,13 +320,27 @@ impl CheckKind {
     /// The body text for the check.
     pub fn body(&self) -> String {
         match self {
+            CheckKind::AmbiguousClassName(name) => {
+                format!("ambiguous class name '{}'", name)
+            }
+            CheckKind::AmbiguousFunctionName(name) => {
+                format!("ambiguous function name '{}'", name)
+            }
+            CheckKind::AmbiguousVariableName(name) => {
+                format!("ambiguous variable name '{}'", name)
+            }
             CheckKind::AssertTuple => {
                 "Assert test is a non-empty tuple, which is always `True`".to_string()
             }
-            CheckKind::DoNotUseBareExcept => "Do not use bare `except`".to_string(),
+            CheckKind::BreakOutsideLoop => "`break` outside loop".to_string(),
+            CheckKind::ContinueOutsideLoop => "`continue` not properly in loop".to_string(),
             CheckKind::DefaultExceptNotLast => {
                 "an `except:` block as not the last exception handler".to_string()
             }
+            CheckKind::DoNotAssignLambda => {
+                "Do not assign a lambda expression, use a def".to_string()
+            }
+            CheckKind::DoNotUseBareExcept => "Do not use bare `except`".to_string(),
             CheckKind::DuplicateArgumentName => {
                 "Duplicate argument name in function definition".to_string()
             }
@@ -332,18 +360,6 @@ impl CheckKind {
             }
             CheckKind::LineTooLong(length, limit) => {
                 format!("Line too long ({length} > {limit} characters)")
-            }
-            CheckKind::DoNotAssignLambda => {
-                "Do not assign a lambda expression, use a def".to_string()
-            }
-            CheckKind::AmbiguousClassName(name) => {
-                format!("ambiguous class name '{}'", name)
-            }
-            CheckKind::AmbiguousFunctionName(name) => {
-                format!("ambiguous function name '{}'", name)
-            }
-            CheckKind::AmbiguousVariableName(name) => {
-                format!("ambiguous variable name '{}'", name)
             }
             CheckKind::ModuleImportNotAtTopOfFile => {
                 "Module level import not at top of file".to_string()
@@ -396,11 +412,11 @@ impl CheckKind {
             CheckKind::UndefinedExport(name) => {
                 format!("Undefined name `{name}` in `__all__`")
             }
-            CheckKind::UndefinedName(name) => {
-                format!("Undefined name `{name}`")
-            }
             CheckKind::UndefinedLocal(name) => {
                 format!("Local variable `{name}` referenced before assignment")
+            }
+            CheckKind::UndefinedName(name) => {
+                format!("Undefined name `{name}`")
             }
             CheckKind::UnusedImport(name) => format!("`{name}` imported but unused"),
             CheckKind::UnusedVariable(name) => {
@@ -417,42 +433,10 @@ impl CheckKind {
 
     /// Whether the check kind is (potentially) fixable.
     pub fn fixable(&self) -> bool {
-        match self {
-            CheckKind::AmbiguousClassName(_) => true,
-            CheckKind::AmbiguousFunctionName(_) => true,
-            CheckKind::AmbiguousVariableName(_) => false,
-            CheckKind::AssertTuple => false,
-            CheckKind::DefaultExceptNotLast => false,
-            CheckKind::DoNotAssignLambda => false,
-            CheckKind::DoNotUseBareExcept => false,
-            CheckKind::DuplicateArgumentName => false,
-            CheckKind::FStringMissingPlaceholders => false,
-            CheckKind::FutureFeatureNotDefined(_) => false,
-            CheckKind::IOError(_) => false,
-            CheckKind::IfTuple => false,
-            CheckKind::ImportStarUsage => false,
-            CheckKind::LateFutureImport => false,
-            CheckKind::LineTooLong(_, _) => false,
-            CheckKind::ModuleImportNotAtTopOfFile => false,
-            CheckKind::MultiValueRepeatedKeyLiteral => false,
-            CheckKind::MultiValueRepeatedKeyVariable(_) => false,
-            CheckKind::NoAssertEquals => true,
-            CheckKind::NoneComparison(_) => false,
-            CheckKind::NotInTest => false,
-            CheckKind::NotIsTest => false,
-            CheckKind::RaiseNotImplemented => false,
-            CheckKind::ReturnOutsideFunction => false,
-            CheckKind::TooManyExpressionsInStarredAssignment => false,
-            CheckKind::TrueFalseComparison(_, _) => false,
-            CheckKind::TwoStarredExpressions => false,
-            CheckKind::UndefinedExport(_) => false,
-            CheckKind::UndefinedLocal(_) => false,
-            CheckKind::UndefinedName(_) => false,
-            CheckKind::UnusedImport(_) => false,
-            CheckKind::UnusedVariable(_) => false,
-            CheckKind::UselessObjectInheritance(_) => true,
-            CheckKind::YieldOutsideFunction => false,
-        }
+        matches!(
+            self,
+            CheckKind::NoAssertEquals | CheckKind::UselessObjectInheritance(_)
+        )
     }
 }
 

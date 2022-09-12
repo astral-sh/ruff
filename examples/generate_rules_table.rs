@@ -3,10 +3,12 @@ use ruff::checks::{CheckKind, RejectedCmpop};
 
 fn main() {
     let mut check_kinds: Vec<CheckKind> = vec![
-        CheckKind::AmbiguousVariableName("...".to_string()),
         CheckKind::AmbiguousClassName("...".to_string()),
         CheckKind::AmbiguousFunctionName("...".to_string()),
+        CheckKind::AmbiguousVariableName("...".to_string()),
         CheckKind::AssertTuple,
+        CheckKind::BreakOutsideLoop,
+        CheckKind::ContinueOutsideLoop,
         CheckKind::DefaultExceptNotLast,
         CheckKind::DoNotAssignLambda,
         CheckKind::DoNotUseBareExcept,
