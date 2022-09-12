@@ -124,7 +124,7 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
 Under those conditions, Flake8 implements about 58 rules, give or take. At time of writing, ruff
-implements 31 rules. (Note that these 31 rules likely cover a disproportionate share of errors:
+implements 33 rules. (Note that these 33 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
 Of the unimplemented rules, ruff is missing:
