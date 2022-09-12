@@ -154,6 +154,7 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | E714 | NotIsTest | Test for object identity should be `is not` |
 | E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |
 | E741 | AmbiguousVariableName | ambiguous variable name '...' |
+| E742 | AmbiguousClassName | ambiguous class name '...' |
 | E902 | IOError | No such file or directory: `...` |
 | F401 | UnusedImport | `...` imported but unused |
 | F403 | ImportStarUsage | Unable to detect undefined names |

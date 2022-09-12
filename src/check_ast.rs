@@ -296,6 +296,12 @@ where
                     }
                 }
 
+                if self.settings.select.contains(&CheckCode::E742) {
+                    if let Some(check) = checks::check_ambiguous_class_name(name, stmt.location) {
+                        self.checks.push(check);
+                    }
+                }
+
                 for expr in bases {
                     self.visit_expr(expr)
                 }
