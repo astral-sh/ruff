@@ -22,7 +22,7 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
     if let StmtKind::AugAssign { .. } = &stmt.node {
         if let Some(binding) = scope.values.get("__all__") {
             if let BindingKind::Export(existing) = &binding.kind {
-                names.extend(existing.clone());
+                names.extend_from_slice(existing);
             }
         }
     }
