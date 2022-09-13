@@ -1176,8 +1176,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        while !self.deferred_annotations.is_empty() {
-            let (location, expression) = self.deferred_annotations.pop().unwrap();
+        while let Some((location, expression)) = self.deferred_annotations.pop() {
             if let Ok(mut expr) = parser::parse_expression(expression, path) {
                 relocate_expr(&mut expr, location);
                 allocator.push(expr);
@@ -1194,9 +1193,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_functions(&mut self) {
-        while !self.deferred_functions.is_empty() {
-            let (stmt, scopes, parents) = self.deferred_functions.pop().unwrap();
-
+        while let Some((stmt, scopes, parents)) = self.deferred_functions.pop() {
             self.parent_stack = parents;
             self.scope_stack = scopes;
             self.push_scope(Scope::new(ScopeKind::Function));
@@ -1220,9 +1217,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_lambdas(&mut self) {
-        while !self.deferred_lambdas.is_empty() {
-            let (expr, scopes, parents) = self.deferred_lambdas.pop().unwrap();
-
+        while let Some((expr, scopes, parents)) = self.deferred_lambdas.pop() {
             self.parent_stack = parents;
             self.scope_stack = scopes;
             self.push_scope(Scope::new(ScopeKind::Function));
@@ -1240,8 +1235,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_assignments(&mut self) {
-        while !self.deferred_assignments.is_empty() {
-            let index = self.deferred_assignments.pop().unwrap();
+        while let Some(index) = self.deferred_assignments.pop() {
             if self.settings.select.contains(&CheckCode::F841) {
                 self.checks
                     .extend(checks::check_unused_variables(&self.scopes[index]));
