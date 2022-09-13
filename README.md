@@ -124,13 +124,13 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
 Under those conditions, Flake8 implements about 60 rules, give or take. At time of writing, ruff
-implements 37 rules. (Note that these 37 rules likely cover a disproportionate share of errors:
+implements 38 rules. (Note that these 38 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
-The 23 unimplemented rules are tracked in #170, and include:
+The unimplemented rules are tracked in #170, and include:
 
 - 14 rules related to string `.format` calls.
-- 3 rules related to parsing and syntax errors.
+- 1 rule related to parsing and syntax.
 - 6 logical rules.
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -172,6 +172,7 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | F704 | YieldOutsideFunction | a `yield` or `yield from` statement outside of a function/method |
 | F706 | ReturnOutsideFunction | a `return` statement outside of a function/method |
 | F707 | DefaultExceptNotLast | an `except:` block as not the last exception handler |
+| F722 | ForwardAnnotationSyntaxError | syntax error in forward annotation '...' |
 | F821 | UndefinedName | Undefined name `...` |
 | F822 | UndefinedExport | Undefined name `...` in `__all__` |
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |

@@ -72,6 +72,7 @@ impl Settings {
                     CheckCode::F704,
                     CheckCode::F706,
                     CheckCode::F707,
+                    CheckCode::F722,
                     CheckCode::F821,
                     CheckCode::F822,
                     CheckCode::F823,

@@ -37,6 +37,7 @@ pub enum CheckCode {
     F704,
     F706,
     F707,
+    F722,
     F821,
     F822,
     F823,
@@ -126,6 +127,7 @@ impl CheckCode {
             CheckCode::F704 => "F704",
             CheckCode::F706 => "F706",
             CheckCode::F707 => "F707",
+            CheckCode::F722 => "F722",
             CheckCode::F821 => "F821",
             CheckCode::F822 => "F822",
             CheckCode::F823 => "F823",
@@ -172,6 +174,7 @@ pub enum CheckKind {
     DoNotAssignLambda,
     DoNotUseBareExcept,
     DuplicateArgumentName,
+    ForwardAnnotationSyntaxError(String),
     FStringMissingPlaceholders,
     FutureFeatureNotDefined(String),
     IOError(String),
@@ -215,6 +218,7 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::DoNotUseBareExcept => "DoNotUseBareExcept",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
+            CheckKind::ForwardAnnotationSyntaxError(_) => "ForwardAnnotationSyntaxError",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
             CheckKind::FutureFeatureNotDefined(_) => "FutureFeatureNotDefined",
             CheckKind::IOError(_) => "IOError",
@@ -260,6 +264,7 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => &CheckCode::E731,
             CheckKind::DoNotUseBareExcept => &CheckCode::E722,
             CheckKind::DuplicateArgumentName => &CheckCode::F831,
+            CheckKind::ForwardAnnotationSyntaxError(_) => &CheckCode::F722,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
             CheckKind::FutureFeatureNotDefined(_) => &CheckCode::F407,
             CheckKind::IOError(_) => &CheckCode::E902,
@@ -316,6 +321,9 @@ impl CheckKind {
             CheckKind::DoNotUseBareExcept => "Do not use bare `except`".to_string(),
             CheckKind::DuplicateArgumentName => {
                 "Duplicate argument name in function definition".to_string()
+            }
+            CheckKind::ForwardAnnotationSyntaxError(body) => {
+                format!("syntax error in forward annotation '{body}'")
             }
             CheckKind::FStringMissingPlaceholders => {
                 "f-string without any placeholders".to_string()

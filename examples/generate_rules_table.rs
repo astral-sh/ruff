@@ -13,6 +13,7 @@ fn main() {
         CheckKind::DoNotAssignLambda,
         CheckKind::DoNotUseBareExcept,
         CheckKind::DuplicateArgumentName,
+        CheckKind::ForwardAnnotationSyntaxError("...".to_string()),
         CheckKind::FStringMissingPlaceholders,
         CheckKind::FutureFeatureNotDefined("...".to_string()),
         CheckKind::IOError("...".to_string()),
