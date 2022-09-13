@@ -472,7 +472,7 @@ where
                         let binding = Binding {
                             kind: BindingKind::Importation(match module {
                                 None => name.clone(),
-                                Some(parent) => format!("{}.{}", parent, name.clone()),
+                                Some(parent) => format!("{}.{}", parent, name),
                             }),
                             used: None,
                             location: stmt.location,
