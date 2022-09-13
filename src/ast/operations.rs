@@ -22,7 +22,7 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
     if let StmtKind::AugAssign { .. } = &stmt.node {
         if let Some(binding) = scope.values.get("__all__") {
             if let BindingKind::Export(existing) = &binding.kind {
-                names.extend(existing.clone());
+                names.extend_from_slice(existing);
             }
         }
     }
@@ -70,9 +70,7 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
 pub fn on_conditional_branch(parent_stack: &[usize], parents: &[&Stmt]) -> bool {
     for index in parent_stack.iter().rev() {
         let parent = parents[*index];
-        if matches!(parent.node, StmtKind::If { .. })
-            || matches!(parent.node, StmtKind::While { .. })
-        {
+        if matches!(parent.node, StmtKind::If { .. } | StmtKind::While { .. }) {
             return true;
         }
         if let StmtKind::Expr { value } = &parent.node {
@@ -89,10 +87,10 @@ pub fn on_conditional_branch(parent_stack: &[usize], parents: &[&Stmt]) -> bool 
 pub fn in_nested_block(parent_stack: &[usize], parents: &[&Stmt]) -> bool {
     for index in parent_stack.iter().rev() {
         let parent = parents[*index];
-        if matches!(parent.node, StmtKind::Try { .. })
-            || matches!(parent.node, StmtKind::If { .. })
-            || matches!(parent.node, StmtKind::With { .. })
-        {
+        if matches!(
+            parent.node,
+            StmtKind::Try { .. } | StmtKind::If { .. } | StmtKind::With { .. }
+        ) {
             return true;
         }
     }

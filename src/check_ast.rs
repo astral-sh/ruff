@@ -472,7 +472,7 @@ where
                         let binding = Binding {
                             kind: BindingKind::Importation(match module {
                                 None => name.clone(),
-                                Some(parent) => format!("{}.{}", parent, name.clone()),
+                                Some(parent) => format!("{}.{}", parent, name),
                             }),
                             used: None,
                             location: stmt.location,
@@ -645,8 +645,7 @@ where
                     .settings
                     .select
                     .contains(CheckKind::YieldOutsideFunction.code())
-                    && matches!(scope.kind, ScopeKind::Class)
-                    || matches!(scope.kind, ScopeKind::Module)
+                    && matches!(scope.kind, ScopeKind::Class | ScopeKind::Module)
                 {
                     self.checks
                         .push(Check::new(CheckKind::YieldOutsideFunction, expr.location));
@@ -998,7 +997,7 @@ impl<'a> Checker<'a> {
 
         for builtin in BUILTINS {
             scope.values.insert(
-                builtin.to_string(),
+                (*builtin).to_string(),
                 Binding {
                     kind: BindingKind::Builtin,
                     location: Default::default(),
@@ -1008,7 +1007,7 @@ impl<'a> Checker<'a> {
         }
         for builtin in MAGIC_GLOBALS {
             scope.values.insert(
-                builtin.to_string(),
+                (*builtin).to_string(),
                 Binding {
                     kind: BindingKind::Builtin,
                     location: Default::default(),
@@ -1077,9 +1076,7 @@ impl<'a> Checker<'a> {
                 && !current.values.contains_key(id)
             {
                 for scope in self.scopes.iter().rev().skip(1) {
-                    if matches!(scope.kind, ScopeKind::Function)
-                        || matches!(scope.kind, ScopeKind::Module)
-                    {
+                    if matches!(scope.kind, ScopeKind::Function | ScopeKind::Module) {
                         let used = scope
                             .values
                             .get(id)
@@ -1110,9 +1107,10 @@ impl<'a> Checker<'a> {
             }
 
             // TODO(charlie): Include comprehensions here.
-            if matches!(parent.node, StmtKind::For { .. })
-                || matches!(parent.node, StmtKind::AsyncFor { .. })
-                || operations::is_unpacking_assignment(parent)
+            if matches!(
+                parent.node,
+                StmtKind::For { .. } | StmtKind::AsyncFor { .. }
+            ) || operations::is_unpacking_assignment(parent)
             {
                 self.add_binding(
                     id.to_string(),
@@ -1127,9 +1125,12 @@ impl<'a> Checker<'a> {
 
             if id == "__all__"
                 && matches!(current.kind, ScopeKind::Module)
-                && (matches!(parent.node, StmtKind::Assign { .. })
-                    || matches!(parent.node, StmtKind::AugAssign { .. })
-                    || matches!(parent.node, StmtKind::AnnAssign { .. }))
+                && matches!(
+                    parent.node,
+                    StmtKind::Assign { .. }
+                        | StmtKind::AugAssign { .. }
+                        | StmtKind::AnnAssign { .. }
+                )
             {
                 self.add_binding(
                     id.to_string(),
@@ -1250,7 +1251,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        for index in self.dead_scopes.clone() {
+        for index in self.dead_scopes.iter().copied() {
             let scope = &self.scopes[index];
 
             let all_binding = scope.values.get("__all__");

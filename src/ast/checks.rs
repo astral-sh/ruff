@@ -156,9 +156,7 @@ pub fn check_useless_object_inheritance(
                             CheckKind::UselessObjectInheritance(name.to_string()),
                             expr.location,
                         );
-                        if matches!(autofix, fixer::Mode::Generate)
-                            || matches!(autofix, fixer::Mode::Apply)
-                        {
+                        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                             if let Some(fix) = fixes::remove_class_def_base(
                                 locator,
                                 &stmt.location,
@@ -254,9 +252,7 @@ pub fn check_assert_equals(expr: &Expr, autofix: &fixer::Mode) -> Option<Check> 
             if let ExprKind::Name { id, .. } = &value.node {
                 if id == "self" {
                     let mut check = Check::new(CheckKind::NoAssertEquals, expr.location);
-                    if matches!(autofix, fixer::Mode::Generate)
-                        || matches!(autofix, fixer::Mode::Apply)
-                    {
+                    if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                         check.amend(Fix {
                             content: "assertEqual".to_string(),
                             start: Location::new(expr.location.row(), expr.location.column() + 1),
@@ -315,7 +311,7 @@ pub fn check_repeated_keys(
                 (Some(DictionaryKey::Variable(v1)), Some(DictionaryKey::Variable(v2))) => {
                     if check_repeated_variables && v1 == v2 {
                         checks.push(Check::new(
-                            CheckKind::MultiValueRepeatedKeyVariable(v2.to_string()),
+                            CheckKind::MultiValueRepeatedKeyVariable((*v2).to_string()),
                             k2.location,
                         ))
                     }
