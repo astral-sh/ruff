@@ -1,8 +1,8 @@
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use std::collections::BTreeSet;
 
-lazy_static! {
-    static ref ANNOTATED_SUBSCRIPTS: BTreeSet<&'static str> = BTreeSet::from([
+static ANNOTATED_SUBSCRIPTS: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
+    BTreeSet::from([
         "AbstractAsyncContextManager",
         "AbstractContextManager",
         "AbstractSet",
@@ -80,8 +80,8 @@ lazy_static! {
         "set",
         "tuple",
         "type",
-    ]);
-}
+    ])
+});
 
 pub fn is_annotated_subscript(name: &str) -> bool {
     ANNOTATED_SUBSCRIPTS.contains(name)

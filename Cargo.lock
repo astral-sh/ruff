@@ -1759,7 +1759,6 @@ dependencies = [
  "filetime",
  "glob",
  "itertools",
- "lazy_static",
  "log",
  "notify",
  "once_cell",
