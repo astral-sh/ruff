@@ -1181,6 +1181,11 @@ impl<'a> Checker<'a> {
             if let Ok(mut expr) = parser::parse_expression(expression, path) {
                 relocate_expr(&mut expr, location);
                 allocator.push(expr);
+            } else if self.settings.select.contains(&CheckCode::F722) {
+                self.checks.push(Check::new(
+                    CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
+                    location,
+                ));
             }
         }
         for expr in allocator {
