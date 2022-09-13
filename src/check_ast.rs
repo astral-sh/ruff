@@ -1256,7 +1256,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        for index in self.dead_scopes.clone() {
+        for index in self.dead_scopes.iter().copied() {
             let scope = &self.scopes[index];
 
             let all_binding = scope.values.get("__all__");
