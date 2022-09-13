@@ -997,7 +997,7 @@ impl<'a> Checker<'a> {
 
         for builtin in BUILTINS {
             scope.values.insert(
-                builtin.to_string(),
+                (*builtin).to_string(),
                 Binding {
                     kind: BindingKind::Builtin,
                     location: Default::default(),
@@ -1007,7 +1007,7 @@ impl<'a> Checker<'a> {
         }
         for builtin in MAGIC_GLOBALS {
             scope.values.insert(
-                builtin.to_string(),
+                (*builtin).to_string(),
                 Binding {
                     kind: BindingKind::Builtin,
                     location: Default::default(),

@@ -311,7 +311,7 @@ pub fn check_repeated_keys(
                 (Some(DictionaryKey::Variable(v1)), Some(DictionaryKey::Variable(v2))) => {
                     if check_repeated_variables && v1 == v2 {
                         checks.push(Check::new(
-                            CheckKind::MultiValueRepeatedKeyVariable(v2.to_string()),
+                            CheckKind::MultiValueRepeatedKeyVariable((*v2).to_string()),
                             k2.location,
                         ))
                     }
