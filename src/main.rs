@@ -1,4 +1,3 @@
-use std::io::{stdout, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -141,7 +140,8 @@ fn inner_main() -> Result<ExitCode> {
     set_up_logging(cli.verbose)?;
 
     let mut settings = Settings::from_paths(&cli.files);
-    let mut printer = Printer::new(BufWriter::new(stdout()), cli.format);
+
+    let mut printer = Printer::new(cli.format);
 
     if !cli.select.is_empty() {
         settings.select(cli.select);
@@ -155,12 +155,16 @@ fn inner_main() -> Result<ExitCode> {
 
     if cli.watch {
         if cli.fix {
-            println!("Warning: --fix is not enabled in watch mode.")
+            println!("Warning: --fix is not enabled in watch mode.");
+        }
+
+        if cli.format != SerializationFormat::Text {
+            println!("Warning: --format 'text' is used in watch mode.");
         }
 
         // Perform an initial run instantly.
-        clearscreen::clear()?;
-        tell_user!(printer.writer, "Starting linter in watch mode...\n");
+        printer.clear_screen()?;
+        tell_user!("Starting linter in watch mode...\n");
 
         let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
         if !cli.quiet {
@@ -179,8 +183,8 @@ fn inner_main() -> Result<ExitCode> {
                 Ok(e) => {
                     if let Some(path) = e.path {
                         if path.to_string_lossy().ends_with(".py") {
-                            clearscreen::clear()?;
-                            tell_user!(printer.writer, "File change detected...\n");
+                            printer.clear_screen()?;
+                            tell_user!("File change detected...\n");
 
                             let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
                             if !cli.quiet {

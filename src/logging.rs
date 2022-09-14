@@ -3,16 +3,15 @@ use fern;
 
 #[macro_export]
 macro_rules! tell_user {
-    ($writer:expr,$($arg:tt)*) => {
-        writeln!(
-            $writer,
+    ($($arg:tt)*) => {
+        println!(
             "[{}] {}",
             chrono::Local::now()
                 .format("%H:%M:%S %p")
                 .to_string()
                 .dimmed(),
             format_args!($($arg)*)
-        )?
+        )
     }
 }
 

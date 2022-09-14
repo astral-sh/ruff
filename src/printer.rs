@@ -1,5 +1,4 @@
 use colored::Colorize;
-use std::io::Write;
 
 use anyhow::Result;
 use clap::ValueEnum;
@@ -7,20 +6,19 @@ use clap::ValueEnum;
 use crate::message::Message;
 use crate::tell_user;
 
-#[derive(Clone, ValueEnum, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Debug)]
 pub enum SerializationFormat {
     Text,
     Json,
 }
 
-pub struct Printer<W> {
-    pub writer: W,
+pub struct Printer {
     format: SerializationFormat,
 }
 
-impl<W: Write> Printer<W> {
-    pub fn new(writer: W, format: SerializationFormat) -> Self {
-        Self { writer, format }
+impl Printer {
+    pub fn new(format: SerializationFormat) -> Self {
+        Self { format }
     }
 
     pub fn write_once(&mut self, messages: &[Message]) -> Result<()> {
@@ -33,29 +31,25 @@ impl<W: Write> Printer<W> {
 
         match self.format {
             SerializationFormat::Json => {
-                writeln!(self.writer, "{}", serde_json::to_string_pretty(&messages)?)?
+                println!("{}", serde_json::to_string_pretty(&messages)?)
             }
             SerializationFormat::Text => {
                 if !fixed.is_empty() {
-                    writeln!(
-                        self.writer,
+                    println!(
                         "Found {} error(s) ({} fixed).",
                         outstanding.len(),
                         fixed.len()
-                    )?
+                    )
                 } else {
-                    writeln!(self.writer, "Found {} error(s).", outstanding.len())?
+                    println!("Found {} error(s).", outstanding.len())
                 }
 
                 for message in outstanding {
-                    writeln!(self.writer, "{}", message)?
+                    println!("{}", message)
                 }
 
                 if num_fixable > 0 {
-                    writeln!(
-                        self.writer,
-                        "{num_fixable} potentially fixable with the --fix option."
-                    )?
+                    println!("{num_fixable} potentially fixable with the --fix option.")
                 }
             }
         }
@@ -65,18 +59,22 @@ impl<W: Write> Printer<W> {
 
     pub fn write_continuously(&mut self, messages: &[Message]) -> Result<()> {
         tell_user!(
-            self.writer,
             "Found {} error(s). Watching for file changes.",
             messages.len(),
         );
 
         if !messages.is_empty() {
-            writeln!(self.writer, "\n")?;
+            println!();
             for message in messages {
-                writeln!(self.writer, "{}", message)?
+                println!("{}", message)
             }
         }
 
+        Ok(())
+    }
+
+    pub fn clear_screen(&mut self) -> Result<()> {
+        clearscreen::clear()?;
         Ok(())
     }
 }
