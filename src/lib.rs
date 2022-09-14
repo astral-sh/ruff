@@ -10,6 +10,7 @@ pub mod fs;
 pub mod linter;
 pub mod logging;
 pub mod message;
+pub mod printer;
 mod pyproject;
 mod python;
 pub mod settings;
