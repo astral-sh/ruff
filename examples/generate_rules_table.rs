@@ -21,6 +21,7 @@ fn main() {
         CheckKind::ImportStarNotPermitted("...".to_string()),
         CheckKind::ImportStarUsage("...".to_string()),
         CheckKind::InvalidPrintSyntax,
+        CheckKind::IsLiteral,
         CheckKind::LateFutureImport,
         CheckKind::LineTooLong(89, 88),
         CheckKind::ModuleImportNotAtTopOfFile,

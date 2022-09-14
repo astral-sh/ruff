@@ -737,6 +737,15 @@ where
                         check_true_false_comparisons,
                     ));
                 }
+
+                if self.settings.select.contains(&CheckCode::F632) {
+                    self.checks.extend(checks::check_is_literal(
+                        left,
+                        ops,
+                        comparators,
+                        expr.location,
+                    ));
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),

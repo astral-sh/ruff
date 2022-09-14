@@ -283,6 +283,7 @@ other-attribute = 1
                     CheckCode::F621,
                     CheckCode::F622,
                     CheckCode::F631,
+                    CheckCode::F632,
                     CheckCode::F633,
                     CheckCode::F634,
                     CheckCode::F701,
