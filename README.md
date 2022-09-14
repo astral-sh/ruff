@@ -124,7 +124,7 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
 Under those conditions, Flake8 implements about 60 rules, give or take. At time of writing, ruff
-implements 38 rules. (Note that these 38 rules likely cover a disproportionate share of errors:
+implements 39 rules. (Note that these 39 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
 The unimplemented rules are tracked in #170, and include:
@@ -166,6 +166,7 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | F621 | TooManyExpressionsInStarredAssignment | too many expressions in star-unpacking assignment |
 | F622 | TwoStarredExpressions | two starred expressions in assignment |
 | F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |
+| F633 | InvalidPrintSyntax | use of >> is invalid with print function |
 | F634 | IfTuple | If test is a tuple, which is always `True` |
 | F701 | BreakOutsideLoop | `break` outside loop |
 | F702 | ContinueOutsideLoop | `continue` not properly in loop |
