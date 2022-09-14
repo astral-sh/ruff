@@ -432,6 +432,50 @@ pub fn check_literal_comparisons(
     checks
 }
 
+fn is_constant(expr: &Expr) -> bool {
+    match &expr.node {
+        ExprKind::Constant { .. } => true,
+        ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant),
+        _ => false,
+    }
+}
+
+fn is_singleton(expr: &Expr) -> bool {
+    matches!(
+        expr.node,
+        ExprKind::Constant {
+            value: Constant::None | Constant::Bool(_) | Constant::Ellipsis,
+            ..
+        }
+    )
+}
+
+fn is_constant_non_singleton(expr: &Expr) -> bool {
+    is_constant(expr) && !is_singleton(expr)
+}
+
+/// Check IsLiteral compliance.
+pub fn check_is_literal(
+    left: &Expr,
+    ops: &Vec<Cmpop>,
+    comparators: &Vec<Expr>,
+    location: Location,
+) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+
+    let mut left = left;
+    for (op, right) in izip!(ops, comparators) {
+        if matches!(op, Cmpop::Is | Cmpop::IsNot)
+            && (is_constant_non_singleton(left) || is_constant_non_singleton(right))
+        {
+            checks.push(Check::new(CheckKind::IsLiteral, location));
+        }
+        left = right;
+    }
+
+    checks
+}
+
 /// Check TwoStarredExpressions and TooManyExpressionsInStarredAssignment compliance.
 pub fn check_starred_expressions(
     elts: &[Expr],

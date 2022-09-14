@@ -852,6 +852,38 @@ mod tests {
     }
 
     #[test]
+    fn f632() -> Result<()> {
+        let mut actual = check_path(
+            Path::new("./resources/test/fixtures/F632.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F632]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        actual.sort_by_key(|check| check.location);
+        let expected = vec![
+            Check {
+                kind: CheckKind::IsLiteral,
+                location: Location::new(1, 6),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::IsLiteral,
+                location: Location::new(4, 8),
+                fix: None,
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn f633() -> Result<()> {
         let mut actual = check_path(
             Path::new("./resources/test/fixtures/F633.py"),
