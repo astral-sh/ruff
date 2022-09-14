@@ -8,7 +8,7 @@ use serde::Deserialize;
 use crate::checks::CheckCode;
 use crate::fs;
 
-pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<(PathBuf, Config)> {
+pub fn load_config(paths: &[PathBuf]) -> (PathBuf, Config) {
     match find_project_root(paths) {
         Some(project_root) => match find_pyproject_toml(&project_root) {
             Some(path) => {
@@ -19,18 +19,18 @@ pub fn load_config<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<(Pat
                             .tool
                             .and_then(|tool| tool.ruff)
                             .unwrap_or_default();
-                        Ok((project_root, config))
+                        (project_root, config)
                     }
                     Err(e) => {
                         println!("Failed to load pyproject.toml: {:?}", e);
                         println!("Falling back to default configuration...");
-                        Ok(Default::default())
+                        Default::default()
                     }
                 }
             }
-            None => Ok(Default::default()),
+            None => Default::default(),
         },
-        None => Ok(Default::default()),
+        None => Default::default(),
     }
 }
 
@@ -70,8 +70,8 @@ fn find_user_pyproject_toml() -> Option<PathBuf> {
     dirs::home_dir().map(|path| path.join(".ruff"))
 }
 
-fn find_project_root<'a>(sources: impl IntoIterator<Item = &'a Path>) -> Option<PathBuf> {
-    if let Some(prefix) = common_path_all(sources) {
+fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
+    if let Some(prefix) = common_path_all(sources.iter().map(PathBuf::as_path)) {
         for directory in prefix.ancestors() {
             if directory.join(".git").is_dir() {
                 return Some(directory.to_path_buf());
@@ -90,7 +90,7 @@ fn find_project_root<'a>(sources: impl IntoIterator<Item = &'a Path>) -> Option<
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use anyhow::Result;
 
@@ -238,8 +238,9 @@ other-attribute = 1
 
     #[test]
     fn find_and_parse_pyproject_toml() -> Result<()> {
-        let project_root = find_project_root([Path::new("resources/test/fixtures/__init__.py")])
-            .expect("Unable to find project root.");
+        let project_root =
+            find_project_root(&[PathBuf::from("resources/test/fixtures/__init__.py")])
+                .expect("Unable to find project root.");
         assert_eq!(project_root, Path::new("resources/test/fixtures"));
 
         let path = find_pyproject_toml(&project_root).expect("Unable to find pyproject.toml.");

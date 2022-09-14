@@ -1,8 +1,7 @@
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
-use std::path::Path;
+use std::path::PathBuf;
 
-use anyhow::Result;
 use glob::Pattern;
 
 use crate::checks::CheckCode;
@@ -25,8 +24,8 @@ impl Hash for Settings {
 }
 
 impl Settings {
-    pub fn from_paths<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<Self> {
-        let (project_root, config) = load_config(paths)?;
+    pub fn from_paths(paths: &[PathBuf]) -> Self {
+        let (project_root, config) = load_config(paths);
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
             exclude: config
@@ -89,7 +88,7 @@ impl Settings {
         if let Some(ignore) = &config.ignore {
             settings.ignore(ignore);
         }
-        Ok(settings)
+        settings
     }
 
     pub fn select(&mut self, codes: Vec<CheckCode>) {
