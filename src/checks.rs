@@ -31,6 +31,7 @@ pub enum CheckCode {
     F621,
     F622,
     F631,
+    F633,
     F634,
     F701,
     F702,
@@ -76,6 +77,7 @@ impl FromStr for CheckCode {
             "F621" => Ok(CheckCode::F621),
             "F622" => Ok(CheckCode::F622),
             "F631" => Ok(CheckCode::F631),
+            "F633" => Ok(CheckCode::F633),
             "F634" => Ok(CheckCode::F634),
             "F701" => Ok(CheckCode::F701),
             "F702" => Ok(CheckCode::F702),
@@ -121,6 +123,7 @@ impl CheckCode {
             CheckCode::F621 => "F621",
             CheckCode::F622 => "F622",
             CheckCode::F631 => "F631",
+            CheckCode::F633 => "F633",
             CheckCode::F634 => "F634",
             CheckCode::F701 => "F701",
             CheckCode::F702 => "F702",
@@ -179,6 +182,7 @@ pub enum CheckKind {
     FutureFeatureNotDefined(String),
     IOError(String),
     IfTuple,
+    InvalidPrintSyntax,
     ImportStarNotPermitted(String),
     ImportStarUsage(String),
     LateFutureImport,
@@ -223,6 +227,7 @@ impl CheckKind {
             CheckKind::FutureFeatureNotDefined(_) => "FutureFeatureNotDefined",
             CheckKind::IOError(_) => "IOError",
             CheckKind::IfTuple => "IfTuple",
+            CheckKind::InvalidPrintSyntax => "InvalidPrintSyntax",
             CheckKind::ImportStarNotPermitted(_) => "ImportStarNotPermitted",
             CheckKind::ImportStarUsage(_) => "ImportStarUsage",
             CheckKind::LateFutureImport => "LateFutureImport",
@@ -269,6 +274,7 @@ impl CheckKind {
             CheckKind::FutureFeatureNotDefined(_) => &CheckCode::F407,
             CheckKind::IOError(_) => &CheckCode::E902,
             CheckKind::IfTuple => &CheckCode::F634,
+            CheckKind::InvalidPrintSyntax => &CheckCode::F633,
             CheckKind::ImportStarNotPermitted(_) => &CheckCode::F406,
             CheckKind::ImportStarUsage(_) => &CheckCode::F403,
             CheckKind::LateFutureImport => &CheckCode::F404,
@@ -335,6 +341,7 @@ impl CheckKind {
                 format!("No such file or directory: `{name}`")
             }
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
+            CheckKind::InvalidPrintSyntax => "use of >> is invalid with print function".to_string(),
             CheckKind::ImportStarNotPermitted(name) => {
                 format!("`from {name} import *` only allowed at module level")
             }

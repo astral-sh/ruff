@@ -1,6 +1,12 @@
-[project]
-name = "ruff"
-keywords = ["automation", "flake8", "pycodestyle", "pyflakes", "pylint", "clippy"]
+[tool.poetry]
+name = "autobot-ml"
+version = "0.0.1"
+description = "An automated code refactoring tool powered by GPT-3."
+authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/charliermarsh/autobot"
+keywords = ["automation", "refactor", "GPT-3"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -17,19 +23,35 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Software Development :: Quality Assurance",
 ]
-author = "Charlie Marsh"
-author_email = "charlie.r.marsh@gmail.com"
-description = "An extremely fast Python linter, written in Rust."
-requires-python = ">=3.7"
+packages = [{ include = "autobot" }]
 
-[project.urls]
-repository = "https://github.com/charliermarsh/ruff"
+
+[tool.poetry.dependencies]
+python = ">=3.7,<3.11"
+openai = "^0.23.0"
+python-dotenv = "^0.21.0"
+colorama = "^0.4.5"
+patch = "^1.16"
+rich = "^12.5.1"
+
+[tool.poetry.dev-dependencies]
+mypy = "^0.971"
+black = "^22.8.0"
+isort = "^5.10.1"
+
+[tool.poetry.scripts]
+autobot = "autobot.main:main"
 
 [build-system]
-requires = ["maturin>=0.13,<0.14"]
-build-backend = "maturin"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
-[tool.maturin]
-bindings = "bin"
-sdist-include = ["Cargo.lock"]
-strip = true
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+extend-exclude = "schematics"
+preview = true
+
+[tool.isort]
+profile = "black"
+extend_skip = "schematics"

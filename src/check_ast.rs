@@ -3,7 +3,7 @@ use std::path::Path;
 
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
-    KeywordData, Location, Stmt, StmtKind, Suite,
+    KeywordData, Location, Operator, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
 
@@ -667,6 +667,28 @@ where
                     ));
                 }
                 self.in_f_string = true;
+            }
+            ExprKind::BinOp {
+                left,
+                op: Operator::RShift,
+                ..
+            } => {
+                if self.settings.select.contains(&CheckCode::F633) {
+                    if let ExprKind::Name { id, .. } = &left.node {
+                        if id == "print" {
+                            let scope = &self.scopes
+                                [*(self.scope_stack.last().expect("No current scope found."))];
+                            if let Some(Binding {
+                                kind: BindingKind::Builtin,
+                                ..
+                            }) = scope.values.get("print")
+                            {
+                                self.checks
+                                    .push(Check::new(CheckKind::InvalidPrintSyntax, left.location));
+                            }
+                        }
+                    }
+                }
             }
             ExprKind::UnaryOp { op, operand } => {
                 let check_not_in = self.settings.select.contains(&CheckCode::E713);
