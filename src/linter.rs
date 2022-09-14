@@ -1599,4 +1599,36 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn future_annotations() -> Result<()> {
+        let mut actual = check_path(
+            Path::new("./resources/test/fixtures/future_annotations.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::F401, CheckCode::F821]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        actual.sort_by_key(|check| check.location);
+        let expected = vec![
+            Check {
+                kind: CheckKind::UnusedImport("models.Nut".to_string()),
+                location: Location::new(5, 1),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::UndefinedName("Bar".to_string()),
+                location: Location::new(22, 19),
+                fix: None,
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
 }
