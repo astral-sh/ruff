@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -183,9 +183,7 @@ fn inner_main() -> Result<ExitCode> {
 
     set_up_logging(cli.verbose)?;
 
-    // TODO(charlie): Can we avoid this cast?
-    let paths: Vec<&Path> = cli.files.iter().map(PathBuf::as_path).collect();
-    let mut settings = Settings::from_paths(paths)?;
+    let mut settings = Settings::from_paths(&cli.files)?;
     if !cli.select.is_empty() {
         settings.select(cli.select);
     }
