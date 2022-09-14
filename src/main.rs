@@ -183,7 +183,7 @@ fn inner_main() -> Result<ExitCode> {
 
     set_up_logging(cli.verbose)?;
 
-    let mut settings = Settings::from_paths(&cli.files)?;
+    let mut settings = Settings::from_paths(&cli.files);
     if !cli.select.is_empty() {
         settings.select(cli.select);
     }
