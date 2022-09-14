@@ -1,6 +1,6 @@
 [tool.ruff]
 line-length = 88
-exclude = ["excluded.py", "**/migrations"]
+extend-exclude = ["excluded\\.py", "migrations"]
 select = [
     "E402",
     "E501",

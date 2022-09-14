@@ -3,35 +3,40 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use glob::Pattern;
+use log::debug;
+use regex::Regex;
 use walkdir::{DirEntry, WalkDir};
 
-fn is_not_hidden(entry: &DirEntry) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .map(|s| (entry.depth() == 0 || !s.starts_with('.')))
-        .unwrap_or(false)
-}
-
-fn is_not_excluded(entry: &DirEntry, exclude: &[Pattern]) -> bool {
+fn is_excluded(entry: &DirEntry, exclude: &[Regex]) -> bool {
     entry
         .path()
         .to_str()
-        .map(|s| !exclude.iter().any(|pattern| pattern.matches(s)))
-        .unwrap_or(false)
+        .map(|path| exclude.iter().any(|pattern| pattern.is_match(path)))
+        .unwrap_or(true)
+}
+
+fn is_included(entry: &DirEntry) -> bool {
+    let path = entry.path().to_string_lossy();
+    path.ends_with(".py") || path.ends_with(".pyi")
 }
 
 pub fn iter_python_files<'a>(
     path: &'a PathBuf,
-    exclude: &'a [Pattern],
+    exclude: &'a [Regex],
 ) -> impl Iterator<Item = DirEntry> + 'a {
     WalkDir::new(path)
         .follow_links(true)
         .into_iter()
-        .filter_entry(|entry| is_not_hidden(entry) && is_not_excluded(entry, exclude))
+        .filter_entry(|entry| {
+            if is_excluded(entry, exclude) {
+                debug!("Ignored path: {}", entry.path().to_string_lossy());
+                false
+            } else {
+                true
+            }
+        })
         .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.path().to_string_lossy().ends_with(".py"))
+        .filter(is_included)
 }
 
 pub fn read_file(path: &Path) -> Result<String> {

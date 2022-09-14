@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use glob::Pattern;
+use regex::Regex;
 
 use crate::checks::CheckCode;
 use crate::pyproject::load_config;
@@ -10,7 +10,7 @@ use crate::pyproject::load_config;
 #[derive(Debug)]
 pub struct Settings {
     pub line_length: usize,
-    pub exclude: Vec<Pattern>,
+    pub exclude: Vec<Regex>,
     pub select: BTreeSet<CheckCode>,
 }
 
@@ -25,21 +25,32 @@ impl Hash for Settings {
 
 impl Settings {
     pub fn from_paths(paths: &[PathBuf]) -> Self {
-        let (project_root, config) = load_config(paths);
+        let config = load_config(paths);
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
             exclude: config
                 .exclude
-                .unwrap_or_default()
-                .into_iter()
-                .map(|path| {
-                    if path.is_relative() {
-                        project_root.join(path)
-                    } else {
-                        path
-                    }
+                .unwrap_or_else(|| {
+                    vec![
+                        Path::new("\\.direnv").to_path_buf(),
+                        Path::new("\\.eggs").to_path_buf(),
+                        Path::new("\\.git").to_path_buf(),
+                        Path::new("\\.hg").to_path_buf(),
+                        Path::new("\\.mypy_cache").to_path_buf(),
+                        Path::new("\\.nox").to_path_buf(),
+                        Path::new("\\.svn").to_path_buf(),
+                        Path::new("\\.tox").to_path_buf(),
+                        Path::new("\\.venv").to_path_buf(),
+                        Path::new("__pypackages__").to_path_buf(),
+                        Path::new("_build").to_path_buf(),
+                        Path::new("buck-out").to_path_buf(),
+                        Path::new("build").to_path_buf(),
+                        Path::new("dist").to_path_buf(),
+                        Path::new("venv").to_path_buf(),
+                    ]
                 })
-                .map(|path| Pattern::new(&path.to_string_lossy()).expect("Invalid pattern."))
+                .into_iter()
+                .map(|path| Regex::new(&path.to_string_lossy()).expect("Invalid pattern."))
                 .collect(),
             select: BTreeSet::from_iter(config.select.unwrap_or_else(|| {
                 vec![
@@ -106,7 +117,11 @@ impl Settings {
         }
     }
 
-    pub fn exclude(&mut self, exclude: Vec<Pattern>) {
+    pub fn exclude(&mut self, exclude: Vec<Regex>) {
         self.exclude = exclude;
+    }
+
+    pub fn extend_exclude(&mut self, exclude: Vec<Regex>) {
+        self.exclude.extend(exclude);
     }
 }
