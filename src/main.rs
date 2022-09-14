@@ -60,7 +60,7 @@ struct Cli {
     #[clap(long, multiple = true)]
     exclude: Vec<Pattern>,
     /// Output formatting of linting messages
-    #[clap(long, value_name = "FORMAT", arg_enum, default_value_t=SerializationFormat::Text)]
+    #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
 }
 
@@ -140,9 +140,7 @@ fn inner_main() -> Result<ExitCode> {
 
     set_up_logging(cli.verbose)?;
 
-    // TODO(charlie): Can we avoid this cast?
-    let paths: Vec<&Path> = cli.files.iter().map(PathBuf::as_path).collect();
-    let mut settings = Settings::from_paths(paths)?;
+    let mut settings = Settings::from_paths(&cli.files);
     let mut printer = Printer::new(BufWriter::new(stdout()), cli.format);
     
     if !cli.select.is_empty() {
