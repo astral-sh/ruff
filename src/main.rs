@@ -1,4 +1,3 @@
-use std::io::{stdout, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -19,7 +18,6 @@ use ::ruff::fs::iter_python_files;
 use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
-use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::settings::Settings;
 use ::ruff::tell_user;
 
@@ -59,9 +57,6 @@ struct Cli {
     /// List of file and/or directory patterns to exclude from checks.
     #[clap(long, multiple = true)]
     exclude: Vec<Pattern>,
-    /// Output formatting of linting messages
-    #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
-    format: SerializationFormat,
 }
 
 #[cfg(feature = "update-informer")]
@@ -135,14 +130,60 @@ fn run_once(
     Ok(messages)
 }
 
+fn report_once(messages: &[Message]) -> Result<()> {
+    let (fixed, outstanding): (Vec<&Message>, Vec<&Message>) =
+        messages.iter().partition(|message| message.fixed);
+    let num_fixable = outstanding
+        .iter()
+        .filter(|message| message.kind.fixable())
+        .count();
+
+    if !outstanding.is_empty() {
+        for message in &outstanding {
+            println!("{}", message);
+        }
+        println!();
+    }
+
+    if !fixed.is_empty() {
+        println!(
+            "Found {} error(s) ({} fixed).",
+            outstanding.len(),
+            fixed.len()
+        );
+    } else {
+        println!("Found {} error(s).", outstanding.len());
+    }
+
+    if num_fixable > 0 {
+        println!("{num_fixable} potentially fixable with the --fix option.");
+    }
+
+    Ok(())
+}
+
+fn report_continuously(messages: &[Message]) -> Result<()> {
+    tell_user!(
+        "Found {} error(s). Watching for file changes.",
+        messages.len(),
+    );
+
+    if !messages.is_empty() {
+        println!();
+        for message in messages {
+            println!("{}", message);
+        }
+    }
+
+    Ok(())
+}
+
 fn inner_main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
     set_up_logging(cli.verbose)?;
 
     let mut settings = Settings::from_paths(&cli.files);
-    let mut printer = Printer::new(BufWriter::new(stdout()), cli.format);
-
     if !cli.select.is_empty() {
         settings.select(cli.select);
     }
@@ -160,11 +201,11 @@ fn inner_main() -> Result<ExitCode> {
 
         // Perform an initial run instantly.
         clearscreen::clear()?;
-        tell_user!(printer.writer, "Starting linter in watch mode...\n");
+        tell_user!("Starting linter in watch mode...\n");
 
         let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
         if !cli.quiet {
-            printer.write_continuously(&messages)?;
+            report_continuously(&messages)?;
         }
 
         // Configure the file watcher.
@@ -180,11 +221,11 @@ fn inner_main() -> Result<ExitCode> {
                     if let Some(path) = e.path {
                         if path.to_string_lossy().ends_with(".py") {
                             clearscreen::clear()?;
-                            tell_user!(printer.writer, "File change detected...\n");
+                            tell_user!("File change detected...\n");
 
                             let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
                             if !cli.quiet {
-                                printer.write_continuously(&messages)?;
+                                report_continuously(&messages)?;
                             }
                         }
                     }
@@ -195,7 +236,7 @@ fn inner_main() -> Result<ExitCode> {
     } else {
         let messages = run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?;
         if !cli.quiet {
-            printer.write_once(&messages)?;
+            report_once(&messages)?;
         }
 
         #[cfg(feature = "update-informer")]
