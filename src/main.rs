@@ -143,9 +143,8 @@ fn inner_main() -> Result<ExitCode> {
     // TODO(charlie): Can we avoid this cast?
     let paths: Vec<&Path> = cli.files.iter().map(PathBuf::as_path).collect();
     let mut settings = Settings::from_paths(paths)?;
-
     let mut printer = Printer::new(BufWriter::new(stdout()), cli.format);
-
+    
     if !cli.select.is_empty() {
         settings.select(cli.select);
     }
