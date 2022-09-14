@@ -1,5 +1,5 @@
 use std::io::{stdout, BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -142,7 +142,7 @@ fn inner_main() -> Result<ExitCode> {
 
     let mut settings = Settings::from_paths(&cli.files);
     let mut printer = Printer::new(BufWriter::new(stdout()), cli.format);
-    
+
     if !cli.select.is_empty() {
         settings.select(cli.select);
     }
@@ -164,7 +164,7 @@ fn inner_main() -> Result<ExitCode> {
 
         let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
         if !cli.quiet {
-            printer.write_continuously(messages)?;
+            printer.write_continuously(&messages)?;
         }
 
         // Configure the file watcher.
@@ -184,7 +184,7 @@ fn inner_main() -> Result<ExitCode> {
 
                             let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
                             if !cli.quiet {
-                                printer.write_continuously(messages)?;
+                                printer.write_continuously(&messages)?;
                             }
                         }
                     }

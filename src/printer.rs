@@ -23,7 +23,7 @@ impl<W: Write> Printer<W> {
         Self { writer, format }
     }
 
-    pub fn write_once(&mut self, messages: &Vec<Message>) -> Result<()> {
+    pub fn write_once(&mut self, messages: &[Message]) -> Result<()> {
         let (fixed, outstanding): (Vec<&Message>, Vec<&Message>) =
             messages.iter().partition(|message| message.fixed);
         let num_fixable = outstanding
@@ -63,7 +63,7 @@ impl<W: Write> Printer<W> {
         Ok(())
     }
 
-    pub fn write_continuously(&mut self, messages: Vec<Message>) -> Result<()> {
+    pub fn write_continuously(&mut self, messages: &[Message]) -> Result<()> {
         tell_user!(
             self.writer,
             "Found {} error(s). Watching for file changes.",
