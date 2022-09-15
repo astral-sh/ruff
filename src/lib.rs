@@ -7,6 +7,7 @@ pub mod check_ast;
 mod check_lines;
 pub mod checks;
 pub mod fs;
+pub mod gitignore;
 pub mod linter;
 pub mod logging;
 pub mod message;

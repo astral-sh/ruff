@@ -24,7 +24,7 @@ pub const GLOBAL_SCOPE_INDEX: usize = 0;
 struct Checker<'a> {
     // Input data.
     locator: SourceCodeLocator<'a>,
-    settings: &'a Settings,
+    settings: &'a Settings<'a>,
     autofix: &'a fixer::Mode,
     path: &'a str,
     // Computed checks.

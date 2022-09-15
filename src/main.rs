@@ -1,3 +1,4 @@
+use std::env;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -100,7 +101,14 @@ fn run_once(
     let start = Instant::now();
     let paths: Vec<DirEntry> = files
         .iter()
-        .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
+        .flat_map(|path| {
+            iter_python_files(
+                path,
+                &settings.exclude,
+                &settings.extend_exclude,
+                &settings.gitignore,
+            )
+        })
         .collect();
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
@@ -151,7 +159,8 @@ fn inner_main() -> Result<ExitCode> {
 
     set_up_logging(cli.verbose)?;
 
-    let mut settings = Settings::from_paths(&cli.files);
+    let gitignore_path = env::current_dir().unwrap().join(".gitignore");
+    let mut settings = Settings::from_paths(&cli.files, &gitignore_path);
 
     let mut printer = Printer::new(cli.format);
 

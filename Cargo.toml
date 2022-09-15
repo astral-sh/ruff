@@ -18,6 +18,7 @@ common-path = { version = "1.0.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 filetime = { version = "0.2.17" }
+gitignore = "1.0.7"
 glob = "0.3.0"
 itertools = "0.10.3"
 log = { version = "0.4.17" }

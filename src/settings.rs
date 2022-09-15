@@ -1,22 +1,24 @@
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use glob::Pattern;
 use once_cell::sync::Lazy;
 
 use crate::checks::CheckCode;
+use crate::gitignore::File;
 use crate::pyproject::load_config;
 
 #[derive(Debug)]
-pub struct Settings {
+pub struct Settings<'a> {
     pub line_length: usize,
     pub exclude: Vec<Pattern>,
     pub extend_exclude: Vec<Pattern>,
+    pub gitignore: Option<File<'a>>,
     pub select: BTreeSet<CheckCode>,
 }
 
-impl Hash for Settings {
+impl Hash for Settings<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.line_length.hash(state);
         for value in self.select.iter() {
@@ -37,6 +39,7 @@ static DEFAULT_EXCLUDE: Lazy<Vec<Pattern>> = Lazy::new(|| {
         Pattern::new(".svn").unwrap(),
         Pattern::new(".tox").unwrap(),
         Pattern::new(".venv").unwrap(),
+        Pattern::new("__pycache__").unwrap(),
         Pattern::new("__pypackages__").unwrap(),
         Pattern::new("_build").unwrap(),
         Pattern::new("buck-out").unwrap(),
@@ -47,11 +50,21 @@ static DEFAULT_EXCLUDE: Lazy<Vec<Pattern>> = Lazy::new(|| {
     ]
 });
 
-impl Settings {
-    pub fn from_paths(paths: &[PathBuf]) -> Self {
+impl<'a> Settings<'a> {
+    pub fn from_paths(paths: &[PathBuf], gitignore_path: &'a Path) -> Self {
         let config = load_config(paths);
+
+        let gitignore = if config.skip_gitignore.unwrap_or_default() {
+            None
+        } else if gitignore_path.is_file() {
+            File::new(gitignore_path).ok()
+        } else {
+            None
+        };
+
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
+            gitignore,
             exclude: config
                 .exclude
                 .map(|paths| {

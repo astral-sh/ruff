@@ -7,6 +7,8 @@ use glob::Pattern;
 use log::debug;
 use walkdir::{DirEntry, WalkDir};
 
+use crate::gitignore;
+
 fn is_excluded(path: &Path, exclude: &[Pattern]) -> bool {
     if let Some(file_name) = path.file_name() {
         if let Some(file_name) = file_name.to_str() {
@@ -33,12 +35,19 @@ pub fn iter_python_files<'a>(
     path: &'a PathBuf,
     exclude: &'a [Pattern],
     extend_exclude: &'a [Pattern],
-) -> impl Iterator<Item = DirEntry> + 'a {
+    gitignore: &'a Option<gitignore::File<'a>>,
+) -> Vec<DirEntry> {
+    let skip_filter = exclude.is_empty()
+        && extend_exclude.is_empty()
+        && gitignore
+            .as_ref()
+            .map(|file| file.is_empty())
+            .unwrap_or(true);
     WalkDir::new(path)
         .follow_links(true)
         .into_iter()
         .filter_entry(|entry| {
-            if exclude.is_empty() && extend_exclude.is_empty() {
+            if skip_filter {
                 return true;
             }
 
@@ -49,6 +58,13 @@ pub fn iter_python_files<'a>(
             } else if is_excluded(path, extend_exclude) {
                 debug!("Ignored path via `extend-exclude`: {:?}", path);
                 false
+            } else if gitignore
+                .as_ref()
+                .and_then(|file| file.is_excluded(path).ok())
+                .unwrap_or_default()
+            {
+                debug!("Ignored path via `.gitignore`: {:?}", path);
+                true
             } else {
                 true
             }
@@ -58,6 +74,7 @@ pub fn iter_python_files<'a>(
             let path = entry.path();
             is_included(path)
         })
+        .collect()
 }
 
 pub fn read_file(path: &Path) -> Result<String> {

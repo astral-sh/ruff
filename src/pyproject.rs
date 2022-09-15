@@ -39,6 +39,7 @@ pub struct Config {
     pub extend_exclude: Option<Vec<PathBuf>>,
     pub select: Option<Vec<CheckCode>>,
     pub ignore: Option<Vec<CheckCode>>,
+    pub skip_gitignore: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -124,6 +125,7 @@ mod tests {
                     extend_exclude: None,
                     select: None,
                     ignore: None,
+                    skip_gitignore: None,
                 })
             })
         );
@@ -144,6 +146,7 @@ line-length = 79
                     extend_exclude: None,
                     select: None,
                     ignore: None,
+                    skip_gitignore: None,
                 })
             })
         );
@@ -164,6 +167,7 @@ exclude = ["foo.py"]
                     extend_exclude: None,
                     select: None,
                     ignore: None,
+                    skip_gitignore: None,
                 })
             })
         );
@@ -184,6 +188,7 @@ select = ["E501"]
                     extend_exclude: None,
                     select: Some(vec![CheckCode::E501]),
                     ignore: None,
+                    skip_gitignore: None,
                 })
             })
         );
@@ -204,6 +209,7 @@ ignore = ["E501"]
                     extend_exclude: None,
                     select: None,
                     ignore: Some(vec![CheckCode::E501]),
+                    skip_gitignore: None,
                 })
             })
         );
@@ -308,6 +314,7 @@ other-attribute = 1
                     CheckCode::R002,
                 ]),
                 ignore: None,
+                skip_gitignore: None,
             }
         );
 
