@@ -33,6 +33,7 @@ fn main() {
         CheckKind::NotIsTest,
         CheckKind::RaiseNotImplemented,
         CheckKind::ReturnOutsideFunction,
+        CheckKind::SyntaxError("...".to_string()),
         CheckKind::TooManyExpressionsInStarredAssignment,
         CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq),
         CheckKind::TwoStarredExpressions,

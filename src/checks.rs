@@ -21,6 +21,7 @@ pub enum CheckCode {
     E742,
     E743,
     E902,
+    E999,
     F401,
     F403,
     F404,
@@ -69,6 +70,7 @@ impl FromStr for CheckCode {
             "E742" => Ok(CheckCode::E742),
             "E743" => Ok(CheckCode::E743),
             "E902" => Ok(CheckCode::E902),
+            "E999" => Ok(CheckCode::E999),
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
             "F404" => Ok(CheckCode::F404),
@@ -118,6 +120,7 @@ impl CheckCode {
             CheckCode::E742 => "E742",
             CheckCode::E743 => "E743",
             CheckCode::E902 => "E902",
+            CheckCode::E999 => "E999",
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
             CheckCode::F404 => "F404",
@@ -153,7 +156,7 @@ impl CheckCode {
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             CheckCode::E501 => &LintSource::Lines,
-            CheckCode::E902 => &LintSource::FileSystem,
+            CheckCode::E902 | CheckCode::E999 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
     }
@@ -204,6 +207,7 @@ pub enum CheckKind {
     NotIsTest,
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    SyntaxError(String),
     TooManyExpressionsInStarredAssignment,
     TrueFalseComparison(bool, RejectedCmpop),
     TwoStarredExpressions,
@@ -251,6 +255,7 @@ impl CheckKind {
             CheckKind::NotIsTest => "NotIsTest",
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
             CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
+            CheckKind::SyntaxError(_) => "SyntaxError",
             CheckKind::TooManyExpressionsInStarredAssignment => {
                 "TooManyExpressionsInStarredAssignment"
             }
@@ -300,6 +305,7 @@ impl CheckKind {
             CheckKind::NotIsTest => &CheckCode::E714,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::TooManyExpressionsInStarredAssignment => &CheckCode::F621,
             CheckKind::TrueFalseComparison(_, _) => &CheckCode::E712,
             CheckKind::TwoStarredExpressions => &CheckCode::F622,
@@ -394,6 +400,7 @@ impl CheckKind {
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
             }
+            CheckKind::SyntaxError(message) => format!("SyntaxError: {message}"),
             CheckKind::TooManyExpressionsInStarredAssignment => {
                 "too many expressions in star-unpacking assignment".to_string()
             }
