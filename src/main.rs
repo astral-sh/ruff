@@ -106,8 +106,17 @@ fn run_once(
         .par_iter()
         .map(|entry| {
             lint_path(entry.path(), settings, &cache.into(), &autofix.into()).unwrap_or_else(|e| {
-                error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
-                vec![]
+                if settings.select.contains(&CheckCode::E999) {
+                    vec![Message {
+                        kind: CheckKind::SyntaxError(e.to_string()),
+                        fixed: false,
+                        location: Default::default(),
+                        filename: entry.path().to_string_lossy().to_string(),
+                    }]
+                } else {
+                    error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
+                    vec![]
+                }
             })
         })
         .flatten()

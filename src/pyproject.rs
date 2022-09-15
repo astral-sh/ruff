@@ -277,6 +277,7 @@ other-attribute = 1
                     CheckCode::E742,
                     CheckCode::E743,
                     CheckCode::E902,
+                    CheckCode::E999,
                     CheckCode::F401,
                     CheckCode::F403,
                     CheckCode::F404,
