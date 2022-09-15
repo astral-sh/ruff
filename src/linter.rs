@@ -13,10 +13,12 @@ use crate::message::Message;
 use crate::settings::Settings;
 use crate::{cache, fs};
 
-fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
-    // Read the file from disk.
-    let contents = fs::read_file(path)?;
-
+fn check_path(
+    path: &Path,
+    contents: &str,
+    settings: &Settings,
+    autofix: &fixer::Mode,
+) -> Result<Vec<Check>> {
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
@@ -26,12 +28,12 @@ fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
     {
-        let python_ast = parser::parse_program(&contents, "<filename>")?;
-        checks.extend(check_ast(&python_ast, &contents, settings, autofix, path));
+        let python_ast = parser::parse_program(contents, "<filename>")?;
+        checks.extend(check_ast(&python_ast, contents, settings, autofix, path));
     }
 
     // Run the lines-based checks.
-    check_lines(&mut checks, &contents, settings);
+    check_lines(&mut checks, contents, settings);
 
     Ok(checks)
 }
@@ -54,7 +56,7 @@ pub fn lint_path(
     let contents = fs::read_file(path)?;
 
     // Generate checks.
-    let mut checks = check_path(path, settings, autofix)?;
+    let mut checks = check_path(path, &contents, settings, autofix)?;
 
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
@@ -84,9 +86,19 @@ mod tests {
     use anyhow::Result;
 
     use crate::autofix::fixer;
-    use crate::checks::CheckCode;
-    use crate::linter::check_path;
+    use crate::checks::{Check, CheckCode};
+    use crate::fs;
+    use crate::linter;
     use crate::settings;
+
+    fn check_path(
+        path: &Path,
+        settings: &settings::Settings,
+        autofix: &fixer::Mode,
+    ) -> Result<Vec<Check>> {
+        let contents = fs::read_file(path)?;
+        linter::check_path(path, &contents, settings, autofix)
+    }
 
     #[test]
     fn e402() -> Result<()> {
