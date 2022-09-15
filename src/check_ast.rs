@@ -184,7 +184,7 @@ where
                                 name.to_string(),
                                 Binding {
                                     kind: BindingKind::Assignment,
-                                    used: Some(global_scope_id),
+                                    used: Some((global_scope_id, stmt.location)),
                                     location: stmt.location,
                                 },
                             );
@@ -416,13 +416,14 @@ where
                             name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
-                                used: Some(
+                                used: Some((
                                     self.scopes[*(self
                                         .scope_stack
                                         .last()
                                         .expect("No current scope found."))]
                                     .id,
-                                ),
+                                    stmt.location,
+                                )),
                                 location: stmt.location,
                             },
                         );
@@ -1108,7 +1109,7 @@ impl<'a> Checker<'a> {
                     }
                 }
                 if let Some(binding) = scope.values.get_mut(id) {
-                    binding.used = Some(scope_id);
+                    binding.used = Some((scope_id, expr.location));
                     return;
                 }
 
@@ -1136,17 +1137,14 @@ impl<'a> Checker<'a> {
             {
                 for scope in self.scopes.iter().rev().skip(1) {
                     if matches!(scope.kind, ScopeKind::Function | ScopeKind::Module) {
-                        let used = scope
-                            .values
-                            .get(id)
-                            .map(|binding| binding.used)
-                            .unwrap_or_default();
-                        if let Some(scope_id) = used {
-                            if scope_id == current.id {
-                                self.checks.push(Check::new(
-                                    CheckKind::UndefinedLocal(id.clone()),
-                                    expr.location,
-                                ));
+                        if let Some(binding) = scope.values.get(id) {
+                            if let Some((scope_id, location)) = binding.used {
+                                if scope_id == current.id {
+                                    self.checks.push(Check::new(
+                                        CheckKind::UndefinedLocal(id.clone()),
+                                        location,
+                                    ));
+                                }
                             }
                         }
                     }

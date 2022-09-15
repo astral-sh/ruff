@@ -53,5 +53,7 @@ pub enum BindingKind {
 pub struct Binding {
     pub kind: BindingKind,
     pub location: Location,
-    pub used: Option<usize>,
+    /// Tuple of (scope index, location) indicating the scope and location at which the binding was
+    /// last used.
+    pub used: Option<(usize, Location)>,
 }
