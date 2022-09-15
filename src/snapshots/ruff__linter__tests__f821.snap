@@ -32,4 +32,10 @@ expression: checks
     row: 58
     column: 5
   fix: ~
+- kind:
+    UndefinedName: TOMATO
+  location:
+    row: 83
+    column: 11
+  fix: ~
 
