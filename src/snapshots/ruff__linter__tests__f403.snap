@@ -1,0 +1,17 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    ImportStarUsage: F634
+  location:
+    row: 1
+    column: 1
+  fix: ~
+- kind:
+    ImportStarUsage: F634
+  location:
+    row: 2
+    column: 1
+  fix: ~
+

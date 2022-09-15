@@ -32,6 +32,9 @@ toml = { version = "0.5.9" }
 update-informer = { version = "0.5.0", default_features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
 
+[dev-dependencies]
+insta = { version = "1.19.1", features = ["yaml"] }
+
 [features]
 default = ["update-informer"]
 update-informer = ["dep:update-informer"]
@@ -40,4 +43,10 @@ update-informer = ["dep:update-informer"]
 panic = "abort"
 lto = "thin"
 codegen-units = 1
+opt-level = 3
+
+[profile.dev.package.insta]
+opt-level = 3
+
+[profile.dev.package.similar]
 opt-level = 3

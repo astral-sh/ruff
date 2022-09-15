@@ -1,0 +1,17 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 1
+    column: 11
+  fix: ~
+- kind:
+    NoneComparison: NotEq
+  location:
+    row: 4
+    column: 4
+  fix: ~
+

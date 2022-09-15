@@ -1,0 +1,10 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: ModuleImportNotAtTopOfFile
+  location:
+    row: 20
+    column: 1
+  fix: ~
+

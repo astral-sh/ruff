@@ -1,0 +1,15 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: DoNotAssignLambda
+  location:
+    row: 3
+    column: 1
+  fix: ~
+- kind: DoNotAssignLambda
+  location:
+    row: 5
+    column: 1
+  fix: ~
+
