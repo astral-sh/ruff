@@ -41,6 +41,14 @@ assert type(res) == type(())
 #: E201 E202 E721
 assert type(res) == type((0,))
 
-assert type(res) == type(res)
-assert type(res) == type(int)
-assert type(res) == type()
+#: Okay
+import types
+
+if isinstance(res, int):
+    pass
+if isinstance(res, str):
+    pass
+if isinstance(res, types.MethodType):
+    pass
+if type(a) != type(b) or type(a) == type(ccc):
+    pass
