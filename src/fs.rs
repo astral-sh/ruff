@@ -3,40 +3,61 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use glob::Pattern;
 use log::debug;
-use regex::Regex;
 use walkdir::{DirEntry, WalkDir};
 
-fn is_excluded(entry: &DirEntry, exclude: &[Regex]) -> bool {
-    entry
-        .path()
-        .to_str()
-        .map(|path| exclude.iter().any(|pattern| pattern.is_match(path)))
-        .unwrap_or(true)
+fn is_excluded(path: &Path, exclude: &[Pattern]) -> bool {
+    if let Some(file_name) = path.file_name() {
+        if let Some(file_name) = file_name.to_str() {
+            for pattern in exclude {
+                if pattern.matches(file_name) {
+                    return true;
+                }
+            }
+            false
+        } else {
+            false
+        }
+    } else {
+        false
+    }
 }
 
-fn is_included(entry: &DirEntry) -> bool {
-    let path = entry.path().to_string_lossy();
-    path.ends_with(".py") || path.ends_with(".pyi")
+fn is_included(path: &Path) -> bool {
+    let file_name = path.to_string_lossy();
+    file_name.ends_with(".py") || file_name.ends_with(".pyi")
 }
 
 pub fn iter_python_files<'a>(
     path: &'a PathBuf,
-    exclude: &'a [Regex],
+    exclude: &'a [Pattern],
+    extend_exclude: &'a [Pattern],
 ) -> impl Iterator<Item = DirEntry> + 'a {
     WalkDir::new(path)
         .follow_links(true)
         .into_iter()
         .filter_entry(|entry| {
-            if is_excluded(entry, exclude) {
-                debug!("Ignored path: {}", entry.path().to_string_lossy());
+            if exclude.is_empty() && extend_exclude.is_empty() {
+                return true;
+            }
+
+            let path = entry.path();
+            if is_excluded(path, exclude) {
+                debug!("Ignored path via `exclude`: {:?}", path);
+                false
+            } else if is_excluded(path, extend_exclude) {
+                debug!("Ignored path via `extend-exclude`: {:?}", path);
                 false
             } else {
                 true
             }
         })
         .filter_map(|entry| entry.ok())
-        .filter(is_included)
+        .filter(|entry| {
+            let path = entry.path();
+            is_included(path)
+        })
 }
 
 pub fn read_file(path: &Path) -> Result<String> {
@@ -45,4 +66,47 @@ pub fn read_file(path: &Path) -> Result<String> {
     let mut contents = String::new();
     buf_reader.read_to_string(&mut contents)?;
     Ok(contents)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use glob::Pattern;
+
+    use crate::fs::{is_excluded, is_included};
+
+    #[test]
+    fn inclusions() {
+        let path = Path::new("foo/bar/baz.py");
+        assert!(is_included(path));
+
+        let path = Path::new("foo/bar/baz.pyi");
+        assert!(is_included(path));
+
+        let path = Path::new("foo/bar/baz.js");
+        assert!(!is_included(path));
+
+        let path = Path::new("foo/bar/baz");
+        assert!(!is_included(path));
+    }
+
+    #[test]
+    fn exclusions() {
+        let path = Path::new("foo");
+        let exclude = vec![Pattern::new("foo").unwrap()];
+        assert!(is_excluded(path, &exclude));
+
+        let path = Path::new("foo/bar");
+        let exclude = vec![Pattern::new("bar").unwrap()];
+        assert!(is_excluded(path, &exclude));
+
+        let path = Path::new("foo/bar/baz.py");
+        let exclude = vec![Pattern::new("baz.py").unwrap()];
+        assert!(is_excluded(path, &exclude));
+
+        let path = Path::new("foo/bar/baz.py");
+        let exclude = vec![Pattern::new("baz").unwrap()];
+        assert!(!is_excluded(path, &exclude));
+    }
 }

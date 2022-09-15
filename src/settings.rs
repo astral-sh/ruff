@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use regex::Regex;
+use glob::Pattern;
+use once_cell::sync::Lazy;
 
 use crate::checks::CheckCode;
 use crate::pyproject::load_config;
@@ -10,7 +11,8 @@ use crate::pyproject::load_config;
 #[derive(Debug)]
 pub struct Settings {
     pub line_length: usize,
-    pub exclude: Vec<Regex>,
+    pub exclude: Vec<Pattern>,
+    pub extend_exclude: Vec<Pattern>,
     pub select: BTreeSet<CheckCode>,
 }
 
@@ -22,6 +24,28 @@ impl Hash for Settings {
         }
     }
 }
+static DEFAULT_EXCLUDE: Lazy<Vec<Pattern>> = Lazy::new(|| {
+    vec![
+        Pattern::new(".bzr").unwrap(),
+        Pattern::new(".direnv").unwrap(),
+        Pattern::new(".eggs").unwrap(),
+        Pattern::new(".git").unwrap(),
+        Pattern::new(".hg").unwrap(),
+        Pattern::new(".mypy_cache").unwrap(),
+        Pattern::new(".nox").unwrap(),
+        Pattern::new(".pants.d").unwrap(),
+        Pattern::new(".svn").unwrap(),
+        Pattern::new(".tox").unwrap(),
+        Pattern::new(".venv").unwrap(),
+        Pattern::new("__pypackages__").unwrap(),
+        Pattern::new("_build").unwrap(),
+        Pattern::new("buck-out").unwrap(),
+        Pattern::new("build").unwrap(),
+        Pattern::new("dist").unwrap(),
+        Pattern::new("node_modules").unwrap(),
+        Pattern::new("venv").unwrap(),
+    ]
+});
 
 impl Settings {
     pub fn from_paths(paths: &[PathBuf]) -> Self {
@@ -30,28 +54,26 @@ impl Settings {
             line_length: config.line_length.unwrap_or(88),
             exclude: config
                 .exclude
-                .unwrap_or_else(|| {
-                    vec![
-                        Path::new("\\.direnv").to_path_buf(),
-                        Path::new("\\.eggs").to_path_buf(),
-                        Path::new("\\.git").to_path_buf(),
-                        Path::new("\\.hg").to_path_buf(),
-                        Path::new("\\.mypy_cache").to_path_buf(),
-                        Path::new("\\.nox").to_path_buf(),
-                        Path::new("\\.svn").to_path_buf(),
-                        Path::new("\\.tox").to_path_buf(),
-                        Path::new("\\.venv").to_path_buf(),
-                        Path::new("__pypackages__").to_path_buf(),
-                        Path::new("_build").to_path_buf(),
-                        Path::new("buck-out").to_path_buf(),
-                        Path::new("build").to_path_buf(),
-                        Path::new("dist").to_path_buf(),
-                        Path::new("venv").to_path_buf(),
-                    ]
+                .map(|paths| {
+                    paths
+                        .into_iter()
+                        .map(|path| {
+                            Pattern::new(&path.to_string_lossy()).expect("Invalid pattern.")
+                        })
+                        .collect()
                 })
-                .into_iter()
-                .map(|path| Regex::new(&path.to_string_lossy()).expect("Invalid pattern."))
-                .collect(),
+                .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
+            extend_exclude: config
+                .extend_exclude
+                .map(|paths| {
+                    paths
+                        .into_iter()
+                        .map(|path| {
+                            Pattern::new(&path.to_string_lossy()).expect("Invalid pattern.")
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
             select: BTreeSet::from_iter(config.select.unwrap_or_else(|| {
                 vec![
                     CheckCode::E402,
@@ -115,13 +137,5 @@ impl Settings {
         for code in codes {
             self.select.remove(code);
         }
-    }
-
-    pub fn exclude(&mut self, exclude: Vec<Regex>) {
-        self.exclude = exclude;
-    }
-
-    pub fn extend_exclude(&mut self, exclude: Vec<Regex>) {
-        self.exclude.extend(exclude);
     }
 }

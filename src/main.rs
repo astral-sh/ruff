@@ -6,10 +6,10 @@ use std::time::Instant;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
+use glob::Pattern;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
-use regex::Regex;
 use walkdir::DirEntry;
 
 use ::ruff::checks::CheckCode;
@@ -54,12 +54,12 @@ struct Cli {
     /// List of error codes to ignore.
     #[clap(long, multiple = true)]
     ignore: Vec<CheckCode>,
-    /// List of regular expressions, used to exclude files and/or directories from checks.
+    /// List of paths, used to exclude files and/or directories from checks.
     #[clap(long, multiple = true)]
-    exclude: Vec<Regex>,
+    exclude: Vec<Pattern>,
     /// Like --exclude, but adds additional files and directories on top of the excluded ones.
     #[clap(long, multiple = true)]
-    extend_exclude: Vec<Regex>,
+    extend_exclude: Vec<Pattern>,
 }
 
 #[cfg(feature = "update-informer")]
@@ -96,7 +96,7 @@ fn run_once(
     let start = Instant::now();
     let paths: Vec<DirEntry> = files
         .iter()
-        .flat_map(|path| iter_python_files(path, &settings.exclude))
+        .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
         .collect();
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
@@ -194,10 +194,10 @@ fn inner_main() -> Result<ExitCode> {
         settings.ignore(&cli.ignore);
     }
     if !cli.exclude.is_empty() {
-        settings.exclude(cli.exclude);
+        settings.exclude = cli.exclude;
     }
     if !cli.extend_exclude.is_empty() {
-        settings.extend_exclude(cli.extend_exclude);
+        settings.extend_exclude = cli.extend_exclude;
     }
 
     if cli.watch {

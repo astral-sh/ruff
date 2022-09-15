@@ -12,7 +12,7 @@ pub fn load_config(paths: &[PathBuf]) -> Config {
     match find_project_root(paths) {
         Some(project_root) => match find_pyproject_toml(&project_root) {
             Some(path) => {
-                debug!("Found pyproject.toml at: {}", path.to_string_lossy());
+                debug!("Found pyproject.toml at: {:?}", path);
                 match parse_pyproject_toml(&path) {
                     Ok(pyproject) => pyproject
                         .tool
@@ -260,7 +260,7 @@ other-attribute = 1
                 line_length: Some(88),
                 exclude: None,
                 extend_exclude: Some(vec![
-                    Path::new("excluded\\.py").to_path_buf(),
+                    Path::new("excluded.py").to_path_buf(),
                     Path::new("migrations").to_path_buf()
                 ]),
                 select: Some(vec![
