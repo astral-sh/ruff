@@ -26,7 +26,7 @@ struct Checker<'a> {
     locator: SourceCodeLocator<'a>,
     settings: &'a Settings,
     autofix: &'a fixer::Mode,
-    path: &'a str,
+    path: &'a Path,
     // Computed checks.
     checks: Vec<Check>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
@@ -55,7 +55,7 @@ impl<'a> Checker<'a> {
     pub fn new(
         settings: &'a Settings,
         autofix: &'a fixer::Mode,
-        path: &'a str,
+        path: &'a Path,
         content: &'a str,
     ) -> Checker<'a> {
         Checker {
@@ -1118,6 +1118,10 @@ impl<'a> Checker<'a> {
             }
 
             if self.settings.select.contains(&CheckCode::F821) {
+                // Allow __path__.
+                if self.path.ends_with("__init__.py") && id == "__path__" {
+                    return;
+                }
                 self.checks.push(Check::new(
                     CheckKind::UndefinedName(id.clone()),
                     expr.location,
@@ -1238,12 +1242,12 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_deferred_string_annotations<'b>(&mut self, path: &str, allocator: &'b mut Vec<Expr>)
+    fn check_deferred_string_annotations<'b>(&mut self, allocator: &'b mut Vec<Expr>)
     where
         'b: 'a,
     {
         while let Some((location, expression)) = self.deferred_string_annotations.pop() {
-            if let Ok(mut expr) = parser::parse_expression(expression, path) {
+            if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 relocate_expr(&mut expr, location);
                 allocator.push(expr);
             } else if self.settings.select.contains(&CheckCode::F722) {
@@ -1326,7 +1330,7 @@ impl<'a> Checker<'a> {
             });
 
             if self.settings.select.contains(&CheckCode::F822)
-                && !Path::new(self.path).ends_with("__init__.py")
+                && !self.path.ends_with("__init__.py")
             {
                 if let Some(binding) = all_binding {
                     if let Some(names) = all_names {
@@ -1372,7 +1376,7 @@ pub fn check_ast(
     content: &str,
     settings: &Settings,
     autofix: &fixer::Mode,
-    path: &str,
+    path: &Path,
 ) -> Vec<Check> {
     let mut checker = Checker::new(settings, autofix, path, content);
     checker.push_scope(Scope::new(ScopeKind::Module));
@@ -1389,7 +1393,7 @@ pub fn check_ast(
     checker.check_deferred_assignments();
     checker.check_deferred_annotations();
     let mut allocator = vec![];
-    checker.check_deferred_string_annotations(path, &mut allocator);
+    checker.check_deferred_string_annotations(&mut allocator);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.scope_stack = vec![GLOBAL_SCOPE_INDEX];

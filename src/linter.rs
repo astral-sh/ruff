@@ -26,9 +26,8 @@ fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
     {
-        let path = path.to_string_lossy();
-        let python_ast = parser::parse_program(&contents, &path)?;
-        checks.extend(check_ast(&python_ast, &contents, settings, autofix, &path));
+        let python_ast = parser::parse_program(&contents, "<filename>")?;
+        checks.extend(check_ast(&python_ast, &contents, settings, autofix, path));
     }
 
     // Run the lines-based checks.
@@ -744,6 +743,23 @@ mod tests {
                 exclude: vec![],
                 extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::R002]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn init() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/__init__.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                extend_exclude: vec![],
+                select: BTreeSet::from([CheckCode::F821, CheckCode::F822]),
             },
             &fixer::Mode::Generate,
         )?;
