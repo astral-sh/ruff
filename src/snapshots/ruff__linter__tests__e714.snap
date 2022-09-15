@@ -1,0 +1,20 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: NotIsTest
+  location:
+    row: 2
+    column: 10
+  fix: ~
+- kind: NotIsTest
+  location:
+    row: 5
+    column: 12
+  fix: ~
+- kind: NotIsTest
+  location:
+    row: 8
+    column: 10
+  fix: ~
+

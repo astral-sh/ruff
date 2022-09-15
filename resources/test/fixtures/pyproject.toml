@@ -1,6 +1,6 @@
 [tool.ruff]
 line-length = 88
-exclude = ["excluded.py", "**/migrations"]
+extend-exclude = ["excluded.py", "migrations"]
 select = [
     "E402",
     "E501",
@@ -8,12 +8,14 @@ select = [
     "E712",
     "E713",
     "E714",
+    "E721",
     "E722",
     "E731",
     "E741",
     "E742",
     "E743",
     "E902",
+    "E999",
     "F401",
     "F403",
     "F404",
@@ -25,6 +27,7 @@ select = [
     "F621",
     "F622",
     "F631",
+    "F632",
     "F633",
     "F634",
     "F701",

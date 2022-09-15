@@ -42,18 +42,20 @@ pub fn check_not_tests(
 
     if matches!(op, Unaryop::Not) {
         if let ExprKind::Compare { ops, .. } = &operand.node {
-            match ops[..] {
-                [Cmpop::In] => {
-                    if check_not_in {
-                        checks.push(Check::new(CheckKind::NotInTest, operand.location));
+            for op in ops {
+                match op {
+                    Cmpop::In => {
+                        if check_not_in {
+                            checks.push(Check::new(CheckKind::NotInTest, operand.location));
+                        }
                     }
-                }
-                [Cmpop::Is] => {
-                    if check_not_is {
-                        checks.push(Check::new(CheckKind::NotIsTest, operand.location));
+                    Cmpop::Is => {
+                        if check_not_is {
+                            checks.push(Check::new(CheckKind::NotIsTest, operand.location));
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
     }
@@ -425,6 +427,90 @@ pub fn check_literal_comparisons(
                         comparator.location,
                     ));
                 }
+            }
+        }
+    }
+
+    checks
+}
+
+fn is_constant(expr: &Expr) -> bool {
+    match &expr.node {
+        ExprKind::Constant { .. } => true,
+        ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant),
+        _ => false,
+    }
+}
+
+fn is_singleton(expr: &Expr) -> bool {
+    matches!(
+        expr.node,
+        ExprKind::Constant {
+            value: Constant::None | Constant::Bool(_) | Constant::Ellipsis,
+            ..
+        }
+    )
+}
+
+fn is_constant_non_singleton(expr: &Expr) -> bool {
+    is_constant(expr) && !is_singleton(expr)
+}
+
+/// Check IsLiteral compliance.
+pub fn check_is_literal(
+    left: &Expr,
+    ops: &Vec<Cmpop>,
+    comparators: &Vec<Expr>,
+    location: Location,
+) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+
+    let mut left = left;
+    for (op, right) in izip!(ops, comparators) {
+        if matches!(op, Cmpop::Is | Cmpop::IsNot)
+            && (is_constant_non_singleton(left) || is_constant_non_singleton(right))
+        {
+            checks.push(Check::new(CheckKind::IsLiteral, location));
+        }
+        left = right;
+    }
+
+    checks
+}
+
+/// Check TypeComparison compliance.
+pub fn check_type_comparison(
+    ops: &Vec<Cmpop>,
+    comparators: &Vec<Expr>,
+    location: Location,
+) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+
+    for (op, right) in izip!(ops, comparators) {
+        if matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
+            match &right.node {
+                ExprKind::Call { func, args, .. } => {
+                    if let ExprKind::Name { id, .. } = &func.node {
+                        // Ex) type(False)
+                        if id == "type" {
+                            if let Some(arg) = args.first() {
+                                // Allow comparison for types which are not obvious.
+                                if !matches!(arg.node, ExprKind::Name { .. }) {
+                                    checks.push(Check::new(CheckKind::TypeComparison, location));
+                                }
+                            }
+                        }
+                    }
+                }
+                ExprKind::Attribute { value, .. } => {
+                    if let ExprKind::Name { id, .. } = &value.node {
+                        // Ex) types.IntType
+                        if id == "types" {
+                            checks.push(Check::new(CheckKind::TypeComparison, location));
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     }

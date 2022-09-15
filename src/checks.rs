@@ -14,12 +14,14 @@ pub enum CheckCode {
     E712,
     E713,
     E714,
+    E721,
     E722,
     E731,
     E741,
     E742,
     E743,
     E902,
+    E999,
     F401,
     F403,
     F404,
@@ -31,6 +33,7 @@ pub enum CheckCode {
     F621,
     F622,
     F631,
+    F632,
     F633,
     F634,
     F701,
@@ -59,13 +62,15 @@ impl FromStr for CheckCode {
             "E711" => Ok(CheckCode::E711),
             "E712" => Ok(CheckCode::E712),
             "E713" => Ok(CheckCode::E713),
-            "E722" => Ok(CheckCode::E722),
             "E714" => Ok(CheckCode::E714),
+            "E721" => Ok(CheckCode::E721),
+            "E722" => Ok(CheckCode::E722),
             "E731" => Ok(CheckCode::E731),
             "E741" => Ok(CheckCode::E741),
             "E742" => Ok(CheckCode::E742),
             "E743" => Ok(CheckCode::E743),
             "E902" => Ok(CheckCode::E902),
+            "E999" => Ok(CheckCode::E999),
             "F401" => Ok(CheckCode::F401),
             "F403" => Ok(CheckCode::F403),
             "F404" => Ok(CheckCode::F404),
@@ -77,6 +82,7 @@ impl FromStr for CheckCode {
             "F621" => Ok(CheckCode::F621),
             "F622" => Ok(CheckCode::F622),
             "F631" => Ok(CheckCode::F631),
+            "F632" => Ok(CheckCode::F632),
             "F633" => Ok(CheckCode::F633),
             "F634" => Ok(CheckCode::F634),
             "F701" => Ok(CheckCode::F701),
@@ -84,6 +90,7 @@ impl FromStr for CheckCode {
             "F704" => Ok(CheckCode::F704),
             "F706" => Ok(CheckCode::F706),
             "F707" => Ok(CheckCode::F707),
+            "F722" => Ok(CheckCode::F722),
             "F821" => Ok(CheckCode::F821),
             "F822" => Ok(CheckCode::F822),
             "F823" => Ok(CheckCode::F823),
@@ -106,12 +113,14 @@ impl CheckCode {
             CheckCode::E712 => "E712",
             CheckCode::E713 => "E713",
             CheckCode::E714 => "E714",
+            CheckCode::E721 => "E721",
             CheckCode::E722 => "E722",
             CheckCode::E731 => "E731",
             CheckCode::E741 => "E741",
             CheckCode::E742 => "E742",
             CheckCode::E743 => "E743",
             CheckCode::E902 => "E902",
+            CheckCode::E999 => "E999",
             CheckCode::F401 => "F401",
             CheckCode::F403 => "F403",
             CheckCode::F404 => "F404",
@@ -123,6 +132,7 @@ impl CheckCode {
             CheckCode::F621 => "F621",
             CheckCode::F622 => "F622",
             CheckCode::F631 => "F631",
+            CheckCode::F632 => "F632",
             CheckCode::F633 => "F633",
             CheckCode::F634 => "F634",
             CheckCode::F701 => "F701",
@@ -146,7 +156,7 @@ impl CheckCode {
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             CheckCode::E501 => &LintSource::Lines,
-            CheckCode::E902 => &LintSource::FileSystem,
+            CheckCode::E902 | CheckCode::E999 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
     }
@@ -182,9 +192,10 @@ pub enum CheckKind {
     FutureFeatureNotDefined(String),
     IOError(String),
     IfTuple,
-    InvalidPrintSyntax,
     ImportStarNotPermitted(String),
     ImportStarUsage(String),
+    InvalidPrintSyntax,
+    IsLiteral,
     LateFutureImport,
     LineTooLong(usize, usize),
     ModuleImportNotAtTopOfFile,
@@ -196,9 +207,11 @@ pub enum CheckKind {
     NotIsTest,
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    SyntaxError(String),
     TooManyExpressionsInStarredAssignment,
     TrueFalseComparison(bool, RejectedCmpop),
     TwoStarredExpressions,
+    TypeComparison,
     UndefinedExport(String),
     UndefinedLocal(String),
     UndefinedName(String),
@@ -222,14 +235,15 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::DoNotUseBareExcept => "DoNotUseBareExcept",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
-            CheckKind::ForwardAnnotationSyntaxError(_) => "ForwardAnnotationSyntaxError",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
+            CheckKind::ForwardAnnotationSyntaxError(_) => "ForwardAnnotationSyntaxError",
             CheckKind::FutureFeatureNotDefined(_) => "FutureFeatureNotDefined",
             CheckKind::IOError(_) => "IOError",
             CheckKind::IfTuple => "IfTuple",
-            CheckKind::InvalidPrintSyntax => "InvalidPrintSyntax",
             CheckKind::ImportStarNotPermitted(_) => "ImportStarNotPermitted",
             CheckKind::ImportStarUsage(_) => "ImportStarUsage",
+            CheckKind::InvalidPrintSyntax => "InvalidPrintSyntax",
+            CheckKind::IsLiteral => "IsLiteral",
             CheckKind::LateFutureImport => "LateFutureImport",
             CheckKind::LineTooLong(_, _) => "LineTooLong",
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
@@ -241,11 +255,13 @@ impl CheckKind {
             CheckKind::NotIsTest => "NotIsTest",
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
             CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
+            CheckKind::SyntaxError(_) => "SyntaxError",
             CheckKind::TooManyExpressionsInStarredAssignment => {
                 "TooManyExpressionsInStarredAssignment"
             }
             CheckKind::TrueFalseComparison(_, _) => "TrueFalseComparison",
             CheckKind::TwoStarredExpressions => "TwoStarredExpressions",
+            CheckKind::TypeComparison => "TypeComparison",
             CheckKind::UndefinedExport(_) => "UndefinedExport",
             CheckKind::UndefinedLocal(_) => "UndefinedLocal",
             CheckKind::UndefinedName(_) => "UndefinedName",
@@ -269,14 +285,15 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => &CheckCode::E731,
             CheckKind::DoNotUseBareExcept => &CheckCode::E722,
             CheckKind::DuplicateArgumentName => &CheckCode::F831,
-            CheckKind::ForwardAnnotationSyntaxError(_) => &CheckCode::F722,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
+            CheckKind::ForwardAnnotationSyntaxError(_) => &CheckCode::F722,
             CheckKind::FutureFeatureNotDefined(_) => &CheckCode::F407,
             CheckKind::IOError(_) => &CheckCode::E902,
             CheckKind::IfTuple => &CheckCode::F634,
-            CheckKind::InvalidPrintSyntax => &CheckCode::F633,
             CheckKind::ImportStarNotPermitted(_) => &CheckCode::F406,
             CheckKind::ImportStarUsage(_) => &CheckCode::F403,
+            CheckKind::InvalidPrintSyntax => &CheckCode::F633,
+            CheckKind::IsLiteral => &CheckCode::F632,
             CheckKind::LateFutureImport => &CheckCode::F404,
             CheckKind::LineTooLong(_, _) => &CheckCode::E501,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
@@ -288,9 +305,11 @@ impl CheckKind {
             CheckKind::NotIsTest => &CheckCode::E714,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::TooManyExpressionsInStarredAssignment => &CheckCode::F621,
             CheckKind::TrueFalseComparison(_, _) => &CheckCode::E712,
             CheckKind::TwoStarredExpressions => &CheckCode::F622,
+            CheckKind::TypeComparison => &CheckCode::E721,
             CheckKind::UndefinedExport(_) => &CheckCode::F822,
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
@@ -348,6 +367,7 @@ impl CheckKind {
             CheckKind::ImportStarUsage(name) => {
                 format!("`from {name} import *` used; unable to detect undefined names")
             }
+            CheckKind::IsLiteral => "use ==/!= to compare constant literals".to_string(),
             CheckKind::LateFutureImport => {
                 "from __future__ imports must occur at the beginning of the file".to_string()
             }
@@ -380,6 +400,7 @@ impl CheckKind {
             CheckKind::ReturnOutsideFunction => {
                 "a `return` statement outside of a function/method".to_string()
             }
+            CheckKind::SyntaxError(message) => format!("SyntaxError: {message}"),
             CheckKind::TooManyExpressionsInStarredAssignment => {
                 "too many expressions in star-unpacking assignment".to_string()
             }
@@ -402,6 +423,7 @@ impl CheckKind {
                 },
             },
             CheckKind::TwoStarredExpressions => "two starred expressions in assignment".to_string(),
+            CheckKind::TypeComparison => "do not compare types, use `isinstance()`".to_string(),
             CheckKind::UndefinedExport(name) => {
                 format!("Undefined name `{name}` in `__all__`")
             }

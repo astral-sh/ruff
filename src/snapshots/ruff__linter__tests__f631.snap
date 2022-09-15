@@ -1,0 +1,15 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: AssertTuple
+  location:
+    row: 1
+    column: 1
+  fix: ~
+- kind: AssertTuple
+  location:
+    row: 2
+    column: 1
+  fix: ~
+

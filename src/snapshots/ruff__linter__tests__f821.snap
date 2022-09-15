@@ -1,0 +1,41 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UndefinedName: self
+  location:
+    row: 2
+    column: 12
+  fix: ~
+- kind:
+    UndefinedName: self
+  location:
+    row: 6
+    column: 13
+  fix: ~
+- kind:
+    UndefinedName: self
+  location:
+    row: 10
+    column: 9
+  fix: ~
+- kind:
+    UndefinedName: numeric_string
+  location:
+    row: 21
+    column: 12
+  fix: ~
+- kind:
+    UndefinedName: Bar
+  location:
+    row: 58
+    column: 5
+  fix: ~
+- kind:
+    UndefinedName: TOMATO
+  location:
+    row: 83
+    column: 11
+  fix: ~
+

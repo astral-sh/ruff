@@ -36,7 +36,8 @@ struct Checker<'a> {
     scopes: Vec<Scope>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
-    deferred_annotations: Vec<(Location, &'a str)>,
+    deferred_string_annotations: Vec<(Location, &'a str)>,
+    deferred_annotations: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>)>,
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_assignments: Vec<usize>,
@@ -47,6 +48,7 @@ struct Checker<'a> {
     seen_non_import: bool,
     seen_docstring: bool,
     futures_allowed: bool,
+    annotations_future_enabled: bool,
 }
 
 impl<'a> Checker<'a> {
@@ -67,6 +69,7 @@ impl<'a> Checker<'a> {
             scopes: vec![],
             scope_stack: vec![],
             dead_scopes: vec![],
+            deferred_string_annotations: vec![],
             deferred_annotations: vec![],
             deferred_functions: vec![],
             deferred_lambdas: vec![],
@@ -77,6 +80,7 @@ impl<'a> Checker<'a> {
             seen_non_import: false,
             seen_docstring: false,
             futures_allowed: true,
+            annotations_future_enabled: false,
         }
     }
 }
@@ -180,7 +184,7 @@ where
                                 name.to_string(),
                                 Binding {
                                     kind: BindingKind::Assignment,
-                                    used: Some(global_scope_id),
+                                    used: Some((global_scope_id, stmt.location)),
                                     location: stmt.location,
                                 },
                             );
@@ -412,16 +416,21 @@ where
                             name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
-                                used: Some(
+                                used: Some((
                                     self.scopes[*(self
                                         .scope_stack
                                         .last()
                                         .expect("No current scope found."))]
                                     .id,
-                                ),
+                                    stmt.location,
+                                )),
                                 location: stmt.location,
                             },
                         );
+
+                        if alias.node.name == "annotations" {
+                            self.annotations_future_enabled = true;
+                        }
 
                         if self.settings.select.contains(&CheckCode::F407)
                             && !ALL_FEATURE_NAMES.contains(&alias.node.name.deref())
@@ -581,6 +590,17 @@ where
         let prev_in_literal = self.in_literal;
         let prev_in_annotation = self.in_annotation;
 
+        // Important:
+        if self.in_annotation && self.annotations_future_enabled {
+            self.deferred_annotations.push((
+                expr,
+                self.scope_stack.clone(),
+                self.parent_stack.clone(),
+            ));
+            visitor::walk_expr(self, expr);
+            return;
+        }
+
         // Pre-visit.
         match &expr.node {
             ExprKind::Subscript { value, .. } => {
@@ -718,12 +738,30 @@ where
                         check_true_false_comparisons,
                     ));
                 }
+
+                if self.settings.select.contains(&CheckCode::F632) {
+                    self.checks.extend(checks::check_is_literal(
+                        left,
+                        ops,
+                        comparators,
+                        expr.location,
+                    ));
+                }
+
+                if self.settings.select.contains(&CheckCode::E721) {
+                    self.checks.extend(checks::check_type_comparison(
+                        ops,
+                        comparators,
+                        expr.location,
+                    ));
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),
                 ..
             } if self.in_annotation && !self.in_literal => {
-                self.deferred_annotations.push((expr.location, value));
+                self.deferred_string_annotations
+                    .push((expr.location, value));
             }
             ExprKind::GeneratorExp { .. }
             | ExprKind::ListComp { .. }
@@ -784,7 +822,7 @@ where
                 } else if match_name_or_attr(func, "NamedTuple") {
                     self.visit_expr(func);
 
-                    // NamedTuple("a", [("a", int)])
+                    // Ex) NamedTuple("a", [("a", int)])
                     if args.len() > 1 {
                         match &args[1].node {
                             ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
@@ -808,7 +846,7 @@ where
                         }
                     }
 
-                    // NamedTuple("a", a=int)
+                    // Ex) NamedTuple("a", a=int)
                     for keyword in keywords {
                         let KeywordData { value, .. } = &keyword.node;
                         self.visit_annotation(value);
@@ -816,7 +854,7 @@ where
                 } else if match_name_or_attr(func, "TypedDict") {
                     self.visit_expr(func);
 
-                    // TypedDict("a", {"a": int})
+                    // Ex) TypedDict("a", {"a": int})
                     if args.len() > 1 {
                         if let ExprKind::Dict { keys, values } = &args[1].node {
                             for key in keys {
@@ -830,7 +868,7 @@ where
                         }
                     }
 
-                    // TypedDict("a", a=int)
+                    // Ex) TypedDict("a", a=int)
                     for keyword in keywords {
                         let KeywordData { value, .. } = &keyword.node;
                         self.visit_annotation(value);
@@ -1071,7 +1109,7 @@ impl<'a> Checker<'a> {
                     }
                 }
                 if let Some(binding) = scope.values.get_mut(id) {
-                    binding.used = Some(scope_id);
+                    binding.used = Some((scope_id, expr.location));
                     return;
                 }
 
@@ -1099,17 +1137,14 @@ impl<'a> Checker<'a> {
             {
                 for scope in self.scopes.iter().rev().skip(1) {
                     if matches!(scope.kind, ScopeKind::Function | ScopeKind::Module) {
-                        let used = scope
-                            .values
-                            .get(id)
-                            .map(|binding| binding.used)
-                            .unwrap_or_default();
-                        if let Some(scope_id) = used {
-                            if scope_id == current.id {
-                                self.checks.push(Check::new(
-                                    CheckKind::UndefinedLocal(id.clone()),
-                                    expr.location,
-                                ));
+                        if let Some(binding) = scope.values.get(id) {
+                            if let Some((scope_id, location)) = binding.used {
+                                if scope_id == current.id {
+                                    self.checks.push(Check::new(
+                                        CheckKind::UndefinedLocal(id.clone()),
+                                        location,
+                                    ));
+                                }
                             }
                         }
                     }
@@ -1195,11 +1230,19 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_deferred_annotations<'b>(&mut self, path: &str, allocator: &'b mut Vec<Expr>)
+    fn check_deferred_annotations(&mut self) {
+        while let Some((expr, scopes, parents)) = self.deferred_annotations.pop() {
+            self.parent_stack = parents;
+            self.scope_stack = scopes;
+            self.visit_expr(expr);
+        }
+    }
+
+    fn check_deferred_string_annotations<'b>(&mut self, path: &str, allocator: &'b mut Vec<Expr>)
     where
         'b: 'a,
     {
-        while let Some((location, expression)) = self.deferred_annotations.pop() {
+        while let Some((location, expression)) = self.deferred_string_annotations.pop() {
             if let Ok(mut expr) = parser::parse_expression(expression, path) {
                 relocate_expr(&mut expr, location);
                 allocator.push(expr);
@@ -1344,8 +1387,9 @@ pub fn check_ast(
     checker.check_deferred_functions();
     checker.check_deferred_lambdas();
     checker.check_deferred_assignments();
+    checker.check_deferred_annotations();
     let mut allocator = vec![];
-    checker.check_deferred_annotations(path, &mut allocator);
+    checker.check_deferred_string_annotations(path, &mut allocator);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.scope_stack = vec![GLOBAL_SCOPE_INDEX];

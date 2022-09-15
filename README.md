@@ -57,7 +57,7 @@ ruff also works with [Pre-Commit](https://pre-commit.com) (requires Cargo on sys
 ```yaml
 repos:
 - repo: https://github.com/charliermarsh/ruff
-  rev: v0.0.37
+  rev: v0.0.38
   hooks:
     - id: lint
 ```
@@ -86,7 +86,7 @@ ruff path/to/code/ --select F401 F403
 See `ruff --help` for more:
 
 ```shell
-ruff (v0.0.37)
+ruff (v0.0.38)
 An extremely fast Python linter.
 
 USAGE:
@@ -124,14 +124,14 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
 Under those conditions, Flake8 implements about 60 rules, give or take. At time of writing, ruff
-implements 39 rules. (Note that these 39 rules likely cover a disproportionate share of errors:
+implements 42 rules. (Note that these 42 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
 The unimplemented rules are tracked in #170, and include:
 
 - 14 rules related to string `.format` calls.
-- 1 rule related to parsing and syntax.
-- 6 logical rules.
+- 4 logical rules.
+- 1 rule related to parsing.
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -149,12 +149,14 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |
 | E713 | NotInTest | Test for membership should be `not in` |
 | E714 | NotIsTest | Test for object identity should be `is not` |
+| E721 | TypeComparison | do not compare types, use `isinstance()` |
 | E722 | DoNotUseBareExcept | Do not use bare `except` |
 | E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |
 | E741 | AmbiguousVariableName | ambiguous variable name '...' |
 | E742 | AmbiguousClassName | ambiguous class name '...' |
 | E743 | AmbiguousFunctionName | ambiguous function name '...' |
 | E902 | IOError | No such file or directory: `...` |
+| E999 | SyntaxError | SyntaxError: ... |
 | F401 | UnusedImport | `...` imported but unused |
 | F403 | ImportStarUsage | `from ... import *` used; unable to detect undefined names |
 | F404 | LateFutureImport | from __future__ imports must occur at the beginning of the file |
@@ -166,6 +168,7 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | F621 | TooManyExpressionsInStarredAssignment | too many expressions in star-unpacking assignment |
 | F622 | TwoStarredExpressions | two starred expressions in assignment |
 | F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |
+| F632 | IsLiteral | use ==/!= to compare constant literals |
 | F633 | InvalidPrintSyntax | use of >> is invalid with print function |
 | F634 | IfTuple | If test is a tuple, which is always `True` |
 | F701 | BreakOutsideLoop | `break` outside loop |

@@ -1,0 +1,20 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: DefaultExceptNotLast
+  location:
+    row: 3
+    column: 1
+  fix: ~
+- kind: DefaultExceptNotLast
+  location:
+    row: 10
+    column: 1
+  fix: ~
+- kind: DefaultExceptNotLast
+  location:
+    row: 19
+    column: 1
+  fix: ~
+

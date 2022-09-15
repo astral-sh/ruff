@@ -1,0 +1,25 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: BreakOutsideLoop
+  location:
+    row: 4
+    column: 5
+  fix: ~
+- kind: BreakOutsideLoop
+  location:
+    row: 16
+    column: 5
+  fix: ~
+- kind: BreakOutsideLoop
+  location:
+    row: 20
+    column: 5
+  fix: ~
+- kind: BreakOutsideLoop
+  location:
+    row: 23
+    column: 1
+  fix: ~
+

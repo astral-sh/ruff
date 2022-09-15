@@ -1,0 +1,31 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: NoAssertEquals
+  location:
+    row: 1
+    column: 5
+  fix:
+    content: assertEqual
+    start:
+      row: 1
+      column: 6
+    end:
+      row: 1
+      column: 18
+    applied: false
+- kind: NoAssertEquals
+  location:
+    row: 2
+    column: 5
+  fix:
+    content: assertEqual
+    start:
+      row: 2
+      column: 6
+    end:
+      row: 2
+      column: 18
+    applied: false
+

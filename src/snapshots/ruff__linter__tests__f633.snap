@@ -1,0 +1,10 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: InvalidPrintSyntax
+  location:
+    row: 4
+    column: 1
+  fix: ~
+

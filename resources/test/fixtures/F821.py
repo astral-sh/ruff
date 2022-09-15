@@ -77,3 +77,8 @@ class Ticket:
 
     def set_status(self, status: Status):
         self.status = status
+
+
+def update_tomato():
+    print(TOMATO)
+    TOMATO = "cherry tomato"

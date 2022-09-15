@@ -1,0 +1,20 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: DuplicateArgumentName
+  location:
+    row: 1
+    column: 25
+  fix: ~
+- kind: DuplicateArgumentName
+  location:
+    row: 5
+    column: 28
+  fix: ~
+- kind: DuplicateArgumentName
+  location:
+    row: 9
+    column: 27
+  fix: ~
+

@@ -1,0 +1,15 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: IfTuple
+  location:
+    row: 1
+    column: 1
+  fix: ~
+- kind: IfTuple
+  location:
+    row: 7
+    column: 5
+  fix: ~
+
