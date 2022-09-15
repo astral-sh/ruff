@@ -64,7 +64,7 @@ pub fn iter_python_files<'a>(
                 .unwrap_or_default()
             {
                 debug!("Ignored path via `.gitignore`: {:?}", path);
-                true
+                false
             } else {
                 true
             }
