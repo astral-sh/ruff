@@ -746,6 +746,14 @@ where
                         expr.location,
                     ));
                 }
+
+                if self.settings.select.contains(&CheckCode::E721) {
+                    self.checks.extend(checks::check_type_comparison(
+                        ops,
+                        comparators,
+                        expr.location,
+                    ));
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),
@@ -813,7 +821,7 @@ where
                 } else if match_name_or_attr(func, "NamedTuple") {
                     self.visit_expr(func);
 
-                    // NamedTuple("a", [("a", int)])
+                    // Ex) NamedTuple("a", [("a", int)])
                     if args.len() > 1 {
                         match &args[1].node {
                             ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
@@ -837,7 +845,7 @@ where
                         }
                     }
 
-                    // NamedTuple("a", a=int)
+                    // Ex) NamedTuple("a", a=int)
                     for keyword in keywords {
                         let KeywordData { value, .. } = &keyword.node;
                         self.visit_annotation(value);
@@ -845,7 +853,7 @@ where
                 } else if match_name_or_attr(func, "TypedDict") {
                     self.visit_expr(func);
 
-                    // TypedDict("a", {"a": int})
+                    // Ex) TypedDict("a", {"a": int})
                     if args.len() > 1 {
                         if let ExprKind::Dict { keys, values } = &args[1].node {
                             for key in keys {
@@ -859,7 +867,7 @@ where
                         }
                     }
 
-                    // TypedDict("a", a=int)
+                    // Ex) TypedDict("a", a=int)
                     for keyword in keywords {
                         let KeywordData { value, .. } = &keyword.node;
                         self.visit_annotation(value);

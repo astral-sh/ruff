@@ -476,6 +476,46 @@ pub fn check_is_literal(
     checks
 }
 
+/// Check TypeComparison compliance.
+pub fn check_type_comparison(
+    ops: &Vec<Cmpop>,
+    comparators: &Vec<Expr>,
+    location: Location,
+) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+
+    for (op, right) in izip!(ops, comparators) {
+        if matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
+            match &right.node {
+                ExprKind::Call { func, args, .. } => {
+                    if let ExprKind::Name { id, .. } = &func.node {
+                        // Ex) type(False)
+                        if id == "type" {
+                            if let Some(arg) = args.first() {
+                                // Allow comparison for types which are not obvious.
+                                if !matches!(arg.node, ExprKind::Name { .. }) {
+                                    checks.push(Check::new(CheckKind::TypeComparison, location));
+                                }
+                            }
+                        }
+                    }
+                }
+                ExprKind::Attribute { value, .. } => {
+                    if let ExprKind::Name { id, .. } = &value.node {
+                        // Ex) types.IntType
+                        if id == "types" {
+                            checks.push(Check::new(CheckKind::TypeComparison, location));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    checks
+}
+
 /// Check TwoStarredExpressions and TooManyExpressionsInStarredAssignment compliance.
 pub fn check_starred_expressions(
     elts: &[Expr],
