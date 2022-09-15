@@ -61,7 +61,7 @@ struct Cli {
     /// Like --exclude, but adds additional files and directories on top of the excluded ones.
     #[clap(long, multiple = true)]
     extend_exclude: Vec<Pattern>,
-    /// Output formatting of linting messages
+    /// Output serialization format for error messages.
     #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
 }
