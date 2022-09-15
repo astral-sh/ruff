@@ -36,6 +36,7 @@ fn main() {
         CheckKind::TooManyExpressionsInStarredAssignment,
         CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq),
         CheckKind::TwoStarredExpressions,
+        CheckKind::TypeComparison,
         CheckKind::UndefinedExport("...".to_string()),
         CheckKind::UndefinedLocal("...".to_string()),
         CheckKind::UndefinedName("...".to_string()),

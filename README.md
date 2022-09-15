@@ -124,14 +124,14 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
 Under those conditions, Flake8 implements about 60 rules, give or take. At time of writing, ruff
-implements 40 rules. (Note that these 40 rules likely cover a disproportionate share of errors:
+implements 41 rules. (Note that these 41 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
 The unimplemented rules are tracked in #170, and include:
 
 - 14 rules related to string `.format` calls.
-- 1 rule related to parsing and syntax.
-- 6 logical rules.
+- 4 logical rules.
+- 1 rule related to parsing.
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -149,6 +149,7 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |
 | E713 | NotInTest | Test for membership should be `not in` |
 | E714 | NotIsTest | Test for object identity should be `is not` |
+| E721 | TypeComparison | do not compare types, use `isinstance()` |
 | E722 | DoNotUseBareExcept | Do not use bare `except` |
 | E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |
 | E741 | AmbiguousVariableName | ambiguous variable name '...' |

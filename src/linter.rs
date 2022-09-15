@@ -241,6 +241,108 @@ mod tests {
     }
 
     #[test]
+    fn e721() -> Result<()> {
+        let mut actual = check_path(
+            Path::new("./resources/test/fixtures/E721.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                select: BTreeSet::from([CheckCode::E721]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        actual.sort_by_key(|check| check.location);
+        let expected = vec![
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(2, 14),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(5, 14),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(10, 8),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(15, 14),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(18, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(18, 46),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(20, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(22, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(24, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(26, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(28, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(30, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(32, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(34, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(40, 18),
+                fix: None,
+            },
+            Check {
+                kind: CheckKind::TypeComparison,
+                location: Location::new(42, 18),
+                fix: None,
+            },
+        ];
+        assert_eq!(actual.len(), expected.len());
+        for i in 0..actual.len() {
+            assert_eq!(actual[i], expected[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn e722() -> Result<()> {
         let mut actual = check_path(
             Path::new("./resources/test/fixtures/E722.py"),
