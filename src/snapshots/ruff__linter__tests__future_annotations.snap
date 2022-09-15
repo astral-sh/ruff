@@ -1,0 +1,17 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UnusedImport: models.Nut
+  location:
+    row: 5
+    column: 1
+  fix: ~
+- kind:
+    UndefinedName: Bar
+  location:
+    row: 22
+    column: 19
+  fix: ~
+

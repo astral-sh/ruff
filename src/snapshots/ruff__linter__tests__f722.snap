@@ -1,0 +1,11 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    ForwardAnnotationSyntaxError: ///
+  location:
+    row: 9
+    column: 13
+  fix: ~
+

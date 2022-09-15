@@ -1,0 +1,20 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: YieldOutsideFunction
+  location:
+    row: 6
+    column: 5
+  fix: ~
+- kind: YieldOutsideFunction
+  location:
+    row: 9
+    column: 1
+  fix: ~
+- kind: YieldOutsideFunction
+  location:
+    row: 10
+    column: 1
+  fix: ~
+

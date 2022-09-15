@@ -1,0 +1,10 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: LateFutureImport
+  location:
+    row: 7
+    column: 1
+  fix: ~
+

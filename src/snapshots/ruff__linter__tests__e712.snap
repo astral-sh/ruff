@@ -1,0 +1,37 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    TrueFalseComparison:
+      - true
+      - Eq
+  location:
+    row: 1
+    column: 11
+  fix: ~
+- kind:
+    TrueFalseComparison:
+      - false
+      - NotEq
+  location:
+    row: 4
+    column: 4
+  fix: ~
+- kind:
+    TrueFalseComparison:
+      - false
+      - NotEq
+  location:
+    row: 7
+    column: 11
+  fix: ~
+- kind:
+    TrueFalseComparison:
+      - true
+      - NotEq
+  location:
+    row: 7
+    column: 20
+  fix: ~
+

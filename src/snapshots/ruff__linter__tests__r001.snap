@@ -1,0 +1,285 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 5
+    column: 9
+  fix:
+    content: ""
+    start:
+      row: 5
+      column: 8
+    end:
+      row: 5
+      column: 16
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 10
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 9
+      column: 8
+    end:
+      row: 11
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 16
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 15
+      column: 8
+    end:
+      row: 18
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 24
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 22
+      column: 8
+    end:
+      row: 25
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 31
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 29
+      column: 8
+    end:
+      row: 32
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 37
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 36
+      column: 8
+    end:
+      row: 39
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 45
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 43
+      column: 8
+    end:
+      row: 47
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 53
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 51
+      column: 8
+    end:
+      row: 55
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 61
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 59
+      column: 8
+    end:
+      row: 63
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 69
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 67
+      column: 8
+    end:
+      row: 71
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: B
+  location:
+    row: 75
+    column: 12
+  fix:
+    content: ""
+    start:
+      row: 75
+      column: 10
+    end:
+      row: 75
+      column: 18
+    applied: false
+- kind:
+    UselessObjectInheritance: B
+  location:
+    row: 79
+    column: 9
+  fix:
+    content: ""
+    start:
+      row: 79
+      column: 9
+    end:
+      row: 79
+      column: 17
+    applied: false
+- kind:
+    UselessObjectInheritance: B
+  location:
+    row: 84
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 84
+      column: 5
+    end:
+      row: 85
+      column: 5
+    applied: false
+- kind:
+    UselessObjectInheritance: B
+  location:
+    row: 92
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 91
+      column: 6
+    end:
+      row: 92
+      column: 11
+    applied: false
+- kind:
+    UselessObjectInheritance: B
+  location:
+    row: 98
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 98
+      column: 5
+    end:
+      row: 100
+      column: 5
+    applied: false
+- kind:
+    UselessObjectInheritance: B
+  location:
+    row: 108
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 107
+      column: 6
+    end:
+      row: 108
+      column: 11
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 114
+    column: 13
+  fix:
+    content: ""
+    start:
+      row: 114
+      column: 12
+    end:
+      row: 114
+      column: 20
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 119
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 118
+      column: 8
+    end:
+      row: 120
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 125
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 124
+      column: 8
+    end:
+      row: 126
+      column: 2
+    applied: false
+- kind:
+    UselessObjectInheritance: A
+  location:
+    row: 131
+    column: 5
+  fix:
+    content: ""
+    start:
+      row: 130
+      column: 8
+    end:
+      row: 133
+      column: 2
+    applied: false
+

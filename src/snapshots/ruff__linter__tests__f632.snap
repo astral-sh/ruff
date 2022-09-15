@@ -1,0 +1,15 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: IsLiteral
+  location:
+    row: 1
+    column: 6
+  fix: ~
+- kind: IsLiteral
+  location:
+    row: 4
+    column: 8
+  fix: ~
+

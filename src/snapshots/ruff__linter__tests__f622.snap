@@ -1,0 +1,10 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: TwoStarredExpressions
+  location:
+    row: 1
+    column: 1
+  fix: ~
+

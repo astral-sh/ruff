@@ -1,0 +1,11 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    MultiValueRepeatedKeyVariable: a
+  location:
+    row: 5
+    column: 5
+  fix: ~
+
