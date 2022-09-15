@@ -8,19 +8,16 @@ use serde::Deserialize;
 use crate::checks::CheckCode;
 use crate::fs;
 
-pub fn load_config(paths: &[PathBuf]) -> (PathBuf, Config) {
+pub fn load_config(paths: &[PathBuf]) -> Config {
     match find_project_root(paths) {
         Some(project_root) => match find_pyproject_toml(&project_root) {
             Some(path) => {
-                debug!("Found pyproject.toml at: {}", path.to_string_lossy());
+                debug!("Found pyproject.toml at: {:?}", path);
                 match parse_pyproject_toml(&path) {
-                    Ok(pyproject) => {
-                        let config = pyproject
-                            .tool
-                            .and_then(|tool| tool.ruff)
-                            .unwrap_or_default();
-                        (project_root, config)
-                    }
+                    Ok(pyproject) => pyproject
+                        .tool
+                        .and_then(|tool| tool.ruff)
+                        .unwrap_or_default(),
                     Err(e) => {
                         println!("Failed to load pyproject.toml: {:?}", e);
                         println!("Falling back to default configuration...");
@@ -39,6 +36,7 @@ pub fn load_config(paths: &[PathBuf]) -> (PathBuf, Config) {
 pub struct Config {
     pub line_length: Option<usize>,
     pub exclude: Option<Vec<PathBuf>>,
+    pub extend_exclude: Option<Vec<PathBuf>>,
     pub select: Option<Vec<CheckCode>>,
     pub ignore: Option<Vec<CheckCode>>,
 }
@@ -123,6 +121,7 @@ mod tests {
                 ruff: Some(Config {
                     line_length: None,
                     exclude: None,
+                    extend_exclude: None,
                     select: None,
                     ignore: None,
                 })
@@ -142,6 +141,7 @@ line-length = 79
                 ruff: Some(Config {
                     line_length: Some(79),
                     exclude: None,
+                    extend_exclude: None,
                     select: None,
                     ignore: None,
                 })
@@ -161,6 +161,7 @@ exclude = ["foo.py"]
                 ruff: Some(Config {
                     line_length: None,
                     exclude: Some(vec![Path::new("foo.py").to_path_buf()]),
+                    extend_exclude: None,
                     select: None,
                     ignore: None,
                 })
@@ -180,6 +181,7 @@ select = ["E501"]
                 ruff: Some(Config {
                     line_length: None,
                     exclude: None,
+                    extend_exclude: None,
                     select: Some(vec![CheckCode::E501]),
                     ignore: None,
                 })
@@ -199,6 +201,7 @@ ignore = ["E501"]
                 ruff: Some(Config {
                     line_length: None,
                     exclude: None,
+                    extend_exclude: None,
                     select: None,
                     ignore: Some(vec![CheckCode::E501]),
                 })
@@ -255,9 +258,10 @@ other-attribute = 1
             config,
             Config {
                 line_length: Some(88),
-                exclude: Some(vec![
+                exclude: None,
+                extend_exclude: Some(vec![
                     Path::new("excluded.py").to_path_buf(),
-                    Path::new("**/migrations").to_path_buf()
+                    Path::new("migrations").to_path_buf()
                 ]),
                 select: Some(vec![
                     CheckCode::E402,

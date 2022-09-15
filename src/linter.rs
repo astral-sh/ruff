@@ -96,6 +96,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E402]),
             },
             &fixer::Mode::Generate,
@@ -112,6 +113,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E501]),
             },
             &fixer::Mode::Generate,
@@ -128,6 +130,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E711]),
             },
             &fixer::Mode::Generate,
@@ -144,6 +147,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E712]),
             },
             &fixer::Mode::Generate,
@@ -160,6 +164,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E713]),
             },
             &fixer::Mode::Generate,
@@ -176,6 +181,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E721]),
             },
             &fixer::Mode::Generate,
@@ -192,6 +198,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E722]),
             },
             &fixer::Mode::Generate,
@@ -208,6 +215,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E714]),
             },
             &fixer::Mode::Generate,
@@ -224,6 +232,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E731]),
             },
             &fixer::Mode::Generate,
@@ -240,6 +249,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E741]),
             },
             &fixer::Mode::Generate,
@@ -256,6 +266,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E742]),
             },
             &fixer::Mode::Generate,
@@ -272,6 +283,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::E743]),
             },
             &fixer::Mode::Generate,
@@ -288,6 +300,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F401]),
             },
             &fixer::Mode::Generate,
@@ -304,6 +317,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F403]),
             },
             &fixer::Mode::Generate,
@@ -320,6 +334,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F404]),
             },
             &fixer::Mode::Generate,
@@ -336,6 +351,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F406]),
             },
             &fixer::Mode::Generate,
@@ -352,6 +368,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F407]),
             },
             &fixer::Mode::Generate,
@@ -368,6 +385,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F541]),
             },
             &fixer::Mode::Generate,
@@ -384,6 +402,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F601]),
             },
             &fixer::Mode::Generate,
@@ -400,6 +419,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F602]),
             },
             &fixer::Mode::Generate,
@@ -416,6 +436,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F622]),
             },
             &fixer::Mode::Generate,
@@ -432,6 +453,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F631]),
             },
             &fixer::Mode::Generate,
@@ -448,6 +470,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F632]),
             },
             &fixer::Mode::Generate,
@@ -464,6 +487,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F633]),
             },
             &fixer::Mode::Generate,
@@ -480,6 +504,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F634]),
             },
             &fixer::Mode::Generate,
@@ -496,6 +521,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F701]),
             },
             &fixer::Mode::Generate,
@@ -512,6 +538,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F702]),
             },
             &fixer::Mode::Generate,
@@ -528,6 +555,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F704]),
             },
             &fixer::Mode::Generate,
@@ -544,6 +572,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F706]),
             },
             &fixer::Mode::Generate,
@@ -560,6 +589,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F707]),
             },
             &fixer::Mode::Generate,
@@ -576,6 +606,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F722]),
             },
             &fixer::Mode::Generate,
@@ -592,6 +623,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F821]),
             },
             &fixer::Mode::Generate,
@@ -608,6 +640,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F822]),
             },
             &fixer::Mode::Generate,
@@ -624,6 +657,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F823]),
             },
             &fixer::Mode::Generate,
@@ -640,6 +674,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F831]),
             },
             &fixer::Mode::Generate,
@@ -656,6 +691,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F841]),
             },
             &fixer::Mode::Generate,
@@ -672,6 +708,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F901]),
             },
             &fixer::Mode::Generate,
@@ -688,6 +725,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::R001]),
             },
             &fixer::Mode::Generate,
@@ -704,6 +742,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::R002]),
             },
             &fixer::Mode::Generate,
@@ -720,6 +759,7 @@ mod tests {
             &settings::Settings {
                 line_length: 88,
                 exclude: vec![],
+                extend_exclude: vec![],
                 select: BTreeSet::from([CheckCode::F401, CheckCode::F821]),
             },
             &fixer::Mode::Generate,
