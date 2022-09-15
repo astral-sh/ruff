@@ -4,7 +4,17 @@ expression: checks
 ---
 - kind: NotIsTest
   location:
-    row: 1
-    column: 13
+    row: 2
+    column: 10
+  fix: ~
+- kind: NotIsTest
+  location:
+    row: 5
+    column: 12
+  fix: ~
+- kind: NotIsTest
+  location:
+    row: 8
+    column: 10
   fix: ~
 

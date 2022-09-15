@@ -42,18 +42,20 @@ pub fn check_not_tests(
 
     if matches!(op, Unaryop::Not) {
         if let ExprKind::Compare { ops, .. } = &operand.node {
-            match ops[..] {
-                [Cmpop::In] => {
-                    if check_not_in {
-                        checks.push(Check::new(CheckKind::NotInTest, operand.location));
+            for op in ops {
+                match op {
+                    Cmpop::In => {
+                        if check_not_in {
+                            checks.push(Check::new(CheckKind::NotInTest, operand.location));
+                        }
                     }
-                }
-                [Cmpop::Is] => {
-                    if check_not_is {
-                        checks.push(Check::new(CheckKind::NotIsTest, operand.location));
+                    Cmpop::Is => {
+                        if check_not_is {
+                            checks.push(Check::new(CheckKind::NotIsTest, operand.location));
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
     }

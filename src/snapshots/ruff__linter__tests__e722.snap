@@ -4,7 +4,17 @@ expression: checks
 ---
 - kind: DoNotUseBareExcept
   location:
-    row: 3
+    row: 4
+    column: 1
+  fix: ~
+- kind: DoNotUseBareExcept
+  location:
+    row: 11
+    column: 1
+  fix: ~
+- kind: DoNotUseBareExcept
+  location:
+    row: 16
     column: 1
   fix: ~
 
