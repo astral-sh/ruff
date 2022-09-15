@@ -99,6 +99,7 @@ OPTIONS:
     -e, --exit-zero               Exit with status code "0", even upon detecting errors
         --exclude <EXCLUDE>...    List of file and/or directory patterns to exclude from checks
     -f, --fix                     Attempt to automatically fix lint errors
+        --format <FORMAT>         Output serialization format for error messages [default: text] [possible values: text, json]
     -h, --help                    Print help information
         --ignore <IGNORE>...      List of error codes to ignore
     -n, --no-cache                Disable cache reads
