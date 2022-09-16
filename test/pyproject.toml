@@ -1,3 +1,0 @@
-[tool.ruff]
-line-length = 88
-extend-exclude = ["./directory/*"]
