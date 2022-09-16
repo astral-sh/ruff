@@ -96,19 +96,41 @@ ARGS:
     <FILES>...
 
 OPTIONS:
-    -e, --exit-zero               Exit with status code "0", even upon detecting errors
-        --exclude <EXCLUDE>...    List of file and/or directory patterns to exclude from checks
-    -f, --fix                     Attempt to automatically fix lint errors
-        --format <FORMAT>         Output serialization format for error messages [default: text] [possible values: text, json]
-    -h, --help                    Print help information
-        --ignore <IGNORE>...      List of error codes to ignore
-    -n, --no-cache                Disable cache reads
-    -q, --quiet                   Disable all logging (but still exit with status code "1" upon
-                                  detecting errors)
-        --select <SELECT>...      List of error codes to enable
-    -v, --verbose                 Enable verbose logging
-    -w, --watch                   Run in watch mode by re-running whenever files change
+    -e, --exit-zero
+            Exit with status code "0", even upon detecting errors
+        --exclude <EXCLUDE>...
+            List of paths, used to exclude files and/or directories from checks
+        --extend-exclude <EXTEND_EXCLUDE>...
+            Like --exclude, but adds additional files and directories on top of the excluded ones
+    -f, --fix
+            Attempt to automatically fix lint errors
+        --format <FORMAT>
+            Output serialization format for error messages [default: text] [possible values: text,
+            json]
+    -h, --help
+            Print help information
+        --ignore <IGNORE>...
+            List of error codes to ignore
+    -n, --no-cache
+            Disable cache reads
+    -q, --quiet
+            Disable all logging (but still exit with status code "1" upon detecting errors)
+        --select <SELECT>...
+            List of error codes to enable
+    -v, --verbose
+            Enable verbose logging
+    -w, --watch
+            Run in watch mode by re-running whenever files change
 ```
+
+Exclusions are based on globs, and can be either:
+
+- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the
+  tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching
+  `foo_*.py` ).
+- Relative patterns, like `./directory/foo.py` (to exclude that specific file) or `./directory/*.py`
+  (to exclude any Python files in `./directory`). Note that these paths are relative to the
+  directory from which you execute `ruff`, and _not_ the directory of the `pyproject.toml`.
 
 ### Compatibility with Black
 
@@ -222,28 +244,28 @@ Add this `pyproject.toml` to the CPython directory:
 [tool.ruff]
 line-length = 88
 exclude = [
-    "Lib/lib2to3/tests/data/bom.py",
-    "Lib/lib2to3/tests/data/crlf.py",
-    "Lib/lib2to3/tests/data/different_encoding.py",
-    "Lib/lib2to3/tests/data/false_encoding.py",
-    "Lib/lib2to3/tests/data/py2_test_grammar.py",
-    "Lib/test/bad_coding2.py",
-    "Lib/test/badsyntax_3131.py",
-    "Lib/test/badsyntax_pep3120.py",
-    "Lib/test/encoded_modules/module_iso_8859_1.py",
-    "Lib/test/encoded_modules/module_koi8_r.py",
-    "Lib/test/test_fstring.py",
-    "Lib/test/test_grammar.py",
-    "Lib/test/test_importlib/test_util.py",
-    "Lib/test/test_named_expressions.py",
-    "Lib/test/test_patma.py",
-    "Lib/test/test_source_encoding.py",
-    "Tools/c-analyzer/c_parser/parser/_delim.py",
-    "Tools/i18n/pygettext.py",
-    "Tools/test2to3/maintest.py",
-    "Tools/test2to3/setup.py",
-    "Tools/test2to3/test/test_foo.py",
-    "Tools/test2to3/test2to3/hello.py",
+    "./resources/test/cpython/Lib/lib2to3/tests/data/bom.py",
+    "./resources/test/cpython/Lib/lib2to3/tests/data/crlf.py",
+    "./resources/test/cpython/Lib/lib2to3/tests/data/different_encoding.py",
+    "./resources/test/cpython/Lib/lib2to3/tests/data/false_encoding.py",
+    "./resources/test/cpython/Lib/lib2to3/tests/data/py2_test_grammar.py",
+    "./resources/test/cpython/Lib/test/bad_coding2.py",
+    "./resources/test/cpython/Lib/test/badsyntax_3131.py",
+    "./resources/test/cpython/Lib/test/badsyntax_pep3120.py",
+    "./resources/test/cpython/Lib/test/encoded_modules/module_iso_8859_1.py",
+    "./resources/test/cpython/Lib/test/encoded_modules/module_koi8_r.py",
+    "./resources/test/cpython/Lib/test/test_fstring.py",
+    "./resources/test/cpython/Lib/test/test_grammar.py",
+    "./resources/test/cpython/Lib/test/test_importlib/test_util.py",
+    "./resources/test/cpython/Lib/test/test_named_expressions.py",
+    "./resources/test/cpython/Lib/test/test_patma.py",
+    "./resources/test/cpython/Lib/test/test_source_encoding.py",
+    "./resources/test/cpython/Tools/c-analyzer/c_parser/parser/_delim.py",
+    "./resources/test/cpython/Tools/i18n/pygettext.py",
+    "./resources/test/cpython/Tools/test2to3/maintest.py",
+    "./resources/test/cpython/Tools/test2to3/setup.py",
+    "./resources/test/cpython/Tools/test2to3/test/test_foo.py",
+    "./resources/test/cpython/Tools/test2to3/test2to3/hello.py",
 ]
 ```
 

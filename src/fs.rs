@@ -70,10 +70,13 @@ pub fn iter_python_files<'a>(
 }
 
 pub fn normalize_path(path: &PathBuf) -> PathBuf {
+    if path == Path::new(".") || path == Path::new("..") {
+        return path.clone();
+    }
     if let Ok(path) = path.absolutize() {
         if let Ok(root) = env::current_dir() {
             if let Ok(path) = path.strip_prefix(root) {
-                return path.to_path_buf();
+                return Path::new(".").join(path);
             }
         }
     }

@@ -6,7 +6,6 @@ use glob::Pattern;
 use once_cell::sync::Lazy;
 
 use crate::checks::CheckCode;
-use crate::fs::normalize_path;
 use crate::pyproject::load_config;
 
 #[derive(Debug)]
@@ -61,8 +60,7 @@ impl Settings {
                     paths
                         .iter()
                         .map(|path| {
-                            Pattern::new(&normalize_path(path).to_string_lossy())
-                                .expect("Invalid pattern.")
+                            Pattern::new(&path.to_string_lossy()).expect("Invalid pattern.")
                         })
                         .collect()
                 })
@@ -73,8 +71,7 @@ impl Settings {
                     paths
                         .iter()
                         .map(|path| {
-                            Pattern::new(&normalize_path(path).to_string_lossy())
-                                .expect("Invalid pattern.")
+                            Pattern::new(&path.to_string_lossy()).expect("Invalid pattern.")
                         })
                         .collect()
                 })
