@@ -1,5 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
-use std::fs::{File, Metadata};
+use std::fs::{create_dir_all, File, Metadata};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::Path;
@@ -90,6 +90,7 @@ pub fn init() -> Result<()> {
     if gitignore_path.exists() {
         return Ok(());
     }
+    create_dir_all(cache_dir())?;
     let mut file = File::create(gitignore_path)?;
     file.write_all(b"*").map_err(|e| e.into())
 }
