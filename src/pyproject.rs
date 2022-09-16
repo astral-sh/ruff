@@ -1,3 +1,4 @@
+use std::env::current_dir;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -69,7 +70,10 @@ fn find_user_pyproject_toml() -> Option<PathBuf> {
 }
 
 fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
-    if let Some(prefix) = common_path_all(sources.iter().map(PathBuf::as_path)) {
+    let cwd = current_dir().unwrap_or_else(|_| ".".into());
+    // common_path doesn't work correctly with relative paths
+    let absolute_sources: Vec<PathBuf> = sources.iter().map(|source| cwd.join(source)).collect();
+    if let Some(prefix) = common_path_all(absolute_sources.iter().map(PathBuf::as_path)) {
         for directory in prefix.ancestors() {
             if directory.join(".git").is_dir() {
                 return Some(directory.to_path_buf());
@@ -88,6 +92,7 @@ fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use std::env::current_dir;
     use std::path::{Path, PathBuf};
 
     use anyhow::Result;
@@ -241,13 +246,14 @@ other-attribute = 1
 
     #[test]
     fn find_and_parse_pyproject_toml() -> Result<()> {
+        let cwd = current_dir().unwrap_or_else(|_| ".".into());
         let project_root =
             find_project_root(&[PathBuf::from("resources/test/fixtures/__init__.py")])
                 .expect("Unable to find project root.");
-        assert_eq!(project_root, Path::new("resources/test/fixtures"));
+        assert_eq!(project_root, cwd.join("resources/test/fixtures"));
 
         let path = find_pyproject_toml(&project_root).expect("Unable to find pyproject.toml.");
-        assert_eq!(path, Path::new("resources/test/fixtures/pyproject.toml"));
+        assert_eq!(path, cwd.join("resources/test/fixtures/pyproject.toml"));
 
         let pyproject = parse_pyproject_toml(&path)?;
         let config = pyproject
