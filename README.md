@@ -1,7 +1,9 @@
 # ruff
 
+[![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
+[![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
+[![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
-[![PyPI version](https://badge.fury.io/py/ruff.svg)](https://badge.fury.io/py/ruff)
 
 An extremely fast Python linter, written in Rust.
 
