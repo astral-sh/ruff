@@ -2,7 +2,7 @@ extern crate core;
 
 mod ast;
 mod autofix;
-mod cache;
+pub mod cache;
 pub mod check_ast;
 mod check_lines;
 pub mod checks;
