@@ -1,11 +1,13 @@
 use std::cmp::Ordering;
 use std::fmt;
+use std::path::Path;
 
 use colored::Colorize;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
 use crate::checks::CheckKind;
+use crate::fs::relativize_path;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
@@ -36,7 +38,7 @@ impl fmt::Display for Message {
         write!(
             f,
             "{}{}{}{}{}{} {} {}",
-            self.filename.white().bold(),
+            relativize_path(Path::new(&self.filename)).white().bold(),
             ":".cyan(),
             self.location.row(),
             ":".cyan(),

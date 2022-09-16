@@ -6,7 +6,6 @@ use std::time::Instant;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
-use glob::Pattern;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
@@ -22,6 +21,7 @@ use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::settings::Settings;
 use ::ruff::tell_user;
+use ruff::settings::FilePattern;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -59,10 +59,10 @@ struct Cli {
     ignore: Vec<CheckCode>,
     /// List of paths, used to exclude files and/or directories from checks.
     #[clap(long, multiple = true)]
-    exclude: Vec<Pattern>,
+    exclude: Vec<String>,
     /// Like --exclude, but adds additional files and directories on top of the excluded ones.
     #[clap(long, multiple = true)]
-    extend_exclude: Vec<Pattern>,
+    extend_exclude: Vec<String>,
     /// Output serialization format for error messages.
     #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
@@ -164,10 +164,18 @@ fn inner_main() -> Result<ExitCode> {
         settings.ignore(&cli.ignore);
     }
     if !cli.exclude.is_empty() {
-        settings.exclude = cli.exclude;
+        settings.exclude = cli
+            .exclude
+            .iter()
+            .map(|path| FilePattern::user_provided(path))
+            .collect();
     }
     if !cli.extend_exclude.is_empty() {
-        settings.extend_exclude = cli.extend_exclude;
+        settings.extend_exclude = cli
+            .extend_exclude
+            .iter()
+            .map(|path| FilePattern::user_provided(path))
+            .collect();
     }
 
     cache::init()?;

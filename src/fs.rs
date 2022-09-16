@@ -1,20 +1,22 @@
+use std::borrow::Cow;
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use glob::Pattern;
 use log::debug;
 use path_absolutize::Absolutize;
 use walkdir::{DirEntry, WalkDir};
 
-fn is_excluded(path: &Path, exclude: &[Pattern]) -> bool {
+use crate::settings::FilePattern;
+
+fn is_excluded(path: &Path, exclude: &[FilePattern]) -> bool {
     // Check the basename.
     if let Some(file_name) = path.file_name() {
         if let Some(file_name) = file_name.to_str() {
             for pattern in exclude {
-                if pattern.matches(file_name) {
+                if pattern.basename.matches(file_name) {
                     return true;
                 }
             }
@@ -24,7 +26,12 @@ fn is_excluded(path: &Path, exclude: &[Pattern]) -> bool {
     // Check the complete path.
     if let Some(file_name) = path.to_str() {
         for pattern in exclude {
-            if pattern.matches(file_name) {
+            if pattern
+                .absolute
+                .as_ref()
+                .map(|pattern| pattern.matches(file_name))
+                .unwrap_or_default()
+            {
                 return true;
             }
         }
@@ -39,9 +46,9 @@ fn is_included(path: &Path) -> bool {
 }
 
 pub fn iter_python_files<'a>(
-    path: &'a PathBuf,
-    exclude: &'a [Pattern],
-    extend_exclude: &'a [Pattern],
+    path: &'a Path,
+    exclude: &'a [FilePattern],
+    extend_exclude: &'a [FilePattern],
 ) -> impl Iterator<Item = DirEntry> + 'a {
     WalkDir::new(normalize_path(path))
         .follow_links(true)
@@ -69,18 +76,23 @@ pub fn iter_python_files<'a>(
         })
 }
 
-pub fn normalize_path(path: &PathBuf) -> PathBuf {
+pub fn normalize_path(path: &Path) -> PathBuf {
     if path == Path::new(".") || path == Path::new("..") {
-        return path.clone();
+        return path.to_path_buf();
     }
     if let Ok(path) = path.absolutize() {
-        if let Ok(root) = env::current_dir() {
-            if let Ok(path) = path.strip_prefix(root) {
-                return Path::new(".").join(path);
-            }
+        return path.to_path_buf();
+    }
+    path.to_path_buf()
+}
+
+pub fn relativize_path(path: &Path) -> Cow<str> {
+    if let Ok(root) = env::current_dir() {
+        if let Ok(path) = path.strip_prefix(root) {
+            return path.to_string_lossy();
         }
     }
-    path.clone()
+    path.to_string_lossy()
 }
 
 pub fn read_file(path: &Path) -> Result<String> {
@@ -95,53 +107,54 @@ pub fn read_file(path: &Path) -> Result<String> {
 mod tests {
     use std::path::Path;
 
-    use glob::Pattern;
+    use path_absolutize::Absolutize;
 
     use crate::fs::{is_excluded, is_included};
+    use crate::settings::FilePattern;
 
     #[test]
     fn inclusions() {
-        let path = Path::new("foo/bar/baz.py");
-        assert!(is_included(path));
+        let path = Path::new("foo/bar/baz.py").absolutize().unwrap();
+        assert!(is_included(&path));
 
-        let path = Path::new("foo/bar/baz.pyi");
-        assert!(is_included(path));
+        let path = Path::new("foo/bar/baz.pyi").absolutize().unwrap();
+        assert!(is_included(&path));
 
-        let path = Path::new("foo/bar/baz.js");
-        assert!(!is_included(path));
+        let path = Path::new("foo/bar/baz.js").absolutize().unwrap();
+        assert!(!is_included(&path));
 
-        let path = Path::new("foo/bar/baz");
-        assert!(!is_included(path));
+        let path = Path::new("foo/bar/baz").absolutize().unwrap();
+        assert!(!is_included(&path));
     }
 
     #[test]
     fn exclusions() {
-        let path = Path::new("foo");
-        let exclude = vec![Pattern::new("foo").unwrap()];
-        assert!(is_excluded(path, &exclude));
+        let path = Path::new("foo").absolutize().unwrap();
+        let exclude = vec![FilePattern::user_provided("foo")];
+        assert!(is_excluded(&path, &exclude));
 
-        let path = Path::new("foo/bar");
-        let exclude = vec![Pattern::new("bar").unwrap()];
-        assert!(is_excluded(path, &exclude));
+        let path = Path::new("foo/bar").absolutize().unwrap();
+        let exclude = vec![FilePattern::user_provided("bar")];
+        assert!(is_excluded(&path, &exclude));
 
-        let path = Path::new("foo/bar/baz.py");
-        let exclude = vec![Pattern::new("baz.py").unwrap()];
-        assert!(is_excluded(path, &exclude));
+        let path = Path::new("foo/bar/baz.py").absolutize().unwrap();
+        let exclude = vec![FilePattern::user_provided("baz.py")];
+        assert!(is_excluded(&path, &exclude));
 
-        let path = Path::new("foo/bar");
-        let exclude = vec![Pattern::new("foo/bar").unwrap()];
-        assert!(is_excluded(path, &exclude));
+        let path = Path::new("foo/bar").absolutize().unwrap();
+        let exclude = vec![FilePattern::user_provided("foo/bar")];
+        assert!(is_excluded(&path, &exclude));
 
-        let path = Path::new("foo/bar/baz.py");
-        let exclude = vec![Pattern::new("foo/bar/baz.py").unwrap()];
-        assert!(is_excluded(path, &exclude));
+        let path = Path::new("foo/bar/baz.py").absolutize().unwrap();
+        let exclude = vec![FilePattern::user_provided("foo/bar/baz.py")];
+        assert!(is_excluded(&path, &exclude));
 
-        let path = Path::new("foo/bar/baz.py");
-        let exclude = vec![Pattern::new("foo/bar/*.py").unwrap()];
-        assert!(is_excluded(path, &exclude));
+        let path = Path::new("foo/bar/baz.py").absolutize().unwrap();
+        let exclude = vec![FilePattern::user_provided("foo/bar/*.py")];
+        assert!(is_excluded(&path, &exclude));
 
-        let path = Path::new("foo/bar/baz.py");
-        let exclude = vec![Pattern::new("baz").unwrap()];
-        assert!(!is_excluded(path, &exclude));
+        let path = Path::new("foo/bar/baz.py").absolutize().unwrap();
+        let exclude = vec![FilePattern::user_provided("baz")];
+        assert!(!is_excluded(&path, &exclude));
     }
 }

@@ -3,5 +3,5 @@ line-length = 88
 extend-exclude = [
     "excluded.py",
     "migrations",
-    "./resources/test/fixtures/directory/also_excluded.py",
+    "resources/test/fixtures/directory/also_excluded.py",
 ]

@@ -1,18 +1,44 @@
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use glob::Pattern;
 use once_cell::sync::Lazy;
 
 use crate::checks::{CheckCode, ALL_CHECK_CODES};
+use crate::fs;
 use crate::pyproject::load_config;
+
+#[derive(Debug, Clone)]
+pub struct FilePattern {
+    pub basename: Pattern,
+    pub absolute: Option<Pattern>,
+}
+
+impl FilePattern {
+    pub fn single(pattern: &str) -> Self {
+        FilePattern {
+            basename: Pattern::new(pattern).unwrap(),
+            absolute: None,
+        }
+    }
+
+    pub fn user_provided(pattern: &str) -> Self {
+        FilePattern {
+            basename: Pattern::new(pattern).expect("Invalid pattern."),
+            absolute: Some(
+                Pattern::new(&fs::normalize_path(Path::new(pattern)).to_string_lossy())
+                    .expect("Invalid pattern."),
+            ),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Settings {
     pub line_length: usize,
-    pub exclude: Vec<Pattern>,
-    pub extend_exclude: Vec<Pattern>,
+    pub exclude: Vec<FilePattern>,
+    pub extend_exclude: Vec<FilePattern>,
     pub select: BTreeSet<CheckCode>,
 }
 
@@ -25,27 +51,27 @@ impl Hash for Settings {
     }
 }
 
-static DEFAULT_EXCLUDE: Lazy<Vec<Pattern>> = Lazy::new(|| {
+static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     vec![
-        Pattern::new(".bzr").unwrap(),
-        Pattern::new(".direnv").unwrap(),
-        Pattern::new(".eggs").unwrap(),
-        Pattern::new(".git").unwrap(),
-        Pattern::new(".hg").unwrap(),
-        Pattern::new(".mypy_cache").unwrap(),
-        Pattern::new(".nox").unwrap(),
-        Pattern::new(".pants.d").unwrap(),
-        Pattern::new(".ruff_cache").unwrap(),
-        Pattern::new(".svn").unwrap(),
-        Pattern::new(".tox").unwrap(),
-        Pattern::new(".venv").unwrap(),
-        Pattern::new("__pypackages__").unwrap(),
-        Pattern::new("_build").unwrap(),
-        Pattern::new("buck-out").unwrap(),
-        Pattern::new("build").unwrap(),
-        Pattern::new("dist").unwrap(),
-        Pattern::new("node_modules").unwrap(),
-        Pattern::new("venv").unwrap(),
+        FilePattern::single(".bzr"),
+        FilePattern::single(".direnv"),
+        FilePattern::single(".eggs"),
+        FilePattern::single(".git"),
+        FilePattern::single(".hg"),
+        FilePattern::single(".mypy_cache"),
+        FilePattern::single(".nox"),
+        FilePattern::single(".pants.d"),
+        FilePattern::single(".ruff_cache"),
+        FilePattern::single(".svn"),
+        FilePattern::single(".tox"),
+        FilePattern::single(".venv"),
+        FilePattern::single("__pypackages__"),
+        FilePattern::single("_build"),
+        FilePattern::single("buck-out"),
+        FilePattern::single("build"),
+        FilePattern::single("dist"),
+        FilePattern::single("node_modules"),
+        FilePattern::single("venv"),
     ]
 });
 
@@ -59,9 +85,7 @@ impl Settings {
                 .map(|paths| {
                     paths
                         .iter()
-                        .map(|path| {
-                            Pattern::new(&path.to_string_lossy()).expect("Invalid pattern.")
-                        })
+                        .map(|path| FilePattern::user_provided(path))
                         .collect()
                 })
                 .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
@@ -70,9 +94,7 @@ impl Settings {
                 .map(|paths| {
                     paths
                         .iter()
-                        .map(|path| {
-                            Pattern::new(&path.to_string_lossy()).expect("Invalid pattern.")
-                        })
+                        .map(|path| FilePattern::user_provided(path))
                         .collect()
                 })
                 .unwrap_or_default(),
