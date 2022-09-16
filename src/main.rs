@@ -12,6 +12,7 @@ use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
 use walkdir::DirEntry;
 
+use ::ruff::cache;
 use ::ruff::checks::CheckCode;
 use ::ruff::checks::CheckKind;
 use ::ruff::fs::iter_python_files;
@@ -167,6 +168,8 @@ fn inner_main() -> Result<ExitCode> {
     if !cli.extend_exclude.is_empty() {
         settings.extend_exclude = cli.extend_exclude;
     }
+
+    cache::init()?;
 
     if cli.watch {
         if cli.fix {

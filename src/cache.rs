@@ -1,8 +1,10 @@
 use std::collections::hash_map::DefaultHasher;
-use std::fs::Metadata;
+use std::fs::{File, Metadata};
 use std::hash::{Hash, Hasher};
+use std::io::Write;
 use std::path::Path;
 
+use anyhow::Result;
 use cacache::Error::EntryNotFound;
 use filetime::FileTime;
 use log::error;
@@ -81,6 +83,15 @@ fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> String 
         VERSION,
         hasher.finish()
     )
+}
+
+pub fn init() -> Result<()> {
+    let gitignore_path = Path::new(cache_dir()).join(".gitignore");
+    if gitignore_path.exists() {
+        return Ok(());
+    }
+    let mut file = File::create(gitignore_path)?;
+    file.write_all(b"*").map_err(|e| e.into())
 }
 
 pub fn get(
