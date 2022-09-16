@@ -24,6 +24,7 @@ impl Hash for Settings {
         }
     }
 }
+
 static DEFAULT_EXCLUDE: Lazy<Vec<Pattern>> = Lazy::new(|| {
     vec![
         Pattern::new(".bzr").unwrap(),
@@ -57,7 +58,7 @@ impl Settings {
                 .exclude
                 .map(|paths| {
                     paths
-                        .into_iter()
+                        .iter()
                         .map(|path| {
                             Pattern::new(&path.to_string_lossy()).expect("Invalid pattern.")
                         })
@@ -68,7 +69,7 @@ impl Settings {
                 .extend_exclude
                 .map(|paths| {
                     paths
-                        .into_iter()
+                        .iter()
                         .map(|path| {
                             Pattern::new(&path.to_string_lossy()).expect("Invalid pattern.")
                         })

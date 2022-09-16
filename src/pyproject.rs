@@ -261,7 +261,8 @@ other-attribute = 1
                 exclude: None,
                 extend_exclude: Some(vec![
                     Path::new("excluded.py").to_path_buf(),
-                    Path::new("migrations").to_path_buf()
+                    Path::new("migrations").to_path_buf(),
+                    Path::new("./resources/test/fixtures/directory/also_excluded.py").to_path_buf()
                 ]),
                 select: Some(vec![
                     CheckCode::E402,
