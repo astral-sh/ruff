@@ -1,27 +1,41 @@
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::{Path, PathBuf};
-
 use anyhow::Result;
 use glob::Pattern;
 use log::debug;
+use path_absolutize::*;
+use std::env;
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
 use walkdir::{DirEntry, WalkDir};
 
 fn is_excluded(path: &Path, exclude: &[Pattern]) -> bool {
+    // println!("Patterns: {:?}", exclude);
+    // // println!("{:?}", path);
+    // Check the basename.
     if let Some(file_name) = path.file_name() {
         if let Some(file_name) = file_name.to_str() {
+            // println!("Basename: {:?}", file_name);
             for pattern in exclude {
                 if pattern.matches(file_name) {
                     return true;
                 }
             }
-            false
-        } else {
-            false
         }
-    } else {
-        false
     }
+
+    // Check the absolute path.
+    if let Ok(root) = env::current_dir() {
+        if let Some(file_name) = root.join(path).absolutize().unwrap().to_str() {
+            // println!("Abs: {:?}", file_name);
+            for pattern in exclude {
+                if pattern.matches(file_name) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
 }
 
 fn is_included(path: &Path) -> bool {
