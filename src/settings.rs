@@ -34,6 +34,7 @@ static DEFAULT_EXCLUDE: Lazy<Vec<Pattern>> = Lazy::new(|| {
         Pattern::new(".mypy_cache").unwrap(),
         Pattern::new(".nox").unwrap(),
         Pattern::new(".pants.d").unwrap(),
+        Pattern::new(".ruff_cache").unwrap(),
         Pattern::new(".svn").unwrap(),
         Pattern::new(".tox").unwrap(),
         Pattern::new(".venv").unwrap(),
