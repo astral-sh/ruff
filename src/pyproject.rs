@@ -65,7 +65,10 @@ fn find_pyproject_toml(path: &Path) -> Option<PathBuf> {
 }
 
 fn find_user_pyproject_toml() -> Option<PathBuf> {
-    dirs::home_dir().map(|path| path.join(".ruff"))
+    let mut path = dirs::config_dir()?;
+    path.push("ruff");
+    path.push("pyproject.toml");
+    Some(path)
 }
 
 fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
