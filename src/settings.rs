@@ -1,14 +1,13 @@
 use std::collections::BTreeSet;
-use std::env;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
-use crate::checks::CheckCode;
-use crate::pyproject::load_config;
 use glob::Pattern;
-use itertools::Itertools;
 use once_cell::sync::Lazy;
-use path_absolutize::*;
+
+use crate::checks::CheckCode;
+use crate::fs::normalize_path;
+use crate::pyproject::load_config;
 
 #[derive(Debug)]
 pub struct Settings {
@@ -26,6 +25,7 @@ impl Hash for Settings {
         }
     }
 }
+
 static DEFAULT_EXCLUDE: Lazy<Vec<Pattern>> = Lazy::new(|| {
     vec![
         Pattern::new(".bzr").unwrap(),
@@ -59,22 +59,10 @@ impl Settings {
                 .exclude
                 .map(|paths| {
                     paths
-                        .into_iter()
+                        .iter()
                         .map(|path| {
-                            let path_as_string_lossy = path.to_string_lossy();
-                            if path_as_string_lossy.contains(std::path::is_separator) {
-                                Pattern::new(
-                                    &env::current_dir()
-                                        .unwrap()
-                                        .join(&path)
-                                        .absolutize()
-                                        .unwrap()
-                                        .to_string_lossy(),
-                                )
+                            Pattern::new(&normalize_path(path).to_string_lossy())
                                 .expect("Invalid pattern.")
-                            } else {
-                                Pattern::new(&path_as_string_lossy).expect("Invalid pattern.")
-                            }
                         })
                         .collect()
                 })
@@ -83,22 +71,10 @@ impl Settings {
                 .extend_exclude
                 .map(|paths| {
                     paths
-                        .into_iter()
+                        .iter()
                         .map(|path| {
-                            let path_as_string_lossy = path.to_string_lossy();
-                            if path_as_string_lossy.contains(std::path::is_separator) {
-                                Pattern::new(
-                                    &env::current_dir()
-                                        .unwrap()
-                                        .join(&path)
-                                        .absolutize()
-                                        .unwrap()
-                                        .to_string_lossy(),
-                                )
+                            Pattern::new(&normalize_path(path).to_string_lossy())
                                 .expect("Invalid pattern.")
-                            } else {
-                                Pattern::new(&path_as_string_lossy).expect("Invalid pattern.")
-                            }
                         })
                         .collect()
                 })
