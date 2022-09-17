@@ -22,3 +22,6 @@ def g():
 
     bar = (1, 2)
     (c, d) = bar
+
+    (x, y) = baz = bar
+    print(baz)
