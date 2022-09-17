@@ -10,24 +10,22 @@ use crate::checks::CheckCode;
 use crate::fs;
 
 pub fn load_config(paths: &[PathBuf]) -> Config {
-    match find_project_root(paths) {
-        Some(project_root) => match find_pyproject_toml(&project_root) {
-            Some(path) => {
-                debug!("Found pyproject.toml at: {:?}", path);
-                match parse_pyproject_toml(&path) {
-                    Ok(pyproject) => pyproject
-                        .tool
-                        .and_then(|tool| tool.ruff)
-                        .unwrap_or_default(),
-                    Err(e) => {
-                        println!("Failed to load pyproject.toml: {:?}", e);
-                        println!("Falling back to default configuration...");
-                        Default::default()
-                    }
+    let project_root = find_project_root(paths);
+    match find_pyproject_toml(project_root.as_deref()) {
+        Some(path) => {
+            debug!("Found pyproject.toml at: {:?}", path);
+            match parse_pyproject_toml(&path) {
+                Ok(pyproject) => pyproject
+                    .tool
+                    .and_then(|tool| tool.ruff)
+                    .unwrap_or_default(),
+                Err(e) => {
+                    println!("Failed to load pyproject.toml: {:?}", e);
+                    println!("Falling back to default configuration...");
+                    Default::default()
                 }
             }
-            None => Default::default(),
-        },
+        }
         None => Default::default(),
     }
 }
@@ -57,11 +55,14 @@ fn parse_pyproject_toml(path: &Path) -> Result<PyProject> {
     toml::from_str(&contents).map_err(|e| e.into())
 }
 
-fn find_pyproject_toml(path: &Path) -> Option<PathBuf> {
-    let path_pyproject_toml = path.join("pyproject.toml");
-    if path_pyproject_toml.is_file() {
-        return Some(path_pyproject_toml);
+fn find_pyproject_toml(path: Option<&Path>) -> Option<PathBuf> {
+    if let Some(path) = path {
+        let path_pyproject_toml = path.join("pyproject.toml");
+        if path_pyproject_toml.is_file() {
+            return Some(path_pyproject_toml);
+        }
     }
+
     find_user_pyproject_toml()
 }
 
@@ -252,7 +253,8 @@ other-attribute = 1
                 .expect("Unable to find project root.");
         assert_eq!(project_root, cwd.join("resources/test/fixtures"));
 
-        let path = find_pyproject_toml(&project_root).expect("Unable to find pyproject.toml.");
+        let path =
+            find_pyproject_toml(Some(&project_root)).expect("Unable to find pyproject.toml.");
         assert_eq!(path, cwd.join("resources/test/fixtures/pyproject.toml"));
 
         let pyproject = parse_pyproject_toml(&path)?;
