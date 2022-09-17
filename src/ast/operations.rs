@@ -101,11 +101,13 @@ pub fn in_nested_block(parent_stack: &[usize], parents: &[&Stmt]) -> bool {
 /// Check if a node represents an unpacking assignment.
 pub fn is_unpacking_assignment(stmt: &Stmt) -> bool {
     if let StmtKind::Assign { targets, value, .. } = &stmt.node {
-        for child in targets {
-            match &child.node {
-                ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. } => {}
-                _ => return false,
-            }
+        if !targets.iter().any(|child| {
+            matches!(
+                child.node,
+                ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+            )
+        }) {
+            return false;
         }
         match &value.node {
             ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. } => return false,
