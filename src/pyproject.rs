@@ -1,9 +1,10 @@
-use std::env::current_dir;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use common_path::common_path_all;
 use log::debug;
+use path_absolutize::path_dedot;
 use serde::Deserialize;
 
 use crate::checks::CheckCode;
@@ -74,8 +75,7 @@ fn find_user_pyproject_toml() -> Option<PathBuf> {
 }
 
 fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
-    let cwd = current_dir().unwrap_or_else(|_| ".".into());
-    // common_path doesn't work correctly with relative paths
+    let cwd = path_dedot::CWD.deref();
     let absolute_sources: Vec<PathBuf> = sources.iter().map(|source| cwd.join(source)).collect();
     if let Some(prefix) = common_path_all(absolute_sources.iter().map(PathBuf::as_path)) {
         for directory in prefix.ancestors() {
@@ -97,7 +97,7 @@ fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use std::env::current_dir;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     use anyhow::Result;
 

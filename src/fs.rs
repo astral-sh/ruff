@@ -1,11 +1,12 @@
 use std::borrow::Cow;
-use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use log::debug;
+use path_absolutize::path_dedot;
 use path_absolutize::Absolutize;
 use walkdir::{DirEntry, WalkDir};
 
@@ -87,10 +88,8 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 }
 
 pub fn relativize_path(path: &Path) -> Cow<str> {
-    if let Ok(root) = env::current_dir() {
-        if let Ok(path) = path.strip_prefix(root) {
-            return path.to_string_lossy();
-        }
+    if let Ok(path) = path.strip_prefix(path_dedot::CWD.deref()) {
+        return path.to_string_lossy();
     }
     path.to_string_lossy()
 }

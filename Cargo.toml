@@ -23,7 +23,7 @@ itertools = "0.10.3"
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 once_cell = { version = "1.13.1" }
-path-absolutize = "3.0.13"
+path-absolutize = { version = "3.0.13", features = ["once_cell_cache"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "7d21c6923a506e79cc041708d83cef925efd33f4" }
