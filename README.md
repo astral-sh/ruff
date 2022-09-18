@@ -121,6 +121,8 @@ OPTIONS:
             List of error codes to enable
     -v, --verbose
             Enable verbose logging
+    -V, --version
+            Print version information
     -w, --watch
             Run in watch mode by re-running whenever files change
 ```
