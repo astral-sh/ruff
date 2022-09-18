@@ -8,15 +8,15 @@ expression: checks
       - os
       - 1
   location:
-    row: 1
-    column: 1
+    row: 5
+    column: 5
   fix: ~
 - kind:
     ImportShadowedByLoopVar:
       - path
       - 2
   location:
-    row: 2
-    column: 1
+    row: 8
+    column: 5
   fix: ~
 

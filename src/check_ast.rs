@@ -1090,7 +1090,7 @@ impl<'a> Checker<'a> {
                 {
                     self.checks.push(Check::new(
                         CheckKind::ImportShadowedByLoopVar(name.clone(), existing.location.row()),
-                        existing.location,
+                        binding.location,
                     ));
                 }
                 Binding {
