@@ -1083,12 +1083,24 @@ impl<'a> Checker<'a> {
         // TODO(charlie): Don't treat annotations as assignments if there is an existing value.
         let binding = match scope.values.get(&name) {
             None => binding,
-            Some(existing) => Binding {
-                kind: binding.kind,
-                location: binding.location,
-                used: existing.used,
-            },
+            Some(existing) => {
+                if self.settings.select.contains(&CheckCode::F402)
+                    && matches!(existing.kind, BindingKind::Importation(_))
+                    && matches!(binding.kind, BindingKind::LoopVar)
+                {
+                    self.checks.push(Check::new(
+                        CheckKind::ImportShadowedByLoopVar(name.clone(), existing.location.row()),
+                        existing.location,
+                    ));
+                }
+                Binding {
+                    kind: binding.kind,
+                    location: binding.location,
+                    used: existing.used,
+                }
+            }
         };
+
         scope.values.insert(name, binding);
     }
 
@@ -1171,8 +1183,19 @@ impl<'a> Checker<'a> {
             if matches!(
                 parent.node,
                 StmtKind::For { .. } | StmtKind::AsyncFor { .. }
-            ) || operations::is_unpacking_assignment(parent)
-            {
+            ) {
+                self.add_binding(
+                    id.to_string(),
+                    Binding {
+                        kind: BindingKind::LoopVar,
+                        used: None,
+                        location: expr.location,
+                    },
+                );
+                return;
+            }
+
+            if operations::is_unpacking_assignment(parent) {
                 self.add_binding(
                     id.to_string(),
                     Binding {

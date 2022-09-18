@@ -23,6 +23,7 @@ pub enum CheckCode {
     E902,
     E999,
     F401,
+    F402,
     F403,
     F404,
     F406,
@@ -72,6 +73,7 @@ impl FromStr for CheckCode {
             "E902" => Ok(CheckCode::E902),
             "E999" => Ok(CheckCode::E999),
             "F401" => Ok(CheckCode::F401),
+            "F402" => Ok(CheckCode::F402),
             "F403" => Ok(CheckCode::F403),
             "F404" => Ok(CheckCode::F404),
             "F406" => Ok(CheckCode::F406),
@@ -122,6 +124,7 @@ impl CheckCode {
             CheckCode::E902 => "E902",
             CheckCode::E999 => "E999",
             CheckCode::F401 => "F401",
+            CheckCode::F402 => "F402",
             CheckCode::F403 => "F403",
             CheckCode::F404 => "F404",
             CheckCode::F406 => "F406",
@@ -192,6 +195,7 @@ pub enum CheckKind {
     FutureFeatureNotDefined(String),
     IOError(String),
     IfTuple,
+    ImportShadowedByLoopVar(String, usize),
     ImportStarNotPermitted(String),
     ImportStarUsage(String),
     InvalidPrintSyntax,
@@ -240,6 +244,7 @@ impl CheckKind {
             CheckKind::FutureFeatureNotDefined(_) => "FutureFeatureNotDefined",
             CheckKind::IOError(_) => "IOError",
             CheckKind::IfTuple => "IfTuple",
+            CheckKind::ImportShadowedByLoopVar(_, _) => "ImportShadowedByLoopVar",
             CheckKind::ImportStarNotPermitted(_) => "ImportStarNotPermitted",
             CheckKind::ImportStarUsage(_) => "ImportStarUsage",
             CheckKind::InvalidPrintSyntax => "InvalidPrintSyntax",
@@ -290,6 +295,7 @@ impl CheckKind {
             CheckKind::FutureFeatureNotDefined(_) => &CheckCode::F407,
             CheckKind::IOError(_) => &CheckCode::E902,
             CheckKind::IfTuple => &CheckCode::F634,
+            CheckKind::ImportShadowedByLoopVar(_, _) => &CheckCode::F402,
             CheckKind::ImportStarNotPermitted(_) => &CheckCode::F406,
             CheckKind::ImportStarUsage(_) => &CheckCode::F403,
             CheckKind::InvalidPrintSyntax => &CheckCode::F633,
@@ -361,6 +367,9 @@ impl CheckKind {
             }
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
             CheckKind::InvalidPrintSyntax => "use of >> is invalid with print function".to_string(),
+            CheckKind::ImportShadowedByLoopVar(name, line) => {
+                format!("import '{name}' from line {line} shadowed by loop variable")
+            }
             CheckKind::ImportStarNotPermitted(name) => {
                 format!("`from {name} import *` only allowed at module level")
             }

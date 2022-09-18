@@ -39,6 +39,7 @@ pub enum BindingKind {
     Argument,
     Assignment,
     Binding,
+    LoopVar,
     Builtin,
     ClassDefinition,
     Definition,

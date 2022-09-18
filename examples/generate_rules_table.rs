@@ -18,6 +18,7 @@ fn main() {
         CheckKind::FutureFeatureNotDefined("...".to_string()),
         CheckKind::IOError("...".to_string()),
         CheckKind::IfTuple,
+        CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
         CheckKind::ImportStarNotPermitted("...".to_string()),
         CheckKind::ImportStarUsage("...".to_string()),
         CheckKind::InvalidPrintSyntax,

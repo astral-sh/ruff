@@ -322,6 +322,23 @@ mod tests {
     }
 
     #[test]
+    fn f402() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/F402.py"),
+            &settings::Settings {
+                line_length: 88,
+                exclude: vec![],
+                extend_exclude: vec![],
+                select: BTreeSet::from([CheckCode::F402]),
+            },
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn f403() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F403.py"),

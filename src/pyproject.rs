@@ -291,6 +291,7 @@ other-attribute = 1
                     CheckCode::E902,
                     CheckCode::E999,
                     CheckCode::F401,
+                    CheckCode::F402,
                     CheckCode::F403,
                     CheckCode::F404,
                     CheckCode::F406,
