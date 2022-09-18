@@ -35,7 +35,7 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
 
         // Enforce line length.
         if enforce_line_too_long {
-            let line_length = line.len();
+            let line_length = line.chars().count();
             if should_enforce_line_length(line, line_length, settings.line_length) {
                 let check = Check::new(
                     CheckKind::LineTooLong(line_length, settings.line_length),
@@ -52,4 +52,29 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
         checks.swap_remove(*index);
     }
     checks.extend(line_checks);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_lines;
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn e501_non_ascii_char() {
+        let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
+        let check_with_max_line_length = |line_length: usize| {
+            let mut checks: Vec<Check> = vec![];
+            let settings = Settings {
+                line_length,
+                exclude: vec![],
+                extend_exclude: vec![],
+                select: BTreeSet::from_iter(vec![CheckCode::E501]),
+            };
+            check_lines(&mut checks, line, &settings);
+            return checks;
+        };
+        assert!(!check_with_max_line_length(6).is_empty());
+        assert!(check_with_max_line_length(7).is_empty());
+    }
 }
