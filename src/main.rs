@@ -29,6 +29,7 @@ const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Debug, Parser)]
 #[clap(name = format!("{CARGO_PKG_NAME} (v{CARGO_PKG_VERSION})"))]
 #[clap(about = "An extremely fast Python linter.", long_about = None)]
+#[clap(version)]
 struct Cli {
     #[clap(parse(from_os_str), value_hint = ValueHint::AnyPath, required = true)]
     files: Vec<PathBuf>,
