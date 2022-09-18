@@ -94,6 +94,7 @@ impl Settings {
                     CheckCode::E999,
                     CheckCode::F401,
                     CheckCode::F403,
+                    CheckCode::F404,
                     CheckCode::F406,
                     CheckCode::F407,
                     CheckCode::F541,
