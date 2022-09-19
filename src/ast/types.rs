@@ -8,10 +8,15 @@ fn id() -> usize {
     COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct FunctionScope {
+    pub uses_locals: bool,
+}
+
 #[derive(Clone, Debug)]
 pub enum ScopeKind {
     Class,
-    Function,
+    Function(FunctionScope),
     Generator,
     Module,
 }
