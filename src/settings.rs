@@ -9,57 +9,23 @@ use crate::checks::{CheckCode, ALL_CHECK_CODES};
 use crate::fs;
 use crate::pyproject::load_config;
 
-pub struct SimplePattern {}
-
 #[derive(Debug, Clone)]
 pub enum FilePattern {
     Simple(&'static str),
-    Complex(
-        Option<String>,
-        Option<Pattern>,
-        Option<String>,
-        Option<Pattern>,
-    ),
+    Complex(Pattern, Option<Pattern>),
 }
 
 impl FilePattern {
     pub fn from_user(pattern: &str) -> Self {
-        // STOPSHIP: Do this in one pass.
-        let is_glob = pattern.contains('*')
-            || pattern.contains('?')
-            || pattern.contains('[')
-            || pattern.contains(']');
-        let has_segments = pattern.contains(std::path::MAIN_SEPARATOR);
-
-        let basename = if !has_segments && !is_glob {
-            Some(pattern.to_string())
-        } else {
-            None
-        };
-        let basename_glob = if !has_segments && is_glob {
+        let absolute = Pattern::new(&fs::normalize_path(Path::new(pattern)).to_string_lossy())
+            .expect("Invalid pattern.");
+        let basename = if !pattern.contains(std::path::MAIN_SEPARATOR) {
             Some(Pattern::new(pattern).expect("Invalid pattern."))
         } else {
             None
         };
-        let absolute = if !is_glob {
-            Some(
-                fs::normalize_path(Path::new(pattern))
-                    .to_string_lossy()
-                    .to_string(),
-            )
-        } else {
-            None
-        };
-        let absolute_glob = if is_glob {
-            Some(
-                Pattern::new(&fs::normalize_path(Path::new(pattern)).to_string_lossy())
-                    .expect("Invalid pattern."),
-            )
-        } else {
-            None
-        };
 
-        FilePattern::Complex(basename, basename_glob, absolute, absolute_glob)
+        FilePattern::Complex(absolute, basename)
     }
 }
 
