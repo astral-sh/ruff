@@ -9,31 +9,57 @@ use crate::checks::{CheckCode, ALL_CHECK_CODES};
 use crate::fs;
 use crate::pyproject::load_config;
 
+pub struct SimplePattern {}
+
 #[derive(Debug, Clone)]
-pub struct FilePattern {
-    pub basename: Pattern,
-    pub absolute: Option<Pattern>,
-    pub directory_only: bool,
+pub enum FilePattern {
+    Simple(&'static str),
+    Complex(
+        Option<String>,
+        Option<Pattern>,
+        Option<String>,
+        Option<Pattern>,
+    ),
 }
 
 impl FilePattern {
-    pub fn single(pattern: &str) -> Self {
-        FilePattern {
-            basename: Pattern::new(pattern).unwrap(),
-            absolute: None,
-            directory_only: true,
-        }
-    }
+    pub fn from_user(pattern: &str) -> Self {
+        // STOPSHIP: Do this in one pass.
+        let is_glob = pattern.contains('*')
+            || pattern.contains('?')
+            || pattern.contains('[')
+            || pattern.contains(']');
+        let has_segments = pattern.contains(std::path::MAIN_SEPARATOR);
 
-    pub fn user_provided(pattern: &str) -> Self {
-        FilePattern {
-            basename: Pattern::new(pattern).expect("Invalid pattern."),
-            absolute: Some(
+        let basename = if !has_segments && !is_glob {
+            Some(pattern.to_string())
+        } else {
+            None
+        };
+        let basename_glob = if !has_segments && is_glob {
+            Some(Pattern::new(pattern).expect("Invalid pattern."))
+        } else {
+            None
+        };
+        let absolute = if !is_glob {
+            Some(
+                fs::normalize_path(Path::new(pattern))
+                    .to_string_lossy()
+                    .to_string(),
+            )
+        } else {
+            None
+        };
+        let absolute_glob = if is_glob {
+            Some(
                 Pattern::new(&fs::normalize_path(Path::new(pattern)).to_string_lossy())
                     .expect("Invalid pattern."),
-            ),
-            directory_only: false,
-        }
+            )
+        } else {
+            None
+        };
+
+        FilePattern::Complex(basename, basename_glob, absolute, absolute_glob)
     }
 }
 
@@ -56,25 +82,25 @@ impl Hash for Settings {
 
 static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     vec![
-        FilePattern::single(".bzr"),
-        FilePattern::single(".direnv"),
-        FilePattern::single(".eggs"),
-        FilePattern::single(".git"),
-        FilePattern::single(".hg"),
-        FilePattern::single(".mypy_cache"),
-        FilePattern::single(".nox"),
-        FilePattern::single(".pants.d"),
-        FilePattern::single(".ruff_cache"),
-        FilePattern::single(".svn"),
-        FilePattern::single(".tox"),
-        FilePattern::single(".venv"),
-        FilePattern::single("__pypackages__"),
-        FilePattern::single("_build"),
-        FilePattern::single("buck-out"),
-        FilePattern::single("build"),
-        FilePattern::single("dist"),
-        FilePattern::single("node_modules"),
-        FilePattern::single("venv"),
+        FilePattern::Simple(".bzr"),
+        FilePattern::Simple(".direnv"),
+        FilePattern::Simple(".eggs"),
+        FilePattern::Simple(".git"),
+        FilePattern::Simple(".hg"),
+        FilePattern::Simple(".mypy_cache"),
+        FilePattern::Simple(".nox"),
+        FilePattern::Simple(".pants.d"),
+        FilePattern::Simple(".ruff_cache"),
+        FilePattern::Simple(".svn"),
+        FilePattern::Simple(".tox"),
+        FilePattern::Simple(".venv"),
+        FilePattern::Simple("__pypackages__"),
+        FilePattern::Simple("_build"),
+        FilePattern::Simple("buck-out"),
+        FilePattern::Simple("build"),
+        FilePattern::Simple("dist"),
+        FilePattern::Simple("node_modules"),
+        FilePattern::Simple("venv"),
     ]
 });
 
@@ -88,7 +114,7 @@ impl Settings {
                 .map(|paths| {
                     paths
                         .iter()
-                        .map(|path| FilePattern::user_provided(path))
+                        .map(|path| FilePattern::from_user(path))
                         .collect()
                 })
                 .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
@@ -97,7 +123,7 @@ impl Settings {
                 .map(|paths| {
                     paths
                         .iter()
-                        .map(|path| FilePattern::user_provided(path))
+                        .map(|path| FilePattern::from_user(path))
                         .collect()
                 })
                 .unwrap_or_default(),

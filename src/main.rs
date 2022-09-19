@@ -1,3 +1,5 @@
+extern crate core;
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -19,9 +21,9 @@ use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
+use ::ruff::settings::FilePattern;
 use ::ruff::settings::Settings;
 use ::ruff::tell_user;
-use ruff::settings::FilePattern;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -154,7 +156,6 @@ fn inner_main() -> Result<ExitCode> {
     set_up_logging(cli.verbose)?;
 
     let mut settings = Settings::from_paths(&cli.files);
-
     let mut printer = Printer::new(cli.format);
 
     if !cli.select.is_empty() {
@@ -167,14 +168,14 @@ fn inner_main() -> Result<ExitCode> {
         settings.exclude = cli
             .exclude
             .iter()
-            .map(|path| FilePattern::user_provided(path))
+            .map(|path| FilePattern::from_user(path))
             .collect();
     }
     if !cli.extend_exclude.is_empty() {
         settings.extend_exclude = cli
             .extend_exclude
             .iter()
-            .map(|path| FilePattern::user_provided(path))
+            .map(|path| FilePattern::from_user(path))
             .collect();
     }
 

@@ -13,31 +13,45 @@ use walkdir::{DirEntry, WalkDir};
 use crate::settings::FilePattern;
 
 fn is_excluded(path: &Path, exclude: &[FilePattern]) -> bool {
-    // Check the basename.
-    if let Some(file_name) = path.file_name() {
-        if let Some(file_name) = file_name.to_str() {
-            for pattern in exclude {
-                if pattern.basename.matches(file_name) {
-                    return true;
+    if let Some(file_absolute_name) = path.to_str() {
+        if let Some(file_name) = path.file_name() {
+            if let Some(file_basename) = file_name.to_str() {
+                for pattern in exclude {
+                    match pattern {
+                        FilePattern::Simple(basename) => {
+                            if *basename == file_basename {
+                                return true;
+                            }
+                        }
+                        FilePattern::Complex(basename, basename_glob, absolute, absolute_glob) => {
+                            // Check the basename, as a simple path and a glob pattern.
+                            if let Some(basename) = basename {
+                                if basename == file_basename {
+                                    return true;
+                                }
+                            }
+                            if let Some(basename_glob) = basename_glob {
+                                if basename_glob.matches(file_basename) {
+                                    return true;
+                                }
+                            }
+                            // Check the absolute name, as a simple path and a glob pattern.
+                            if let Some(absolute) = absolute {
+                                if absolute == file_absolute_name {
+                                    return true;
+                                }
+                            }
+                            if let Some(absolute_glob) = absolute_glob {
+                                if absolute_glob.matches(file_absolute_name) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
-
-    // Check the complete path.
-    if let Some(file_name) = path.to_str() {
-        for pattern in exclude {
-            if pattern
-                .absolute
-                .as_ref()
-                .map(|pattern| pattern.matches(file_name))
-                .unwrap_or_default()
-            {
-                return true;
-            }
-        }
-    }
-
     false
 }
 
@@ -53,8 +67,12 @@ pub fn iter_python_files<'a>(
 ) -> impl Iterator<Item = DirEntry> + 'a {
     let has_exclude = !exclude.is_empty();
     let has_extend_exclude = !extend_exclude.is_empty();
-    let exclude_directory_only = exclude.iter().all(|pattern| pattern.directory_only);
-    let extend_exclude_directory_only = extend_exclude.iter().all(|pattern| pattern.directory_only);
+    let exclude_simple = exclude
+        .iter()
+        .all(|pattern| matches!(pattern, FilePattern::Simple(_)));
+    let extend_exclude_simple = exclude
+        .iter()
+        .all(|pattern| matches!(pattern, FilePattern::Simple(_)));
 
     WalkDir::new(normalize_path(path))
         .follow_links(true)
@@ -67,14 +85,12 @@ pub fn iter_python_files<'a>(
             let path = entry.path();
             let file_type = entry.file_type();
 
-            if has_exclude
-                && (!exclude_directory_only || file_type.is_dir())
-                && is_excluded(path, exclude)
+            if has_exclude && (!exclude_simple || file_type.is_dir()) && is_excluded(path, exclude)
             {
                 debug!("Ignored path via `exclude`: {:?}", path);
                 false
             } else if has_extend_exclude
-                && (!extend_exclude_directory_only || file_type.is_dir())
+                && (!extend_exclude_simple || file_type.is_dir())
                 && is_excluded(path, extend_exclude)
             {
                 debug!("Ignored path via `extend-exclude`: {:?}", path);
