@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use glob::Pattern;
 use once_cell::sync::Lazy;
 
-use crate::checks::CheckCode;
+use crate::checks::{CheckCode, ALL_CHECK_CODES};
 use crate::pyproject::load_config;
 
 #[derive(Debug)]
@@ -76,53 +76,11 @@ impl Settings {
                         .collect()
                 })
                 .unwrap_or_default(),
-            select: BTreeSet::from_iter(config.select.unwrap_or_else(|| {
-                vec![
-                    CheckCode::E402,
-                    CheckCode::E501,
-                    CheckCode::E711,
-                    CheckCode::E712,
-                    CheckCode::E713,
-                    CheckCode::E714,
-                    CheckCode::E721,
-                    CheckCode::E722,
-                    CheckCode::E731,
-                    CheckCode::E741,
-                    CheckCode::E742,
-                    CheckCode::E743,
-                    CheckCode::E902,
-                    CheckCode::E999,
-                    CheckCode::F401,
-                    CheckCode::F403,
-                    CheckCode::F404,
-                    CheckCode::F406,
-                    CheckCode::F407,
-                    CheckCode::F541,
-                    CheckCode::F601,
-                    CheckCode::F602,
-                    CheckCode::F621,
-                    CheckCode::F622,
-                    CheckCode::F631,
-                    CheckCode::F632,
-                    CheckCode::F633,
-                    CheckCode::F634,
-                    CheckCode::F701,
-                    CheckCode::F702,
-                    CheckCode::F704,
-                    CheckCode::F706,
-                    CheckCode::F707,
-                    CheckCode::F722,
-                    CheckCode::F821,
-                    CheckCode::F822,
-                    CheckCode::F823,
-                    CheckCode::F831,
-                    CheckCode::F841,
-                    CheckCode::F901,
-                    // Disable refactoring codes by default.
-                    // CheckCode::R001,
-                    // CheckCode::R002,
-                ]
-            })),
+            select: if let Some(select) = config.select {
+                BTreeSet::from_iter(select)
+            } else {
+                BTreeSet::from_iter(ALL_CHECK_CODES)
+            },
         };
         if let Some(ignore) = &config.ignore {
             settings.ignore(ignore);
