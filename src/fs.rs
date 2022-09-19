@@ -51,19 +51,32 @@ pub fn iter_python_files<'a>(
     exclude: &'a [FilePattern],
     extend_exclude: &'a [FilePattern],
 ) -> impl Iterator<Item = DirEntry> + 'a {
+    let has_exclude = !exclude.is_empty();
+    let has_extend_exclude = !extend_exclude.is_empty();
+    let exclude_directory_only = exclude.iter().all(|pattern| pattern.directory_only);
+    let extend_exclude_directory_only = extend_exclude.iter().all(|pattern| pattern.directory_only);
+
     WalkDir::new(normalize_path(path))
         .follow_links(true)
         .into_iter()
-        .filter_entry(|entry| {
-            if exclude.is_empty() && extend_exclude.is_empty() {
+        .filter_entry(move |entry| {
+            if !has_exclude && !has_extend_exclude {
                 return true;
             }
 
             let path = entry.path();
-            if is_excluded(path, exclude) {
+            let file_type = entry.file_type();
+
+            if has_exclude
+                && (!exclude_directory_only || file_type.is_dir())
+                && is_excluded(path, exclude)
+            {
                 debug!("Ignored path via `exclude`: {:?}", path);
                 false
-            } else if is_excluded(path, extend_exclude) {
+            } else if has_extend_exclude
+                && (!extend_exclude_directory_only || file_type.is_dir())
+                && is_excluded(path, extend_exclude)
+            {
                 debug!("Ignored path via `extend-exclude`: {:?}", path);
                 false
             } else {

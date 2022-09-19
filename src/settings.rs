@@ -13,6 +13,7 @@ use crate::pyproject::load_config;
 pub struct FilePattern {
     pub basename: Pattern,
     pub absolute: Option<Pattern>,
+    pub directory_only: bool,
 }
 
 impl FilePattern {
@@ -20,6 +21,7 @@ impl FilePattern {
         FilePattern {
             basename: Pattern::new(pattern).unwrap(),
             absolute: None,
+            directory_only: true,
         }
     }
 
@@ -30,6 +32,7 @@ impl FilePattern {
                 Pattern::new(&fs::normalize_path(Path::new(pattern)).to_string_lossy())
                     .expect("Invalid pattern."),
             ),
+            directory_only: false,
         }
     }
 }
