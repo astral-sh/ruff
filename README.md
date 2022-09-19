@@ -134,7 +134,7 @@ Exclusions are based on globs, and can be either:
   `foo_*.py` ).
 - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py`
   (to exclude any Python files in `directory`). Note that these paths are relative to the
-  directory from which you execute `ruff`, and _not_ the directory of the `pyproject.toml`.
+  project root (e.g., the directory containing your `pyproject.toml`).
 
 ### Compatibility with Black
 

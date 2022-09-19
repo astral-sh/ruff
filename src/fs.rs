@@ -112,6 +112,7 @@ pub fn iter_python_files<'a>(
         })
 }
 
+/// Convert any path to an absolute path (based on the current working directory).
 pub fn normalize_path(path: &Path) -> PathBuf {
     if path == Path::new(".") || path == Path::new("..") {
         return path.to_path_buf();
@@ -122,6 +123,18 @@ pub fn normalize_path(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
+/// Convert any path to an absolute path (based on the specified project root).
+pub fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
+    if path == Path::new(".") || path == Path::new("..") {
+        return path.to_path_buf();
+    }
+    if let Ok(path) = path.absolutize_from(project_root) {
+        return path.to_path_buf();
+    }
+    path.to_path_buf()
+}
+
+/// Convert an absolute path to be relative to the current working directory.
 pub fn relativize_path(path: &Path) -> Cow<str> {
     if let Ok(path) = path.strip_prefix(path_dedot::CWD.deref()) {
         return path.to_string_lossy();
@@ -129,6 +142,7 @@ pub fn relativize_path(path: &Path) -> Cow<str> {
     path.to_string_lossy()
 }
 
+/// Read a file's contents from disk.
 pub fn read_file(path: &Path) -> Result<String> {
     let file = File::open(path)?;
     let mut buf_reader = BufReader::new(file);
@@ -164,38 +178,69 @@ mod tests {
 
     #[test]
     fn exclusions() -> Result<()> {
-        let exclude = vec![FilePattern::from_user("foo")];
-        let path = Path::new("foo").absolutize().unwrap();
+        let project_root = Path::new("/tmp/");
+
+        let path = Path::new("foo").absolutize_from(project_root).unwrap();
+        let exclude = vec![FilePattern::from_user(
+            "foo",
+            &Some(project_root.to_path_buf()),
+        )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &exclude));
 
-        let exclude = vec![FilePattern::from_user("bar")];
-        let path = Path::new("bar").absolutize().unwrap();
+        let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
+        let exclude = vec![FilePattern::from_user(
+            "bar",
+            &Some(project_root.to_path_buf()),
+        )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &exclude));
 
-        let exclude = vec![FilePattern::from_user("baz.py")];
-        let path = Path::new("baz.py").absolutize().unwrap();
+        let path = Path::new("foo/bar/baz.py")
+            .absolutize_from(project_root)
+            .unwrap();
+        let exclude = vec![FilePattern::from_user(
+            "baz.py",
+            &Some(project_root.to_path_buf()),
+        )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &exclude));
 
-        let exclude = vec![FilePattern::from_user("foo/bar")];
-        let path = Path::new("foo/bar").absolutize().unwrap();
+        let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
+        let exclude = vec![FilePattern::from_user(
+            "foo/bar",
+            &Some(project_root.to_path_buf()),
+        )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &exclude));
 
-        let exclude = vec![FilePattern::from_user("foo/bar/baz.py")];
-        let path = Path::new("foo/bar/baz.py").absolutize().unwrap();
+        let path = Path::new("foo/bar/baz.py")
+            .absolutize_from(project_root)
+            .unwrap();
+        let exclude = vec![FilePattern::from_user(
+            "foo/bar/baz.py",
+            &Some(project_root.to_path_buf()),
+        )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &exclude));
 
-        let exclude = vec![FilePattern::from_user("foo/bar/*.py")];
-        let path = Path::new("foo/bar/*.py").absolutize().unwrap();
+        let path = Path::new("foo/bar/baz.py")
+            .absolutize_from(project_root)
+            .unwrap();
+        let exclude = vec![FilePattern::from_user(
+            "foo/bar/*.py",
+            &Some(project_root.to_path_buf()),
+        )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &exclude));
 
-        let exclude = vec![FilePattern::from_user("baz")];
-        let path = Path::new("foo/bar/baz.py").absolutize().unwrap();
+        let path = Path::new("foo/bar/baz.py")
+            .absolutize_from(project_root)
+            .unwrap();
+        let exclude = vec![FilePattern::from_user(
+            "baz",
+            &Some(project_root.to_path_buf()),
+        )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(!is_excluded(file_path, file_basename, &exclude));
 

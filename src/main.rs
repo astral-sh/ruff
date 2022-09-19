@@ -21,8 +21,8 @@ use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
-use ::ruff::settings::FilePattern;
-use ::ruff::settings::Settings;
+use ::ruff::pyproject;
+use ::ruff::settings::{FilePattern, Settings};
 use ::ruff::tell_user;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -155,9 +155,20 @@ fn inner_main() -> Result<ExitCode> {
 
     set_up_logging(cli.verbose)?;
 
-    let mut settings = Settings::from_paths(&cli.files);
-    let mut printer = Printer::new(cli.format);
+    // Find the project root and pyproject.toml.
+    let project_root = pyproject::find_project_root(&cli.files);
+    match &project_root {
+        Some(path) => debug!("Found project root at: {:?}", path),
+        None => debug!("Unable to identify project root; assuming current directory..."),
+    };
+    let pyproject = pyproject::find_pyproject_toml(&project_root);
+    match &pyproject {
+        Some(path) => debug!("Found pyproject.toml at: {:?}", path),
+        None => debug!("Unable to find pyproject.toml; using default settings..."),
+    };
 
+    // Parse the settings from the pyproject.toml and command-line arguments.
+    let mut settings = Settings::from_pyproject(&pyproject, &project_root);
     if !cli.select.is_empty() {
         settings.select(cli.select);
     }
@@ -168,19 +179,20 @@ fn inner_main() -> Result<ExitCode> {
         settings.exclude = cli
             .exclude
             .iter()
-            .map(|path| FilePattern::from_user(path))
+            .map(|path| FilePattern::from_user(path, &project_root))
             .collect();
     }
     if !cli.extend_exclude.is_empty() {
         settings.extend_exclude = cli
             .extend_exclude
             .iter()
-            .map(|path| FilePattern::from_user(path))
+            .map(|path| FilePattern::from_user(path, &project_root))
             .collect();
     }
 
     cache::init()?;
 
+    let mut printer = Printer::new(cli.format);
     if cli.watch {
         if cli.fix {
             println!("Warning: --fix is not enabled in watch mode.");
