@@ -24,3 +24,8 @@ def g():
     (c, d) = bar
 
     (x, y) = baz = bar
+
+
+def h():
+    locals()
+    x = 1

@@ -9,7 +9,7 @@ use rustpython_parser::parser;
 
 use crate::ast::operations::{extract_all_names, SourceCodeLocator};
 use crate::ast::relocate::relocate_expr;
-use crate::ast::types::{Binding, BindingKind, Scope, ScopeKind};
+use crate::ast::types::{Binding, BindingKind, FunctionScope, Scope, ScopeKind};
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, operations, visitor};
 use crate::autofix::fixer;
@@ -646,6 +646,33 @@ where
                         self.checks.push(check)
                     }
                 }
+
+                if let ExprKind::Name { id, ctx } = &func.node {
+                    if id == "locals" && matches!(ctx, ExprContext::Load) {
+                        let scope = &mut self.scopes[*(self
+                            .scope_stack
+                            .last_mut()
+                            .expect("No current scope found."))];
+                        if matches!(
+                            scope.kind,
+                            ScopeKind::Function(FunctionScope { uses_locals: false })
+                        ) {
+                            scope.kind = ScopeKind::Function(FunctionScope { uses_locals: true });
+                        }
+                    }
+                }
+
+                //
+                // if id == "locals" {
+                //     let scope = &self.scopes
+                //         [*(self.scope_stack.last().expect("No current scope found."))];
+                //     if matches!(scope.kind, ScopeKind::Function(_)) {
+                //     let parent =
+                //         self.parents[*(self.parent_stack.last().expect("No parent found."))];
+                //         if matches!(parent.node, StmtKind::Call)
+                //     }
+                //
+                // }
             }
             ExprKind::Dict { keys, .. } => {
                 let check_repeated_literals = self.settings.select.contains(&CheckCode::F601);
@@ -1136,11 +1163,11 @@ impl<'a> Checker<'a> {
                 &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
 
             if self.settings.select.contains(&CheckCode::F823)
-                && matches!(current.kind, ScopeKind::Function)
+                && matches!(current.kind, ScopeKind::Function(_))
                 && !current.values.contains_key(id)
             {
                 for scope in self.scopes.iter().rev().skip(1) {
-                    if matches!(scope.kind, ScopeKind::Function | ScopeKind::Module) {
+                    if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
                         if let Some(binding) = scope.values.get(id) {
                             if let Some((scope_id, location)) = binding.used {
                                 if scope_id == current.id {
@@ -1266,7 +1293,7 @@ impl<'a> Checker<'a> {
         while let Some((stmt, scopes, parents)) = self.deferred_functions.pop() {
             self.parent_stack = parents;
             self.scope_stack = scopes;
-            self.push_scope(Scope::new(ScopeKind::Function));
+            self.push_scope(Scope::new(ScopeKind::Function(Default::default())));
 
             match &stmt.node {
                 StmtKind::FunctionDef { body, args, .. }
@@ -1290,7 +1317,7 @@ impl<'a> Checker<'a> {
         while let Some((expr, scopes, parents)) = self.deferred_lambdas.pop() {
             self.parent_stack = parents;
             self.scope_stack = scopes;
-            self.push_scope(Scope::new(ScopeKind::Function));
+            self.push_scope(Scope::new(ScopeKind::Function(Default::default())));
 
             if let ExprKind::Lambda { args, body } = &expr.node {
                 self.visit_arguments(args);
