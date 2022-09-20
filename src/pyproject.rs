@@ -1,9 +1,10 @@
-use std::env::current_dir;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use common_path::common_path_all;
 use log::debug;
+use path_absolutize::path_dedot;
 use serde::Deserialize;
 
 use crate::checks::CheckCode;
@@ -34,8 +35,8 @@ pub fn load_config(paths: &[PathBuf]) -> Config {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Config {
     pub line_length: Option<usize>,
-    pub exclude: Option<Vec<PathBuf>>,
-    pub extend_exclude: Option<Vec<PathBuf>>,
+    pub exclude: Option<Vec<String>>,
+    pub extend_exclude: Option<Vec<String>>,
     pub select: Option<Vec<CheckCode>>,
     pub ignore: Option<Vec<CheckCode>>,
 }
@@ -74,8 +75,7 @@ fn find_user_pyproject_toml() -> Option<PathBuf> {
 }
 
 fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
-    let cwd = current_dir().unwrap_or_else(|_| ".".into());
-    // common_path doesn't work correctly with relative paths
+    let cwd = path_dedot::CWD.deref();
     let absolute_sources: Vec<PathBuf> = sources.iter().map(|source| cwd.join(source)).collect();
     if let Some(prefix) = common_path_all(absolute_sources.iter().map(PathBuf::as_path)) {
         for directory in prefix.ancestors() {
@@ -97,7 +97,7 @@ fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use std::env::current_dir;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     use anyhow::Result;
 
@@ -169,7 +169,7 @@ exclude = ["foo.py"]
             Some(Tools {
                 ruff: Some(Config {
                     line_length: None,
-                    exclude: Some(vec![Path::new("foo.py").to_path_buf()]),
+                    exclude: Some(vec!["foo.py".to_string()]),
                     extend_exclude: None,
                     select: None,
                     ignore: None,
@@ -271,9 +271,9 @@ other-attribute = 1
                 line_length: Some(88),
                 exclude: None,
                 extend_exclude: Some(vec![
-                    Path::new("excluded.py").to_path_buf(),
-                    Path::new("migrations").to_path_buf(),
-                    Path::new("./resources/test/fixtures/directory/also_excluded.py").to_path_buf()
+                    "excluded.py".to_string(),
+                    "migrations".to_string(),
+                    "resources/test/fixtures/directory/also_excluded.py".to_string(),
                 ]),
                 select: None,
                 ignore: None,
