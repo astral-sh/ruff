@@ -1,5 +1,5 @@
 repos:
-  - repo: https://github.com/charliermarsh/ruff
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: v0.0.40
     hooks:
       - id: lint
