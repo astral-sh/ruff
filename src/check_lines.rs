@@ -56,9 +56,10 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::check_lines;
     use super::*;
-    use std::collections::BTreeSet;
 
     #[test]
     fn e501_non_ascii_char() {

@@ -1,7 +1,6 @@
-use colored::Colorize;
-
 use anyhow::Result;
 use clap::ValueEnum;
+use colored::Colorize;
 
 use crate::message::Message;
 use crate::tell_user;

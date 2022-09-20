@@ -1,5 +1,6 @@
-use once_cell::sync::Lazy;
 use std::collections::BTreeSet;
+
+use once_cell::sync::Lazy;
 
 static ANNOTATED_SUBSCRIPTS: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
     BTreeSet::from([
