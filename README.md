@@ -247,29 +247,29 @@ Add this `pyproject.toml` to the CPython directory:
 ```toml
 [tool.ruff]
 line-length = 88
-exclude = [
-    "./resources/test/cpython/Lib/lib2to3/tests/data/bom.py",
-    "./resources/test/cpython/Lib/lib2to3/tests/data/crlf.py",
-    "./resources/test/cpython/Lib/lib2to3/tests/data/different_encoding.py",
-    "./resources/test/cpython/Lib/lib2to3/tests/data/false_encoding.py",
-    "./resources/test/cpython/Lib/lib2to3/tests/data/py2_test_grammar.py",
-    "./resources/test/cpython/Lib/test/bad_coding2.py",
-    "./resources/test/cpython/Lib/test/badsyntax_3131.py",
-    "./resources/test/cpython/Lib/test/badsyntax_pep3120.py",
-    "./resources/test/cpython/Lib/test/encoded_modules/module_iso_8859_1.py",
-    "./resources/test/cpython/Lib/test/encoded_modules/module_koi8_r.py",
-    "./resources/test/cpython/Lib/test/test_fstring.py",
-    "./resources/test/cpython/Lib/test/test_grammar.py",
-    "./resources/test/cpython/Lib/test/test_importlib/test_util.py",
-    "./resources/test/cpython/Lib/test/test_named_expressions.py",
-    "./resources/test/cpython/Lib/test/test_patma.py",
-    "./resources/test/cpython/Lib/test/test_source_encoding.py",
-    "./resources/test/cpython/Tools/c-analyzer/c_parser/parser/_delim.py",
-    "./resources/test/cpython/Tools/i18n/pygettext.py",
-    "./resources/test/cpython/Tools/test2to3/maintest.py",
-    "./resources/test/cpython/Tools/test2to3/setup.py",
-    "./resources/test/cpython/Tools/test2to3/test/test_foo.py",
-    "./resources/test/cpython/Tools/test2to3/test2to3/hello.py",
+extend-exclude = [
+    "Lib/lib2to3/tests/data/bom.py",
+    "Lib/lib2to3/tests/data/crlf.py",
+    "Lib/lib2to3/tests/data/different_encoding.py",
+    "Lib/lib2to3/tests/data/false_encoding.py",
+    "Lib/lib2to3/tests/data/py2_test_grammar.py",
+    "Lib/test/bad_coding2.py",
+    "Lib/test/badsyntax_3131.py",
+    "Lib/test/badsyntax_pep3120.py",
+    "Lib/test/encoded_modules/module_iso_8859_1.py",
+    "Lib/test/encoded_modules/module_koi8_r.py",
+    "Lib/test/test_fstring.py",
+    "Lib/test/test_grammar.py",
+    "Lib/test/test_importlib/test_util.py",
+    "Lib/test/test_named_expressions.py",
+    "Lib/test/test_patma.py",
+    "Lib/test/test_source_encoding.py",
+    "Tools/c-analyzer/c_parser/parser/_delim.py",
+    "Tools/i18n/pygettext.py",
+    "Tools/test2to3/maintest.py",
+    "Tools/test2to3/setup.py",
+    "Tools/test2to3/test/test_foo.py",
+    "Tools/test2to3/test2to3/hello.py",
 ]
 ```
 
@@ -278,17 +278,21 @@ Next, to benchmark the release build:
 ```shell
 cargo build --release
 
-hyperfine --ignore-failure --warmup 1 \
+hyperfine --ignore-failure --warmup 10 --runs 100 \
   "./target/release/ruff ./resources/test/cpython/ --no-cache" \
   "./target/release/ruff ./resources/test/cpython/"
 
 Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
-  Time (mean ± σ):     353.6 ms ±   7.6 ms    [User: 2868.8 ms, System: 171.5 ms]
-  Range (min … max):   344.4 ms … 367.3 ms    10 runs
+  Time (mean ± σ):     297.4 ms ±   4.9 ms    [User: 2460.0 ms, System: 67.2 ms]
+  Range (min … max):   287.7 ms … 312.1 ms    100 runs
+
+  Warning: Ignoring non-zero exit code.
 
 Benchmark 2: ./target/release/ruff ./resources/test/cpython/
-  Time (mean ± σ):      59.6 ms ±   2.5 ms    [User: 36.4 ms, System: 345.6 ms]
-  Range (min … max):    55.9 ms …  67.0 ms    48 runs
+  Time (mean ± σ):      79.6 ms ±   7.3 ms    [User: 59.7 ms, System: 356.1 ms]
+  Range (min … max):    62.4 ms … 111.2 ms    100 runs
+
+  Warning: Ignoring non-zero exit code.
 ```
 
 To benchmark against the ecosystem's existing tools:
@@ -300,11 +304,8 @@ hyperfine --ignore-failure --warmup 5 \
   "pyflakes resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
   "pycodestyle resources/test/cpython" \
-  "pycodestyle --select E501 resources/test/cpython" \
   "flake8 resources/test/cpython" \
-  "flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython" \
-  "python -m scripts.run_flake8 resources/test/cpython" \
-  "python -m scripts.run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501"
+  "python -m scripts.run_flake8 resources/test/cpython"
 ```
 
 In order, these evaluate:
@@ -314,66 +315,58 @@ In order, these evaluate:
 - PyFlakes
 - autoflake
 - pycodestyle
-- pycodestyle, limited to the checks supported by ruff
 - Flake8
-- Flake8, limited to the checks supported by ruff
 - Flake8, with a hack to enable multiprocessing on macOS
-- Flake8, with a hack to enable multiprocessing on macOS, limited to the checks supported by ruff
 
 (You can `poetry install` from `./scripts` to create a working environment for the above.)
 
 ```shell
 Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
-  Time (mean ± σ):     469.3 ms ±  16.3 ms    [User: 2663.0 ms, System: 972.5 ms]
-  Range (min … max):   445.2 ms … 494.8 ms    10 runs
+  Time (mean ± σ):     297.9 ms ±   7.0 ms    [User: 2436.6 ms, System: 65.9 ms]
+  Range (min … max):   289.9 ms … 314.6 ms    10 runs
+
+  Warning: Ignoring non-zero exit code.
 
 Benchmark 2: pylint --recursive=y resources/test/cpython/
-  Time (mean ± σ):     27.211 s ±  0.097 s    [User: 26.405 s, System: 0.799 s]
-  Range (min … max):   27.056 s … 27.349 s    10 runs
+  Time (mean ± σ):     37.634 s ±  0.225 s    [User: 36.728 s, System: 0.853 s]
+  Range (min … max):   37.201 s … 38.106 s    10 runs
+
+  Warning: Ignoring non-zero exit code.
 
 Benchmark 3: pyflakes resources/test/cpython
-  Time (mean ± σ):     27.309 s ±  0.033 s    [User: 27.137 s, System: 0.169 s]
-  Range (min … max):   27.267 s … 27.372 s    10 runs
+  Time (mean ± σ):     40.950 s ±  0.449 s    [User: 40.688 s, System: 0.229 s]
+  Range (min … max):   40.348 s … 41.671 s    10 runs
+
+  Warning: Ignoring non-zero exit code.
 
 Benchmark 4: autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython
-  Time (mean ± σ):      8.027 s ±  0.024 s    [User: 74.255 s, System: 0.953 s]
-  Range (min … max):    7.969 s …  8.052 s    10 runs
+  Time (mean ± σ):     11.562 s ±  0.160 s    [User: 107.022 s, System: 1.143 s]
+  Range (min … max):   11.417 s … 11.917 s    10 runs
 
 Benchmark 5: pycodestyle resources/test/cpython
-  Time (mean ± σ):     41.666 s ±  0.266 s    [User: 41.531 s, System: 0.132 s]
-  Range (min … max):   41.295 s … 41.980 s    10 runs
+  Time (mean ± σ):     67.428 s ±  0.985 s    [User: 67.199 s, System: 0.203 s]
+  Range (min … max):   65.313 s … 68.496 s    10 runs
 
-Benchmark 6: pycodestyle --select E501 resources/test/cpython
-  Time (mean ± σ):     14.547 s ±  0.077 s    [User: 14.466 s, System: 0.079 s]
-  Range (min … max):   14.429 s … 14.695 s    10 runs
+  Warning: Ignoring non-zero exit code.
 
-Benchmark 7: flake8 resources/test/cpython
-  Time (mean ± σ):     75.700 s ±  0.152 s    [User: 75.254 s, System: 0.440 s]
-  Range (min … max):   75.513 s … 76.014 s    10 runs
+Benchmark 6: flake8 resources/test/cpython
+  Time (mean ± σ):     116.099 s ±  1.178 s    [User: 115.217 s, System: 0.845 s]
+  Range (min … max):   114.180 s … 117.724 s    10 runs
 
-Benchmark 8: flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython
-  Time (mean ± σ):     75.122 s ±  0.532 s    [User: 74.677 s, System: 0.440 s]
-  Range (min … max):   74.130 s … 75.606 s    10 runs
+  Warning: Ignoring non-zero exit code.
 
-Benchmark 9: python -m scripts.run_flake8 resources/test/cpython
-  Time (mean ± σ):     12.794 s ±  0.147 s    [User: 90.792 s, System: 0.738 s]
-  Range (min … max):   12.606 s … 13.030 s    10 runs
-
-Benchmark 10: python -m scripts.run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501
-  Time (mean ± σ):     12.487 s ±  0.118 s    [User: 90.052 s, System: 0.714 s]
-  Range (min … max):   12.265 s … 12.665 s    10 runs
+Benchmark 7: python -m scripts.run_flake8 resources/test/cpython
+  Time (mean ± σ):     20.477 s ±  0.349 s    [User: 142.372 s, System: 1.504 s]
+  Range (min … max):   20.107 s … 21.183 s    10 runs
 
 Summary
   './target/release/ruff ./resources/test/cpython/ --no-cache' ran
-   17.10 ± 0.60 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
-   26.60 ± 0.96 times faster than 'python -m scripts.run_flake8 resources/test/cpython --select=F831,F541,F634,F403,F706,F901,E501'
-   27.26 ± 1.00 times faster than 'python -m scripts.run_flake8 resources/test/cpython'
-   30.99 ± 1.09 times faster than 'pycodestyle --select E501 resources/test/cpython'
-   57.98 ± 2.03 times faster than 'pylint --recursive=y resources/test/cpython/'
-   58.19 ± 2.02 times faster than 'pyflakes resources/test/cpython'
-   88.77 ± 3.14 times faster than 'pycodestyle resources/test/cpython'
-  160.06 ± 5.68 times faster than 'flake8 --select=F831,F541,F634,F403,F706,F901,E501 resources/test/cpython'
-  161.29 ± 5.61 times faster than 'flake8 resources/test/cpython'
+   38.81 ± 1.05 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
+   68.74 ± 1.99 times faster than 'python -m scripts.run_flake8 resources/test/cpython'
+  126.33 ± 3.05 times faster than 'pylint --recursive=y resources/test/cpython/'
+  137.46 ± 3.55 times faster than 'pyflakes resources/test/cpython'
+  226.35 ± 6.23 times faster than 'pycodestyle resources/test/cpython'
+  389.73 ± 9.92 times faster than 'flake8 resources/test/cpython'
 ```
 
 ## License
