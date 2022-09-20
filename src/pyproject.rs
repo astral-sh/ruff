@@ -1,9 +1,8 @@
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use common_path::common_path_all;
-use path_absolutize::path_dedot;
+use path_absolutize::Absolutize;
 use serde::Deserialize;
 
 use crate::checks::CheckCode;
@@ -78,8 +77,10 @@ fn find_user_pyproject_toml() -> Option<PathBuf> {
 }
 
 pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
-    let cwd = path_dedot::CWD.deref();
-    let absolute_sources: Vec<PathBuf> = sources.iter().map(|source| cwd.join(source)).collect();
+    let absolute_sources: Vec<PathBuf> = sources
+        .iter()
+        .flat_map(|source| source.absolutize().map(|path| path.to_path_buf()))
+        .collect();
     if let Some(prefix) = common_path_all(absolute_sources.iter().map(PathBuf::as_path)) {
         for directory in prefix.ancestors() {
             if directory.join(".git").is_dir() {

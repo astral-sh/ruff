@@ -66,7 +66,7 @@ pub fn iter_python_files<'a>(
     let exclude_simple = exclude
         .iter()
         .all(|pattern| matches!(pattern, FilePattern::Simple(_)));
-    let extend_exclude_simple = exclude
+    let extend_exclude_simple = extend_exclude
         .iter()
         .all(|pattern| matches!(pattern, FilePattern::Simple(_)));
 
@@ -114,9 +114,6 @@ pub fn iter_python_files<'a>(
 
 /// Convert any path to an absolute path (based on the current working directory).
 pub fn normalize_path(path: &Path) -> PathBuf {
-    if path == Path::new(".") || path == Path::new("..") {
-        return path.to_path_buf();
-    }
     if let Ok(path) = path.absolutize() {
         return path.to_path_buf();
     }
@@ -125,9 +122,6 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 
 /// Convert any path to an absolute path (based on the specified project root).
 pub fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
-    if path == Path::new(".") || path == Path::new("..") {
-        return path.to_path_buf();
-    }
     if let Ok(path) = path.absolutize_from(project_root) {
         return path.to_path_buf();
     }
