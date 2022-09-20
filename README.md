@@ -88,7 +88,7 @@ ruff path/to/code/ --select F401 F403
 See `ruff --help` for more:
 
 ```shell
-ruff (v0.0.42)
+ruff (v0.0.43)
 An extremely fast Python linter.
 
 USAGE:
