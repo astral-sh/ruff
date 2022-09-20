@@ -54,14 +54,14 @@ You can run ruff in `--watch` mode to automatically re-run on-change:
 ruff path/to/code/ --watch
 ```
 
-ruff also works with [Pre-Commit](https://pre-commit.com) (requires Cargo on system):
+ruff also works with [pre-commit](https://pre-commit.com):
 
 ```yaml
 repos:
-- repo: https://github.com/charliermarsh/ruff
-  rev: v0.0.40
-  hooks:
-    - id: lint
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.0.40
+    hooks:
+      - id: lint
 ```
 
 ## Configuration
