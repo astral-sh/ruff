@@ -13,11 +13,12 @@ pub enum SerializationFormat {
 
 pub struct Printer {
     format: SerializationFormat,
+    verbose: bool,
 }
 
 impl Printer {
-    pub fn new(format: SerializationFormat) -> Self {
-        Self { format }
+    pub fn new(format: SerializationFormat, verbose: bool) -> Self {
+        Self { format, verbose }
     }
 
     pub fn write_once(&mut self, messages: &[Message]) -> Result<()> {
@@ -39,7 +40,7 @@ impl Printer {
                         outstanding.len(),
                         fixed.len()
                     )
-                } else {
+                } else if !outstanding.is_empty() || self.verbose {
                     println!("Found {} error(s).", outstanding.len())
                 }
 

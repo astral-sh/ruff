@@ -192,7 +192,7 @@ fn inner_main() -> Result<ExitCode> {
 
     cache::init()?;
 
-    let mut printer = Printer::new(cli.format);
+    let mut printer = Printer::new(cli.format, cli.verbose);
     if cli.watch {
         if cli.fix {
             println!("Warning: --fix is not enabled in watch mode.");
