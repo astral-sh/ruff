@@ -16,9 +16,14 @@ pub enum FilePattern {
 }
 
 impl FilePattern {
-    pub fn from_user(pattern: &str) -> Self {
-        let absolute = Pattern::new(&fs::normalize_path(Path::new(pattern)).to_string_lossy())
-            .expect("Invalid pattern.");
+    pub fn from_user(pattern: &str, project_root: &Option<PathBuf>) -> Self {
+        let path = Path::new(pattern);
+        let absolute_path = match project_root {
+            Some(project_root) => fs::normalize_path_to(path, project_root),
+            None => fs::normalize_path(path),
+        };
+
+        let absolute = Pattern::new(&absolute_path.to_string_lossy()).expect("Invalid pattern.");
         let basename = if !pattern.contains(std::path::MAIN_SEPARATOR) {
             Some(Pattern::new(pattern).expect("Invalid pattern."))
         } else {
@@ -71,8 +76,8 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 });
 
 impl Settings {
-    pub fn from_paths(paths: &[PathBuf]) -> Self {
-        let config = load_config(paths);
+    pub fn from_pyproject(path: &Option<PathBuf>, project_root: &Option<PathBuf>) -> Self {
+        let config = load_config(path);
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
             exclude: config
@@ -80,7 +85,7 @@ impl Settings {
                 .map(|paths| {
                     paths
                         .iter()
-                        .map(|path| FilePattern::from_user(path))
+                        .map(|path| FilePattern::from_user(path, project_root))
                         .collect()
                 })
                 .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
@@ -89,7 +94,7 @@ impl Settings {
                 .map(|paths| {
                     paths
                         .iter()
-                        .map(|path| FilePattern::from_user(path))
+                        .map(|path| FilePattern::from_user(path, project_root))
                         .collect()
                 })
                 .unwrap_or_default(),

@@ -3,31 +3,30 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use common_path::common_path_all;
-use log::debug;
 use path_absolutize::path_dedot;
 use serde::Deserialize;
 
 use crate::checks::CheckCode;
 use crate::fs;
 
-pub fn load_config(paths: &[PathBuf]) -> Config {
-    let project_root = find_project_root(paths);
-    match find_pyproject_toml(project_root.as_deref()) {
-        Some(path) => {
-            debug!("Found pyproject.toml at: {:?}", path);
-            match parse_pyproject_toml(&path) {
-                Ok(pyproject) => pyproject
-                    .tool
-                    .and_then(|tool| tool.ruff)
-                    .unwrap_or_default(),
-                Err(e) => {
-                    println!("Failed to load pyproject.toml: {:?}", e);
-                    println!("Falling back to default configuration...");
-                    Default::default()
-                }
+pub fn load_config(pyproject: &Option<PathBuf>) -> Config {
+    match pyproject {
+        Some(pyproject) => match parse_pyproject_toml(pyproject) {
+            Ok(pyproject) => pyproject
+                .tool
+                .and_then(|tool| tool.ruff)
+                .unwrap_or_default(),
+            Err(e) => {
+                println!("Failed to load pyproject.toml: {:?}", e);
+                println!("Falling back to default configuration...");
+                Default::default()
             }
+        },
+        None => {
+            println!("No pyproject.toml found.");
+            println!("Falling back to default configuration...");
+            Default::default()
         }
-        None => Default::default(),
     }
 }
 
@@ -56,7 +55,7 @@ fn parse_pyproject_toml(path: &Path) -> Result<PyProject> {
     toml::from_str(&contents).map_err(|e| e.into())
 }
 
-fn find_pyproject_toml(path: Option<&Path>) -> Option<PathBuf> {
+pub fn find_pyproject_toml(path: &Option<PathBuf>) -> Option<PathBuf> {
     if let Some(path) = path {
         let path_pyproject_toml = path.join("pyproject.toml");
         if path_pyproject_toml.is_file() {
@@ -71,10 +70,14 @@ fn find_user_pyproject_toml() -> Option<PathBuf> {
     let mut path = dirs::config_dir()?;
     path.push("ruff");
     path.push("pyproject.toml");
-    Some(path)
+    if path.is_file() {
+        Some(path)
+    } else {
+        None
+    }
 }
 
-fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
+pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
     let cwd = path_dedot::CWD.deref();
     let absolute_sources: Vec<PathBuf> = sources.iter().map(|source| cwd.join(source)).collect();
     if let Some(prefix) = common_path_all(absolute_sources.iter().map(PathBuf::as_path)) {
@@ -250,14 +253,14 @@ other-attribute = 1
 
     #[test]
     fn find_and_parse_pyproject_toml() -> Result<()> {
-        let cwd = current_dir().unwrap_or_else(|_| ".".into());
+        let cwd = current_dir()?;
         let project_root =
             find_project_root(&[PathBuf::from("resources/test/fixtures/__init__.py")])
                 .expect("Unable to find project root.");
         assert_eq!(project_root, cwd.join("resources/test/fixtures"));
 
         let path =
-            find_pyproject_toml(Some(&project_root)).expect("Unable to find pyproject.toml.");
+            find_pyproject_toml(&Some(project_root)).expect("Unable to find pyproject.toml.");
         assert_eq!(path, cwd.join("resources/test/fixtures/pyproject.toml"));
 
         let pyproject = parse_pyproject_toml(&path)?;
@@ -273,7 +276,7 @@ other-attribute = 1
                 extend_exclude: Some(vec![
                     "excluded.py".to_string(),
                     "migrations".to_string(),
-                    "resources/test/fixtures/directory/also_excluded.py".to_string(),
+                    "directory/also_excluded.py".to_string(),
                 ]),
                 select: None,
                 ignore: None,
