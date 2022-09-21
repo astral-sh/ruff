@@ -8,6 +8,9 @@ repository = "https://github.com/RustPython/RustPython"
 license = "MIT"
 edition = "2021"
 
+[features]
+default = ["lalrpop"]  # removing this causes potential build failure
+
 [build-dependencies]
 anyhow = "1.0.45"
 lalrpop = { version = "0.19.8", optional = true }
