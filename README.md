@@ -151,14 +151,14 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
 Under those conditions, Flake8 implements about 60 rules, give or take. At time of writing, ruff
-implements 43 rules. (Note that these 43 rules likely cover a disproportionate share of errors:
+implements 44 rules. (Note that these 44 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
 The unimplemented rules are tracked in #170, and include:
 
 - 14 rules related to string `.format` calls.
-- 4 logical rules.
-- 1 rule related to parsing.
+- 1 logical rule.
+- 1 rule related to docstring parsing.
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -182,12 +182,13 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | E741 | AmbiguousVariableName | ambiguous variable name '...' |
 | E742 | AmbiguousClassName | ambiguous class name '...' |
 | E743 | AmbiguousFunctionName | ambiguous function name '...' |
-| E902 | IOError | No such file or directory: `...` |
+| E902 | IOError | ... |
 | E999 | SyntaxError | SyntaxError: ... |
 | F401 | UnusedImport | `...` imported but unused |
 | F402 | ImportShadowedByLoopVar | import '...' from line 1 shadowed by loop variable |
-| F403 | ImportStarUsage | `from ... import *` used; unable to detect undefined names |
+| F403 | ImportStarUsed | `from ... import *` used; unable to detect undefined names |
 | F404 | LateFutureImport | from __future__ imports must occur at the beginning of the file |
+| F405 | ImportStarUsage | '...' may be undefined, or defined from star imports: ... |
 | F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |
 | F407 | FutureFeatureNotDefined | future feature '...' is not defined |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders |

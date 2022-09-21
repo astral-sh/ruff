@@ -1,0 +1,21 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    ImportStarUsed:
+      - name
+      - mymodule
+  location:
+    row: 5
+    column: 11
+  fix: ~
+- kind:
+    ImportStarUsed:
+      - a
+      - mymodule
+  location:
+    row: 11
+    column: 1
+  fix: ~
+
