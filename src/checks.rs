@@ -449,9 +449,7 @@ impl CheckKind {
             CheckKind::FutureFeatureNotDefined(name) => {
                 format!("future feature '{name}' is not defined")
             }
-            CheckKind::IOError(name) => {
-                format!("No such file or directory: `{name}`")
-            }
+            CheckKind::IOError(message) => message.clone(),
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
             CheckKind::InvalidPrintSyntax => "use of >> is invalid with print function".to_string(),
             CheckKind::ImportStarNotPermitted(name) => {
