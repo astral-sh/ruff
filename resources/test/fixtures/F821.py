@@ -82,3 +82,10 @@ class Ticket:
 def update_tomato():
     print(TOMATO)
     TOMATO = "cherry tomato"
+
+
+A = f'{B}'
+A = (
+    f'B'
+    f'{B}'
+)

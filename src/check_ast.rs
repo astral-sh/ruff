@@ -9,7 +9,7 @@ use rustpython_parser::parser;
 
 use crate::ast::operations::{extract_all_names, SourceCodeLocator};
 use crate::ast::relocate::relocate_expr;
-use crate::ast::types::{Binding, BindingKind, FunctionScope, Scope, ScopeKind};
+use crate::ast::types::{Binding, BindingKind, CheckLocator, FunctionScope, Scope, ScopeKind};
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, operations, visitor};
 use crate::autofix::fixer;
@@ -42,7 +42,7 @@ struct Checker<'a> {
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_assignments: Vec<usize>,
     // Derivative state.
-    in_f_string: bool,
+    in_f_string: Option<Location>,
     in_annotation: bool,
     in_literal: bool,
     seen_non_import: bool,
@@ -74,7 +74,7 @@ impl<'a> Checker<'a> {
             deferred_functions: vec![],
             deferred_lambdas: vec![],
             deferred_assignments: vec![],
-            in_f_string: false,
+            in_f_string: None,
             in_annotation: false,
             in_literal: false,
             seen_non_import: false,
@@ -171,7 +171,6 @@ where
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
-                // TODO(charlie): Handle doctests.
                 let global_scope_id = self.scopes[GLOBAL_SCOPE_INDEX].id;
 
                 let current_scope =
@@ -193,25 +192,34 @@ where
                 }
 
                 if self.settings.select.contains(&CheckCode::E741) {
-                    self.checks.extend(names.iter().filter_map(|name| {
-                        checks::check_ambiguous_variable_name(name, stmt.location)
-                    }));
+                    let location = self.locate_check(stmt.location);
+                    self.checks.extend(
+                        names.iter().filter_map(|name| {
+                            checks::check_ambiguous_variable_name(name, location)
+                        }),
+                    );
                 }
             }
             StmtKind::Break => {
                 if self.settings.select.contains(&CheckCode::F701) {
-                    if let Some(check) =
-                        checks::check_break_outside_loop(stmt, &self.parents, &self.parent_stack)
-                    {
+                    if let Some(check) = checks::check_break_outside_loop(
+                        stmt,
+                        &self.parents,
+                        &self.parent_stack,
+                        self,
+                    ) {
                         self.checks.push(check);
                     }
                 }
             }
             StmtKind::Continue => {
                 if self.settings.select.contains(&CheckCode::F702) {
-                    if let Some(check) =
-                        checks::check_continue_outside_loop(stmt, &self.parents, &self.parent_stack)
-                    {
+                    if let Some(check) = checks::check_continue_outside_loop(
+                        stmt,
+                        &self.parents,
+                        &self.parent_stack,
+                        self,
+                    ) {
                         self.checks.push(check);
                     }
                 }
@@ -231,8 +239,10 @@ where
                 ..
             } => {
                 if self.settings.select.contains(&CheckCode::E743) {
-                    if let Some(check) = checks::check_ambiguous_function_name(name, stmt.location)
-                    {
+                    if let Some(check) = checks::check_ambiguous_function_name(
+                        name,
+                        self.locate_check(stmt.location),
+                    ) {
                         self.checks.push(check);
                     }
                 }
@@ -293,7 +303,7 @@ where
                             ScopeKind::Class | ScopeKind::Module => {
                                 self.checks.push(Check::new(
                                     CheckKind::ReturnOutsideFunction,
-                                    stmt.location,
+                                    self.locate_check(stmt.location),
                                 ));
                             }
                             _ => {}
@@ -325,7 +335,9 @@ where
                 }
 
                 if self.settings.select.contains(&CheckCode::E742) {
-                    if let Some(check) = checks::check_ambiguous_class_name(name, stmt.location) {
+                    if let Some(check) =
+                        checks::check_ambiguous_class_name(name, self.locate_check(stmt.location))
+                    {
                         self.checks.push(check);
                     }
                 }
@@ -351,7 +363,7 @@ where
                 {
                     self.checks.push(Check::new(
                         CheckKind::ModuleImportNotAtTopOfFile,
-                        stmt.location,
+                        self.locate_check(stmt.location),
                     ));
                 }
 
@@ -405,7 +417,7 @@ where
                 {
                     self.checks.push(Check::new(
                         CheckKind::ModuleImportNotAtTopOfFile,
-                        stmt.location,
+                        self.locate_check(stmt.location),
                     ));
                 }
 
@@ -441,14 +453,16 @@ where
                         {
                             self.checks.push(Check::new(
                                 CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
-                                stmt.location,
+                                self.locate_check(stmt.location),
                             ));
                         }
 
                         if self.settings.select.contains(&CheckCode::F404) && !self.futures_allowed
                         {
-                            self.checks
-                                .push(Check::new(CheckKind::LateFutureImport, stmt.location));
+                            self.checks.push(Check::new(
+                                CheckKind::LateFutureImport,
+                                self.locate_check(stmt.location),
+                            ));
                         }
                     } else if alias.node.name == "*" {
                         let module_name = format!(
@@ -472,7 +486,7 @@ where
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.checks.push(Check::new(
                                     CheckKind::ImportStarNotPermitted(module_name.to_string()),
-                                    stmt.location,
+                                    self.locate_check(stmt.location),
                                 ));
                             }
                         }
@@ -480,7 +494,7 @@ where
                         if self.settings.select.contains(&CheckCode::F403) {
                             self.checks.push(Check::new(
                                 CheckKind::ImportStarUsed(module_name.to_string()),
-                                stmt.location,
+                                self.locate_check(stmt.location),
                             ));
                         }
 
@@ -516,14 +530,18 @@ where
             }
             StmtKind::If { test, .. } => {
                 if self.settings.select.contains(&CheckCode::F634) {
-                    if let Some(check) = checks::check_if_tuple(test, stmt.location) {
+                    if let Some(check) =
+                        checks::check_if_tuple(test, self.locate_check(stmt.location))
+                    {
                         self.checks.push(check);
                     }
                 }
             }
             StmtKind::Assert { test, .. } => {
                 if self.settings.select.contains(CheckKind::AssertTuple.code()) {
-                    if let Some(check) = checks::check_assert_tuple(test, stmt.location) {
+                    if let Some(check) =
+                        checks::check_assert_tuple(test, self.locate_check(stmt.location))
+                    {
                         self.checks.push(check);
                     }
                 }
@@ -537,7 +555,9 @@ where
             }
             StmtKind::Assign { value, .. } => {
                 if self.settings.select.contains(&CheckCode::E731) {
-                    if let Some(check) = checks::check_do_not_assign_lambda(value, stmt.location) {
+                    if let Some(check) =
+                        checks::check_do_not_assign_lambda(value, self.locate_check(stmt.location))
+                    {
                         self.checks.push(check);
                     }
                 }
@@ -545,9 +565,10 @@ where
             StmtKind::AnnAssign { value, .. } => {
                 if self.settings.select.contains(&CheckCode::E731) {
                     if let Some(value) = value {
-                        if let Some(check) =
-                            checks::check_do_not_assign_lambda(value, stmt.location)
-                        {
+                        if let Some(check) = checks::check_do_not_assign_lambda(
+                            value,
+                            self.locate_check(stmt.location),
+                        ) {
                             self.checks.push(check);
                         }
                     }
@@ -628,9 +649,9 @@ where
                         self.settings.select.contains(&CheckCode::F622);
                     if let Some(check) = checks::check_starred_expressions(
                         elts,
-                        expr.location,
                         check_too_many_expressions,
                         check_two_starred_expressions,
+                        self.locate_check(expr.location),
                     ) {
                         self.checks.push(check);
                     }
@@ -640,9 +661,10 @@ where
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => {
                     if self.settings.select.contains(&CheckCode::E741) {
-                        if let Some(check) =
-                            checks::check_ambiguous_variable_name(id, expr.location)
-                        {
+                        if let Some(check) = checks::check_ambiguous_variable_name(
+                            id,
+                            self.locate_check(expr.location),
+                        ) {
                             self.checks.push(check);
                         }
                     }
@@ -673,18 +695,6 @@ where
                         }
                     }
                 }
-
-                //
-                // if id == "locals" {
-                //     let scope = &self.scopes
-                //         [*(self.scope_stack.last().expect("No current scope found."))];
-                //     if matches!(scope.kind, ScopeKind::Function(_)) {
-                //     let parent =
-                //         self.parents[*(self.parent_stack.last().expect("No parent found."))];
-                //         if matches!(parent.node, StmtKind::Call)
-                //     }
-                //
-                // }
             }
             ExprKind::Dict { keys, .. } => {
                 let check_repeated_literals = self.settings.select.contains(&CheckCode::F601);
@@ -694,6 +704,7 @@ where
                         keys,
                         check_repeated_literals,
                         check_repeated_variables,
+                        self,
                     ));
                 }
             }
@@ -706,12 +717,14 @@ where
                     .contains(CheckKind::YieldOutsideFunction.code())
                     && matches!(scope.kind, ScopeKind::Class | ScopeKind::Module)
                 {
-                    self.checks
-                        .push(Check::new(CheckKind::YieldOutsideFunction, expr.location));
+                    self.checks.push(Check::new(
+                        CheckKind::YieldOutsideFunction,
+                        self.locate_check(expr.location),
+                    ));
                 }
             }
             ExprKind::JoinedStr { values } => {
-                if !self.in_f_string
+                if self.in_f_string.is_none()
                     && self
                         .settings
                         .select
@@ -722,10 +735,10 @@ where
                 {
                     self.checks.push(Check::new(
                         CheckKind::FStringMissingPlaceholders,
-                        expr.location,
+                        self.locate_check(expr.location),
                     ));
                 }
-                self.in_f_string = true;
+                self.in_f_string = Some(expr.location);
             }
             ExprKind::BinOp {
                 left,
@@ -758,6 +771,7 @@ where
                         operand,
                         check_not_in,
                         check_not_is,
+                        self,
                     ));
                 }
             }
@@ -775,6 +789,7 @@ where
                         comparators,
                         check_none_comparisons,
                         check_true_false_comparisons,
+                        self,
                     ));
                 }
 
@@ -783,7 +798,7 @@ where
                         left,
                         ops,
                         comparators,
-                        expr.location,
+                        self.locate_check(expr.location),
                     ));
                 }
 
@@ -791,7 +806,7 @@ where
                     self.checks.extend(checks::check_type_comparison(
                         ops,
                         comparators,
-                        expr.location,
+                        self.locate_check(expr.location),
                     ));
                 }
             }
@@ -956,9 +971,10 @@ where
                 match name {
                     Some(name) => {
                         if self.settings.select.contains(&CheckCode::E741) {
-                            if let Some(check) =
-                                checks::check_ambiguous_variable_name(name, excepthandler.location)
-                            {
+                            if let Some(check) = checks::check_ambiguous_variable_name(
+                                name,
+                                self.locate_check(excepthandler.location),
+                            ) {
                                 self.checks.push(check);
                             }
                         }
@@ -1058,11 +1074,19 @@ where
         );
 
         if self.settings.select.contains(&CheckCode::E741) {
-            if let Some(check) = checks::check_ambiguous_variable_name(&arg.node.arg, arg.location)
-            {
+            if let Some(check) = checks::check_ambiguous_variable_name(
+                &arg.node.arg,
+                self.locate_check(arg.location),
+            ) {
                 self.checks.push(check);
             }
         }
+    }
+}
+
+impl CheckLocator for Checker<'_> {
+    fn locate_check(&self, default: Location) -> Location {
+        self.in_f_string.unwrap_or(default)
     }
 }
 
@@ -1185,7 +1209,7 @@ impl<'a> Checker<'a> {
 
                     self.checks.push(Check::new(
                         CheckKind::ImportStarUsage(id.clone(), from_list.join(", ")),
-                        expr.location,
+                        self.locate_check(expr.location),
                     ));
                 }
                 return;
@@ -1198,7 +1222,7 @@ impl<'a> Checker<'a> {
                 }
                 self.checks.push(Check::new(
                     CheckKind::UndefinedName(id.clone()),
-                    expr.location,
+                    self.locate_check(expr.location),
                 ))
             }
         }
@@ -1220,7 +1244,7 @@ impl<'a> Checker<'a> {
                                 if scope_id == current.id {
                                     self.checks.push(Check::new(
                                         CheckKind::UndefinedLocal(id.clone()),
-                                        location,
+                                        self.locate_check(location),
                                     ));
                                 }
                             }
@@ -1313,7 +1337,7 @@ impl<'a> Checker<'a> {
             {
                 self.checks.push(Check::new(
                     CheckKind::UndefinedName(id.clone()),
-                    expr.location,
+                    self.locate_check(expr.location),
                 ))
             }
         }
@@ -1338,7 +1362,7 @@ impl<'a> Checker<'a> {
             } else if self.settings.select.contains(&CheckCode::F722) {
                 self.checks.push(Check::new(
                     CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
-                    location,
+                    self.locate_check(location),
                 ));
             }
         }
@@ -1390,10 +1414,10 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_assignments(&mut self) {
-        while let Some(index) = self.deferred_assignments.pop() {
-            if self.settings.select.contains(&CheckCode::F841) {
+        if self.settings.select.contains(&CheckCode::F841) {
+            while let Some(index) = self.deferred_assignments.pop() {
                 self.checks
-                    .extend(checks::check_unused_variables(&self.scopes[index]));
+                    .extend(checks::check_unused_variables(&self.scopes[index], self));
             }
         }
     }
@@ -1425,7 +1449,7 @@ impl<'a> Checker<'a> {
                             if !scope.values.contains_key(name) {
                                 self.checks.push(Check::new(
                                     CheckKind::UndefinedExport(name.to_string()),
-                                    all_binding.location,
+                                    self.locate_check(all_binding.location),
                                 ));
                             }
                         }
@@ -1448,7 +1472,7 @@ impl<'a> Checker<'a> {
                             if !scope.values.contains_key(name) {
                                 self.checks.push(Check::new(
                                     CheckKind::ImportStarUsage(name.clone(), from_list.join(", ")),
-                                    all_binding.location,
+                                    self.locate_check(all_binding.location),
                                 ));
                             }
                         }
@@ -1469,7 +1493,7 @@ impl<'a> Checker<'a> {
                             | BindingKind::SubmoduleImportation(full_name) => {
                                 self.checks.push(Check::new(
                                     CheckKind::UnusedImport(full_name.to_string()),
-                                    binding.location,
+                                    self.locate_check(binding.location),
                                 ));
                             }
                             _ => {}

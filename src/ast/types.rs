@@ -65,3 +65,7 @@ pub struct Binding {
     /// last used.
     pub used: Option<(usize, Location)>,
 }
+
+pub trait CheckLocator {
+    fn locate_check(&self, default: Location) -> Location;
+}
