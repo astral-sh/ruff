@@ -67,6 +67,8 @@ mod tests {
         let check_with_max_line_length = |line_length: usize| {
             let mut checks: Vec<Check> = vec![];
             let settings = Settings {
+                pyproject: None,
+                project_root: None,
                 line_length,
                 exclude: vec![],
                 extend_exclude: vec![],
