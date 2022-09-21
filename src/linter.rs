@@ -91,7 +91,6 @@ pub fn lint_path(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
@@ -115,12 +114,7 @@ mod tests {
     fn e402() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E402.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E402]),
-            },
+            &settings::Settings::for_rule(CheckCode::E402),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -132,12 +126,7 @@ mod tests {
     fn e501() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E501.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E501]),
-            },
+            &settings::Settings::for_rule(CheckCode::E501),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -149,12 +138,7 @@ mod tests {
     fn e711() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E711.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E711]),
-            },
+            &settings::Settings::for_rule(CheckCode::E711),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -166,12 +150,7 @@ mod tests {
     fn e712() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E712.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E712]),
-            },
+            &settings::Settings::for_rule(CheckCode::E712),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -183,12 +162,7 @@ mod tests {
     fn e713() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E713.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E713]),
-            },
+            &settings::Settings::for_rule(CheckCode::E713),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -200,12 +174,7 @@ mod tests {
     fn e721() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E721.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E721]),
-            },
+            &settings::Settings::for_rule(CheckCode::E721),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -217,12 +186,7 @@ mod tests {
     fn e722() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E722.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E722]),
-            },
+            &settings::Settings::for_rule(CheckCode::E722),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -234,12 +198,7 @@ mod tests {
     fn e714() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E714.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E714]),
-            },
+            &settings::Settings::for_rule(CheckCode::E714),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -251,12 +210,7 @@ mod tests {
     fn e731() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E731.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E731]),
-            },
+            &settings::Settings::for_rule(CheckCode::E731),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -268,12 +222,7 @@ mod tests {
     fn e741() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E741.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E741]),
-            },
+            &settings::Settings::for_rule(CheckCode::E741),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -285,12 +234,7 @@ mod tests {
     fn e742() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E742.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E742]),
-            },
+            &settings::Settings::for_rule(CheckCode::E742),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -302,12 +246,7 @@ mod tests {
     fn e743() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E743.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::E743]),
-            },
+            &settings::Settings::for_rule(CheckCode::E743),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -319,12 +258,7 @@ mod tests {
     fn f401() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F401.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F401]),
-            },
+            &settings::Settings::for_rule(CheckCode::F401),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -336,12 +270,7 @@ mod tests {
     fn f402() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F402.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F402]),
-            },
+            &settings::Settings::for_rule(CheckCode::F402),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -353,12 +282,7 @@ mod tests {
     fn f403() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F403.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F403]),
-            },
+            &settings::Settings::for_rule(CheckCode::F403),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -370,12 +294,7 @@ mod tests {
     fn f404() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F404.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F404]),
-            },
+            &settings::Settings::for_rule(CheckCode::F404),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -387,12 +306,7 @@ mod tests {
     fn f405() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F405.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F405]),
-            },
+            &settings::Settings::for_rule(CheckCode::F405),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -404,12 +318,7 @@ mod tests {
     fn f406() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F406.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F406]),
-            },
+            &settings::Settings::for_rule(CheckCode::F406),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -421,12 +330,7 @@ mod tests {
     fn f407() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F407.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F407]),
-            },
+            &settings::Settings::for_rule(CheckCode::F407),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -438,12 +342,7 @@ mod tests {
     fn f541() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F541.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F541]),
-            },
+            &settings::Settings::for_rule(CheckCode::F541),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -455,12 +354,7 @@ mod tests {
     fn f601() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F601.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F601]),
-            },
+            &settings::Settings::for_rule(CheckCode::F601),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -472,12 +366,7 @@ mod tests {
     fn f602() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F602.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F602]),
-            },
+            &settings::Settings::for_rule(CheckCode::F602),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -489,12 +378,7 @@ mod tests {
     fn f622() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F622.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F622]),
-            },
+            &settings::Settings::for_rule(CheckCode::F622),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -506,12 +390,7 @@ mod tests {
     fn f631() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F631.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F631]),
-            },
+            &settings::Settings::for_rule(CheckCode::F631),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -523,12 +402,7 @@ mod tests {
     fn f632() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F632.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F632]),
-            },
+            &settings::Settings::for_rule(CheckCode::F632),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -540,12 +414,7 @@ mod tests {
     fn f633() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F633.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F633]),
-            },
+            &settings::Settings::for_rule(CheckCode::F633),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -557,12 +426,7 @@ mod tests {
     fn f634() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F634.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F634]),
-            },
+            &settings::Settings::for_rule(CheckCode::F634),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -574,12 +438,7 @@ mod tests {
     fn f701() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F701.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F701]),
-            },
+            &settings::Settings::for_rule(CheckCode::F701),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -591,12 +450,7 @@ mod tests {
     fn f702() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F702.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F702]),
-            },
+            &settings::Settings::for_rule(CheckCode::F702),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -608,12 +462,7 @@ mod tests {
     fn f704() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F704.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F704]),
-            },
+            &settings::Settings::for_rule(CheckCode::F704),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -625,12 +474,7 @@ mod tests {
     fn f706() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F706.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F706]),
-            },
+            &settings::Settings::for_rule(CheckCode::F706),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -642,12 +486,7 @@ mod tests {
     fn f707() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F707.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F707]),
-            },
+            &settings::Settings::for_rule(CheckCode::F707),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -659,12 +498,7 @@ mod tests {
     fn f722() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F722.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F722]),
-            },
+            &settings::Settings::for_rule(CheckCode::F722),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -676,12 +510,7 @@ mod tests {
     fn f821() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F821.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F821]),
-            },
+            &settings::Settings::for_rule(CheckCode::F821),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -693,12 +522,7 @@ mod tests {
     fn f822() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F822.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F822]),
-            },
+            &settings::Settings::for_rule(CheckCode::F822),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -710,12 +534,7 @@ mod tests {
     fn f823() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F823.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F823]),
-            },
+            &settings::Settings::for_rule(CheckCode::F823),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -727,12 +546,7 @@ mod tests {
     fn f831() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F831.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F831]),
-            },
+            &settings::Settings::for_rule(CheckCode::F831),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -744,12 +558,7 @@ mod tests {
     fn f841() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F841.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F841]),
-            },
+            &settings::Settings::for_rule(CheckCode::F841),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -761,12 +570,7 @@ mod tests {
     fn f901() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F901.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F901]),
-            },
+            &settings::Settings::for_rule(CheckCode::F901),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -778,12 +582,7 @@ mod tests {
     fn r001() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/R001.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::R001]),
-            },
+            &settings::Settings::for_rule(CheckCode::R001),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -795,12 +594,7 @@ mod tests {
     fn r002() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/R002.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::R002]),
-            },
+            &settings::Settings::for_rule(CheckCode::R002),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -812,12 +606,7 @@ mod tests {
     fn init() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/__init__.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F821, CheckCode::F822]),
-            },
+            &settings::Settings::for_rules(vec![CheckCode::F821, CheckCode::F822]),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -829,12 +618,7 @@ mod tests {
     fn future_annotations() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/future_annotations.py"),
-            &settings::Settings {
-                line_length: 88,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from([CheckCode::F401, CheckCode::F821]),
-            },
+            &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);

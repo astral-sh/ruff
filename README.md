@@ -86,7 +86,7 @@ ruff path/to/code/ --select F401 F403
 See `ruff --help` for more:
 
 ```shell
-ruff (v0.0.44)
+ruff (v0.0.44) 0.0.44
 An extremely fast Python linter.
 
 USAGE:
@@ -117,6 +117,10 @@ OPTIONS:
             Disable all logging (but still exit with status code "1" upon detecting errors)
         --select <SELECT>...
             List of error codes to enable
+        --show-files
+            See the files ruff will be run against with the current configuration options
+        --show-settings
+            See ruff's settings
     -v, --verbose
             Enable verbose logging
     -V, --version

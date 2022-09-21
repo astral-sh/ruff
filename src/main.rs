@@ -69,6 +69,12 @@ struct Cli {
     /// Output serialization format for error messages.
     #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
+    /// See the files ruff will be run against with the current settings.
+    #[clap(long, action)]
+    show_files: bool,
+    /// See ruff's settings.
+    #[clap(long, action)]
+    show_settings: bool,
 }
 
 #[cfg(feature = "update-informer")]
@@ -92,6 +98,22 @@ fn check_for_updates() {
         );
 
         println!("\n{msg}\n{cmd}");
+    }
+}
+
+fn show_settings(settings: &Settings) {
+    println!("{:#?}", settings);
+}
+
+fn show_files(files: &[PathBuf], settings: &Settings) {
+    let mut entries: Vec<DirEntry> = files
+        .iter()
+        .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
+        .flatten()
+        .collect();
+    entries.sort_by(|a, b| a.path().cmp(b.path()));
+    for entry in entries {
+        println!("{}", entry.path().to_string_lossy());
     }
 }
 
@@ -173,26 +195,42 @@ fn inner_main() -> Result<ExitCode> {
     };
 
     // Parse the settings from the pyproject.toml and command-line arguments.
-    let mut settings = Settings::from_pyproject(&pyproject, &project_root);
+    let exclude: Vec<FilePattern> = cli
+        .exclude
+        .iter()
+        .map(|path| FilePattern::from_user(path, &project_root))
+        .collect();
+    let extend_exclude: Vec<FilePattern> = cli
+        .extend_exclude
+        .iter()
+        .map(|path| FilePattern::from_user(path, &project_root))
+        .collect();
+
+    let mut settings = Settings::from_pyproject(pyproject, project_root);
+    if !exclude.is_empty() {
+        settings.exclude = exclude;
+    }
+    if !extend_exclude.is_empty() {
+        settings.extend_exclude = extend_exclude;
+    }
     if !cli.select.is_empty() {
         settings.select(cli.select);
     }
     if !cli.ignore.is_empty() {
         settings.ignore(&cli.ignore);
     }
-    if !cli.exclude.is_empty() {
-        settings.exclude = cli
-            .exclude
-            .iter()
-            .map(|path| FilePattern::from_user(path, &project_root))
-            .collect();
+
+    if cli.show_settings && cli.show_files {
+        println!("Error: specify --show-settings or show-files (not both).");
+        return Ok(ExitCode::FAILURE);
     }
-    if !cli.extend_exclude.is_empty() {
-        settings.extend_exclude = cli
-            .extend_exclude
-            .iter()
-            .map(|path| FilePattern::from_user(path, &project_root))
-            .collect();
+    if cli.show_settings {
+        show_settings(&settings);
+        return Ok(ExitCode::SUCCESS);
+    }
+    if cli.show_files {
+        show_files(&cli.files, &settings);
+        return Ok(ExitCode::SUCCESS);
     }
 
     cache::init()?;

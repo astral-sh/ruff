@@ -36,10 +36,36 @@ impl FilePattern {
 
 #[derive(Debug)]
 pub struct Settings {
+    pub pyproject: Option<PathBuf>,
+    pub project_root: Option<PathBuf>,
     pub line_length: usize,
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
     pub select: BTreeSet<CheckCode>,
+}
+
+impl Settings {
+    pub fn for_rule(check_code: CheckCode) -> Self {
+        Self {
+            pyproject: None,
+            project_root: None,
+            line_length: 88,
+            exclude: vec![],
+            extend_exclude: vec![],
+            select: BTreeSet::from([check_code]),
+        }
+    }
+
+    pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
+        Self {
+            pyproject: None,
+            project_root: None,
+            line_length: 88,
+            exclude: vec![],
+            extend_exclude: vec![],
+            select: BTreeSet::from_iter(check_codes),
+        }
+    }
 }
 
 impl Hash for Settings {
@@ -76,8 +102,8 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 });
 
 impl Settings {
-    pub fn from_pyproject(path: &Option<PathBuf>, project_root: &Option<PathBuf>) -> Self {
-        let config = load_config(path);
+    pub fn from_pyproject(pyproject: Option<PathBuf>, project_root: Option<PathBuf>) -> Self {
+        let config = load_config(&pyproject);
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
             exclude: config
@@ -85,7 +111,7 @@ impl Settings {
                 .map(|paths| {
                     paths
                         .iter()
-                        .map(|path| FilePattern::from_user(path, project_root))
+                        .map(|path| FilePattern::from_user(path, &project_root))
                         .collect()
                 })
                 .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
@@ -94,7 +120,7 @@ impl Settings {
                 .map(|paths| {
                     paths
                         .iter()
-                        .map(|path| FilePattern::from_user(path, project_root))
+                        .map(|path| FilePattern::from_user(path, &project_root))
                         .collect()
                 })
                 .unwrap_or_default(),
@@ -103,6 +129,8 @@ impl Settings {
             } else {
                 BTreeSet::from_iter(ALL_CHECK_CODES)
             },
+            pyproject,
+            project_root,
         };
         if let Some(ignore) = &config.ignore {
             settings.ignore(ignore);
