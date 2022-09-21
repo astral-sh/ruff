@@ -18,7 +18,7 @@ fn check_path(
     contents: &str,
     settings: &Settings,
     autofix: &fixer::Mode,
-) -> Result<Vec<Check>> {
+) -> Vec<Check> {
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
@@ -46,7 +46,7 @@ fn check_path(
     // Run the lines-based checks.
     check_lines(&mut checks, contents, settings);
 
-    Ok(checks)
+    checks
 }
 
 pub fn lint_path(
@@ -67,7 +67,7 @@ pub fn lint_path(
     let contents = fs::read_file(path)?;
 
     // Generate checks.
-    let mut checks = check_path(path, &contents, settings, autofix)?;
+    let mut checks = check_path(path, &contents, settings, autofix);
 
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
@@ -108,7 +108,7 @@ mod tests {
         autofix: &fixer::Mode,
     ) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;
-        linter::check_path(path, &contents, settings, autofix)
+        Ok(linter::check_path(path, &contents, settings, autofix))
     }
 
     #[test]
