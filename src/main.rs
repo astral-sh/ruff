@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+extern crate core;
+
+use std::io;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -6,7 +9,6 @@ use std::time::Instant;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
-use glob::Pattern;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
@@ -20,7 +22,8 @@ use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
-use ::ruff::settings::Settings;
+use ::ruff::pyproject;
+use ::ruff::settings::{FilePattern, Settings};
 use ::ruff::tell_user;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -29,6 +32,7 @@ const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Debug, Parser)]
 #[clap(name = format!("{CARGO_PKG_NAME} (v{CARGO_PKG_VERSION})"))]
 #[clap(about = "An extremely fast Python linter.", long_about = None)]
+#[clap(version)]
 struct Cli {
     #[clap(parse(from_os_str), value_hint = ValueHint::AnyPath, required = true)]
     files: Vec<PathBuf>,
@@ -58,10 +62,10 @@ struct Cli {
     ignore: Vec<CheckCode>,
     /// List of paths, used to exclude files and/or directories from checks.
     #[clap(long, multiple = true)]
-    exclude: Vec<Pattern>,
+    exclude: Vec<String>,
     /// Like --exclude, but adds additional files and directories on top of the excluded ones.
     #[clap(long, multiple = true)]
-    extend_exclude: Vec<Pattern>,
+    extend_exclude: Vec<String>,
     /// Output serialization format for error messages.
     #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
@@ -99,7 +103,7 @@ fn run_once(
 ) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
-    let paths: Vec<DirEntry> = files
+    let paths: Vec<Result<DirEntry, walkdir::Error>> = files
         .iter()
         .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
         .collect();
@@ -110,35 +114,39 @@ fn run_once(
     let mut messages: Vec<Message> = paths
         .par_iter()
         .map(|entry| {
-            lint_path(entry.path(), settings, &cache.into(), &autofix.into()).unwrap_or_else(|e| {
-                if settings.select.contains(&CheckCode::E999) {
-                    vec![Message {
-                        kind: CheckKind::SyntaxError(e.to_string()),
-                        fixed: false,
-                        location: Default::default(),
-                        filename: entry.path().to_string_lossy().to_string(),
-                    }]
+            match entry {
+                Ok(entry) => {
+                    let path = entry.path();
+                    lint_path(path, settings, &cache.into(), &autofix.into())
+                        .map_err(|e| (Some(path.to_owned()), e.to_string()))
+                }
+                Err(e) => Err((
+                    e.path().map(Path::to_owned),
+                    e.io_error()
+                        .map_or_else(|| e.to_string(), io::Error::to_string),
+                )),
+            }
+            .unwrap_or_else(|(path, message)| {
+                if let Some(path) = path {
+                    if settings.select.contains(&CheckCode::E902) {
+                        vec![Message {
+                            kind: CheckKind::IOError(message),
+                            fixed: false,
+                            location: Default::default(),
+                            filename: path.to_string_lossy().to_string(),
+                        }]
+                    } else {
+                        error!("Failed to check {}: {message}", path.to_string_lossy());
+                        vec![]
+                    }
                 } else {
-                    error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
+                    error!("{message}");
                     vec![]
                 }
             })
         })
         .flatten()
         .collect();
-
-    if settings.select.contains(&CheckCode::E902) {
-        for file in files {
-            if !file.exists() {
-                messages.push(Message {
-                    kind: CheckKind::IOError(file.to_string_lossy().to_string()),
-                    fixed: false,
-                    location: Default::default(),
-                    filename: file.to_string_lossy().to_string(),
-                })
-            }
-        }
-    }
 
     messages.sort_unstable();
     let duration = start.elapsed();
@@ -152,10 +160,20 @@ fn inner_main() -> Result<ExitCode> {
 
     set_up_logging(cli.verbose)?;
 
-    let mut settings = Settings::from_paths(&cli.files);
+    // Find the project root and pyproject.toml.
+    let project_root = pyproject::find_project_root(&cli.files);
+    match &project_root {
+        Some(path) => debug!("Found project root at: {:?}", path),
+        None => debug!("Unable to identify project root; assuming current directory..."),
+    };
+    let pyproject = pyproject::find_pyproject_toml(&project_root);
+    match &pyproject {
+        Some(path) => debug!("Found pyproject.toml at: {:?}", path),
+        None => debug!("Unable to find pyproject.toml; using default settings..."),
+    };
 
-    let mut printer = Printer::new(cli.format);
-
+    // Parse the settings from the pyproject.toml and command-line arguments.
+    let mut settings = Settings::from_pyproject(&pyproject, &project_root);
     if !cli.select.is_empty() {
         settings.select(cli.select);
     }
@@ -163,14 +181,23 @@ fn inner_main() -> Result<ExitCode> {
         settings.ignore(&cli.ignore);
     }
     if !cli.exclude.is_empty() {
-        settings.exclude = cli.exclude;
+        settings.exclude = cli
+            .exclude
+            .iter()
+            .map(|path| FilePattern::from_user(path, &project_root))
+            .collect();
     }
     if !cli.extend_exclude.is_empty() {
-        settings.extend_exclude = cli.extend_exclude;
+        settings.extend_exclude = cli
+            .extend_exclude
+            .iter()
+            .map(|path| FilePattern::from_user(path, &project_root))
+            .collect();
     }
 
     cache::init()?;
 
+    let mut printer = Printer::new(cli.format, cli.verbose);
     if cli.watch {
         if cli.fix {
             println!("Warning: --fix is not enabled in watch mode.");

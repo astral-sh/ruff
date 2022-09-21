@@ -8,6 +8,7 @@ use anyhow::Result;
 use cacache::Error::EntryNotFound;
 use filetime::FileTime;
 use log::error;
+use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 
 use crate::autofix::fixer;
@@ -79,7 +80,7 @@ fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> String 
     autofix.hash(&mut hasher);
     format!(
         "{}@{}@{}",
-        path.canonicalize().unwrap().to_string_lossy(),
+        path.absolutize().unwrap().to_string_lossy(),
         VERSION,
         hasher.finish()
     )

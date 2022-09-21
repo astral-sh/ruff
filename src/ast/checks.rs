@@ -7,7 +7,7 @@ use rustpython_parser::ast::{
 };
 
 use crate::ast::operations::SourceCodeLocator;
-use crate::ast::types::{Binding, BindingKind, Scope};
+use crate::ast::types::{Binding, BindingKind, FunctionScope, Scope, ScopeKind};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckKind, Fix, RejectedCmpop};
 
@@ -66,6 +66,13 @@ pub fn check_not_tests(
 /// Check UnusedVariable compliance.
 pub fn check_unused_variables(scope: &Scope) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
+
+    if matches!(
+        scope.kind,
+        ScopeKind::Function(FunctionScope { uses_locals: true })
+    ) {
+        return checks;
+    }
 
     for (name, binding) in scope.values.iter() {
         // TODO(charlie): Ignore if using `locals`.

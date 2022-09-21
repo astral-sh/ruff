@@ -1,57 +1,14 @@
 /// Generate a Markdown-compatible table of supported lint rules.
-use ruff::checks::{CheckKind, RejectedCmpop};
+use ruff::checks::{CheckCode, ALL_CHECK_CODES};
 
 fn main() {
-    let mut check_kinds: Vec<CheckKind> = vec![
-        CheckKind::AmbiguousClassName("...".to_string()),
-        CheckKind::AmbiguousFunctionName("...".to_string()),
-        CheckKind::AmbiguousVariableName("...".to_string()),
-        CheckKind::AssertTuple,
-        CheckKind::BreakOutsideLoop,
-        CheckKind::ContinueOutsideLoop,
-        CheckKind::DefaultExceptNotLast,
-        CheckKind::DoNotAssignLambda,
-        CheckKind::DoNotUseBareExcept,
-        CheckKind::DuplicateArgumentName,
-        CheckKind::FStringMissingPlaceholders,
-        CheckKind::ForwardAnnotationSyntaxError("...".to_string()),
-        CheckKind::FutureFeatureNotDefined("...".to_string()),
-        CheckKind::IOError("...".to_string()),
-        CheckKind::IfTuple,
-        CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
-        CheckKind::ImportStarNotPermitted("...".to_string()),
-        CheckKind::ImportStarUsage("...".to_string()),
-        CheckKind::InvalidPrintSyntax,
-        CheckKind::IsLiteral,
-        CheckKind::LateFutureImport,
-        CheckKind::LineTooLong(89, 88),
-        CheckKind::ModuleImportNotAtTopOfFile,
-        CheckKind::MultiValueRepeatedKeyLiteral,
-        CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
-        CheckKind::NoAssertEquals,
-        CheckKind::NoneComparison(RejectedCmpop::Eq),
-        CheckKind::NotInTest,
-        CheckKind::NotIsTest,
-        CheckKind::RaiseNotImplemented,
-        CheckKind::ReturnOutsideFunction,
-        CheckKind::SyntaxError("...".to_string()),
-        CheckKind::TooManyExpressionsInStarredAssignment,
-        CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq),
-        CheckKind::TwoStarredExpressions,
-        CheckKind::TypeComparison,
-        CheckKind::UndefinedExport("...".to_string()),
-        CheckKind::UndefinedLocal("...".to_string()),
-        CheckKind::UndefinedName("...".to_string()),
-        CheckKind::UnusedImport("...".to_string()),
-        CheckKind::UnusedVariable("...".to_string()),
-        CheckKind::UselessObjectInheritance("...".to_string()),
-        CheckKind::YieldOutsideFunction,
-    ];
-    check_kinds.sort_by_key(|check_kind| check_kind.code());
+    let mut check_codes: Vec<CheckCode> = ALL_CHECK_CODES.to_vec();
+    check_codes.sort();
 
     println!("| Code | Name | Message |");
     println!("| ---- | ----- | ------- |");
-    for check_kind in check_kinds {
+    for check_code in check_codes {
+        let check_kind = check_code.kind();
         println!(
             "| {} | {} | {} |",
             check_kind.code().as_str(),
