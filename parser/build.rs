@@ -16,22 +16,26 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn requires_lalrpop(source: &str, target: &str) -> bool {
+fn requires_lalrpop(source: &str, target: &str) -> Option<String> {
     let target = if let Ok(target) = File::open(target) {
         target
     } else {
-        println!("cargo:warning=python.rs doesn't exist. regenerate.");
-        return true;
+        return Some("python.rs doesn't exist. regenerate.".to_owned());
     };
 
     let sha_prefix = "// sha3: ";
-    let sha3_line = BufReader::with_capacity(128, target)
-        .lines()
-        .find_map(|line| {
-            let line = line.unwrap();
-            line.starts_with(sha_prefix).then_some(line)
-        })
-        .expect("no sha3 line?");
+    let sha3_line = if let Some(sha3_line) =
+        BufReader::with_capacity(128, target)
+            .lines()
+            .find_map(|line| {
+                let line = line.unwrap();
+                line.starts_with(sha_prefix).then_some(line)
+            }) {
+        sha3_line
+    } else {
+        // no sha3 line - maybe old version of lalrpop installed
+        return Some("python.rs doesn't include sha3 hash. regenerate.".to_owned());
+    };
     let expected_sha3_str = sha3_line.strip_prefix(sha_prefix).unwrap();
 
     let actual_sha3 = {
@@ -55,29 +59,35 @@ fn requires_lalrpop(source: &str, target: &str) -> bool {
     };
     let eq = sha_equal(expected_sha3_str, &actual_sha3);
     if !eq {
-        println!("cargo:warning=python.rs hash expected: {expected_sha3_str}");
         let mut actual_sha3_str = String::new();
         for byte in actual_sha3 {
             write!(actual_sha3_str, "{byte:02x}").unwrap();
         }
-        println!("cargo:warning=python.rs hash   actual: {actual_sha3_str}");
+        return Some(format!(
+            "python.rs hash expected: {expected_sha3_str} but actual: {actual_sha3_str}"
+        ));
     }
-    !eq
+    None
 }
 
 fn try_lalrpop(source: &str, target: &str) -> anyhow::Result<()> {
-    if !requires_lalrpop(source, target) {
+    let _message = if let Some(msg) = requires_lalrpop(source, target) {
+        msg
+    } else {
         return Ok(());
-    }
+    };
 
     #[cfg(feature = "lalrpop")]
-    {
-        lalrpop::process_root().expect("running lalrpop failed");
-        Ok(())
-    }
+    lalrpop::process_root().unwrap_or_else(|e| {
+        println!("cargo:warning={_message}");
+        panic!("running lalrpop failed. {e:?}");
+    });
 
     #[cfg(not(feature = "lalrpop"))]
-    panic!("try: cargo build --manifest-path=compiler/parser/Cargo.toml --features=lalrpop");
+    {
+        println!("cargo:warning=try: cargo build --manifest-path=compiler/parser/Cargo.toml --features=lalrpop");
+    }
+    Ok(())
 }
 
 fn sha_equal(expected_sha3_str: &str, actual_sha3: &[u8; 32]) -> bool {
