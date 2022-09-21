@@ -138,32 +138,25 @@ Exclusions are based on globs, and can be either:
 
 ### Compatibility with Black
 
-ruff is intended to be compatible with [Black](https://github.com/psf/black), and should be
-compatible out-of-the-box as long as the `line-length` setting is consistent between the two.
+ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
+the `line-length` setting is consistent between the two.
 
 As a project, ruff is designed to be used alongside Black and, as such, will defer implementing
-lint rules that are obviated by Black (e.g., stylistic rules).
+stylistic lint rules that are obviated by autoformatting.
 
 ### Parity with Flake8
 
-ruff's goal is to achieve feature-parity with Flake8 when used (1) without any plugins,
-(2) alongside Black, and (3) on Python 3 code. (Using Black obviates the need for many of Flake8's
-stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
+ruff's goal is to achieve feature-parity with Flake8 when used (1) without plugins, (2) alongside
+Black, and (3) on Python 3 code.
 
-Under those conditions, Flake8 implements about 60 rules, give or take. At time of writing, ruff
-implements 44 rules. (Note that these 44 rules likely cover a disproportionate share of errors:
-unused imports, undefined variables, etc.)
-
-The unimplemented rules are tracked in #170, and include:
-
-- 14 rules related to string `.format` calls.
-- 1 logical rule.
-- 1 rule related to docstring parsing.
+**Under those conditions, ruff implements 44 out of 60 rules.** (ruff is missing: 14 rules related
+to string `.format` calls, 1 rule related to docstring parsing, and 1 rule related to redefined
+variables.)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
-1. Flake8 supports a wider range of `noqa` patterns, such as per-file ignores defined in `.flake8`.
-2. Flake8 has a plugin architecture and supports writing custom lint rules.
+1. Flake8 has a plugin architecture and supports writing custom lint rules.
+2. Flake8 supports a wider range of `noqa` patterns, such as per-file ignores defined in `.flake8`.
 3. ruff does not yet support parenthesized context managers.
 
 ## Rules
