@@ -38,4 +38,16 @@ expression: checks
     row: 83
     column: 11
   fix: ~
+- kind:
+    UndefinedName: B
+  location:
+    row: 87
+    column: 7
+  fix: ~
+- kind:
+    UndefinedName: B
+  location:
+    row: 89
+    column: 7
+  fix: ~
 

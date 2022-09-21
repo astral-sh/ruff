@@ -7,7 +7,7 @@ use rustpython_parser::ast::{
 };
 
 use crate::ast::operations::SourceCodeLocator;
-use crate::ast::types::{Binding, BindingKind, FunctionScope, Scope, ScopeKind};
+use crate::ast::types::{Binding, BindingKind, CheckLocator, FunctionScope, Scope, ScopeKind};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckKind, Fix, RejectedCmpop};
 
@@ -37,6 +37,7 @@ pub fn check_not_tests(
     operand: &Expr,
     check_not_in: bool,
     check_not_is: bool,
+    locator: &dyn CheckLocator,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -46,12 +47,18 @@ pub fn check_not_tests(
                 match op {
                     Cmpop::In => {
                         if check_not_in {
-                            checks.push(Check::new(CheckKind::NotInTest, operand.location));
+                            checks.push(Check::new(
+                                CheckKind::NotInTest,
+                                locator.locate_check(operand.location),
+                            ));
                         }
                     }
                     Cmpop::Is => {
                         if check_not_is {
-                            checks.push(Check::new(CheckKind::NotIsTest, operand.location));
+                            checks.push(Check::new(
+                                CheckKind::NotIsTest,
+                                locator.locate_check(operand.location),
+                            ));
                         }
                     }
                     _ => {}
@@ -64,7 +71,7 @@ pub fn check_not_tests(
 }
 
 /// Check UnusedVariable compliance.
-pub fn check_unused_variables(scope: &Scope) -> Vec<Check> {
+pub fn check_unused_variables(scope: &Scope, locator: &dyn CheckLocator) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
     if matches!(
@@ -85,7 +92,7 @@ pub fn check_unused_variables(scope: &Scope) -> Vec<Check> {
         {
             checks.push(Check::new(
                 CheckKind::UnusedVariable(name.to_string()),
-                binding.location,
+                locator.locate_check(binding.location),
             ));
         }
     }
@@ -299,6 +306,7 @@ pub fn check_repeated_keys(
     keys: &Vec<Expr>,
     check_repeated_literals: bool,
     check_repeated_variables: bool,
+    locator: &dyn CheckLocator,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -313,7 +321,7 @@ pub fn check_repeated_keys(
                     if check_repeated_literals && v1 == v2 {
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyLiteral,
-                            k2.location,
+                            locator.locate_check(k2.location),
                         ))
                     }
                 }
@@ -321,7 +329,7 @@ pub fn check_repeated_keys(
                     if check_repeated_variables && v1 == v2 {
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyVariable((*v2).to_string()),
-                            k2.location,
+                            locator.locate_check(k2.location),
                         ))
                     }
                 }
@@ -340,6 +348,7 @@ pub fn check_literal_comparisons(
     comparators: &Vec<Expr>,
     check_none_comparisons: bool,
     check_true_false_comparisons: bool,
+    locator: &dyn CheckLocator,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -359,13 +368,13 @@ pub fn check_literal_comparisons(
         if matches!(op, Cmpop::Eq) {
             checks.push(Check::new(
                 CheckKind::NoneComparison(RejectedCmpop::Eq),
-                comparator.location,
+                locator.locate_check(comparator.location),
             ));
         }
         if matches!(op, Cmpop::NotEq) {
             checks.push(Check::new(
                 CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                comparator.location,
+                locator.locate_check(comparator.location),
             ));
         }
     }
@@ -379,13 +388,13 @@ pub fn check_literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 checks.push(Check::new(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                    comparator.location,
+                    locator.locate_check(comparator.location),
                 ));
             }
             if matches!(op, Cmpop::NotEq) {
                 checks.push(Check::new(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                    comparator.location,
+                    locator.locate_check(comparator.location),
                 ));
             }
         }
@@ -405,13 +414,13 @@ pub fn check_literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 checks.push(Check::new(
                     CheckKind::NoneComparison(RejectedCmpop::Eq),
-                    comparator.location,
+                    locator.locate_check(comparator.location),
                 ));
             }
             if matches!(op, Cmpop::NotEq) {
                 checks.push(Check::new(
                     CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                    comparator.location,
+                    locator.locate_check(comparator.location),
                 ));
             }
         }
@@ -425,13 +434,13 @@ pub fn check_literal_comparisons(
                 if matches!(op, Cmpop::Eq) {
                     checks.push(Check::new(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                        comparator.location,
+                        locator.locate_check(comparator.location),
                     ));
                 }
                 if matches!(op, Cmpop::NotEq) {
                     checks.push(Check::new(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                        comparator.location,
+                        locator.locate_check(comparator.location),
                     ));
                 }
             }
@@ -528,9 +537,9 @@ pub fn check_type_comparison(
 /// Check TwoStarredExpressions and TooManyExpressionsInStarredAssignment compliance.
 pub fn check_starred_expressions(
     elts: &[Expr],
-    location: Location,
     check_too_many_expressions: bool,
     check_two_starred_expressions: bool,
+    location: Location,
 ) -> Option<Check> {
     let mut has_starred: bool = false;
     let mut starred_index: Option<usize> = None;
@@ -563,6 +572,7 @@ pub fn check_break_outside_loop(
     stmt: &Stmt,
     parents: &[&Stmt],
     parent_stack: &[usize],
+    locator: &dyn CheckLocator,
 ) -> Option<Check> {
     let mut allowed: bool = false;
     let mut parent = stmt;
@@ -589,7 +599,10 @@ pub fn check_break_outside_loop(
     }
 
     if !allowed {
-        Some(Check::new(CheckKind::BreakOutsideLoop, stmt.location))
+        Some(Check::new(
+            CheckKind::BreakOutsideLoop,
+            locator.locate_check(stmt.location),
+        ))
     } else {
         None
     }
@@ -600,6 +613,7 @@ pub fn check_continue_outside_loop(
     stmt: &Stmt,
     parents: &[&Stmt],
     parent_stack: &[usize],
+    locator: &dyn CheckLocator,
 ) -> Option<Check> {
     let mut allowed: bool = false;
     let mut parent = stmt;
@@ -626,7 +640,10 @@ pub fn check_continue_outside_loop(
     }
 
     if !allowed {
-        Some(Check::new(CheckKind::ContinueOutsideLoop, stmt.location))
+        Some(Check::new(
+            CheckKind::ContinueOutsideLoop,
+            locator.locate_check(stmt.location),
+        ))
     } else {
         None
     }
