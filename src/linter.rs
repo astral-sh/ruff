@@ -8,7 +8,7 @@ use crate::autofix::fixer;
 use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
-use crate::checks::{Check, LintSource};
+use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::message::Message;
 use crate::settings::Settings;
 use crate::{cache, fs};
@@ -28,8 +28,19 @@ fn check_path(
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
     {
-        let python_ast = parser::parse_program(contents, "<filename>")?;
-        checks.extend(check_ast(&python_ast, contents, settings, autofix, path));
+        match parser::parse_program(contents, "<filename>") {
+            Ok(python_ast) => {
+                checks.extend(check_ast(&python_ast, contents, settings, autofix, path))
+            }
+            Err(parse_error) => {
+                if settings.select.contains(&CheckCode::E999) {
+                    checks.push(Check::new(
+                        CheckKind::SyntaxError(parse_error.error.to_string()),
+                        parse_error.location,
+                    ))
+                }
+            }
+        }
     }
 
     // Run the lines-based checks.
