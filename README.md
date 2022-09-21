@@ -98,6 +98,14 @@ ARGS:
 OPTIONS:
     -e, --exit-zero
             Exit with status code "0", even upon detecting errors
+        --select <SELECT>...
+            List of error codes to enable
+        --extend-select <EXTEND_SELECT>...
+            Like --select, but adds additional error codes on top of the selected ones
+        --ignore <IGNORE>...
+            List of error codes to ignore
+        --extend-ignore <EXTEND_IGNORE>...
+            Like --ignore, but adds additional error codes on top of the ignored ones
         --exclude <EXCLUDE>...
             List of paths, used to exclude files and/or directories from checks
         --extend-exclude <EXTEND_EXCLUDE>...
@@ -109,16 +117,12 @@ OPTIONS:
             json]
     -h, --help
             Print help information
-        --ignore <IGNORE>...
-            List of error codes to ignore
     -n, --no-cache
             Disable cache reads
     -q, --quiet
             Disable all logging (but still exit with status code "1" upon detecting errors)
-        --select <SELECT>...
-            List of error codes to enable
         --show-files
-            See the files ruff will be run against with the current configuration options
+            See the files ruff will be run against with the current settings
         --show-settings
             See ruff's settings
     -v, --verbose
