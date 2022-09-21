@@ -51,7 +51,7 @@ fn check_path(
     }
 
     // Run the lines-based checks.
-    check_lines(&mut checks, contents, &noqa_line_for, settings);
+    check_lines(&mut checks, contents, &noqa_line_for, settings, autofix);
 
     checks
 }

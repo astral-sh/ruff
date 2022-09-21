@@ -6,24 +6,84 @@ expression: checks
     UnusedNOQA: ~
   location:
     row: 9
-    column: 12
-  fix: ~
+    column: 10
+  fix:
+    content: ""
+    start:
+      row: 9
+      column: 10
+    end:
+      row: 9
+      column: 18
+    applied: false
 - kind:
     UnusedNOQA: E501
   location:
     row: 13
-    column: 12
-  fix: ~
+    column: 10
+  fix:
+    content: ""
+    start:
+      row: 13
+      column: 10
+    end:
+      row: 13
+      column: 24
+    applied: false
 - kind:
     UnusedNOQA: E501
   location:
     row: 16
-    column: 12
-  fix: ~
+    column: 10
+  fix:
+    content: "  # noqa: F841"
+    start:
+      row: 16
+      column: 10
+    end:
+      row: 16
+      column: 30
+    applied: false
 - kind:
     UnusedNOQA: F841
   location:
-    row: 31
-    column: 6
-  fix: ~
+    row: 41
+    column: 4
+  fix:
+    content: "  # noqa: E501"
+    start:
+      row: 41
+      column: 4
+    end:
+      row: 41
+      column: 24
+    applied: false
+- kind:
+    UnusedNOQA: E501
+  location:
+    row: 49
+    column: 4
+  fix:
+    content: ""
+    start:
+      row: 49
+      column: 4
+    end:
+      row: 49
+      column: 18
+    applied: false
+- kind:
+    UnusedNOQA: ~
+  location:
+    row: 57
+    column: 4
+  fix:
+    content: ""
+    start:
+      row: 57
+      column: 4
+    end:
+      row: 57
+      column: 12
+    applied: false
 
