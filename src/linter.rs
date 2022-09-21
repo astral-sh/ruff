@@ -579,6 +579,18 @@ mod tests {
     }
 
     #[test]
+    fn m001() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/M001.py"),
+            &settings::Settings::for_rules(vec![CheckCode::M001, CheckCode::F841]),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn r001() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/R001.py"),

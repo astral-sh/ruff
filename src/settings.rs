@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use glob::Pattern;
 use once_cell::sync::Lazy;
 
-use crate::checks::{CheckCode, ALL_CHECK_CODES};
+use crate::checks::{CheckCode, DEFAULT_CHECK_CODES};
 use crate::fs;
 use crate::pyproject::load_config;
 
@@ -127,7 +127,7 @@ impl Settings {
             select: if let Some(select) = config.select {
                 BTreeSet::from_iter(select)
             } else {
-                BTreeSet::from_iter(ALL_CHECK_CODES)
+                BTreeSet::from_iter(DEFAULT_CHECK_CODES)
             },
             pyproject,
             project_root,

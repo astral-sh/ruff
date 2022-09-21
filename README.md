@@ -209,6 +209,7 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` |
 | R001 | UselessObjectInheritance | Class `...` inherits from object |
 | R002 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |
+| M001 | UnusedNOQA | Unused `noqa` directive |
 
 ## Development
 

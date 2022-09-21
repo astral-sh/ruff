@@ -6,7 +6,7 @@ use regex::Regex;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-pub const ALL_CHECK_CODES: [CheckCode; 44] = [
+pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -49,6 +49,52 @@ pub const ALL_CHECK_CODES: [CheckCode; 44] = [
     CheckCode::F831,
     CheckCode::F841,
     CheckCode::F901,
+];
+
+pub const ALL_CHECK_CODES: [CheckCode; 45] = [
+    CheckCode::E402,
+    CheckCode::E501,
+    CheckCode::E711,
+    CheckCode::E712,
+    CheckCode::E713,
+    CheckCode::E714,
+    CheckCode::E721,
+    CheckCode::E722,
+    CheckCode::E731,
+    CheckCode::E741,
+    CheckCode::E742,
+    CheckCode::E743,
+    CheckCode::E902,
+    CheckCode::E999,
+    CheckCode::F401,
+    CheckCode::F402,
+    CheckCode::F403,
+    CheckCode::F404,
+    CheckCode::F405,
+    CheckCode::F406,
+    CheckCode::F407,
+    CheckCode::F541,
+    CheckCode::F601,
+    CheckCode::F602,
+    CheckCode::F621,
+    CheckCode::F622,
+    CheckCode::F631,
+    CheckCode::F632,
+    CheckCode::F633,
+    CheckCode::F634,
+    CheckCode::F701,
+    CheckCode::F702,
+    CheckCode::F704,
+    CheckCode::F706,
+    CheckCode::F707,
+    CheckCode::F722,
+    CheckCode::F821,
+    CheckCode::F822,
+    CheckCode::F823,
+    CheckCode::F831,
+    CheckCode::F841,
+    CheckCode::F901,
+    CheckCode::M001,
     CheckCode::R001,
     CheckCode::R002,
 ];
@@ -99,6 +145,7 @@ pub enum CheckCode {
     F901,
     R001,
     R002,
+    M001,
 }
 
 impl FromStr for CheckCode {
@@ -150,6 +197,7 @@ impl FromStr for CheckCode {
             "F901" => Ok(CheckCode::F901),
             "R001" => Ok(CheckCode::R001),
             "R002" => Ok(CheckCode::R002),
+            "M001" => Ok(CheckCode::M001),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
         }
     }
@@ -202,13 +250,14 @@ impl CheckCode {
             CheckCode::F901 => "F901",
             CheckCode::R001 => "R001",
             CheckCode::R002 => "R002",
+            CheckCode::M001 => "M001",
         }
     }
 
     /// The source for the check (either the AST, the filesystem, or the physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            CheckCode::E501 => &LintSource::Lines,
+            CheckCode::E501 | CheckCode::M001 => &LintSource::Lines,
             CheckCode::E902 | CheckCode::E999 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
@@ -259,6 +308,7 @@ impl CheckCode {
             CheckCode::F831 => CheckKind::DuplicateArgumentName,
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
+            CheckCode::M001 => CheckKind::UnusedNOQA(None),
             CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::R002 => CheckKind::NoAssertEquals,
         }
@@ -280,6 +330,7 @@ pub enum RejectedCmpop {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckKind {
+    UnusedNOQA(Option<String>),
     AmbiguousClassName(String),
     AmbiguousFunctionName(String),
     AmbiguousVariableName(String),
@@ -376,6 +427,7 @@ impl CheckKind {
             CheckKind::UnusedVariable(_) => "UnusedVariable",
             CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
             CheckKind::YieldOutsideFunction => "YieldOutsideFunction",
+            CheckKind::UnusedNOQA(_) => "UnusedNOQA",
         }
     }
 
@@ -399,8 +451,8 @@ impl CheckKind {
             CheckKind::IfTuple => &CheckCode::F634,
             CheckKind::ImportShadowedByLoopVar(_, _) => &CheckCode::F402,
             CheckKind::ImportStarNotPermitted(_) => &CheckCode::F406,
-            CheckKind::ImportStarUsed(_) => &CheckCode::F403,
             CheckKind::ImportStarUsage(_, _) => &CheckCode::F405,
+            CheckKind::ImportStarUsed(_) => &CheckCode::F403,
             CheckKind::InvalidPrintSyntax => &CheckCode::F633,
             CheckKind::IsLiteral => &CheckCode::F632,
             CheckKind::LateFutureImport => &CheckCode::F404,
@@ -423,6 +475,7 @@ impl CheckKind {
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(_) => &CheckCode::F401,
+            CheckKind::UnusedNOQA(_) => &CheckCode::M001,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::R001,
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
@@ -556,6 +609,10 @@ impl CheckKind {
             CheckKind::YieldOutsideFunction => {
                 "a `yield` or `yield from` statement outside of a function/method".to_string()
             }
+            CheckKind::UnusedNOQA(code) => match code {
+                None => "Unused `noqa` directive".to_string(),
+                Some(code) => format!("Unused `noqa` directive for {code}"),
+            },
         }
     }
 
@@ -584,9 +641,36 @@ pub struct Check {
 }
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)# noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").expect("Invalid regex")
+    Regex::new(r"(?i)(?P<noqa># noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
+        .expect("Invalid regex")
 });
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").expect("Invalid regex"));
+
+pub enum Directive<'a> {
+    None,
+    All(usize),
+    Codes(usize, Vec<&'a str>),
+}
+
+pub fn extract_noqa_directive(line: &str) -> Directive {
+    match NO_QA_REGEX.captures(line) {
+        Some(caps) => match caps.name("noqa") {
+            Some(noqa) => match caps.name("codes") {
+                Some(codes) => Directive::Codes(
+                    noqa.start(),
+                    SPLIT_COMMA_REGEX
+                        .split(codes.as_str())
+                        .map(|code| code.trim())
+                        .filter(|code| !code.is_empty())
+                        .collect(),
+                ),
+                None => Directive::All(noqa.start()),
+            },
+            None => Directive::None,
+        },
+        None => Directive::None,
+    }
+}
 
 impl Check {
     pub fn new(kind: CheckKind, location: Location) -> Self {
@@ -599,26 +683,5 @@ impl Check {
 
     pub fn amend(&mut self, fix: Fix) {
         self.fix = Some(fix);
-    }
-
-    pub fn is_inline_ignored(&self, line: &str) -> bool {
-        match NO_QA_REGEX.captures(line) {
-            Some(caps) => match caps.name("codes") {
-                Some(codes) => {
-                    for code in SPLIT_COMMA_REGEX
-                        .split(codes.as_str())
-                        .map(|code| code.trim())
-                        .filter(|code| !code.is_empty())
-                    {
-                        if code == self.kind.code().as_str() {
-                            return true;
-                        }
-                    }
-                    false
-                }
-                None => true,
-            },
-            None => false,
-        }
     }
 }
