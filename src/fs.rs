@@ -59,7 +59,7 @@ pub fn iter_python_files<'a>(
     path: &'a Path,
     exclude: &'a [FilePattern],
     extend_exclude: &'a [FilePattern],
-) -> impl Iterator<Item = DirEntry> + 'a {
+) -> impl Iterator<Item = Result<DirEntry, walkdir::Error>> + 'a {
     // Run some checks over the provided patterns, to enable optimizations below.
     let has_exclude = !exclude.is_empty();
     let has_extend_exclude = !extend_exclude.is_empty();
@@ -105,9 +105,10 @@ pub fn iter_python_files<'a>(
                 }
             }
         })
-        .filter_map(|entry| entry.ok())
         .filter(|entry| {
-            (entry.depth() == 0 && !entry.file_type().is_dir()) || is_included(entry.path())
+            entry.as_ref().map_or(true, |entry| {
+                (entry.depth() == 0 && !entry.file_type().is_dir()) || is_included(entry.path())
+            })
         })
 }
 

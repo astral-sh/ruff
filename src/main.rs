@@ -1,6 +1,7 @@
 extern crate core;
 
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -102,7 +103,7 @@ fn run_once(
 ) -> Result<Vec<Message>> {
     // Collect all the files to check.
     let start = Instant::now();
-    let paths: Vec<DirEntry> = files
+    let paths: Vec<Result<DirEntry, walkdir::Error>> = files
         .iter()
         .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
         .collect();
@@ -113,35 +114,39 @@ fn run_once(
     let mut messages: Vec<Message> = paths
         .par_iter()
         .map(|entry| {
-            lint_path(entry.path(), settings, &cache.into(), &autofix.into()).unwrap_or_else(|e| {
-                if settings.select.contains(&CheckCode::E999) {
-                    vec![Message {
-                        kind: CheckKind::SyntaxError(e.to_string()),
-                        fixed: false,
-                        location: Default::default(),
-                        filename: entry.path().to_string_lossy().to_string(),
-                    }]
+            match entry {
+                Ok(entry) => {
+                    let path = entry.path();
+                    lint_path(path, settings, &cache.into(), &autofix.into())
+                        .map_err(|e| (Some(path.to_owned()), e.to_string()))
+                }
+                Err(e) => Err((
+                    e.path().map(Path::to_owned),
+                    e.io_error()
+                        .map_or_else(|| e.to_string(), io::Error::to_string),
+                )),
+            }
+            .unwrap_or_else(|(path, message)| {
+                if let Some(path) = path {
+                    if settings.select.contains(&CheckCode::E902) {
+                        vec![Message {
+                            kind: CheckKind::IOError(message),
+                            fixed: false,
+                            location: Default::default(),
+                            filename: path.to_string_lossy().to_string(),
+                        }]
+                    } else {
+                        error!("Failed to check {}: {message}", path.to_string_lossy());
+                        vec![]
+                    }
                 } else {
-                    error!("Failed to check {}: {e:?}", entry.path().to_string_lossy());
+                    error!("{message}");
                     vec![]
                 }
             })
         })
         .flatten()
         .collect();
-
-    if settings.select.contains(&CheckCode::E902) {
-        for file in files {
-            if !file.exists() {
-                messages.push(Message {
-                    kind: CheckKind::IOError(file.to_string_lossy().to_string()),
-                    fixed: false,
-                    location: Default::default(),
-                    filename: file.to_string_lossy().to_string(),
-                })
-            }
-        }
-    }
 
     messages.sort_unstable();
     let duration = start.elapsed();
