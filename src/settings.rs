@@ -138,8 +138,11 @@ impl Settings {
         settings
     }
 
-    pub fn select(&mut self, codes: Vec<CheckCode>) {
+    pub fn clear(&mut self) {
         self.select.clear();
+    }
+
+    pub fn select(&mut self, codes: Vec<CheckCode>) {
         for code in codes {
             self.select.insert(code);
         }

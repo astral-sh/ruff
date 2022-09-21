@@ -57,9 +57,15 @@ struct Cli {
     /// List of error codes to enable.
     #[clap(long, multiple = true)]
     select: Vec<CheckCode>,
+    /// Like --select, but adds additional error codes on top of the selected ones.
+    #[clap(long, multiple = true)]
+    extend_select: Vec<CheckCode>,
     /// List of error codes to ignore.
     #[clap(long, multiple = true)]
     ignore: Vec<CheckCode>,
+    /// Like --ignore, but adds additional error codes on top of the ignored ones.
+    #[clap(long, multiple = true)]
+    extend_ignore: Vec<CheckCode>,
     /// List of paths, used to exclude files and/or directories from checks.
     #[clap(long, multiple = true)]
     exclude: Vec<String>,
@@ -214,10 +220,17 @@ fn inner_main() -> Result<ExitCode> {
         settings.extend_exclude = extend_exclude;
     }
     if !cli.select.is_empty() {
+        settings.clear();
         settings.select(cli.select);
+    }
+    if !cli.extend_select.is_empty() {
+        settings.select(cli.extend_select);
     }
     if !cli.ignore.is_empty() {
         settings.ignore(&cli.ignore);
+    }
+    if !cli.extend_ignore.is_empty() {
+        settings.ignore(&cli.extend_ignore);
     }
 
     if cli.show_settings && cli.show_files {
