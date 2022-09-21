@@ -623,7 +623,6 @@ where
         let prev_in_literal = self.in_literal;
         let prev_in_annotation = self.in_annotation;
 
-        // Important:
         if self.in_annotation && self.annotations_future_enabled {
             self.deferred_annotations.push((
                 expr,
