@@ -107,8 +107,7 @@ pub fn iter_python_files<'a>(
         })
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
-            let path = entry.path();
-            is_included(path)
+            (entry.depth() == 0 && !entry.file_type().is_dir()) || is_included(entry.path())
         })
 }
 
