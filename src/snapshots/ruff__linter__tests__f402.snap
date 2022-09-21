@@ -1,0 +1,21 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    ImportShadowedByLoopVar:
+      - os
+      - 1
+  location:
+    row: 5
+    column: 5
+  fix: ~
+- kind:
+    ImportShadowedByLoopVar:
+      - path
+      - 2
+  location:
+    row: 8
+    column: 5
+  fix: ~
+

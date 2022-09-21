@@ -151,7 +151,7 @@ ruff's goal is to achieve feature-parity with Flake8 when used (1) without any p
 stylistic checks; limiting to Python 3 obviates the need for certain compatibility checks.)
 
 Under those conditions, Flake8 implements about 60 rules, give or take. At time of writing, ruff
-implements 42 rules. (Note that these 42 rules likely cover a disproportionate share of errors:
+implements 43 rules. (Note that these 43 rules likely cover a disproportionate share of errors:
 unused imports, undefined variables, etc.)
 
 The unimplemented rules are tracked in #170, and include:
@@ -185,6 +185,7 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | E902 | IOError | No such file or directory: `...` |
 | E999 | SyntaxError | SyntaxError: ... |
 | F401 | UnusedImport | `...` imported but unused |
+| F402 | ImportShadowedByLoopVar | import '...' from line 1 shadowed by loop variable |
 | F403 | ImportStarUsage | `from ... import *` used; unable to detect undefined names |
 | F404 | LateFutureImport | from __future__ imports must occur at the beginning of the file |
 | F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |
