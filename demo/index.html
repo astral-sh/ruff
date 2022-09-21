@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="An in-browser playground for Ruff, an extremely fast Python linter written in Rust."
+    />
+    <meta name="keywords" content="ruff, python, rust, webassembly, wasm" />
+    <title>Ruff Playground</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <div style="display: flex; position: fixed; right: 16px; top: 16px">
+      <a href="https://GitHub.com/charliermarsh/ruff"
+        ><img
+          src="https://img.shields.io/github/stars/charliermarsh/ruff.svg?style=social&label=GitHub&maxAge=2592000&?logoWidth=100"
+          alt="GitHub stars"
+          style="width: 120px"
+      /></a>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

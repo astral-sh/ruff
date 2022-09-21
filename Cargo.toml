@@ -5,40 +5,27 @@ edition = "2021"
 
 [lib]
 name = "ruff"
+crate-type = ["cdylib"]
 
 [dependencies]
+wasm-bindgen = "0.2.83"
 anyhow = { version = "1.0.60" }
-bincode = { version = "1.3.3" }
-cacache = { version = "10.0.1" }
 chrono = { version = "0.4.21" }
-clap = { version = "3.2.16", features = ["derive"] }
-clearscreen = { version = "1.0.10" }
-colored = { version = "2.0.0" }
-common-path = { version = "1.0.0" }
-dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 filetime = { version = "0.2.17" }
 glob = { version = "0.3.0" }
 itertools = { version = "0.10.3" }
 log = { version = "0.4.17" }
-notify = { version = "4.0.17" }
 once_cell = { version = "1.13.1" }
-path-absolutize = { version = "3.0.13", features = ["once_cell_cache"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "7d21c6923a506e79cc041708d83cef925efd33f4" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }
-update-informer = { version = "0.5.0", default_features = false, features = ["pypi"], optional = true }
-walkdir = { version = "2.3.2" }
 
 [dev-dependencies]
 insta = { version = "1.19.1", features = ["yaml"] }
-
-[features]
-default = ["update-informer"]
-update-informer = ["dep:update-informer"]
 
 [profile.release]
 panic = "abort"

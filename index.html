@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8"/>
+  <title>hello-wasm example</title>
+</head>
+<body>
+<script type="module">
+  import init, {check} from "./pkg/ruff.js";
+
+  init().then(() => {
+    console.log(check("if (1, 2): pass"));
+  });
+</script>
+</body>
+</html>
