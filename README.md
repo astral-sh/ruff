@@ -23,9 +23,6 @@ An extremely fast Python linter, written in Rust.
 - 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired `--fix` support
 - 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` support
 
-_ruff is a proof-of-concept and not yet intended for production use. It supports only a small subset
-of the Flake8 rules, and may crash on your codebase._
-
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Installation and usage
