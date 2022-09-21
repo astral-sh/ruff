@@ -25,6 +25,7 @@ pub enum ScopeKind {
 pub struct Scope {
     pub id: usize,
     pub kind: ScopeKind,
+    pub import_starred: bool,
     pub values: BTreeMap<String, Binding>,
 }
 
@@ -33,6 +34,7 @@ impl Scope {
         Scope {
             id: id(),
             kind,
+            import_starred: false,
             values: BTreeMap::new(),
         }
     }

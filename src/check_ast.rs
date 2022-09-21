@@ -391,7 +391,11 @@ where
                     }
                 }
             }
-            StmtKind::ImportFrom { names, module, .. } => {
+            StmtKind::ImportFrom {
+                names,
+                module,
+                level,
+            } => {
                 if self
                     .settings
                     .select
@@ -447,8 +451,14 @@ where
                                 .push(Check::new(CheckKind::LateFutureImport, stmt.location));
                         }
                     } else if alias.node.name == "*" {
+                        let module_name = format!(
+                            "{}{}",
+                            ".".repeat(level.unwrap_or_default()),
+                            module.clone().unwrap_or_else(|| "module".to_string()),
+                        );
+
                         self.add_binding(
-                            name,
+                            module_name.to_string(),
                             Binding {
                                 kind: BindingKind::StarImportation,
                                 used: None,
@@ -456,27 +466,29 @@ where
                             },
                         );
 
-                        if self.settings.select.contains(&CheckCode::F403) {
-                            self.checks.push(Check::new(
-                                CheckKind::ImportStarUsage(
-                                    module.clone().unwrap_or_else(|| "module".to_string()),
-                                ),
-                                stmt.location,
-                            ));
-                        }
-
                         if self.settings.select.contains(&CheckCode::F406) {
                             let scope = &self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found."))];
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.checks.push(Check::new(
-                                    CheckKind::ImportStarNotPermitted(
-                                        module.clone().unwrap_or_else(|| "module".to_string()),
-                                    ),
+                                    CheckKind::ImportStarNotPermitted(module_name.to_string()),
                                     stmt.location,
                                 ));
                             }
                         }
+
+                        if self.settings.select.contains(&CheckCode::F403) {
+                            self.checks.push(Check::new(
+                                CheckKind::ImportStarUsed(module_name.to_string()),
+                                stmt.location,
+                            ));
+                        }
+
+                        let scope = &mut self.scopes[*(self
+                            .scope_stack
+                            .last_mut()
+                            .expect("No current scope found."))];
+                        scope.import_starred = true;
                     } else {
                         let binding = Binding {
                             kind: BindingKind::Importation(match module {
@@ -1138,6 +1150,7 @@ impl<'a> Checker<'a> {
 
             let mut first_iter = true;
             let mut in_generator = false;
+            let mut import_starred = false;
             for scope_index in self.scope_stack.iter().rev() {
                 let scope = &mut self.scopes[*scope_index];
                 if matches!(scope.kind, ScopeKind::Class) {
@@ -1154,6 +1167,28 @@ impl<'a> Checker<'a> {
 
                 first_iter = false;
                 in_generator = matches!(scope.kind, ScopeKind::Generator);
+                import_starred = import_starred || scope.import_starred;
+            }
+
+            if import_starred {
+                if self.settings.select.contains(&CheckCode::F405) {
+                    let mut from_list = vec![];
+                    for scope_index in self.scope_stack.iter().rev() {
+                        let scope = &self.scopes[*scope_index];
+                        for (name, binding) in scope.values.iter() {
+                            if matches!(binding.kind, BindingKind::StarImportation) {
+                                from_list.push(name.as_str());
+                            }
+                        }
+                    }
+                    from_list.sort();
+
+                    self.checks.push(Check::new(
+                        CheckKind::ImportStarUsage(id.clone(), from_list.join(", ")),
+                        expr.location,
+                    ));
+                }
+                return;
             }
 
             if self.settings.select.contains(&CheckCode::F821) {
@@ -1364,8 +1399,9 @@ impl<'a> Checker<'a> {
     }
 
     fn check_dead_scopes(&mut self) {
-        if !self.settings.select.contains(&CheckCode::F822)
-            && !self.settings.select.contains(&CheckCode::F401)
+        if !self.settings.select.contains(&CheckCode::F401)
+            && !self.settings.select.contains(&CheckCode::F405)
+            && !self.settings.select.contains(&CheckCode::F822)
         {
             return;
         }
@@ -1380,15 +1416,39 @@ impl<'a> Checker<'a> {
             });
 
             if self.settings.select.contains(&CheckCode::F822)
+                && !scope.import_starred
                 && !self.path.ends_with("__init__.py")
             {
-                if let Some(binding) = all_binding {
+                if let Some(all_binding) = all_binding {
                     if let Some(names) = all_names {
                         for name in names {
                             if !scope.values.contains_key(name) {
                                 self.checks.push(Check::new(
                                     CheckKind::UndefinedExport(name.to_string()),
-                                    binding.location,
+                                    all_binding.location,
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if self.settings.select.contains(&CheckCode::F405) && scope.import_starred {
+                if let Some(all_binding) = all_binding {
+                    if let Some(names) = all_names {
+                        let mut from_list = vec![];
+                        for (name, binding) in scope.values.iter() {
+                            if matches!(binding.kind, BindingKind::StarImportation) {
+                                from_list.push(name.as_str());
+                            }
+                        }
+                        from_list.sort();
+
+                        for name in names {
+                            if !scope.values.contains_key(name) {
+                                self.checks.push(Check::new(
+                                    CheckKind::ImportStarUsage(name.clone(), from_list.join(", ")),
+                                    all_binding.location,
                                 ));
                             }
                         }
