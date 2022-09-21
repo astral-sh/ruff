@@ -6,7 +6,7 @@ use regex::Regex;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-pub const ALL_CHECK_CODES: [CheckCode; 42] = [
+pub const ALL_CHECK_CODES: [CheckCode; 43] = [
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -22,6 +22,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::E902,
     CheckCode::E999,
     CheckCode::F401,
+    CheckCode::F402,
     CheckCode::F403,
     CheckCode::F404,
     CheckCode::F406,
@@ -227,6 +228,7 @@ impl CheckCode {
             CheckCode::F407 => CheckKind::FutureFeatureNotDefined("...".to_string()),
             CheckCode::E902 => CheckKind::IOError("...".to_string()),
             CheckCode::F634 => CheckKind::IfTuple,
+            CheckCode::F402 => CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
             CheckCode::F406 => CheckKind::ImportStarNotPermitted("...".to_string()),
             CheckCode::F403 => CheckKind::ImportStarUsage("...".to_string()),
             CheckCode::F633 => CheckKind::InvalidPrintSyntax,
