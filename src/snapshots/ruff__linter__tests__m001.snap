@@ -26,10 +26,4 @@ expression: checks
     row: 31
     column: 6
   fix: ~
-- kind:
-    UnusedNOQA: E501
-  location:
-    row: 38
-    column: 6
-  fix: ~
 
