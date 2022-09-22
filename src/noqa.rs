@@ -5,7 +5,7 @@ use regex::Regex;
 use rustpython_parser::lexer::{LexResult, Tok};
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)(?P<noqa># noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
+    Regex::new(r"(?i)(?P<noqa>\s*# noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
         .expect("Invalid regex")
 });
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").expect("Invalid regex"));

@@ -609,7 +609,7 @@ impl CheckKind {
             }
             CheckKind::UnusedNOQA(code) => match code {
                 None => "Unused `noqa` directive".to_string(),
-                Some(code) => format!("Unused `noqa` directive for {code}"),
+                Some(code) => format!("Unused `noqa` directive for: {code}"),
             },
         }
     }
@@ -618,7 +618,9 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            CheckKind::NoAssertEquals | CheckKind::UselessObjectInheritance(_)
+            CheckKind::NoAssertEquals
+                | CheckKind::UselessObjectInheritance(_)
+                | CheckKind::UnusedNOQA(_)
         )
     }
 }

@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use rustpython_parser::ast::Location;
 
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::autofix::fixer;
+use crate::checks::{Check, CheckCode, CheckKind, Fix};
 use crate::noqa;
 use crate::noqa::Directive;
 use crate::settings::Settings;
@@ -28,6 +29,7 @@ pub fn check_lines(
     contents: &str,
     noqa_line_for: &[usize],
     settings: &Settings,
+    autofix: &fixer::Mode,
 ) {
     let enforce_line_too_long = settings.select.contains(&CheckCode::E501);
     let enforce_noqa = settings.select.contains(&CheckCode::M001);
@@ -113,20 +115,55 @@ pub fn check_lines(
             match directive {
                 Directive::All(column) => {
                     if matches.is_empty() {
-                        line_checks.push(Check::new(
+                        let mut check = Check::new(
                             CheckKind::UnusedNOQA(None),
                             Location::new(row + 1, column + 1),
-                        ));
+                        );
+                        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            check.amend(Fix {
+                                content: "".to_string(),
+                                start: Location::new(row + 1, column + 1),
+                                end: Location::new(row + 1, lines[row].chars().count() + 1),
+                                applied: false,
+                            });
+                        }
+                        line_checks.push(check);
                     }
                 }
                 Directive::Codes(column, codes) => {
-                    for code in &codes {
-                        if !matches.contains(code) {
-                            line_checks.push(Check::new(
-                                CheckKind::UnusedNOQA(Some(code.to_string())),
-                                Location::new(row + 1, column + 1),
-                            ));
+                    let mut invalid_codes = vec![];
+                    let mut valid_codes = vec![];
+                    for code in codes {
+                        if !matches.contains(&code) {
+                            invalid_codes.push(code);
+                        } else {
+                            valid_codes.push(code);
                         }
+                    }
+
+                    if !invalid_codes.is_empty() {
+                        let mut check = Check::new(
+                            CheckKind::UnusedNOQA(Some(invalid_codes.join(", "))),
+                            Location::new(row + 1, column + 1),
+                        );
+                        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            if valid_codes.is_empty() {
+                                check.amend(Fix {
+                                    content: "".to_string(),
+                                    start: Location::new(row + 1, column + 1),
+                                    end: Location::new(row + 1, lines[row].chars().count() + 1),
+                                    applied: false,
+                                });
+                            } else {
+                                check.amend(Fix {
+                                    content: format!("  # noqa: {}", valid_codes.join(", ")),
+                                    start: Location::new(row + 1, column + 1),
+                                    end: Location::new(row + 1, lines[row].chars().count() + 1),
+                                    applied: false,
+                                });
+                            }
+                        }
+                        line_checks.push(check);
                     }
                 }
                 Directive::None => {}
@@ -162,8 +199,13 @@ mod tests {
                 extend_exclude: vec![],
                 select: BTreeSet::from_iter(vec![CheckCode::E501]),
             };
-
-            check_lines(&mut checks, line, &noqa_line_for, &settings);
+            check_lines(
+                &mut checks,
+                line,
+                &noqa_line_for,
+                &settings,
+                &fixer::Mode::Generate,
+            );
             return checks;
         };
         assert!(!check_with_max_line_length(6).is_empty());
