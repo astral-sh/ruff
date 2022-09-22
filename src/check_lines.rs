@@ -39,8 +39,6 @@ pub fn check_lines(
 
     let lines: Vec<&str> = contents.lines().collect();
     for (lineno, line) in lines.iter().enumerate() {
-        let mut did_insert: bool = false;
-
         // Grab the noqa (logical) line number for the current (physical) line.
         // If there are newlines at the end of the file, they won't be represented in
         // `noqa_line_for`, so fallback to the current line.
@@ -49,45 +47,19 @@ pub fn check_lines(
             .map(|lineno| lineno - 1)
             .unwrap_or(lineno);
 
-        if enforce_noqa && !did_insert {
-            // Try the current physical line.
+        if enforce_noqa {
             noqa_directives
-                .entry(lineno)
-                .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno]), vec![]));
-            // Try the current logical line.
-            if lineno != noqa_lineno {
-                noqa_directives
-                    .entry(noqa_lineno)
-                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
-            }
-            did_insert = true;
+                .entry(noqa_lineno)
+                .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
         }
 
         // Remove any ignored checks.
         // TODO(charlie): Only validate checks for the current line.
         for (index, check) in checks.iter().enumerate() {
             if check.location.row() == lineno + 1 {
-                if !did_insert {
-                    // Try the current physical line.
-                    noqa_directives
-                        .entry(lineno)
-                        .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno]), vec![]));
-                    // Try the current logical line.
-                    if lineno != noqa_lineno {
-                        noqa_directives.entry(noqa_lineno).or_insert_with(|| {
-                            (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![])
-                        });
-                    }
-                    did_insert = true;
-                }
-
-                let noqa = if lineno != noqa_lineno
-                    && matches!(noqa_directives.get(&lineno).unwrap(), (Directive::None, _))
-                {
-                    noqa_directives.get_mut(&noqa_lineno).unwrap()
-                } else {
-                    noqa_directives.get_mut(&lineno).unwrap()
-                };
+                let noqa = noqa_directives
+                    .entry(noqa_lineno)
+                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
 
                 match noqa {
                     (Directive::All(_), matches) => {
@@ -109,26 +81,9 @@ pub fn check_lines(
         if enforce_line_too_long {
             let line_length = line.chars().count();
             if should_enforce_line_length(line, line_length, settings.line_length) {
-                if !did_insert {
-                    // Try the current physical line.
-                    noqa_directives
-                        .entry(lineno)
-                        .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno]), vec![]));
-                    // Try the current logical line.
-                    if lineno != noqa_lineno {
-                        noqa_directives.entry(noqa_lineno).or_insert_with(|| {
-                            (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![])
-                        });
-                    }
-                }
-
-                let noqa = if lineno != noqa_lineno
-                    && matches!(noqa_directives.get(&lineno).unwrap(), (Directive::None, _))
-                {
-                    noqa_directives.get_mut(&noqa_lineno).unwrap()
-                } else {
-                    noqa_directives.get_mut(&lineno).unwrap()
-                };
+                let noqa = noqa_directives
+                    .entry(noqa_lineno)
+                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
 
                 let check = Check::new(
                     CheckKind::LineTooLong(line_length, settings.line_length),

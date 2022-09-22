@@ -27,7 +27,7 @@ fn check_path(
     let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
 
     // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_line_map(&lxr);
+    let noqa_line_for = noqa::extract_noqa_line_for(&lxr);
 
     // Run the AST-based checks.
     if settings
