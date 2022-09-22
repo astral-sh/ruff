@@ -589,7 +589,7 @@ mod tests {
     fn m001() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/M001.py"),
-            &settings::Settings::for_rules(vec![CheckCode::M001, CheckCode::F841]),
+            &settings::Settings::for_rules(vec![CheckCode::M001, CheckCode::E501, CheckCode::F841]),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
