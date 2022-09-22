@@ -96,8 +96,6 @@ ARGS:
     <FILES>...
 
 OPTIONS:
-    -e, --exit-zero
-            Exit with status code "0", even upon detecting errors
         --select <SELECT>...
             List of error codes to enable
         --extend-select <EXTEND_SELECT>...
@@ -110,6 +108,8 @@ OPTIONS:
             List of paths, used to exclude files and/or directories from checks
         --extend-exclude <EXTEND_EXCLUDE>...
             Like --exclude, but adds additional files and directories on top of the excluded ones
+    -e, --exit-zero
+            Exit with status code "0", even upon detecting errors
     -f, --fix
             Attempt to automatically fix lint errors
         --format <FORMAT>
@@ -121,6 +121,8 @@ OPTIONS:
             Disable cache reads
     -q, --quiet
             Disable all logging (but still exit with status code "1" upon detecting errors)
+        --add-noqa
+            Enable automatic additions of noqa directives to failing lines
         --show-files
             See the files ruff will be run against with the current settings
         --show-settings
@@ -133,6 +135,8 @@ OPTIONS:
             Run in watch mode by re-running whenever files change
 ```
 
+### Excluding files
+
 Exclusions are based on globs, and can be either:
 
 - Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the
@@ -141,6 +145,50 @@ Exclusions are based on globs, and can be either:
 - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py`
   (to exclude any Python files in `directory`). Note that these paths are relative to the
   project root (e.g., the directory containing your `pyproject.toml`).
+
+### Ignoring errors
+
+To omit a lint check entirely, add it to the "ignore" list via `--ignore` or `--extend-ignore`,
+either  on the command-line or in your `project.toml` file.
+
+To ignore an error in-line, ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
+To ignore an individual error, add `# noqa: {code}` to the end of the line, like so:
+
+```python
+# Ignore F841.
+x = 1  # noqa: F841
+
+# Ignore E741 and F841.
+i = 1  # noqa: E741, F841
+
+# Ignore _all_ errors.
+x = 1  # noqa
+```
+
+Note that, for multi-line strings, the `noqa` directive should come at the end of the string, and
+will apply to the entire body, like so:
+
+```python
+"""Lorem ipsum dolor sit amet.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+"""  # noqa: E501
+```
+
+ruff supports several (experimental) workflows to aid in `noqa` management.
+
+First, ruff provides a special error code, `M001`, to enforce that your `noqa` directives are
+"valid", in that the errors they _say_ they ignore are actually being triggered on that line (and
+thus suppressed). **You can run `ruff /path/to/file.py --extend-select M001` to flag unused `noqa`
+directives.**
+
+Second, ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
+**You can run `ruff /path/to/file.py --extend-select M001 --fix` to automatically remove unused
+`noqa` directives.**
+
+Third, ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
+migrating a new codebase to ruff. **You can run `ruff /path/to/file.py --add-noqa` to automatically
+add `noqa` directives to all failing lines, with the appropriate error codes.**
 
 ### Compatibility with Black
 
