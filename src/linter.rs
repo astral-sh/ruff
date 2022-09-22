@@ -11,6 +11,7 @@ use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::message::Message;
+use crate::noqa::add_noqa;
 use crate::settings::Settings;
 use crate::{cache, fs, noqa};
 
@@ -80,6 +81,8 @@ pub fn lint_path(
     if matches!(autofix, fixer::Mode::Apply) {
         fix_file(&mut checks, &contents, path)?;
     };
+
+    add_noqa(&checks, &contents, path)?;
 
     // Convert to messages.
     let messages: Vec<Message> = checks

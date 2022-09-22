@@ -81,6 +81,9 @@ struct Cli {
     /// See ruff's settings.
     #[clap(long, action)]
     show_settings: bool,
+    /// Enable automatic additions of noqa directives to failing lines.
+    #[clap(long, action)]
+    add_noqa: bool,
 }
 
 #[cfg(feature = "update-informer")]
@@ -254,6 +257,10 @@ fn inner_main() -> Result<ExitCode> {
             println!("Warning: --fix is not enabled in watch mode.");
         }
 
+        if cli.no_qa {
+            println!("Warning: --no-qa is not enabled in watch mode.");
+        }
+
         if cli.format != SerializationFormat::Text {
             println!("Warning: --format 'text' is used in watch mode.");
         }
@@ -292,6 +299,8 @@ fn inner_main() -> Result<ExitCode> {
                 Err(e) => return Err(e.into()),
             }
         }
+    } else if cli.add_noqa {
+        // TODO(charlie): Plug into noqa flow.
     } else {
         let messages = run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?;
         if !cli.quiet {

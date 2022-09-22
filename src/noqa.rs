@@ -1,8 +1,13 @@
 use std::cmp::{max, min};
 
+use crate::checks::{Check, CheckCode};
+use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::lexer::{LexResult, Tok};
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::Path;
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)(?P<noqa>\s*# noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
@@ -38,7 +43,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 }
 
 pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
-    let mut line_map: Vec<usize> = vec![];
+    let mut noqa_line_for: Vec<usize> = vec![];
 
     let mut last_is_string = false;
     let mut last_seen = usize::MIN;
@@ -56,10 +61,10 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
 
             // For now, we only care about preserving noqa directives across multi-line strings.
             if last_is_string {
-                line_map.extend(vec![max_line; (max_line + 1) - min_line]);
+                noqa_line_for.extend(vec![max_line; (max_line + 1) - min_line]);
             } else {
                 for i in (min_line - 1)..(max_line) {
-                    line_map.push(i + 1);
+                    noqa_line_for.push(i + 1);
                 }
             }
 
@@ -69,7 +74,7 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
             // Handle empty lines.
             if start.row() > last_seen {
                 for i in last_seen..(start.row() - 1) {
-                    line_map.push(i + 1);
+                    noqa_line_for.push(i + 1);
                 }
             }
 
@@ -80,7 +85,40 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
         last_is_string = matches!(tok, Tok::String { .. });
     }
 
-    line_map
+    noqa_line_for
+}
+
+pub fn add_noqa(checks: &Vec<Check>, contents: &str, path: &Path) -> Result<()> {
+    let mut output = "".to_string();
+    for (row, line) in contents.lines().enumerate() {
+        let mut codes: BTreeSet<CheckCode> = BTreeSet::new();
+        for check in checks {
+            if check.location.row() == row + 1 {
+                codes.insert(check.kind.code().clone());
+            }
+        }
+
+        if codes.is_empty() {
+            output.push_str(line);
+            output.push('\n');
+        } else {
+            match extract_noqa_directive(line) {
+                Directive::None => {
+                    output.push_str(line);
+                    output.push(' ');
+                    output.push(' ');
+                }
+                Directive::All(start) => output.push_str(&line[..start]),
+                Directive::Codes(start, _) => output.push_str(&line[..start]),
+            };
+            let codes: Vec<&str> = codes.iter().map(|code| code.as_str()).collect();
+            output.push_str("# noqa: ");
+            output.push_str(&codes.join(", "));
+            output.push('\n');
+        }
+    }
+
+    fs::write(path, output).map_err(|e| e.into())
 }
 
 #[cfg(test)]
@@ -92,7 +130,7 @@ mod tests {
     use crate::noqa::extract_noqa_line_for;
 
     #[test]
-    fn line_map() -> Result<()> {
+    fn noqa_line_for() -> Result<()> {
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
 y = 2
