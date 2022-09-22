@@ -18,17 +18,15 @@ use crate::{cache, fs, noqa};
 fn check_path(
     path: &Path,
     contents: &str,
+    tokens: Vec<LexResult>,
     settings: &Settings,
     autofix: &fixer::Mode,
 ) -> Vec<Check> {
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
-    // Tokenize once.
-    let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-
     // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&lxr);
+    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
     // Run the AST-based checks.
     if settings
@@ -36,7 +34,7 @@ fn check_path(
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
     {
-        match parser::parse_program_tokens(lxr, "<filename>") {
+        match parser::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
                 checks.extend(check_ast(&python_ast, contents, settings, autofix, path))
             }
@@ -74,15 +72,16 @@ pub fn lint_path(
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
+    // Tokenize once.
+    let tokens: Vec<LexResult> = lexer::make_tokenizer(&contents).collect();
+
     // Generate checks.
-    let mut checks = check_path(path, &contents, settings, autofix);
+    let mut checks = check_path(path, &contents, tokens, settings, autofix);
 
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
         fix_file(&mut checks, &contents, path)?;
     };
-
-    add_noqa(&checks, &contents, path)?;
 
     // Convert to messages.
     let messages: Vec<Message> = checks
@@ -99,11 +98,29 @@ pub fn lint_path(
     Ok(messages)
 }
 
+pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
+    // Read the file from disk.
+    let contents = fs::read_file(path)?;
+
+    // Tokenize once.
+    let tokens: Vec<LexResult> = lexer::make_tokenizer(&contents).collect();
+
+    // Determine the noqa line for every line in the source.
+    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+
+    // Generate checks.
+    let checks = check_path(path, &contents, tokens, settings, &fixer::Mode::None);
+
+    add_noqa(&checks, &contents, &noqa_line_for, path)
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use rustpython_parser::lexer;
+    use rustpython_parser::lexer::LexResult;
 
     use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
@@ -117,7 +134,10 @@ mod tests {
         autofix: &fixer::Mode,
     ) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;
-        Ok(linter::check_path(path, &contents, settings, autofix))
+        let tokens: Vec<LexResult> = lexer::make_tokenizer(&contents).collect();
+        Ok(linter::check_path(
+            path, &contents, tokens, settings, autofix,
+        ))
     }
 
     #[test]
