@@ -1,7 +1,9 @@
 use once_cell::sync::Lazy;
 use rustpython_parser::ast::Location;
 
-use crate::checks::{extract_noqa_directive, Check, CheckCode, CheckKind, Directive};
+use crate::checks::{Check, CheckCode, CheckKind};
+use crate::noqa;
+use crate::noqa::Directive;
 use crate::settings::Settings;
 
 /// Whether the given line is too long and should be reported.
@@ -27,7 +29,7 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
     let mut line_checks = vec![];
     let mut ignored = vec![];
     for (row, line) in contents.lines().enumerate() {
-        let noqa_directive = Lazy::new(|| extract_noqa_directive(line));
+        let noqa_directive = Lazy::new(|| noqa::extract_noqa_directive(line));
         let mut line_ignored: Vec<&str> = vec![];
 
         // Remove any ignored checks.
