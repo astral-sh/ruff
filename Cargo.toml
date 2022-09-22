@@ -26,7 +26,7 @@ once_cell = { version = "1.13.1" }
 path-absolutize = { version = "3.0.13", features = ["once_cell_cache"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "7d21c6923a506e79cc041708d83cef925efd33f4" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "966a80597d626a9a47eaec78471164422d341453" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }

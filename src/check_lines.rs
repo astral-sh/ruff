@@ -22,20 +22,43 @@ fn should_enforce_line_length(line: &str, length: usize, limit: usize) -> bool {
     }
 }
 
-pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings) {
+pub fn check_lines(
+    checks: &mut Vec<Check>,
+    contents: &str,
+    noqa_line_for: &[usize],
+    settings: &Settings,
+) {
     let enforce_line_too_long = settings.select.contains(&CheckCode::E501);
     let enforce_noqa = settings.select.contains(&CheckCode::M001);
 
     let mut line_checks = vec![];
     let mut ignored = vec![];
-    for (row, line) in contents.lines().enumerate() {
-        let noqa_directive = Lazy::new(|| noqa::extract_noqa_directive(line));
+    let lines: Vec<&str> = contents.lines().collect();
+    for (lineno, line) in lines.iter().enumerate() {
         let mut line_ignored: Vec<&str> = vec![];
+
+        // Grab the noqa (logical) line number for the current (physical) line.
+        // If there are newlines at the end of the file, they won't be represented in
+        // `noqa_line_for`, so fallback to the current line.
+        let noqa_lineno = noqa_line_for
+            .get(lineno)
+            .map(|lineno| lineno - 1)
+            .unwrap_or(lineno);
+
+        // Allow matching on _either_ the logical or physical line.
+        let noqa_directive = Lazy::new(|| {
+            let line_directive = noqa::extract_noqa_directive(lines[lineno]);
+            if noqa_lineno != lineno && matches!(line_directive, Directive::None) {
+                noqa::extract_noqa_directive(lines[noqa_lineno])
+            } else {
+                line_directive
+            }
+        });
 
         // Remove any ignored checks.
         // TODO(charlie): Only validate checks for the current line.
         for (index, check) in checks.iter().enumerate() {
-            if check.location.row() == row + 1 {
+            if check.location.row() == lineno + 1 {
                 match &*noqa_directive {
                     Directive::All(_) => {
                         line_ignored.push(check.kind.code().as_str());
@@ -58,7 +81,7 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
             if should_enforce_line_length(line, line_length, settings.line_length) {
                 let check = Check::new(
                     CheckKind::LineTooLong(line_length, settings.line_length),
-                    Location::new(row + 1, settings.line_length + 1),
+                    Location::new(lineno + 1, settings.line_length + 1),
                 );
                 match &*noqa_directive {
                     Directive::All(_) => {
@@ -76,14 +99,15 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
             }
         }
 
-        // Enforce that the noqa was actually used.
+        // Enforce that the noqa directive. was actually used.
+        // TODO(charlie): This logic doesn't work for multi-line noqa directives.
         if enforce_noqa {
             match &*noqa_directive {
                 Directive::All(column) => {
                     if line_ignored.is_empty() {
                         line_checks.push(Check::new(
                             CheckKind::UnusedNOQA(None),
-                            Location::new(row + 1, column + 1),
+                            Location::new(noqa_lineno + 1, column + 1),
                         ));
                     }
                 }
@@ -92,7 +116,7 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
                         if !line_ignored.contains(code) {
                             line_checks.push(Check::new(
                                 CheckKind::UnusedNOQA(Some(code.to_string())),
-                                Location::new(row + 1, column + 1),
+                                Location::new(noqa_lineno + 1, column + 1),
                             ));
                         }
                     }
@@ -118,6 +142,7 @@ mod tests {
     #[test]
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
+        let noqa_line_for: Vec<usize> = vec![1];
         let check_with_max_line_length = |line_length: usize| {
             let mut checks: Vec<Check> = vec![];
             let settings = Settings {
@@ -128,7 +153,8 @@ mod tests {
                 extend_exclude: vec![],
                 select: BTreeSet::from_iter(vec![CheckCode::E501]),
             };
-            check_lines(&mut checks, line, &settings);
+
+            check_lines(&mut checks, line, &noqa_line_for, &settings);
             return checks;
         };
         assert!(!check_with_max_line_length(6).is_empty());

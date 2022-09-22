@@ -2,7 +2,8 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
-use rustpython_parser::parser;
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::{lexer, parser};
 
 use crate::autofix::fixer;
 use crate::autofix::fixer::fix_file;
@@ -11,7 +12,7 @@ use crate::check_lines::check_lines;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::message::Message;
 use crate::settings::Settings;
-use crate::{cache, fs};
+use crate::{cache, fs, noqa};
 
 fn check_path(
     path: &Path,
@@ -22,13 +23,19 @@ fn check_path(
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
+    // Tokenize once.
+    let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+
+    // Determine the noqa line for every line in the source.
+    let noqa_line_for = noqa::extract_line_map(&lxr);
+
     // Run the AST-based checks.
     if settings
         .select
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
     {
-        match parser::parse_program(contents, "<filename>") {
+        match parser::parse_program_tokens(lxr, "<filename>") {
             Ok(python_ast) => {
                 checks.extend(check_ast(&python_ast, contents, settings, autofix, path))
             }
@@ -44,7 +51,7 @@ fn check_path(
     }
 
     // Run the lines-based checks.
-    check_lines(&mut checks, contents, settings);
+    check_lines(&mut checks, contents, &noqa_line_for, settings);
 
     checks
 }
