@@ -25,6 +25,7 @@ use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::pyproject;
 use ::ruff::settings::{FilePattern, Settings};
 use ::ruff::tell_user;
+use ruff::linter::add_noqa_to_path;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -81,6 +82,9 @@ struct Cli {
     /// See ruff's settings.
     #[clap(long, action)]
     show_settings: bool,
+    /// Enable automatic additions of noqa directives to failing lines.
+    #[clap(long, action)]
+    add_noqa: bool,
 }
 
 #[cfg(feature = "update-informer")]
@@ -183,6 +187,35 @@ fn run_once(
     Ok(messages)
 }
 
+fn add_noqa(files: &[PathBuf], settings: &Settings) -> Result<usize> {
+    // Collect all the files to check.
+    let start = Instant::now();
+    let paths: Vec<Result<DirEntry, walkdir::Error>> = files
+        .iter()
+        .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
+        .collect();
+    let duration = start.elapsed();
+    debug!("Identified files to lint in: {:?}", duration);
+
+    let start = Instant::now();
+    let modifications: usize = paths
+        .par_iter()
+        .map(|entry| match entry {
+            Ok(entry) => {
+                let path = entry.path();
+                add_noqa_to_path(path, settings)
+            }
+            Err(_) => Ok(0),
+        })
+        .flatten()
+        .sum();
+
+    let duration = start.elapsed();
+    debug!("Added noqa to files in: {:?}", duration);
+
+    Ok(modifications)
+}
+
 fn inner_main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
@@ -254,6 +287,10 @@ fn inner_main() -> Result<ExitCode> {
             println!("Warning: --fix is not enabled in watch mode.");
         }
 
+        if cli.add_noqa {
+            println!("Warning: --no-qa is not enabled in watch mode.");
+        }
+
         if cli.format != SerializationFormat::Text {
             println!("Warning: --format 'text' is used in watch mode.");
         }
@@ -291,6 +328,11 @@ fn inner_main() -> Result<ExitCode> {
                 }
                 Err(e) => return Err(e.into()),
             }
+        }
+    } else if cli.add_noqa {
+        let modifications = add_noqa(&cli.files, &settings)?;
+        if modifications > 0 {
+            println!("Added {modifications} noqa directives.");
         }
     } else {
         let messages = run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?;
