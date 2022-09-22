@@ -20,4 +20,16 @@ expression: checks
     row: 16
     column: 12
   fix: ~
+- kind:
+    UnusedNOQA: F841
+  location:
+    row: 31
+    column: 6
+  fix: ~
+- kind:
+    UnusedNOQA: E501
+  location:
+    row: 38
+    column: 6
+  fix: ~
 

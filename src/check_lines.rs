@@ -1,4 +1,5 @@
-use once_cell::sync::Lazy;
+use std::collections::BTreeMap;
+
 use rustpython_parser::ast::Location;
 
 use crate::checks::{Check, CheckCode, CheckKind};
@@ -22,32 +23,84 @@ fn should_enforce_line_length(line: &str, length: usize, limit: usize) -> bool {
     }
 }
 
-pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings) {
+pub fn check_lines(
+    checks: &mut Vec<Check>,
+    contents: &str,
+    noqa_line_for: &[usize],
+    settings: &Settings,
+) {
     let enforce_line_too_long = settings.select.contains(&CheckCode::E501);
     let enforce_noqa = settings.select.contains(&CheckCode::M001);
 
+    let mut noqa_directives: BTreeMap<usize, (Directive, Vec<&str>)> = BTreeMap::new();
+
     let mut line_checks = vec![];
     let mut ignored = vec![];
-    for (row, line) in contents.lines().enumerate() {
-        let noqa_directive = Lazy::new(|| noqa::extract_noqa_directive(line));
-        let mut line_ignored: Vec<&str> = vec![];
+
+    let lines: Vec<&str> = contents.lines().collect();
+    for (lineno, line) in lines.iter().enumerate() {
+        let mut did_insert: bool = false;
+
+        // Grab the noqa (logical) line number for the current (physical) line.
+        // If there are newlines at the end of the file, they won't be represented in
+        // `noqa_line_for`, so fallback to the current line.
+        let noqa_lineno = noqa_line_for
+            .get(lineno)
+            .map(|lineno| lineno - 1)
+            .unwrap_or(lineno);
+
+        if enforce_noqa && !did_insert {
+            // Try the current physical line.
+            noqa_directives
+                .entry(lineno)
+                .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno]), vec![]));
+            // Try the current logical line.
+            if lineno != noqa_lineno {
+                noqa_directives
+                    .entry(noqa_lineno)
+                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
+            }
+            did_insert = true;
+        }
 
         // Remove any ignored checks.
         // TODO(charlie): Only validate checks for the current line.
         for (index, check) in checks.iter().enumerate() {
-            if check.location.row() == row + 1 {
-                match &*noqa_directive {
-                    Directive::All(_) => {
-                        line_ignored.push(check.kind.code().as_str());
+            if check.location.row() == lineno + 1 {
+                if !did_insert {
+                    // Try the current physical line.
+                    noqa_directives
+                        .entry(lineno)
+                        .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno]), vec![]));
+                    // Try the current logical line.
+                    if lineno != noqa_lineno {
+                        noqa_directives.entry(noqa_lineno).or_insert_with(|| {
+                            (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![])
+                        });
+                    }
+                    did_insert = true;
+                }
+
+                let noqa = if lineno != noqa_lineno
+                    && matches!(noqa_directives.get(&lineno).unwrap(), (Directive::None, _))
+                {
+                    noqa_directives.get_mut(&noqa_lineno).unwrap()
+                } else {
+                    noqa_directives.get_mut(&lineno).unwrap()
+                };
+
+                match noqa {
+                    (Directive::All(_), matches) => {
+                        matches.push(check.kind.code().as_str());
                         ignored.push(index)
                     }
-                    Directive::Codes(_, codes) => {
+                    (Directive::Codes(_, codes), matches) => {
                         if codes.contains(&check.kind.code().as_str()) {
-                            line_ignored.push(check.kind.code().as_str());
+                            matches.push(check.kind.code().as_str());
                             ignored.push(index);
                         }
                     }
-                    Directive::None => {}
+                    (Directive::None, _) => {}
                 }
             }
         }
@@ -56,31 +109,55 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
         if enforce_line_too_long {
             let line_length = line.chars().count();
             if should_enforce_line_length(line, line_length, settings.line_length) {
+                if !did_insert {
+                    // Try the current physical line.
+                    noqa_directives
+                        .entry(lineno)
+                        .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno]), vec![]));
+                    // Try the current logical line.
+                    if lineno != noqa_lineno {
+                        noqa_directives.entry(noqa_lineno).or_insert_with(|| {
+                            (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![])
+                        });
+                    }
+                }
+
+                let noqa = if lineno != noqa_lineno
+                    && matches!(noqa_directives.get(&lineno).unwrap(), (Directive::None, _))
+                {
+                    noqa_directives.get_mut(&noqa_lineno).unwrap()
+                } else {
+                    noqa_directives.get_mut(&lineno).unwrap()
+                };
+
                 let check = Check::new(
                     CheckKind::LineTooLong(line_length, settings.line_length),
-                    Location::new(row + 1, settings.line_length + 1),
+                    Location::new(lineno + 1, settings.line_length + 1),
                 );
-                match &*noqa_directive {
-                    Directive::All(_) => {
-                        line_ignored.push(check.kind.code().as_str());
+
+                match noqa {
+                    (Directive::All(_), matches) => {
+                        matches.push(check.kind.code().as_str());
                     }
-                    Directive::Codes(_, codes) => {
+                    (Directive::Codes(_, codes), matches) => {
                         if codes.contains(&check.kind.code().as_str()) {
-                            line_ignored.push(check.kind.code().as_str());
+                            matches.push(check.kind.code().as_str());
                         } else {
                             line_checks.push(check);
                         }
                     }
-                    Directive::None => line_checks.push(check),
+                    (Directive::None, _) => line_checks.push(check),
                 }
             }
         }
+    }
 
-        // Enforce that the noqa was actually used.
-        if enforce_noqa {
-            match &*noqa_directive {
+    // Enforce that the noqa directive was actually used.
+    if enforce_noqa {
+        for (row, (directive, matches)) in noqa_directives {
+            match directive {
                 Directive::All(column) => {
-                    if line_ignored.is_empty() {
+                    if matches.is_empty() {
                         line_checks.push(Check::new(
                             CheckKind::UnusedNOQA(None),
                             Location::new(row + 1, column + 1),
@@ -88,8 +165,8 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
                     }
                 }
                 Directive::Codes(column, codes) => {
-                    for code in codes {
-                        if !line_ignored.contains(code) {
+                    for code in &codes {
+                        if !matches.contains(code) {
                             line_checks.push(Check::new(
                                 CheckKind::UnusedNOQA(Some(code.to_string())),
                                 Location::new(row + 1, column + 1),
@@ -101,6 +178,7 @@ pub fn check_lines(checks: &mut Vec<Check>, contents: &str, settings: &Settings)
             }
         }
     }
+
     ignored.sort();
     for index in ignored.iter().rev() {
         checks.swap_remove(*index);
@@ -118,6 +196,7 @@ mod tests {
     #[test]
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
+        let noqa_line_for: Vec<usize> = vec![1];
         let check_with_max_line_length = |line_length: usize| {
             let mut checks: Vec<Check> = vec![];
             let settings = Settings {
@@ -128,7 +207,8 @@ mod tests {
                 extend_exclude: vec![],
                 select: BTreeSet::from_iter(vec![CheckCode::E501]),
             };
-            check_lines(&mut checks, line, &settings);
+
+            check_lines(&mut checks, line, &noqa_line_for, &settings);
             return checks;
         };
         assert!(!check_with_max_line_length(6).is_empty());
