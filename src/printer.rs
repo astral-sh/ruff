@@ -1,7 +1,10 @@
 use anyhow::Result;
 use clap::ValueEnum;
 use colored::Colorize;
+use rustpython_parser::ast::Location;
+use serde::Serialize;
 
+use crate::checks::{CheckCode, CheckKind};
 use crate::message::Message;
 use crate::tell_user;
 
@@ -9,6 +12,16 @@ use crate::tell_user;
 pub enum SerializationFormat {
     Text,
     Json,
+}
+
+#[derive(Serialize)]
+struct ExpandedMessage<'a> {
+    kind: &'a CheckKind,
+    code: &'a CheckCode,
+    message: String,
+    fixed: bool,
+    location: Location,
+    filename: &'a String,
 }
 
 pub struct Printer {
@@ -31,7 +44,22 @@ impl Printer {
 
         match self.format {
             SerializationFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&messages)?)
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &messages
+                            .iter()
+                            .map(|m| ExpandedMessage {
+                                kind: &m.kind,
+                                code: m.kind.code(),
+                                message: m.kind.body(),
+                                fixed: m.fixed,
+                                location: m.location,
+                                filename: &m.filename,
+                            })
+                            .collect::<Vec<_>>()
+                    )?
+                )
             }
             SerializationFormat::Text => {
                 if !fixed.is_empty() {
