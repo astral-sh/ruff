@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::ops::Deref;
@@ -10,7 +11,8 @@ use path_absolutize::path_dedot;
 use path_absolutize::Absolutize;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::settings::FilePattern;
+use crate::checks::CheckCode;
+use crate::settings::{FilePattern, PerFileIgnore};
 
 /// Extract the absolute path and basename (as strings) from a Path.
 fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -110,6 +112,31 @@ pub fn iter_python_files<'a>(
                 (entry.depth() == 0 && !entry.file_type().is_dir()) || is_included(entry.path())
             })
         })
+}
+
+/// Create tree set with codes matching the pattern/code pairs.
+///
+/// Guarantees a `Some` result will be non-empty
+pub fn ignores_from_path(
+    path: &Path,
+    pattern_code_pairs: &[PerFileIgnore],
+) -> Result<Option<BTreeSet<CheckCode>>> {
+    let (file_path, file_basename) = extract_path_names(path)?;
+    let code_set = {
+        let mut rv = BTreeSet::new();
+        pattern_code_pairs.iter().for_each(|x| {
+            if is_excluded(file_path, file_basename, &[x.pattern.clone()]) {
+                rv.insert(x.code.clone());
+            }
+        });
+        rv
+    };
+    let rv = if code_set.is_empty() {
+        None
+    } else {
+        Some(code_set)
+    };
+    Ok(rv)
 }
 
 /// Convert any path to an absolute path (based on the current working directory).

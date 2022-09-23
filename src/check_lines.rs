@@ -198,6 +198,7 @@ mod tests {
                 exclude: vec![],
                 extend_exclude: vec![],
                 select: BTreeSet::from_iter(vec![CheckCode::E501]),
+                per_file_ignores: vec![],
             };
             check_lines(
                 &mut checks,

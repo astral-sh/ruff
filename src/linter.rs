@@ -52,7 +52,17 @@ fn check_path(
     // Run the lines-based checks.
     check_lines(&mut checks, contents, &noqa_line_for, settings, autofix);
 
+    // Create path ignores (panics if path cannot be parsed)
+    let ignores = fs::ignores_from_path(path, &settings.per_file_ignores).unwrap();
+
+    // Filter checks by ignores
     checks
+        .into_iter()
+        .filter(|check| match &ignores {
+            Some(ignores_set) => !ignores_set.contains(check.kind.code()),
+            None => true,
+        })
+        .collect()
 }
 
 pub fn lint_path(

@@ -1,6 +1,8 @@
+use anyhow::{anyhow, Result};
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use glob::Pattern;
 use once_cell::sync::Lazy;
@@ -34,6 +36,27 @@ impl FilePattern {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct PerFileIgnore {
+    pub pattern: FilePattern,
+    pub code: CheckCode,
+}
+
+impl PerFileIgnore {
+    pub fn from_user(user_str: &str, project_root: &Option<PathBuf>) -> Result<Self> {
+        let (pattern_str, code_string) = {
+            let tokens = user_str.split(':').collect::<Vec<_>>();
+            if tokens.len() != 2 {
+                return Err(anyhow!("expected ':' delimited file pattern, code pair"));
+            }
+            (tokens[0], tokens[1])
+        };
+        let pattern = FilePattern::from_user(pattern_str, project_root);
+        let code = CheckCode::from_str(code_string)?;
+        Ok(Self { pattern, code })
+    }
+}
+
 #[derive(Debug)]
 pub struct Settings {
     pub pyproject: Option<PathBuf>,
@@ -42,6 +65,7 @@ pub struct Settings {
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
     pub select: BTreeSet<CheckCode>,
+    pub per_file_ignores: Vec<PerFileIgnore>,
 }
 
 impl Settings {
@@ -53,6 +77,7 @@ impl Settings {
             exclude: vec![],
             extend_exclude: vec![],
             select: BTreeSet::from([check_code]),
+            per_file_ignores: vec![],
         }
     }
 
@@ -64,6 +89,7 @@ impl Settings {
             exclude: vec![],
             extend_exclude: vec![],
             select: BTreeSet::from_iter(check_codes),
+            per_file_ignores: vec![],
         }
     }
 }
@@ -129,6 +155,7 @@ impl Settings {
             } else {
                 BTreeSet::from_iter(DEFAULT_CHECK_CODES)
             },
+            per_file_ignores: vec![],
             pyproject,
             project_root,
         };
@@ -152,5 +179,29 @@ impl Settings {
         for code in codes {
             self.select.remove(code);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn per_file_ignore_strings() {
+        let project_root = Some(Path::new("/tmp/").to_path_buf());
+        let result = PerFileIgnore::from_user("foo:E501", &project_root);
+        assert!(result.is_ok());
+        let result = PerFileIgnore::from_user("E501:foo", &project_root);
+        assert!(result.is_err());
+        let result = PerFileIgnore::from_user("E501", &project_root);
+        assert!(result.is_err());
+        let result = PerFileIgnore::from_user("foo", &project_root);
+        assert!(result.is_err());
+        let result = PerFileIgnore::from_user("foo:E501:E402", &project_root);
+        assert!(result.is_err());
+        let result = PerFileIgnore::from_user("**/bar:E501", &project_root);
+        assert!(result.is_ok());
+        let result = PerFileIgnore::from_user("bar:E502", &project_root);
+        assert!(result.is_err());
     }
 }

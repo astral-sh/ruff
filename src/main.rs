@@ -23,7 +23,7 @@ use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::pyproject;
-use ::ruff::settings::{FilePattern, Settings};
+use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ::ruff::tell_user;
 use ruff::linter::add_noqa_to_path;
 
@@ -73,6 +73,9 @@ struct Cli {
     /// Like --exclude, but adds additional files and directories on top of the excluded ones.
     #[clap(long, multiple = true)]
     extend_exclude: Vec<String>,
+    /// List of mappings from file pattern to code to exclude
+    #[clap(long, multiple = true)]
+    per_file_ignores: Vec<String>,
     /// Output serialization format for error messages.
     #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
@@ -244,6 +247,20 @@ fn inner_main() -> Result<ExitCode> {
         .iter()
         .map(|path| FilePattern::from_user(path, &project_root))
         .collect();
+    let per_file_ignores: Vec<PerFileIgnore> = {
+        let (rv, rv_err): (Vec<_>, Vec<_>) = cli
+            .per_file_ignores
+            .iter()
+            .map(|pair| PerFileIgnore::from_user(pair, &project_root))
+            .partition(Result::is_ok);
+        if !rv_err.is_empty() {
+            rv_err.into_iter().for_each(|err| {
+                println!("{}", err.unwrap_err());
+            });
+            return Ok(ExitCode::FAILURE);
+        }
+        rv.into_iter().flatten().collect()
+    };
 
     let mut settings = Settings::from_pyproject(pyproject, project_root);
     if !exclude.is_empty() {
@@ -251,6 +268,9 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !extend_exclude.is_empty() {
         settings.extend_exclude = extend_exclude;
+    }
+    if !per_file_ignores.is_empty() {
+        settings.per_file_ignores = per_file_ignores;
     }
     if !cli.select.is_empty() {
         settings.clear();
