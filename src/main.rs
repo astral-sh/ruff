@@ -245,7 +245,7 @@ fn inner_main() -> Result<ExitCode> {
         .map(|path| FilePattern::from_user(path, &project_root))
         .collect();
 
-    let mut settings = Settings::from_pyproject(pyproject, project_root);
+    let mut settings = Settings::from_pyproject(pyproject, project_root)?;
     if !exclude.is_empty() {
         settings.exclude = exclude;
     }
