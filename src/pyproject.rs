@@ -11,12 +11,10 @@ use crate::fs;
 pub fn load_config(pyproject: &Option<PathBuf>) -> Result<Config> {
     match pyproject {
         Some(pyproject) => match parse_pyproject_toml(pyproject) {
-            Ok(pyproject) => Ok(
-                pyproject
+            Ok(pyproject) => Ok(pyproject
                 .tool
                 .and_then(|tool| tool.ruff)
-                .unwrap_or_default()
-            ),
+                .unwrap_or_default()),
             Err(e) => {
                 println!("Failed to load pyproject.toml: {:?}", e);
                 Err(e)

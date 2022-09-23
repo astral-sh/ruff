@@ -103,7 +103,10 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 });
 
 impl Settings {
-    pub fn from_pyproject(pyproject: Option<PathBuf>, project_root: Option<PathBuf>) -> Result<Self> {
+    pub fn from_pyproject(
+        pyproject: Option<PathBuf>,
+        project_root: Option<PathBuf>,
+    ) -> Result<Self> {
         let config = load_config(&pyproject)?;
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
