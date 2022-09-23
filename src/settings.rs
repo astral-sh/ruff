@@ -11,7 +11,7 @@ use crate::checks::{CheckCode, DEFAULT_CHECK_CODES};
 use crate::fs;
 use crate::pyproject::load_config;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub enum FilePattern {
     Simple(&'static str),
     Complex(Pattern, Option<Pattern>),
@@ -36,7 +36,7 @@ impl FilePattern {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct PerFileIgnore {
     pub pattern: FilePattern,
     pub code: CheckCode,
@@ -100,6 +100,9 @@ impl Hash for Settings {
         for value in self.select.iter() {
             value.hash(state);
         }
+        for value in self.per_file_ignores.iter() {
+            value.hash(state);
+        }
     }
 }
 
@@ -155,7 +158,15 @@ impl Settings {
             } else {
                 BTreeSet::from_iter(DEFAULT_CHECK_CODES)
             },
-            per_file_ignores: vec![],
+            per_file_ignores: match config.per_file_ignores {
+                Some(ignore_strings) => ignore_strings
+                    .iter()
+                    .map(|x| PerFileIgnore::from_user(x, &project_root))
+                    .filter(Result::is_ok)
+                    .flatten()
+                    .collect(),
+                None => vec![],
+            },
             pyproject,
             project_root,
         };
