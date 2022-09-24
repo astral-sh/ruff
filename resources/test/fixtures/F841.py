@@ -10,14 +10,13 @@ except ValueError as e:
     print(e)
 
 
-def f():
-    _ = 0
+def f1():
     x = 1
     y = 2
     z = x + y
 
 
-def g():
+def f2():
     foo = (1, 2)
     (a, b) = (1, 2)
 
@@ -27,6 +26,12 @@ def g():
     (x, y) = baz = bar
 
 
-def h():
+def f3():
     locals()
     x = 1
+
+
+def f4():
+    _ = 1
+    __ = 1
+    _discarded = 1

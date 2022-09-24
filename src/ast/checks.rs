@@ -87,13 +87,12 @@ pub fn check_unused_variables(
     }
 
     for (name, binding) in scope.values.iter() {
-        // TODO(charlie): Ignore if using `locals`.
         if binding.used.is_none()
+            && matches!(binding.kind, BindingKind::Assignment)
             && !dummy_variable_rgx.is_match(name)
             && name != "__tracebackhide__"
             && name != "__traceback_info__"
             && name != "__traceback_supplement__"
-            && matches!(binding.kind, BindingKind::Assignment)
         {
             checks.push(Check::new(
                 CheckKind::UnusedVariable(name.to_string()),

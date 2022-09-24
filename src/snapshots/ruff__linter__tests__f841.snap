@@ -11,25 +11,25 @@ expression: checks
 - kind:
     UnusedVariable: z
   location:
-    row: 17
+    row: 16
     column: 5
   fix: ~
 - kind:
     UnusedVariable: foo
   location:
-    row: 21
+    row: 20
     column: 5
   fix: ~
 - kind:
     UnusedVariable: a
   location:
-    row: 22
+    row: 21
     column: 6
   fix: ~
 - kind:
     UnusedVariable: b
   location:
-    row: 22
+    row: 21
     column: 9
   fix: ~
 

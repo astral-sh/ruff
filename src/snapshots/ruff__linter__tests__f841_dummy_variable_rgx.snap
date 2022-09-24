@@ -9,27 +9,39 @@ expression: checks
     column: 1
   fix: ~
 - kind:
-    UnusedVariable: _
-  location:
-    row: 14
-    column: 5
-  fix: ~
-- kind:
     UnusedVariable: foo
   location:
-    row: 21
+    row: 20
     column: 5
   fix: ~
 - kind:
     UnusedVariable: a
   location:
-    row: 22
+    row: 21
     column: 6
   fix: ~
 - kind:
     UnusedVariable: b
   location:
-    row: 22
+    row: 21
     column: 9
+  fix: ~
+- kind:
+    UnusedVariable: _
+  location:
+    row: 35
+    column: 5
+  fix: ~
+- kind:
+    UnusedVariable: __
+  location:
+    row: 36
+    column: 5
+  fix: ~
+- kind:
+    UnusedVariable: _discarded
+  location:
+    row: 37
+    column: 5
   fix: ~
 

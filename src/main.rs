@@ -7,7 +7,7 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::{Parser, ValueHint};
 use colored::Colorize;
 use log::{debug, error};
@@ -87,9 +87,8 @@ struct Cli {
     #[clap(long, action)]
     add_noqa: bool,
     /// Regular expression matching the name of dummy variables.
-    /// If unspecified, defaults to '^_$'.
     #[clap(long)]
-    dummy_variable_rgx: Option<String>,
+    dummy_variable_rgx: Option<Regex>,
 }
 
 #[cfg(feature = "update-informer")]
@@ -271,8 +270,7 @@ fn inner_main() -> Result<ExitCode> {
         settings.ignore(&cli.extend_ignore);
     }
     if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
-        settings.dummy_variable_rgx = Regex::new(&dummy_variable_rgx)
-            .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?
+        settings.dummy_variable_rgx = dummy_variable_rgx;
     }
 
     if cli.show_settings && cli.show_files {
