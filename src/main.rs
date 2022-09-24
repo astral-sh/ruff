@@ -7,7 +7,7 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::{Parser, ValueHint};
 use colored::Colorize;
 use log::{debug, error};
@@ -250,7 +250,7 @@ fn inner_main() -> Result<ExitCode> {
         .map(|path| FilePattern::from_user(path, &project_root))
         .collect();
 
-    let mut settings = Settings::from_pyproject(pyproject, project_root);
+    let mut settings = Settings::from_pyproject(pyproject, project_root)?;
     if !exclude.is_empty() {
         settings.exclude = exclude;
     }
@@ -271,13 +271,8 @@ fn inner_main() -> Result<ExitCode> {
         settings.ignore(&cli.extend_ignore);
     }
     if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
-        settings.dummy_variable_rgx = match Regex::new(&dummy_variable_rgx) {
-            Ok(regex) => regex,
-            Err(e) => {
-                eprintln!("Invalid dummy variable regular expression: {}", e);
-                return Ok(ExitCode::FAILURE);
-            }
-        };
+        settings.dummy_variable_rgx = Regex::new(&dummy_variable_rgx)
+            .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?
     }
 
     if cli.show_settings && cli.show_files {
@@ -368,6 +363,9 @@ fn inner_main() -> Result<ExitCode> {
 fn main() -> ExitCode {
     match inner_main() {
         Ok(code) => code,
-        Err(_) => ExitCode::FAILURE,
+        Err(err) => {
+            eprintln!("{err}");
+            ExitCode::FAILURE
+        }
     }
 }

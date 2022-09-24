@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
+use anyhow::{anyhow, Result};
 use glob::Pattern;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -109,7 +110,10 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> = Lazy::new(|| Regex::new("^_$").unwrap());
 
 impl Settings {
-    pub fn from_pyproject(pyproject: Option<PathBuf>, project_root: Option<PathBuf>) -> Self {
+    pub fn from_pyproject(
+        pyproject: Option<PathBuf>,
+        project_root: Option<PathBuf>,
+    ) -> Result<Self> {
         let config = load_config(&pyproject);
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
@@ -136,17 +140,18 @@ impl Settings {
             } else {
                 BTreeSet::from_iter(DEFAULT_CHECK_CODES)
             },
-            dummy_variable_rgx: config.dummy_variable_rgx.map_or_else(
-                || DEFAULT_DUMMY_VARIABLE_RGX.clone(),
-                |rgx| Regex::new(&rgx).expect("Invalid dummy variable regular expression."),
-            ),
+            dummy_variable_rgx: match config.dummy_variable_rgx {
+                Some(pattern) => Regex::new(&pattern)
+                    .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
+                None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
+            },
             pyproject,
             project_root,
         };
         if let Some(ignore) = &config.ignore {
             settings.ignore(ignore);
         }
-        settings
+        Ok(settings)
     }
 
     pub fn clear(&mut self) {
