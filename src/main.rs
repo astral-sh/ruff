@@ -86,8 +86,8 @@ struct Cli {
     /// Enable automatic additions of noqa directives to failing lines.
     #[clap(long, action)]
     add_noqa: bool,
-    // Regular expression matching the name of dummy variables (i.e. "unused_variable").
-    #[clap(long)]
+    /// Regular expression matching the name of dummy variables (i.e. '^unused_.+').
+    #[clap(long, value_parser)]
     dummy_variable_rgx: Option<String>,
 }
 
