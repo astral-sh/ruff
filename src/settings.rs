@@ -2,9 +2,10 @@ use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use glob::Pattern;
 use once_cell::sync::Lazy;
+use regex::Regex;
 
 use crate::checks::{CheckCode, DEFAULT_CHECK_CODES};
 use crate::fs;
@@ -43,6 +44,7 @@ pub struct Settings {
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
     pub select: BTreeSet<CheckCode>,
+    pub dummy_variable_rgx: Regex,
 }
 
 impl Settings {
@@ -54,6 +56,7 @@ impl Settings {
             exclude: vec![],
             extend_exclude: vec![],
             select: BTreeSet::from([check_code]),
+            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
         }
     }
 
@@ -65,6 +68,7 @@ impl Settings {
             exclude: vec![],
             extend_exclude: vec![],
             select: BTreeSet::from_iter(check_codes),
+            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
         }
     }
 }
@@ -72,6 +76,7 @@ impl Settings {
 impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.line_length.hash(state);
+        self.dummy_variable_rgx.as_str().hash(state);
         for value in self.select.iter() {
             value.hash(state);
         }
@@ -101,6 +106,9 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
         FilePattern::Simple("venv"),
     ]
 });
+
+static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
+    Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
 
 impl Settings {
     pub fn from_pyproject(
@@ -132,6 +140,11 @@ impl Settings {
                 BTreeSet::from_iter(select)
             } else {
                 BTreeSet::from_iter(DEFAULT_CHECK_CODES)
+            },
+            dummy_variable_rgx: match config.dummy_variable_rgx {
+                Some(pattern) => Regex::new(&pattern)
+                    .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
+                None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
             },
             pyproject,
             project_root,

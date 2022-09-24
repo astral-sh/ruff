@@ -30,6 +30,7 @@ pub struct Config {
     pub extend_exclude: Option<Vec<String>>,
     pub select: Option<Vec<CheckCode>>,
     pub ignore: Option<Vec<CheckCode>>,
+    pub dummy_variable_rgx: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -130,6 +131,7 @@ mod tests {
                     extend_exclude: None,
                     select: None,
                     ignore: None,
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -150,6 +152,7 @@ line-length = 79
                     extend_exclude: None,
                     select: None,
                     ignore: None,
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -170,6 +173,7 @@ exclude = ["foo.py"]
                     extend_exclude: None,
                     select: None,
                     ignore: None,
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -190,6 +194,7 @@ select = ["E501"]
                     extend_exclude: None,
                     select: Some(vec![CheckCode::E501]),
                     ignore: None,
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -210,6 +215,7 @@ ignore = ["E501"]
                     extend_exclude: None,
                     select: None,
                     ignore: Some(vec![CheckCode::E501]),
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -274,6 +280,7 @@ other-attribute = 1
                 ]),
                 select: None,
                 ignore: None,
+                dummy_variable_rgx: None,
             }
         );
 

@@ -119,6 +119,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use regex::Regex;
     use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
 
@@ -589,6 +590,21 @@ mod tests {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F841.py"),
             &settings::Settings::for_rule(CheckCode::F841),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn f841_dummy_variable_rgx() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/F841.py"),
+            &settings::Settings {
+                dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
+                ..settings::Settings::for_rule(CheckCode::F841)
+            },
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
