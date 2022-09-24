@@ -10,23 +10,16 @@ use serde::{Deserialize, Deserializer};
 use crate::checks::CheckCode;
 use crate::fs;
 
-pub fn load_config(pyproject: &Option<PathBuf>) -> Config {
+pub fn load_config(pyproject: &Option<PathBuf>) -> Result<Config> {
     match pyproject {
-        Some(pyproject) => match parse_pyproject_toml(pyproject) {
-            Ok(pyproject) => pyproject
-                .tool
-                .and_then(|tool| tool.ruff)
-                .unwrap_or_default(),
-            Err(e) => {
-                println!("Failed to load pyproject.toml: {:?}", e);
-                println!("Falling back to default configuration...");
-                Default::default()
-            }
-        },
+        Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
+            .tool
+            .and_then(|tool| tool.ruff)
+            .unwrap_or_default()),
         None => {
-            println!("No pyproject.toml found.");
-            println!("Falling back to default configuration...");
-            Default::default()
+            eprintln!("No pyproject.toml found.");
+            eprintln!("Falling back to default configuration...");
+            Ok(Default::default())
         }
     }
 }
@@ -40,6 +33,7 @@ pub struct Config {
     pub select: Option<Vec<CheckCode>>,
     pub ignore: Option<Vec<CheckCode>>,
     pub per_file_ignores: Option<Vec<StrCheckCodePair>>,
+    pub dummy_variable_rgx: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -184,6 +178,7 @@ mod tests {
                     select: None,
                     ignore: None,
                     per_file_ignores: None,
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -205,6 +200,7 @@ line-length = 79
                     select: None,
                     ignore: None,
                     per_file_ignores: None,
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -226,6 +222,7 @@ exclude = ["foo.py"]
                     select: None,
                     ignore: None,
                     per_file_ignores: None,
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -247,6 +244,7 @@ select = ["E501"]
                     select: Some(vec![CheckCode::E501]),
                     ignore: None,
                     per_file_ignores: None,
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -268,6 +266,7 @@ ignore = ["E501"]
                     select: None,
                     ignore: Some(vec![CheckCode::E501]),
                     per_file_ignores: None,
+                    dummy_variable_rgx: None,
                 })
             })
         );
@@ -333,6 +332,7 @@ other-attribute = 1
                 select: None,
                 ignore: None,
                 per_file_ignores: None,
+                dummy_variable_rgx: None,
             }
         );
 

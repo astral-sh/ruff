@@ -2,8 +2,10 @@ use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
+use anyhow::{anyhow, Result};
 use glob::Pattern;
 use once_cell::sync::Lazy;
+use regex::Regex;
 
 use crate::checks::{CheckCode, DEFAULT_CHECK_CODES};
 use crate::fs;
@@ -57,6 +59,7 @@ pub struct Settings {
     pub extend_exclude: Vec<FilePattern>,
     pub select: BTreeSet<CheckCode>,
     pub per_file_ignores: Vec<PerFileIgnore>,
+    pub dummy_variable_rgx: Regex,
 }
 
 impl Settings {
@@ -69,6 +72,7 @@ impl Settings {
             extend_exclude: vec![],
             select: BTreeSet::from([check_code]),
             per_file_ignores: vec![],
+            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
         }
     }
 
@@ -81,6 +85,7 @@ impl Settings {
             extend_exclude: vec![],
             select: BTreeSet::from_iter(check_codes),
             per_file_ignores: vec![],
+            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
         }
     }
 }
@@ -88,6 +93,7 @@ impl Settings {
 impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.line_length.hash(state);
+        self.dummy_variable_rgx.as_str().hash(state);
         for value in self.select.iter() {
             value.hash(state);
         }
@@ -121,9 +127,15 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     ]
 });
 
+static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
+    Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
+
 impl Settings {
-    pub fn from_pyproject(pyproject: Option<PathBuf>, project_root: Option<PathBuf>) -> Self {
-        let config = load_config(&pyproject);
+    pub fn from_pyproject(
+        pyproject: Option<PathBuf>,
+        project_root: Option<PathBuf>,
+    ) -> Result<Self> {
+        let config = load_config(&pyproject)?;
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
             exclude: config
@@ -156,13 +168,18 @@ impl Settings {
                     .collect(),
                 None => vec![],
             },
+            dummy_variable_rgx: match config.dummy_variable_rgx {
+                Some(pattern) => Regex::new(&pattern)
+                    .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
+                None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
+            },
             pyproject,
             project_root,
         };
         if let Some(ignore) = &config.ignore {
             settings.ignore(ignore);
         }
-        settings
+        Ok(settings)
     }
 
     pub fn clear(&mut self) {

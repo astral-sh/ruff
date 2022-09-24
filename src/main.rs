@@ -1,5 +1,6 @@
 extern crate core;
 
+use regex::Regex;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -18,6 +19,7 @@ use ::ruff::cache;
 use ::ruff::checks::CheckCode;
 use ::ruff::checks::CheckKind;
 use ::ruff::fs::iter_python_files;
+use ::ruff::linter::add_noqa_to_path;
 use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
@@ -25,7 +27,6 @@ use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::pyproject::{self, StrCheckCodePair};
 use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ::ruff::tell_user;
-use ruff::linter::add_noqa_to_path;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -88,6 +89,9 @@ struct Cli {
     /// Enable automatic additions of noqa directives to failing lines.
     #[clap(long, action)]
     add_noqa: bool,
+    /// Regular expression matching the name of dummy variables.
+    #[clap(long)]
+    dummy_variable_rgx: Option<Regex>,
 }
 
 #[cfg(feature = "update-informer")]
@@ -253,7 +257,7 @@ fn inner_main() -> Result<ExitCode> {
         .map(|pair| PerFileIgnore::new(pair, &project_root))
         .collect();
 
-    let mut settings = Settings::from_pyproject(pyproject, project_root);
+    let mut settings = Settings::from_pyproject(pyproject, project_root)?;
     if !exclude.is_empty() {
         settings.exclude = exclude;
     }
@@ -276,9 +280,12 @@ fn inner_main() -> Result<ExitCode> {
     if !cli.extend_ignore.is_empty() {
         settings.ignore(&cli.extend_ignore);
     }
+    if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
+        settings.dummy_variable_rgx = dummy_variable_rgx;
+    }
 
     if cli.show_settings && cli.show_files {
-        println!("Error: specify --show-settings or show-files (not both).");
+        eprintln!("Error: specify --show-settings or show-files (not both).");
         return Ok(ExitCode::FAILURE);
     }
     if cli.show_settings {
@@ -295,15 +302,15 @@ fn inner_main() -> Result<ExitCode> {
     let mut printer = Printer::new(cli.format, cli.verbose);
     if cli.watch {
         if cli.fix {
-            println!("Warning: --fix is not enabled in watch mode.");
+            eprintln!("Warning: --fix is not enabled in watch mode.");
         }
 
         if cli.add_noqa {
-            println!("Warning: --no-qa is not enabled in watch mode.");
+            eprintln!("Warning: --no-qa is not enabled in watch mode.");
         }
 
         if cli.format != SerializationFormat::Text {
-            println!("Warning: --format 'text' is used in watch mode.");
+            eprintln!("Warning: --format 'text' is used in watch mode.");
         }
 
         // Perform an initial run instantly.
@@ -365,6 +372,9 @@ fn inner_main() -> Result<ExitCode> {
 fn main() -> ExitCode {
     match inner_main() {
         Ok(code) => code,
-        Err(_) => ExitCode::FAILURE,
+        Err(err) => {
+            eprintln!("{} {:?}", "error".red().bold(), err);
+            ExitCode::FAILURE
+        }
     }
 }
