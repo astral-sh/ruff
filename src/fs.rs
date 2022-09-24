@@ -125,8 +125,14 @@ pub fn ignores_from_path<'a>(
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
         .iter()
-        .filter(|x| is_excluded(file_path, file_basename, [&x.pattern].into_iter()))
-        .map(|x| &x.code)
+        .filter(|pattern_code_pair| {
+            is_excluded(
+                file_path,
+                file_basename,
+                [&pattern_code_pair.pattern].into_iter(),
+            )
+        })
+        .map(|pattern_code_pair| &pattern_code_pair.code)
         .collect())
 }
 

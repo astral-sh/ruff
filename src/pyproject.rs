@@ -63,11 +63,12 @@ impl<'de> Deserialize<'de> for StrCheckCodePair {
 
 impl FromStr for StrCheckCodePair {
     type Err = anyhow::Error;
+
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         let (pattern_str, code_string) = {
             let tokens = string.split(':').collect::<Vec<_>>();
             if tokens.len() != 2 {
-                return Err(anyhow!("expected {}", Self::EXPECTED_PATTERN));
+                return Err(anyhow!("Expected {}", Self::EXPECTED_PATTERN));
             }
             (tokens[0], tokens[1])
         };

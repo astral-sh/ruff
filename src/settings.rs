@@ -161,13 +161,15 @@ impl Settings {
             } else {
                 BTreeSet::from_iter(DEFAULT_CHECK_CODES)
             },
-            per_file_ignores: match config.per_file_ignores {
-                Some(ignore_strings) => ignore_strings
-                    .into_iter()
-                    .map(|pair| PerFileIgnore::new(pair, &project_root))
-                    .collect(),
-                None => vec![],
-            },
+            per_file_ignores: config
+                .per_file_ignores
+                .map(|ignore_strings| {
+                    ignore_strings
+                        .into_iter()
+                        .map(|pair| PerFileIgnore::new(pair, &project_root))
+                        .collect()
+                })
+                .unwrap_or_default(),
             dummy_variable_rgx: match config.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
                     .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
