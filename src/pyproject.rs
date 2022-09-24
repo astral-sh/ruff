@@ -43,7 +43,7 @@ pub struct StrCheckCodePair {
 }
 
 impl StrCheckCodePair {
-    const EXPECTED_PATTERN: &str = "<FilePattern>:<CheckCode> pattern";
+    const EXPECTED_PATTERN: &'static str = "<FilePattern>:<CheckCode> pattern";
 }
 
 impl<'de> Deserialize<'de> for StrCheckCodePair {
