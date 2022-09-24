@@ -106,7 +106,8 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     ]
 });
 
-static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> = Lazy::new(|| Regex::new("^_+$").unwrap());
+static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
+    Lazy::new(|| Regex::new("_+$|_[a-zA-Z0-9_]*[a-zA-Z0-9]+?$").unwrap());
 
 impl Settings {
     pub fn from_pyproject(pyproject: Option<PathBuf>, project_root: Option<PathBuf>) -> Self {
