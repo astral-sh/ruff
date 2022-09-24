@@ -56,13 +56,14 @@ fn check_path(
     let ignores = fs::ignores_from_path(path, &settings.per_file_ignores).unwrap();
 
     // Filter checks by ignores
-    checks
-        .into_iter()
-        .filter(|check| match &ignores {
-            Some(ignores_set) => !ignores_set.contains(check.kind.code()),
-            None => true,
-        })
-        .collect()
+    if ignores.is_empty() {
+        checks
+    } else {
+        checks
+            .into_iter()
+            .filter(|check| !ignores.contains(check.kind.code()))
+            .collect()
+    }
 }
 
 pub fn lint_path(

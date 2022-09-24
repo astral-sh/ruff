@@ -27,9 +27,12 @@ fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
     Ok((file_path, file_basename))
 }
 
-fn is_excluded(file_path: &str, file_basename: &str, exclude: &[FilePattern]) -> bool {
+fn is_excluded<'a, T>(file_path: &str, file_basename: &str, exclude: T) -> bool
+where
+    T: Iterator<Item = &'a FilePattern>,
+{
     for pattern in exclude {
-        match &pattern {
+        match pattern {
             FilePattern::Simple(basename) => {
                 if *basename == file_basename {
                     return true;
@@ -47,7 +50,7 @@ fn is_excluded(file_path: &str, file_basename: &str, exclude: &[FilePattern]) ->
                     return true;
                 }
             }
-        }
+        };
     }
     false
 }
@@ -87,13 +90,13 @@ pub fn iter_python_files<'a>(
 
                     if has_exclude
                         && (!exclude_simple || file_type.is_dir())
-                        && is_excluded(file_path, file_basename, exclude)
+                        && is_excluded(file_path, file_basename, exclude.iter())
                     {
                         debug!("Ignored path via `exclude`: {:?}", path);
                         false
                     } else if has_extend_exclude
                         && (!extend_exclude_simple || file_type.is_dir())
-                        && is_excluded(file_path, file_basename, extend_exclude)
+                        && is_excluded(file_path, file_basename, extend_exclude.iter())
                     {
                         debug!("Ignored path via `extend-exclude`: {:?}", path);
                         false
@@ -115,28 +118,16 @@ pub fn iter_python_files<'a>(
 }
 
 /// Create tree set with codes matching the pattern/code pairs.
-///
-/// Guarantees a `Some` result will be non-empty
-pub fn ignores_from_path(
+pub fn ignores_from_path<'a>(
     path: &Path,
-    pattern_code_pairs: &[PerFileIgnore],
-) -> Result<Option<BTreeSet<CheckCode>>> {
+    pattern_code_pairs: &'a [PerFileIgnore],
+) -> Result<BTreeSet<&'a CheckCode>> {
     let (file_path, file_basename) = extract_path_names(path)?;
-    let code_set = {
-        let mut rv = BTreeSet::new();
-        pattern_code_pairs.iter().for_each(|x| {
-            if is_excluded(file_path, file_basename, &[x.pattern.clone()]) {
-                rv.insert(x.code.clone());
-            }
-        });
-        rv
-    };
-    let rv = if code_set.is_empty() {
-        None
-    } else {
-        Some(code_set)
-    };
-    Ok(rv)
+    Ok(pattern_code_pairs
+        .iter()
+        .filter(|x| is_excluded(file_path, file_basename, [&x.pattern].into_iter()))
+        .map(|x| &x.code)
+        .collect())
 }
 
 /// Convert any path to an absolute path (based on the current working directory).
@@ -207,7 +198,7 @@ mod tests {
             &Some(project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &exclude));
+        assert!(is_excluded(file_path, file_basename, exclude.iter()));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
         let exclude = vec![FilePattern::from_user(
@@ -215,7 +206,7 @@ mod tests {
             &Some(project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &exclude));
+        assert!(is_excluded(file_path, file_basename, exclude.iter()));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
@@ -225,7 +216,7 @@ mod tests {
             &Some(project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &exclude));
+        assert!(is_excluded(file_path, file_basename, exclude.iter()));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
         let exclude = vec![FilePattern::from_user(
@@ -233,7 +224,7 @@ mod tests {
             &Some(project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &exclude));
+        assert!(is_excluded(file_path, file_basename, exclude.iter()));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
@@ -243,7 +234,7 @@ mod tests {
             &Some(project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &exclude));
+        assert!(is_excluded(file_path, file_basename, exclude.iter()));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
@@ -253,7 +244,7 @@ mod tests {
             &Some(project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &exclude));
+        assert!(is_excluded(file_path, file_basename, exclude.iter()));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
@@ -263,7 +254,7 @@ mod tests {
             &Some(project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(!is_excluded(file_path, file_basename, &exclude));
+        assert!(!is_excluded(file_path, file_basename, exclude.iter()));
 
         Ok(())
     }

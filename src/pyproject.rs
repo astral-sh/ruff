@@ -1,9 +1,11 @@
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use common_path::common_path_all;
 use path_absolutize::Absolutize;
-use serde::Deserialize;
+use serde::de;
+use serde::{Deserialize, Deserializer};
 
 use crate::checks::CheckCode;
 use crate::fs;
@@ -37,7 +39,48 @@ pub struct Config {
     pub extend_exclude: Option<Vec<String>>,
     pub select: Option<Vec<CheckCode>>,
     pub ignore: Option<Vec<CheckCode>>,
-    pub per_file_ignores: Option<Vec<String>>,
+    pub per_file_ignores: Option<Vec<StrCheckCodePair>>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct StrCheckCodePair {
+    pub pattern: String,
+    pub code: CheckCode,
+}
+
+impl StrCheckCodePair {
+    const EXPECTED_PATTERN: &str = "<FilePattern>:<CheckCode> pattern";
+}
+
+impl<'de> Deserialize<'de> for StrCheckCodePair {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let str_result = String::deserialize(deserializer)?;
+        Self::from_str(str_result.as_str()).map_err(|_| {
+            de::Error::invalid_value(
+                de::Unexpected::Str(str_result.as_str()),
+                &Self::EXPECTED_PATTERN,
+            )
+        })
+    }
+}
+
+impl FromStr for StrCheckCodePair {
+    type Err = anyhow::Error;
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        let (pattern_str, code_string) = {
+            let tokens = string.split(':').collect::<Vec<_>>();
+            if tokens.len() != 2 {
+                return Err(anyhow!("expected {}", Self::EXPECTED_PATTERN));
+            }
+            (tokens[0], tokens[1])
+        };
+        let code = CheckCode::from_str(code_string)?;
+        let pattern = pattern_str.into();
+        Ok(Self { pattern, code })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
@@ -103,9 +146,11 @@ pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
 mod tests {
     use std::env::current_dir;
     use std::path::PathBuf;
+    use std::str::FromStr;
 
     use anyhow::Result;
 
+    use super::StrCheckCodePair;
     use crate::checks::CheckCode;
     use crate::pyproject::{
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Config, PyProject, Tools,
@@ -292,5 +337,23 @@ other-attribute = 1
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn str_check_code_pair_strings() {
+        let result = StrCheckCodePair::from_str("foo:E501");
+        assert!(result.is_ok());
+        let result = StrCheckCodePair::from_str("E501:foo");
+        assert!(result.is_err());
+        let result = StrCheckCodePair::from_str("E501");
+        assert!(result.is_err());
+        let result = StrCheckCodePair::from_str("foo");
+        assert!(result.is_err());
+        let result = StrCheckCodePair::from_str("foo:E501:E402");
+        assert!(result.is_err());
+        let result = StrCheckCodePair::from_str("**/bar:E501");
+        assert!(result.is_ok());
+        let result = StrCheckCodePair::from_str("bar:E502");
+        assert!(result.is_err());
     }
 }

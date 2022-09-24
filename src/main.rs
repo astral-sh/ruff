@@ -22,7 +22,7 @@ use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
-use ::ruff::pyproject;
+use ::ruff::pyproject::{self, StrCheckCodePair};
 use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ::ruff::tell_user;
 use ruff::linter::add_noqa_to_path;
@@ -75,7 +75,7 @@ struct Cli {
     extend_exclude: Vec<String>,
     /// List of mappings from file pattern to code to exclude
     #[clap(long, multiple = true)]
-    per_file_ignores: Vec<String>,
+    per_file_ignores: Vec<StrCheckCodePair>,
     /// Output serialization format for error messages.
     #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
@@ -247,20 +247,11 @@ fn inner_main() -> Result<ExitCode> {
         .iter()
         .map(|path| FilePattern::from_user(path, &project_root))
         .collect();
-    let per_file_ignores: Vec<PerFileIgnore> = {
-        let (rv, rv_err): (Vec<_>, Vec<_>) = cli
-            .per_file_ignores
-            .iter()
-            .map(|pair| PerFileIgnore::from_user(pair, &project_root))
-            .partition(Result::is_ok);
-        if !rv_err.is_empty() {
-            rv_err.into_iter().for_each(|err| {
-                println!("{}", err.unwrap_err());
-            });
-            return Ok(ExitCode::FAILURE);
-        }
-        rv.into_iter().flatten().collect()
-    };
+    let per_file_ignores: Vec<PerFileIgnore> = cli
+        .per_file_ignores
+        .into_iter()
+        .map(|pair| PerFileIgnore::new(pair, &project_root))
+        .collect();
 
     let mut settings = Settings::from_pyproject(pyproject, project_root);
     if !exclude.is_empty() {
