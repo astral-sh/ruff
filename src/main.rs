@@ -19,6 +19,7 @@ use ::ruff::cache;
 use ::ruff::checks::CheckCode;
 use ::ruff::checks::CheckKind;
 use ::ruff::fs::iter_python_files;
+use ::ruff::linter::add_noqa_to_path;
 use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
@@ -26,7 +27,6 @@ use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::pyproject;
 use ::ruff::settings::{FilePattern, Settings};
 use ::ruff::tell_user;
-use ruff::linter::add_noqa_to_path;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -364,7 +364,7 @@ fn main() -> ExitCode {
     match inner_main() {
         Ok(code) => code,
         Err(err) => {
-            eprintln!("{err}");
+            println!("{} {:?}", "error".red().bold(), err);
             ExitCode::FAILURE
         }
     }

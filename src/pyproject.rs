@@ -8,23 +8,16 @@ use serde::Deserialize;
 use crate::checks::CheckCode;
 use crate::fs;
 
-pub fn load_config(pyproject: &Option<PathBuf>) -> Config {
+pub fn load_config(pyproject: &Option<PathBuf>) -> Result<Config> {
     match pyproject {
-        Some(pyproject) => match parse_pyproject_toml(pyproject) {
-            Ok(pyproject) => pyproject
-                .tool
-                .and_then(|tool| tool.ruff)
-                .unwrap_or_default(),
-            Err(e) => {
-                println!("Failed to load pyproject.toml: {:?}", e);
-                println!("Falling back to default configuration...");
-                Default::default()
-            }
-        },
+        Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
+            .tool
+            .and_then(|tool| tool.ruff)
+            .unwrap_or_default()),
         None => {
             println!("No pyproject.toml found.");
             println!("Falling back to default configuration...");
-            Default::default()
+            Ok(Default::default())
         }
     }
 }

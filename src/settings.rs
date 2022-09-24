@@ -114,7 +114,7 @@ impl Settings {
         pyproject: Option<PathBuf>,
         project_root: Option<PathBuf>,
     ) -> Result<Self> {
-        let config = load_config(&pyproject);
+        let config = load_config(&pyproject)?;
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
             exclude: config
