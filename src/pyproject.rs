@@ -10,12 +10,10 @@ use crate::fs;
 
 pub fn load_config(pyproject: &Option<PathBuf>) -> Result<Config> {
     match pyproject {
-        Some(pyproject) => {
-            parse_pyproject_toml(pyproject)?
+        Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
             .tool
             .and_then(|tool| tool.ruff)
-            .unwrap_or_default())
-        }
+            .unwrap_or_default()),
         None => {
             println!("No pyproject.toml found.");
             println!("Falling back to default configuration...");
