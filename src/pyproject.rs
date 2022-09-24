@@ -15,8 +15,8 @@ pub fn load_config(pyproject: &Option<PathBuf>) -> Result<Config> {
             .and_then(|tool| tool.ruff)
             .unwrap_or_default()),
         None => {
-            println!("No pyproject.toml found.");
-            println!("Falling back to default configuration...");
+            eprintln!("No pyproject.toml found.");
+            eprintln!("Falling back to default configuration...");
             Ok(Default::default())
         }
     }

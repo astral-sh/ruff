@@ -267,7 +267,7 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     if cli.show_settings && cli.show_files {
-        println!("Error: specify --show-settings or show-files (not both).");
+        eprintln!("Error: specify --show-settings or show-files (not both).");
         return Ok(ExitCode::FAILURE);
     }
     if cli.show_settings {
@@ -284,15 +284,15 @@ fn inner_main() -> Result<ExitCode> {
     let mut printer = Printer::new(cli.format, cli.verbose);
     if cli.watch {
         if cli.fix {
-            println!("Warning: --fix is not enabled in watch mode.");
+            eprintln!("Warning: --fix is not enabled in watch mode.");
         }
 
         if cli.add_noqa {
-            println!("Warning: --no-qa is not enabled in watch mode.");
+            eprintln!("Warning: --no-qa is not enabled in watch mode.");
         }
 
         if cli.format != SerializationFormat::Text {
-            println!("Warning: --format 'text' is used in watch mode.");
+            eprintln!("Warning: --format 'text' is used in watch mode.");
         }
 
         // Perform an initial run instantly.
