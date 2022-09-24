@@ -212,8 +212,7 @@ variables.)
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
 1. Flake8 has a plugin architecture and supports writing custom lint rules.
-2. Flake8 supports a wider range of `noqa` patterns, such as per-file ignores defined in `.flake8`.
-3. ruff does not yet support parenthesized context managers.
+2. ruff does not yet support parenthesized context managers.
 
 ## Rules
 
