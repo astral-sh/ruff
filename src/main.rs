@@ -245,7 +245,7 @@ fn inner_main() -> Result<ExitCode> {
         .map(|path| FilePattern::from_user(path, &project_root))
         .collect();
 
-    let mut settings = Settings::from_pyproject(pyproject, project_root);
+    let mut settings = Settings::from_pyproject(pyproject, project_root)?;
     if !exclude.is_empty() {
         settings.exclude = exclude;
     }
@@ -354,6 +354,9 @@ fn inner_main() -> Result<ExitCode> {
 fn main() -> ExitCode {
     match inner_main() {
         Ok(code) => code,
-        Err(_) => ExitCode::FAILURE,
+        Err(err) => {
+            println!("{} {:?}", "error".red().bold(), err);
+            ExitCode::FAILURE
+        }
     }
 }

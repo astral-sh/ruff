@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
+use anyhow::Result;
 use glob::Pattern;
 use once_cell::sync::Lazy;
 
@@ -102,8 +103,11 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 });
 
 impl Settings {
-    pub fn from_pyproject(pyproject: Option<PathBuf>, project_root: Option<PathBuf>) -> Self {
-        let config = load_config(&pyproject);
+    pub fn from_pyproject(
+        pyproject: Option<PathBuf>,
+        project_root: Option<PathBuf>,
+    ) -> Result<Self> {
+        let config = load_config(&pyproject)?;
         let mut settings = Settings {
             line_length: config.line_length.unwrap_or(88),
             exclude: config
@@ -135,7 +139,7 @@ impl Settings {
         if let Some(ignore) = &config.ignore {
             settings.ignore(ignore);
         }
-        settings
+        Ok(settings)
     }
 
     pub fn clear(&mut self) {
