@@ -21,7 +21,7 @@ fn check_path(
     tokens: Vec<LexResult>,
     settings: &Settings,
     autofix: &fixer::Mode,
-) -> Vec<Check> {
+) -> Result<Vec<Check>> {
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
@@ -52,7 +52,18 @@ fn check_path(
     // Run the lines-based checks.
     check_lines(&mut checks, contents, &noqa_line_for, settings, autofix);
 
-    checks
+    // Create path ignores.
+    if !checks.is_empty() && !settings.per_file_ignores.is_empty() {
+        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores)?;
+        if !ignores.is_empty() {
+            return Ok(checks
+                .into_iter()
+                .filter(|check| !ignores.contains(check.kind.code()))
+                .collect());
+        }
+    }
+
+    Ok(checks)
 }
 
 pub fn lint_path(
@@ -76,7 +87,7 @@ pub fn lint_path(
     let tokens: Vec<LexResult> = lexer::make_tokenizer(&contents).collect();
 
     // Generate checks.
-    let mut checks = check_path(path, &contents, tokens, settings, autofix);
+    let mut checks = check_path(path, &contents, tokens, settings, autofix)?;
 
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
@@ -109,7 +120,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
     // Generate checks.
-    let checks = check_path(path, &contents, tokens, settings, &fixer::Mode::None);
+    let checks = check_path(path, &contents, tokens, settings, &fixer::Mode::None)?;
 
     add_noqa(&checks, &contents, &noqa_line_for, path)
 }
@@ -136,9 +147,7 @@ mod tests {
     ) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;
         let tokens: Vec<LexResult> = lexer::make_tokenizer(&contents).collect();
-        Ok(linter::check_path(
-            path, &contents, tokens, settings, autofix,
-        ))
+        linter::check_path(path, &contents, tokens, settings, autofix)
     }
 
     #[test]

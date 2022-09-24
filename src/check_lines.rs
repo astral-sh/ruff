@@ -180,12 +180,11 @@ pub fn check_lines(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-
-    use regex::Regex;
+    use crate::autofix::fixer;
+    use crate::checks::{Check, CheckCode};
+    use crate::settings;
 
     use super::check_lines;
-    use super::*;
 
     #[test]
     fn e501_non_ascii_char() {
@@ -193,20 +192,14 @@ mod tests {
         let noqa_line_for: Vec<usize> = vec![1];
         let check_with_max_line_length = |line_length: usize| {
             let mut checks: Vec<Check> = vec![];
-            let settings = Settings {
-                pyproject: None,
-                project_root: None,
-                line_length,
-                exclude: vec![],
-                extend_exclude: vec![],
-                select: BTreeSet::from_iter(vec![CheckCode::E501]),
-                dummy_variable_rgx: Regex::new(r"^_+").unwrap(),
-            };
             check_lines(
                 &mut checks,
                 line,
                 &noqa_line_for,
-                &settings,
+                &settings::Settings {
+                    line_length,
+                    ..settings::Settings::for_rule(CheckCode::E501)
+                },
                 &fixer::Mode::Generate,
             );
             return checks;

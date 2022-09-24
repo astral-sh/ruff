@@ -24,8 +24,8 @@ use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
-use ::ruff::pyproject;
-use ::ruff::settings::{FilePattern, Settings};
+use ::ruff::pyproject::{self, StrCheckCodePair};
+use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ::ruff::tell_user;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -74,6 +74,9 @@ struct Cli {
     /// Like --exclude, but adds additional files and directories on top of the excluded ones.
     #[clap(long, multiple = true)]
     extend_exclude: Vec<String>,
+    /// List of mappings from file pattern to code to exclude
+    #[clap(long, multiple = true)]
+    per_file_ignores: Vec<StrCheckCodePair>,
     /// Output serialization format for error messages.
     #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
@@ -248,6 +251,11 @@ fn inner_main() -> Result<ExitCode> {
         .iter()
         .map(|path| FilePattern::from_user(path, &project_root))
         .collect();
+    let per_file_ignores: Vec<PerFileIgnore> = cli
+        .per_file_ignores
+        .into_iter()
+        .map(|pair| PerFileIgnore::new(pair, &project_root))
+        .collect();
 
     let mut settings = Settings::from_pyproject(pyproject, project_root)?;
     if !exclude.is_empty() {
@@ -255,6 +263,9 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !extend_exclude.is_empty() {
         settings.extend_exclude = extend_exclude;
+    }
+    if !per_file_ignores.is_empty() {
+        settings.per_file_ignores = per_file_ignores;
     }
     if !cli.select.is_empty() {
         settings.clear();

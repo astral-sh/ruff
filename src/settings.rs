@@ -9,9 +9,9 @@ use regex::Regex;
 
 use crate::checks::{CheckCode, DEFAULT_CHECK_CODES};
 use crate::fs;
-use crate::pyproject::load_config;
+use crate::pyproject::{load_config, StrCheckCodePair};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub enum FilePattern {
     Simple(&'static str),
     Complex(Pattern, Option<Pattern>),
@@ -36,6 +36,20 @@ impl FilePattern {
     }
 }
 
+#[derive(Debug, Clone, Hash)]
+pub struct PerFileIgnore {
+    pub pattern: FilePattern,
+    pub code: CheckCode,
+}
+
+impl PerFileIgnore {
+    pub fn new(user_in: StrCheckCodePair, project_root: &Option<PathBuf>) -> Self {
+        let pattern = FilePattern::from_user(user_in.pattern.as_str(), project_root);
+        let code = user_in.code;
+        Self { pattern, code }
+    }
+}
+
 #[derive(Debug)]
 pub struct Settings {
     pub pyproject: Option<PathBuf>,
@@ -44,6 +58,7 @@ pub struct Settings {
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
     pub select: BTreeSet<CheckCode>,
+    pub per_file_ignores: Vec<PerFileIgnore>,
     pub dummy_variable_rgx: Regex,
 }
 
@@ -56,6 +71,7 @@ impl Settings {
             exclude: vec![],
             extend_exclude: vec![],
             select: BTreeSet::from([check_code]),
+            per_file_ignores: vec![],
             dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
         }
     }
@@ -68,6 +84,7 @@ impl Settings {
             exclude: vec![],
             extend_exclude: vec![],
             select: BTreeSet::from_iter(check_codes),
+            per_file_ignores: vec![],
             dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
         }
     }
@@ -78,6 +95,9 @@ impl Hash for Settings {
         self.line_length.hash(state);
         self.dummy_variable_rgx.as_str().hash(state);
         for value in self.select.iter() {
+            value.hash(state);
+        }
+        for value in self.per_file_ignores.iter() {
             value.hash(state);
         }
     }
@@ -141,6 +161,15 @@ impl Settings {
             } else {
                 BTreeSet::from_iter(DEFAULT_CHECK_CODES)
             },
+            per_file_ignores: config
+                .per_file_ignores
+                .map(|ignore_strings| {
+                    ignore_strings
+                        .into_iter()
+                        .map(|pair| PerFileIgnore::new(pair, &project_root))
+                        .collect()
+                })
+                .unwrap_or_default(),
             dummy_variable_rgx: match config.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
                     .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,

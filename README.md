@@ -119,6 +119,8 @@ OPTIONS:
             Print help information
     -n, --no-cache
             Disable cache reads
+        --per-file-ignores <PER_FILE_IGNORES>...
+            List of mappings from file pattern to code to exclude
     -q, --quiet
             Disable all logging (but still exit with status code "1" upon detecting errors)
         --add-noqa
