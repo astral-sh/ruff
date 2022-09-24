@@ -274,7 +274,7 @@ fn inner_main() -> Result<ExitCode> {
         settings.dummy_variable_rgx = match Regex::new(&dummy_variable_rgx) {
             Ok(regex) => regex,
             Err(e) => {
-                println!("Invalid dummy variable regular expression: {}", e);
+                eprintln!("Invalid dummy variable regular expression: {}", e);
                 return Ok(ExitCode::FAILURE);
             }
         };
