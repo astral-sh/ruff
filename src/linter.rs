@@ -610,7 +610,7 @@ mod tests {
     }
 
     #[test]
-    fn f841_dummy_variable_rgx() -> Result<()> {
+    fn f841_dummy_variable_rgx_custom() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/F841_dummy_variable_rgx.py"),
             &settings::Settings {
