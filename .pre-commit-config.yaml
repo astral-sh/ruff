@@ -3,3 +3,8 @@ repos:
     rev: v0.0.40
     hooks:
       - id: lint
+
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.10.1
+    hooks:
+      - id: validate-pyproject
