@@ -1,5 +1,6 @@
 extern crate core;
 
+use regex::Regex;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -85,6 +86,9 @@ struct Cli {
     /// Enable automatic additions of noqa directives to failing lines.
     #[clap(long, action)]
     add_noqa: bool,
+    // Regular expression matching the name of dummy variables (i.e. "unused_variable").
+    #[clap(long)]
+    dummy_variable_rgx: Option<String>,
 }
 
 #[cfg(feature = "update-informer")]
@@ -264,6 +268,15 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !cli.extend_ignore.is_empty() {
         settings.ignore(&cli.extend_ignore);
+    }
+    if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
+        settings.dummy_variable_rgx = match Regex::new(&dummy_variable_rgx) {
+            Ok(regex) => regex,
+            Err(e) => {
+                println!("Invalid dummy variable regular expression: {}", e);
+                return Ok(ExitCode::FAILURE);
+            }
+        };
     }
 
     if cli.show_settings && cli.show_files {

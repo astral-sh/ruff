@@ -182,6 +182,8 @@ pub fn check_lines(
 mod tests {
     use std::collections::BTreeSet;
 
+    use regex::Regex;
+
     use super::check_lines;
     use super::*;
 
@@ -198,6 +200,7 @@ mod tests {
                 exclude: vec![],
                 extend_exclude: vec![],
                 select: BTreeSet::from_iter(vec![CheckCode::E501]),
+                dummy_variable_rgx: Regex::new(r"^_+").unwrap(),
             };
             check_lines(
                 &mut checks,

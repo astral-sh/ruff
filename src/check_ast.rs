@@ -1415,8 +1415,11 @@ impl<'a> Checker<'a> {
     fn check_deferred_assignments(&mut self) {
         if self.settings.select.contains(&CheckCode::F841) {
             while let Some(index) = self.deferred_assignments.pop() {
-                self.checks
-                    .extend(checks::check_unused_variables(&self.scopes[index], self));
+                self.checks.extend(checks::check_unused_variables(
+                    &self.scopes[index],
+                    self,
+                    &self.settings.dummy_variable_rgx,
+                ));
             }
         }
     }

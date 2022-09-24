@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use itertools::izip;
+use regex::Regex;
 use rustpython_parser::ast::{
     Arg, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword,
     Location, Stmt, StmtKind, Unaryop,
@@ -71,7 +72,11 @@ pub fn check_not_tests(
 }
 
 /// Check UnusedVariable compliance.
-pub fn check_unused_variables(scope: &Scope, locator: &dyn CheckLocator) -> Vec<Check> {
+pub fn check_unused_variables(
+    scope: &Scope,
+    locator: &dyn CheckLocator,
+    dummy_variable_rgx: &Regex,
+) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
     if matches!(
@@ -84,7 +89,7 @@ pub fn check_unused_variables(scope: &Scope, locator: &dyn CheckLocator) -> Vec<
     for (name, binding) in scope.values.iter() {
         // TODO(charlie): Ignore if using `locals`.
         if binding.used.is_none()
-            && name != "_"
+            && !dummy_variable_rgx.is_match(name)
             && name != "__tracebackhide__"
             && name != "__traceback_info__"
             && name != "__traceback_supplement__"

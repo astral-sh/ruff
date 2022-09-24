@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use glob::Pattern;
 use once_cell::sync::Lazy;
+use regex::Regex;
 
 use crate::checks::{CheckCode, DEFAULT_CHECK_CODES};
 use crate::fs;
@@ -42,6 +43,7 @@ pub struct Settings {
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
     pub select: BTreeSet<CheckCode>,
+    pub dummy_variable_rgx: Regex,
 }
 
 impl Settings {
@@ -53,6 +55,7 @@ impl Settings {
             exclude: vec![],
             extend_exclude: vec![],
             select: BTreeSet::from([check_code]),
+            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
         }
     }
 
@@ -64,6 +67,7 @@ impl Settings {
             exclude: vec![],
             extend_exclude: vec![],
             select: BTreeSet::from_iter(check_codes),
+            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
         }
     }
 }
@@ -71,6 +75,7 @@ impl Settings {
 impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.line_length.hash(state);
+        self.dummy_variable_rgx.as_str().hash(state);
         for value in self.select.iter() {
             value.hash(state);
         }
@@ -101,6 +106,8 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     ]
 });
 
+static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> = Lazy::new(|| Regex::new("^_+").unwrap());
+
 impl Settings {
     pub fn from_pyproject(pyproject: Option<PathBuf>, project_root: Option<PathBuf>) -> Self {
         let config = load_config(&pyproject);
@@ -129,6 +136,10 @@ impl Settings {
             } else {
                 BTreeSet::from_iter(DEFAULT_CHECK_CODES)
             },
+            dummy_variable_rgx: config.dummy_variable_rgx.map_or_else(
+                || DEFAULT_DUMMY_VARIABLE_RGX.clone(),
+                |rgx| Regex::new(&rgx).expect("Invalid dummy variable regular expression."),
+            ),
             pyproject,
             project_root,
         };
