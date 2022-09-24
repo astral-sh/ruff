@@ -598,23 +598,11 @@ mod tests {
     }
 
     #[test]
-    fn f841_dummy_variable_rgx_default() -> Result<()> {
+    fn f841_dummy_variable_rgx() -> Result<()> {
         let mut checks = check_path(
-            Path::new("./resources/test/fixtures/F841_dummy_variable_rgx.py"),
-            &settings::Settings::for_rule(CheckCode::F841),
-            &fixer::Mode::Generate,
-        )?;
-        checks.sort_by_key(|check| check.location);
-        insta::assert_yaml_snapshot!(checks);
-        Ok(())
-    }
-
-    #[test]
-    fn f841_dummy_variable_rgx_custom() -> Result<()> {
-        let mut checks = check_path(
-            Path::new("./resources/test/fixtures/F841_dummy_variable_rgx.py"),
+            Path::new("./resources/test/fixtures/F841.py"),
             &settings::Settings {
-                dummy_variable_rgx: Regex::new(r"^_+$").unwrap(),
+                dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
                 ..settings::Settings::for_rule(CheckCode::F841)
             },
             &fixer::Mode::Generate,

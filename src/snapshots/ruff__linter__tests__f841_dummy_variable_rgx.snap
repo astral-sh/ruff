@@ -1,5 +1,6 @@
 ---
 source: src/linter.rs
+assertion_line: 611
 expression: checks
 ---
 - kind:
@@ -9,9 +10,9 @@ expression: checks
     column: 1
   fix: ~
 - kind:
-    UnusedVariable: z
+    UnusedVariable: _
   location:
-    row: 17
+    row: 14
     column: 5
   fix: ~
 - kind:
