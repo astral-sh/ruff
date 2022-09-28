@@ -32,65 +32,65 @@ const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Parser)]
-#[clap(name = format!("{CARGO_PKG_NAME} (v{CARGO_PKG_VERSION})"))]
+#[clap(name = CARGO_PKG_NAME)]
 #[clap(about = "An extremely fast Python linter.", long_about = None)]
 #[clap(version)]
 struct Cli {
-    #[clap(parse(from_os_str), value_hint = ValueHint::AnyPath, required = true)]
+    #[arg(value_hint = ValueHint::AnyPath, required = true)]
     files: Vec<PathBuf>,
     /// Enable verbose logging.
-    #[clap(short, long, action)]
+    #[arg(short, long, action)]
     verbose: bool,
     /// Disable all logging (but still exit with status code "1" upon detecting errors).
-    #[clap(short, long, action)]
+    #[arg(short, long, action)]
     quiet: bool,
     /// Exit with status code "0", even upon detecting errors.
-    #[clap(short, long, action)]
+    #[arg(short, long, action)]
     exit_zero: bool,
     /// Run in watch mode by re-running whenever files change.
-    #[clap(short, long, action)]
+    #[arg(short, long, action)]
     watch: bool,
     /// Attempt to automatically fix lint errors.
-    #[clap(short, long, action)]
+    #[arg(short, long, action)]
     fix: bool,
     /// Disable cache reads.
-    #[clap(short, long, action)]
+    #[arg(short, long, action)]
     no_cache: bool,
     /// List of error codes to enable.
-    #[clap(long, multiple = true)]
+    #[arg(long, num_args = 1..)]
     select: Vec<CheckCode>,
     /// Like --select, but adds additional error codes on top of the selected ones.
-    #[clap(long, multiple = true)]
+    #[arg(long, num_args = 1..)]
     extend_select: Vec<CheckCode>,
     /// List of error codes to ignore.
-    #[clap(long, multiple = true)]
+    #[arg(long, num_args = 1..)]
     ignore: Vec<CheckCode>,
     /// Like --ignore, but adds additional error codes on top of the ignored ones.
-    #[clap(long, multiple = true)]
+    #[arg(long, num_args = 1..)]
     extend_ignore: Vec<CheckCode>,
     /// List of paths, used to exclude files and/or directories from checks.
-    #[clap(long, multiple = true)]
+    #[arg(long, num_args = 1..)]
     exclude: Vec<String>,
     /// Like --exclude, but adds additional files and directories on top of the excluded ones.
-    #[clap(long, multiple = true)]
+    #[arg(long, num_args = 1..)]
     extend_exclude: Vec<String>,
     /// List of mappings from file pattern to code to exclude
-    #[clap(long, multiple = true)]
+    #[arg(long, num_args = 1..)]
     per_file_ignores: Vec<StrCheckCodePair>,
     /// Output serialization format for error messages.
-    #[clap(long, arg_enum, default_value_t=SerializationFormat::Text)]
+    #[arg(long, value_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
     /// See the files ruff will be run against with the current settings.
-    #[clap(long, action)]
+    #[arg(long, action)]
     show_files: bool,
     /// See ruff's settings.
-    #[clap(long, action)]
+    #[arg(long, action)]
     show_settings: bool,
     /// Enable automatic additions of noqa directives to failing lines.
-    #[clap(long, action)]
+    #[arg(long, action)]
     add_noqa: bool,
     /// Regular expression matching the name of dummy variables.
-    #[clap(long)]
+    #[arg(long)]
     dummy_variable_rgx: Option<Regex>,
 }
 
