@@ -36,7 +36,7 @@ pub struct Config {
     pub dummy_variable_rgx: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StrCheckCodePair {
     pub pattern: String,
     pub code: CheckCode,

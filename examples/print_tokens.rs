@@ -9,7 +9,7 @@ use ruff::fs;
 
 #[derive(Debug, Parser)]
 struct Cli {
-    #[clap(parse(from_os_str), value_hint = ValueHint::FilePath, required = true)]
+    #[arg(value_hint = ValueHint::FilePath, required = true)]
     file: PathBuf,
 }
 
