@@ -24,17 +24,30 @@ use ::ruff::linter::lint_path;
 use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
-use ::ruff::pyproject::{self, StrCheckCodePair};
+use ::ruff::pyproject::{self, user_pyproject_toml_path, StrCheckCodePair};
 use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ::ruff::tell_user;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+fn after_help() -> String {
+    if let Some(path) = user_pyproject_toml_path() {
+        format!(
+            "User configuration file: {} ({})\n",
+            path.to_string_lossy(),
+            if path.is_file() { "present" } else { "absent" }
+        )
+    } else {
+        "".to_string()
+    }
+}
+
 #[derive(Debug, Parser)]
 #[clap(name = CARGO_PKG_NAME)]
 #[clap(about = "An extremely fast Python linter.", long_about = None)]
 #[clap(version)]
+#[clap(after_help = after_help())]
 struct Cli {
     #[arg(value_hint = ValueHint::AnyPath, required = true)]
     files: Vec<PathBuf>,

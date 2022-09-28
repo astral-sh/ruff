@@ -101,18 +101,20 @@ pub fn find_pyproject_toml(path: &Option<PathBuf>) -> Option<PathBuf> {
         }
     }
 
-    find_user_pyproject_toml()
+    if let Some(path_pyproject_toml) = user_pyproject_toml_path() {
+        if path_pyproject_toml.is_file() {
+            return Some(path_pyproject_toml);
+        }
+    }
+
+    None
 }
 
-fn find_user_pyproject_toml() -> Option<PathBuf> {
+pub fn user_pyproject_toml_path() -> Option<PathBuf> {
     let mut path = dirs::config_dir()?;
     path.push("ruff");
     path.push("pyproject.toml");
-    if path.is_file() {
-        Some(path)
-    } else {
-        None
-    }
+    Some(path)
 }
 
 pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
