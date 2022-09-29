@@ -16,7 +16,7 @@ use crate::settings::Settings;
 use crate::{cache, fs, noqa};
 
 /// Collect tokens up to and including the first error.
-fn tokenize(contents: &str) -> Vec<LexResult> {
+pub(crate) fn tokenize(contents: &str) -> Vec<LexResult> {
     let mut tokens: Vec<LexResult> = vec![];
     for tok in lexer::make_tokenizer(contents) {
         let is_err = tok.is_err();
@@ -28,7 +28,7 @@ fn tokenize(contents: &str) -> Vec<LexResult> {
     tokens
 }
 
-fn check_path(
+pub(crate) fn check_path(
     path: &Path,
     contents: &str,
     tokens: Vec<LexResult>,

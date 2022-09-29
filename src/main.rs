@@ -23,9 +23,9 @@ use ::ruff::logging::set_up_logging;
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::pyproject::{self, StrCheckCodePair};
+use ::ruff::settings::CurrentSettings;
 use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ::ruff::tell_user;
-use ruff::settings::CurrentSettings;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
