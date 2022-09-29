@@ -57,7 +57,7 @@ ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.40
+    rev: v0.0.48
     hooks:
       - id: lint
 ```
@@ -277,6 +277,30 @@ add a new tool with the following configuration:
 ruff should then appear as a runnable action:
 
 ![ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
+
+### GitHub Actions
+
+GitHub Actions has everything you need to run ruff out-of-the-box:
+
+```yaml
+name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+      - name: Run ruff
+        run: ruff .
+```
 
 ## Development
 
