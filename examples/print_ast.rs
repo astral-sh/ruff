@@ -2,14 +2,14 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::{Parser, ValueHint};
+use clap::Parser;
 use rustpython_parser::parser;
 
 use ruff::fs;
 
 #[derive(Debug, Parser)]
 struct Cli {
-    #[arg(value_hint = ValueHint::FilePath, required = true)]
+    #[arg(required = true)]
     file: PathBuf,
 }
 
