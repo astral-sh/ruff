@@ -671,7 +671,7 @@ pub fn check_builtin_shadowing(
                 ShadowingType::Variable => CheckKind::BuiltinVariableShadowing(name.to_string()),
                 ShadowingType::Argument => CheckKind::BuiltinArgumentShadowing(name.to_string()),
                 ShadowingType::Attribute => CheckKind::BuiltinAttributeShadowing(name.to_string()),
-            }
+            },
             location,
         ))
     } else {
