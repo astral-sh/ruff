@@ -670,7 +670,7 @@ where
 
                     // flake8-builtins
                     let scope =
-                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+                        &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                     if matches!(scope.kind, ScopeKind::Class) {
                         if self.settings.select.contains(&CheckCode::A003) {
                             if let Some(check) = checks::check_builtin_shadowing(
@@ -681,15 +681,13 @@ where
                                 self.checks.push(check);
                             }
                         }
-                    } else {
-                        if self.settings.select.contains(&CheckCode::A001) {
-                            if let Some(check) = checks::check_builtin_shadowing(
-                                id,
-                                self.locate_check(expr.location),
-                                checks::ShadowingType::Variable,
-                            ) {
-                                self.checks.push(check);
-                            }
+                    } else if self.settings.select.contains(&CheckCode::A001) {
+                        if let Some(check) = checks::check_builtin_shadowing(
+                            id,
+                            self.locate_check(expr.location),
+                            checks::ShadowingType::Variable,
+                        ) {
+                            self.checks.push(check);
                         }
                     }
 

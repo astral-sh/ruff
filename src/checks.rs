@@ -265,6 +265,10 @@ impl CheckCode {
             CheckCode::R001 => "R001",
             CheckCode::R002 => "R002",
             CheckCode::M001 => "M001",
+            // flake8-builtins
+            CheckCode::A001 => "A001",
+            CheckCode::A002 => "A002",
+            CheckCode::A003 => "A003",
         }
     }
 
