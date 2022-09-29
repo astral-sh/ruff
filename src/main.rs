@@ -1,6 +1,5 @@
 extern crate core;
 
-use regex::Regex;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -8,11 +7,12 @@ use std::sync::mpsc::channel;
 use std::time::Instant;
 
 use anyhow::Result;
-use clap::{Parser, ValueHint};
+use clap::{command, Parser};
 use colored::Colorize;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
+use regex::Regex;
 use walkdir::DirEntry;
 
 use ::ruff::cache;
@@ -32,29 +32,28 @@ const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Parser)]
-#[clap(name = CARGO_PKG_NAME)]
-#[clap(about = "An extremely fast Python linter.", long_about = None)]
-#[clap(version)]
+#[command(about = "An extremely fast Python linter.", long_about = None)]
+#[command(version)]
 struct Cli {
-    #[arg(value_hint = ValueHint::AnyPath, required = true)]
+    #[arg(required = true)]
     files: Vec<PathBuf>,
     /// Enable verbose logging.
-    #[arg(short, long, action)]
+    #[arg(short, long)]
     verbose: bool,
     /// Disable all logging (but still exit with status code "1" upon detecting errors).
-    #[arg(short, long, action)]
+    #[arg(short, long)]
     quiet: bool,
     /// Exit with status code "0", even upon detecting errors.
-    #[arg(short, long, action)]
+    #[arg(short, long)]
     exit_zero: bool,
     /// Run in watch mode by re-running whenever files change.
-    #[arg(short, long, action)]
+    #[arg(short, long)]
     watch: bool,
     /// Attempt to automatically fix lint errors.
-    #[arg(short, long, action)]
+    #[arg(short, long)]
     fix: bool,
     /// Disable cache reads.
-    #[arg(short, long, action)]
+    #[arg(short, long)]
     no_cache: bool,
     /// List of error codes to enable.
     #[arg(long, num_args = 1..)]
@@ -81,13 +80,13 @@ struct Cli {
     #[arg(long, value_enum, default_value_t=SerializationFormat::Text)]
     format: SerializationFormat,
     /// See the files ruff will be run against with the current settings.
-    #[arg(long, action)]
+    #[arg(long)]
     show_files: bool,
     /// See ruff's settings.
-    #[arg(long, action)]
+    #[arg(long)]
     show_settings: bool,
     /// Enable automatic additions of noqa directives to failing lines.
-    #[arg(long, action)]
+    #[arg(long)]
     add_noqa: bool,
     /// Regular expression matching the name of dummy variables.
     #[arg(long)]
