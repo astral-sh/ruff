@@ -1,13 +1,14 @@
 use std::cmp::{max, min};
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::Path;
 
-use crate::checks::{Check, CheckCode};
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::lexer::{LexResult, Tok};
-use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
-use std::path::Path;
+
+use crate::checks::{Check, CheckCode};
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)(?P<noqa>\s*# noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
@@ -160,12 +161,12 @@ pub fn add_noqa(
 
 #[cfg(test)]
 mod tests {
-    use crate::checks::{Check, CheckKind};
     use anyhow::Result;
     use rustpython_parser::ast::Location;
     use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
 
+    use crate::checks::{Check, CheckKind};
     use crate::noqa::{add_noqa_inner, extract_noqa_line_for};
 
     #[test]

@@ -256,7 +256,7 @@ impl CheckCode {
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             CheckCode::E501 | CheckCode::M001 => &LintSource::Lines,
-            CheckCode::E902 | CheckCode::E999 => &LintSource::FileSystem,
+            CheckCode::E902 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
     }
