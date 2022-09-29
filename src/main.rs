@@ -27,6 +27,7 @@ use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::pyproject::{self, StrCheckCodePair};
 use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ::ruff::tell_user;
+use ruff::settings::CurrentSettings;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -117,8 +118,8 @@ fn check_for_updates() {
     }
 }
 
-fn show_settings(settings: &Settings) {
-    println!("{:#?}", settings);
+fn show_settings(settings: Settings) {
+    println!("{:#?}", CurrentSettings::from_settings(settings));
 }
 
 fn show_files(files: &[PathBuf], settings: &Settings) {
@@ -287,12 +288,12 @@ fn inner_main() -> Result<ExitCode> {
         eprintln!("Error: specify --show-settings or show-files (not both).");
         return Ok(ExitCode::FAILURE);
     }
-    if cli.show_settings {
-        show_settings(&settings);
-        return Ok(ExitCode::SUCCESS);
-    }
     if cli.show_files {
         show_files(&cli.files, &settings);
+        return Ok(ExitCode::SUCCESS);
+    }
+    if cli.show_settings {
+        show_settings(settings);
         return Ok(ExitCode::SUCCESS);
     }
 

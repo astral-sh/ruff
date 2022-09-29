@@ -200,3 +200,62 @@ impl Settings {
         }
     }
 }
+
+/// Struct to render user-facing exclusion patterns.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct Exclusion {
+    basename: Option<String>,
+    absolute: Option<String>,
+}
+
+impl Exclusion {
+    pub fn from_file_pattern(file_pattern: FilePattern) -> Self {
+        match file_pattern {
+            FilePattern::Simple(basename) => Exclusion {
+                basename: Some(basename.to_string()),
+                absolute: None,
+            },
+            FilePattern::Complex(absolute, basename) => Exclusion {
+                basename: basename.map(|pattern| pattern.to_string()),
+                absolute: Some(absolute.to_string()),
+            },
+        }
+    }
+}
+
+/// Struct to render user-facing Settings.
+#[derive(Debug)]
+pub struct CurrentSettings {
+    pub pyproject: Option<PathBuf>,
+    pub project_root: Option<PathBuf>,
+    pub line_length: usize,
+    pub exclude: Vec<Exclusion>,
+    pub extend_exclude: Vec<Exclusion>,
+    pub select: BTreeSet<CheckCode>,
+    pub per_file_ignores: Vec<PerFileIgnore>,
+    pub dummy_variable_rgx: Regex,
+}
+
+impl CurrentSettings {
+    pub fn from_settings(settings: Settings) -> Self {
+        Self {
+            pyproject: settings.pyproject,
+            project_root: settings.project_root,
+            line_length: settings.line_length,
+            exclude: settings
+                .exclude
+                .into_iter()
+                .map(Exclusion::from_file_pattern)
+                .collect(),
+            extend_exclude: settings
+                .extend_exclude
+                .into_iter()
+                .map(Exclusion::from_file_pattern)
+                .collect(),
+            select: settings.select,
+            per_file_ignores: settings.per_file_ignores,
+            dummy_variable_rgx: settings.dummy_variable_rgx,
+        }
+    }
+}
