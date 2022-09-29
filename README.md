@@ -264,6 +264,20 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | R002 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |
 | M001 | UnusedNOQA | Unused `noqa` directive |
 
+## Integrations
+
+### PyCharm
+
+ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
+in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
+add a new tool with the following configuration:
+
+![Install ruff as an External Tool](https://user-images.githubusercontent.com/1309177/193155720-336e43f0-1a8d-46b4-bc12-e60f9ae01f7e.png)
+
+ruff should then appear as a runnable action:
+
+![ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
+
 ## Development
 
 ruff is written in Rust (1.63.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
