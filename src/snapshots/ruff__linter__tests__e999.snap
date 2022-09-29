@@ -1,0 +1,11 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    SyntaxError: Got unexpected EOF
+  location:
+    row: 2
+    column: 1
+  fix: ~
+

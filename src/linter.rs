@@ -15,18 +15,29 @@ use crate::noqa::add_noqa;
 use crate::settings::Settings;
 use crate::{cache, fs, noqa};
 
+/// Collect tokens up to and including the first error.
+fn tokenize(contents: &str) -> Vec<LexResult> {
+    let mut tokens: Vec<LexResult> = vec![];
+    for tok in lexer::make_tokenizer(contents) {
+        let is_err = tok.is_err();
+        tokens.push(tok);
+        if is_err {
+            break;
+        }
+    }
+    tokens
+}
+
 fn check_path(
     path: &Path,
     contents: &str,
     tokens: Vec<LexResult>,
+    noqa_line_for: &[usize],
     settings: &Settings,
     autofix: &fixer::Mode,
 ) -> Result<Vec<Check>> {
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
-
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
     // Run the AST-based checks.
     if settings
@@ -50,7 +61,7 @@ fn check_path(
     }
 
     // Run the lines-based checks.
-    check_lines(&mut checks, contents, &noqa_line_for, settings, autofix);
+    check_lines(&mut checks, contents, noqa_line_for, settings, autofix);
 
     // Create path ignores.
     if !checks.is_empty() && !settings.per_file_ignores.is_empty() {
@@ -84,10 +95,13 @@ pub fn lint_path(
     let contents = fs::read_file(path)?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = lexer::make_tokenizer(&contents).collect();
+    let tokens: Vec<LexResult> = tokenize(&contents);
+
+    // Determine the noqa line for every line in the source.
+    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
     // Generate checks.
-    let mut checks = check_path(path, &contents, tokens, settings, autofix)?;
+    let mut checks = check_path(path, &contents, tokens, &noqa_line_for, settings, autofix)?;
 
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
@@ -114,13 +128,20 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     let contents = fs::read_file(path)?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = lexer::make_tokenizer(&contents).collect();
+    let tokens: Vec<LexResult> = tokenize(&contents);
 
     // Determine the noqa line for every line in the source.
     let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
     // Generate checks.
-    let checks = check_path(path, &contents, tokens, settings, &fixer::Mode::None)?;
+    let checks = check_path(
+        path,
+        &contents,
+        tokens,
+        &noqa_line_for,
+        settings,
+        &fixer::Mode::None,
+    )?;
 
     add_noqa(&checks, &contents, &noqa_line_for, path)
 }
@@ -131,14 +152,14 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
 
     use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
-    use crate::fs;
     use crate::linter;
+    use crate::linter::tokenize;
     use crate::settings;
+    use crate::{fs, noqa};
 
     fn check_path(
         path: &Path,
@@ -146,8 +167,9 @@ mod tests {
         autofix: &fixer::Mode,
     ) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;
-        let tokens: Vec<LexResult> = lexer::make_tokenizer(&contents).collect();
-        linter::check_path(path, &contents, tokens, settings, autofix)
+        let tokens: Vec<LexResult> = tokenize(&contents);
+        let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+        linter::check_path(path, &contents, tokens, &noqa_line_for, settings, autofix)
     }
 
     #[test]
@@ -686,6 +708,18 @@ mod tests {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/future_annotations.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn e999() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/E999.py"),
+            &settings::Settings::for_rule(CheckCode::E999),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
