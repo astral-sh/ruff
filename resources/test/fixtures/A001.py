@@ -2,7 +2,10 @@ import some as sum
 from some import other as int
 
 print = 1
-copyright = 2
+copyright: 'annotation' = 2
+(complex := 3)
+float = object = 4
+min, max = 5, 6
 
 def bytes():
     pass
@@ -18,7 +21,7 @@ except ImportError as ValueError:
 for memoryview, *bytearray in []:
     pass
 
-with open('file') as str:
+with open('file') as str, open('file2') as (all, any):
     pass
 
-[1 for all in ()]
+[0 for sum in ()]

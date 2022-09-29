@@ -7,8 +7,3 @@ async def func2(bytes):
 
 
 map([], lambda float: ...)
-
-
-class MyClass:
-    def str(self):
-        pass
