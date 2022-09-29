@@ -211,7 +211,8 @@ variables.)
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
 1. Flake8 has a plugin architecture and supports writing custom lint rules.
-2. ruff does not yet support parenthesized context managers.
+2. ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
+   pattern matching and parenthesized context managers.
 
 ## Rules
 
