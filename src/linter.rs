@@ -726,4 +726,40 @@ mod tests {
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
+
+    #[test]
+    fn a001() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/A001.py"),
+            &settings::Settings::for_rule(CheckCode::A001),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn a002() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/A002.py"),
+            &settings::Settings::for_rule(CheckCode::A002),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn a003() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/A003.py"),
+            &settings::Settings::for_rule(CheckCode::A003),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
 }
