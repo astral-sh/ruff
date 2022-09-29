@@ -388,7 +388,7 @@ where
                         )
                     } else {
                         if let Some(asname) = &alias.node.asname {
-                            self.check_builtin_shadowing(&asname, stmt.location, false);
+                            self.check_builtin_shadowing(asname, stmt.location, false);
                         }
 
                         self.add_binding(
@@ -514,7 +514,7 @@ where
                         scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
-                            self.check_builtin_shadowing(&asname, stmt.location, false);
+                            self.check_builtin_shadowing(asname, stmt.location, false);
                         }
 
                         let binding = Binding {
