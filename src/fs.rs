@@ -76,7 +76,6 @@ pub fn iter_python_files<'a>(
         .all(|pattern| matches!(pattern, FilePattern::Simple(_)));
 
     WalkDir::new(normalize_path(path))
-        .follow_links(true)
         .into_iter()
         .filter_entry(move |entry| {
             if !has_exclude && !has_extend_exclude {
@@ -112,7 +111,9 @@ pub fn iter_python_files<'a>(
         })
         .filter(|entry| {
             entry.as_ref().map_or(true, |entry| {
-                (entry.depth() == 0 && !entry.file_type().is_dir()) || is_included(entry.path())
+                (entry.depth() == 0 || is_included(entry.path()))
+                    && !entry.file_type().is_dir()
+                    && !(entry.file_type().is_symlink() && entry.path().is_dir())
             })
         })
 }
