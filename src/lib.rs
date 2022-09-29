@@ -1,5 +1,3 @@
-extern crate core;
-
 mod ast;
 mod autofix;
 pub mod cache;

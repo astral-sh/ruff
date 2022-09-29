@@ -39,7 +39,6 @@ impl fmt::Display for Message {
             f,
             "{}{}{}{}{}{} {} {}",
             relativize_path(Path::new(&self.filename)).white().bold(),
-            // self.filename.white(),
             ":".cyan(),
             self.location.row(),
             ":".cyan(),
