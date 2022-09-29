@@ -20,7 +20,7 @@ An extremely fast Python linter, written in Rust.
 - 🤝 Python 3.10 compatibility
 - 🛠️ `pyproject.toml` support
 - 📦 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache support
-- 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired `--fix` support
+- 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix)-inspired `--fix` support
 - 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` support
 - ⚖️ [Near-complete parity](#Parity-with-Flake8) with the built-in Flake8 rule set
 
