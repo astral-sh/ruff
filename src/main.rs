@@ -32,7 +32,7 @@ const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Parser)]
-#[command(about = "An extremely fast Python linter.", long_about = None)]
+#[command(author, about = "ruff: An extremely fast Python linter.")]
 #[command(version)]
 struct Cli {
     #[arg(required = true)]
@@ -56,25 +56,25 @@ struct Cli {
     #[arg(short, long)]
     no_cache: bool,
     /// List of error codes to enable.
-    #[arg(long, num_args = 1..)]
+    #[arg(long, value_delimiter = ',')]
     select: Vec<CheckCode>,
     /// Like --select, but adds additional error codes on top of the selected ones.
-    #[arg(long, num_args = 1..)]
+    #[arg(long, value_delimiter = ',')]
     extend_select: Vec<CheckCode>,
     /// List of error codes to ignore.
-    #[arg(long, num_args = 1..)]
+    #[arg(long, value_delimiter = ',')]
     ignore: Vec<CheckCode>,
     /// Like --ignore, but adds additional error codes on top of the ignored ones.
-    #[arg(long, num_args = 1..)]
+    #[arg(long, value_delimiter = ',')]
     extend_ignore: Vec<CheckCode>,
     /// List of paths, used to exclude files and/or directories from checks.
-    #[arg(long, num_args = 1..)]
+    #[arg(long, value_delimiter = ',')]
     exclude: Vec<String>,
     /// Like --exclude, but adds additional files and directories on top of the excluded ones.
-    #[arg(long, num_args = 1..)]
+    #[arg(long, value_delimiter = ',')]
     extend_exclude: Vec<String>,
     /// List of mappings from file pattern to code to exclude
-    #[arg(long, num_args = 1..)]
+    #[arg(long, value_delimiter = ',')]
     per_file_ignores: Vec<StrCheckCodePair>,
     /// Output serialization format for error messages.
     #[arg(long, value_enum, default_value_t=SerializationFormat::Text)]
