@@ -4,7 +4,7 @@ use anyhow::Result;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
+pub const DEFAULT_CHECK_CODES: [CheckCode; 45] = [
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -47,9 +47,13 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::F831,
     CheckCode::F841,
     CheckCode::F901,
+    // flake8-builtins
+    CheckCode::A001,
+    CheckCode::A002,
+    CheckCode::A003,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 45] = [
+pub const ALL_CHECK_CODES: [CheckCode; 48] = [
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -95,6 +99,10 @@ pub const ALL_CHECK_CODES: [CheckCode; 45] = [
     CheckCode::M001,
     CheckCode::R001,
     CheckCode::R002,
+    // flake8-builtins
+    CheckCode::A001,
+    CheckCode::A002,
+    CheckCode::A003,
 ];
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash, PartialOrd, Ord)]
@@ -144,6 +152,10 @@ pub enum CheckCode {
     R001,
     R002,
     M001,
+    // flake8-builtins
+    A001,
+    A002,
+    A003,
 }
 
 impl FromStr for CheckCode {
@@ -196,6 +208,10 @@ impl FromStr for CheckCode {
             "R001" => Ok(CheckCode::R001),
             "R002" => Ok(CheckCode::R002),
             "M001" => Ok(CheckCode::M001),
+            // flake8-builtins
+            "A001" => Ok(CheckCode::A001),
+            "A002" => Ok(CheckCode::A002),
+            "A003" => Ok(CheckCode::A003),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
         }
     }
@@ -249,6 +265,10 @@ impl CheckCode {
             CheckCode::R001 => "R001",
             CheckCode::R002 => "R002",
             CheckCode::M001 => "M001",
+            // flake8-builtins
+            CheckCode::A001 => "A001",
+            CheckCode::A002 => "A002",
+            CheckCode::A003 => "A003",
         }
     }
 
@@ -309,6 +329,10 @@ impl CheckCode {
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
             CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::R002 => CheckKind::NoAssertEquals,
+            // flake8-builtins
+            CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
+            CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
+            CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
         }
     }
 }
@@ -373,6 +397,10 @@ pub enum CheckKind {
     UnusedVariable(String),
     UselessObjectInheritance(String),
     YieldOutsideFunction,
+    // flake8-builtin
+    BuiltinVariableShadowing(String),
+    BuiltinArgumentShadowing(String),
+    BuiltinAttributeShadowing(String),
 }
 
 impl CheckKind {
@@ -426,6 +454,10 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
             CheckKind::YieldOutsideFunction => "YieldOutsideFunction",
             CheckKind::UnusedNOQA(_) => "UnusedNOQA",
+            // flake8-builtins
+            CheckKind::BuiltinVariableShadowing(_) => "BuiltinVariableShadowing",
+            CheckKind::BuiltinArgumentShadowing(_) => "BuiltinArgumentShadowing",
+            CheckKind::BuiltinAttributeShadowing(_) => "BuiltinAttributeShadowing",
         }
     }
 
@@ -477,6 +509,10 @@ impl CheckKind {
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::R001,
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
+            // flake8-builtins
+            CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
+            CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
+            CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
         }
     }
 
@@ -611,6 +647,16 @@ impl CheckKind {
                 None => "Unused `noqa` directive".to_string(),
                 Some(code) => format!("Unused `noqa` directive for: {code}"),
             },
+            // flake8-builtins
+            CheckKind::BuiltinVariableShadowing(name) => {
+                format!("Variable `{name}` is shadowing a python builtin")
+            }
+            CheckKind::BuiltinArgumentShadowing(name) => {
+                format!("Argument `{name}` is shadowing a python builtin")
+            }
+            CheckKind::BuiltinAttributeShadowing(name) => {
+                format!("class attribute `{name}` is shadowing a python builtin")
+            }
         }
     }
 

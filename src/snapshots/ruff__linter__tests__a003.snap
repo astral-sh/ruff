@@ -1,0 +1,18 @@
+---
+source: src/linter.rs
+assertion_line: 762
+expression: checks
+---
+- kind:
+    BuiltinAttributeShadowing: ImportError
+  location:
+    row: 2
+    column: 5
+  fix: ~
+- kind:
+    BuiltinAttributeShadowing: str
+  location:
+    row: 7
+    column: 5
+  fix: ~
+

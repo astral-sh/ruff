@@ -1,0 +1,46 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    BuiltinArgumentShadowing: str
+  location:
+    row: 1
+    column: 11
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: type
+  location:
+    row: 1
+    column: 19
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: complex
+  location:
+    row: 1
+    column: 26
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: Exception
+  location:
+    row: 1
+    column: 35
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: getattr
+  location:
+    row: 1
+    column: 48
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: bytes
+  location:
+    row: 5
+    column: 17
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: float
+  location:
+    row: 9
+    column: 16
+  fix: ~

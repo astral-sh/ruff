@@ -246,6 +246,9 @@ where
                         self.checks.push(check);
                     }
                 }
+
+                self.check_builtin_shadowing(name, stmt.location, true);
+
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
@@ -342,6 +345,8 @@ where
                     }
                 }
 
+                self.check_builtin_shadowing(name, self.locate_check(stmt.location), false);
+
                 for expr in bases {
                     self.visit_expr(expr)
                 }
@@ -382,6 +387,10 @@ where
                             },
                         )
                     } else {
+                        if let Some(asname) = &alias.node.asname {
+                            self.check_builtin_shadowing(asname, stmt.location, false);
+                        }
+
                         self.add_binding(
                             alias
                                 .node
@@ -504,6 +513,10 @@ where
                             .expect("No current scope found."))];
                         scope.import_starred = true;
                     } else {
+                        if let Some(asname) = &alias.node.asname {
+                            self.check_builtin_shadowing(asname, stmt.location, false);
+                        }
+
                         let binding = Binding {
                             kind: BindingKind::Importation(match module {
                                 None => name.clone(),
@@ -667,6 +680,9 @@ where
                             self.checks.push(check);
                         }
                     }
+
+                    self.check_builtin_shadowing(id, expr.location, true);
+
                     let parent =
                         self.parents[*(self.parent_stack.last().expect("No parent found."))];
                     self.handle_node_store(expr, parent);
@@ -977,6 +993,9 @@ where
                                 self.checks.push(check);
                             }
                         }
+
+                        self.check_builtin_shadowing(name, excepthandler.location, false);
+
                         let scope = &self.scopes
                             [*(self.scope_stack.last().expect("No current scope found."))];
                         if scope.values.contains_key(name) {
@@ -1080,6 +1099,8 @@ where
                 self.checks.push(check);
             }
         }
+
+        self.check_builtin_arg_shadowing(&arg.node.arg, arg.location);
     }
 }
 
@@ -1502,6 +1523,44 @@ impl<'a> Checker<'a> {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    fn check_builtin_shadowing(&mut self, name: &str, location: Location, is_attribute: bool) {
+        let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+
+        // flake8-builtins
+        if is_attribute
+            && matches!(scope.kind, ScopeKind::Class)
+            && self.settings.select.contains(&CheckCode::A003)
+        {
+            if let Some(check) = checks::check_builtin_shadowing(
+                name,
+                self.locate_check(location),
+                checks::ShadowingType::Attribute,
+            ) {
+                self.checks.push(check);
+            }
+        } else if self.settings.select.contains(&CheckCode::A001) {
+            if let Some(check) = checks::check_builtin_shadowing(
+                name,
+                self.locate_check(location),
+                checks::ShadowingType::Variable,
+            ) {
+                self.checks.push(check);
+            }
+        }
+    }
+
+    fn check_builtin_arg_shadowing(&mut self, name: &str, location: Location) {
+        if self.settings.select.contains(&CheckCode::A002) {
+            if let Some(check) = checks::check_builtin_shadowing(
+                name,
+                self.locate_check(location),
+                checks::ShadowingType::Argument,
+            ) {
+                self.checks.push(check);
             }
         }
     }
