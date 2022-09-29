@@ -11,6 +11,7 @@ use crate::ast::operations::SourceCodeLocator;
 use crate::ast::types::{Binding, BindingKind, CheckLocator, FunctionScope, Scope, ScopeKind};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckKind, Fix, RejectedCmpop};
+use crate::python::builtins::BUILTINS;
 
 /// Check IfTuple compliance.
 pub fn check_if_tuple(test: &Expr, location: Location) -> Option<Check> {
@@ -647,6 +648,31 @@ pub fn check_continue_outside_loop(
         Some(Check::new(
             CheckKind::ContinueOutsideLoop,
             locator.locate_check(stmt.location),
+        ))
+    } else {
+        None
+    }
+}
+
+// flake8-builtins
+pub enum ShadowingType {
+    Variable,
+    Argument,
+    Attribute,
+}
+
+/// Check builtin name shadowing
+pub fn check_builtin_shadowing(
+    name: &str, location: Location, node_type: ShadowingType,
+) -> Option<Check> {
+    if BUILTINS.contains(&name) {
+        Some(Check::new(
+            match node_type {
+                ShadowingType::Variable => CheckKind::BuiltinVariableShadowing(name.to_string()),
+                ShadowingType::Argument => CheckKind::BuiltinArgumentShadowing(name.to_string()),
+                ShadowingType::Attribute => CheckKind::BuiltinAttributeShadowing(name.to_string()),
+            }
+            location,
         ))
     } else {
         None

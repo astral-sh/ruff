@@ -667,6 +667,30 @@ where
                             self.checks.push(check);
                         }
                     }
+
+                    // flake8-builtins
+                    if matches!(scope.kind, ScopeKind::Class) {
+                        if self.settings.select.contains(&CheckCode::A003) {
+                            if let Some(check) = checks::check_builtin_shadowing(
+                                id,
+                                self.locate_check(expr.location),
+                                checks::ShadowingType::Attribute,
+                            ) {
+                                self.checks.push(check);
+                            }
+                        }
+                    } else {
+                        if self.settings.select.contains(&CheckCode::A001) {
+                            if let Some(check) = checks::check_builtin_shadowing(
+                                id,
+                                self.locate_check(expr.location),
+                                checks::ShadowingType::Variable,
+                            ) {
+                                self.checks.push(check);
+                            }
+                        }
+                    }
+
                     let parent =
                         self.parents[*(self.parent_stack.last().expect("No parent found."))];
                     self.handle_node_store(expr, parent);
@@ -1076,6 +1100,17 @@ where
             if let Some(check) = checks::check_ambiguous_variable_name(
                 &arg.node.arg,
                 self.locate_check(arg.location),
+            ) {
+                self.checks.push(check);
+            }
+        }
+
+        // flake8-builtins
+        if self.settings.select.contains(&CheckCode::A002) {
+            if let Some(check) = checks::check_builtin_shadowing(
+                &arg.node.arg,
+                self.locate_check(arg.location),
+                checks::ShadowingType::Argument,
             ) {
                 self.checks.push(check);
             }
