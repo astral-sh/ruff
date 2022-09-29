@@ -663,7 +663,9 @@ pub enum ShadowingType {
 
 /// Check builtin name shadowing
 pub fn check_builtin_shadowing(
-    name: &str, location: Location, node_type: ShadowingType,
+    name: &str,
+    location: Location,
+    node_type: ShadowingType,
 ) -> Option<Check> {
     if BUILTINS.contains(&name) {
         Some(Check::new(

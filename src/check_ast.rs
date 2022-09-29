@@ -669,6 +669,8 @@ where
                     }
 
                     // flake8-builtins
+                    let scope =
+                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                     if matches!(scope.kind, ScopeKind::Class) {
                         if self.settings.select.contains(&CheckCode::A003) {
                             if let Some(check) = checks::check_builtin_shadowing(

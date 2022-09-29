@@ -4,7 +4,7 @@ use anyhow::Result;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
+pub const DEFAULT_CHECK_CODES: [CheckCode; 45] = [
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -53,7 +53,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::A003,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 45] = [
+pub const ALL_CHECK_CODES: [CheckCode; 48] = [
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -642,7 +642,7 @@ impl CheckKind {
             CheckKind::UnusedNOQA(code) => match code {
                 None => "Unused `noqa` directive".to_string(),
                 Some(code) => format!("Unused `noqa` directive for: {code}"),
-            }
+            },
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
                 format!("Variable `{name}` is shadowing a python builtin")
