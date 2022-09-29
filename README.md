@@ -80,61 +80,60 @@ select = [
 Alternatively, on the command-line:
 
 ```shell
-ruff path/to/code/ --select F401 F403
+ruff path/to/code/ --select F401 --select F403
 ```
 
 See `ruff --help` for more:
 
 ```shell
-ruff (v0.0.46)
-An extremely fast Python linter.
+ruff: An extremely fast Python linter.
 
-USAGE:
-    ruff [OPTIONS] <FILES>...
+Usage: ruff [OPTIONS] <FILES>...
 
-ARGS:
-    <FILES>...
+Arguments:
+  <FILES>...
 
-OPTIONS:
-        --select <SELECT>...
-            List of error codes to enable
-        --extend-select <EXTEND_SELECT>...
-            Like --select, but adds additional error codes on top of the selected ones
-        --ignore <IGNORE>...
-            List of error codes to ignore
-        --extend-ignore <EXTEND_IGNORE>...
-            Like --ignore, but adds additional error codes on top of the ignored ones
-        --exclude <EXCLUDE>...
-            List of paths, used to exclude files and/or directories from checks
-        --extend-exclude <EXTEND_EXCLUDE>...
-            Like --exclude, but adds additional files and directories on top of the excluded ones
-    -e, --exit-zero
-            Exit with status code "0", even upon detecting errors
-    -f, --fix
-            Attempt to automatically fix lint errors
-        --format <FORMAT>
-            Output serialization format for error messages [default: text] [possible values: text,
-            json]
-    -h, --help
-            Print help information
-    -n, --no-cache
-            Disable cache reads
-        --per-file-ignores <PER_FILE_IGNORES>...
-            List of mappings from file pattern to code to exclude
-    -q, --quiet
-            Disable all logging (but still exit with status code "1" upon detecting errors)
-        --add-noqa
-            Enable automatic additions of noqa directives to failing lines
-        --show-files
-            See the files ruff will be run against with the current settings
-        --show-settings
-            See ruff's settings
-    -v, --verbose
-            Enable verbose logging
-    -V, --version
-            Print version information
-    -w, --watch
-            Run in watch mode by re-running whenever files change
+Options:
+  -v, --verbose
+          Enable verbose logging
+  -q, --quiet
+          Disable all logging (but still exit with status code "1" upon detecting errors)
+  -e, --exit-zero
+          Exit with status code "0", even upon detecting errors
+  -w, --watch
+          Run in watch mode by re-running whenever files change
+  -f, --fix
+          Attempt to automatically fix lint errors
+  -n, --no-cache
+          Disable cache reads
+      --select <SELECT>
+          List of error codes to enable
+      --extend-select <EXTEND_SELECT>
+          Like --select, but adds additional error codes on top of the selected ones
+      --ignore <IGNORE>
+          List of error codes to ignore
+      --extend-ignore <EXTEND_IGNORE>
+          Like --ignore, but adds additional error codes on top of the ignored ones
+      --exclude <EXCLUDE>
+          List of paths, used to exclude files and/or directories from checks
+      --extend-exclude <EXTEND_EXCLUDE>
+          Like --exclude, but adds additional files and directories on top of the excluded ones
+      --per-file-ignores <PER_FILE_IGNORES>
+          List of mappings from file pattern to code to exclude
+      --format <FORMAT>
+          Output serialization format for error messages [default: text] [possible values: text, json]
+      --show-files
+          See the files ruff will be run against with the current settings
+      --show-settings
+          See ruff's settings
+      --add-noqa
+          Enable automatic additions of noqa directives to failing lines
+      --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
+          Regular expression matching the name of dummy variables
+  -h, --help
+          Print help information
+  -V, --version
+          Print version information
 ```
 
 ### Excluding files
