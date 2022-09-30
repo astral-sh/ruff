@@ -685,10 +685,13 @@ pub fn check_builtin_shadowing(
 /// Check that `super()` has no args
 pub fn check_super_args(expr: &Expr, args: &Vec<Expr>) -> Option<Check> {
     if let ExprKind::Name { id, .. } = &expr.node {
-        if id == "super" && args.len() != 0 {
-            return Some(Check::new(CheckKind::SuperCallWithParameters, expr.location));
+        if id == "super" && !args.is_empty() {
+            return Some(Check::new(
+                CheckKind::SuperCallWithParameters,
+                expr.location,
+            ));
         }
     }
 
-    return None;
+    None
 }
