@@ -5,6 +5,7 @@ use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_CHECK_CODES: [CheckCode; 46] = [
+    // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -19,6 +20,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 46] = [
     CheckCode::E743,
     CheckCode::E902,
     CheckCode::E999,
+    // pyflakes
     CheckCode::F401,
     CheckCode::F402,
     CheckCode::F403,
@@ -56,6 +58,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 46] = [
 ];
 
 pub const ALL_CHECK_CODES: [CheckCode; 49] = [
+    // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -70,6 +73,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 49] = [
     CheckCode::E743,
     CheckCode::E902,
     CheckCode::E999,
+    // pyflakes
     CheckCode::F401,
     CheckCode::F402,
     CheckCode::F403,
@@ -98,19 +102,22 @@ pub const ALL_CHECK_CODES: [CheckCode; 49] = [
     CheckCode::F831,
     CheckCode::F841,
     CheckCode::F901,
-    CheckCode::M001,
-    CheckCode::R001,
-    CheckCode::R002,
     // flake8-builtins
     CheckCode::A001,
     CheckCode::A002,
     CheckCode::A003,
     // flake8-super
     CheckCode::SPR001,
+    // Meta
+    CheckCode::M001,
+    // Refactor
+    CheckCode::R001,
+    CheckCode::R002,
 ];
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub enum CheckCode {
+    // pycodestyle
     E402,
     E501,
     E711,
@@ -125,6 +132,7 @@ pub enum CheckCode {
     E743,
     E902,
     E999,
+    // pyflakes
     F401,
     F402,
     F403,
@@ -153,15 +161,17 @@ pub enum CheckCode {
     F831,
     F841,
     F901,
-    R001,
-    R002,
-    M001,
     // flake8-builtins
     A001,
     A002,
     A003,
     // flake8-super
     SPR001,
+    // Refactor
+    R001,
+    R002,
+    // Meta
+    M001,
 }
 
 impl FromStr for CheckCode {
@@ -169,6 +179,7 @@ impl FromStr for CheckCode {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
+            // pycodestyle
             "E402" => Ok(CheckCode::E402),
             "E501" => Ok(CheckCode::E501),
             "E711" => Ok(CheckCode::E711),
@@ -183,6 +194,7 @@ impl FromStr for CheckCode {
             "E743" => Ok(CheckCode::E743),
             "E902" => Ok(CheckCode::E902),
             "E999" => Ok(CheckCode::E999),
+            // pyflakes
             "F401" => Ok(CheckCode::F401),
             "F402" => Ok(CheckCode::F402),
             "F403" => Ok(CheckCode::F403),
@@ -211,15 +223,17 @@ impl FromStr for CheckCode {
             "F831" => Ok(CheckCode::F831),
             "F841" => Ok(CheckCode::F841),
             "F901" => Ok(CheckCode::F901),
-            "R001" => Ok(CheckCode::R001),
-            "R002" => Ok(CheckCode::R002),
-            "M001" => Ok(CheckCode::M001),
             // flake8-builtins
             "A001" => Ok(CheckCode::A001),
             "A002" => Ok(CheckCode::A002),
             "A003" => Ok(CheckCode::A003),
             // flake8-super
             "SPR001" => Ok(CheckCode::SPR001),
+            // Refactor
+            "R001" => Ok(CheckCode::R001),
+            "R002" => Ok(CheckCode::R002),
+            // Meta
+            "M001" => Ok(CheckCode::M001),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
         }
     }
@@ -228,6 +242,7 @@ impl FromStr for CheckCode {
 impl CheckCode {
     pub fn as_str(&self) -> &str {
         match self {
+            // pycodestyle
             CheckCode::E402 => "E402",
             CheckCode::E501 => "E501",
             CheckCode::E711 => "E711",
@@ -242,6 +257,7 @@ impl CheckCode {
             CheckCode::E743 => "E743",
             CheckCode::E902 => "E902",
             CheckCode::E999 => "E999",
+            // pyflakes
             CheckCode::F401 => "F401",
             CheckCode::F402 => "F402",
             CheckCode::F403 => "F403",
@@ -270,15 +286,17 @@ impl CheckCode {
             CheckCode::F831 => "F831",
             CheckCode::F841 => "F841",
             CheckCode::F901 => "F901",
-            CheckCode::R001 => "R001",
-            CheckCode::R002 => "R002",
-            CheckCode::M001 => "M001",
             // flake8-builtins
             CheckCode::A001 => "A001",
             CheckCode::A002 => "A002",
             CheckCode::A003 => "A003",
             // flake8-super
             CheckCode::SPR001 => "SPR001",
+            // Refactor
+            CheckCode::R001 => "R001",
+            CheckCode::R002 => "R002",
+            // Meta
+            CheckCode::M001 => "M001",
         }
     }
 
@@ -294,6 +312,7 @@ impl CheckCode {
     /// A placeholder representation of the CheckKind for the check.
     pub fn kind(&self) -> CheckKind {
         match self {
+            // pycodestyle
             CheckCode::E402 => CheckKind::ModuleImportNotAtTopOfFile,
             CheckCode::E501 => CheckKind::LineTooLong(89, 88),
             CheckCode::E711 => CheckKind::NoneComparison(RejectedCmpop::Eq),
@@ -308,6 +327,7 @@ impl CheckCode {
             CheckCode::E743 => CheckKind::AmbiguousFunctionName("...".to_string()),
             CheckCode::E902 => CheckKind::IOError("...".to_string()),
             CheckCode::E999 => CheckKind::SyntaxError("...".to_string()),
+            // pyflakes
             CheckCode::F401 => CheckKind::UnusedImport("...".to_string()),
             CheckCode::F402 => CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
             CheckCode::F403 => CheckKind::ImportStarUsed("...".to_string()),
@@ -336,15 +356,17 @@ impl CheckCode {
             CheckCode::F831 => CheckKind::DuplicateArgumentName,
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
-            CheckCode::M001 => CheckKind::UnusedNOQA(None),
-            CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
-            CheckCode::R002 => CheckKind::NoAssertEquals,
             // flake8-builtins
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-super
             CheckCode::SPR001 => CheckKind::SuperCallWithParameters,
+            // Refactor
+            CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
+            CheckCode::R002 => CheckKind::NoAssertEquals,
+            // Meta
+            CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
     }
 }
