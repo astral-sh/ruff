@@ -4,7 +4,7 @@ use anyhow::Result;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_CHECK_CODES: [CheckCode; 45] = [
+pub const DEFAULT_CHECK_CODES: [CheckCode; 46] = [
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -51,9 +51,11 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 45] = [
     CheckCode::A001,
     CheckCode::A002,
     CheckCode::A003,
+    // flake8-super
+    CheckCode::SPR001,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 48] = [
+pub const ALL_CHECK_CODES: [CheckCode; 49] = [
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -103,6 +105,8 @@ pub const ALL_CHECK_CODES: [CheckCode; 48] = [
     CheckCode::A001,
     CheckCode::A002,
     CheckCode::A003,
+    // flake8-super
+    CheckCode::SPR001,
 ];
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash, PartialOrd, Ord)]
@@ -156,6 +160,8 @@ pub enum CheckCode {
     A001,
     A002,
     A003,
+    // flake8-super
+    SPR001,
 }
 
 impl FromStr for CheckCode {
@@ -212,6 +218,8 @@ impl FromStr for CheckCode {
             "A001" => Ok(CheckCode::A001),
             "A002" => Ok(CheckCode::A002),
             "A003" => Ok(CheckCode::A003),
+            // flake8-super
+            "SPR001" => Ok(CheckCode::SPR001),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
         }
     }
@@ -269,6 +277,8 @@ impl CheckCode {
             CheckCode::A001 => "A001",
             CheckCode::A002 => "A002",
             CheckCode::A003 => "A003",
+            // flake8-super
+            CheckCode::SPR001 => "SPR001",
         }
     }
 
@@ -333,6 +343,8 @@ impl CheckCode {
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
+            // flake8-super
+            CheckCode::SPR001 => CheckKind::SuperCallWithParameters,
         }
     }
 }
@@ -401,6 +413,8 @@ pub enum CheckKind {
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
     BuiltinAttributeShadowing(String),
+    // flake8-super
+    SuperCallWithParameters,
 }
 
 impl CheckKind {
@@ -458,6 +472,8 @@ impl CheckKind {
             CheckKind::BuiltinVariableShadowing(_) => "BuiltinVariableShadowing",
             CheckKind::BuiltinArgumentShadowing(_) => "BuiltinArgumentShadowing",
             CheckKind::BuiltinAttributeShadowing(_) => "BuiltinAttributeShadowing",
+            // flake8-super
+            CheckKind::SuperCallWithParameters => "SuperCallWithParameters",
         }
     }
 
@@ -513,6 +529,8 @@ impl CheckKind {
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
+            // flake8-super
+            CheckKind::SuperCallWithParameters => &CheckCode::SPR001,
         }
     }
 
@@ -656,6 +674,10 @@ impl CheckKind {
             }
             CheckKind::BuiltinAttributeShadowing(name) => {
                 format!("class attribute `{name}` is shadowing a python builtin")
+            }
+            // flake8-super
+            CheckKind::SuperCallWithParameters => {
+                "Use `super()` instead of `super(__class__, self)`".to_string()
             }
         }
     }

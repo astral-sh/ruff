@@ -689,9 +689,16 @@ where
                 }
                 ExprContext::Del => self.handle_node_delete(expr),
             },
-            ExprKind::Call { func, .. } => {
+            ExprKind::Call { func, args, .. } => {
                 if self.settings.select.contains(&CheckCode::R002) {
                     if let Some(check) = checks::check_assert_equals(func, self.autofix) {
+                        self.checks.push(check)
+                    }
+                }
+
+                // flake8-super
+                if self.settings.select.contains(&CheckCode::SPR001) {
+                    if let Some(check) = checks::check_super_args(func, args) {
                         self.checks.push(check)
                     }
                 }
