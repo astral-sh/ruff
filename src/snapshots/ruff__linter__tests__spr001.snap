@@ -1,0 +1,19 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: SuperCallWithParameters
+  location:
+    row: 17
+    column: 18
+  fix: ~
+- kind: SuperCallWithParameters
+  location:
+    row: 18
+    column: 9
+  fix: ~
+- kind: SuperCallWithParameters
+  location:
+    row: 19
+    column: 9
+  fix: ~
