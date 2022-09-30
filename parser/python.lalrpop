@@ -816,12 +816,12 @@ AndExpression: ast::Expr = {
 };
 
 ShiftExpression: ast::Expr = {
-    <e1:ShiftExpression> <location:@L> <op:ShiftOp> <e2:ArithmaticExpression> => ast::Expr {
+    <e1:ShiftExpression> <location:@L> <op:ShiftOp> <e2:ArithmeticExpression> => ast::Expr {
         location,
         custom: (),
         node: ast::ExprKind::BinOp { left: Box::new(e1), op, right: Box::new(e2) }
     },
-    ArithmaticExpression,
+    ArithmeticExpression,
 };
 
 ShiftOp: ast::Operator = {
@@ -829,8 +829,8 @@ ShiftOp: ast::Operator = {
     ">>" => ast::Operator::RShift,
 };
 
-ArithmaticExpression: ast::Expr = {
-    <a:ArithmaticExpression> <location:@L> <op:AddOp> <b:Term> => ast::Expr {
+ArithmeticExpression: ast::Expr = {
+    <a:ArithmeticExpression> <location:@L> <op:AddOp> <b:Term> => ast::Expr {
         location,
         custom: (),
         node: ast::ExprKind::BinOp { left: Box::new(a), op, right: Box::new(b) }
