@@ -1,31 +1,11 @@
 use std::fmt;
-use std::fmt::Write;
 
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Suite, Withitem};
 use rustpython_common::str;
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Expr, ExprKind,
     Operator, Stmt, StmtKind,
 };
-
-pub struct RuffStmt<U> {
-    stmt: Stmt<U>,
-}
-
-impl<U> RuffStmt<U> {
-    pub fn new(stmt: Stmt<U>) -> RuffStmt<U> {
-        Self { stmt }
-    }
-}
-
-pub struct RuffExpr<U> {
-    expr: Expr<U>,
-}
-
-impl<U> RuffExpr<U> {
-    pub fn new(expr: Expr<U>) -> RuffExpr<U> {
-        Self { expr }
-    }
-}
 
 mod precedence {
     macro_rules! precedence {
@@ -45,26 +25,44 @@ mod precedence {
     pub const EXPR: u8 = BOR;
 }
 
-struct SourceGenerator<'a> {
-    f: fmt::Formatter<'a>,
+pub struct SourceGenerator {
+    pub buffer: Vec<u8>,
     indentation: usize,
     new_lines: usize,
+    initial: bool,
 }
 
-impl<'a> SourceGenerator<'a> {
-    fn new<'b>(f: &'b mut fmt::Formatter<'a>) -> &'b mut SourceGenerator<'a> {
-        let obj = unsafe { &mut *(f as *mut fmt::Formatter<'a> as *mut SourceGenerator<'a>) };
-        obj.indentation = 0;
-        obj.new_lines = 0;
-        obj
+impl Default for SourceGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SourceGenerator {
+    pub fn new() -> Self {
+        SourceGenerator {
+            buffer: vec![],
+            indentation: 0,
+            new_lines: 0,
+            initial: true,
+        }
     }
 
     fn newline(&mut self) -> fmt::Result {
-        self.new_lines = std::cmp::max(self.new_lines, 1);
-        for _ in 0..(self.new_lines) {
-            self.f.write_char('\n')?;
+        if self.initial {
+            self.initial = false;
+        } else {
+            self.new_lines = std::cmp::max(self.new_lines, 1);
         }
-        self.new_lines = 0;
+        Ok(())
+    }
+
+    fn newlines(&mut self, extra: usize) -> fmt::Result {
+        if self.initial {
+            self.initial = false;
+        } else {
+            self.new_lines = std::cmp::max(self.new_lines, 1 + extra);
+        }
         Ok(())
     }
 
@@ -78,7 +76,14 @@ impl<'a> SourceGenerator<'a> {
     }
 
     fn p(&mut self, s: &str) -> fmt::Result {
-        self.f.write_str(s)
+        if self.new_lines > 0 {
+            for _ in 0..self.new_lines {
+                self.buffer.extend("\n".as_bytes());
+            }
+            self.new_lines = 0;
+        }
+        self.buffer.extend(s.as_bytes());
+        Ok(())
     }
 
     fn p_if(&mut self, cond: bool, s: &str) -> fmt::Result {
@@ -93,62 +98,345 @@ impl<'a> SourceGenerator<'a> {
     }
 
     fn write_fmt(&mut self, f: fmt::Arguments<'_>) -> fmt::Result {
-        self.f.write_fmt(f)
+        self.buffer.extend(format!("{}", f).as_bytes());
+        Ok(())
+    }
+
+    pub fn unparse_suite<U>(&mut self, suite: &Suite<U>) -> fmt::Result {
+        for stmt in suite {
+            self.unparse_stmt(stmt)?;
+        }
+        Ok(())
     }
 
     fn unparse_stmt<U>(&mut self, ast: &Stmt<U>) -> fmt::Result {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline()?;
-                self.p(&" ".repeat(self.indentation))?;
+                self.p(&"    ".repeat(self.indentation))?;
                 $body
             }};
         }
 
         match &ast.node {
-            StmtKind::FunctionDef { .. } => {}
-            StmtKind::AsyncFunctionDef { .. } => {}
-            StmtKind::ClassDef { .. } => {}
+            StmtKind::FunctionDef {
+                name,
+                args,
+                body,
+                returns,
+                ..
+            } => {
+                // TODO(charlie): Handle decorators.
+                self.newlines(if self.indentation == 0 { 2 } else { 1 })?;
+                statement!({
+                    self.p("def ")?;
+                    self.p(name)?;
+                    self.p("(")?;
+                    self.unparse_args(args)?;
+                    self.p(")")?;
+                    if let Some(returns) = returns {
+                        self.p(" -> ")?;
+                        self.unparse_expr(returns, precedence::EXPR)?;
+                    }
+                    self.p(":")?;
+                    self.body(body)?;
+
+                    if self.indentation == 0 {
+                        self.newlines(2)?;
+                    }
+                })
+            }
+            StmtKind::AsyncFunctionDef {
+                name,
+                args,
+                body,
+                returns,
+                ..
+            } => {
+                // TODO(charlie): Handle decorators.
+                self.newlines(if self.indentation == 0 { 2 } else { 1 })?;
+                statement!({
+                    self.p("async def ")?;
+                    self.p(name)?;
+                    self.p("(")?;
+                    self.unparse_args(args)?;
+                    self.p(")")?;
+                    if let Some(returns) = returns {
+                        self.p(" -> ")?;
+                        self.unparse_expr(returns, precedence::EXPR)?;
+                    }
+                    self.p(":")?;
+                    self.body(body)?;
+                    if self.indentation == 0 {
+                        self.newlines(2)?;
+                    }
+                })
+            }
+            StmtKind::ClassDef {
+                name,
+                bases,
+                keywords,
+                body,
+                ..
+            } => {
+                // TODO(charlie): Handle decorators.
+                self.newlines(if self.indentation == 0 { 2 } else { 1 })?;
+                statement!({
+                    self.p("class ")?;
+                    self.p(name)?;
+                    let mut first = true;
+                    for base in bases {
+                        self.p_if(first, "(")?;
+                        self.p_delim(&mut first, ", ")?;
+                        self.unparse_expr(base, precedence::EXPR)?;
+                    }
+                    for keyword in keywords {
+                        self.p_if(first, "(")?;
+                        self.p_delim(&mut first, ", ")?;
+                        if let Some(arg) = &keyword.node.arg {
+                            self.p(arg)?;
+                            self.p("=")?;
+                        } else {
+                            self.p("**")?;
+                        }
+                        self.unparse_expr(&keyword.node.value, precedence::EXPR)?;
+                    }
+                    self.p_if(!first, ")")?;
+                    self.p(":")?;
+                    self.body(body)?;
+                    if self.indentation == 0 {
+                        self.newlines(2)?;
+                    }
+                })
+            }
             StmtKind::Return { value } => {
-                if let Some(expr) = value {
-                    self.p("return ")?;
-                    self.unparse_expr(expr, precedence::ATOM)?;
-                } else {
-                    self.p("return")?;
-                }
+                statement!({
+                    if let Some(expr) = value {
+                        self.p("return ")?;
+                        self.unparse_expr(expr, precedence::ATOM)?;
+                    } else {
+                        self.p("return")?;
+                    }
+                });
             }
             StmtKind::Delete { targets } => {
-                self.p("del ")?;
-                let mut first = true;
-                for expr in targets {
-                    self.p_delim(&mut first, ", ")?;
-                    self.unparse_expr(expr, precedence::ATOM)?;
-                }
+                statement!({
+                    self.p("del ")?;
+                    let mut first = true;
+                    for expr in targets {
+                        self.p_delim(&mut first, ", ")?;
+                        self.unparse_expr(expr, precedence::ATOM)?;
+                    }
+                });
             }
-            StmtKind::Assign { .. } => {}
-            StmtKind::AugAssign { .. } => {}
-            StmtKind::AnnAssign { .. } => {}
-            StmtKind::For { .. } => {}
-            StmtKind::AsyncFor { .. } => {}
-            StmtKind::While { .. } => {}
+            StmtKind::Assign { targets, value, .. } => {
+                statement!({
+                    for target in targets {
+                        self.unparse_expr(target, precedence::EXPR)?;
+                        self.p(" = ")?;
+                    }
+                    self.unparse_expr(value, precedence::EXPR)?;
+                });
+            }
+            StmtKind::AugAssign { target, op, value } => {
+                statement!({
+                    self.unparse_expr(target, precedence::EXPR)?;
+                    self.p(" ")?;
+                    self.p(match op {
+                        Operator::Add => "+",
+                        Operator::Sub => "-",
+                        Operator::Mult => "*",
+                        Operator::MatMult => "@",
+                        Operator::Div => "/",
+                        Operator::Mod => "%",
+                        Operator::Pow => "**",
+                        Operator::LShift => "<<",
+                        Operator::RShift => ">>",
+                        Operator::BitOr => "|",
+                        Operator::BitXor => "^",
+                        Operator::BitAnd => "&",
+                        Operator::FloorDiv => "//",
+                    })?;
+                    self.p("= ")?;
+                    self.unparse_expr(value, precedence::EXPR)?;
+                })
+            }
+            StmtKind::AnnAssign {
+                target,
+                annotation,
+                value,
+                simple,
+            } => {
+                statement!({
+                    let need_parens = matches!(target.node, ExprKind::Name { .. }) && simple == &0;
+                    self.p_if(need_parens, "(")?;
+                    self.unparse_expr(target, precedence::EXPR)?;
+                    self.p_if(need_parens, ")")?;
+                    self.p(": ")?;
+                    self.unparse_expr(annotation, precedence::EXPR)?;
+                    if let Some(value) = value {
+                        self.p(" = ")?;
+                        self.unparse_expr(value, precedence::EXPR)?;
+                    }
+                })
+            }
+            StmtKind::For {
+                target,
+                iter,
+                body,
+                orelse,
+                ..
+            } => {
+                statement!({
+                    self.p("for ")?;
+                    self.unparse_expr(target, precedence::TEST)?;
+                    self.p(" in ")?;
+                    self.unparse_expr(iter, precedence::TEST)?;
+                    self.p(":")?;
+                    self.body(body)?;
+                    if !orelse.is_empty() {
+                        statement!({
+                            self.p("else:")?;
+                            self.body(orelse)?;
+                        });
+                    }
+                })
+            }
+            StmtKind::AsyncFor {
+                target,
+                iter,
+                body,
+                orelse,
+                ..
+            } => {
+                statement!({
+                    self.p("async for ")?;
+                    self.unparse_expr(target, precedence::TEST)?;
+                    self.p(" in ")?;
+                    self.unparse_expr(iter, precedence::TEST)?;
+                    self.p(":")?;
+                    self.body(body)?;
+                    if !orelse.is_empty() {
+                        statement!({
+                            self.p("else:")?;
+                            self.body(orelse)?;
+                        });
+                    }
+                })
+            }
+            StmtKind::While { test, body, orelse } => {
+                statement!({
+                    self.p("while ")?;
+                    self.unparse_expr(test, precedence::TEST)?;
+                    self.p(":")?;
+                    self.body(body)?;
+                    if !orelse.is_empty() {
+                        statement!({
+                            self.p("else:")?;
+                            self.body(orelse)?;
+                        });
+                    }
+                })
+            }
             StmtKind::If { test, body, orelse } => {
                 statement!({
                     self.p("if ")?;
                     self.unparse_expr(test, precedence::TEST)?;
                     self.p(":")?;
+                    self.body(body)?;
+
+                    let mut orelse_: &Vec<Stmt<U>> = orelse;
+                    loop {
+                        if orelse_.len() == 1 && matches!(orelse_[0].node, StmtKind::If { .. }) {
+                            if let StmtKind::If { body, test, orelse } = &orelse_[0].node {
+                                statement!({
+                                    self.p("elif ")?;
+                                    self.unparse_expr(test, precedence::TEST)?;
+                                    self.p(":")?;
+                                    self.body(body)?;
+                                });
+                                orelse_ = orelse;
+                            }
+                        } else {
+                            if !orelse_.is_empty() {
+                                statement!({
+                                    self.p("else:")?;
+                                    self.body(orelse_)?;
+                                });
+                            }
+                            break;
+                        }
+                    }
                 });
-                self.body(body)?;
-                if !orelse.is_empty() {
-                    self.p("else:")?;
-                    self.unparse_expr(test, precedence::TEST)?;
-                    self.p(":")?;
-                }
             }
-            StmtKind::With { .. } => {}
-            StmtKind::AsyncWith { .. } => {}
+            StmtKind::With { items, body, .. } => {
+                statement!({
+                    self.p("with ")?;
+                    let mut first = true;
+                    for item in items {
+                        self.p_delim(&mut first, ", ")?;
+                        self.unparse_withitem(item)?;
+                    }
+                    self.p(":")?;
+                    self.body(body)?;
+                })
+            }
+            StmtKind::AsyncWith { items, body, .. } => {
+                statement!({
+                    self.p("async with ")?;
+                    let mut first = true;
+                    for item in items {
+                        self.p_delim(&mut first, ", ")?;
+                        self.unparse_withitem(item)?;
+                    }
+                    self.p(":")?;
+                    self.body(body)?;
+                })
+            }
             StmtKind::Match { .. } => {}
-            StmtKind::Raise { .. } => {}
-            StmtKind::Try { .. } => {}
+            StmtKind::Raise { exc, cause } => {
+                statement!({
+                    self.p("raise")?;
+                    if let Some(exc) = exc {
+                        self.p(" ")?;
+                        self.unparse_expr(exc, precedence::EXPR)?;
+                    }
+                    if let Some(cause) = cause {
+                        self.p(" from ")?;
+                        self.unparse_expr(cause, precedence::EXPR)?;
+                    }
+                });
+            }
+            StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => {
+                statement!({
+                    self.p("try:")?;
+                    self.body(body)?;
+
+                    for handler in handlers {
+                        statement!({
+                            self.unparse_excepthandler(handler)?;
+                        });
+                    }
+
+                    if !orelse.is_empty() {
+                        statement!({
+                            self.p("else:")?;
+                            self.body(orelse)?;
+                        });
+                    }
+                    if !finalbody.is_empty() {
+                        statement!({
+                            self.p("finally:")?;
+                            self.body(finalbody)?;
+                        });
+                    }
+                })
+            }
             StmtKind::Assert { test, msg } => {
                 statement!({
                     self.p("assert ")?;
@@ -169,20 +457,85 @@ impl<'a> SourceGenerator<'a> {
                     }
                 });
             }
-            StmtKind::ImportFrom { .. } => {}
-            StmtKind::Global { .. } => {}
-            StmtKind::Nonlocal { .. } => {}
+            StmtKind::ImportFrom {
+                module,
+                names,
+                level,
+            } => {
+                statement!({
+                    self.p("from ")?;
+                    if let Some(level) = level {
+                        self.p(&".".repeat(*level))?;
+                    }
+                    if let Some(module) = module {
+                        self.p(module)?;
+                    }
+                    self.p(" import ")?;
+                    let mut first = true;
+                    for alias in names {
+                        self.p_delim(&mut first, ", ")?;
+                        self.unparse_alias(alias)?;
+                    }
+                })
+            }
+            StmtKind::Global { names } => {
+                statement!({
+                    self.p("global ")?;
+                    let mut first = true;
+                    for name in names {
+                        self.p_delim(&mut first, ", ")?;
+                        self.p(name)?;
+                    }
+                });
+            }
+            StmtKind::Nonlocal { names } => {
+                statement!({
+                    self.p("nonlocal ")?;
+                    let mut first = true;
+                    for name in names {
+                        self.p_delim(&mut first, ", ")?;
+                        self.p(name)?;
+                    }
+                });
+            }
             StmtKind::Expr { value } => {
-                self.unparse_expr(value, 0)?;
+                statement!({
+                    self.unparse_expr(value, 0)?;
+                });
             }
             StmtKind::Pass => {
-                self.p("pass")?;
+                statement!({
+                    self.p("pass")?;
+                });
             }
             StmtKind::Break => {
-                self.p("break")?;
+                statement!({
+                    self.p("break")?;
+                });
             }
             StmtKind::Continue => {
-                self.p("continue")?;
+                statement!({
+                    self.p("continue")?;
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn unparse_excepthandler<U>(&mut self, ast: &Excepthandler<U>) -> fmt::Result {
+        match &ast.node {
+            ExcepthandlerKind::ExceptHandler { type_, name, body } => {
+                self.p("except")?;
+                if let Some(type_) = type_ {
+                    self.p(" ")?;
+                    self.unparse_expr(type_, precedence::EXPR)?;
+                }
+                if let Some(name) = name {
+                    self.p(" as ")?;
+                    self.p(name)?;
+                }
+                self.p(":")?;
+                self.body(body)?;
             }
         }
         Ok(())
@@ -442,7 +795,7 @@ impl<'a> SourceGenerator<'a> {
                     {
                         self.p(&value.to_string().replace("inf", inf_str))?
                     }
-                    _ => fmt::Display::fmt(value, &mut self.f)?,
+                    _ => self.p(&format!("{}", value))?,
                 }
             }
             ExprKind::Attribute { value, attr, .. } => {
@@ -595,17 +948,16 @@ impl<'a> SourceGenerator<'a> {
         conversion: usize,
         spec: Option<&Expr<U>>,
     ) -> fmt::Result {
-        let buffered =
-            to_string_fmt(|f| SourceGenerator::new(f).unparse_expr(val, precedence::TEST + 1));
-        let brace = if buffered.starts_with('{') {
+        let mut generator: SourceGenerator = Default::default();
+        generator.unparse_expr(val, precedence::TEST + 1)?;
+        let brace = if generator.buffer.starts_with("{".as_bytes()) {
             // put a space to avoid escaping the bracket
             "{ "
         } else {
             "{"
         };
         self.p(brace)?;
-        self.p(&buffered)?;
-        drop(buffered);
+        self.buffer.extend(generator.buffer);
 
         if conversion != ConversionFlag::None as usize {
             self.p("!")?;
@@ -650,13 +1002,15 @@ impl<'a> SourceGenerator<'a> {
 
     fn unparse_joinedstr<U>(&mut self, values: &[Expr<U>], is_spec: bool) -> fmt::Result {
         if is_spec {
-            self.unparse_fstring_body(values, is_spec)
+            self.unparse_fstring_body(values, is_spec)?;
         } else {
             self.p("f")?;
-            let body =
-                to_string_fmt(|f| SourceGenerator::new(f).unparse_fstring_body(values, is_spec));
-            fmt::Display::fmt(&rustpython_common::str::repr(&body), &mut self.f)
+            let mut generator: SourceGenerator = Default::default();
+            generator.unparse_fstring_body(values, is_spec)?;
+            let body = std::str::from_utf8(&generator.buffer).unwrap();
+            self.p(&format!("{}", str::repr(body)))?;
         }
+        Ok(())
     }
 
     fn unparse_alias<U>(&mut self, alias: &Alias<U>) -> fmt::Result {
@@ -667,27 +1021,13 @@ impl<'a> SourceGenerator<'a> {
         }
         Ok(())
     }
-}
 
-impl<U> fmt::Display for RuffStmt<U> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        SourceGenerator::new(f).unparse_stmt(&self.stmt)
-    }
-}
-
-impl<U> fmt::Display for RuffExpr<U> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        SourceGenerator::new(f).unparse_expr(&self.expr, precedence::TEST)
-    }
-}
-
-fn to_string_fmt(f: impl FnOnce(&mut fmt::Formatter) -> fmt::Result) -> String {
-    use std::cell::Cell;
-    struct Fmt<F>(Cell<Option<F>>);
-    impl<F: FnOnce(&mut fmt::Formatter) -> fmt::Result> fmt::Display for Fmt<F> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            self.0.take().unwrap()(f)
+    fn unparse_withitem<U>(&mut self, withitem: &Withitem<U>) -> fmt::Result {
+        self.unparse_expr(&withitem.context_expr, precedence::EXPR)?;
+        if let Some(optional_vars) = &withitem.optional_vars {
+            self.p(" as ")?;
+            self.unparse_expr(optional_vars, precedence::EXPR)?;
         }
+        Ok(())
     }
-    Fmt(Cell::new(Some(f))).to_string()
 }

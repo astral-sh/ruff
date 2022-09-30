@@ -1,123 +1,28 @@
-use anyhow::Result;
-use rustpython_ast::{Alias, AliasData, Stmt, StmtKind};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
+use std::fs::write;
+use std::path::PathBuf;
 
-use ruff::unparse::{RuffExpr, RuffStmt};
+use anyhow::Result;
+use clap::Parser;
+use rustpython_parser::parser;
+
+use ruff::code_gen::SourceGenerator;
+use ruff::fs;
+
+#[derive(Debug, Parser)]
+struct Cli {
+    #[arg(required = true)]
+    file: PathBuf,
+}
 
 fn main() -> Result<()> {
-    let expr = RuffExpr::new(Expr::new(
-        Location::default(),
-        ExprKind::Constant {
-            value: Constant::Bool(true),
-            kind: None,
-        },
-    ));
-    println!("{}", expr);
+    let cli = Cli::parse();
 
-    let stmt = RuffStmt::new(Stmt::new(Location::default(), StmtKind::Pass));
-    println!("{}", stmt);
+    let contents = fs::read_file(&cli.file)?;
+    let python_ast = parser::parse_program(&contents, &cli.file.to_string_lossy())?;
+    let mut generator = SourceGenerator::new();
+    generator.unparse_suite(&python_ast)?;
 
-    let stmt = RuffStmt::new(Stmt::new(
-        Location::default(),
-        StmtKind::Return {
-            value: Some(Box::new(Expr::new(
-                Location::default(),
-                ExprKind::Set { elts: vec![] },
-            ))),
-        },
-    ));
-    println!("{}", stmt);
-
-    let stmt = RuffStmt::new(Stmt::new(
-        Location::default(),
-        StmtKind::Delete {
-            targets: vec![Expr::new(
-                Location::default(),
-                ExprKind::Set { elts: vec![] },
-            )],
-        },
-    ));
-    println!("{}", stmt);
-
-    let stmt = RuffStmt::new(Stmt::new(
-        Location::default(),
-        StmtKind::Import {
-            names: vec![
-                Alias::new(
-                    Location::default(),
-                    AliasData {
-                        name: "foo".to_string(),
-                        asname: Some("bar".to_string()),
-                    },
-                ),
-                Alias::new(
-                    Location::default(),
-                    AliasData {
-                        name: "baz".to_string(),
-                        asname: Some("bar".to_string()),
-                    },
-                ),
-            ],
-        },
-    ));
-    println!("{}", stmt);
-
-    let stmt = RuffStmt::new(Stmt::new(
-        Location::default(),
-        StmtKind::If {
-            test: Box::new(Expr::new(
-                Location::default(),
-                ExprKind::Constant {
-                    value: Constant::Bool(true),
-                    kind: None,
-                },
-            )),
-            body: vec![Stmt::new(
-                Location::default(),
-                StmtKind::Import {
-                    names: vec![
-                        Alias::new(
-                            Location::default(),
-                            AliasData {
-                                name: "foo".to_string(),
-                                asname: Some("bar".to_string()),
-                            },
-                        ),
-                        Alias::new(
-                            Location::default(),
-                            AliasData {
-                                name: "baz".to_string(),
-                                asname: Some("bar".to_string()),
-                            },
-                        ),
-                    ],
-                },
-            )],
-            orelse: vec![],
-        },
-    ));
-    println!("{}", stmt);
-
-    let stmt = RuffStmt::new(Stmt::new(
-        Location::default(),
-        StmtKind::Assert {
-            test: Box::new(Expr::new(
-                Location::default(),
-                ExprKind::Constant {
-                    value: Constant::Bool(true),
-                    kind: None,
-                },
-            )),
-            msg: Some(Box::new(Expr::new(
-                Location::default(),
-                ExprKind::Constant {
-                    value: Constant::Str("Bad".to_string()),
-                    kind: None,
-                },
-            ))),
-        },
-    ));
-    println!("{}", stmt);
+    write("transformed.py", &generator.buffer)?;
 
     Ok(())
 }

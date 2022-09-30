@@ -15,6 +15,7 @@ pub mod cache;
 pub mod check_ast;
 mod check_lines;
 pub mod checks;
+pub mod code_gen;
 pub mod fs;
 pub mod linter;
 pub mod logging;
@@ -24,7 +25,6 @@ pub mod printer;
 pub mod pyproject;
 mod python;
 pub mod settings;
-pub mod unparse;
 
 /// Run ruff over Python source code directly.
 pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
