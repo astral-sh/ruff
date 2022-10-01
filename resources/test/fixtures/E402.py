@@ -1,4 +1,8 @@
 """Top-level docstring."""
+
+__all__ = ["y"]
+__version__: str = "0.1.0"
+
 import a
 
 try:
