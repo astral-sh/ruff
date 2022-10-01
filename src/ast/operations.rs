@@ -134,7 +134,7 @@ impl<'a> SourceCodeLocator<'a> {
         }
     }
 
-    pub fn slice_source_code(&mut self, location: &Location) -> &'a str {
+    pub fn slice_source_code_at(&mut self, location: &Location) -> &'a str {
         if !self.initialized {
             let mut offset = 0;
             for i in self.content.lines() {
@@ -146,5 +146,20 @@ impl<'a> SourceCodeLocator<'a> {
         }
         let offset = self.offsets[location.row() - 1] + location.column() - 1;
         &self.content[offset..]
+    }
+
+    pub fn slice_source_code_range(&mut self, start: &Location, end: &Location) -> &'a str {
+        if !self.initialized {
+            let mut offset = 0;
+            for i in self.content.lines() {
+                self.offsets.push(offset);
+                offset += i.len();
+                offset += 1;
+            }
+            self.initialized = true;
+        }
+        let start = self.offsets[start.row() - 1] + start.column() - 1;
+        let end = self.offsets[end.row() - 1] + end.column() - 1;
+        &self.content[start..end]
     }
 }

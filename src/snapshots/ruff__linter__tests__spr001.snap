@@ -8,22 +8,46 @@ expression: checks
     column: 18
   end_location:
     row: 17
-    column: 23
-  fix: ~
+    column: 36
+  fix:
+    content: super()
+    location:
+      row: 17
+      column: 18
+    end_location:
+      row: 17
+      column: 36
+    applied: false
 - kind: SuperCallWithParameters
   location:
     row: 18
     column: 9
   end_location:
     row: 18
-    column: 14
-  fix: ~
+    column: 27
+  fix:
+    content: super()
+    location:
+      row: 18
+      column: 9
+    end_location:
+      row: 18
+      column: 27
+    applied: false
 - kind: SuperCallWithParameters
   location:
     row: 19
     column: 9
   end_location:
-    row: 19
-    column: 14
-  fix: ~
+    row: 22
+    column: 10
+  fix:
+    content: super()
+    location:
+      row: 19
+      column: 9
+    end_location:
+      row: 22
+      column: 10
+    applied: false
 
