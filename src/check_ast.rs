@@ -1,6 +1,8 @@
 use std::ops::Deref;
 use std::path::Path;
 
+use once_cell::sync::Lazy;
+use regex::Regex;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Location, Operator, Stmt, StmtKind, Suite,
@@ -20,6 +22,8 @@ use crate::python::typing;
 use crate::settings::Settings;
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
+
+static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
 struct Checker<'a> {
     // Input data.
@@ -101,6 +105,36 @@ fn is_annotated_subscript(expr: &Expr) -> bool {
     }
 }
 
+fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
+    // Check whether it's an assignment to a dunder, with or without a type annotation.
+    // This is what pycodestyle (as of 2.9.1) does.
+    match node {
+        StmtKind::Assign {
+            targets,
+            value: _,
+            type_comment: _,
+        } => {
+            if targets.len() != 1 {
+                return false;
+            }
+            match &targets[0].node {
+                ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
+                _ => false,
+            }
+        }
+        StmtKind::AnnAssign {
+            target,
+            annotation: _,
+            value: _,
+            simple: _,
+        } => match &target.node {
+            ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
 impl<'a, 'b> Visitor<'b> for Checker<'a>
 where
     'b: 'a,
@@ -157,10 +191,11 @@ where
                     self.futures_allowed = false;
                 }
             }
-            _ => {
+            node => {
                 self.futures_allowed = false;
 
                 if !self.seen_non_import
+                    && !is_assignment_to_a_dunder(node)
                     && !operations::in_nested_block(&self.parent_stack, &self.parents)
                 {
                     self.seen_non_import = true;

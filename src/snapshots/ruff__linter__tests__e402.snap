@@ -4,7 +4,7 @@ expression: checks
 ---
 - kind: ModuleImportNotAtTopOfFile
   location:
-    row: 20
+    row: 24
     column: 1
   fix: ~
 
