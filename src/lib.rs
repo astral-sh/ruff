@@ -15,7 +15,6 @@ pub mod cache;
 pub mod check_ast;
 mod check_lines;
 pub mod checks;
-mod cst_visitor;
 pub mod fs;
 pub mod linter;
 pub mod logging;

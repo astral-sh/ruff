@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::Path;
 
@@ -1603,6 +1604,10 @@ impl<'a> Checker<'a> {
             }
 
             if self.settings.select.contains(&CheckCode::F401) {
+                // Collect all unused imports by location. (Multiple unused imports at the same
+                // location indicates an `import from`.)
+                let mut unused: BTreeMap<Range, Vec<String>> = BTreeMap::new();
+
                 for (name, binding) in scope.values.iter().rev() {
                     let used = binding.used.is_some()
                         || all_names
@@ -1613,22 +1618,26 @@ impl<'a> Checker<'a> {
                         match &binding.kind {
                             BindingKind::Importation(full_name)
                             | BindingKind::SubmoduleImportation(full_name) => {
-                                let mut check = Check::new(
-                                    CheckKind::UnusedImport(full_name.to_string()),
-                                    self.locate_check(binding.location),
-                                );
-                                if let Some(fix) = fixes::remove_unused_import_from(
-                                    &mut self.locator,
-                                    full_name,
-                                    &binding.location,
-                                ) {
-                                    check.amend(fix);
-                                }
-                                self.checks.push(check);
+                                let full_names = unused.entry(binding.location).or_insert(vec![]);
+                                full_names.push(full_name.to_string());
                             }
                             _ => {}
                         }
                     }
+                }
+
+                for (location, full_names) in unused {
+                    let mut check = Check::new(
+                        CheckKind::UnusedImport(full_names.join(", ")),
+                        self.locate_check(location),
+                    );
+                    if let Some(fix) =
+                        fixes::remove_unused_import_from(&mut self.locator, &full_names, location)
+                    {
+                        println!("{:?}", fix);
+                        check.amend(fix);
+                    }
+                    self.checks.push(check);
                 }
             }
         }

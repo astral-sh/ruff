@@ -17,8 +17,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let contents = fs::read_file(&cli.file)?;
-    for (_, tok, _) in lexer::make_tokenizer(&contents).flatten() {
-        println!("{:#?}", tok);
+    for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
+        println!("{:?} {:#?} {:?}", start, tok, end);
     }
 
     Ok(())

@@ -1,27 +1,19 @@
 use libcst_native::ImportNames::Aliases;
-use libcst_native::{
-    AnnAssign, Annotation, Arg, AsName, Assert, Assign, AssignEqual, AssignTarget,
-    AssignTargetExpression, Asynchronous, Attribute, AugAssign, Await, BinaryOp, BinaryOperation,
-    BooleanOp, BooleanOperation, Break, Call, ClassDef, Codegen, CompFor, CompIf, CompOp,
-    Comparison, ComparisonTarget, CompoundStatement, ConcatenatedString, Continue, Decorator, Del,
-    DelTargetExpression, Dict, DictComp, DictElement, Element, Ellipsis, Else, ExceptHandler,
-    ExceptStarHandler, Expression, Finally, Float, For, FormattedString, FormattedStringExpression,
-    FormattedStringText, FunctionDef, GeneratorExp, Global, If, IfExp, Imaginary, Import,
-    ImportAlias, ImportFrom, ImportStar, IndentedBlock, Index, Integer, Lambda, List, ListComp,
-    Match, Module, Name, NameItem, NamedExpr, Nonlocal, OrElse, Param, ParamStar, Parameters, Pass,
-    Raise, Return, Set, SetComp, SimpleStatementLine, SimpleStatementSuite, SimpleString, Slice,
-    SmallStatement, StarredDictElement, StarredElement, Statement, Subscript, SubscriptElement,
-    Try, TryStar, Tuple, UnaryOp, UnaryOperation, While, With, WithItem, Yield, YieldValue,
-};
-use rustpython_parser::ast::{Alias, Expr, Keyword, Location};
+use libcst_native::NameOrAttribute::N;
+use libcst_native::{Codegen, Expression, SmallStatement, Statement};
+use rustpython_parser::ast::{Expr, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
 use crate::ast::operations::SourceCodeLocator;
+<<<<<<< HEAD
 use crate::ast::types::Range;
 use crate::checks::{Check, Fix};
 use crate::cst_visitor;
 use crate::cst_visitor::CSTVisitor;
+=======
+use crate::checks::Fix;
+>>>>>>> 863c093 (Starting to come together)
 
 /// Convert a location within a file (relative to `base`) to an absolute position.
 fn to_absolute(relative: &Location, base: &Location) -> Location {
@@ -174,87 +166,108 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
     None
 }
 
-// struct ImportRemover {}
-//
-// impl CSTVisitor for ImportRemover {
-//     fn visit_SmallStatement<'a>(&mut self, node: &'a mut SmallStatement<'a>) {
-//         match node {
-//             SmallStatement::Import(body) => {
-//                 body.names = vec![];
-//             }
-//             SmallStatement::ImportFrom(_) => {}
-//             _ => {
-//                 cst_visitor::walk_SmallStatement(self, node);
-//             }
-//         }
-//     }
-// }
-//
-// pub fn modify(contents: &str) -> Module {
-//     // First, generate the CST.
-//     let mut tree = match libcst_native::parse_module(contents, None) {
-//         Ok(m) => m,
-//         Err(_) => panic!("Oops"),
-//     };
-//
-//     let mut visitor = ImportRemover {};
-//     visitor.visit_Module(&mut tree);
-//
-//     tree
-// }
-
-// pub fn remove_unused_imports(contents: &str, checks: &[Check]) {
-//     // // // First, generate the CST.
-//     // // let mut tree = match libcst_native::parse_module(contents, None) {
-//     // //     Ok(m) => m,
-//     // //     Err(_) => return,
-//     // // };
-//     // //
-//     // // let mut visitor = ImportRemover {};
-//     // // visitor.visit_Module(&mut tree);
-//     // let mut tree = modify(contents);
-//     //
-//     // let mut state = Default::default();
-//     // tree.codegen(&mut state);
-// }
-
-pub fn remove_unused_import(location: &Location, end_location: &Location) -> Option<Fix> {
-    Some(Fix {
-        start: location.clone(),
-        end: end_location.clone(),
-        content: "".to_string(),
-        applied: false,
-    })
-}
-
 pub fn remove_unused_import_from(
     locator: &mut SourceCodeLocator,
-    full_name: &str,
-    location: &Range,
+    full_names: &[String],
+    range: &Range,
 ) -> Option<Fix> {
-    let contents = locator.slice_source_code_range(&location, &end_location);
+    let contents = locator.slice_source_code_range(&range);
+    let location = range.location;
 
+    // TODO(charlie): Not necessary if we're removing a non-`from`, so just track that ahead of
+    // time.
     let mut tree = match libcst_native::parse_module(contents, None) {
         Ok(m) => m,
         Err(_) => return None,
     };
 
+    // import collections
+    if let Some(Statement::Simple(body)) = tree.body.first_mut() {
+        if let Some(SmallStatement::Import(_)) = body.body.first_mut() {
+            // TODO(charlie): If this is the only child in a parent block, add a `pass`.
+            let suffix = locator.slice_source_code_at(&location);
+            let mut adjusted_end_location = end_location;
+            for (start, tok, end) in lexer::make_tokenizer(suffix).flatten() {
+                if to_absolute(&end, &location) <= end_location {
+                    continue;
+                }
+                if matches!(tok, Tok::Semi) {
+                    continue;
+                }
+                if matches!(tok, Tok::Newline) {
+                    adjusted_end_location = to_absolute(&end, &location);
+                } else {
+                    adjusted_end_location = to_absolute(&start, &location);
+                }
+                break;
+            }
+
+            return Some(Fix {
+                location,
+                end_location: adjusted_end_location,
+                content: "".to_string(),
+                applied: false,
+            });
+        }
+    }
+
+    // from collections import OrderedDict
     if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         if let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() {
             if let Aliases(aliases) = &mut body.names {
-                // let index = aliases.iter().position(|alias| alias.name)
-                aliases.remove(0);
+                let mut removable = vec![];
+                for (index, alias) in aliases.iter().enumerate() {
+                    if let N(name) = &alias.name {
+                        let import_name = if let Some(N(module_name)) = &body.module {
+                            format!("{}.{}", module_name.value, name.value)
+                        } else {
+                            name.value.to_string()
+                        };
+                        if full_names.contains(&import_name) {
+                            removable.push(index);
+                        }
+                    }
+                }
+                for index in removable.iter() {
+                    aliases.remove(*index);
+                }
+
+                return if aliases.is_empty() {
+                    // TODO(charlie): If this is the only child in a parent block, add a `pass`.
+                    let suffix = locator.slice_source_code_at(&location);
+                    let mut adjusted_end_location = end_location;
+                    for (start, tok, end) in lexer::make_tokenizer(suffix).flatten() {
+                        if to_absolute(&end, &location) <= end_location {
+                            continue;
+                        }
+                        if matches!(tok, Tok::Semi) {
+                            continue;
+                        }
+                        if matches!(tok, Tok::Newline) {
+                            adjusted_end_location = to_absolute(&end, &location);
+                        } else {
+                            adjusted_end_location = to_absolute(&start, &location);
+                        }
+                        break;
+                    }
+                    Some(Fix {
+                        location,
+                        end_location: adjusted_end_location,
+                        content: "".to_string(),
+                        applied: false,
+                    })
+                } else {
+                    let mut state = Default::default();
+                    tree.codegen(&mut state);
+
+                    Some(Fix {
+                        content: state.to_string(),
+                        location,
+                        end_location,
+                        applied: false,
+                    })
+                };
             }
-
-            let mut state = Default::default();
-            tree.codegen(&mut state);
-
-            return Some(Fix {
-                content: state.to_string(),
-                start: expr.location,
-                end: expr.end_location,
-                applied: false,
-            });
         }
     }
 

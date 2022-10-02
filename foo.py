@@ -1,16 +1,24 @@
-import os as bar
+import os as bar; import os as foo
 from collections import (
     OrderedDict,
-    Awaitable as X,
+    # Comment goes here
+    Counter,
 )
 
-if False:
-    import pathlib
+from logging import (
+    Logger,
+)
 
-if False:
-    import pathlib
+# import baz.bar.bop
+#
+# if False:
+#     import pathlib
+#
+# if False:
+#     import pathlib
+#
+#     ### Hello
 
-    ### Hello
 
-
-x = 1 + 2
+x = Counter()
+y = foo()
