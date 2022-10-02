@@ -1,4 +1,3 @@
-use std::fs::write;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -21,8 +20,7 @@ fn main() -> Result<()> {
     let python_ast = parser::parse_program(&contents, &cli.file.to_string_lossy())?;
     let mut generator = SourceGenerator::new();
     generator.unparse_suite(&python_ast)?;
-
-    write("transformed.py", &generator.buffer)?;
+    println!("{}", generator.generate()?);
 
     Ok(())
 }

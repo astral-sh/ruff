@@ -1,21 +1,37 @@
 from collections import Counter
-for x in range(5):
-    print(x)
-else:
-    print('Nope!')
-while False:
-    print('False')
-else:
-    print('True')
+
+
+def f() -> None:
+    """Docstring goes here."""
     for x in range(5):
         print(x)
     else:
-        print('Nope!')
+        print("Nope!")
 
 
-def f(x: int, y: int, *, z: int) -> int:
-    return (x + y + z)
+a = {
+    "a",
+    "b",
+    "c",
+    "a",
+    "b",
+    "c",
+    "a",
+    "b",
+    "c",
+    "a",
+    "b",
+    "c",
+    "a",
+    "b",
+    "c",
+    "a",
+    "b",
+    "c",
+    "a",
+    "b",
+    "c",
+}
 
+cls(title=title, before_text=before_text, after_text=after_text, before_description=before_description, after_description=after_description, transform_type=transform_type)
 
-with x as 1, y as 2:
-    pass

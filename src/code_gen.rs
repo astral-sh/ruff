@@ -1,5 +1,7 @@
 use std::fmt;
+use std::string::FromUtf8Error;
 
+use anyhow::Result;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Suite, Withitem};
 use rustpython_common::str;
 use rustpython_parser::ast::{
@@ -26,7 +28,7 @@ mod precedence {
 }
 
 pub struct SourceGenerator {
-    pub buffer: Vec<u8>,
+    buffer: Vec<u8>,
     indentation: usize,
     new_lines: usize,
     initial: bool,
@@ -46,6 +48,10 @@ impl SourceGenerator {
             new_lines: 0,
             initial: true,
         }
+    }
+
+    pub fn generate(self) -> Result<String, FromUtf8Error> {
+        String::from_utf8(self.buffer)
     }
 
     fn newline(&mut self) -> fmt::Result {

@@ -164,7 +164,7 @@ pub fn autoformat_path(path: &Path) -> Result<()> {
     let python_ast = parser::parse_program_tokens(tokens, "<filename>")?;
     let mut generator: SourceGenerator = Default::default();
     generator.unparse_suite(&python_ast)?;
-    write(path, generator.buffer)?;
+    write(path, generator.generate()?)?;
 
     Ok(())
 }
