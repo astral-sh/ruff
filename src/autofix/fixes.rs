@@ -1,19 +1,14 @@
+use itertools::Itertools;
 use libcst_native::ImportNames::Aliases;
 use libcst_native::NameOrAttribute::N;
 use libcst_native::{Codegen, Expression, SmallStatement, Statement};
-use rustpython_parser::ast::{Expr, Keyword, Location};
+use rustpython_parser::ast::{Expr, Keyword, Location, Stmt, StmtKind};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
 use crate::ast::operations::SourceCodeLocator;
-<<<<<<< HEAD
 use crate::ast::types::Range;
-use crate::checks::{Check, Fix};
-use crate::cst_visitor;
-use crate::cst_visitor::CSTVisitor;
-=======
 use crate::checks::Fix;
->>>>>>> 863c093 (Starting to come together)
 
 /// Convert a location within a file (relative to `base`) to an absolute position.
 fn to_absolute(relative: &Location, base: &Location) -> Location {
@@ -136,7 +131,8 @@ pub fn remove_class_def_base(
 }
 
 pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> Option<Fix> {
-    let contents = locator.slice_source_code_range(&expr.location, &expr.end_location);
+    let range = Range::from_located(expr);
+    let contents = locator.slice_source_code_range(&range);
 
     let mut tree = match libcst_native::parse_module(contents, None) {
         Ok(m) => m,
@@ -155,8 +151,8 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
 
                 return Some(Fix {
                     content: state.to_string(),
-                    location: expr.location,
-                    end_location: expr.end_location,
+                    location: range.location,
+                    end_location: range.end_location,
                     applied: false,
                 });
             }
@@ -166,13 +162,55 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
     None
 }
 
-pub fn remove_unused_import_from(
+fn is_lone_child(parent: &Stmt, child: &Stmt) -> bool {
+    match &parent.node {
+        StmtKind::FunctionDef { body, .. }
+        | StmtKind::AsyncFunctionDef { body, .. }
+        | StmtKind::ClassDef { body, .. }
+        | StmtKind::With { body, .. }
+        | StmtKind::AsyncWith { body, .. } => body.len() == 1,
+        StmtKind::For { body, orelse, .. }
+        | StmtKind::AsyncFor { body, orelse, .. }
+        | StmtKind::While { body, orelse, .. }
+        | StmtKind::If { body, orelse, .. } => {
+            if body.iter().contains(child) {
+                body.len() == 1
+            } else if orelse.iter().contains(child) {
+                orelse.len() == 1
+            } else {
+                false
+            }
+        }
+        StmtKind::Try {
+            body,
+            orelse,
+            finalbody,
+            ..
+        } => {
+            if body.iter().contains(child) {
+                body.len() == 1
+            } else if orelse.iter().contains(child) {
+                orelse.len() == 1
+            } else if finalbody.iter().contains(child) {
+                finalbody.len() == 1
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+pub fn remove_unused_imports(
     locator: &mut SourceCodeLocator,
     full_names: &[String],
-    range: &Range,
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
 ) -> Option<Fix> {
-    let contents = locator.slice_source_code_range(&range);
-    let location = range.location;
+    let contents = locator.slice_source_code_range(&Range::from_located(stmt));
+
+    let location = stmt.location;
+    let end_location = stmt.end_location;
 
     // TODO(charlie): Not necessary if we're removing a non-`from`, so just track that ahead of
     // time.
@@ -184,7 +222,18 @@ pub fn remove_unused_import_from(
     // import collections
     if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         if let Some(SmallStatement::Import(_)) = body.body.first_mut() {
-            // TODO(charlie): If this is the only child in a parent block, add a `pass`.
+            if parent
+                .map(|parent| is_lone_child(parent, stmt))
+                .unwrap_or_default()
+            {
+                return Some(Fix {
+                    location,
+                    end_location,
+                    content: "pass".to_string(),
+                    applied: false,
+                });
+            }
+
             let suffix = locator.slice_source_code_at(&location);
             let mut adjusted_end_location = end_location;
             for (start, tok, end) in lexer::make_tokenizer(suffix).flatten() {
@@ -215,6 +264,9 @@ pub fn remove_unused_import_from(
     if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         if let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() {
             if let Aliases(aliases) = &mut body.names {
+                // Preserve the trailing comma (or not) from the last entry.
+                let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
+
                 let mut removable = vec![];
                 for (index, alias) in aliases.iter().enumerate() {
                     if let N(name) = &alias.name {
@@ -232,8 +284,23 @@ pub fn remove_unused_import_from(
                     aliases.remove(*index);
                 }
 
+                if let Some(alias) = aliases.last_mut() {
+                    alias.comma = trailing_comma;
+                }
+
                 return if aliases.is_empty() {
-                    // TODO(charlie): If this is the only child in a parent block, add a `pass`.
+                    if parent
+                        .map(|parent| is_lone_child(parent, stmt))
+                        .unwrap_or_default()
+                    {
+                        return Some(Fix {
+                            location,
+                            end_location,
+                            content: "pass".to_string(),
+                            applied: false,
+                        });
+                    }
+
                     let suffix = locator.slice_source_code_at(&location);
                     let mut adjusted_end_location = end_location;
                     for (start, tok, end) in lexer::make_tokenizer(suffix).flatten() {

@@ -1,4 +1,5 @@
-import os as bar; import os as foo
+import os as bar
+import os as foo
 from collections import (
     OrderedDict,
     # Comment goes here
@@ -9,16 +10,13 @@ from logging import (
     Logger,
 )
 
-# import baz.bar.bop
-#
-# if False:
-#     import pathlib
-#
-# if False:
-#     import pathlib
-#
-#     ### Hello
+if False:
+    """Hello, world!"""
+    import pathlib
 
+
+if False:
+    import shelve
 
 x = Counter()
 y = foo()

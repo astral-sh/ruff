@@ -10,7 +10,15 @@ expression: checks
   end_location:
     row: 3
     column: 17
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 3
+      column: 1
+    end_location:
+      row: 4
+      column: 1
+    applied: false
 - kind:
     UnusedImport: collections.OrderedDict
   location:
@@ -19,7 +27,15 @@ expression: checks
   end_location:
     row: 9
     column: 2
-  fix: ~
+  fix:
+    content: "from collections import (\n    Counter,\n    namedtuple,\n)"
+    location:
+      row: 5
+      column: 1
+    end_location:
+      row: 9
+      column: 2
+    applied: false
 - kind:
     UnusedImport: logging.handlers
   location:
@@ -28,5 +44,13 @@ expression: checks
   end_location:
     row: 13
     column: 24
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 13
+      column: 1
+    end_location:
+      row: 14
+      column: 1
+    applied: false
 

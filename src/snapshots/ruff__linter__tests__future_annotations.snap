@@ -8,16 +8,24 @@ expression: checks
     row: 5
     column: 1
   end_location:
-    row: 5
-    column: 30
-  fix: ~
+    row: 8
+    column: 2
+  fix:
+    content: "from models import (\n    Fruit,\n)"
+    location:
+      row: 5
+      column: 1
+    end_location:
+      row: 8
+      column: 2
+    applied: false
 - kind:
     UndefinedName: Bar
   location:
-    row: 22
+    row: 25
     column: 19
   end_location:
-    row: 22
+    row: 25
     column: 22
   fix: ~
 

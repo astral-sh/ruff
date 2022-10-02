@@ -13,7 +13,7 @@ use rustpython_parser::parser;
 use crate::ast::operations::{extract_all_names, SourceCodeLocator};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind,
+    Binding, BindingContext, BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, operations, visitor};
@@ -222,7 +222,7 @@ where
                                 Binding {
                                     kind: BindingKind::Assignment,
                                     used: Some((global_scope_id, Range::from_located(stmt))),
-                                    location: Range::from_located(stmt),
+                                    range: Range::from_located(stmt),
                                 },
                             );
                         }
@@ -330,7 +330,7 @@ where
                     Binding {
                         kind: BindingKind::Definition,
                         used: None,
-                        location: Range::from_located(stmt),
+                        range: Range::from_located(stmt),
                     },
                 );
             }
@@ -425,9 +425,11 @@ where
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(
                                     alias.node.name.to_string(),
+                                    self.binding_context(),
                                 ),
                                 used: None,
-                                location: Range::from_located(stmt),
+
+                                range: Range::from_located(stmt),
                             },
                         )
                     } else {
@@ -448,9 +450,10 @@ where
                                         .asname
                                         .clone()
                                         .unwrap_or_else(|| alias.node.name.clone()),
+                                    self.binding_context(),
                                 ),
                                 used: None,
-                                location: Range::from_located(stmt),
+                                range: Range::from_located(stmt),
                             },
                         )
                     }
@@ -493,7 +496,7 @@ where
                                     .id,
                                     Range::from_located(stmt),
                                 )),
-                                location: Range::from_located(stmt),
+                                range: Range::from_located(stmt),
                             },
                         );
 
@@ -529,7 +532,7 @@ where
                             Binding {
                                 kind: BindingKind::StarImportation,
                                 used: None,
-                                location: Range::from_located(stmt),
+                                range: Range::from_located(stmt),
                             },
                         );
 
@@ -562,12 +565,15 @@ where
                         }
 
                         let binding = Binding {
-                            kind: BindingKind::Importation(match module {
-                                None => name.clone(),
-                                Some(parent) => format!("{}.{}", parent, name),
-                            }),
+                            kind: BindingKind::Importation(
+                                match module {
+                                    None => name.clone(),
+                                    Some(parent) => format!("{}.{}", parent, name),
+                                },
+                                self.binding_context(),
+                            ),
                             used: None,
-                            location: Range::from_located(stmt),
+                            range: Range::from_located(stmt),
                         };
                         self.add_binding(name, binding)
                     }
@@ -662,7 +668,7 @@ where
                 Binding {
                     kind: BindingKind::ClassDefinition,
                     used: None,
-                    location: Range::from_located(stmt),
+                    range: Range::from_located(stmt),
                 },
             );
         };
@@ -1107,7 +1113,6 @@ where
                                 ),
                                 parent,
                             );
-                            self.parents.push(parent);
                         }
 
                         let parent =
@@ -1126,7 +1131,6 @@ where
                             ),
                             parent,
                         );
-                        self.parents.push(parent);
 
                         walk_excepthandler(self, excepthandler);
 
@@ -1184,7 +1188,7 @@ where
             Binding {
                 kind: BindingKind::Argument,
                 used: None,
-                location: Range::from_located(arg),
+                range: Range::from_located(arg),
             },
         );
 
@@ -1240,7 +1244,7 @@ impl<'a> Checker<'a> {
                 (*builtin).to_string(),
                 Binding {
                     kind: BindingKind::Builtin,
-                    location: Default::default(),
+                    range: Default::default(),
                     used: None,
                 },
             );
@@ -1250,10 +1254,20 @@ impl<'a> Checker<'a> {
                 (*builtin).to_string(),
                 Binding {
                     kind: BindingKind::Builtin,
-                    location: Default::default(),
+                    range: Default::default(),
                     used: None,
                 },
             );
+        }
+    }
+
+    fn binding_context(&self) -> BindingContext {
+        let mut rev = self.parent_stack.iter().rev().fuse();
+        let defined_by = *rev.next().expect("Expected to bind within a statement.");
+        let defined_in = rev.next().cloned();
+        BindingContext {
+            defined_by,
+            defined_in,
         }
     }
 
@@ -1265,20 +1279,20 @@ impl<'a> Checker<'a> {
             None => binding,
             Some(existing) => {
                 if self.settings.select.contains(&CheckCode::F402)
-                    && matches!(existing.kind, BindingKind::Importation(_))
+                    && matches!(existing.kind, BindingKind::Importation(_, _))
                     && matches!(binding.kind, BindingKind::LoopVar)
                 {
                     self.checks.push(Check::new(
                         CheckKind::ImportShadowedByLoopVar(
                             name.clone(),
-                            existing.location.location.row(),
+                            existing.range.location.row(),
                         ),
-                        binding.location,
+                        binding.range,
                     ));
                 }
                 Binding {
                     kind: binding.kind,
-                    location: binding.location,
+                    range: binding.range,
                     used: existing.used,
                 }
             }
@@ -1379,7 +1393,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::Annotation,
                         used: None,
-                        location: Range::from_located(expr),
+                        range: Range::from_located(expr),
                     },
                 );
                 return;
@@ -1395,7 +1409,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::LoopVar,
                         used: None,
-                        location: Range::from_located(expr),
+                        range: Range::from_located(expr),
                     },
                 );
                 return;
@@ -1407,7 +1421,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::Binding,
                         used: None,
-                        location: Range::from_located(expr),
+                        range: Range::from_located(expr),
                     },
                 );
                 return;
@@ -1427,7 +1441,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::Export(extract_all_names(parent, current)),
                         used: None,
-                        location: Range::from_located(expr),
+                        range: Range::from_located(expr),
                     },
                 );
                 return;
@@ -1438,7 +1452,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::Assignment,
                     used: None,
-                    location: Range::from_located(expr),
+                    range: Range::from_located(expr),
                 },
             );
         }
@@ -1572,7 +1586,7 @@ impl<'a> Checker<'a> {
                             if !scope.values.contains_key(name) {
                                 self.checks.push(Check::new(
                                     CheckKind::UndefinedExport(name.to_string()),
-                                    self.locate_check(all_binding.location),
+                                    self.locate_check(all_binding.range),
                                 ));
                             }
                         }
@@ -1595,7 +1609,7 @@ impl<'a> Checker<'a> {
                             if !scope.values.contains_key(name) {
                                 self.checks.push(Check::new(
                                     CheckKind::ImportStarUsage(name.clone(), from_list.join(", ")),
-                                    self.locate_check(all_binding.location),
+                                    self.locate_check(all_binding.range),
                                 ));
                             }
                         }
@@ -1606,7 +1620,7 @@ impl<'a> Checker<'a> {
             if self.settings.select.contains(&CheckCode::F401) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
-                let mut unused: BTreeMap<Range, Vec<String>> = BTreeMap::new();
+                let mut unused: BTreeMap<(usize, Option<usize>), Vec<String>> = BTreeMap::new();
 
                 for (name, binding) in scope.values.iter().rev() {
                     let used = binding.used.is_some()
@@ -1616,9 +1630,11 @@ impl<'a> Checker<'a> {
 
                     if !used {
                         match &binding.kind {
-                            BindingKind::Importation(full_name)
-                            | BindingKind::SubmoduleImportation(full_name) => {
-                                let full_names = unused.entry(binding.location).or_insert(vec![]);
+                            BindingKind::Importation(full_name, context)
+                            | BindingKind::SubmoduleImportation(full_name, context) => {
+                                let full_names = unused
+                                    .entry((context.defined_by, context.defined_in))
+                                    .or_insert(vec![]);
                                 full_names.push(full_name.to_string());
                             }
                             _ => {}
@@ -1626,17 +1642,21 @@ impl<'a> Checker<'a> {
                     }
                 }
 
-                for (location, full_names) in unused {
+                for ((defined_by, defined_in), full_names) in unused {
+                    let child = self.parents[defined_by];
+                    let parent = defined_in.map(|defined_in| self.parents[defined_in]);
+
                     let mut check = Check::new(
                         CheckKind::UnusedImport(full_names.join(", ")),
-                        self.locate_check(location),
+                        self.locate_check(Range::from_located(child)),
                     );
+
                     if let Some(fix) =
-                        fixes::remove_unused_import_from(&mut self.locator, &full_names, location)
+                        fixes::remove_unused_imports(&mut self.locator, &full_names, child, parent)
                     {
-                        println!("{:?}", fix);
                         check.amend(fix);
                     }
+
                     self.checks.push(check);
                 }
             }

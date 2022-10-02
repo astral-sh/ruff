@@ -99,7 +99,7 @@ pub fn check_unused_variables(
         {
             checks.push(Check::new(
                 CheckKind::UnusedVariable(name.to_string()),
-                locator.locate_check(binding.location),
+                locator.locate_check(binding.range),
             ));
         }
     }

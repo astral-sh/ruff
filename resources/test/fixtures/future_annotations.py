@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from models import Fruit, Nut
+from models import (
+    Fruit,
+    Nut,
+)
 
 
 @dataclass
