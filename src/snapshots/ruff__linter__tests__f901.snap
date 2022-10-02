@@ -6,10 +6,16 @@ expression: checks
   location:
     row: 2
     column: 11
+  end_location:
+    row: 2
+    column: 27
   fix: ~
 - kind: RaiseNotImplemented
   location:
     row: 6
     column: 11
+  end_location:
+    row: 6
+    column: 25
   fix: ~
 

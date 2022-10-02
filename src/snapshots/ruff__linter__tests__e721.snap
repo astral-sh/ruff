@@ -6,80 +6,128 @@ expression: checks
   location:
     row: 2
     column: 14
+  end_location:
+    row: 2
+    column: 25
   fix: ~
 - kind: TypeComparison
   location:
     row: 5
     column: 14
+  end_location:
+    row: 5
+    column: 25
   fix: ~
 - kind: TypeComparison
   location:
     row: 10
     column: 8
+  end_location:
+    row: 10
+    column: 24
   fix: ~
 - kind: TypeComparison
   location:
     row: 15
     column: 14
+  end_location:
+    row: 15
+    column: 35
   fix: ~
 - kind: TypeComparison
   location:
     row: 18
     column: 18
+  end_location:
+    row: 18
+    column: 32
   fix: ~
 - kind: TypeComparison
   location:
     row: 18
     column: 46
+  end_location:
+    row: 18
+    column: 59
   fix: ~
 - kind: TypeComparison
   location:
     row: 20
     column: 18
+  end_location:
+    row: 20
+    column: 29
   fix: ~
 - kind: TypeComparison
   location:
     row: 22
     column: 18
+  end_location:
+    row: 22
+    column: 29
   fix: ~
 - kind: TypeComparison
   location:
     row: 24
     column: 18
+  end_location:
+    row: 24
+    column: 31
   fix: ~
 - kind: TypeComparison
   location:
     row: 26
     column: 18
+  end_location:
+    row: 26
+    column: 30
   fix: ~
 - kind: TypeComparison
   location:
     row: 28
     column: 18
+  end_location:
+    row: 28
+    column: 31
   fix: ~
 - kind: TypeComparison
   location:
     row: 30
     column: 18
+  end_location:
+    row: 30
+    column: 31
   fix: ~
 - kind: TypeComparison
   location:
     row: 32
     column: 18
+  end_location:
+    row: 32
+    column: 35
   fix: ~
 - kind: TypeComparison
   location:
     row: 34
     column: 18
+  end_location:
+    row: 38
+    column: 2
   fix: ~
 - kind: TypeComparison
   location:
     row: 40
     column: 18
+  end_location:
+    row: 40
+    column: 29
   fix: ~
 - kind: TypeComparison
   location:
     row: 42
     column: 18
+  end_location:
+    row: 42
+    column: 31
   fix: ~
 

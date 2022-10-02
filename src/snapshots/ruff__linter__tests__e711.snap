@@ -7,47 +7,71 @@ expression: checks
   location:
     row: 2
     column: 11
+  end_location:
+    row: 2
+    column: 15
   fix: ~
 - kind:
     NoneComparison: NotEq
   location:
     row: 5
     column: 11
+  end_location:
+    row: 5
+    column: 15
   fix: ~
 - kind:
     NoneComparison: Eq
   location:
     row: 8
     column: 4
+  end_location:
+    row: 8
+    column: 8
   fix: ~
 - kind:
     NoneComparison: NotEq
   location:
     row: 11
     column: 4
+  end_location:
+    row: 11
+    column: 8
   fix: ~
 - kind:
     NoneComparison: Eq
   location:
     row: 14
     column: 14
+  end_location:
+    row: 14
+    column: 18
   fix: ~
 - kind:
     NoneComparison: NotEq
   location:
     row: 17
     column: 14
+  end_location:
+    row: 17
+    column: 18
   fix: ~
 - kind:
     NoneComparison: NotEq
   location:
     row: 20
     column: 4
+  end_location:
+    row: 20
+    column: 8
   fix: ~
 - kind:
     NoneComparison: Eq
   location:
     row: 23
     column: 4
+  end_location:
+    row: 23
+    column: 8
   fix: ~
 

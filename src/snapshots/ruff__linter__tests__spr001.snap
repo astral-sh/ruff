@@ -6,14 +6,24 @@ expression: checks
   location:
     row: 17
     column: 18
+  end_location:
+    row: 17
+    column: 23
   fix: ~
 - kind: SuperCallWithParameters
   location:
     row: 18
     column: 9
+  end_location:
+    row: 18
+    column: 14
   fix: ~
 - kind: SuperCallWithParameters
   location:
     row: 19
     column: 9
+  end_location:
+    row: 19
+    column: 14
   fix: ~
+

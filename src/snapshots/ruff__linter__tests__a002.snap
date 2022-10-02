@@ -7,40 +7,62 @@ expression: checks
   location:
     row: 1
     column: 11
+  end_location:
+    row: 1
+    column: 14
   fix: ~
 - kind:
     BuiltinArgumentShadowing: type
   location:
     row: 1
     column: 19
+  end_location:
+    row: 1
+    column: 23
   fix: ~
 - kind:
     BuiltinArgumentShadowing: complex
   location:
     row: 1
     column: 26
+  end_location:
+    row: 1
+    column: 33
   fix: ~
 - kind:
     BuiltinArgumentShadowing: Exception
   location:
     row: 1
     column: 35
+  end_location:
+    row: 1
+    column: 44
   fix: ~
 - kind:
     BuiltinArgumentShadowing: getattr
   location:
     row: 1
     column: 48
+  end_location:
+    row: 1
+    column: 55
   fix: ~
 - kind:
     BuiltinArgumentShadowing: bytes
   location:
     row: 5
     column: 17
+  end_location:
+    row: 5
+    column: 22
   fix: ~
 - kind:
     BuiltinArgumentShadowing: float
   location:
     row: 9
     column: 16
+  end_location:
+    row: 9
+    column: 21
   fix: ~
+

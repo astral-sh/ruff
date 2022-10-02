@@ -170,6 +170,7 @@ fn run_once(
                             kind: CheckKind::IOError(message),
                             fixed: false,
                             location: Default::default(),
+                            end_location: Default::default(),
                             filename: path.to_string_lossy().to_string(),
                         }]
                     } else {

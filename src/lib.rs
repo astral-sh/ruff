@@ -64,6 +64,7 @@ pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
             kind: check.kind,
             fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
             location: check.location,
+            end_location: check.end_location,
             filename: path.to_string_lossy().to_string(),
         })
         .collect();

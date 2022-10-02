@@ -52,8 +52,8 @@ pub fn remove_class_def_base(
         return match (fix_start, fix_end) {
             (Some(start), Some(end)) => Some(Fix {
                 content: "".to_string(),
-                start,
-                end,
+                location: start,
+                end_location: end,
                 applied: false,
             }),
             _ => None,
@@ -91,8 +91,8 @@ pub fn remove_class_def_base(
         match (fix_start, fix_end) {
             (Some(start), Some(end)) => Some(Fix {
                 content: "".to_string(),
-                start,
-                end,
+                location: start,
+                end_location: end,
                 applied: false,
             }),
             _ => None,
@@ -116,8 +116,8 @@ pub fn remove_class_def_base(
         match (fix_start, fix_end) {
             (Some(start), Some(end)) => Some(Fix {
                 content: "".to_string(),
-                start,
-                end,
+                location: start,
+                end_location: end,
                 applied: false,
             }),
             _ => None,

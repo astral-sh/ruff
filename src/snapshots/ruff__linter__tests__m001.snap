@@ -7,12 +7,15 @@ expression: checks
   location:
     row: 9
     column: 10
+  end_location:
+    row: 9
+    column: 18
   fix:
     content: ""
-    start:
+    location:
       row: 9
       column: 10
-    end:
+    end_location:
       row: 9
       column: 18
     applied: false
@@ -21,12 +24,15 @@ expression: checks
   location:
     row: 13
     column: 10
+  end_location:
+    row: 13
+    column: 24
   fix:
     content: ""
-    start:
+    location:
       row: 13
       column: 10
-    end:
+    end_location:
       row: 13
       column: 24
     applied: false
@@ -35,12 +41,15 @@ expression: checks
   location:
     row: 16
     column: 10
+  end_location:
+    row: 16
+    column: 30
   fix:
     content: "  # noqa: F841"
-    start:
+    location:
       row: 16
       column: 10
-    end:
+    end_location:
       row: 16
       column: 30
     applied: false
@@ -49,12 +58,15 @@ expression: checks
   location:
     row: 41
     column: 4
+  end_location:
+    row: 41
+    column: 24
   fix:
     content: "  # noqa: E501"
-    start:
+    location:
       row: 41
       column: 4
-    end:
+    end_location:
       row: 41
       column: 24
     applied: false
@@ -63,12 +75,15 @@ expression: checks
   location:
     row: 49
     column: 4
+  end_location:
+    row: 49
+    column: 18
   fix:
     content: ""
-    start:
+    location:
       row: 49
       column: 4
-    end:
+    end_location:
       row: 49
       column: 18
     applied: false
@@ -77,12 +92,15 @@ expression: checks
   location:
     row: 57
     column: 4
+  end_location:
+    row: 57
+    column: 12
   fix:
     content: ""
-    start:
+    location:
       row: 57
       column: 4
-    end:
+    end_location:
       row: 57
       column: 12
     applied: false

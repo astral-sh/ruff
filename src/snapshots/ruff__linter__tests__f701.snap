@@ -6,20 +6,32 @@ expression: checks
   location:
     row: 4
     column: 5
+  end_location:
+    row: 4
+    column: 10
   fix: ~
 - kind: BreakOutsideLoop
   location:
     row: 16
     column: 5
+  end_location:
+    row: 16
+    column: 10
   fix: ~
 - kind: BreakOutsideLoop
   location:
     row: 20
     column: 5
+  end_location:
+    row: 20
+    column: 10
   fix: ~
 - kind: BreakOutsideLoop
   location:
     row: 23
     column: 1
+  end_location:
+    row: 23
+    column: 6
   fix: ~
 
