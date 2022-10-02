@@ -75,8 +75,8 @@ pub enum BindingKind {
 #[derive(Clone, Debug)]
 pub struct Binding {
     pub kind: BindingKind,
-    pub location: Range,
     /// Tuple of (scope index, range) indicating the scope and range at which the binding was
+    pub location: Range,
     /// last used.
     pub used: Option<(usize, Range)>,
 }

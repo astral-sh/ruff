@@ -1,10 +1,26 @@
-use libcst_native::{Codegen, Expression, SmallStatement, Statement};
+use libcst_native::{
+    AnnAssign, Annotation, Arg, AsName, Assert, Assign, AssignEqual, AssignTarget,
+    AssignTargetExpression, Asynchronous, Attribute, AugAssign, Await, BinaryOp, BinaryOperation,
+    BooleanOp, BooleanOperation, Break, Call, ClassDef, Codegen, CompFor, CompIf, CompOp,
+    Comparison, ComparisonTarget, CompoundStatement, ConcatenatedString, Continue, Decorator, Del,
+    DelTargetExpression, Dict, DictComp, DictElement, Element, Ellipsis, Else, ExceptHandler,
+    ExceptStarHandler, Expression, Finally, Float, For, FormattedString, FormattedStringExpression,
+    FormattedStringText, FunctionDef, GeneratorExp, Global, If, IfExp, Imaginary, Import,
+    ImportAlias, ImportFrom, ImportStar, IndentedBlock, Index, Integer, Lambda, List, ListComp,
+    Match, Module, Name, NameItem, NamedExpr, Nonlocal, OrElse, Param, ParamStar, Parameters, Pass,
+    Raise, Return, Set, SetComp, SimpleStatementLine, SimpleStatementSuite, SimpleString, Slice,
+    SmallStatement, StarredDictElement, StarredElement, Statement, Subscript, SubscriptElement,
+    Try, TryStar, Tuple, UnaryOp, UnaryOperation, While, With, WithItem, Yield, YieldValue,
+};
 use rustpython_parser::ast::{Expr, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
 use crate::ast::operations::SourceCodeLocator;
-use crate::checks::Fix;
+use crate::ast::types::Range;
+use crate::checks::{Check, Fix};
+use crate::cst_visitor;
+use crate::cst_visitor::CSTVisitor;
 
 /// Convert a location within a file (relative to `base`) to an absolute position.
 fn to_absolute(relative: &Location, base: &Location) -> Location {
@@ -153,6 +169,85 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
             }
         }
     }
+
+    None
+}
+
+// struct ImportRemover {}
+//
+// impl CSTVisitor for ImportRemover {
+//     fn visit_SmallStatement<'a>(&mut self, node: &'a mut SmallStatement<'a>) {
+//         match node {
+//             SmallStatement::Import(body) => {
+//                 body.names = vec![];
+//             }
+//             SmallStatement::ImportFrom(_) => {}
+//             _ => {
+//                 cst_visitor::walk_SmallStatement(self, node);
+//             }
+//         }
+//     }
+// }
+//
+// pub fn modify(contents: &str) -> Module {
+//     // First, generate the CST.
+//     let mut tree = match libcst_native::parse_module(contents, None) {
+//         Ok(m) => m,
+//         Err(_) => panic!("Oops"),
+//     };
+//
+//     let mut visitor = ImportRemover {};
+//     visitor.visit_Module(&mut tree);
+//
+//     tree
+// }
+
+// pub fn remove_unused_imports(contents: &str, checks: &[Check]) {
+//     // // // First, generate the CST.
+//     // // let mut tree = match libcst_native::parse_module(contents, None) {
+//     // //     Ok(m) => m,
+//     // //     Err(_) => return,
+//     // // };
+//     // //
+//     // // let mut visitor = ImportRemover {};
+//     // // visitor.visit_Module(&mut tree);
+//     // let mut tree = modify(contents);
+//     //
+//     // let mut state = Default::default();
+//     // tree.codegen(&mut state);
+// }
+
+pub fn remove_unused_import(
+    locator: &mut SourceCodeLocator,
+    full_name: &str,
+    location: &Range,
+) -> Option<Fix> {
+    let contents = locator.slice_source_code_range(&location, &end_location);
+
+    let mut tree = match libcst_native::parse_module(contents, None) {
+        Ok(m) => m,
+        Err(_) => return None,
+    };
+
+    if let Some(Statement::Simple(body)) = tree.body.first_mut() {
+        if let Some(SmallStatement::Import(body)) = body.body.first_mut() {
+            body.names = vec![];
+
+            let mut state = Default::default();
+            tree.codegen(&mut state);
+
+            println!("{:?}", state.to_string());
+        }
+    }
+
+    println!("{:?}", tree);
+
+    return Some(Fix {
+        start: location.clone(),
+        end: end_location.clone(),
+        content: "".to_string(),
+        applied: false,
+    });
 
     None
 }

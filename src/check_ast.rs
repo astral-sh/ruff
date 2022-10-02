@@ -16,7 +16,7 @@ use crate::ast::types::{
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, operations, visitor};
-use crate::autofix::fixer;
+use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
@@ -1613,6 +1613,15 @@ impl<'a> Checker<'a> {
                         match &binding.kind {
                             BindingKind::Importation(full_name)
                             | BindingKind::SubmoduleImportation(full_name) => {
+                                println!(
+                                    "{:?}",
+                                    fixes::remove_unused_import(
+                                        &mut self.locator,
+                                        full_name,
+                                        &binding.location,
+                                    )
+                                );
+
                                 self.checks.push(Check::new(
                                     CheckKind::UnusedImport(full_name.to_string()),
                                     self.locate_check(binding.location),
@@ -1666,12 +1675,12 @@ impl<'a> Checker<'a> {
 
 pub fn check_ast(
     python_ast: &Suite,
-    content: &str,
+    contents: &str,
     settings: &Settings,
     autofix: &fixer::Mode,
     path: &Path,
 ) -> Vec<Check> {
-    let mut checker = Checker::new(settings, autofix, path, content);
+    let mut checker = Checker::new(settings, autofix, path, contents);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 

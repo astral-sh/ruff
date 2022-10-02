@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
-use crate::ast::types::{BindingKind, Scope};
+use crate::ast::types::{BindingKind, Range, Scope};
 
 /// Extract the names bound to a given __all__ assignment.
 pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
@@ -148,7 +148,7 @@ impl<'a> SourceCodeLocator<'a> {
         &self.content[offset..]
     }
 
-    pub fn slice_source_code_range(&mut self, start: &Location, end: &Location) -> &'a str {
+    pub fn slice_source_code_range(&mut self, range: &Range) -> &'a str {
         if !self.initialized {
             let mut offset = 0;
             for i in self.content.lines() {
@@ -158,8 +158,8 @@ impl<'a> SourceCodeLocator<'a> {
             }
             self.initialized = true;
         }
-        let start = self.offsets[start.row() - 1] + start.column() - 1;
-        let end = self.offsets[end.row() - 1] + end.column() - 1;
+        let start = self.offsets[range.location.row() - 1] + range.location.column() - 1;
+        let end = self.offsets[range.end_location.row() - 1] + range.end_location.column() - 1;
         &self.content[start..end]
     }
 }
