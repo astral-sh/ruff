@@ -87,6 +87,8 @@ pub fn lint_path(
     mode: &cache::Mode,
     autofix: &fixer::Mode,
 ) -> Result<Vec<Message>> {
+    println!("{:?}", path);
+
     let metadata = path.metadata()?;
 
     // Check the cache.

@@ -2,7 +2,7 @@ use itertools::Itertools;
 use libcst_native::ImportNames::Aliases;
 use libcst_native::NameOrAttribute::N;
 use libcst_native::{Codegen, Expression, SmallStatement, Statement};
-use rustpython_parser::ast::{Expr, Keyword, Location, Stmt, StmtKind};
+use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, StmtKind};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
@@ -162,6 +162,7 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
     None
 }
 
+/// Determine if a child is the only statement in its body.
 fn is_lone_child(parent: &Stmt, child: &Stmt) -> bool {
     match &parent.node {
         StmtKind::FunctionDef { body, .. }
@@ -178,14 +179,15 @@ fn is_lone_child(parent: &Stmt, child: &Stmt) -> bool {
             } else if orelse.iter().contains(child) {
                 orelse.len() == 1
             } else {
-                false
+                // TODO(charlie): Return Result<Option<Fix>>.
+                panic!("Unable to find child in parent body.")
             }
         }
         StmtKind::Try {
             body,
+            handlers,
             orelse,
             finalbody,
-            ..
         } => {
             if body.iter().contains(child) {
                 body.len() == 1
@@ -193,68 +195,65 @@ fn is_lone_child(parent: &Stmt, child: &Stmt) -> bool {
                 orelse.len() == 1
             } else if finalbody.iter().contains(child) {
                 finalbody.len() == 1
+            } else if let Some(body) = handlers.iter().find_map(|handler| match &handler.node {
+                ExcepthandlerKind::ExceptHandler { body, .. } => {
+                    if body.iter().contains(child) {
+                        Some(body)
+                    } else {
+                        None
+                    }
+                }
+            }) {
+                body.len() == 1
             } else {
-                false
+                // TODO(charlie): Return Result<Option<Fix>>.
+                panic!("Unable to find child in parent body.")
             }
         }
-        _ => false,
+        _ => {
+            // TODO(charlie): Return Result<Option<Fix>>.
+            panic!("Unable to find child in parent body.")
+        }
     }
 }
 
+/// Generate a Fix to remove any unused imports from an import statement.
 pub fn remove_unused_imports(
     locator: &mut SourceCodeLocator,
     full_names: &[String],
     stmt: &Stmt,
     parent: Option<&Stmt>,
 ) -> Option<Fix> {
-    let contents = locator.slice_source_code_range(&Range::from_located(stmt));
+    let range = Range::from_located(stmt);
+    let location = range.location;
+    let end_location = range.end_location;
 
-    let location = stmt.location;
-    let end_location = stmt.end_location;
+    let contents = locator.slice_source_code_range(&range);
 
     // TODO(charlie): Not necessary if we're removing a non-`from`, so just track that ahead of
     // time.
     let mut tree = match libcst_native::parse_module(contents, None) {
         Ok(m) => m,
+        // TODO(charlie): Log this? Or return Result<Option<Fix>>?
         Err(_) => return None,
     };
 
     // import collections
     if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         if let Some(SmallStatement::Import(_)) = body.body.first_mut() {
-            if parent
-                .map(|parent| is_lone_child(parent, stmt))
-                .unwrap_or_default()
-            {
-                return Some(Fix {
-                    location,
-                    end_location,
-                    content: "pass".to_string(),
-                    applied: false,
-                });
-            }
-
-            let suffix = locator.slice_source_code_at(&location);
-            let mut adjusted_end_location = end_location;
-            for (start, tok, end) in lexer::make_tokenizer(suffix).flatten() {
-                if to_absolute(&end, &location) <= end_location {
-                    continue;
-                }
-                if matches!(tok, Tok::Semi) {
-                    continue;
-                }
-                if matches!(tok, Tok::Newline) {
-                    adjusted_end_location = to_absolute(&end, &location);
-                } else {
-                    adjusted_end_location = to_absolute(&start, &location);
-                }
-                break;
-            }
-
+            // Nuke the entire line.
+            // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
             return Some(Fix {
-                location,
-                end_location: adjusted_end_location,
-                content: "".to_string(),
+                location: Location::new(location.row(), 1),
+                end_location: Location::new(end_location.row() + 1, 1),
+                content: if parent
+                    .map(|parent| is_lone_child(parent, stmt))
+                    .unwrap_or_default()
+                {
+                    "pass".to_string()
+                } else {
+                    "".to_string()
+                },
                 applied: false,
             });
         }
@@ -280,7 +279,9 @@ pub fn remove_unused_imports(
                         }
                     }
                 }
-                for index in removable.iter() {
+
+                // TODO(charlie): Find a way to do this more efficiently.
+                for index in removable.iter().rev() {
                     aliases.remove(*index);
                 }
 
@@ -289,38 +290,19 @@ pub fn remove_unused_imports(
                 }
 
                 return if aliases.is_empty() {
-                    if parent
-                        .map(|parent| is_lone_child(parent, stmt))
-                        .unwrap_or_default()
-                    {
-                        return Some(Fix {
-                            location,
-                            end_location,
-                            content: "pass".to_string(),
-                            applied: false,
-                        });
-                    }
-
-                    let suffix = locator.slice_source_code_at(&location);
-                    let mut adjusted_end_location = end_location;
-                    for (start, tok, end) in lexer::make_tokenizer(suffix).flatten() {
-                        if to_absolute(&end, &location) <= end_location {
-                            continue;
-                        }
-                        if matches!(tok, Tok::Semi) {
-                            continue;
-                        }
-                        if matches!(tok, Tok::Newline) {
-                            adjusted_end_location = to_absolute(&end, &location);
-                        } else {
-                            adjusted_end_location = to_absolute(&start, &location);
-                        }
-                        break;
-                    }
+                    // Nuke the entire line.
+                    // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
                     Some(Fix {
-                        location,
-                        end_location: adjusted_end_location,
-                        content: "".to_string(),
+                        location: Location::new(location.row(), 1),
+                        end_location: Location::new(end_location.row() + 1, 1),
+                        content: if parent
+                            .map(|parent| is_lone_child(parent, stmt))
+                            .unwrap_or_default()
+                        {
+                            "pass".to_string()
+                        } else {
+                            "".to_string()
+                        },
                         applied: false,
                     })
                 } else {
