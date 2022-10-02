@@ -1613,19 +1613,18 @@ impl<'a> Checker<'a> {
                         match &binding.kind {
                             BindingKind::Importation(full_name)
                             | BindingKind::SubmoduleImportation(full_name) => {
-                                println!(
-                                    "{:?}",
-                                    fixes::remove_unused_import(
-                                        &mut self.locator,
-                                        full_name,
-                                        &binding.location,
-                                    )
-                                );
-
-                                self.checks.push(Check::new(
+                                let mut check = Check::new(
                                     CheckKind::UnusedImport(full_name.to_string()),
                                     self.locate_check(binding.location),
-                                ));
+                                );
+                                if let Some(fix) = fixes::remove_unused_import_from(
+                                    &mut self.locator,
+                                    full_name,
+                                    &binding.location,
+                                ) {
+                                    check.amend(fix);
+                                }
+                                self.checks.push(check);
                             }
                             _ => {}
                         }

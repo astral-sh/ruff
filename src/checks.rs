@@ -713,6 +713,7 @@ impl CheckKind {
                 | CheckKind::UselessObjectInheritance(_)
                 | CheckKind::UnusedNOQA(_)
                 | CheckKind::SuperCallWithParameters
+                | CheckKind::UnusedImport(_)
         )
     }
 }

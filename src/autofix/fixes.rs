@@ -1,3 +1,4 @@
+use libcst_native::ImportNames::Aliases;
 use libcst_native::{
     AnnAssign, Annotation, Arg, AsName, Assert, Assign, AssignEqual, AssignTarget,
     AssignTargetExpression, Asynchronous, Attribute, AugAssign, Await, BinaryOp, BinaryOperation,
@@ -12,7 +13,7 @@ use libcst_native::{
     SmallStatement, StarredDictElement, StarredElement, Statement, Subscript, SubscriptElement,
     Try, TryStar, Tuple, UnaryOp, UnaryOperation, While, With, WithItem, Yield, YieldValue,
 };
-use rustpython_parser::ast::{Expr, Keyword, Location};
+use rustpython_parser::ast::{Alias, Expr, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
@@ -217,7 +218,16 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
 //     // tree.codegen(&mut state);
 // }
 
-pub fn remove_unused_import(
+pub fn remove_unused_import(location: &Location, end_location: &Location) -> Option<Fix> {
+    Some(Fix {
+        start: location.clone(),
+        end: end_location.clone(),
+        content: "".to_string(),
+        applied: false,
+    })
+}
+
+pub fn remove_unused_import_from(
     locator: &mut SourceCodeLocator,
     full_name: &str,
     location: &Range,
@@ -230,24 +240,23 @@ pub fn remove_unused_import(
     };
 
     if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        if let Some(SmallStatement::Import(body)) = body.body.first_mut() {
-            body.names = vec![];
+        if let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() {
+            if let Aliases(aliases) = &mut body.names {
+                // let index = aliases.iter().position(|alias| alias.name)
+                aliases.remove(0);
+            }
 
             let mut state = Default::default();
             tree.codegen(&mut state);
 
-            println!("{:?}", state.to_string());
+            return Some(Fix {
+                content: state.to_string(),
+                start: expr.location,
+                end: expr.end_location,
+                applied: false,
+            });
         }
     }
-
-    println!("{:?}", tree);
-
-    return Some(Fix {
-        start: location.clone(),
-        end: end_location.clone(),
-        content: "".to_string(),
-        applied: false,
-    });
 
     None
 }
