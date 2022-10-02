@@ -45,29 +45,29 @@ fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> 
 
     for fix in fixes {
         // Best-effort approach: if this fix overlaps with a fix we've already applied, skip it.
-        if last_pos > fix.start {
+        if last_pos > fix.location {
             continue;
         }
 
-        if fix.start.row() > last_pos.row() {
+        if fix.location.row() > last_pos.row() {
             if last_pos.row() > 0 || last_pos.column() > 0 {
                 output.push_str(&lines[last_pos.row() - 1][last_pos.column() - 1..]);
                 output.push('\n');
             }
-            for line in &lines[last_pos.row()..fix.start.row() - 1] {
+            for line in &lines[last_pos.row()..fix.location.row() - 1] {
                 output.push_str(line);
                 output.push('\n');
             }
-            output.push_str(&lines[fix.start.row() - 1][..fix.start.column() - 1]);
+            output.push_str(&lines[fix.location.row() - 1][..fix.location.column() - 1]);
             output.push_str(&fix.content);
         } else {
             output.push_str(
-                &lines[last_pos.row() - 1][last_pos.column() - 1..fix.start.column() - 1],
+                &lines[last_pos.row() - 1][last_pos.column() - 1..fix.location.column() - 1],
             );
             output.push_str(&fix.content);
         }
 
-        last_pos = fix.end;
+        last_pos = fix.end_location;
         fix.applied = true;
     }
 
@@ -106,8 +106,8 @@ mod tests {
     fn apply_single_replacement() -> Result<()> {
         let mut fixes = vec![Fix {
             content: "Bar".to_string(),
-            start: Location::new(1, 9),
-            end: Location::new(1, 15),
+            location: Location::new(1, 9),
+            end_location: Location::new(1, 15),
             applied: false,
         }];
         let actual = apply_fixes(
@@ -130,8 +130,8 @@ mod tests {
     fn apply_single_removal() -> Result<()> {
         let mut fixes = vec![Fix {
             content: "".to_string(),
-            start: Location::new(1, 8),
-            end: Location::new(1, 16),
+            location: Location::new(1, 8),
+            end_location: Location::new(1, 16),
             applied: false,
         }];
         let actual = apply_fixes(
@@ -155,14 +155,14 @@ mod tests {
         let mut fixes = vec![
             Fix {
                 content: "".to_string(),
-                start: Location::new(1, 8),
-                end: Location::new(1, 17),
+                location: Location::new(1, 8),
+                end_location: Location::new(1, 17),
                 applied: false,
             },
             Fix {
                 content: "".to_string(),
-                start: Location::new(1, 17),
-                end: Location::new(1, 24),
+                location: Location::new(1, 17),
+                end_location: Location::new(1, 24),
                 applied: false,
             },
         ];
@@ -187,14 +187,14 @@ mod tests {
         let mut fixes = vec![
             Fix {
                 content: "".to_string(),
-                start: Location::new(1, 8),
-                end: Location::new(1, 16),
+                location: Location::new(1, 8),
+                end_location: Location::new(1, 16),
                 applied: false,
             },
             Fix {
                 content: "ignored".to_string(),
-                start: Location::new(1, 10),
-                end: Location::new(1, 12),
+                location: Location::new(1, 10),
+                end_location: Location::new(1, 12),
                 applied: false,
             },
         ];

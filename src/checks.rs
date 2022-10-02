@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use crate::ast::types::Range;
 use anyhow::Result;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
@@ -718,8 +719,8 @@ impl CheckKind {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fix {
     pub content: String,
-    pub start: Location,
-    pub end: Location,
+    pub location: Location,
+    pub end_location: Location,
     pub applied: bool,
 }
 
@@ -727,14 +728,16 @@ pub struct Fix {
 pub struct Check {
     pub kind: CheckKind,
     pub location: Location,
+    pub end_location: Location,
     pub fix: Option<Fix>,
 }
 
 impl Check {
-    pub fn new(kind: CheckKind, location: Location) -> Self {
+    pub fn new(kind: CheckKind, span: Range) -> Self {
         Self {
             kind,
-            location,
+            location: span.location,
+            end_location: span.end_location,
             fix: None,
         }
     }

@@ -6,15 +6,24 @@ expression: checks
   location:
     row: 4
     column: 7
+  end_location:
+    row: 4
+    column: 11
   fix: ~
 - kind: FStringMissingPlaceholders
   location:
     row: 5
     column: 7
+  end_location:
+    row: 5
+    column: 11
   fix: ~
 - kind: FStringMissingPlaceholders
   location:
     row: 7
     column: 7
+  end_location:
+    row: 7
+    column: 11
   fix: ~
 

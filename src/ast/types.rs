@@ -1,11 +1,26 @@
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use rustpython_parser::ast::Location;
+use rustpython_parser::ast::{Located, Location};
 
 fn id() -> usize {
     static COUNTER: AtomicUsize = AtomicUsize::new(1);
     COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Range {
+    pub location: Location,
+    pub end_location: Location,
+}
+
+impl Range {
+    pub fn from_located<T>(located: &Located<T>) -> Self {
+        Range {
+            location: located.location,
+            end_location: located.end_location,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -60,12 +75,12 @@ pub enum BindingKind {
 #[derive(Clone, Debug)]
 pub struct Binding {
     pub kind: BindingKind,
-    pub location: Location,
-    /// Tuple of (scope index, location) indicating the scope and location at which the binding was
+    pub location: Range,
+    /// Tuple of (scope index, range) indicating the scope and range at which the binding was
     /// last used.
-    pub used: Option<(usize, Location)>,
+    pub used: Option<(usize, Range)>,
 }
 
 pub trait CheckLocator {
-    fn locate_check(&self, default: Location) -> Location;
+    fn locate_check(&self, default: Range) -> Range;
 }

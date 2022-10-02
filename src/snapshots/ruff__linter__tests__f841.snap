@@ -7,29 +7,44 @@ expression: checks
   location:
     row: 3
     column: 1
+  end_location:
+    row: 7
+    column: 1
   fix: ~
 - kind:
     UnusedVariable: z
   location:
     row: 16
     column: 5
+  end_location:
+    row: 16
+    column: 6
   fix: ~
 - kind:
     UnusedVariable: foo
   location:
     row: 20
     column: 5
+  end_location:
+    row: 20
+    column: 8
   fix: ~
 - kind:
     UnusedVariable: a
   location:
     row: 21
     column: 6
+  end_location:
+    row: 21
+    column: 7
   fix: ~
 - kind:
     UnusedVariable: b
   location:
     row: 21
     column: 9
+  end_location:
+    row: 21
+    column: 10
   fix: ~
 

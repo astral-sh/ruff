@@ -6,12 +6,15 @@ expression: checks
   location:
     row: 1
     column: 1
+  end_location:
+    row: 1
+    column: 18
   fix:
     content: assertEqual
-    start:
+    location:
       row: 1
       column: 2
-    end:
+    end_location:
       row: 1
       column: 14
     applied: false
@@ -19,12 +22,15 @@ expression: checks
   location:
     row: 2
     column: 1
+  end_location:
+    row: 2
+    column: 18
   fix:
     content: assertEqual
-    start:
+    location:
       row: 2
       column: 2
-    end:
+    end_location:
       row: 2
       column: 14
     applied: false

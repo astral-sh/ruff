@@ -1,13 +1,17 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword, Location};
+use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-fn relocate_keyword(keyword: &mut Keyword, location: Location) {
-    keyword.location = location;
+use crate::ast::types::Range;
+
+fn relocate_keyword(keyword: &mut Keyword, location: Range) {
+    keyword.location = location.location;
+    keyword.end_location = location.end_location;
     relocate_expr(&mut keyword.node.value, location);
 }
 
 /// Change an expression's location (recursively) to match a desired, fixed location.
-pub fn relocate_expr(expr: &mut Expr, location: Location) {
-    expr.location = location;
+pub fn relocate_expr(expr: &mut Expr, location: Range) {
+    expr.location = location.location;
+    expr.end_location = location.end_location;
     match &mut expr.node {
         ExprKind::BoolOp { values, .. } => {
             for expr in values {

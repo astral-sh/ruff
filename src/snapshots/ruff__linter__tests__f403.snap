@@ -7,11 +7,17 @@ expression: checks
   location:
     row: 1
     column: 1
+  end_location:
+    row: 1
+    column: 19
   fix: ~
 - kind:
     ImportStarUsed: F634
   location:
     row: 2
     column: 1
+  end_location:
+    row: 2
+    column: 19
   fix: ~
 

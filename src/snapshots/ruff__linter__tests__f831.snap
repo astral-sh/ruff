@@ -6,15 +6,24 @@ expression: checks
   location:
     row: 1
     column: 25
+  end_location:
+    row: 1
+    column: 31
   fix: ~
 - kind: DuplicateArgumentName
   location:
     row: 5
     column: 28
+  end_location:
+    row: 5
+    column: 34
   fix: ~
 - kind: DuplicateArgumentName
   location:
     row: 9
     column: 27
+  end_location:
+    row: 9
+    column: 33
   fix: ~
 

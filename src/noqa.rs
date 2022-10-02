@@ -19,8 +19,8 @@ static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").expect
 #[derive(Debug)]
 pub enum Directive<'a> {
     None,
-    All(usize),
-    Codes(usize, Vec<&'a str>),
+    All(usize, usize),
+    Codes(usize, usize, Vec<&'a str>),
 }
 
 pub fn extract_noqa_directive(line: &str) -> Directive {
@@ -29,13 +29,14 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
             Some(noqa) => match caps.name("codes") {
                 Some(codes) => Directive::Codes(
                     noqa.start(),
+                    noqa.end(),
                     SPLIT_COMMA_REGEX
                         .split(codes.as_str())
                         .map(|code| code.trim())
                         .filter(|code| !code.is_empty())
                         .collect(),
                 ),
-                None => Directive::All(noqa.start()),
+                None => Directive::All(noqa.start(), noqa.end()),
             },
             None => Directive::None,
         },
@@ -133,8 +134,8 @@ fn add_noqa_inner(
                     Directive::None => {
                         output.push_str(line);
                     }
-                    Directive::All(start) => output.push_str(&line[..start]),
-                    Directive::Codes(start, _) => output.push_str(&line[..start]),
+                    Directive::All(start, _) => output.push_str(&line[..start]),
+                    Directive::Codes(start, _, _) => output.push_str(&line[..start]),
                 };
                 let codes: Vec<&str> = codes.iter().map(|code| code.as_str()).collect();
                 output.push_str("  # noqa: ");
@@ -161,6 +162,7 @@ pub fn add_noqa(
 
 #[cfg(test)]
 mod tests {
+    use crate::ast::types::Range;
     use anyhow::Result;
     use rustpython_parser::ast::Location;
     use rustpython_parser::lexer;
@@ -236,7 +238,10 @@ z = x + 1",
 
         let checks = vec![Check::new(
             CheckKind::UnusedVariable("x".to_string()),
-            Location::new(1, 1),
+            Range {
+                location: Location::new(1, 1),
+                end_location: Location::new(1, 1),
+            },
         )];
         let contents = "x = 1";
         let noqa_line_for = vec![1];
@@ -247,11 +252,17 @@ z = x + 1",
         let checks = vec![
             Check::new(
                 CheckKind::AmbiguousVariableName("x".to_string()),
-                Location::new(1, 1),
+                Range {
+                    location: Location::new(1, 1),
+                    end_location: Location::new(1, 1),
+                },
             ),
             Check::new(
                 CheckKind::UnusedVariable("x".to_string()),
-                Location::new(1, 1),
+                Range {
+                    location: Location::new(1, 1),
+                    end_location: Location::new(1, 1),
+                },
             ),
         ];
         let contents = "x = 1  # noqa: E741";
@@ -263,11 +274,17 @@ z = x + 1",
         let checks = vec![
             Check::new(
                 CheckKind::AmbiguousVariableName("x".to_string()),
-                Location::new(1, 1),
+                Range {
+                    location: Location::new(1, 1),
+                    end_location: Location::new(1, 1),
+                },
             ),
             Check::new(
                 CheckKind::UnusedVariable("x".to_string()),
-                Location::new(1, 1),
+                Range {
+                    location: Location::new(1, 1),
+                    end_location: Location::new(1, 1),
+                },
             ),
         ];
         let contents = "x = 1  # noqa";

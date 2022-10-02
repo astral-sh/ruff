@@ -6,15 +6,24 @@ expression: checks
   location:
     row: 3
     column: 6
+  end_location:
+    row: 3
+    column: 8
   fix: ~
 - kind: MultiValueRepeatedKeyLiteral
   location:
     row: 9
     column: 5
+  end_location:
+    row: 9
+    column: 6
   fix: ~
 - kind: MultiValueRepeatedKeyLiteral
   location:
     row: 11
     column: 7
+  end_location:
+    row: 11
+    column: 11
   fix: ~
 

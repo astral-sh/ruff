@@ -6,15 +6,24 @@ expression: checks
   location:
     row: 6
     column: 5
+  end_location:
+    row: 6
+    column: 12
   fix: ~
 - kind: YieldOutsideFunction
   location:
     row: 9
     column: 1
+  end_location:
+    row: 9
+    column: 8
   fix: ~
 - kind: YieldOutsideFunction
   location:
     row: 10
     column: 1
+  end_location:
+    row: 10
+    column: 13
   fix: ~
 

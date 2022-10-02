@@ -21,6 +21,7 @@ struct ExpandedMessage<'a> {
     message: String,
     fixed: bool,
     location: Location,
+    end_location: Location,
     filename: &'a String,
 }
 
@@ -55,6 +56,7 @@ impl Printer {
                                 message: m.kind.body(),
                                 fixed: m.fixed,
                                 location: m.location,
+                                end_location: m.end_location,
                                 filename: &m.filename,
                             })
                             .collect::<Vec<_>>()

@@ -6,10 +6,16 @@ expression: checks
   location:
     row: 1
     column: 6
+  end_location:
+    row: 1
+    column: 14
   fix: ~
 - kind: IsLiteral
   location:
     row: 4
     column: 8
+  end_location:
+    row: 4
+    column: 16
   fix: ~
 

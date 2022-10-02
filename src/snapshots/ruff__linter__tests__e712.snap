@@ -9,6 +9,9 @@ expression: checks
   location:
     row: 2
     column: 11
+  end_location:
+    row: 2
+    column: 15
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -17,6 +20,9 @@ expression: checks
   location:
     row: 5
     column: 11
+  end_location:
+    row: 5
+    column: 16
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -25,6 +31,9 @@ expression: checks
   location:
     row: 8
     column: 4
+  end_location:
+    row: 8
+    column: 8
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -33,6 +42,9 @@ expression: checks
   location:
     row: 11
     column: 4
+  end_location:
+    row: 11
+    column: 9
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -41,6 +53,9 @@ expression: checks
   location:
     row: 14
     column: 14
+  end_location:
+    row: 14
+    column: 18
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -49,6 +64,9 @@ expression: checks
   location:
     row: 17
     column: 14
+  end_location:
+    row: 17
+    column: 19
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -57,6 +75,9 @@ expression: checks
   location:
     row: 20
     column: 20
+  end_location:
+    row: 20
+    column: 24
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -65,6 +86,9 @@ expression: checks
   location:
     row: 20
     column: 44
+  end_location:
+    row: 20
+    column: 49
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -73,5 +97,8 @@ expression: checks
   location:
     row: 22
     column: 5
+  end_location:
+    row: 22
+    column: 9
   fix: ~
 

@@ -5,6 +5,7 @@ use log::debug;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::{lexer, parser};
 
+use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
@@ -53,7 +54,10 @@ pub(crate) fn check_path(
                 if settings.select.contains(&CheckCode::E999) {
                     checks.push(Check::new(
                         CheckKind::SyntaxError(parse_error.error.to_string()),
-                        parse_error.location,
+                        Range {
+                            location: parse_error.location,
+                            end_location: parse_error.location,
+                        },
                     ))
                 }
             }
@@ -115,6 +119,7 @@ pub fn lint_path(
             kind: check.kind,
             fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
             location: check.location,
+            end_location: check.end_location,
             filename: path.to_string_lossy().to_string(),
         })
         .collect();

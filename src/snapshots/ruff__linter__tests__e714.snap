@@ -6,15 +6,24 @@ expression: checks
   location:
     row: 2
     column: 10
+  end_location:
+    row: 2
+    column: 14
   fix: ~
 - kind: NotIsTest
   location:
     row: 5
     column: 12
+  end_location:
+    row: 5
+    column: 16
   fix: ~
 - kind: NotIsTest
   location:
     row: 8
     column: 10
+  end_location:
+    row: 8
+    column: 23
   fix: ~
 

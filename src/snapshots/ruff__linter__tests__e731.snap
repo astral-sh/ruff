@@ -6,25 +6,40 @@ expression: checks
   location:
     row: 2
     column: 1
+  end_location:
+    row: 2
+    column: 20
   fix: ~
 - kind: DoNotAssignLambda
   location:
     row: 4
     column: 1
+  end_location:
+    row: 4
+    column: 20
   fix: ~
 - kind: DoNotAssignLambda
   location:
     row: 7
     column: 5
+  end_location:
+    row: 7
+    column: 30
   fix: ~
 - kind: DoNotAssignLambda
   location:
     row: 12
     column: 1
+  end_location:
+    row: 12
+    column: 28
   fix: ~
 - kind: DoNotAssignLambda
   location:
     row: 16
     column: 1
+  end_location:
+    row: 16
+    column: 26
   fix: ~
 

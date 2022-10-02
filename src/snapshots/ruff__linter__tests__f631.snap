@@ -6,10 +6,16 @@ expression: checks
   location:
     row: 1
     column: 1
+  end_location:
+    row: 1
+    column: 20
   fix: ~
 - kind: AssertTuple
   location:
     row: 2
     column: 1
+  end_location:
+    row: 2
+    column: 16
   fix: ~
 

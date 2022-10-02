@@ -14,6 +14,7 @@ pub struct Message {
     pub kind: CheckKind,
     pub fixed: bool,
     pub location: Location,
+    pub end_location: Location,
     pub filename: String,
 }
 

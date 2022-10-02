@@ -7,47 +7,71 @@ expression: checks
   location:
     row: 2
     column: 12
+  end_location:
+    row: 2
+    column: 16
   fix: ~
 - kind:
     UndefinedName: self
   location:
     row: 6
     column: 13
+  end_location:
+    row: 6
+    column: 17
   fix: ~
 - kind:
     UndefinedName: self
   location:
     row: 10
     column: 9
+  end_location:
+    row: 10
+    column: 13
   fix: ~
 - kind:
     UndefinedName: numeric_string
   location:
     row: 21
     column: 12
+  end_location:
+    row: 21
+    column: 26
   fix: ~
 - kind:
     UndefinedName: Bar
   location:
     row: 58
     column: 5
+  end_location:
+    row: 58
+    column: 9
   fix: ~
 - kind:
     UndefinedName: TOMATO
   location:
     row: 83
     column: 11
+  end_location:
+    row: 83
+    column: 17
   fix: ~
 - kind:
     UndefinedName: B
   location:
     row: 87
     column: 7
+  end_location:
+    row: 87
+    column: 11
   fix: ~
 - kind:
     UndefinedName: B
   location:
     row: 89
     column: 7
+  end_location:
+    row: 89
+    column: 9
   fix: ~
 

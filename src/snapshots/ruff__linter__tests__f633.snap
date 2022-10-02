@@ -6,5 +6,8 @@ expression: checks
   location:
     row: 4
     column: 1
+  end_location:
+    row: 4
+    column: 6
   fix: ~
 

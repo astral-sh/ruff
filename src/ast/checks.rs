@@ -8,13 +8,15 @@ use rustpython_parser::ast::{
 };
 
 use crate::ast::operations::SourceCodeLocator;
-use crate::ast::types::{Binding, BindingKind, CheckLocator, FunctionScope, Scope, ScopeKind};
+use crate::ast::types::{
+    Binding, BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind,
+};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckKind, Fix, RejectedCmpop};
 use crate::python::builtins::BUILTINS;
 
 /// Check IfTuple compliance.
-pub fn check_if_tuple(test: &Expr, location: Location) -> Option<Check> {
+pub fn check_if_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
         if !elts.is_empty() {
             return Some(Check::new(CheckKind::IfTuple, location));
@@ -24,7 +26,7 @@ pub fn check_if_tuple(test: &Expr, location: Location) -> Option<Check> {
 }
 
 /// Check AssertTuple compliance.
-pub fn check_assert_tuple(test: &Expr, location: Location) -> Option<Check> {
+pub fn check_assert_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
         if !elts.is_empty() {
             return Some(Check::new(CheckKind::AssertTuple, location));
@@ -51,7 +53,7 @@ pub fn check_not_tests(
                         if check_not_in {
                             checks.push(Check::new(
                                 CheckKind::NotInTest,
-                                locator.locate_check(operand.location),
+                                locator.locate_check(Range::from_located(operand)),
                             ));
                         }
                     }
@@ -59,7 +61,7 @@ pub fn check_not_tests(
                         if check_not_is {
                             checks.push(Check::new(
                                 CheckKind::NotIsTest,
-                                locator.locate_check(operand.location),
+                                locator.locate_check(Range::from_located(operand)),
                             ));
                         }
                     }
@@ -106,7 +108,7 @@ pub fn check_unused_variables(
 }
 
 /// Check DoNotAssignLambda compliance.
-pub fn check_do_not_assign_lambda(value: &Expr, location: Location) -> Option<Check> {
+pub fn check_do_not_assign_lambda(value: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Lambda { .. } = &value.node {
         Some(Check::new(CheckKind::DoNotAssignLambda, location))
     } else {
@@ -119,7 +121,7 @@ fn is_ambiguous_name(name: &str) -> bool {
 }
 
 /// Check AmbiguousVariableName compliance.
-pub fn check_ambiguous_variable_name(name: &str, location: Location) -> Option<Check> {
+pub fn check_ambiguous_variable_name(name: &str, location: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousVariableName(name.to_string()),
@@ -131,7 +133,7 @@ pub fn check_ambiguous_variable_name(name: &str, location: Location) -> Option<C
 }
 
 /// Check AmbiguousClassName compliance.
-pub fn check_ambiguous_class_name(name: &str, location: Location) -> Option<Check> {
+pub fn check_ambiguous_class_name(name: &str, location: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousClassName(name.to_string()),
@@ -143,7 +145,7 @@ pub fn check_ambiguous_class_name(name: &str, location: Location) -> Option<Chec
 }
 
 /// Check AmbiguousFunctionName compliance.
-pub fn check_ambiguous_function_name(name: &str, location: Location) -> Option<Check> {
+pub fn check_ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousFunctionName(name.to_string()),
@@ -175,7 +177,7 @@ pub fn check_useless_object_inheritance(
                     }) => {
                         let mut check = Check::new(
                             CheckKind::UselessObjectInheritance(name.to_string()),
-                            expr.location,
+                            Range::from_located(expr),
                         );
                         if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                             if let Some(fix) = fixes::remove_class_def_base(
@@ -206,7 +208,7 @@ pub fn check_default_except_not_last(handlers: &Vec<Excepthandler>) -> Option<Ch
         if type_.is_none() && idx < handlers.len() - 1 {
             return Some(Check::new(
                 CheckKind::DefaultExceptNotLast,
-                handler.location,
+                Range::from_located(handler),
             ));
         }
     }
@@ -220,13 +222,19 @@ pub fn check_raise_not_implemented(expr: &Expr) -> Option<Check> {
         ExprKind::Call { func, .. } => {
             if let ExprKind::Name { id, .. } = &func.node {
                 if id == "NotImplemented" {
-                    return Some(Check::new(CheckKind::RaiseNotImplemented, expr.location));
+                    return Some(Check::new(
+                        CheckKind::RaiseNotImplemented,
+                        Range::from_located(expr),
+                    ));
                 }
             }
         }
         ExprKind::Name { id, .. } => {
             if id == "NotImplemented" {
-                return Some(Check::new(CheckKind::RaiseNotImplemented, expr.location));
+                return Some(Check::new(
+                    CheckKind::RaiseNotImplemented,
+                    Range::from_located(expr),
+                ));
             }
         }
         _ => {}
@@ -258,7 +266,10 @@ pub fn check_duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
     for arg in all_arguments {
         let ident = &arg.node.arg;
         if idents.contains(ident.as_str()) {
-            checks.push(Check::new(CheckKind::DuplicateArgumentName, arg.location));
+            checks.push(Check::new(
+                CheckKind::DuplicateArgumentName,
+                Range::from_located(arg),
+            ));
         }
         idents.insert(ident);
     }
@@ -272,12 +283,16 @@ pub fn check_assert_equals(expr: &Expr, autofix: &fixer::Mode) -> Option<Check> 
         if attr == "assertEquals" {
             if let ExprKind::Name { id, .. } = &value.node {
                 if id == "self" {
-                    let mut check = Check::new(CheckKind::NoAssertEquals, expr.location);
+                    let mut check =
+                        Check::new(CheckKind::NoAssertEquals, Range::from_located(expr));
                     if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                         check.amend(Fix {
                             content: "assertEqual".to_string(),
-                            start: Location::new(expr.location.row(), expr.location.column() + 1),
-                            end: Location::new(
+                            location: Location::new(
+                                expr.location.row(),
+                                expr.location.column() + 1,
+                            ),
+                            end_location: Location::new(
                                 expr.location.row(),
                                 expr.location.column() + 1 + "assertEquals".len(),
                             ),
@@ -326,7 +341,7 @@ pub fn check_repeated_keys(
                     if check_repeated_literals && v1 == v2 {
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyLiteral,
-                            locator.locate_check(k2.location),
+                            locator.locate_check(Range::from_located(k2)),
                         ))
                     }
                 }
@@ -334,7 +349,7 @@ pub fn check_repeated_keys(
                     if check_repeated_variables && v1 == v2 {
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyVariable((*v2).to_string()),
-                            locator.locate_check(k2.location),
+                            locator.locate_check(Range::from_located(k2)),
                         ))
                     }
                 }
@@ -373,13 +388,13 @@ pub fn check_literal_comparisons(
         if matches!(op, Cmpop::Eq) {
             checks.push(Check::new(
                 CheckKind::NoneComparison(RejectedCmpop::Eq),
-                locator.locate_check(comparator.location),
+                locator.locate_check(Range::from_located(comparator)),
             ));
         }
         if matches!(op, Cmpop::NotEq) {
             checks.push(Check::new(
                 CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                locator.locate_check(comparator.location),
+                locator.locate_check(Range::from_located(comparator)),
             ));
         }
     }
@@ -393,13 +408,13 @@ pub fn check_literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 checks.push(Check::new(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                    locator.locate_check(comparator.location),
+                    locator.locate_check(Range::from_located(comparator)),
                 ));
             }
             if matches!(op, Cmpop::NotEq) {
                 checks.push(Check::new(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                    locator.locate_check(comparator.location),
+                    locator.locate_check(Range::from_located(comparator)),
                 ));
             }
         }
@@ -419,13 +434,13 @@ pub fn check_literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 checks.push(Check::new(
                     CheckKind::NoneComparison(RejectedCmpop::Eq),
-                    locator.locate_check(comparator.location),
+                    locator.locate_check(Range::from_located(comparator)),
                 ));
             }
             if matches!(op, Cmpop::NotEq) {
                 checks.push(Check::new(
                     CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                    locator.locate_check(comparator.location),
+                    locator.locate_check(Range::from_located(comparator)),
                 ));
             }
         }
@@ -439,13 +454,13 @@ pub fn check_literal_comparisons(
                 if matches!(op, Cmpop::Eq) {
                     checks.push(Check::new(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                        locator.locate_check(comparator.location),
+                        locator.locate_check(Range::from_located(comparator)),
                     ));
                 }
                 if matches!(op, Cmpop::NotEq) {
                     checks.push(Check::new(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                        locator.locate_check(comparator.location),
+                        locator.locate_check(Range::from_located(comparator)),
                     ));
                 }
             }
@@ -482,7 +497,7 @@ pub fn check_is_literal(
     left: &Expr,
     ops: &Vec<Cmpop>,
     comparators: &Vec<Expr>,
-    location: Location,
+    location: Range,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -503,7 +518,7 @@ pub fn check_is_literal(
 pub fn check_type_comparison(
     ops: &Vec<Cmpop>,
     comparators: &Vec<Expr>,
-    location: Location,
+    location: Range,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -544,7 +559,7 @@ pub fn check_starred_expressions(
     elts: &[Expr],
     check_too_many_expressions: bool,
     check_two_starred_expressions: bool,
-    location: Location,
+    location: Range,
 ) -> Option<Check> {
     let mut has_starred: bool = false;
     let mut starred_index: Option<usize> = None;
@@ -606,7 +621,7 @@ pub fn check_break_outside_loop(
     if !allowed {
         Some(Check::new(
             CheckKind::BreakOutsideLoop,
-            locator.locate_check(stmt.location),
+            locator.locate_check(Range::from_located(stmt)),
         ))
     } else {
         None
@@ -647,7 +662,7 @@ pub fn check_continue_outside_loop(
     if !allowed {
         Some(Check::new(
             CheckKind::ContinueOutsideLoop,
-            locator.locate_check(stmt.location),
+            locator.locate_check(Range::from_located(stmt)),
         ))
     } else {
         None
@@ -664,7 +679,7 @@ pub enum ShadowingType {
 /// Check builtin name shadowing
 pub fn check_builtin_shadowing(
     name: &str,
-    location: Location,
+    location: Range,
     node_type: ShadowingType,
 ) -> Option<Check> {
     if BUILTINS.contains(&name) {
@@ -688,7 +703,7 @@ pub fn check_super_args(expr: &Expr, args: &Vec<Expr>) -> Option<Check> {
         if id == "super" && !args.is_empty() {
             return Some(Check::new(
                 CheckKind::SuperCallWithParameters,
-                expr.location,
+                Range::from_located(expr),
             ));
         }
     }

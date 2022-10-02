@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::ast::types::Range;
 use rustpython_parser::ast::Location;
 
 use crate::autofix::fixer;
@@ -64,11 +65,11 @@ pub fn check_lines(
                     .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
 
                 match noqa {
-                    (Directive::All(_), matches) => {
+                    (Directive::All(_, _), matches) => {
                         matches.push(check.kind.code().as_str());
                         ignored.push(index)
                     }
-                    (Directive::Codes(_, codes), matches) => {
+                    (Directive::Codes(_, _, codes), matches) => {
                         if codes.contains(&check.kind.code().as_str()) {
                             matches.push(check.kind.code().as_str());
                             ignored.push(index);
@@ -89,14 +90,17 @@ pub fn check_lines(
 
                 let check = Check::new(
                     CheckKind::LineTooLong(line_length, settings.line_length),
-                    Location::new(lineno + 1, settings.line_length + 1),
+                    Range {
+                        location: Location::new(lineno + 1, 1),
+                        end_location: Location::new(lineno + 1, line_length + 1),
+                    },
                 );
 
                 match noqa {
-                    (Directive::All(_), matches) => {
+                    (Directive::All(_, _), matches) => {
                         matches.push(check.kind.code().as_str());
                     }
-                    (Directive::Codes(_, codes), matches) => {
+                    (Directive::Codes(_, _, codes), matches) => {
                         if codes.contains(&check.kind.code().as_str()) {
                             matches.push(check.kind.code().as_str());
                         } else {
@@ -113,24 +117,30 @@ pub fn check_lines(
     if enforce_noqa {
         for (row, (directive, matches)) in noqa_directives {
             match directive {
-                Directive::All(column) => {
+                Directive::All(start, end) => {
                     if matches.is_empty() {
                         let mut check = Check::new(
                             CheckKind::UnusedNOQA(None),
-                            Location::new(row + 1, column + 1),
+                            Range {
+                                location: Location::new(row + 1, start + 1),
+                                end_location: Location::new(row + 1, end + 1),
+                            },
                         );
                         if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                             check.amend(Fix {
                                 content: "".to_string(),
-                                start: Location::new(row + 1, column + 1),
-                                end: Location::new(row + 1, lines[row].chars().count() + 1),
+                                location: Location::new(row + 1, start + 1),
+                                end_location: Location::new(
+                                    row + 1,
+                                    lines[row].chars().count() + 1,
+                                ),
                                 applied: false,
                             });
                         }
                         line_checks.push(check);
                     }
                 }
-                Directive::Codes(column, codes) => {
+                Directive::Codes(start, end, codes) => {
                     let mut invalid_codes = vec![];
                     let mut valid_codes = vec![];
                     for code in codes {
@@ -144,21 +154,30 @@ pub fn check_lines(
                     if !invalid_codes.is_empty() {
                         let mut check = Check::new(
                             CheckKind::UnusedNOQA(Some(invalid_codes.join(", "))),
-                            Location::new(row + 1, column + 1),
+                            Range {
+                                location: Location::new(row + 1, start + 1),
+                                end_location: Location::new(row + 1, end + 1),
+                            },
                         );
                         if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                             if valid_codes.is_empty() {
                                 check.amend(Fix {
                                     content: "".to_string(),
-                                    start: Location::new(row + 1, column + 1),
-                                    end: Location::new(row + 1, lines[row].chars().count() + 1),
+                                    location: Location::new(row + 1, start + 1),
+                                    end_location: Location::new(
+                                        row + 1,
+                                        lines[row].chars().count() + 1,
+                                    ),
                                     applied: false,
                                 });
                             } else {
                                 check.amend(Fix {
                                     content: format!("  # noqa: {}", valid_codes.join(", ")),
-                                    start: Location::new(row + 1, column + 1),
-                                    end: Location::new(row + 1, lines[row].chars().count() + 1),
+                                    location: Location::new(row + 1, start + 1),
+                                    end_location: Location::new(
+                                        row + 1,
+                                        lines[row].chars().count() + 1,
+                                    ),
                                     applied: false,
                                 });
                             }
