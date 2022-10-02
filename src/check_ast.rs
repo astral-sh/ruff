@@ -1,7 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Deref;
 use std::path::Path;
 
+use log::error;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{
@@ -1622,6 +1623,10 @@ impl<'a> Checker<'a> {
                 // location indicates an `import from`.)
                 let mut unused: BTreeMap<(usize, Option<usize>), Vec<String>> = BTreeMap::new();
 
+                // Track all deleted statements. This ensures that we don't leave the generated code
+                // in a bad state.
+                let mut deletions: BTreeMap<Option<usize>, BTreeSet<usize>> = BTreeMap::new();
+
                 for (name, binding) in scope.values.iter().rev() {
                     let used = binding.used.is_some()
                         || all_names
@@ -1651,10 +1656,27 @@ impl<'a> Checker<'a> {
                         self.locate_check(Range::from_located(child)),
                     );
 
-                    if let Some(fix) =
-                        fixes::remove_unused_imports(&mut self.locator, &full_names, child, parent)
-                    {
-                        check.amend(fix);
+                    let deletion_indexes = deletions.entry(defined_in).or_insert(BTreeSet::new());
+                    let deletion_stmts: Vec<&Stmt> = deletion_indexes
+                        .iter()
+                        .map(|index| self.parents[*index])
+                        .collect();
+
+                    match fixes::remove_unused_imports(
+                        &mut self.locator,
+                        &full_names,
+                        child,
+                        parent,
+                        &deletion_stmts,
+                    ) {
+                        Ok(Some(fix)) => {
+                            if fix.content.is_empty() {
+                                deletion_indexes.insert(defined_by);
+                            }
+                            check.amend(fix)
+                        }
+                        Ok(None) => {}
+                        Err(e) => error!("Failed to fix unused imports: {}", e),
                     }
 
                     self.checks.push(check);

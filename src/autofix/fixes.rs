@@ -1,3 +1,4 @@
+use anyhow::Result;
 use itertools::Itertools;
 use libcst_native::ImportNames::Aliases;
 use libcst_native::NameOrAttribute::N;
@@ -162,25 +163,38 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
     None
 }
 
+/// Determine if a body contains only a single statement, taking into account deletions.
+fn has_single_child(body: &[Stmt], deletions: &[&Stmt]) -> bool {
+    body.iter()
+        .filter(|child| !deletions.contains(child))
+        .count()
+        == 1
+}
+
 /// Determine if a child is the only statement in its body.
-fn is_lone_child(parent: &Stmt, child: &Stmt) -> bool {
+fn is_lone_child(child: &Stmt, parent: &Stmt, deletions: &[&Stmt]) -> Result<bool> {
     match &parent.node {
         StmtKind::FunctionDef { body, .. }
         | StmtKind::AsyncFunctionDef { body, .. }
         | StmtKind::ClassDef { body, .. }
         | StmtKind::With { body, .. }
-        | StmtKind::AsyncWith { body, .. } => body.len() == 1,
+        | StmtKind::AsyncWith { body, .. } => {
+            if body.iter().contains(child) {
+                Ok(has_single_child(body, deletions))
+            } else {
+                Err(anyhow::anyhow!("Unable to find child in parent body."))
+            }
+        }
         StmtKind::For { body, orelse, .. }
         | StmtKind::AsyncFor { body, orelse, .. }
         | StmtKind::While { body, orelse, .. }
         | StmtKind::If { body, orelse, .. } => {
             if body.iter().contains(child) {
-                body.len() == 1
+                Ok(has_single_child(body, deletions))
             } else if orelse.iter().contains(child) {
-                orelse.len() == 1
+                Ok(has_single_child(orelse, deletions))
             } else {
-                // TODO(charlie): Return Result<Option<Fix>>.
-                panic!("Unable to find child in parent body.")
+                Err(anyhow::anyhow!("Unable to find child in parent body."))
             }
         }
         StmtKind::Try {
@@ -190,11 +204,11 @@ fn is_lone_child(parent: &Stmt, child: &Stmt) -> bool {
             finalbody,
         } => {
             if body.iter().contains(child) {
-                body.len() == 1
+                Ok(has_single_child(body, deletions))
             } else if orelse.iter().contains(child) {
-                orelse.len() == 1
+                Ok(has_single_child(orelse, deletions))
             } else if finalbody.iter().contains(child) {
-                finalbody.len() == 1
+                Ok(has_single_child(finalbody, deletions))
             } else if let Some(body) = handlers.iter().find_map(|handler| match &handler.node {
                 ExcepthandlerKind::ExceptHandler { body, .. } => {
                     if body.iter().contains(child) {
@@ -204,16 +218,12 @@ fn is_lone_child(parent: &Stmt, child: &Stmt) -> bool {
                     }
                 }
             }) {
-                body.len() == 1
+                Ok(has_single_child(body, deletions))
             } else {
-                // TODO(charlie): Return Result<Option<Fix>>.
-                panic!("Unable to find child in parent body.")
+                Err(anyhow::anyhow!("Unable to find child in parent body."))
             }
         }
-        _ => {
-            // TODO(charlie): Return Result<Option<Fix>>.
-            panic!("Unable to find child in parent body.")
-        }
+        _ => Err(anyhow::anyhow!("Unable to find child in parent body.")),
     }
 }
 
@@ -223,43 +233,52 @@ pub fn remove_unused_imports(
     full_names: &[String],
     stmt: &Stmt,
     parent: Option<&Stmt>,
-) -> Option<Fix> {
+    deletions: &[&Stmt],
+) -> Result<Option<Fix>> {
     let range = Range::from_located(stmt);
     let location = range.location;
     let end_location = range.end_location;
 
-    let contents = locator.slice_source_code_range(&range);
-
     // TODO(charlie): Not necessary if we're removing a non-`from`, so just track that ahead of
     // time.
-    let mut tree = match libcst_native::parse_module(contents, None) {
+    let mut tree = match libcst_native::parse_module(locator.slice_source_code_range(&range), None)
+    {
         Ok(m) => m,
-        // TODO(charlie): Log this? Or return Result<Option<Fix>>?
-        Err(_) => return None,
+        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
     };
 
-    // import collections
+    // Ex) import collections
     if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         if let Some(SmallStatement::Import(_)) = body.body.first_mut() {
-            // Nuke the entire line.
-            // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
-            return Some(Fix {
-                location: Location::new(location.row(), 1),
-                end_location: Location::new(end_location.row() + 1, 1),
-                content: if parent
-                    .map(|parent| is_lone_child(parent, stmt))
+            return Ok(Some(
+                if parent
+                    .map(|parent| is_lone_child(stmt, parent, deletions))
+                    .map_or(Ok(None), |v| v.map(Some))?
                     .unwrap_or_default()
                 {
-                    "pass".to_string()
+                    // If removing this node would lead to an invalid syntax tree, replace
+                    // it with a `pass`.
+                    Fix {
+                        location,
+                        end_location,
+                        content: "pass".to_string(),
+                        applied: false,
+                    }
                 } else {
-                    "".to_string()
+                    // Otherwise, nuke the entire line.
+                    // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
+                    Fix {
+                        location: Location::new(location.row(), 1),
+                        end_location: Location::new(end_location.row() + 1, 1),
+                        content: "".to_string(),
+                        applied: false,
+                    }
                 },
-                applied: false,
-            });
+            ));
         }
     }
 
-    // from collections import OrderedDict
+    // Ex) from collections import OrderedDict
     if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         if let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() {
             if let Aliases(aliases) = &mut body.names {
@@ -280,7 +299,7 @@ pub fn remove_unused_imports(
                     }
                 }
 
-                // TODO(charlie): Find a way to do this more efficiently.
+                // TODO(charlie): Do this more efficiently.
                 for index in removable.iter().rev() {
                     aliases.remove(*index);
                 }
@@ -290,35 +309,45 @@ pub fn remove_unused_imports(
                 }
 
                 return if aliases.is_empty() {
-                    // Nuke the entire line.
-                    // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
-                    Some(Fix {
-                        location: Location::new(location.row(), 1),
-                        end_location: Location::new(end_location.row() + 1, 1),
-                        content: if parent
-                            .map(|parent| is_lone_child(parent, stmt))
+                    Ok(Some(
+                        if parent
+                            .map(|parent| is_lone_child(stmt, parent, deletions))
+                            .map_or(Ok(None), |v| v.map(Some))?
                             .unwrap_or_default()
                         {
-                            "pass".to_string()
+                            // If removing this node would lead to an invalid syntax tree, replace
+                            // it with a `pass`.
+                            Fix {
+                                location,
+                                end_location,
+                                content: "pass".to_string(),
+                                applied: false,
+                            }
                         } else {
-                            "".to_string()
+                            // Otherwise, nuke the entire line.
+                            // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
+                            Fix {
+                                location: Location::new(location.row(), 1),
+                                end_location: Location::new(end_location.row() + 1, 1),
+                                content: "".to_string(),
+                                applied: false,
+                            }
                         },
-                        applied: false,
-                    })
+                    ))
                 } else {
                     let mut state = Default::default();
                     tree.codegen(&mut state);
 
-                    Some(Fix {
+                    Ok(Some(Fix {
                         content: state.to_string(),
                         location,
                         end_location,
                         applied: false,
-                    })
+                    }))
                 };
             }
         }
     }
 
-    None
+    Ok(None)
 }
