@@ -5,7 +5,7 @@ expression: checks
 - kind: RaiseNotImplemented
   location:
     row: 2
-    column: 25
+    column: 11
   fix: ~
 - kind: RaiseNotImplemented
   location:
