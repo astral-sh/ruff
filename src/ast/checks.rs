@@ -698,15 +698,26 @@ pub fn check_builtin_shadowing(
 
 // flake8-super
 /// Check that `super()` has no args
-pub fn check_super_args(expr: &Expr, args: &Vec<Expr>) -> Option<Check> {
-    if let ExprKind::Name { id, .. } = &expr.node {
+pub fn check_super_args(
+    expr: &Expr,
+    func: &Expr,
+    args: &Vec<Expr>,
+    locator: &mut SourceCodeLocator,
+    autofix: &fixer::Mode,
+) -> Option<Check> {
+    if let ExprKind::Name { id, .. } = &func.node {
         if id == "super" && !args.is_empty() {
-            return Some(Check::new(
+            let mut check = Check::new(
                 CheckKind::SuperCallWithParameters,
                 Range::from_located(expr),
-            ));
+            );
+            if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                if let Some(fix) = fixes::remove_super_arguments(locator, expr) {
+                    check.amend(fix);
+                }
+            }
+            return Some(check);
         }
     }
-
     None
 }

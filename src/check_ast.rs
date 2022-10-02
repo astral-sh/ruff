@@ -742,7 +742,9 @@ where
 
                 // flake8-super
                 if self.settings.select.contains(&CheckCode::SPR001) {
-                    if let Some(check) = checks::check_super_args(func, args) {
+                    if let Some(check) =
+                        checks::check_super_args(expr, func, args, &mut self.locator, self.autofix)
+                    {
                         self.checks.push(check)
                     }
                 }

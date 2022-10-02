@@ -1,3 +1,4 @@
+use libcst_native::{Codegen, Expression, SmallStatement, Statement};
 use rustpython_parser::ast::{Expr, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
@@ -25,7 +26,7 @@ pub fn remove_class_def_base(
     bases: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Fix> {
-    let content = locator.slice_source_code(stmt_at);
+    let content = locator.slice_source_code_at(stmt_at);
 
     // Case 1: `object` is the only base.
     if bases.len() == 1 && keywords.is_empty() {
@@ -123,4 +124,35 @@ pub fn remove_class_def_base(
             _ => None,
         }
     }
+}
+
+pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> Option<Fix> {
+    let contents = locator.slice_source_code_range(&expr.location, &expr.end_location);
+
+    let mut tree = match libcst_native::parse_module(contents, None) {
+        Ok(m) => m,
+        Err(_) => return None,
+    };
+
+    if let Some(Statement::Simple(body)) = tree.body.first_mut() {
+        if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
+            if let Expression::Call(body) = &mut body.value {
+                body.args = vec![];
+                body.whitespace_before_args = Default::default();
+                body.whitespace_after_func = Default::default();
+
+                let mut state = Default::default();
+                tree.codegen(&mut state);
+
+                return Some(Fix {
+                    content: state.to_string(),
+                    location: expr.location,
+                    end_location: expr.end_location,
+                    applied: false,
+                });
+            }
+        }
+    }
+
+    None
 }

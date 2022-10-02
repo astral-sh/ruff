@@ -712,6 +712,7 @@ impl CheckKind {
             CheckKind::NoAssertEquals
                 | CheckKind::UselessObjectInheritance(_)
                 | CheckKind::UnusedNOQA(_)
+                | CheckKind::SuperCallWithParameters
         )
     }
 }
