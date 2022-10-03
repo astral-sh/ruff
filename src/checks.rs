@@ -5,7 +5,7 @@ use anyhow::Result;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_CHECK_CODES: [CheckCode; 46] = [
+pub const DEFAULT_CHECK_CODES: [CheckCode; 48] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -54,11 +54,14 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 46] = [
     CheckCode::A001,
     CheckCode::A002,
     CheckCode::A003,
+    // flake8-print
+    CheckCode::T201,
+    CheckCode::T203,
     // flake8-super
     CheckCode::SPR001,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 49] = [
+pub const ALL_CHECK_CODES: [CheckCode; 51] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -109,6 +112,9 @@ pub const ALL_CHECK_CODES: [CheckCode; 49] = [
     CheckCode::A003,
     // flake8-super
     CheckCode::SPR001,
+    // flake8-print
+    CheckCode::T201,
+    CheckCode::T203,
     // Meta
     CheckCode::M001,
     // Refactor
@@ -168,6 +174,9 @@ pub enum CheckCode {
     A003,
     // flake8-super
     SPR001,
+    // flake8-print
+    T201,
+    T203,
     // Refactor
     R001,
     R002,
@@ -293,6 +302,9 @@ impl CheckCode {
             CheckCode::A003 => "A003",
             // flake8-super
             CheckCode::SPR001 => "SPR001",
+            // flake8-print
+            CheckCode::T201 => "T201",
+            CheckCode::T203 => "T203",
             // Refactor
             CheckCode::R001 => "R001",
             CheckCode::R002 => "R002",
@@ -363,6 +375,9 @@ impl CheckCode {
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-super
             CheckCode::SPR001 => CheckKind::SuperCallWithParameters,
+            // flake8-print
+            CheckCode::T201 => CheckKind::PrintFound,
+            CheckCode::T203 => CheckKind::PPrintFound,
             // Refactor
             CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::R002 => CheckKind::NoAssertEquals,
@@ -438,6 +453,9 @@ pub enum CheckKind {
     BuiltinAttributeShadowing(String),
     // flake8-super
     SuperCallWithParameters,
+    // flake8-print
+    PrintFound,
+    PPrintFound,
 }
 
 impl CheckKind {
@@ -497,6 +515,9 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => "BuiltinAttributeShadowing",
             // flake8-super
             CheckKind::SuperCallWithParameters => "SuperCallWithParameters",
+            // flake8-print
+            CheckKind::PrintFound => "PrintFound",
+            CheckKind::PPrintFound => "PPrintFound",
         }
     }
 
@@ -554,6 +575,9 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-super
             CheckKind::SuperCallWithParameters => &CheckCode::SPR001,
+            // flake8-print
+            CheckKind::PrintFound => &CheckCode::T201,
+            CheckKind::PPrintFound => &CheckCode::T203,
         }
     }
 
@@ -702,6 +726,9 @@ impl CheckKind {
             CheckKind::SuperCallWithParameters => {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
+            // flake8-print
+            CheckKind::PrintFound => "`print` found".to_string(),
+            CheckKind::PPrintFound => "`pprint` found`".to_string(),
         }
     }
 
@@ -714,6 +741,8 @@ impl CheckKind {
                 | CheckKind::UnusedNOQA(_)
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::UnusedImport(_)
+                | CheckKind::PrintFound
+                | CheckKind::PPrintFound
         )
     }
 }

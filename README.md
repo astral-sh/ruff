@@ -264,6 +264,8 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |
 | A003 | BuiltinAttributeShadowing | class attribute `...` is shadowing a python builtin |
 | SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |
+| T201 | PrintFound | `print` found |
+| T203 | PPrintFound | `pprint` found` |
 | R001 | UselessObjectInheritance | Class `...` inherits from object |
 | R002 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |
 | M001 | UnusedNOQA | Unused `noqa` directive |

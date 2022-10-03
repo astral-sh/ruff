@@ -779,4 +779,28 @@ mod tests {
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
+
+    #[test]
+    fn t201() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/T201.py"),
+            &settings::Settings::for_rule(CheckCode::T201),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn t203() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/T203.py"),
+            &settings::Settings::for_rule(CheckCode::T203),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
 }

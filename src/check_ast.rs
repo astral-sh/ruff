@@ -19,6 +19,7 @@ use crate::ast::types::{
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, operations, visitor};
+use crate::autofix::fixes::remove_stmt;
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -757,6 +758,43 @@ where
                     if let Some(check) =
                         checks::check_super_args(expr, func, args, &mut self.locator, self.autofix)
                     {
+                        self.checks.push(check)
+                    }
+                }
+
+                // flake8-print
+                if self.settings.select.contains(&CheckCode::T201)
+                    || self.settings.select.contains(&CheckCode::T203)
+                {
+                    if let Some(mut check) = checks::check_print_call(expr, func) {
+                        if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            let context = self.binding_context();
+                            if matches!(
+                                self.parents[context.defined_by].node,
+                                StmtKind::Expr { .. }
+                            ) {
+                                let deleted: Vec<&Stmt> = self
+                                    .deletions
+                                    .iter()
+                                    .map(|index| self.parents[*index])
+                                    .collect();
+
+                                match remove_stmt(
+                                    self.parents[context.defined_by],
+                                    context.defined_in.map(|index| self.parents[index]),
+                                    &deleted,
+                                ) {
+                                    Ok(fix) => {
+                                        if fix.content.is_empty() || fix.content == "pass" {
+                                            self.deletions.insert(context.defined_by);
+                                        }
+                                        check.amend(fix)
+                                    }
+                                    Err(e) => error!("Failed to fix unused imports: {}", e),
+                                }
+                            }
+                        }
+
                         self.checks.push(check)
                     }
                 }
