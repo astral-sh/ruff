@@ -75,6 +75,7 @@ pub enum BindingKind {
     FutureImportation,
     StarImportation,
     Importation(String, BindingContext),
+    FromImportation(String, BindingContext),
     SubmoduleImportation(String, BindingContext),
 }
 
@@ -89,4 +90,10 @@ pub struct Binding {
 
 pub trait CheckLocator {
     fn locate_check(&self, default: Range) -> Range;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ImportKind {
+    Import,
+    ImportFrom,
 }

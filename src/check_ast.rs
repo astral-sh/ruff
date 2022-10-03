@@ -14,7 +14,8 @@ use rustpython_parser::parser;
 use crate::ast::operations::{extract_all_names, SourceCodeLocator};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind,
+    Binding, BindingContext, BindingKind, CheckLocator, FunctionScope, ImportKind, Range, Scope,
+    ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, operations, visitor};
@@ -57,6 +58,8 @@ struct Checker<'a> {
     seen_docstring: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
+    // Edit tracking.
+    deletions: BTreeSet<usize>,
 }
 
 impl<'a> Checker<'a> {
@@ -89,6 +92,7 @@ impl<'a> Checker<'a> {
             seen_docstring: false,
             futures_allowed: true,
             annotations_future_enabled: false,
+            deletions: Default::default(),
         }
     }
 }
@@ -429,7 +433,6 @@ where
                                     self.binding_context(),
                                 ),
                                 used: None,
-
                                 range: Range::from_located(stmt),
                             },
                         )
@@ -566,7 +569,7 @@ where
                         }
 
                         let binding = Binding {
-                            kind: BindingKind::Importation(
+                            kind: BindingKind::FromImportation(
                                 match module {
                                     None => name.clone(),
                                     Some(parent) => format!("{}.{}", parent, name),
@@ -1280,8 +1283,11 @@ impl<'a> Checker<'a> {
             None => binding,
             Some(existing) => {
                 if self.settings.select.contains(&CheckCode::F402)
-                    && matches!(existing.kind, BindingKind::Importation(_, _))
                     && matches!(binding.kind, BindingKind::LoopVar)
+                    && matches!(
+                        existing.kind,
+                        BindingKind::Importation(_, _) | BindingKind::FromImportation(_, _)
+                    )
                 {
                     self.checks.push(Check::new(
                         CheckKind::ImportShadowedByLoopVar(
@@ -1621,11 +1627,8 @@ impl<'a> Checker<'a> {
             if self.settings.select.contains(&CheckCode::F401) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
-                let mut unused: BTreeMap<(usize, Option<usize>), Vec<String>> = BTreeMap::new();
-
-                // Track all deleted statements. This ensures that we don't leave the generated code
-                // in a bad state.
-                let mut deletions: BTreeMap<Option<usize>, BTreeSet<usize>> = BTreeMap::new();
+                let mut unused: BTreeMap<(ImportKind, usize, Option<usize>), Vec<String>> =
+                    BTreeMap::new();
 
                 for (name, binding) in scope.values.iter().rev() {
                     let used = binding.used.is_some()
@@ -1635,10 +1638,24 @@ impl<'a> Checker<'a> {
 
                     if !used {
                         match &binding.kind {
+                            BindingKind::FromImportation(full_name, context) => {
+                                let full_names = unused
+                                    .entry((
+                                        ImportKind::ImportFrom,
+                                        context.defined_by,
+                                        context.defined_in,
+                                    ))
+                                    .or_insert(vec![]);
+                                full_names.push(full_name.to_string());
+                            }
                             BindingKind::Importation(full_name, context)
                             | BindingKind::SubmoduleImportation(full_name, context) => {
                                 let full_names = unused
-                                    .entry((context.defined_by, context.defined_in))
+                                    .entry((
+                                        ImportKind::Import,
+                                        context.defined_by,
+                                        context.defined_in,
+                                    ))
                                     .or_insert(vec![]);
                                 full_names.push(full_name.to_string());
                             }
@@ -1647,7 +1664,7 @@ impl<'a> Checker<'a> {
                     }
                 }
 
-                for ((defined_by, defined_in), full_names) in unused {
+                for ((kind, defined_by, defined_in), full_names) in unused {
                     let child = self.parents[defined_by];
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
@@ -1656,27 +1673,43 @@ impl<'a> Checker<'a> {
                         self.locate_check(Range::from_located(child)),
                     );
 
-                    let deletion_indexes = deletions.entry(defined_in).or_insert(BTreeSet::new());
-                    let deletion_stmts: Vec<&Stmt> = deletion_indexes
-                        .iter()
-                        .map(|index| self.parents[*index])
-                        .collect();
+                    if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                        let deleted: Vec<&Stmt> = self
+                            .deletions
+                            .iter()
+                            .map(|index| self.parents[*index])
+                            .collect();
 
-                    match fixes::remove_unused_imports(
-                        &mut self.locator,
-                        &full_names,
-                        child,
-                        parent,
-                        &deletion_stmts,
-                    ) {
-                        Ok(Some(fix)) => {
-                            if fix.content.is_empty() {
-                                deletion_indexes.insert(defined_by);
+                        match kind {
+                            ImportKind::Import => {
+                                match fixes::remove_unused_imports(child, parent, &deleted) {
+                                    Ok(fix) => {
+                                        if fix.content.is_empty() || fix.content == "pass" {
+                                            self.deletions.insert(defined_by);
+                                        }
+                                        check.amend(fix)
+                                    }
+                                    Err(e) => error!("Failed to fix unused imports: {}", e),
+                                }
                             }
-                            check.amend(fix)
+                            ImportKind::ImportFrom => {
+                                match fixes::remove_unused_import_froms(
+                                    &mut self.locator,
+                                    &full_names,
+                                    child,
+                                    parent,
+                                    &deleted,
+                                ) {
+                                    Ok(fix) => {
+                                        if fix.content.is_empty() || fix.content == "pass" {
+                                            self.deletions.insert(defined_by);
+                                        }
+                                        check.amend(fix)
+                                    }
+                                    Err(e) => error!("Failed to fix unused imports: {}", e),
+                                }
+                            }
                         }
-                        Ok(None) => {}
-                        Err(e) => error!("Failed to fix unused imports: {}", e),
                     }
 
                     self.checks.push(check);

@@ -30,6 +30,17 @@ if TYPE_CHECKING:
     from models import Fruit, Nut, Vegetable
 
 
+if TYPE_CHECKING:
+    import shelve
+    import importlib
+
+if TYPE_CHECKING:
+    """Hello, world!"""
+    import pathlib
+
+    z = 1
+
+
 class X:
     datetime: datetime
     foo: Type["NamedTuple"]
@@ -38,6 +49,9 @@ class X:
         x = os.environ["1"]
         y = Counter()
         z = multiprocessing.pool.ThreadPool()
+
+    def b(self) -> None:
+        import pickle
 
 
 __all__ = ["ClassA"] + ["ClassB"]
