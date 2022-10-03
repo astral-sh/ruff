@@ -224,7 +224,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
     }
 }
 
-fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Result<Fix> {
+pub fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Result<Fix> {
     if parent
         .map(|parent| is_lone_child(stmt, parent, deleted))
         .map_or(Ok(None), |v| v.map(Some))?

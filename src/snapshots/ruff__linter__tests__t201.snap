@@ -1,0 +1,21 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: PrintFound
+  location:
+    row: 1
+    column: 1
+  end_location:
+    row: 1
+    column: 23
+  fix:
+    content: ""
+    location:
+      row: 1
+      column: 1
+    end_location:
+      row: 2
+      column: 1
+    applied: false
+
