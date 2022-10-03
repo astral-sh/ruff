@@ -11,11 +11,22 @@ import multiprocessing.pool
 import multiprocessing.process
 import logging.config
 import logging.handlers
-from typing import TYPING_CHECK, NamedTuple, Dict, Type, TypeVar, List, Set, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    NamedTuple,
+    Dict,
+    Type,
+    TypeVar,
+    List,
+    Set,
+    Union,
+    cast,
+)
+from dataclasses import MISSING, field
 
 from blah import ClassA, ClassB, ClassC
 
-if TYPING_CHECK:
+if TYPE_CHECKING:
     from models import Fruit, Nut, Vegetable
 
 
@@ -39,3 +50,5 @@ Z = TypeVar("Z", "List", "Set")
 a = list["Fruit"]
 b = Union["Nut", None]
 c = cast("Vegetable", b)
+
+Field = lambda default=MISSING: field(default=default)

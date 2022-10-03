@@ -286,6 +286,7 @@ where
 
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
 
+                // Visit the decorators and arguments, but avoid the body, which will be deferred.
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
@@ -886,6 +887,40 @@ where
             } if self.in_annotation && !self.in_literal => {
                 self.deferred_string_annotations
                     .push((Range::from_located(expr), value));
+            }
+            ExprKind::Lambda { args, .. } => {
+                // Visit the arguments, but avoid the body, which will be deferred.
+                for arg in &args.posonlyargs {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                for arg in &args.args {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                if let Some(arg) = &args.vararg {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                for arg in &args.kwonlyargs {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                if let Some(arg) = &args.kwarg {
+                    if let Some(expr) = &arg.node.annotation {
+                        self.visit_annotation(expr);
+                    }
+                }
+                for expr in &args.kw_defaults {
+                    self.visit_expr(expr);
+                }
+                for expr in &args.defaults {
+                    self.visit_expr(expr);
+                }
             }
             ExprKind::GeneratorExp { .. }
             | ExprKind::ListComp { .. }
