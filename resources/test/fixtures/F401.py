@@ -1,6 +1,5 @@
 from __future__ import all_feature_names
-import os
-import functools
+import functools, os
 from datetime import datetime
 from collections import (
     Counter,

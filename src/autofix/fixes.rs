@@ -251,14 +251,75 @@ fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Result<
 }
 
 /// Generate a Fix to remove any unused imports from an `import` statement.
-pub fn remove_unused_imports(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Result<Fix> {
-    remove_stmt(stmt, parent, deleted)
+pub fn remove_unused_imports(
+    locator: &mut SourceCodeLocator,
+    full_names: &[&str],
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
+    deleted: &[&Stmt],
+) -> Result<Fix> {
+    let mut tree = match libcst_native::parse_module(
+        locator.slice_source_code_range(&Range::from_located(stmt)),
+        None,
+    ) {
+        Ok(m) => m,
+        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
+    };
+
+    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
+    };
+    let body = if let Some(SmallStatement::Import(body)) = body.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!(
+            "Expected node to be: SmallStatement::ImportFrom."
+        ));
+    };
+    let aliases = &mut body.names;
+
+    // Preserve the trailing comma (or not) from the last entry.
+    let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
+
+    // Identify unused imports from within the `import from`.
+    let mut removable = vec![];
+    for (index, alias) in aliases.iter().enumerate() {
+        if let N(import_name) = &alias.name {
+            if full_names.contains(&import_name.value) {
+                removable.push(index);
+            }
+        }
+    }
+    // TODO(charlie): This is quadratic.
+    for index in removable.iter().rev() {
+        aliases.remove(*index);
+    }
+
+    if let Some(alias) = aliases.last_mut() {
+        alias.comma = trailing_comma;
+    }
+
+    if aliases.is_empty() {
+        remove_stmt(stmt, parent, deleted)
+    } else {
+        let mut state = Default::default();
+        tree.codegen(&mut state);
+
+        Ok(Fix {
+            content: state.to_string(),
+            location: stmt.location,
+            end_location: stmt.end_location,
+            applied: false,
+        })
+    }
 }
 
 /// Generate a Fix to remove any unused imports from an `import from` statement.
 pub fn remove_unused_import_froms(
     locator: &mut SourceCodeLocator,
-    full_names: &[String],
+    full_names: &[&str],
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
@@ -301,7 +362,7 @@ pub fn remove_unused_import_froms(
             } else {
                 name.value.to_string()
             };
-            if full_names.contains(&import_name) {
+            if full_names.contains(&import_name.as_str()) {
                 removable.push(index);
             }
         }
