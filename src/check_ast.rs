@@ -1,6 +1,8 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Deref;
 use std::path::Path;
 
+use log::error;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{
@@ -12,11 +14,12 @@ use rustpython_parser::parser;
 use crate::ast::operations::{extract_all_names, SourceCodeLocator};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind,
+    Binding, BindingContext, BindingKind, CheckLocator, FunctionScope, ImportKind, Range, Scope,
+    ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, operations, visitor};
-use crate::autofix::fixer;
+use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
@@ -55,6 +58,8 @@ struct Checker<'a> {
     seen_docstring: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
+    // Edit tracking.
+    deletions: BTreeSet<usize>,
 }
 
 impl<'a> Checker<'a> {
@@ -87,6 +92,7 @@ impl<'a> Checker<'a> {
             seen_docstring: false,
             futures_allowed: true,
             annotations_future_enabled: false,
+            deletions: Default::default(),
         }
     }
 }
@@ -221,7 +227,7 @@ where
                                 Binding {
                                     kind: BindingKind::Assignment,
                                     used: Some((global_scope_id, Range::from_located(stmt))),
-                                    location: Range::from_located(stmt),
+                                    range: Range::from_located(stmt),
                                 },
                             );
                         }
@@ -329,7 +335,7 @@ where
                     Binding {
                         kind: BindingKind::Definition,
                         used: None,
-                        location: Range::from_located(stmt),
+                        range: Range::from_located(stmt),
                     },
                 );
             }
@@ -424,9 +430,10 @@ where
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(
                                     alias.node.name.to_string(),
+                                    self.binding_context(),
                                 ),
                                 used: None,
-                                location: Range::from_located(stmt),
+                                range: Range::from_located(stmt),
                             },
                         )
                     } else {
@@ -447,9 +454,10 @@ where
                                         .asname
                                         .clone()
                                         .unwrap_or_else(|| alias.node.name.clone()),
+                                    self.binding_context(),
                                 ),
                                 used: None,
-                                location: Range::from_located(stmt),
+                                range: Range::from_located(stmt),
                             },
                         )
                     }
@@ -492,7 +500,7 @@ where
                                     .id,
                                     Range::from_located(stmt),
                                 )),
-                                location: Range::from_located(stmt),
+                                range: Range::from_located(stmt),
                             },
                         );
 
@@ -528,7 +536,7 @@ where
                             Binding {
                                 kind: BindingKind::StarImportation,
                                 used: None,
-                                location: Range::from_located(stmt),
+                                range: Range::from_located(stmt),
                             },
                         );
 
@@ -561,12 +569,15 @@ where
                         }
 
                         let binding = Binding {
-                            kind: BindingKind::Importation(match module {
-                                None => name.clone(),
-                                Some(parent) => format!("{}.{}", parent, name),
-                            }),
+                            kind: BindingKind::FromImportation(
+                                match module {
+                                    None => name.clone(),
+                                    Some(parent) => format!("{}.{}", parent, name),
+                                },
+                                self.binding_context(),
+                            ),
                             used: None,
-                            location: Range::from_located(stmt),
+                            range: Range::from_located(stmt),
                         };
                         self.add_binding(name, binding)
                     }
@@ -661,7 +672,7 @@ where
                 Binding {
                     kind: BindingKind::ClassDefinition,
                     used: None,
-                    location: Range::from_located(stmt),
+                    range: Range::from_located(stmt),
                 },
             );
         };
@@ -1106,7 +1117,6 @@ where
                                 ),
                                 parent,
                             );
-                            self.parents.push(parent);
                         }
 
                         let parent =
@@ -1125,7 +1135,6 @@ where
                             ),
                             parent,
                         );
-                        self.parents.push(parent);
 
                         walk_excepthandler(self, excepthandler);
 
@@ -1183,7 +1192,7 @@ where
             Binding {
                 kind: BindingKind::Argument,
                 used: None,
-                location: Range::from_located(arg),
+                range: Range::from_located(arg),
             },
         );
 
@@ -1239,7 +1248,7 @@ impl<'a> Checker<'a> {
                 (*builtin).to_string(),
                 Binding {
                     kind: BindingKind::Builtin,
-                    location: Default::default(),
+                    range: Default::default(),
                     used: None,
                 },
             );
@@ -1249,10 +1258,20 @@ impl<'a> Checker<'a> {
                 (*builtin).to_string(),
                 Binding {
                     kind: BindingKind::Builtin,
-                    location: Default::default(),
+                    range: Default::default(),
                     used: None,
                 },
             );
+        }
+    }
+
+    fn binding_context(&self) -> BindingContext {
+        let mut rev = self.parent_stack.iter().rev().fuse();
+        let defined_by = *rev.next().expect("Expected to bind within a statement.");
+        let defined_in = rev.next().cloned();
+        BindingContext {
+            defined_by,
+            defined_in,
         }
     }
 
@@ -1264,20 +1283,23 @@ impl<'a> Checker<'a> {
             None => binding,
             Some(existing) => {
                 if self.settings.select.contains(&CheckCode::F402)
-                    && matches!(existing.kind, BindingKind::Importation(_))
                     && matches!(binding.kind, BindingKind::LoopVar)
+                    && matches!(
+                        existing.kind,
+                        BindingKind::Importation(_, _) | BindingKind::FromImportation(_, _)
+                    )
                 {
                     self.checks.push(Check::new(
                         CheckKind::ImportShadowedByLoopVar(
                             name.clone(),
-                            existing.location.location.row(),
+                            existing.range.location.row(),
                         ),
-                        binding.location,
+                        binding.range,
                     ));
                 }
                 Binding {
                     kind: binding.kind,
-                    location: binding.location,
+                    range: binding.range,
                     used: existing.used,
                 }
             }
@@ -1378,7 +1400,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::Annotation,
                         used: None,
-                        location: Range::from_located(expr),
+                        range: Range::from_located(expr),
                     },
                 );
                 return;
@@ -1394,7 +1416,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::LoopVar,
                         used: None,
-                        location: Range::from_located(expr),
+                        range: Range::from_located(expr),
                     },
                 );
                 return;
@@ -1406,7 +1428,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::Binding,
                         used: None,
-                        location: Range::from_located(expr),
+                        range: Range::from_located(expr),
                     },
                 );
                 return;
@@ -1426,7 +1448,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::Export(extract_all_names(parent, current)),
                         used: None,
-                        location: Range::from_located(expr),
+                        range: Range::from_located(expr),
                     },
                 );
                 return;
@@ -1437,7 +1459,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::Assignment,
                     used: None,
-                    location: Range::from_located(expr),
+                    range: Range::from_located(expr),
                 },
             );
         }
@@ -1571,7 +1593,7 @@ impl<'a> Checker<'a> {
                             if !scope.values.contains_key(name) {
                                 self.checks.push(Check::new(
                                     CheckKind::UndefinedExport(name.to_string()),
-                                    self.locate_check(all_binding.location),
+                                    self.locate_check(all_binding.range),
                                 ));
                             }
                         }
@@ -1594,7 +1616,7 @@ impl<'a> Checker<'a> {
                             if !scope.values.contains_key(name) {
                                 self.checks.push(Check::new(
                                     CheckKind::ImportStarUsage(name.clone(), from_list.join(", ")),
-                                    self.locate_check(all_binding.location),
+                                    self.locate_check(all_binding.range),
                                 ));
                             }
                         }
@@ -1603,6 +1625,11 @@ impl<'a> Checker<'a> {
             }
 
             if self.settings.select.contains(&CheckCode::F401) {
+                // Collect all unused imports by location. (Multiple unused imports at the same
+                // location indicates an `import from`.)
+                let mut unused: BTreeMap<(ImportKind, usize, Option<usize>), Vec<String>> =
+                    BTreeMap::new();
+
                 for (name, binding) in scope.values.iter().rev() {
                     let used = binding.used.is_some()
                         || all_names
@@ -1611,16 +1638,81 @@ impl<'a> Checker<'a> {
 
                     if !used {
                         match &binding.kind {
-                            BindingKind::Importation(full_name)
-                            | BindingKind::SubmoduleImportation(full_name) => {
-                                self.checks.push(Check::new(
-                                    CheckKind::UnusedImport(full_name.to_string()),
-                                    self.locate_check(binding.location),
-                                ));
+                            BindingKind::FromImportation(full_name, context) => {
+                                let full_names = unused
+                                    .entry((
+                                        ImportKind::ImportFrom,
+                                        context.defined_by,
+                                        context.defined_in,
+                                    ))
+                                    .or_insert(vec![]);
+                                full_names.push(full_name.to_string());
+                            }
+                            BindingKind::Importation(full_name, context)
+                            | BindingKind::SubmoduleImportation(full_name, context) => {
+                                let full_names = unused
+                                    .entry((
+                                        ImportKind::Import,
+                                        context.defined_by,
+                                        context.defined_in,
+                                    ))
+                                    .or_insert(vec![]);
+                                full_names.push(full_name.to_string());
                             }
                             _ => {}
                         }
                     }
+                }
+
+                for ((kind, defined_by, defined_in), full_names) in unused {
+                    let child = self.parents[defined_by];
+                    let parent = defined_in.map(|defined_in| self.parents[defined_in]);
+
+                    let mut check = Check::new(
+                        CheckKind::UnusedImport(full_names.join(", ")),
+                        self.locate_check(Range::from_located(child)),
+                    );
+
+                    if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                        let deleted: Vec<&Stmt> = self
+                            .deletions
+                            .iter()
+                            .map(|index| self.parents[*index])
+                            .collect();
+
+                        match kind {
+                            ImportKind::Import => {
+                                match fixes::remove_unused_imports(child, parent, &deleted) {
+                                    Ok(fix) => {
+                                        if fix.content.is_empty() || fix.content == "pass" {
+                                            self.deletions.insert(defined_by);
+                                        }
+                                        check.amend(fix)
+                                    }
+                                    Err(e) => error!("Failed to fix unused imports: {}", e),
+                                }
+                            }
+                            ImportKind::ImportFrom => {
+                                match fixes::remove_unused_import_froms(
+                                    &mut self.locator,
+                                    &full_names,
+                                    child,
+                                    parent,
+                                    &deleted,
+                                ) {
+                                    Ok(fix) => {
+                                        if fix.content.is_empty() || fix.content == "pass" {
+                                            self.deletions.insert(defined_by);
+                                        }
+                                        check.amend(fix)
+                                    }
+                                    Err(e) => error!("Failed to fix unused imports: {}", e),
+                                }
+                            }
+                        }
+                    }
+
+                    self.checks.push(check);
                 }
             }
         }
@@ -1666,12 +1758,12 @@ impl<'a> Checker<'a> {
 
 pub fn check_ast(
     python_ast: &Suite,
-    content: &str,
+    contents: &str,
     settings: &Settings,
     autofix: &fixer::Mode,
     path: &Path,
 ) -> Vec<Check> {
-    let mut checker = Checker::new(settings, autofix, path, content);
+    let mut checker = Checker::new(settings, autofix, path, contents);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 

@@ -8,7 +8,7 @@ fn id() -> usize {
     COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Range {
     pub location: Location,
     pub end_location: Location,
@@ -56,6 +56,12 @@ impl Scope {
 }
 
 #[derive(Clone, Debug)]
+pub struct BindingContext {
+    pub defined_by: usize,
+    pub defined_in: Option<usize>,
+}
+
+#[derive(Clone, Debug)]
 pub enum BindingKind {
     Annotation,
     Argument,
@@ -67,15 +73,16 @@ pub enum BindingKind {
     Definition,
     Export(Vec<String>),
     FutureImportation,
-    Importation(String),
     StarImportation,
-    SubmoduleImportation(String),
+    Importation(String, BindingContext),
+    FromImportation(String, BindingContext),
+    SubmoduleImportation(String, BindingContext),
 }
 
 #[derive(Clone, Debug)]
 pub struct Binding {
     pub kind: BindingKind,
-    pub location: Range,
+    pub range: Range,
     /// Tuple of (scope index, range) indicating the scope and range at which the binding was
     /// last used.
     pub used: Option<(usize, Range)>,
@@ -83,4 +90,10 @@ pub struct Binding {
 
 pub trait CheckLocator {
     fn locate_check(&self, default: Range) -> Range;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ImportKind {
+    Import,
+    ImportFrom,
 }

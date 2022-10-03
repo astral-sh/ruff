@@ -10,7 +10,15 @@ expression: checks
   end_location:
     row: 3
     column: 17
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 3
+      column: 1
+    end_location:
+      row: 4
+      column: 1
+    applied: false
 - kind:
     UnusedImport: collections.OrderedDict
   location:
@@ -19,7 +27,15 @@ expression: checks
   end_location:
     row: 9
     column: 2
-  fix: ~
+  fix:
+    content: "from collections import (\n    Counter,\n    namedtuple,\n)"
+    location:
+      row: 5
+      column: 1
+    end_location:
+      row: 9
+      column: 2
+    applied: false
 - kind:
     UnusedImport: logging.handlers
   location:
@@ -28,5 +44,81 @@ expression: checks
   end_location:
     row: 13
     column: 24
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 13
+      column: 1
+    end_location:
+      row: 14
+      column: 1
+    applied: false
+- kind:
+    UnusedImport: shelve
+  location:
+    row: 34
+    column: 5
+  end_location:
+    row: 34
+    column: 18
+  fix:
+    content: ""
+    location:
+      row: 34
+      column: 1
+    end_location:
+      row: 35
+      column: 1
+    applied: false
+- kind:
+    UnusedImport: importlib
+  location:
+    row: 35
+    column: 5
+  end_location:
+    row: 35
+    column: 21
+  fix:
+    content: pass
+    location:
+      row: 35
+      column: 5
+    end_location:
+      row: 35
+      column: 21
+    applied: false
+- kind:
+    UnusedImport: pathlib
+  location:
+    row: 39
+    column: 5
+  end_location:
+    row: 39
+    column: 19
+  fix:
+    content: ""
+    location:
+      row: 39
+      column: 1
+    end_location:
+      row: 40
+      column: 1
+    applied: false
+- kind:
+    UnusedImport: pickle
+  location:
+    row: 54
+    column: 9
+  end_location:
+    row: 54
+    column: 22
+  fix:
+    content: pass
+    location:
+      row: 54
+      column: 9
+    end_location:
+      row: 54
+      column: 22
+    applied: false
 

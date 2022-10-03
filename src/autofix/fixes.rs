@@ -1,9 +1,14 @@
+use anyhow::Result;
+use itertools::Itertools;
+use libcst_native::ImportNames::Aliases;
+use libcst_native::NameOrAttribute::N;
 use libcst_native::{Codegen, Expression, SmallStatement, Statement};
-use rustpython_parser::ast::{Expr, Keyword, Location};
+use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, StmtKind};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
 use crate::ast::operations::SourceCodeLocator;
+use crate::ast::types::Range;
 use crate::checks::Fix;
 
 /// Convert a location within a file (relative to `base`) to an absolute position.
@@ -127,7 +132,8 @@ pub fn remove_class_def_base(
 }
 
 pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> Option<Fix> {
-    let contents = locator.slice_source_code_range(&expr.location, &expr.end_location);
+    let range = Range::from_located(expr);
+    let contents = locator.slice_source_code_range(&range);
 
     let mut tree = match libcst_native::parse_module(contents, None) {
         Ok(m) => m,
@@ -146,8 +152,8 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
 
                 return Some(Fix {
                     content: state.to_string(),
-                    location: expr.location,
-                    end_location: expr.end_location,
+                    location: range.location,
+                    end_location: range.end_location,
                     applied: false,
                 });
             }
@@ -155,4 +161,171 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
     }
 
     None
+}
+
+/// Determine if a body contains only a single statement, taking into account deleted.
+fn has_single_child(body: &[Stmt], deleted: &[&Stmt]) -> bool {
+    body.iter().filter(|child| !deleted.contains(child)).count() == 1
+}
+
+/// Determine if a child is the only statement in its body.
+fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool> {
+    match &parent.node {
+        StmtKind::FunctionDef { body, .. }
+        | StmtKind::AsyncFunctionDef { body, .. }
+        | StmtKind::ClassDef { body, .. }
+        | StmtKind::With { body, .. }
+        | StmtKind::AsyncWith { body, .. } => {
+            if body.iter().contains(child) {
+                Ok(has_single_child(body, deleted))
+            } else {
+                Err(anyhow::anyhow!("Unable to find child in parent body."))
+            }
+        }
+        StmtKind::For { body, orelse, .. }
+        | StmtKind::AsyncFor { body, orelse, .. }
+        | StmtKind::While { body, orelse, .. }
+        | StmtKind::If { body, orelse, .. } => {
+            if body.iter().contains(child) {
+                Ok(has_single_child(body, deleted))
+            } else if orelse.iter().contains(child) {
+                Ok(has_single_child(orelse, deleted))
+            } else {
+                Err(anyhow::anyhow!("Unable to find child in parent body."))
+            }
+        }
+        StmtKind::Try {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+        } => {
+            if body.iter().contains(child) {
+                Ok(has_single_child(body, deleted))
+            } else if orelse.iter().contains(child) {
+                Ok(has_single_child(orelse, deleted))
+            } else if finalbody.iter().contains(child) {
+                Ok(has_single_child(finalbody, deleted))
+            } else if let Some(body) = handlers.iter().find_map(|handler| match &handler.node {
+                ExcepthandlerKind::ExceptHandler { body, .. } => {
+                    if body.iter().contains(child) {
+                        Some(body)
+                    } else {
+                        None
+                    }
+                }
+            }) {
+                Ok(has_single_child(body, deleted))
+            } else {
+                Err(anyhow::anyhow!("Unable to find child in parent body."))
+            }
+        }
+        _ => Err(anyhow::anyhow!("Unable to find child in parent body.")),
+    }
+}
+
+fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Result<Fix> {
+    if parent
+        .map(|parent| is_lone_child(stmt, parent, deleted))
+        .map_or(Ok(None), |v| v.map(Some))?
+        .unwrap_or_default()
+    {
+        // If removing this node would lead to an invalid syntax tree, replace
+        // it with a `pass`.
+        Ok(Fix {
+            location: stmt.location,
+            end_location: stmt.end_location,
+            content: "pass".to_string(),
+            applied: false,
+        })
+    } else {
+        // Otherwise, nuke the entire line.
+        // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
+        Ok(Fix {
+            location: Location::new(stmt.location.row(), 1),
+            end_location: Location::new(stmt.end_location.row() + 1, 1),
+            content: "".to_string(),
+            applied: false,
+        })
+    }
+}
+
+/// Generate a Fix to remove any unused imports from an `import` statement.
+pub fn remove_unused_imports(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Result<Fix> {
+    remove_stmt(stmt, parent, deleted)
+}
+
+/// Generate a Fix to remove any unused imports from an `import from` statement.
+pub fn remove_unused_import_froms(
+    locator: &mut SourceCodeLocator,
+    full_names: &[String],
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
+    deleted: &[&Stmt],
+) -> Result<Fix> {
+    let mut tree = match libcst_native::parse_module(
+        locator.slice_source_code_range(&Range::from_located(stmt)),
+        None,
+    ) {
+        Ok(m) => m,
+        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
+    };
+
+    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
+    };
+    let body = if let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!(
+            "Expected node to be: SmallStatement::ImportFrom."
+        ));
+    };
+    let aliases = if let Aliases(aliases) = &mut body.names {
+        aliases
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Aliases."));
+    };
+
+    // Preserve the trailing comma (or not) from the last entry.
+    let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
+
+    // Identify unused imports from within the `import from`.
+    let mut removable = vec![];
+    for (index, alias) in aliases.iter().enumerate() {
+        if let N(name) = &alias.name {
+            let import_name = if let Some(N(module_name)) = &body.module {
+                format!("{}.{}", module_name.value, name.value)
+            } else {
+                name.value.to_string()
+            };
+            if full_names.contains(&import_name) {
+                removable.push(index);
+            }
+        }
+    }
+    // TODO(charlie): This is quadratic.
+    for index in removable.iter().rev() {
+        aliases.remove(*index);
+    }
+
+    if let Some(alias) = aliases.last_mut() {
+        alias.comma = trailing_comma;
+    }
+
+    if aliases.is_empty() {
+        remove_stmt(stmt, parent, deleted)
+    } else {
+        let mut state = Default::default();
+        tree.codegen(&mut state);
+
+        Ok(Fix {
+            content: state.to_string(),
+            location: stmt.location,
+            end_location: stmt.end_location,
+            applied: false,
+        })
+    }
 }

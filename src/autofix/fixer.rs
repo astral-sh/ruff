@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use itertools::Itertools;
 use rustpython_parser::ast::Location;
 
 use crate::checks::{Check, Fix};
@@ -43,7 +44,7 @@ fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> 
     let mut output = "".to_string();
     let mut last_pos: Location = Location::new(0, 0);
 
-    for fix in fixes {
+    for fix in fixes.sorted_by_key(|fix| fix.location) {
         // Best-effort approach: if this fix overlaps with a fix we've already applied, skip it.
         if last_pos > fix.location {
             continue;
@@ -71,13 +72,18 @@ fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> 
         fix.applied = true;
     }
 
-    if last_pos.row() > 0 || last_pos.column() > 0 {
+    if last_pos.row() > 0
+        && (last_pos.row() - 1) < lines.len()
+        && (last_pos.row() > 0 || last_pos.column() > 0)
+    {
         output.push_str(&lines[last_pos.row() - 1][last_pos.column() - 1..]);
         output.push('\n');
     }
-    for line in &lines[last_pos.row()..] {
-        output.push_str(line);
-        output.push('\n');
+    if last_pos.row() < lines.len() {
+        for line in &lines[last_pos.row()..] {
+            output.push_str(line);
+            output.push('\n');
+        }
     }
 
     output
