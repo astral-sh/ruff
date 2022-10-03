@@ -201,18 +201,24 @@ stylistic lint rules that are obviated by autoformatting.
 
 ### Parity with Flake8
 
-ruff's goal is to achieve feature-parity with Flake8 when used (1) without plugins, (2) alongside
+ruff's goal is to achieve feature parity with Flake8 when used (1) without plugins, (2) alongside
 Black, and (3) on Python 3 code.
 
 **Under those conditions, ruff implements 44 out of 60 rules.** (ruff is missing: 14 rules related
 to string `.format` calls, 1 rule related to docstring parsing, and 1 rule related to redefined
 variables.)
 
+ruff also implements some of the most popular Flake8 plugins natively, including:
+
+- [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
+- [`flake8-super`](https://pypi.org/project/flake8-super/)
+- [`flake8-print`](https://pypi.org/project/flake8-print/)
+
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
-1. Flake8 has a plugin architecture and supports writing custom lint rules.
-2. ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
+1. ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
    pattern matching and parenthesized context managers.
+2. Flake8 has a plugin architecture and supports writing custom lint rules.
 
 ## Rules
 
