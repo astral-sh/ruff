@@ -1595,16 +1595,15 @@ impl<'a> Checker<'a> {
         let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
 
         // flake8-builtins
-        if is_attribute
-            && matches!(scope.kind, ScopeKind::Class)
-            && self.settings.select.contains(&CheckCode::A003)
-        {
-            if let Some(check) = checks::check_builtin_shadowing(
-                name,
-                self.locate_check(location),
-                checks::ShadowingType::Attribute,
-            ) {
-                self.checks.push(check);
+        if is_attribute && matches!(scope.kind, ScopeKind::Class) {
+            if self.settings.select.contains(&CheckCode::A003) {
+                if let Some(check) = checks::check_builtin_shadowing(
+                    name,
+                    self.locate_check(location),
+                    checks::ShadowingType::Attribute,
+                ) {
+                    self.checks.push(check);
+                }
             }
         } else if self.settings.select.contains(&CheckCode::A001) {
             if let Some(check) = checks::check_builtin_shadowing(
