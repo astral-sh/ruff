@@ -222,59 +222,63 @@ Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis F
 
 ## Rules
 
-| Code | Name | Message |
-| ---- | ----- | ------- |
-| E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |
-| E501 | LineTooLong | Line too long (89 > 88 characters) |
-| E711 | NoneComparison | Comparison to `None` should be `cond is None` |
-| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |
-| E713 | NotInTest | Test for membership should be `not in` |
-| E714 | NotIsTest | Test for object identity should be `is not` |
-| E721 | TypeComparison | do not compare types, use `isinstance()` |
-| E722 | DoNotUseBareExcept | Do not use bare `except` |
-| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |
-| E741 | AmbiguousVariableName | ambiguous variable name '...' |
-| E742 | AmbiguousClassName | ambiguous class name '...' |
-| E743 | AmbiguousFunctionName | ambiguous function name '...' |
-| E902 | IOError | ... |
-| E999 | SyntaxError | SyntaxError: ... |
-| F401 | UnusedImport | `...` imported but unused |
-| F402 | ImportShadowedByLoopVar | import '...' from line 1 shadowed by loop variable |
-| F403 | ImportStarUsed | `from ... import *` used; unable to detect undefined names |
-| F404 | LateFutureImport | from __future__ imports must occur at the beginning of the file |
-| F405 | ImportStarUsage | '...' may be undefined, or defined from star imports: ... |
-| F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |
-| F407 | FutureFeatureNotDefined | future feature '...' is not defined |
-| F541 | FStringMissingPlaceholders | f-string without any placeholders |
-| F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |
-| F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |
-| F621 | TooManyExpressionsInStarredAssignment | too many expressions in star-unpacking assignment |
-| F622 | TwoStarredExpressions | two starred expressions in assignment |
-| F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |
-| F632 | IsLiteral | use ==/!= to compare constant literals |
-| F633 | InvalidPrintSyntax | use of >> is invalid with print function |
-| F634 | IfTuple | If test is a tuple, which is always `True` |
-| F701 | BreakOutsideLoop | `break` outside loop |
-| F702 | ContinueOutsideLoop | `continue` not properly in loop |
-| F704 | YieldOutsideFunction | a `yield` or `yield from` statement outside of a function/method |
-| F706 | ReturnOutsideFunction | a `return` statement outside of a function/method |
-| F707 | DefaultExceptNotLast | an `except:` block as not the last exception handler |
-| F722 | ForwardAnnotationSyntaxError | syntax error in forward annotation '...' |
-| F821 | UndefinedName | Undefined name `...` |
-| F822 | UndefinedExport | Undefined name `...` in `__all__` |
-| F823 | UndefinedLocal | Local variable `...` referenced before assignment |
-| F831 | DuplicateArgumentName | Duplicate argument name in function definition |
-| F841 | UnusedVariable | Local variable `...` is assigned to but never used |
-| F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` |
-| A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |
-| A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |
-| A003 | BuiltinAttributeShadowing | class attribute `...` is shadowing a python builtin |
-| SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |
-| T201 | PrintFound | `print` found |
-| T203 | PPrintFound | `pprint` found` |
-| R001 | UselessObjectInheritance | Class `...` inherits from object |
-| R002 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |
-| M001 | UnusedNOQA | Unused `noqa` directive |
+The ✅ emoji indicates a rule is enabled by default.
+
+The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` command-line option.
+
+| Code | Name | Message |     |     |
+| ---- | ---- | ------- | --- | --- |
+| E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file | ✅ |  |
+| E501 | LineTooLong | Line too long (89 > 88 characters) | ✅ |  |
+| E711 | NoneComparison | Comparison to `None` should be `cond is None` | ✅ |  |
+| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` | ✅ |  |
+| E713 | NotInTest | Test for membership should be `not in` | ✅ |  |
+| E714 | NotIsTest | Test for object identity should be `is not` | ✅ |  |
+| E721 | TypeComparison | Do not compare types, use `isinstance()` | ✅ |  |
+| E722 | DoNotUseBareExcept | Do not use bare `except` | ✅ |  |
+| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def | ✅ |  |
+| E741 | AmbiguousVariableName | Ambiguous variable name: `...` | ✅ |  |
+| E742 | AmbiguousClassName | Ambiguous class name: `...` | ✅ |  |
+| E743 | AmbiguousFunctionName | Ambiguous function name: `...` | ✅ |  |
+| E902 | IOError | IOError: `...` | ✅ |  |
+| E999 | SyntaxError | SyntaxError: `...` | ✅ |  |
+| F401 | UnusedImport | `...` imported but unused | ✅ | 🛠 |
+| F402 | ImportShadowedByLoopVar | Import `...` from line 1 shadowed by loop variable | ✅ |  |
+| F403 | ImportStarUsed | `from ... import *` used; unable to detect undefined names | ✅ |  |
+| F404 | LateFutureImport | `from __future__` imports must occur at the beginning of the file | ✅ |  |
+| F405 | ImportStarUsage | `...` may be undefined, or defined from star imports: `...` | ✅ |  |
+| F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level | ✅ |  |
+| F407 | FutureFeatureNotDefined | Future feature `...` is not defined | ✅ |  |
+| F541 | FStringMissingPlaceholders | f-string without any placeholders | ✅ |  |
+| F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated | ✅ |  |
+| F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated | ✅ |  |
+| F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment | ✅ |  |
+| F622 | TwoStarredExpressions | Two starred expressions in assignment | ✅ |  |
+| F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` | ✅ |  |
+| F632 | IsLiteral | Use `==` and `!=` to compare constant literals | ✅ |  |
+| F633 | InvalidPrintSyntax | Use of `>>` is invalid with `print` function | ✅ |  |
+| F634 | IfTuple | If test is a tuple, which is always `True` | ✅ |  |
+| F701 | BreakOutsideLoop | `break` outside loop | ✅ |  |
+| F702 | ContinueOutsideLoop | `continue` not properly in loop | ✅ |  |
+| F704 | YieldOutsideFunction | `yield` or `yield from` statement outside of a function/method | ✅ |  |
+| F706 | ReturnOutsideFunction | `return` statement outside of a function/method | ✅ |  |
+| F707 | DefaultExceptNotLast | An `except:` block as not the last exception handler | ✅ |  |
+| F722 | ForwardAnnotationSyntaxError | Syntax error in forward annotation: `...` | ✅ |  |
+| F821 | UndefinedName | Undefined name `...` | ✅ |  |
+| F822 | UndefinedExport | Undefined name `...` in `__all__` | ✅ |  |
+| F823 | UndefinedLocal | Local variable `...` referenced before assignment | ✅ |  |
+| F831 | DuplicateArgumentName | Duplicate argument name in function definition | ✅ |  |
+| F841 | UnusedVariable | Local variable `...` is assigned to but never used | ✅ |  |
+| F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | ✅ |  |
+| A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |  |  |
+| A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |  |
+| A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |  |
+| SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
+| T201 | PrintFound | `print` found |  | 🛠 |
+| T203 | PPrintFound | `pprint` found |  | 🛠 |
+| R001 | UselessObjectInheritance | Class `...` inherits from object |  | 🛠 |
+| R002 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
+| M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations
 

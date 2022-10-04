@@ -576,10 +576,7 @@ pub fn check_starred_expressions(
     if check_too_many_expressions {
         if let Some(starred_index) = starred_index {
             if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
-                return Some(Check::new(
-                    CheckKind::TooManyExpressionsInStarredAssignment,
-                    location,
-                ));
+                return Some(Check::new(CheckKind::ExpressionsInStarAssignment, location));
             }
         }
     }

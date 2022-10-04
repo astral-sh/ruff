@@ -5,7 +5,7 @@ expression: checks
 - kind:
     ImportStarUsage:
       - name
-      - mymodule
+      - - mymodule
   location:
     row: 5
     column: 11
@@ -16,7 +16,7 @@ expression: checks
 - kind:
     ImportStarUsage:
       - a
-      - mymodule
+      - - mymodule
   location:
     row: 11
     column: 1

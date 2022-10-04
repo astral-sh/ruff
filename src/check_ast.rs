@@ -1380,14 +1380,14 @@ impl<'a> Checker<'a> {
                         let scope = &self.scopes[*scope_index];
                         for (name, binding) in scope.values.iter() {
                             if matches!(binding.kind, BindingKind::StarImportation) {
-                                from_list.push(name.as_str());
+                                from_list.push(name.to_string());
                             }
                         }
                     }
                     from_list.sort();
 
                     self.checks.push(Check::new(
-                        CheckKind::ImportStarUsage(id.clone(), from_list.join(", ")),
+                        CheckKind::ImportStarUsage(id.clone(), from_list),
                         self.locate_check(Range::from_located(expr)),
                     ));
                 }
@@ -1645,7 +1645,7 @@ impl<'a> Checker<'a> {
                         let mut from_list = vec![];
                         for (name, binding) in scope.values.iter() {
                             if matches!(binding.kind, BindingKind::StarImportation) {
-                                from_list.push(name.as_str());
+                                from_list.push(name.to_string());
                             }
                         }
                         from_list.sort();
@@ -1653,7 +1653,7 @@ impl<'a> Checker<'a> {
                         for name in names {
                             if !scope.values.contains_key(name) {
                                 self.checks.push(Check::new(
-                                    CheckKind::ImportStarUsage(name.clone(), from_list.join(", ")),
+                                    CheckKind::ImportStarUsage(name.clone(), from_list.clone()),
                                     self.locate_check(all_binding.range),
                                 ));
                             }
