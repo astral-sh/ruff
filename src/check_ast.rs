@@ -19,7 +19,6 @@ use crate::ast::types::{
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, operations, visitor};
-use crate::autofix::fixes::remove_stmt;
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -622,12 +621,43 @@ where
                     }
                 }
             }
-            StmtKind::Assign { value, .. } => {
+            StmtKind::Assign { targets, value, .. } => {
                 if self.settings.select.contains(&CheckCode::E731) {
                     if let Some(check) = checks::check_do_not_assign_lambda(
                         value,
                         self.locate_check(Range::from_located(stmt)),
                     ) {
+                        self.checks.push(check);
+                    }
+                }
+                if self.settings.select.contains(&CheckCode::U001) {
+                    if let Some(mut check) = checks::check_useless_metaclass_type(
+                        targets,
+                        value,
+                        self.locate_check(Range::from_located(stmt)),
+                    ) {
+                        if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            let context = self.binding_context();
+                            let deleted: Vec<&Stmt> = self
+                                .deletions
+                                .iter()
+                                .map(|index| self.parents[*index])
+                                .collect();
+
+                            match fixes::remove_stmt(
+                                self.parents[context.defined_by],
+                                context.defined_in.map(|index| self.parents[index]),
+                                &deleted,
+                            ) {
+                                Ok(fix) => {
+                                    if fix.content.is_empty() || fix.content == "pass" {
+                                        self.deletions.insert(context.defined_by);
+                                    }
+                                    check.amend(fix)
+                                }
+                                Err(e) => error!("Failed to fix unused imports: {}", e),
+                            }
+                        }
                         self.checks.push(check);
                     }
                 }
@@ -797,7 +827,7 @@ where
                                     .map(|index| self.parents[*index])
                                     .collect();
 
-                                match remove_stmt(
+                                match fixes::remove_stmt(
                                     self.parents[context.defined_by],
                                     context.defined_in.map(|index| self.parents[index]),
                                     &deleted,

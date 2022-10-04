@@ -116,6 +116,26 @@ pub fn check_do_not_assign_lambda(value: &Expr, location: Range) -> Option<Check
     }
 }
 
+/// Check UselessMetaclassType compliance.
+pub fn check_useless_metaclass_type(
+    targets: &Vec<Expr>,
+    value: &Expr,
+    location: Range,
+) -> Option<Check> {
+    if targets.len() == 1 {
+        if let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() {
+            if id == "__metaclass__" {
+                if let ExprKind::Name { id, .. } = &value.node {
+                    if id == "type" {
+                        return Some(Check::new(CheckKind::UselessMetaclassType, location));
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }

@@ -803,4 +803,16 @@ mod tests {
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
+
+    #[test]
+    fn u001() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/U001.py"),
+            &settings::Settings::for_rule(CheckCode::U001),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
 }
