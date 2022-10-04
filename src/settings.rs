@@ -170,6 +170,7 @@ impl Settings {
             pyproject,
             project_root,
         };
+        settings.select(config.extend_select);
         settings.ignore(&config.ignore);
         Ok(settings)
     }
