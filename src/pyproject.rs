@@ -33,6 +33,8 @@ pub struct Config {
     pub extend_exclude: Vec<String>,
     pub select: Option<Vec<CheckCode>>,
     #[serde(default)]
+    pub extend_select: Vec<CheckCode>,
+    #[serde(default)]
     pub ignore: Vec<CheckCode>,
     #[serde(default)]
     pub per_file_ignores: Vec<StrCheckCodePair>,
@@ -180,6 +182,7 @@ mod tests {
                     exclude: None,
                     extend_exclude: vec![],
                     select: None,
+                    extend_select: vec![],
                     ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
@@ -202,6 +205,7 @@ line-length = 79
                     exclude: None,
                     extend_exclude: vec![],
                     select: None,
+                    extend_select: vec![],
                     ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
@@ -224,6 +228,7 @@ exclude = ["foo.py"]
                     exclude: Some(vec!["foo.py".to_string()]),
                     extend_exclude: vec![],
                     select: None,
+                    extend_select: vec![],
                     ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
@@ -246,6 +251,7 @@ select = ["E501"]
                     exclude: None,
                     extend_exclude: vec![],
                     select: Some(vec![CheckCode::E501]),
+                    extend_select: vec![],
                     ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
@@ -257,6 +263,7 @@ select = ["E501"]
             r#"
 [tool.black]
 [tool.ruff]
+extend-select = ["M001"]
 ignore = ["E501"]
 "#,
         )?;
@@ -268,6 +275,7 @@ ignore = ["E501"]
                     exclude: None,
                     extend_exclude: vec![],
                     select: None,
+                    extend_select: vec![CheckCode::M001],
                     ignore: vec![CheckCode::E501],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
@@ -334,6 +342,7 @@ other-attribute = 1
                     "directory/also_excluded.py".to_string(),
                 ],
                 select: None,
+                extend_select: vec![],
                 ignore: vec![],
                 per_file_ignores: vec![],
                 dummy_variable_rgx: None,
