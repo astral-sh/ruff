@@ -1,3 +1,4 @@
+use std::fs::write;
 use std::path::Path;
 
 use anyhow::Result;
@@ -11,6 +12,7 @@ use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
+use crate::code_gen::SourceGenerator;
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::settings::Settings;
@@ -149,6 +151,22 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     )?;
 
     add_noqa(&checks, &contents, &noqa_line_for, path)
+}
+
+pub fn autoformat_path(path: &Path) -> Result<()> {
+    // Read the file from disk.
+    let contents = fs::read_file(path)?;
+
+    // Tokenize once.
+    let tokens: Vec<LexResult> = tokenize(&contents);
+
+    // Generate the AST.
+    let python_ast = parser::parse_program_tokens(tokens, "<filename>")?;
+    let mut generator: SourceGenerator = Default::default();
+    generator.unparse_suite(&python_ast)?;
+    write(path, generator.generate()?)?;
+
+    Ok(())
 }
 
 #[cfg(test)]

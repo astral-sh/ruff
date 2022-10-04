@@ -26,6 +26,7 @@ use ::ruff::pyproject::{self, StrCheckCodePair};
 use ::ruff::settings::CurrentSettings;
 use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ::ruff::tell_user;
+use ruff::linter::autoformat_path;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -87,6 +88,9 @@ struct Cli {
     /// Enable automatic additions of noqa directives to failing lines.
     #[arg(long)]
     add_noqa: bool,
+    /// Enable automatic formatting.
+    #[arg(long)]
+    autoformat: bool,
     /// Regular expression matching the name of dummy variables.
     #[arg(long)]
     dummy_variable_rgx: Option<Regex>,
@@ -222,6 +226,33 @@ fn add_noqa(files: &[PathBuf], settings: &Settings) -> Result<usize> {
     Ok(modifications)
 }
 
+fn autoformat(files: &[PathBuf], settings: &Settings) -> Result<usize> {
+    // Collect all the files to format.
+    let start = Instant::now();
+    let paths: Vec<DirEntry> = files
+        .iter()
+        .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
+        .flatten()
+        .collect();
+    let duration = start.elapsed();
+    debug!("Identified files to lint in: {:?}", duration);
+
+    let start = Instant::now();
+    let modifications = paths
+        .par_iter()
+        .map(|entry| {
+            let path = entry.path();
+            autoformat_path(path)
+        })
+        .flatten()
+        .count();
+
+    let duration = start.elapsed();
+    debug!("Auto-formatted files in: {:?}", duration);
+
+    Ok(modifications)
+}
+
 fn inner_main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
@@ -308,6 +339,10 @@ fn inner_main() -> Result<ExitCode> {
             eprintln!("Warning: --no-qa is not enabled in watch mode.");
         }
 
+        if cli.autoformat {
+            eprintln!("Warning: --autoformat is not enabled in watch mode.");
+        }
+
         if cli.format != SerializationFormat::Text {
             eprintln!("Warning: --format 'text' is used in watch mode.");
         }
@@ -350,6 +385,11 @@ fn inner_main() -> Result<ExitCode> {
         let modifications = add_noqa(&cli.files, &settings)?;
         if modifications > 0 {
             println!("Added {modifications} noqa directives.");
+        }
+    } else if cli.autoformat {
+        let modifications = autoformat(&cli.files, &settings)?;
+        if modifications > 0 {
+            println!("Formatted {modifications} files.");
         }
     } else {
         let messages = run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?;
