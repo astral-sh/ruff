@@ -21,6 +21,7 @@ pub mod linter;
 pub mod logging;
 pub mod message;
 mod noqa;
+mod plugins;
 pub mod printer;
 pub mod pyproject;
 mod python;

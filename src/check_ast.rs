@@ -21,6 +21,7 @@ use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checks, operations, visitor};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
+use crate::plugins;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
@@ -30,18 +31,22 @@ pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
 static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
-struct Checker<'a> {
+pub struct Checker<'a> {
     // Input data.
-    locator: SourceCodeLocator<'a>,
-    settings: &'a Settings,
-    autofix: &'a fixer::Mode,
     path: &'a Path,
+    // TODO(charlie): Separate immutable from mutable state. (None of these should ever change.)
+    pub(crate) locator: SourceCodeLocator<'a>,
+    pub(crate) settings: &'a Settings,
+    pub(crate) autofix: &'a fixer::Mode,
     // Computed checks.
     checks: Vec<Check>,
+    // Edit tracking.
+    // TODO(charlie): Instead of exposing deletions, wrap in a public API.
+    pub(crate) deletions: BTreeSet<usize>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
     // at various points in time.
-    parents: Vec<&'a Stmt>,
-    parent_stack: Vec<usize>,
+    pub(crate) parents: Vec<&'a Stmt>,
+    pub(crate) parent_stack: Vec<usize>,
     scopes: Vec<Scope>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
@@ -50,7 +55,7 @@ struct Checker<'a> {
     deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>)>,
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_assignments: Vec<usize>,
-    // Derivative state.
+    // Internal, derivative state.
     in_f_string: Option<Range>,
     in_annotation: bool,
     in_literal: bool,
@@ -58,8 +63,6 @@ struct Checker<'a> {
     seen_docstring: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
-    // Edit tracking.
-    deletions: BTreeSet<usize>,
 }
 
 impl<'a> Checker<'a> {
@@ -366,19 +369,7 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::R001) {
-                    let scope =
-                        &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-                    if let Some(check) = checks::check_useless_object_inheritance(
-                        stmt,
-                        name,
-                        bases,
-                        keywords,
-                        scope,
-                        &mut self.locator,
-                        self.autofix,
-                    ) {
-                        self.checks.push(check);
-                    }
+                    plugins::useless_object_inheritance(self, stmt, name, bases, keywords);
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E742) {
@@ -597,25 +588,12 @@ where
             }
             StmtKind::If { test, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F634) {
-                    if let Some(check) =
-                        checks::check_if_tuple(test, self.locate_check(Range::from_located(stmt)))
-                    {
-                        self.checks.push(check);
-                    }
+                    plugins::if_tuple(self, stmt, test);
                 }
             }
             StmtKind::Assert { test, .. } => {
-                if self
-                    .settings
-                    .enabled
-                    .contains(CheckKind::AssertTuple.code())
-                {
-                    if let Some(check) = checks::check_assert_tuple(
-                        test,
-                        self.locate_check(Range::from_located(stmt)),
-                    ) {
-                        self.checks.push(check);
-                    }
+                if self.settings.enabled.contains(&CheckCode::F631) {
+                    plugins::assert_tuple(self, stmt, test);
                 }
             }
             StmtKind::Try { handlers, .. } => {
@@ -635,35 +613,7 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::U001) {
-                    if let Some(mut check) = checks::check_useless_metaclass_type(
-                        targets,
-                        value,
-                        self.locate_check(Range::from_located(stmt)),
-                    ) {
-                        if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                            let context = self.binding_context();
-                            let deleted: Vec<&Stmt> = self
-                                .deletions
-                                .iter()
-                                .map(|index| self.parents[*index])
-                                .collect();
-
-                            match fixes::remove_stmt(
-                                self.parents[context.defined_by],
-                                context.defined_in.map(|index| self.parents[index]),
-                                &deleted,
-                            ) {
-                                Ok(fix) => {
-                                    if fix.content.is_empty() || fix.content == "pass" {
-                                        self.deletions.insert(context.defined_by);
-                                    }
-                                    check.amend(fix)
-                                }
-                                Err(e) => error!("Failed to fix unused imports: {}", e),
-                            }
-                        }
-                        self.checks.push(check);
-                    }
+                    plugins::useless_metaclass_type(self, stmt, value, targets);
                 }
             }
             StmtKind::AnnAssign { value, .. } => {
@@ -782,73 +732,19 @@ where
             },
             ExprKind::Call { func, args, .. } => {
                 if self.settings.enabled.contains(&CheckCode::R002) {
-                    if let Some(check) = checks::check_assert_equals(func, self.autofix) {
-                        self.checks.push(check)
-                    }
+                    plugins::assert_equals(self, func);
                 }
 
                 // flake8-super
                 if self.settings.enabled.contains(&CheckCode::SPR001) {
-                    // Only bother going through the super check at all if we're in a `super` call.
-                    // (We check this in `check_super_args` too, so this is just an optimization.)
-                    if checks::is_super_call_with_arguments(func, args) {
-                        let scope = &mut self.scopes
-                            [*(self.scope_stack.last().expect("No current scope found."))];
-                        let parents: Vec<&Stmt> = self
-                            .parent_stack
-                            .iter()
-                            .map(|index| self.parents[*index])
-                            .collect();
-                        if let Some(mut check) =
-                            checks::check_super_args(scope, &parents, expr, func, args)
-                        {
-                            if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                                if let Some(fix) =
-                                    fixes::remove_super_arguments(&mut self.locator, expr)
-                                {
-                                    check.amend(fix);
-                                }
-                            }
-                            self.checks.push(check)
-                        }
-                    }
+                    plugins::super_call_with_parameters(self, expr, func, args);
                 }
 
                 // flake8-print
                 if self.settings.enabled.contains(&CheckCode::T201)
                     || self.settings.enabled.contains(&CheckCode::T203)
                 {
-                    if let Some(mut check) = checks::check_print_call(expr, func) {
-                        if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                            let context = self.binding_context();
-                            if matches!(
-                                self.parents[context.defined_by].node,
-                                StmtKind::Expr { .. }
-                            ) {
-                                let deleted: Vec<&Stmt> = self
-                                    .deletions
-                                    .iter()
-                                    .map(|index| self.parents[*index])
-                                    .collect();
-
-                                match fixes::remove_stmt(
-                                    self.parents[context.defined_by],
-                                    context.defined_in.map(|index| self.parents[index]),
-                                    &deleted,
-                                ) {
-                                    Ok(fix) => {
-                                        if fix.content.is_empty() || fix.content == "pass" {
-                                            self.deletions.insert(context.defined_by);
-                                        }
-                                        check.amend(fix)
-                                    }
-                                    Err(e) => error!("Failed to fix unused imports: {}", e),
-                                }
-                            }
-                        }
-
-                        self.checks.push(check)
-                    }
+                    plugins::print_call(self, expr, func);
                 }
 
                 if let ExprKind::Name { id, ctx } = &func.node {
@@ -916,22 +812,7 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::F633) {
-                    if let ExprKind::Name { id, .. } = &left.node {
-                        if id == "print" {
-                            let scope = &self.scopes
-                                [*(self.scope_stack.last().expect("No current scope found."))];
-                            if let Some(Binding {
-                                kind: BindingKind::Builtin,
-                                ..
-                            }) = scope.values.get("print")
-                            {
-                                self.checks.push(Check::new(
-                                    CheckKind::InvalidPrintSyntax,
-                                    Range::from_located(left),
-                                ));
-                            }
-                        }
-                    }
+                    plugins::invalid_print_syntax(self, left);
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
@@ -1306,6 +1187,10 @@ impl CheckLocator for Checker<'_> {
 }
 
 impl<'a> Checker<'a> {
+    pub fn add_check(&mut self, check: Check) {
+        self.checks.push(check);
+    }
+
     fn push_parent(&mut self, parent: &'a Stmt) {
         self.parent_stack.push(self.parents.len());
         self.parents.push(parent);
@@ -1355,7 +1240,11 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn binding_context(&self) -> BindingContext {
+    pub fn current_scope(&self) -> &Scope {
+        &self.scopes[*(self.scope_stack.last().expect("No current scope found."))]
+    }
+
+    pub fn binding_context(&self) -> BindingContext {
         let mut rev = self.parent_stack.iter().rev().fuse();
         let defined_by = *rev.next().expect("Expected to bind within a statement.");
         let defined_in = rev.next().cloned();
