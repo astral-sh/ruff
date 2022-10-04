@@ -149,13 +149,9 @@ impl Settings {
                 .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
             extend_exclude: config
                 .extend_exclude
-                .map(|paths| {
-                    paths
-                        .iter()
-                        .map(|path| FilePattern::from_user(path, &project_root))
-                        .collect()
-                })
-                .unwrap_or_default(),
+                .iter()
+                .map(|path| FilePattern::from_user(path, &project_root))
+                .collect(),
             select: if let Some(select) = config.select {
                 BTreeSet::from_iter(select)
             } else {
@@ -163,13 +159,9 @@ impl Settings {
             },
             per_file_ignores: config
                 .per_file_ignores
-                .map(|ignore_strings| {
-                    ignore_strings
-                        .into_iter()
-                        .map(|pair| PerFileIgnore::new(pair, &project_root))
-                        .collect()
-                })
-                .unwrap_or_default(),
+                .into_iter()
+                .map(|pair| PerFileIgnore::new(pair, &project_root))
+                .collect(),
             dummy_variable_rgx: match config.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
                     .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
@@ -178,9 +170,7 @@ impl Settings {
             pyproject,
             project_root,
         };
-        if let Some(ignore) = &config.ignore {
-            settings.ignore(ignore);
-        }
+        settings.ignore(&config.ignore);
         Ok(settings)
     }
 
