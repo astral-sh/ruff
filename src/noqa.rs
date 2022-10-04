@@ -47,10 +47,9 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
     let mut noqa_line_for: Vec<usize> = vec![];
 
-    let mut last_is_string = false;
-    let mut last_seen = usize::MIN;
     let mut min_line = usize::MAX;
     let mut max_line = usize::MIN;
+    let mut in_string = false;
 
     for (start, tok, end) in lxr.iter().flatten() {
         if matches!(tok, Tok::EndOfFile) {
@@ -62,29 +61,20 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
             max_line = max(max_line, start.row());
 
             // For now, we only care about preserving noqa directives across multi-line strings.
-            if last_is_string {
-                noqa_line_for.extend(vec![max_line; (max_line + 1) - min_line]);
-            } else {
-                for i in (min_line - 1)..(max_line) {
+            if in_string {
+                for i in (noqa_line_for.len())..(min_line - 1) {
                     noqa_line_for.push(i + 1);
                 }
+                noqa_line_for.extend(vec![max_line; (max_line + 1) - min_line]);
             }
 
             min_line = usize::MAX;
             max_line = usize::MIN;
         } else {
-            // Handle empty lines.
-            if start.row() > last_seen {
-                for i in last_seen..(start.row() - 1) {
-                    noqa_line_for.push(i + 1);
-                }
-            }
-
             min_line = min(min_line, start.row());
             max_line = max(max_line, end.row());
         }
-        last_seen = start.row();
-        last_is_string = matches!(tok, Tok::String { .. });
+        in_string = matches!(tok, Tok::String { .. });
     }
 
     noqa_line_for
@@ -173,6 +163,8 @@ mod tests {
 
     #[test]
     fn extraction() -> Result<()> {
+        let empty: Vec<usize> = Default::default();
+
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
 y = 2
@@ -180,7 +172,7 @@ z = x + 1",
         )
         .collect();
         println!("{:?}", extract_noqa_line_for(&lxr));
-        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 2, 3]);
+        assert_eq!(extract_noqa_line_for(&lxr), empty);
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "
@@ -190,7 +182,7 @@ z = x + 1",
         )
         .collect();
         println!("{:?}", extract_noqa_line_for(&lxr));
-        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 2, 3, 4]);
+        assert_eq!(extract_noqa_line_for(&lxr), empty);
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
@@ -200,7 +192,7 @@ z = x + 1
         )
         .collect();
         println!("{:?}", extract_noqa_line_for(&lxr));
-        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 2, 3]);
+        assert_eq!(extract_noqa_line_for(&lxr), empty);
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
@@ -211,7 +203,7 @@ z = x + 1
         )
         .collect();
         println!("{:?}", extract_noqa_line_for(&lxr));
-        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 2, 3, 4]);
+        assert_eq!(extract_noqa_line_for(&lxr), empty);
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = '''abc
@@ -222,7 +214,28 @@ y = 2
 z = x + 1",
         )
         .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), vec![4, 4, 4, 4, 5, 6]);
+        assert_eq!(extract_noqa_line_for(&lxr), vec![4, 4, 4, 4]);
+
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+            "x = 1
+y = '''abc
+def
+ghi
+'''
+z = 2",
+        )
+        .collect();
+        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 5, 5, 5, 5]);
+
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+            "x = 1
+y = '''abc
+def
+ghi
+'''",
+        )
+        .collect();
+        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 5, 5, 5, 5]);
 
         Ok(())
     }
