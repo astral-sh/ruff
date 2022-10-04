@@ -755,10 +755,28 @@ where
 
                 // flake8-super
                 if self.settings.select.contains(&CheckCode::SPR001) {
-                    if let Some(check) =
-                        checks::check_super_args(expr, func, args, &mut self.locator, self.autofix)
-                    {
-                        self.checks.push(check)
+                    // Only bother going through the super check at all if we're in a `super` call.
+                    // (We check this in `check_super_args` too, so this is just an optimization.)
+                    if checks::is_super_call_with_arguments(func, args) {
+                        let scope = &mut self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
+                        let parents: Vec<&Stmt> = self
+                            .parent_stack
+                            .iter()
+                            .map(|index| self.parents[*index])
+                            .collect();
+                        if let Some(mut check) =
+                            checks::check_super_args(scope, &parents, expr, func, args)
+                        {
+                            if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                                if let Some(fix) =
+                                    fixes::remove_super_arguments(&mut self.locator, expr)
+                                {
+                                    check.amend(fix);
+                                }
+                            }
+                            self.checks.push(check)
+                        }
                     }
                 }
 

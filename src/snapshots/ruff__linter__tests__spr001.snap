@@ -50,4 +50,36 @@ expression: checks
       row: 22
       column: 10
     applied: false
+- kind: SuperCallWithParameters
+  location:
+    row: 36
+    column: 9
+  end_location:
+    row: 36
+    column: 29
+  fix:
+    content: super()
+    location:
+      row: 36
+      column: 9
+    end_location:
+      row: 36
+      column: 29
+    applied: false
+- kind: SuperCallWithParameters
+  location:
+    row: 50
+    column: 13
+  end_location:
+    row: 50
+    column: 33
+  fix:
+    content: super()
+    location:
+      row: 50
+      column: 13
+    end_location:
+      row: 50
+      column: 33
+    applied: false
 
