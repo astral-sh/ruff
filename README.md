@@ -213,6 +213,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (partial)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -276,6 +277,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
 | T201 | PrintFound | `print` found |  | 🛠 |
 | T203 | PPrintFound | `pprint` found |  | 🛠 |
+| U001 | UselessMetaclassType | `__metaclass__ = type` is implied |  | 🛠 |
 | R001 | UselessObjectInheritance | Class `...` inherits from object |  | 🛠 |
 | R002 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |

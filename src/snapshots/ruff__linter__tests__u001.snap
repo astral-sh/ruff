@@ -1,0 +1,37 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: UselessMetaclassType
+  location:
+    row: 2
+    column: 5
+  end_location:
+    row: 2
+    column: 25
+  fix:
+    content: pass
+    location:
+      row: 2
+      column: 5
+    end_location:
+      row: 2
+      column: 25
+    applied: false
+- kind: UselessMetaclassType
+  location:
+    row: 6
+    column: 5
+  end_location:
+    row: 6
+    column: 25
+  fix:
+    content: ""
+    location:
+      row: 6
+      column: 1
+    end_location:
+      row: 7
+      column: 1
+    applied: false
+

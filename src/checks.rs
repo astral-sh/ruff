@@ -53,7 +53,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::F901,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 51] = [
+pub const ALL_CHECK_CODES: [CheckCode; 52] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -107,11 +107,13 @@ pub const ALL_CHECK_CODES: [CheckCode; 51] = [
     // flake8-print
     CheckCode::T201,
     CheckCode::T203,
-    // Meta
-    CheckCode::M001,
+    // pyupgrade
+    CheckCode::U001,
     // Refactor
     CheckCode::R001,
     CheckCode::R002,
+    // Meta
+    CheckCode::M001,
 ];
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash, PartialOrd, Ord)]
@@ -169,6 +171,8 @@ pub enum CheckCode {
     // flake8-print
     T201,
     T203,
+    // pyupgrade
+    U001,
     // Refactor
     R001,
     R002,
@@ -231,6 +235,8 @@ impl FromStr for CheckCode {
             "A003" => Ok(CheckCode::A003),
             // flake8-super
             "SPR001" => Ok(CheckCode::SPR001),
+            // pyupgrade
+            "U001" => Ok(CheckCode::U001),
             // Refactor
             "R001" => Ok(CheckCode::R001),
             "R002" => Ok(CheckCode::R002),
@@ -297,6 +303,8 @@ impl CheckCode {
             // flake8-print
             CheckCode::T201 => "T201",
             CheckCode::T203 => "T203",
+            // pyupgrade
+            CheckCode::U001 => "U001",
             // Refactor
             CheckCode::R001 => "R001",
             CheckCode::R002 => "R002",
@@ -372,6 +380,8 @@ impl CheckCode {
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
+            // pyupgrade
+            CheckCode::U001 => CheckKind::UselessMetaclassType,
             // Refactor
             CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::R002 => CheckKind::NoAssertEquals,
@@ -439,6 +449,7 @@ pub enum CheckKind {
     UnusedImport(String),
     UnusedNOQA(Option<String>),
     UnusedVariable(String),
+    UselessMetaclassType,
     UselessObjectInheritance(String),
     YieldOutsideFunction,
     // flake8-builtin
@@ -483,7 +494,6 @@ impl CheckKind {
             CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
             CheckKind::MultiValueRepeatedKeyLiteral => "MultiValueRepeatedKeyLiteral",
             CheckKind::MultiValueRepeatedKeyVariable(_) => "MultiValueRepeatedKeyVariable",
-            CheckKind::NoAssertEquals => "NoAssertEquals",
             CheckKind::NoneComparison(_) => "NoneComparison",
             CheckKind::NotInTest => "NotInTest",
             CheckKind::NotIsTest => "NotIsTest",
@@ -497,9 +507,7 @@ impl CheckKind {
             CheckKind::UndefinedLocal(_) => "UndefinedLocal",
             CheckKind::UndefinedName(_) => "UndefinedName",
             CheckKind::UnusedImport(_) => "UnusedImport",
-            CheckKind::UnusedNOQA(_) => "UnusedNOQA",
             CheckKind::UnusedVariable(_) => "UnusedVariable",
-            CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
             CheckKind::YieldOutsideFunction => "YieldOutsideFunction",
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => "BuiltinVariableShadowing",
@@ -510,6 +518,13 @@ impl CheckKind {
             // flake8-print
             CheckKind::PrintFound => "PrintFound",
             CheckKind::PPrintFound => "PPrintFound",
+            // pyupgrade
+            CheckKind::UselessMetaclassType => "UselessMetaclassType",
+            // Refactor
+            CheckKind::NoAssertEquals => "NoAssertEquals",
+            CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
+            // Meta
+            CheckKind::UnusedNOQA(_) => "UnusedNOQA",
         }
     }
 
@@ -542,7 +557,6 @@ impl CheckKind {
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
             CheckKind::MultiValueRepeatedKeyLiteral => &CheckCode::F601,
             CheckKind::MultiValueRepeatedKeyVariable(_) => &CheckCode::F602,
-            CheckKind::NoAssertEquals => &CheckCode::R002,
             CheckKind::NoneComparison(_) => &CheckCode::E711,
             CheckKind::NotInTest => &CheckCode::E713,
             CheckKind::NotIsTest => &CheckCode::E714,
@@ -557,9 +571,7 @@ impl CheckKind {
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(_) => &CheckCode::F401,
-            CheckKind::UnusedNOQA(_) => &CheckCode::M001,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
-            CheckKind::UselessObjectInheritance(_) => &CheckCode::R001,
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
@@ -570,6 +582,13 @@ impl CheckKind {
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
+            // pyupgrade
+            CheckKind::UselessMetaclassType => &CheckCode::U001,
+            // Refactor
+            CheckKind::NoAssertEquals => &CheckCode::R002,
+            CheckKind::UselessObjectInheritance(_) => &CheckCode::R001,
+            // Meta
+            CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
     }
 
@@ -646,9 +665,6 @@ impl CheckKind {
             CheckKind::MultiValueRepeatedKeyVariable(name) => {
                 format!("Dictionary key `{name}` repeated")
             }
-            CheckKind::NoAssertEquals => {
-                "`assertEquals` is deprecated, use `assertEqual` instead".to_string()
-            }
             CheckKind::NoneComparison(op) => match op {
                 RejectedCmpop::Eq => "Comparison to `None` should be `cond is None`".to_string(),
                 RejectedCmpop::NotEq => {
@@ -700,16 +716,10 @@ impl CheckKind {
             CheckKind::UnusedVariable(name) => {
                 format!("Local variable `{name}` is assigned to but never used")
             }
-            CheckKind::UselessObjectInheritance(name) => {
-                format!("Class `{name}` inherits from object")
-            }
             CheckKind::YieldOutsideFunction => {
                 "`yield` or `yield from` statement outside of a function/method".to_string()
             }
-            CheckKind::UnusedNOQA(code) => match code {
-                None => "Unused `noqa` directive".to_string(),
-                Some(code) => format!("Unused `noqa` directive for: {code}"),
-            },
+
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
                 format!("Variable `{name}` is shadowing a python builtin")
@@ -727,6 +737,20 @@ impl CheckKind {
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),
+            // pyupgrade
+            CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
+            // Refactor
+            CheckKind::NoAssertEquals => {
+                "`assertEquals` is deprecated, use `assertEqual` instead".to_string()
+            }
+            CheckKind::UselessObjectInheritance(name) => {
+                format!("Class `{name}` inherits from object")
+            }
+            // Meta
+            CheckKind::UnusedNOQA(code) => match code {
+                None => "Unused `noqa` directive".to_string(),
+                Some(code) => format!("Unused `noqa` directive for: {code}"),
+            },
         }
     }
 
@@ -735,12 +759,13 @@ impl CheckKind {
         matches!(
             self,
             CheckKind::NoAssertEquals
-                | CheckKind::UselessObjectInheritance(_)
-                | CheckKind::UnusedNOQA(_)
+                | CheckKind::PPrintFound
+                | CheckKind::PrintFound
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::UnusedImport(_)
-                | CheckKind::PrintFound
-                | CheckKind::PPrintFound
+                | CheckKind::UnusedNOQA(_)
+                | CheckKind::UselessMetaclassType
+                | CheckKind::UselessObjectInheritance(_)
         )
     }
 }
