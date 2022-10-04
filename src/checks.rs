@@ -5,7 +5,7 @@ use anyhow::Result;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_CHECK_CODES: [CheckCode; 48] = [
+pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -50,15 +50,6 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 48] = [
     CheckCode::F831,
     CheckCode::F841,
     CheckCode::F901,
-    // flake8-builtins
-    CheckCode::A001,
-    CheckCode::A002,
-    CheckCode::A003,
-    // flake8-print
-    CheckCode::T201,
-    CheckCode::T203,
-    // flake8-super
-    CheckCode::SPR001,
 ];
 
 pub const ALL_CHECK_CODES: [CheckCode; 51] = [
