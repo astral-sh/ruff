@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use crate::ast::types::Range;
 use anyhow::Result;
+use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
@@ -329,20 +330,22 @@ impl CheckCode {
             CheckCode::E741 => CheckKind::AmbiguousVariableName("...".to_string()),
             CheckCode::E742 => CheckKind::AmbiguousClassName("...".to_string()),
             CheckCode::E743 => CheckKind::AmbiguousFunctionName("...".to_string()),
-            CheckCode::E902 => CheckKind::IOError("...".to_string()),
-            CheckCode::E999 => CheckKind::SyntaxError("...".to_string()),
+            CheckCode::E902 => CheckKind::IOError("IOError: `...`".to_string()),
+            CheckCode::E999 => CheckKind::SyntaxError("`...`".to_string()),
             // pyflakes
             CheckCode::F401 => CheckKind::UnusedImport("...".to_string()),
             CheckCode::F402 => CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
             CheckCode::F403 => CheckKind::ImportStarUsed("...".to_string()),
             CheckCode::F404 => CheckKind::LateFutureImport,
-            CheckCode::F405 => CheckKind::ImportStarUsage("...".to_string(), "...".to_string()),
+            CheckCode::F405 => {
+                CheckKind::ImportStarUsage("...".to_string(), vec!["...".to_string()])
+            }
             CheckCode::F406 => CheckKind::ImportStarNotPermitted("...".to_string()),
             CheckCode::F407 => CheckKind::FutureFeatureNotDefined("...".to_string()),
             CheckCode::F541 => CheckKind::FStringMissingPlaceholders,
             CheckCode::F601 => CheckKind::MultiValueRepeatedKeyLiteral,
             CheckCode::F602 => CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
-            CheckCode::F621 => CheckKind::TooManyExpressionsInStarredAssignment,
+            CheckCode::F621 => CheckKind::ExpressionsInStarAssignment,
             CheckCode::F622 => CheckKind::TwoStarredExpressions,
             CheckCode::F631 => CheckKind::AssertTuple,
             CheckCode::F632 => CheckKind::IsLiteral,
@@ -393,7 +396,6 @@ pub enum RejectedCmpop {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckKind {
-    UnusedNOQA(Option<String>),
     AmbiguousClassName(String),
     AmbiguousFunctionName(String),
     AmbiguousVariableName(String),
@@ -404,14 +406,15 @@ pub enum CheckKind {
     DoNotAssignLambda,
     DoNotUseBareExcept,
     DuplicateArgumentName,
-    ForwardAnnotationSyntaxError(String),
+    ExpressionsInStarAssignment,
     FStringMissingPlaceholders,
+    ForwardAnnotationSyntaxError(String),
     FutureFeatureNotDefined(String),
     IOError(String),
     IfTuple,
     ImportShadowedByLoopVar(String, usize),
     ImportStarNotPermitted(String),
-    ImportStarUsage(String, String),
+    ImportStarUsage(String, Vec<String>),
     ImportStarUsed(String),
     InvalidPrintSyntax,
     IsLiteral,
@@ -427,7 +430,6 @@ pub enum CheckKind {
     RaiseNotImplemented,
     ReturnOutsideFunction,
     SyntaxError(String),
-    TooManyExpressionsInStarredAssignment,
     TrueFalseComparison(bool, RejectedCmpop),
     TwoStarredExpressions,
     TypeComparison,
@@ -435,6 +437,7 @@ pub enum CheckKind {
     UndefinedLocal(String),
     UndefinedName(String),
     UnusedImport(String),
+    UnusedNOQA(Option<String>),
     UnusedVariable(String),
     UselessObjectInheritance(String),
     YieldOutsideFunction,
@@ -463,6 +466,7 @@ impl CheckKind {
             CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
             CheckKind::DoNotUseBareExcept => "DoNotUseBareExcept",
             CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
+            CheckKind::ExpressionsInStarAssignment => "ExpressionsInStarAssignment",
             CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
             CheckKind::ForwardAnnotationSyntaxError(_) => "ForwardAnnotationSyntaxError",
             CheckKind::FutureFeatureNotDefined(_) => "FutureFeatureNotDefined",
@@ -486,9 +490,6 @@ impl CheckKind {
             CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
             CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
             CheckKind::SyntaxError(_) => "SyntaxError",
-            CheckKind::TooManyExpressionsInStarredAssignment => {
-                "TooManyExpressionsInStarredAssignment"
-            }
             CheckKind::TrueFalseComparison(_, _) => "TrueFalseComparison",
             CheckKind::TwoStarredExpressions => "TwoStarredExpressions",
             CheckKind::TypeComparison => "TypeComparison",
@@ -496,10 +497,10 @@ impl CheckKind {
             CheckKind::UndefinedLocal(_) => "UndefinedLocal",
             CheckKind::UndefinedName(_) => "UndefinedName",
             CheckKind::UnusedImport(_) => "UnusedImport",
+            CheckKind::UnusedNOQA(_) => "UnusedNOQA",
             CheckKind::UnusedVariable(_) => "UnusedVariable",
             CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
             CheckKind::YieldOutsideFunction => "YieldOutsideFunction",
-            CheckKind::UnusedNOQA(_) => "UnusedNOQA",
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => "BuiltinVariableShadowing",
             CheckKind::BuiltinArgumentShadowing(_) => "BuiltinArgumentShadowing",
@@ -548,7 +549,7 @@ impl CheckKind {
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
             CheckKind::SyntaxError(_) => &CheckCode::E999,
-            CheckKind::TooManyExpressionsInStarredAssignment => &CheckCode::F621,
+            CheckKind::ExpressionsInStarAssignment => &CheckCode::F621,
             CheckKind::TrueFalseComparison(_, _) => &CheckCode::E712,
             CheckKind::TwoStarredExpressions => &CheckCode::F622,
             CheckKind::TypeComparison => &CheckCode::E721,
@@ -576,13 +577,13 @@ impl CheckKind {
     pub fn body(&self) -> String {
         match self {
             CheckKind::AmbiguousClassName(name) => {
-                format!("ambiguous class name '{}'", name)
+                format!("Ambiguous class name: `{}`", name)
             }
             CheckKind::AmbiguousFunctionName(name) => {
-                format!("ambiguous function name '{}'", name)
+                format!("Ambiguous function name: `{}`", name)
             }
             CheckKind::AmbiguousVariableName(name) => {
-                format!("ambiguous variable name '{}'", name)
+                format!("Ambiguous variable name: `{}`", name)
             }
             CheckKind::AssertTuple => {
                 "Assert test is a non-empty tuple, which is always `True`".to_string()
@@ -590,7 +591,7 @@ impl CheckKind {
             CheckKind::BreakOutsideLoop => "`break` outside loop".to_string(),
             CheckKind::ContinueOutsideLoop => "`continue` not properly in loop".to_string(),
             CheckKind::DefaultExceptNotLast => {
-                "an `except:` block as not the last exception handler".to_string()
+                "An `except:` block as not the last exception handler".to_string()
             }
             CheckKind::DoNotAssignLambda => {
                 "Do not assign a lambda expression, use a def".to_string()
@@ -600,19 +601,21 @@ impl CheckKind {
                 "Duplicate argument name in function definition".to_string()
             }
             CheckKind::ForwardAnnotationSyntaxError(body) => {
-                format!("syntax error in forward annotation '{body}'")
+                format!("Syntax error in forward annotation: `{body}`")
             }
             CheckKind::FStringMissingPlaceholders => {
                 "f-string without any placeholders".to_string()
             }
             CheckKind::FutureFeatureNotDefined(name) => {
-                format!("future feature '{name}' is not defined")
+                format!("Future feature `{name}` is not defined")
             }
             CheckKind::IOError(message) => message.clone(),
             CheckKind::IfTuple => "If test is a tuple, which is always `True`".to_string(),
-            CheckKind::InvalidPrintSyntax => "use of >> is invalid with print function".to_string(),
+            CheckKind::InvalidPrintSyntax => {
+                "Use of `>>` is invalid with `print` function".to_string()
+            }
             CheckKind::ImportShadowedByLoopVar(name, line) => {
-                format!("import '{name}' from line {line} shadowed by loop variable")
+                format!("Import `{name}` from line {line} shadowed by loop variable")
             }
             CheckKind::ImportStarNotPermitted(name) => {
                 format!("`from {name} import *` only allowed at module level")
@@ -621,11 +624,15 @@ impl CheckKind {
                 format!("`from {name} import *` used; unable to detect undefined names")
             }
             CheckKind::ImportStarUsage(name, sources) => {
-                format!("'{name}' may be undefined, or defined from star imports: {sources}")
+                let sources = sources
+                    .iter()
+                    .map(|source| format!("`{}`", source))
+                    .join(", ");
+                format!("`{name}` may be undefined, or defined from star imports: {sources}")
             }
-            CheckKind::IsLiteral => "use ==/!= to compare constant literals".to_string(),
+            CheckKind::IsLiteral => "Use `==` and `!=` to compare constant literals".to_string(),
             CheckKind::LateFutureImport => {
-                "from __future__ imports must occur at the beginning of the file".to_string()
+                "`from __future__` imports must occur at the beginning of the file".to_string()
             }
             CheckKind::LineTooLong(length, limit) => {
                 format!("Line too long ({length} > {limit} characters)")
@@ -654,11 +661,11 @@ impl CheckKind {
                 "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
             }
             CheckKind::ReturnOutsideFunction => {
-                "a `return` statement outside of a function/method".to_string()
+                "`return` statement outside of a function/method".to_string()
             }
             CheckKind::SyntaxError(message) => format!("SyntaxError: {message}"),
-            CheckKind::TooManyExpressionsInStarredAssignment => {
-                "too many expressions in star-unpacking assignment".to_string()
+            CheckKind::ExpressionsInStarAssignment => {
+                "Too many expressions in star-unpacking assignment".to_string()
             }
             CheckKind::TrueFalseComparison(value, op) => match *value {
                 true => match op {
@@ -678,8 +685,8 @@ impl CheckKind {
                     }
                 },
             },
-            CheckKind::TwoStarredExpressions => "two starred expressions in assignment".to_string(),
-            CheckKind::TypeComparison => "do not compare types, use `isinstance()`".to_string(),
+            CheckKind::TwoStarredExpressions => "Two starred expressions in assignment".to_string(),
+            CheckKind::TypeComparison => "Do not compare types, use `isinstance()`".to_string(),
             CheckKind::UndefinedExport(name) => {
                 format!("Undefined name `{name}` in `__all__`")
             }
@@ -697,7 +704,7 @@ impl CheckKind {
                 format!("Class `{name}` inherits from object")
             }
             CheckKind::YieldOutsideFunction => {
-                "a `yield` or `yield from` statement outside of a function/method".to_string()
+                "`yield` or `yield from` statement outside of a function/method".to_string()
             }
             CheckKind::UnusedNOQA(code) => match code {
                 None => "Unused `noqa` directive".to_string(),
@@ -711,7 +718,7 @@ impl CheckKind {
                 format!("Argument `{name}` is shadowing a python builtin")
             }
             CheckKind::BuiltinAttributeShadowing(name) => {
-                format!("class attribute `{name}` is shadowing a python builtin")
+                format!("Class attribute `{name}` is shadowing a python builtin")
             }
             // flake8-super
             CheckKind::SuperCallWithParameters => {
@@ -719,7 +726,7 @@ impl CheckKind {
             }
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),
-            CheckKind::PPrintFound => "`pprint` found`".to_string(),
+            CheckKind::PPrintFound => "`pprint` found".to_string(),
         }
     }
 
