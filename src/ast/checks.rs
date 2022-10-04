@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 use itertools::izip;
 use regex::Regex;
 use rustpython_parser::ast::{
-    Arg, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword,
-    Location, Stmt, StmtKind, Unaryop,
+    Arg, ArgData, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind,
+    Keyword, Location, Stmt, StmtKind, Unaryop,
 };
 
 use crate::ast::operations::SourceCodeLocator;
@@ -693,29 +693,79 @@ pub fn check_builtin_shadowing(
     }
 }
 
+/// Returns `true` if a call is an argumented `super` invocation.
+pub fn is_super_call_with_arguments(func: &Expr, args: &Vec<Expr>) -> bool {
+    // Check: is this a `super` call?
+    if let ExprKind::Name { id, .. } = &func.node {
+        id == "super" && !args.is_empty()
+    } else {
+        false
+    }
+}
+
 // flake8-super
 /// Check that `super()` has no args
 pub fn check_super_args(
+    scope: &Scope,
+    parents: &[&Stmt],
     expr: &Expr,
     func: &Expr,
     args: &Vec<Expr>,
-    locator: &mut SourceCodeLocator,
-    autofix: &fixer::Mode,
 ) -> Option<Check> {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if id == "super" && !args.is_empty() {
-            let mut check = Check::new(
-                CheckKind::SuperCallWithParameters,
-                Range::from_located(expr),
-            );
-            if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                if let Some(fix) = fixes::remove_super_arguments(locator, expr) {
-                    check.amend(fix);
+    if !is_super_call_with_arguments(func, args) {
+        return None;
+    }
+
+    // Check: are we in a Function scope?
+    if !matches!(scope.kind, ScopeKind::Function { .. }) {
+        return None;
+    }
+
+    let mut parents = parents.iter().rev();
+
+    // For a `super` invocation to be unnecessary, the first argument needs to match the enclosing
+    // class, and the second argument needs to match the first argument to the enclosing function.
+    if let [first_arg, second_arg] = args.as_slice() {
+        // Find the enclosing function definition (if any).
+        if let Some(StmtKind::FunctionDef {
+            args: parent_args, ..
+        }) = parents
+            .find(|stmt| matches!(stmt.node, StmtKind::FunctionDef { .. }))
+            .map(|stmt| &stmt.node)
+        {
+            // Extract the name of the first argument to the enclosing function.
+            if let Some(ArgData {
+                arg: parent_arg, ..
+            }) = parent_args.args.first().map(|expr| &expr.node)
+            {
+                // Find the enclosing class definition (if any).
+                if let Some(StmtKind::ClassDef {
+                    name: parent_name, ..
+                }) = parents
+                    .find(|stmt| matches!(stmt.node, StmtKind::ClassDef { .. }))
+                    .map(|stmt| &stmt.node)
+                {
+                    if let (
+                        ExprKind::Name {
+                            id: first_arg_id, ..
+                        },
+                        ExprKind::Name {
+                            id: second_arg_id, ..
+                        },
+                    ) = (&first_arg.node, &second_arg.node)
+                    {
+                        if first_arg_id == parent_name && second_arg_id == parent_arg {
+                            return Some(Check::new(
+                                CheckKind::SuperCallWithParameters,
+                                Range::from_located(expr),
+                            ));
+                        }
+                    }
                 }
             }
-            return Some(check);
         }
     }
+
     None
 }
 
