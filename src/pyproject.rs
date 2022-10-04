@@ -29,10 +29,13 @@ pub fn load_config(pyproject: &Option<PathBuf>) -> Result<Config> {
 pub struct Config {
     pub line_length: Option<usize>,
     pub exclude: Option<Vec<String>>,
-    pub extend_exclude: Option<Vec<String>>,
+    #[serde(default)]
+    pub extend_exclude: Vec<String>,
     pub select: Option<Vec<CheckCode>>,
-    pub ignore: Option<Vec<CheckCode>>,
-    pub per_file_ignores: Option<Vec<StrCheckCodePair>>,
+    #[serde(default)]
+    pub ignore: Vec<CheckCode>,
+    #[serde(default)]
+    pub per_file_ignores: Vec<StrCheckCodePair>,
     pub dummy_variable_rgx: Option<String>,
 }
 
@@ -175,10 +178,10 @@ mod tests {
                 ruff: Some(Config {
                     line_length: None,
                     exclude: None,
-                    extend_exclude: None,
+                    extend_exclude: vec![],
                     select: None,
-                    ignore: None,
-                    per_file_ignores: None,
+                    ignore: vec![],
+                    per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
             })
@@ -197,10 +200,10 @@ line-length = 79
                 ruff: Some(Config {
                     line_length: Some(79),
                     exclude: None,
-                    extend_exclude: None,
+                    extend_exclude: vec![],
                     select: None,
-                    ignore: None,
-                    per_file_ignores: None,
+                    ignore: vec![],
+                    per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
             })
@@ -219,10 +222,10 @@ exclude = ["foo.py"]
                 ruff: Some(Config {
                     line_length: None,
                     exclude: Some(vec!["foo.py".to_string()]),
-                    extend_exclude: None,
+                    extend_exclude: vec![],
                     select: None,
-                    ignore: None,
-                    per_file_ignores: None,
+                    ignore: vec![],
+                    per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
             })
@@ -241,10 +244,10 @@ select = ["E501"]
                 ruff: Some(Config {
                     line_length: None,
                     exclude: None,
-                    extend_exclude: None,
+                    extend_exclude: vec![],
                     select: Some(vec![CheckCode::E501]),
-                    ignore: None,
-                    per_file_ignores: None,
+                    ignore: vec![],
+                    per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
             })
@@ -263,10 +266,10 @@ ignore = ["E501"]
                 ruff: Some(Config {
                     line_length: None,
                     exclude: None,
-                    extend_exclude: None,
+                    extend_exclude: vec![],
                     select: None,
-                    ignore: Some(vec![CheckCode::E501]),
-                    per_file_ignores: None,
+                    ignore: vec![CheckCode::E501],
+                    per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
             })
@@ -325,14 +328,14 @@ other-attribute = 1
             Config {
                 line_length: Some(88),
                 exclude: None,
-                extend_exclude: Some(vec![
+                extend_exclude: vec![
                     "excluded.py".to_string(),
                     "migrations".to_string(),
                     "directory/also_excluded.py".to_string(),
-                ]),
+                ],
                 select: None,
-                ignore: None,
-                per_file_ignores: None,
+                ignore: vec![],
+                per_file_ignores: vec![],
                 dummy_variable_rgx: None,
             }
         );
