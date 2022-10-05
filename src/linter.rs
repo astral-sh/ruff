@@ -44,7 +44,7 @@ pub(crate) fn check_path(
 
     // Run the AST-based checks.
     if settings
-        .select
+        .enabled
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
     {
@@ -53,7 +53,7 @@ pub(crate) fn check_path(
                 checks.extend(check_ast(&python_ast, contents, settings, autofix, path))
             }
             Err(parse_error) => {
-                if settings.select.contains(&CheckCode::E999) {
+                if settings.enabled.contains(&CheckCode::E999) {
                     checks.push(Check::new(
                         CheckKind::SyntaxError(parse_error.error.to_string()),
                         Range {

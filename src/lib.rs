@@ -7,7 +7,7 @@ use rustpython_parser::lexer::LexResult;
 use crate::autofix::fixer::Mode;
 use crate::linter::{check_path, tokenize};
 use crate::message::Message;
-use crate::settings::Settings;
+use crate::settings::{RawSettings, Settings};
 
 mod ast;
 mod autofix;
@@ -40,7 +40,7 @@ pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
         None => debug!("Unable to find pyproject.toml; using default settings..."),
     };
 
-    let settings = Settings::from_pyproject(pyproject, project_root)?;
+    let settings = Settings::from_raw(RawSettings::from_pyproject(pyproject, project_root)?);
 
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);

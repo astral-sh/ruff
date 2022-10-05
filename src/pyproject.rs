@@ -37,6 +37,8 @@ pub struct Config {
     #[serde(default)]
     pub ignore: Vec<CheckCode>,
     #[serde(default)]
+    pub extend_ignore: Vec<CheckCode>,
+    #[serde(default)]
     pub per_file_ignores: Vec<StrCheckCodePair>,
     pub dummy_variable_rgx: Option<String>,
 }
@@ -184,6 +186,7 @@ mod tests {
                     select: None,
                     extend_select: vec![],
                     ignore: vec![],
+                    extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
@@ -207,6 +210,7 @@ line-length = 79
                     select: None,
                     extend_select: vec![],
                     ignore: vec![],
+                    extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
@@ -230,6 +234,7 @@ exclude = ["foo.py"]
                     select: None,
                     extend_select: vec![],
                     ignore: vec![],
+                    extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
@@ -253,6 +258,7 @@ select = ["E501"]
                     select: Some(vec![CheckCode::E501]),
                     extend_select: vec![],
                     ignore: vec![],
+                    extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
@@ -277,6 +283,7 @@ ignore = ["E501"]
                     select: None,
                     extend_select: vec![CheckCode::M001],
                     ignore: vec![CheckCode::E501],
+                    extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                 })
@@ -344,6 +351,7 @@ other-attribute = 1
                 select: None,
                 extend_select: vec![],
                 ignore: vec![],
+                extend_ignore: vec![],
                 per_file_ignores: vec![],
                 dummy_variable_rgx: None,
             }

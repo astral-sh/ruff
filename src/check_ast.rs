@@ -234,7 +234,7 @@ where
                     }
                 }
 
-                if self.settings.select.contains(&CheckCode::E741) {
+                if self.settings.enabled.contains(&CheckCode::E741) {
                     let location = self.locate_check(Range::from_located(stmt));
                     self.checks.extend(
                         names.iter().filter_map(|name| {
@@ -244,7 +244,7 @@ where
                 }
             }
             StmtKind::Break => {
-                if self.settings.select.contains(&CheckCode::F701) {
+                if self.settings.enabled.contains(&CheckCode::F701) {
                     if let Some(check) = checks::check_break_outside_loop(
                         stmt,
                         &self.parents,
@@ -256,7 +256,7 @@ where
                 }
             }
             StmtKind::Continue => {
-                if self.settings.select.contains(&CheckCode::F702) {
+                if self.settings.enabled.contains(&CheckCode::F702) {
                     if let Some(check) = checks::check_continue_outside_loop(
                         stmt,
                         &self.parents,
@@ -281,7 +281,7 @@ where
                 args,
                 ..
             } => {
-                if self.settings.select.contains(&CheckCode::E743) {
+                if self.settings.enabled.contains(&CheckCode::E743) {
                     if let Some(check) = checks::check_ambiguous_function_name(
                         name,
                         self.locate_check(Range::from_located(stmt)),
@@ -342,7 +342,7 @@ where
             StmtKind::Return { .. } => {
                 if self
                     .settings
-                    .select
+                    .enabled
                     .contains(CheckKind::ReturnOutsideFunction.code())
                 {
                     if let Some(scope_index) = self.scope_stack.last().cloned() {
@@ -365,7 +365,7 @@ where
                 decorator_list,
                 ..
             } => {
-                if self.settings.select.contains(&CheckCode::R001) {
+                if self.settings.enabled.contains(&CheckCode::R001) {
                     let scope =
                         &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                     if let Some(check) = checks::check_useless_object_inheritance(
@@ -381,7 +381,7 @@ where
                     }
                 }
 
-                if self.settings.select.contains(&CheckCode::E742) {
+                if self.settings.enabled.contains(&CheckCode::E742) {
                     if let Some(check) = checks::check_ambiguous_class_name(
                         name,
                         self.locate_check(Range::from_located(stmt)),
@@ -410,7 +410,7 @@ where
             StmtKind::Import { names } => {
                 if self
                     .settings
-                    .select
+                    .enabled
                     .contains(CheckKind::ModuleImportNotAtTopOfFile.code())
                     && self.seen_non_import
                     && stmt.location.column() == 1
@@ -470,7 +470,7 @@ where
             } => {
                 if self
                     .settings
-                    .select
+                    .enabled
                     .contains(CheckKind::ModuleImportNotAtTopOfFile.code())
                     && self.seen_non_import
                     && stmt.location.column() == 1
@@ -508,7 +508,7 @@ where
                             self.annotations_future_enabled = true;
                         }
 
-                        if self.settings.select.contains(&CheckCode::F407)
+                        if self.settings.enabled.contains(&CheckCode::F407)
                             && !ALL_FEATURE_NAMES.contains(&alias.node.name.deref())
                         {
                             self.checks.push(Check::new(
@@ -517,7 +517,7 @@ where
                             ));
                         }
 
-                        if self.settings.select.contains(&CheckCode::F404) && !self.futures_allowed
+                        if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
                         {
                             self.checks.push(Check::new(
                                 CheckKind::LateFutureImport,
@@ -540,7 +540,7 @@ where
                             },
                         );
 
-                        if self.settings.select.contains(&CheckCode::F406) {
+                        if self.settings.enabled.contains(&CheckCode::F406) {
                             let scope = &self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found."))];
                             if !matches!(scope.kind, ScopeKind::Module) {
@@ -551,7 +551,7 @@ where
                             }
                         }
 
-                        if self.settings.select.contains(&CheckCode::F403) {
+                        if self.settings.enabled.contains(&CheckCode::F403) {
                             self.checks.push(Check::new(
                                 CheckKind::ImportStarUsed(module_name.to_string()),
                                 self.locate_check(Range::from_located(stmt)),
@@ -584,7 +584,7 @@ where
                 }
             }
             StmtKind::Raise { exc, .. } => {
-                if self.settings.select.contains(&CheckCode::F901) {
+                if self.settings.enabled.contains(&CheckCode::F901) {
                     if let Some(expr) = exc {
                         if let Some(check) = checks::check_raise_not_implemented(expr) {
                             self.checks.push(check);
@@ -596,7 +596,7 @@ where
                 self.handle_node_load(target);
             }
             StmtKind::If { test, .. } => {
-                if self.settings.select.contains(&CheckCode::F634) {
+                if self.settings.enabled.contains(&CheckCode::F634) {
                     if let Some(check) =
                         checks::check_if_tuple(test, self.locate_check(Range::from_located(stmt)))
                     {
@@ -605,7 +605,11 @@ where
                 }
             }
             StmtKind::Assert { test, .. } => {
-                if self.settings.select.contains(CheckKind::AssertTuple.code()) {
+                if self
+                    .settings
+                    .enabled
+                    .contains(CheckKind::AssertTuple.code())
+                {
                     if let Some(check) = checks::check_assert_tuple(
                         test,
                         self.locate_check(Range::from_located(stmt)),
@@ -615,14 +619,14 @@ where
                 }
             }
             StmtKind::Try { handlers, .. } => {
-                if self.settings.select.contains(&CheckCode::F707) {
+                if self.settings.enabled.contains(&CheckCode::F707) {
                     if let Some(check) = checks::check_default_except_not_last(handlers) {
                         self.checks.push(check);
                     }
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
-                if self.settings.select.contains(&CheckCode::E731) {
+                if self.settings.enabled.contains(&CheckCode::E731) {
                     if let Some(check) = checks::check_do_not_assign_lambda(
                         value,
                         self.locate_check(Range::from_located(stmt)),
@@ -630,7 +634,7 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.select.contains(&CheckCode::U001) {
+                if self.settings.enabled.contains(&CheckCode::U001) {
                     if let Some(mut check) = checks::check_useless_metaclass_type(
                         targets,
                         value,
@@ -663,7 +667,7 @@ where
                 }
             }
             StmtKind::AnnAssign { value, .. } => {
-                if self.settings.select.contains(&CheckCode::E731) {
+                if self.settings.enabled.contains(&CheckCode::E731) {
                     if let Some(value) = value {
                         if let Some(check) = checks::check_do_not_assign_lambda(
                             value,
@@ -743,9 +747,9 @@ where
             ExprKind::Tuple { elts, ctx } | ExprKind::List { elts, ctx } => {
                 if matches!(ctx, ExprContext::Store) {
                     let check_too_many_expressions =
-                        self.settings.select.contains(&CheckCode::F621);
+                        self.settings.enabled.contains(&CheckCode::F621);
                     let check_two_starred_expressions =
-                        self.settings.select.contains(&CheckCode::F622);
+                        self.settings.enabled.contains(&CheckCode::F622);
                     if let Some(check) = checks::check_starred_expressions(
                         elts,
                         check_too_many_expressions,
@@ -759,7 +763,7 @@ where
             ExprKind::Name { id, ctx } => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => {
-                    if self.settings.select.contains(&CheckCode::E741) {
+                    if self.settings.enabled.contains(&CheckCode::E741) {
                         if let Some(check) = checks::check_ambiguous_variable_name(
                             id,
                             self.locate_check(Range::from_located(expr)),
@@ -777,14 +781,14 @@ where
                 ExprContext::Del => self.handle_node_delete(expr),
             },
             ExprKind::Call { func, args, .. } => {
-                if self.settings.select.contains(&CheckCode::R002) {
+                if self.settings.enabled.contains(&CheckCode::R002) {
                     if let Some(check) = checks::check_assert_equals(func, self.autofix) {
                         self.checks.push(check)
                     }
                 }
 
                 // flake8-super
-                if self.settings.select.contains(&CheckCode::SPR001) {
+                if self.settings.enabled.contains(&CheckCode::SPR001) {
                     // Only bother going through the super check at all if we're in a `super` call.
                     // (We check this in `check_super_args` too, so this is just an optimization.)
                     if checks::is_super_call_with_arguments(func, args) {
@@ -811,8 +815,8 @@ where
                 }
 
                 // flake8-print
-                if self.settings.select.contains(&CheckCode::T201)
-                    || self.settings.select.contains(&CheckCode::T203)
+                if self.settings.enabled.contains(&CheckCode::T201)
+                    || self.settings.enabled.contains(&CheckCode::T203)
                 {
                     if let Some(mut check) = checks::check_print_call(expr, func) {
                         if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
@@ -863,8 +867,8 @@ where
                 }
             }
             ExprKind::Dict { keys, .. } => {
-                let check_repeated_literals = self.settings.select.contains(&CheckCode::F601);
-                let check_repeated_variables = self.settings.select.contains(&CheckCode::F602);
+                let check_repeated_literals = self.settings.enabled.contains(&CheckCode::F601);
+                let check_repeated_variables = self.settings.enabled.contains(&CheckCode::F602);
                 if check_repeated_literals || check_repeated_variables {
                     self.checks.extend(checks::check_repeated_keys(
                         keys,
@@ -879,7 +883,7 @@ where
                     &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                 if self
                     .settings
-                    .select
+                    .enabled
                     .contains(CheckKind::YieldOutsideFunction.code())
                     && matches!(scope.kind, ScopeKind::Class | ScopeKind::Module)
                 {
@@ -893,7 +897,7 @@ where
                 if self.in_f_string.is_none()
                     && self
                         .settings
-                        .select
+                        .enabled
                         .contains(CheckKind::FStringMissingPlaceholders.code())
                     && !values
                         .iter()
@@ -911,7 +915,7 @@ where
                 op: Operator::RShift,
                 ..
             } => {
-                if self.settings.select.contains(&CheckCode::F633) {
+                if self.settings.enabled.contains(&CheckCode::F633) {
                     if let ExprKind::Name { id, .. } = &left.node {
                         if id == "print" {
                             let scope = &self.scopes
@@ -931,8 +935,8 @@ where
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
-                let check_not_in = self.settings.select.contains(&CheckCode::E713);
-                let check_not_is = self.settings.select.contains(&CheckCode::E714);
+                let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
+                let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
                 if check_not_in || check_not_is {
                     self.checks.extend(checks::check_not_tests(
                         op,
@@ -948,8 +952,8 @@ where
                 ops,
                 comparators,
             } => {
-                let check_none_comparisons = self.settings.select.contains(&CheckCode::E711);
-                let check_true_false_comparisons = self.settings.select.contains(&CheckCode::E712);
+                let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
+                let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
                 if check_none_comparisons || check_true_false_comparisons {
                     self.checks.extend(checks::check_literal_comparisons(
                         left,
@@ -961,7 +965,7 @@ where
                     ));
                 }
 
-                if self.settings.select.contains(&CheckCode::F632) {
+                if self.settings.enabled.contains(&CheckCode::F632) {
                     self.checks.extend(checks::check_is_literal(
                         left,
                         ops,
@@ -970,7 +974,7 @@ where
                     ));
                 }
 
-                if self.settings.select.contains(&CheckCode::E721) {
+                if self.settings.enabled.contains(&CheckCode::E721) {
                     self.checks.extend(checks::check_type_comparison(
                         ops,
                         comparators,
@@ -1164,7 +1168,7 @@ where
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         match &excepthandler.node {
             ExcepthandlerKind::ExceptHandler { type_, name, .. } => {
-                if self.settings.select.contains(&CheckCode::E722) && type_.is_none() {
+                if self.settings.enabled.contains(&CheckCode::E722) && type_.is_none() {
                     self.checks.push(Check::new(
                         CheckKind::DoNotUseBareExcept,
                         Range::from_located(excepthandler),
@@ -1172,7 +1176,7 @@ where
                 }
                 match name {
                     Some(name) => {
-                        if self.settings.select.contains(&CheckCode::E741) {
+                        if self.settings.enabled.contains(&CheckCode::E741) {
                             if let Some(check) = checks::check_ambiguous_variable_name(
                                 name,
                                 self.locate_check(Range::from_located(excepthandler)),
@@ -1227,7 +1231,7 @@ where
                         let scope = &mut self.scopes
                             [*(self.scope_stack.last().expect("No current scope found."))];
                         if let Some(binding) = &scope.values.remove(name) {
-                            if self.settings.select.contains(&CheckCode::F841)
+                            if self.settings.enabled.contains(&CheckCode::F841)
                                 && binding.used.is_none()
                             {
                                 self.checks.push(Check::new(
@@ -1248,7 +1252,7 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        if self.settings.select.contains(&CheckCode::F831) {
+        if self.settings.enabled.contains(&CheckCode::F831) {
             self.checks
                 .extend(checks::check_duplicate_arguments(arguments));
         }
@@ -1282,7 +1286,7 @@ where
             },
         );
 
-        if self.settings.select.contains(&CheckCode::E741) {
+        if self.settings.enabled.contains(&CheckCode::E741) {
             if let Some(check) = checks::check_ambiguous_variable_name(
                 &arg.node.arg,
                 self.locate_check(Range::from_located(arg)),
@@ -1368,7 +1372,7 @@ impl<'a> Checker<'a> {
         let binding = match scope.values.get(&name) {
             None => binding,
             Some(existing) => {
-                if self.settings.select.contains(&CheckCode::F402)
+                if self.settings.enabled.contains(&CheckCode::F402)
                     && matches!(binding.kind, BindingKind::LoopVar)
                     && matches!(
                         existing.kind,
@@ -1422,7 +1426,7 @@ impl<'a> Checker<'a> {
             }
 
             if import_starred {
-                if self.settings.select.contains(&CheckCode::F405) {
+                if self.settings.enabled.contains(&CheckCode::F405) {
                     let mut from_list = vec![];
                     for scope_index in self.scope_stack.iter().rev() {
                         let scope = &self.scopes[*scope_index];
@@ -1442,7 +1446,7 @@ impl<'a> Checker<'a> {
                 return;
             }
 
-            if self.settings.select.contains(&CheckCode::F821) {
+            if self.settings.enabled.contains(&CheckCode::F821) {
                 // Allow __path__.
                 if self.path.ends_with("__init__.py") && id == "__path__" {
                     return;
@@ -1460,7 +1464,7 @@ impl<'a> Checker<'a> {
             let current =
                 &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
 
-            if self.settings.select.contains(&CheckCode::F823)
+            if self.settings.enabled.contains(&CheckCode::F823)
                 && matches!(current.kind, ScopeKind::Function(_))
                 && !current.values.contains_key(id)
             {
@@ -1560,7 +1564,7 @@ impl<'a> Checker<'a> {
 
             let scope =
                 &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-            if scope.values.remove(id).is_none() && self.settings.select.contains(&CheckCode::F821)
+            if scope.values.remove(id).is_none() && self.settings.enabled.contains(&CheckCode::F821)
             {
                 self.checks.push(Check::new(
                     CheckKind::UndefinedName(id.clone()),
@@ -1586,7 +1590,7 @@ impl<'a> Checker<'a> {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 relocate_expr(&mut expr, location);
                 allocator.push(expr);
-            } else if self.settings.select.contains(&CheckCode::F722) {
+            } else if self.settings.enabled.contains(&CheckCode::F722) {
                 self.checks.push(Check::new(
                     CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
                     self.locate_check(location),
@@ -1641,7 +1645,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_assignments(&mut self) {
-        if self.settings.select.contains(&CheckCode::F841) {
+        if self.settings.enabled.contains(&CheckCode::F841) {
             while let Some(index) = self.deferred_assignments.pop() {
                 self.checks.extend(checks::check_unused_variables(
                     &self.scopes[index],
@@ -1653,9 +1657,9 @@ impl<'a> Checker<'a> {
     }
 
     fn check_dead_scopes(&mut self) {
-        if !self.settings.select.contains(&CheckCode::F401)
-            && !self.settings.select.contains(&CheckCode::F405)
-            && !self.settings.select.contains(&CheckCode::F822)
+        if !self.settings.enabled.contains(&CheckCode::F401)
+            && !self.settings.enabled.contains(&CheckCode::F405)
+            && !self.settings.enabled.contains(&CheckCode::F822)
         {
             return;
         }
@@ -1669,7 +1673,7 @@ impl<'a> Checker<'a> {
                 _ => None,
             });
 
-            if self.settings.select.contains(&CheckCode::F822)
+            if self.settings.enabled.contains(&CheckCode::F822)
                 && !scope.import_starred
                 && !self.path.ends_with("__init__.py")
             {
@@ -1687,7 +1691,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.select.contains(&CheckCode::F405) && scope.import_starred {
+            if self.settings.enabled.contains(&CheckCode::F405) && scope.import_starred {
                 if let Some(all_binding) = all_binding {
                     if let Some(names) = all_names {
                         let mut from_list = vec![];
@@ -1710,7 +1714,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.select.contains(&CheckCode::F401) {
+            if self.settings.enabled.contains(&CheckCode::F401) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
                 let mut unused: BTreeMap<(ImportKind, usize, Option<usize>), Vec<&str>> =
@@ -1793,7 +1797,7 @@ impl<'a> Checker<'a> {
 
         // flake8-builtins
         if is_attribute && matches!(scope.kind, ScopeKind::Class) {
-            if self.settings.select.contains(&CheckCode::A003) {
+            if self.settings.enabled.contains(&CheckCode::A003) {
                 if let Some(check) = checks::check_builtin_shadowing(
                     name,
                     self.locate_check(location),
@@ -1802,7 +1806,7 @@ impl<'a> Checker<'a> {
                     self.checks.push(check);
                 }
             }
-        } else if self.settings.select.contains(&CheckCode::A001) {
+        } else if self.settings.enabled.contains(&CheckCode::A001) {
             if let Some(check) = checks::check_builtin_shadowing(
                 name,
                 self.locate_check(location),
@@ -1814,7 +1818,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_arg_shadowing(&mut self, name: &str, location: Range) {
-        if self.settings.select.contains(&CheckCode::A002) {
+        if self.settings.enabled.contains(&CheckCode::A002) {
             if let Some(check) = checks::check_builtin_shadowing(
                 name,
                 self.locate_check(location),
