@@ -1907,7 +1907,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.55"
+version = "0.0.56"
 dependencies = [
  "anyhow",
  "bincode",
