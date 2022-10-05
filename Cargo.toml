@@ -7,7 +7,7 @@ edition = "2021"
 name = "ruff"
 
 [build-dependencies]
-cc="*"
+cc = "*"
 
 [dependencies]
 anyhow = { version = "1.0.60" }
@@ -27,23 +27,24 @@ itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "32a044c127668df44582f85699358e67803b0d73" }
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
+num-bigint = { version = "0.4.3" }
+num-traits = { version = "0.2.15" }
 once_cell = { version = "1.13.1" }
 path-absolutize = { version = "3.0.13", features = ["once_cell_cache"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
 rustpython-common = { git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
+strum = { version = "0.24.1", features = ["strum_macros"] }
+strum_macros = { version = "0.24.3" }
 toml = { version = "0.5.9" }
-tree-sitter = "0.20.9"
-tree-sitter-python = "0.20.2"
+tree-sitter = { version = "0.20.9" }
+tree-sitter-python = { version = "0.20.2" }
 update-informer = { version = "0.5.0", default_features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
-strum = { version = "0.24.1", features = ["strum_macros"] }
-strum_macros = "0.24.3"
-num-bigint = "0.4.3"
 
 [dev-dependencies]
 insta = { version = "1.19.1", features = ["yaml"] }
