@@ -27,6 +27,7 @@ use ::ruff::settings::CurrentSettings;
 use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ::ruff::tell_user;
 use ruff::linter::autoformat_path;
+use ruff::settings::RawSettings;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -120,7 +121,7 @@ fn check_for_updates() {
     }
 }
 
-fn show_settings(settings: Settings) {
+fn show_settings(settings: RawSettings) {
     println!("{:#?}", CurrentSettings::from_settings(settings));
 }
 
@@ -169,7 +170,7 @@ fn run_once(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = path {
-                    if settings.select.contains(&CheckCode::E902) {
+                    if settings.enabled.contains(&CheckCode::E902) {
                         vec![Message {
                             kind: CheckKind::IOError(message),
                             fixed: false,
@@ -287,7 +288,7 @@ fn inner_main() -> Result<ExitCode> {
         .map(|pair| PerFileIgnore::new(pair, &project_root))
         .collect();
 
-    let mut settings = Settings::from_pyproject(pyproject, project_root)?;
+    let mut settings = RawSettings::from_pyproject(pyproject, project_root)?;
     if !exclude.is_empty() {
         settings.exclude = exclude;
     }
@@ -298,17 +299,16 @@ fn inner_main() -> Result<ExitCode> {
         settings.per_file_ignores = per_file_ignores;
     }
     if !cli.select.is_empty() {
-        settings.clear();
-        settings.select(cli.select);
+        settings.select = cli.select;
     }
     if !cli.extend_select.is_empty() {
-        settings.select(cli.extend_select);
+        settings.extend_select = cli.extend_select;
     }
     if !cli.ignore.is_empty() {
-        settings.ignore(&cli.ignore);
+        settings.ignore = cli.ignore;
     }
     if !cli.extend_ignore.is_empty() {
-        settings.ignore(&cli.extend_ignore);
+        settings.extend_ignore = cli.extend_ignore;
     }
     if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
         settings.dummy_variable_rgx = dummy_variable_rgx;
@@ -318,12 +318,15 @@ fn inner_main() -> Result<ExitCode> {
         eprintln!("Error: specify --show-settings or show-files (not both).");
         return Ok(ExitCode::FAILURE);
     }
-    if cli.show_files {
-        show_files(&cli.files, &settings);
-        return Ok(ExitCode::SUCCESS);
-    }
     if cli.show_settings {
         show_settings(settings);
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    let settings = Settings::from_raw(settings);
+
+    if cli.show_files {
+        show_files(&cli.files, &settings);
         return Ok(ExitCode::SUCCESS);
     }
 

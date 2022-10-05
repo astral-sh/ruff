@@ -51,56 +51,18 @@ impl PerFileIgnore {
 }
 
 #[derive(Debug)]
-pub struct Settings {
-    pub pyproject: Option<PathBuf>,
-    pub project_root: Option<PathBuf>,
-    pub line_length: usize,
+pub struct RawSettings {
+    pub dummy_variable_rgx: Regex,
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
-    pub select: BTreeSet<CheckCode>,
+    pub extend_ignore: Vec<CheckCode>,
+    pub extend_select: Vec<CheckCode>,
+    pub ignore: Vec<CheckCode>,
+    pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
-    pub dummy_variable_rgx: Regex,
-}
-
-impl Settings {
-    pub fn for_rule(check_code: CheckCode) -> Self {
-        Self {
-            pyproject: None,
-            project_root: None,
-            line_length: 88,
-            exclude: vec![],
-            extend_exclude: vec![],
-            select: BTreeSet::from([check_code]),
-            per_file_ignores: vec![],
-            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
-        }
-    }
-
-    pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
-        Self {
-            pyproject: None,
-            project_root: None,
-            line_length: 88,
-            exclude: vec![],
-            extend_exclude: vec![],
-            select: BTreeSet::from_iter(check_codes),
-            per_file_ignores: vec![],
-            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
-        }
-    }
-}
-
-impl Hash for Settings {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.line_length.hash(state);
-        self.dummy_variable_rgx.as_str().hash(state);
-        for value in self.select.iter() {
-            value.hash(state);
-        }
-        for value in self.per_file_ignores.iter() {
-            value.hash(state);
-        }
-    }
+    pub project_root: Option<PathBuf>,
+    pub pyproject: Option<PathBuf>,
+    pub select: Vec<CheckCode>,
 }
 
 static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
@@ -130,14 +92,18 @@ static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
     Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
 
-impl Settings {
+impl RawSettings {
     pub fn from_pyproject(
         pyproject: Option<PathBuf>,
         project_root: Option<PathBuf>,
     ) -> Result<Self> {
         let config = load_config(&pyproject)?;
-        let mut settings = Settings {
-            line_length: config.line_length.unwrap_or(88),
+        Ok(RawSettings {
+            dummy_variable_rgx: match config.dummy_variable_rgx {
+                Some(pattern) => Regex::new(&pattern)
+                    .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
+                None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
+            },
             exclude: config
                 .exclude
                 .map(|paths| {
@@ -152,42 +118,88 @@ impl Settings {
                 .iter()
                 .map(|path| FilePattern::from_user(path, &project_root))
                 .collect(),
-            select: if let Some(select) = config.select {
-                BTreeSet::from_iter(select)
-            } else {
-                BTreeSet::from_iter(DEFAULT_CHECK_CODES)
-            },
+            extend_ignore: config.extend_ignore,
+            extend_select: config.extend_select,
+            ignore: config.ignore,
+            line_length: config.line_length.unwrap_or(88),
             per_file_ignores: config
                 .per_file_ignores
                 .into_iter()
                 .map(|pair| PerFileIgnore::new(pair, &project_root))
                 .collect(),
-            dummy_variable_rgx: match config.dummy_variable_rgx {
-                Some(pattern) => Regex::new(&pattern)
-                    .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
-                None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
-            },
-            pyproject,
             project_root,
-        };
-        settings.select(config.extend_select);
-        settings.ignore(&config.ignore);
-        Ok(settings)
+            pyproject,
+            select: config
+                .select
+                .unwrap_or_else(|| DEFAULT_CHECK_CODES.to_vec()),
+        })
     }
+}
 
-    pub fn clear(&mut self) {
-        self.select.clear();
-    }
+#[derive(Debug)]
+pub struct Settings {
+    pub dummy_variable_rgx: Regex,
+    pub enabled: BTreeSet<CheckCode>,
+    pub exclude: Vec<FilePattern>,
+    pub extend_exclude: Vec<FilePattern>,
+    pub line_length: usize,
+    pub per_file_ignores: Vec<PerFileIgnore>,
+}
 
-    pub fn select(&mut self, codes: Vec<CheckCode>) {
-        for code in codes {
-            self.select.insert(code);
+impl Settings {
+    pub fn from_raw(settings: RawSettings) -> Self {
+        // Materialize the set of enabled CheckCodes.
+        let mut enabled: BTreeSet<CheckCode> = BTreeSet::new();
+        enabled.extend(settings.select);
+        enabled.extend(settings.extend_select);
+        for code in &settings.ignore {
+            enabled.remove(code);
+        }
+        for code in &settings.extend_ignore {
+            enabled.remove(code);
+        }
+        Self {
+            dummy_variable_rgx: settings.dummy_variable_rgx,
+            enabled,
+            exclude: settings.exclude,
+            extend_exclude: settings.extend_exclude,
+            line_length: settings.line_length,
+            per_file_ignores: settings.per_file_ignores,
         }
     }
 
-    pub fn ignore(&mut self, codes: &[CheckCode]) {
-        for code in codes {
-            self.select.remove(code);
+    pub fn for_rule(check_code: CheckCode) -> Self {
+        Self {
+            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
+            enabled: BTreeSet::from([check_code]),
+            exclude: vec![],
+            extend_exclude: vec![],
+            line_length: 88,
+            per_file_ignores: vec![],
+        }
+    }
+
+    pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
+        Self {
+            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
+            enabled: BTreeSet::from_iter(check_codes),
+            exclude: vec![],
+            extend_exclude: vec![],
+            line_length: 88,
+            per_file_ignores: vec![],
+        }
+    }
+}
+
+impl Hash for Settings {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.line_length.hash(state);
+        self.dummy_variable_rgx.as_str().hash(state);
+        for value in self.enabled.iter() {
+            value.hash(state);
+        }
+        for value in self.per_file_ignores.iter() {
+            value.hash(state);
         }
     }
 }
@@ -218,22 +230,23 @@ impl Exclusion {
 /// Struct to render user-facing Settings.
 #[derive(Debug)]
 pub struct CurrentSettings {
-    pub pyproject: Option<PathBuf>,
-    pub project_root: Option<PathBuf>,
-    pub line_length: usize,
+    pub dummy_variable_rgx: Regex,
     pub exclude: Vec<Exclusion>,
     pub extend_exclude: Vec<Exclusion>,
-    pub select: BTreeSet<CheckCode>,
+    pub extend_ignore: Vec<CheckCode>,
+    pub extend_select: Vec<CheckCode>,
+    pub ignore: Vec<CheckCode>,
+    pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
-    pub dummy_variable_rgx: Regex,
+    pub project_root: Option<PathBuf>,
+    pub pyproject: Option<PathBuf>,
+    pub select: Vec<CheckCode>,
 }
 
 impl CurrentSettings {
-    pub fn from_settings(settings: Settings) -> Self {
+    pub fn from_settings(settings: RawSettings) -> Self {
         Self {
-            pyproject: settings.pyproject,
-            project_root: settings.project_root,
-            line_length: settings.line_length,
+            dummy_variable_rgx: settings.dummy_variable_rgx,
             exclude: settings
                 .exclude
                 .into_iter()
@@ -244,9 +257,14 @@ impl CurrentSettings {
                 .into_iter()
                 .map(Exclusion::from_file_pattern)
                 .collect(),
-            select: settings.select,
+            extend_ignore: settings.extend_ignore,
+            extend_select: settings.extend_select,
+            ignore: settings.ignore,
+            line_length: settings.line_length,
             per_file_ignores: settings.per_file_ignores,
-            dummy_variable_rgx: settings.dummy_variable_rgx,
+            project_root: settings.project_root,
+            pyproject: settings.pyproject,
+            select: settings.select,
         }
     }
 }

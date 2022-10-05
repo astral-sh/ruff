@@ -32,8 +32,8 @@ pub fn check_lines(
     settings: &Settings,
     autofix: &fixer::Mode,
 ) {
-    let enforce_line_too_long = settings.select.contains(&CheckCode::E501);
-    let enforce_noqa = settings.select.contains(&CheckCode::M001);
+    let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
+    let enforce_noqa = settings.enabled.contains(&CheckCode::M001);
 
     let mut noqa_directives: BTreeMap<usize, (Directive, Vec<&str>)> = BTreeMap::new();
 
