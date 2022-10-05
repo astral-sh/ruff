@@ -219,8 +219,7 @@ where
             StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
                 let global_scope_id = self.scopes[GLOBAL_SCOPE_INDEX].id;
 
-                let current_scope =
-                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+                let current_scope = self.current_scope();
                 let current_scope_id = current_scope.id;
                 if current_scope_id != global_scope_id {
                     for name in names {
@@ -724,9 +723,7 @@ where
 
                     self.check_builtin_shadowing(id, Range::from_located(expr), true);
 
-                    let parent =
-                        self.parents[*(self.parent_stack.last().expect("No parent found."))];
-                    self.handle_node_store(expr, parent);
+                    self.handle_node_store(expr, self.current_parent());
                 }
                 ExprContext::Del => self.handle_node_delete(expr),
             },
@@ -775,8 +772,7 @@ where
                 }
             }
             ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. } => {
-                let scope =
-                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+                let scope = self.current_scope();
                 if self
                     .settings
                     .enabled
@@ -1072,11 +1068,7 @@ where
                             false,
                         );
 
-                        let scope = &self.scopes
-                            [*(self.scope_stack.last().expect("No current scope found."))];
-                        if scope.values.contains_key(name) {
-                            let parent = self.parents
-                                [*(self.parent_stack.last().expect("No parent found."))];
+                        if self.current_scope().values.contains_key(name) {
                             self.handle_node_store(
                                 &Expr::new(
                                     excepthandler.location,
@@ -1086,15 +1078,11 @@ where
                                         ctx: ExprContext::Store,
                                     },
                                 ),
-                                parent,
+                                self.current_parent(),
                             );
                         }
 
-                        let parent =
-                            self.parents[*(self.parent_stack.last().expect("No parent found."))];
-                        let scope = &self.scopes
-                            [*(self.scope_stack.last().expect("No current scope found."))];
-                        let definition = scope.values.get(name).cloned();
+                        let definition = self.current_scope().values.get(name).cloned();
                         self.handle_node_store(
                             &Expr::new(
                                 excepthandler.location,
@@ -1104,7 +1092,7 @@ where
                                     ctx: ExprContext::Store,
                                 },
                             ),
-                            parent,
+                            self.current_parent(),
                         );
 
                         walk_excepthandler(self, excepthandler);
@@ -1242,6 +1230,10 @@ impl<'a> Checker<'a> {
 
     pub fn current_scope(&self) -> &Scope {
         &self.scopes[*(self.scope_stack.last().expect("No current scope found."))]
+    }
+
+    pub fn current_parent(&self) -> &'a Stmt {
+        self.parents[*(self.parent_stack.last().expect("No parent found."))]
     }
 
     pub fn binding_context(&self) -> BindingContext {
@@ -1682,7 +1674,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_shadowing(&mut self, name: &str, location: Range, is_attribute: bool) {
-        let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        let scope = self.current_scope();
 
         // flake8-builtins
         if is_attribute && matches!(scope.kind, ScopeKind::Class) {
