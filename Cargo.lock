@@ -16,7 +16,7 @@ checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
 dependencies = [
  "getrandom 0.2.7",
  "once_cell",
- "version_check",
+ "version_check 0.9.4",
 ]
 
 [[package]]
@@ -318,6 +318,12 @@ name = "byte-tools"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3b5ca7a04898ad4bcd41c90c5285445ff5b791899bb1b0abdd2a2aa791211d7"
+
+[[package]]
+name = "bytecount"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f861d9ce359f56dbcb6e0c2a1cb84e52ad732cadb57b806adeb3c7668caccbd8"
 
 [[package]]
 name = "byteorder"
@@ -907,7 +913,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bff49e947297f3312447abdca79f45f4738097cc82b06e72054d2223f601f1b9"
 dependencies = [
  "typenum",
- "version_check",
+ "version_check 0.9.4",
 ]
 
 [[package]]
@@ -1137,7 +1143,7 @@ dependencies = [
  "string_cache",
  "term",
  "tiny-keccak",
- "unicode-xid",
+ "unicode-xid 0.2.4",
 ]
 
 [[package]]
@@ -1368,12 +1374,33 @@ dependencies = [
 
 [[package]]
 name = "nom"
+version = "4.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ad2a91a8e869eeb30b9cb3119ae87773a8f4ae617f41b1eb9c154b2905f7bd6"
+dependencies = [
+ "memchr",
+ "version_check 0.1.5",
+]
+
+[[package]]
+name = "nom"
 version = "5.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffb4262d26ed83a1c0a33a38fe2bb15797329c85770da05e6b828ddb782627af"
 dependencies = [
  "memchr",
- "version_check",
+ "version_check 0.9.4",
+]
+
+[[package]]
+name = "nom_locate"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a47c112b3861d81f7fbf73892b9271af933af32bd5dee6889aa3c3fa9caed7e"
+dependencies = [
+ "bytecount",
+ "memchr",
+ "nom 4.2.3",
 ]
 
 [[package]]
@@ -1392,6 +1419,17 @@ dependencies = [
  "mio-extras",
  "walkdir",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -1695,7 +1733,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "version_check",
+ "version_check 0.9.4",
 ]
 
 [[package]]
@@ -1706,7 +1744,7 @@ checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
 dependencies = [
  "proc-macro2",
  "quote",
- "version_check",
+ "version_check 0.9.4",
 ]
 
 [[package]]
@@ -1716,6 +1754,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94e2ef8dbfc347b10c094890f778ee2e36ca9bb4262e86dc99cd217e35f3470b"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "python-parser"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "683594d14f9c4db9e899643108918ad9db99aedad77121b5179aa205343c10de"
+dependencies = [
+ "nom 4.2.3",
+ "nom_locate",
+ "num-bigint 0.2.6",
+ "num-traits",
+ "unicode-xid 0.1.0",
+ "unicode_names2 0.2.2",
+ "wtf8",
 ]
 
 [[package]]
@@ -1928,6 +1981,7 @@ dependencies = [
  "notify",
  "once_cell",
  "path-absolutize",
+ "python-parser",
  "rayon",
  "regex",
  "rustpython-ast",
@@ -1957,7 +2011,7 @@ name = "rustpython-ast"
 version = "0.1.0"
 source = "git+https://github.com/charliermarsh/RustPython.git?rev=4f457893efc381ad5c432576b24bcc7e4a08c641#4f457893efc381ad5c432576b24bcc7e4a08c641"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.3",
  "rustpython-common",
  "rustpython-compiler-core",
 ]
@@ -1973,7 +2027,7 @@ dependencies = [
  "lexical-parse-float",
  "libc",
  "lock_api",
- "num-bigint",
+ "num-bigint 0.4.3",
  "num-complex",
  "num-traits",
  "once_cell",
@@ -1995,7 +2049,7 @@ dependencies = [
  "bstr",
  "itertools",
  "lz4_flex",
- "num-bigint",
+ "num-bigint 0.4.3",
  "num-complex",
  "serde",
  "static_assertions",
@@ -2013,7 +2067,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "log",
- "num-bigint",
+ "num-bigint 0.4.3",
  "num-traits",
  "phf 0.10.1",
  "phf_codegen 0.10.0",
@@ -2023,7 +2077,7 @@ dependencies = [
  "tiny-keccak",
  "unic-emoji-char",
  "unic-ucd-ident",
- "unicode_names2",
+ "unicode_names2 0.5.1",
 ]
 
 [[package]]
@@ -2315,7 +2369,7 @@ checksum = "76971977e6121664ec1b960d1313aacfa75642adc93b9d4d53b247bd4cb1747e"
 dependencies = [
  "dirs 2.0.2",
  "fnv",
- "nom",
+ "nom 5.1.2",
  "phf 0.8.0",
  "phf_codegen 0.8.0",
 ]
@@ -2487,9 +2541,21 @@ dependencies = [
 
 [[package]]
 name = "unicode-xid"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"
+
+[[package]]
+name = "unicode-xid"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
+
+[[package]]
+name = "unicode_names2"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dc6c5da0c8d7200f9488cc346bd30ba62bcd9f79ef937ea6573132e3d507df9"
 
 [[package]]
 name = "unicode_names2"
@@ -2553,8 +2619,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2209b78d1249f7e6f3293657c9779fe31ced465df091bbd433a1cf88e916ec55"
 dependencies = [
  "ctor",
- "version_check",
+ "version_check 0.9.4",
 ]
+
+[[package]]
+name = "version_check"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "914b1a6776c4c929a602fafd8bc742e06365d4bcbe48c30f9cca5824f70dc9dd"
 
 [[package]]
 name = "version_check"
@@ -2819,6 +2891,12 @@ dependencies = [
  "winapi 0.2.8",
  "winapi-build",
 ]
+
+[[package]]
+name = "wtf8"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6b9309a86639c488a8eb2b5331cb5127cc9feb0a94a0db4b5d1ab5b84977956"
 
 [[package]]
 name = "yaml-rust"

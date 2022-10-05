@@ -8,7 +8,6 @@ use rustpython_parser::{lexer, parser};
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
-use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
@@ -101,33 +100,19 @@ pub fn lint_path(
     let contents = fs::read_file(path)?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(&contents);
+    // let tokens: Vec<LexResult> = tokenize(&contents);
 
     // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    // let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
-    // Generate checks.
-    let mut checks = check_path(path, &contents, tokens, &noqa_line_for, settings, autofix)?;
+    match python_parser::file_input(python_parser::make_strspan(&contents)) {
+        Ok(x) => {}
+        Err(e) => return Err(anyhow::anyhow!("Err: failed")),
+    }
 
-    // Apply autofix.
-    if matches!(autofix, fixer::Mode::Apply) {
-        fix_file(&mut checks, &contents, path)?;
-    };
+    // let _ = parser::parse_program_tokens(tokens, "<filename>")?;
 
-    // Convert to messages.
-    let messages: Vec<Message> = checks
-        .into_iter()
-        .map(|check| Message {
-            kind: check.kind,
-            fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
-            location: check.location,
-            end_location: check.end_location,
-            filename: path.to_string_lossy().to_string(),
-        })
-        .collect();
-    cache::set(path, &metadata, settings, autofix, &messages, mode);
-
-    Ok(messages)
+    Ok(vec![])
 }
 
 pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
