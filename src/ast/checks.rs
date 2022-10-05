@@ -4,15 +4,13 @@ use itertools::izip;
 use regex::Regex;
 use rustpython_parser::ast::{
     Arg, ArgData, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind,
-    Keyword, Location, Stmt, StmtKind, Unaryop,
+    Stmt, StmtKind, Unaryop,
 };
 
-use crate::ast::operations::SourceCodeLocator;
 use crate::ast::types::{
     Binding, BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind,
 };
-use crate::autofix::{fixer, fixes};
-use crate::checks::{Check, CheckKind, Fix, RejectedCmpop};
+use crate::checks::{Check, CheckKind, RejectedCmpop};
 use crate::python::builtins::BUILTINS;
 
 /// Check IfTuple compliance.
@@ -178,13 +176,9 @@ pub fn check_ambiguous_function_name(name: &str, location: Range) -> Option<Chec
 
 /// Check UselessObjectInheritance compliance.
 pub fn check_useless_object_inheritance(
-    stmt: &Stmt,
     name: &str,
     bases: &[Expr],
-    keywords: &[Keyword],
     scope: &Scope,
-    locator: &mut SourceCodeLocator,
-    autofix: &fixer::Mode,
 ) -> Option<Check> {
     for expr in bases {
         if let ExprKind::Name { id, .. } = &expr.node {
@@ -195,22 +189,10 @@ pub fn check_useless_object_inheritance(
                         kind: BindingKind::Builtin,
                         ..
                     }) => {
-                        let mut check = Check::new(
+                        return Some(Check::new(
                             CheckKind::UselessObjectInheritance(name.to_string()),
                             Range::from_located(expr),
-                        );
-                        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                            if let Some(fix) = fixes::remove_class_def_base(
-                                locator,
-                                &stmt.location,
-                                expr.location,
-                                bases,
-                                keywords,
-                            ) {
-                                check.amend(fix);
-                            }
-                        }
-                        return Some(check);
+                        ));
                     }
                     _ => {}
                 }
@@ -298,28 +280,15 @@ pub fn check_duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
 }
 
 /// Check AssertEquals compliance.
-pub fn check_assert_equals(expr: &Expr, autofix: &fixer::Mode) -> Option<Check> {
+pub fn check_assert_equals(expr: &Expr) -> Option<Check> {
     if let ExprKind::Attribute { value, attr, .. } = &expr.node {
         if attr == "assertEquals" {
             if let ExprKind::Name { id, .. } = &value.node {
                 if id == "self" {
-                    let mut check =
-                        Check::new(CheckKind::NoAssertEquals, Range::from_located(expr));
-                    if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                        check.amend(Fix {
-                            content: "assertEqual".to_string(),
-                            location: Location::new(
-                                expr.location.row(),
-                                expr.location.column() + 1,
-                            ),
-                            end_location: Location::new(
-                                expr.location.row(),
-                                expr.location.column() + 1 + "assertEquals".len(),
-                            ),
-                            applied: false,
-                        });
-                    }
-                    return Some(check);
+                    return Some(Check::new(
+                        CheckKind::NoAssertEquals,
+                        Range::from_located(expr),
+                    ));
                 }
             }
         }
@@ -791,11 +760,16 @@ pub fn check_super_args(
 
 // flake8-print
 /// Check whether a function call is a `print` or `pprint` invocation
-pub fn check_print_call(expr: &Expr, func: &Expr) -> Option<Check> {
+pub fn check_print_call(
+    expr: &Expr,
+    func: &Expr,
+    check_print: bool,
+    check_pprint: bool,
+) -> Option<Check> {
     if let ExprKind::Name { id, .. } = &func.node {
-        if id == "print" {
+        if check_print && id == "print" {
             return Some(Check::new(CheckKind::PrintFound, Range::from_located(expr)));
-        } else if id == "pprint" {
+        } else if check_pprint && id == "pprint" {
             return Some(Check::new(
                 CheckKind::PPrintFound,
                 Range::from_located(expr),
@@ -805,7 +779,7 @@ pub fn check_print_call(expr: &Expr, func: &Expr) -> Option<Check> {
 
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
         if let ExprKind::Name { id, .. } = &value.node {
-            if id == "pprint" && attr == "pprint" {
+            if check_pprint && id == "pprint" && attr == "pprint" {
                 return Some(Check::new(
                     CheckKind::PPrintFound,
                     Range::from_located(expr),
