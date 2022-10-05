@@ -235,6 +235,9 @@ impl FromStr for CheckCode {
             "A003" => Ok(CheckCode::A003),
             // flake8-super
             "SPR001" => Ok(CheckCode::SPR001),
+            // flake8-print
+            "T201" => Ok(CheckCode::T201),
+            "T203" => Ok(CheckCode::T203),
             // pyupgrade
             "U001" => Ok(CheckCode::U001),
             // Refactor
