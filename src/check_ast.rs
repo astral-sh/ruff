@@ -59,7 +59,6 @@ pub struct Checker<'a> {
     in_f_string: Option<Range>,
     in_annotation: bool,
     in_literal: bool,
-    in_pep593_annotated: bool,
     seen_non_import: bool,
     seen_docstring: bool,
     futures_allowed: bool,
@@ -92,7 +91,6 @@ impl<'a> Checker<'a> {
             in_f_string: None,
             in_annotation: false,
             in_literal: false,
-            in_pep593_annotated: false,
             seen_non_import: false,
             seen_docstring: false,
             futures_allowed: true,
@@ -699,7 +697,6 @@ where
         let prev_in_f_string = self.in_f_string;
         let prev_in_literal = self.in_literal;
         let prev_in_annotation = self.in_annotation;
-        let prev_in_pep593_annotated = self.in_pep593_annotated;
 
         if self.in_annotation && self.annotations_future_enabled {
             self.deferred_annotations.push((
@@ -888,7 +885,7 @@ where
                 value: Constant::Str(value),
                 ..
             } => {
-                if self.in_annotation && !(self.in_literal || self.in_pep593_annotated) {
+                if self.in_annotation && !self.in_literal {
                     self.deferred_string_annotations
                         .push((Range::from_located(expr), value));
                 }
@@ -1087,7 +1084,6 @@ where
 
         self.in_annotation = prev_in_annotation;
         self.in_literal = prev_in_literal;
-        self.in_pep593_annotated = prev_in_pep593_annotated;
         self.in_f_string = prev_in_f_string;
     }
 
