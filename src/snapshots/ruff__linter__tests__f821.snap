@@ -74,4 +74,31 @@ expression: checks
     row: 89
     column: 9
   fix: ~
+- kind:
+    UndefinedName: PEP593Test123
+  location:
+    row: 114
+    column: 10
+  end_location:
+    row: 114
+    column: 24
+  fix: ~
+- kind:
+    UndefinedName: foo
+  location:
+    row: 122
+    column: 15
+  end_location:
+    row: 122
+    column: 19
+  fix: ~
+- kind:
+    UndefinedName: bar
+  location:
+    row: 122
+    column: 22
+  end_location:
+    row: 122
+    column: 26
+  fix: ~
 

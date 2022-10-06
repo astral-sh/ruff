@@ -91,11 +91,34 @@ A = (
 )
 
 
-from typing import Annotated
+from typing import Annotated, Literal  # noqa: E402
 
 
 def arbitrary_callable() -> None:
     ...
 
+
 class PEP593Test:
-    field: Annotated[int, "base64", arbitrary_callable()]
+    field: Annotated[
+        int,
+        "base64",
+        arbitrary_callable(),
+        123,
+        (1, 2, 3),
+    ]
+    field_with_stringified_type: Annotated[
+        "PEP593Test",
+        123,
+    ]
+    field_with_undefined_stringified_type: Annotated[
+        "PEP593Test123",
+        123,
+    ]
+    field_with_nested_subscript: Annotated[
+        dict[Literal["foo"], str],
+        123,
+    ]
+    field_with_undefined_nested_subscript: Annotated[
+        dict["foo", "bar"],  # these should fail as undefined
+        123,
+    ]
