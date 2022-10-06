@@ -109,7 +109,7 @@ fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
 }
 
 #[derive(Clone, Copy)]
-pub enum SubscriptKind {
+enum SubscriptKind {
     AnnotatedSubscript,
     PEP593AnnotatedSubscript,
 }
@@ -1041,28 +1041,30 @@ where
             ExprKind::Subscript { value, slice, ctx } => {
                 match match_annotated_subscript(value) {
                     Some(subscript) => match subscript {
+                        // Ex) Optional[int]
                         SubscriptKind::AnnotatedSubscript => {
                             self.visit_expr(value);
                             self.visit_annotation(slice);
                             self.visit_expr_context(ctx);
                         }
+                        // Ex) Annotated[int, "Hello, world!"]
                         SubscriptKind::PEP593AnnotatedSubscript => {
-                            // the first argument is a type (including forward references)
-                            // the rest of the arguments are arbitrary python objects
+                            // First argument is a type (including forward references); the rest are
+                            // arbitrary Python objects.
                             self.visit_expr(value);
-                            match &slice.node {
-                                ExprKind::Tuple { elts, ctx } => {
-                                    let first = elts.first().unwrap();
-                                    self.visit_expr(first);
+                            if let ExprKind::Tuple { elts, ctx } = &slice.node {
+                                if let Some(expr) = elts.first() {
+                                    self.visit_expr(expr);
                                     self.in_annotation = false;
-                                    for nxt in elts.iter().skip(1) {
-                                        self.visit_expr(nxt);
+                                    for expr in elts.iter().skip(1) {
+                                        self.visit_expr(expr);
                                     }
                                     self.in_annotation = true;
                                     self.visit_expr_context(ctx);
                                 }
-                                _ => panic!(), // arguments can only be slices
-                            };
+                            } else {
+                                error!("Found non-ExprKind::Tuple argument to PEP 593 Annotation.")
+                            }
                         }
                     },
                     None => visitor::walk_expr(self, expr),
