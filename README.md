@@ -213,6 +213,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (partial)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (partial)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
