@@ -14,6 +14,12 @@ your proposed change.
 ruff is written in Rust (1.63.0). You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
+You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
+
+```shell
+cargo install cargo-insta
+```
+
 ### Development
 
 After cloning the repository, run ruff locally with:
@@ -58,7 +64,7 @@ similar rules are implemented.
 To add a test fixture, create a file under `resources/test/fixtures`, named to match the `CheckCode`
 you defined earlier (e.g., `E402.py`). This file should contain a variety of violations and
 non-violations designed to evaluate and demonstrate the behavior of your lint rule. Run ruff locally
-with (e.g.) `cargo run resources/test/fixtures/E402.py`. Once you're satisified with the output,
+with (e.g.) `cargo run resources/test/fixtures/E402.py`. Once you're satisfied with the output,
 codify the behavior as a snapshot test by adding a new function to the `mod tests` section of
 `src/linter.rs`, like so:
 
