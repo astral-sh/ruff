@@ -91,7 +91,7 @@ A = (
 )
 
 
-from typing import Annotated, Literal  # noqa: E402
+from typing import Annotated, Literal
 
 
 def arbitrary_callable() -> None:
@@ -119,6 +119,6 @@ class PEP593Test:
         123,
     ]
     field_with_undefined_nested_subscript: Annotated[
-        dict["foo", "bar"],  # these should fail as undefined
+        dict["foo", "bar"],  # Expected to fail as undefined.
         123,
     ]
