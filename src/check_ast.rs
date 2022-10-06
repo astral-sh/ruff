@@ -108,7 +108,6 @@ fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
     }
 }
 
-#[derive(Clone, Copy)]
 enum SubscriptKind {
     AnnotatedSubscript,
     PEP593AnnotatedSubscript,
