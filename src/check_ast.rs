@@ -765,6 +765,13 @@ where
                     plugins::print_call(self, expr, func);
                 }
 
+                // flake8-comprehensions
+                if self.settings.enabled.contains(&CheckCode::C403) {
+                    if let Some(check) = checks::unnecessary_list_comprehension(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = &mut self.scopes[*(self

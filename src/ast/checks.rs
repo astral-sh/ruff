@@ -692,6 +692,21 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &Vec<Expr>) -> bool {
     }
 }
 
+// flakes8-comprehensions
+pub fn unnecessary_list_comprehension(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+    if let ExprKind::Name { id, .. } = &func.node {
+        if id == "set" && args.len() == 1 {
+            if let ExprKind::ListComp { .. } = &args[0].node {
+                return Some(Check::new(
+                    CheckKind::UnnecessaryListComprehensionSet,
+                    Range::from_located(expr),
+                ));
+            }
+        }
+    }
+    None
+}
+
 // flake8-super
 /// Check that `super()` has no args
 pub fn check_super_args(
