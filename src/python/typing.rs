@@ -7,6 +7,7 @@ static ANNOTATED_SUBSCRIPTS: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
         "AbstractAsyncContextManager",
         "AbstractContextManager",
         "AbstractSet",
+        // "Annotated",
         "AsyncContextManager",
         "AsyncGenerator",
         "AsyncIterable",
@@ -86,4 +87,8 @@ static ANNOTATED_SUBSCRIPTS: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
 
 pub fn is_annotated_subscript(name: &str) -> bool {
     ANNOTATED_SUBSCRIPTS.contains(name)
+}
+
+pub fn is_pep593_annotated_subscript(name: &str) -> bool {
+    name == "Annotated"
 }

@@ -108,11 +108,32 @@ fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
     }
 }
 
-fn is_annotated_subscript(expr: &Expr) -> bool {
+enum SubscriptKind {
+    AnnotatedSubscript,
+    PEP593AnnotatedSubscript,
+}
+
+fn match_annotated_subscript(expr: &Expr) -> Option<SubscriptKind> {
     match &expr.node {
-        ExprKind::Attribute { attr, .. } => typing::is_annotated_subscript(attr),
-        ExprKind::Name { id, .. } => typing::is_annotated_subscript(id),
-        _ => false,
+        ExprKind::Attribute { attr, .. } => {
+            if typing::is_annotated_subscript(attr) {
+                Some(SubscriptKind::AnnotatedSubscript)
+            } else if typing::is_pep593_annotated_subscript(attr) {
+                Some(SubscriptKind::PEP593AnnotatedSubscript)
+            } else {
+                None
+            }
+        }
+        ExprKind::Name { id, .. } => {
+            if typing::is_annotated_subscript(id) {
+                Some(SubscriptKind::AnnotatedSubscript)
+            } else if typing::is_pep593_annotated_subscript(id) {
+                Some(SubscriptKind::PEP593AnnotatedSubscript)
+            } else {
+                None
+            }
+        }
+        _ => None,
     }
 }
 
@@ -862,9 +883,11 @@ where
             ExprKind::Constant {
                 value: Constant::Str(value),
                 ..
-            } if self.in_annotation && !self.in_literal => {
-                self.deferred_string_annotations
-                    .push((Range::from_located(expr), value));
+            } => {
+                if self.in_annotation && !self.in_literal {
+                    self.deferred_string_annotations
+                        .push((Range::from_located(expr), value));
+                }
             }
             ExprKind::Lambda { args, .. } => {
                 // Visit the arguments, but avoid the body, which will be deferred.
@@ -1015,12 +1038,35 @@ where
                 }
             }
             ExprKind::Subscript { value, slice, ctx } => {
-                if is_annotated_subscript(value) {
-                    self.visit_expr(value);
-                    self.visit_annotation(slice);
-                    self.visit_expr_context(ctx);
-                } else {
-                    visitor::walk_expr(self, expr);
+                match match_annotated_subscript(value) {
+                    Some(subscript) => match subscript {
+                        // Ex) Optional[int]
+                        SubscriptKind::AnnotatedSubscript => {
+                            self.visit_expr(value);
+                            self.visit_annotation(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                        // Ex) Annotated[int, "Hello, world!"]
+                        SubscriptKind::PEP593AnnotatedSubscript => {
+                            // First argument is a type (including forward references); the rest are
+                            // arbitrary Python objects.
+                            self.visit_expr(value);
+                            if let ExprKind::Tuple { elts, ctx } = &slice.node {
+                                if let Some(expr) = elts.first() {
+                                    self.visit_expr(expr);
+                                    self.in_annotation = false;
+                                    for expr in elts.iter().skip(1) {
+                                        self.visit_expr(expr);
+                                    }
+                                    self.in_annotation = true;
+                                    self.visit_expr_context(ctx);
+                                }
+                            } else {
+                                error!("Found non-ExprKind::Tuple argument to PEP 593 Annotation.")
+                            }
+                        }
+                    },
+                    None => visitor::walk_expr(self, expr),
                 }
             }
             _ => visitor::walk_expr(self, expr),
