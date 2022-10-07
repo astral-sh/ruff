@@ -24,8 +24,8 @@ use ruff::logging::set_up_logging;
 use ruff::message::Message;
 use ruff::printer::{Printer, SerializationFormat};
 use ruff::pyproject::{self, StrCheckCodePair};
-use ruff::settings::CurrentSettings;
 use ruff::settings::RawSettings;
+use ruff::settings::{CurrentSettings, PythonVersion};
 use ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ruff::tell_user;
 
@@ -92,6 +92,9 @@ struct Cli {
     /// Regular expression matching the name of dummy variables.
     #[arg(long)]
     dummy_variable_rgx: Option<Regex>,
+    /// The minimum Python version that should be supported.
+    #[arg(long)]
+    target_version: Option<PythonVersion>,
     /// Round-trip auto-formatting.
     // TODO(charlie): This should be a sub-command.
     #[arg(long, hide = true)]
@@ -310,6 +313,9 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !cli.extend_ignore.is_empty() {
         settings.extend_ignore = cli.extend_ignore;
+    }
+    if let Some(target_version) = cli.target_version {
+        settings.target_version = target_version;
     }
     if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
         settings.dummy_variable_rgx = dummy_variable_rgx;

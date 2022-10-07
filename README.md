@@ -130,6 +130,8 @@ Options:
           Enable automatic additions of noqa directives to failing lines
       --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
           Regular expression matching the name of dummy variables
+      --target-version <TARGET_VERSION>
+          The minimum Python version that should be supported
   -h, --help
           Print help information
   -V, --version

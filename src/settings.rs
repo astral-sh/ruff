@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use glob::Pattern;
@@ -10,6 +12,38 @@ use regex::Regex;
 use crate::checks::{CheckCode, DEFAULT_CHECK_CODES};
 use crate::fs;
 use crate::pyproject::{load_config, StrCheckCodePair};
+
+#[derive(Clone, Debug, PartialOrd, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PythonVersion {
+    Py33,
+    Py34,
+    Py35,
+    Py36,
+    Py37,
+    Py38,
+    Py39,
+    Py310,
+    Py311,
+}
+
+impl FromStr for PythonVersion {
+    type Err = anyhow::Error;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        match string {
+            "py33" => Ok(PythonVersion::Py33),
+            "py34" => Ok(PythonVersion::Py34),
+            "py35" => Ok(PythonVersion::Py35),
+            "py36" => Ok(PythonVersion::Py36),
+            "py37" => Ok(PythonVersion::Py37),
+            "py38" => Ok(PythonVersion::Py38),
+            "py39" => Ok(PythonVersion::Py39),
+            "py310" => Ok(PythonVersion::Py310),
+            "py311" => Ok(PythonVersion::Py311),
+            _ => Err(anyhow!("Unknown version: {}", string)),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Hash)]
 pub enum FilePattern {
@@ -63,6 +97,7 @@ pub struct RawSettings {
     pub project_root: Option<PathBuf>,
     pub pyproject: Option<PathBuf>,
     pub select: Vec<CheckCode>,
+    pub target_version: PythonVersion,
 }
 
 static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
@@ -104,6 +139,7 @@ impl RawSettings {
                     .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
                 None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
             },
+            target_version: config.target_version.unwrap_or(PythonVersion::Py310),
             exclude: config
                 .exclude
                 .map(|paths| {
@@ -119,6 +155,9 @@ impl RawSettings {
                 .map(|path| FilePattern::from_user(path, &project_root))
                 .collect(),
             extend_ignore: config.extend_ignore,
+            select: config
+                .select
+                .unwrap_or_else(|| DEFAULT_CHECK_CODES.to_vec()),
             extend_select: config.extend_select,
             ignore: config.ignore,
             line_length: config.line_length.unwrap_or(88),
@@ -129,9 +168,6 @@ impl RawSettings {
                 .collect(),
             project_root,
             pyproject,
-            select: config
-                .select
-                .unwrap_or_else(|| DEFAULT_CHECK_CODES.to_vec()),
         })
     }
 }
@@ -144,6 +180,7 @@ pub struct Settings {
     pub extend_exclude: Vec<FilePattern>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
+    pub target_version: PythonVersion,
 }
 
 impl Settings {
@@ -165,6 +202,7 @@ impl Settings {
             extend_exclude: settings.extend_exclude,
             line_length: settings.line_length,
             per_file_ignores: settings.per_file_ignores,
+            target_version: PythonVersion::Py310,
         }
     }
 
@@ -176,6 +214,7 @@ impl Settings {
             extend_exclude: vec![],
             line_length: 88,
             per_file_ignores: vec![],
+            target_version: PythonVersion::Py310,
         }
     }
 
@@ -187,6 +226,7 @@ impl Settings {
             extend_exclude: vec![],
             line_length: 88,
             per_file_ignores: vec![],
+            target_version: PythonVersion::Py310,
         }
     }
 }
@@ -241,6 +281,7 @@ pub struct CurrentSettings {
     pub project_root: Option<PathBuf>,
     pub pyproject: Option<PathBuf>,
     pub select: Vec<CheckCode>,
+    pub target_version: PythonVersion,
 }
 
 impl CurrentSettings {
@@ -265,6 +306,7 @@ impl CurrentSettings {
             project_root: settings.project_root,
             pyproject: settings.pyproject,
             select: settings.select,
+            target_version: settings.target_version,
         }
     }
 }
