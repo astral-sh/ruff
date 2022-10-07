@@ -1,0 +1,90 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    TypeOfPrimitive: Str
+  location:
+    row: 1
+    column: 1
+  end_location:
+    row: 1
+    column: 9
+  fix:
+    content: str
+    location:
+      row: 1
+      column: 1
+    end_location:
+      row: 1
+      column: 9
+    applied: false
+- kind:
+    TypeOfPrimitive: Bytes
+  location:
+    row: 2
+    column: 1
+  end_location:
+    row: 2
+    column: 10
+  fix:
+    content: bytes
+    location:
+      row: 2
+      column: 1
+    end_location:
+      row: 2
+      column: 10
+    applied: false
+- kind:
+    TypeOfPrimitive: Int
+  location:
+    row: 3
+    column: 1
+  end_location:
+    row: 3
+    column: 8
+  fix:
+    content: int
+    location:
+      row: 3
+      column: 1
+    end_location:
+      row: 3
+      column: 8
+    applied: false
+- kind:
+    TypeOfPrimitive: Float
+  location:
+    row: 4
+    column: 1
+  end_location:
+    row: 4
+    column: 9
+  fix:
+    content: float
+    location:
+      row: 4
+      column: 1
+    end_location:
+      row: 4
+      column: 9
+    applied: false
+- kind:
+    TypeOfPrimitive: Complex
+  location:
+    row: 5
+    column: 1
+  end_location:
+    row: 5
+    column: 9
+  fix:
+    content: complex
+    location:
+      row: 5
+      column: 1
+    end_location:
+      row: 5
+      column: 9
+    applied: false
+
