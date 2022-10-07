@@ -772,6 +772,11 @@ where
                     };
                 }
 
+                // pyupgrade
+                if self.settings.enabled.contains(&CheckCode::U002) {
+                    plugins::unnecessary_abspath(self, expr, func, args);
+                }
+
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = &mut self.scopes[*(self

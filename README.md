@@ -280,6 +280,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | T201 | PrintFound | `print` found |  | 🛠 |
 | T203 | PPrintFound | `pprint` found |  | 🛠 |
 | U001 | UselessMetaclassType | `__metaclass__ = type` is implied |  | 🛠 |
+| U002 | UnnecessaryAbspath | `abspath(__file__)` is unnecessary in Python 3.9 and later |  | 🛠 |
 | R001 | UselessObjectInheritance | Class `...` inherits from object |  | 🛠 |
 | R002 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
