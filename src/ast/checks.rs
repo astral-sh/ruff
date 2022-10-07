@@ -714,6 +714,23 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &Vec<Expr>) -> bool {
 }
 
 // flakes8-comprehensions
+/// Check `list(generator)` compliance.
+pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+    if args.len() == 1 {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "list" {
+                if let ExprKind::GeneratorExp { .. } = &args[0].node {
+                    return Some(Check::new(
+                        CheckKind::UnnecessaryGeneratorList,
+                        Range::from_located(expr),
+                    ));
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Check `set([...])` compliance.
 pub fn unnecessary_list_comprehension_set(
     expr: &Expr,
