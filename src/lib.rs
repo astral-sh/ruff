@@ -2,10 +2,9 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
-use rustpython_parser::lexer::LexResult;
 
 use crate::autofix::fixer::Mode;
-use crate::linter::{check_path, tokenize};
+use crate::linter::check_path;
 use crate::message::Message;
 use crate::settings::{RawSettings, Settings};
 
@@ -27,6 +26,7 @@ pub mod printer;
 pub mod pyproject;
 mod python;
 pub mod settings;
+pub mod tree_parser;
 
 /// Run ruff over Python source code directly.
 pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
@@ -44,21 +44,8 @@ pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
 
     let settings = Settings::from_raw(RawSettings::from_pyproject(&pyproject, &project_root)?);
 
-    // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(contents);
-
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-
     // Generate checks.
-    let checks = check_path(
-        path,
-        contents,
-        tokens,
-        &noqa_line_for,
-        &settings,
-        &Mode::None,
-    )?;
+    let checks = check_path(path, contents, &[], &settings, &Mode::None)?;
 
     // Convert to messages.
     let messages: Vec<Message> = checks

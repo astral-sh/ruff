@@ -44,6 +44,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
     }
 }
 
+#[allow(dead_code)]
 pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
     let mut noqa_line_for: Vec<usize> = vec![];
 

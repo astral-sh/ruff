@@ -5,6 +5,7 @@ use anyhow::Result;
 use log::debug;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::{lexer, parser};
+use tree_sitter::Parser;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
@@ -16,7 +17,8 @@ use crate::code_gen::SourceGenerator;
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::settings::Settings;
-use crate::{cache, fs, noqa};
+use crate::tree_parser::extract_module;
+use crate::{cache, fs};
 
 /// Collect tokens up to and including the first error.
 pub(crate) fn tokenize(contents: &str) -> Vec<LexResult> {
@@ -34,7 +36,6 @@ pub(crate) fn tokenize(contents: &str) -> Vec<LexResult> {
 pub(crate) fn check_path(
     path: &Path,
     contents: &str,
-    tokens: Vec<LexResult>,
     noqa_line_for: &[usize],
     settings: &Settings,
     autofix: &fixer::Mode,
@@ -48,17 +49,25 @@ pub(crate) fn check_path(
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
     {
-        match parser::parse_program_tokens(tokens, "<filename>") {
+        let src = contents.as_bytes();
+
+        let mut parser = Parser::new();
+        parser
+            .set_language(tree_sitter_python::language())
+            .expect("Error loading Python grammar");
+        let parse_tree = parser.parse(src, None).unwrap();
+
+        match extract_module(parse_tree.root_node(), src) {
             Ok(python_ast) => {
                 checks.extend(check_ast(&python_ast, contents, settings, autofix, path))
             }
             Err(parse_error) => {
                 if settings.enabled.contains(&CheckCode::E999) {
                     checks.push(Check::new(
-                        CheckKind::SyntaxError(parse_error.error.to_string()),
+                        CheckKind::SyntaxError(parse_error.to_string()),
                         Range {
-                            location: parse_error.location,
-                            end_location: parse_error.location,
+                            location: Default::default(),
+                            end_location: Default::default(),
                         },
                     ))
                 }
@@ -100,14 +109,8 @@ pub fn lint_path(
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
-    // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(&contents);
-
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-
     // Generate checks.
-    let mut checks = check_path(path, &contents, tokens, &noqa_line_for, settings, autofix)?;
+    let mut checks = check_path(path, &contents, &[], settings, autofix)?;
 
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
@@ -134,23 +137,10 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
-    // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(&contents);
-
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-
     // Generate checks.
-    let checks = check_path(
-        path,
-        &contents,
-        tokens,
-        &noqa_line_for,
-        settings,
-        &fixer::Mode::None,
-    )?;
+    let checks = check_path(path, &contents, &[], settings, &fixer::Mode::None)?;
 
-    add_noqa(&checks, &contents, &noqa_line_for, path)
+    add_noqa(&checks, &contents, &[], path)
 }
 
 pub fn autoformat_path(path: &Path) -> Result<()> {
@@ -175,14 +165,12 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use rustpython_parser::lexer::LexResult;
 
     use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
+    use crate::fs;
     use crate::linter;
-    use crate::linter::tokenize;
     use crate::settings;
-    use crate::{fs, noqa};
 
     fn check_path(
         path: &Path,
@@ -190,9 +178,7 @@ mod tests {
         autofix: &fixer::Mode,
     ) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;
-        let tokens: Vec<LexResult> = tokenize(&contents);
-        let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-        linter::check_path(path, &contents, tokens, &noqa_line_for, settings, autofix)
+        linter::check_path(path, &contents, &[], settings, autofix)
     }
 
     #[test]
