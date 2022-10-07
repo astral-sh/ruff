@@ -772,6 +772,12 @@ where
                     };
                 }
 
+                if self.settings.enabled.contains(&CheckCode::C401) {
+                    if let Some(check) = checks::unnecessary_generator_set(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
                 if self.settings.enabled.contains(&CheckCode::C403) {
                     if let Some(check) =
                         checks::unnecessary_list_comprehension_set(expr, func, args)

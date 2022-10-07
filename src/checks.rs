@@ -53,7 +53,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::F901,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 56] = [
+pub const ALL_CHECK_CODES: [CheckCode; 57] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -104,6 +104,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 56] = [
     CheckCode::A003,
     // flake8-comprehensions
     CheckCode::C400,
+    CheckCode::C401,
     CheckCode::C403,
     CheckCode::C404,
     // flake8-super
@@ -173,6 +174,7 @@ pub enum CheckCode {
     A003,
     // flake8-comprehensions
     C400,
+    C401,
     C403,
     C404,
     // flake8-super
@@ -317,6 +319,7 @@ impl CheckCode {
             CheckCode::A003 => "A003",
             // flake8-comprehensions
             CheckCode::C400 => "C400",
+            CheckCode::C401 => "C401",
             CheckCode::C403 => "C403",
             CheckCode::C404 => "C404",
             // flake8-super
@@ -399,6 +402,7 @@ impl CheckCode {
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
+            CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
             CheckCode::C403 => CheckKind::UnnecessaryListComprehensionSet,
             CheckCode::C404 => CheckKind::UnnecessaryListComprehensionDict,
             // flake8-super
@@ -481,6 +485,7 @@ pub enum CheckKind {
     BuiltinAttributeShadowing(String),
     // flakes8-comprehensions
     UnnecessaryGeneratorList,
+    UnnecessaryGeneratorSet,
     UnnecessaryListComprehensionSet,
     UnnecessaryListComprehensionDict,
     // flake8-super
@@ -550,6 +555,7 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => "BuiltinAttributeShadowing",
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => "UnnecessaryGeneratorList",
+            CheckKind::UnnecessaryGeneratorSet => "UnnecessaryGeneratorSet",
             CheckKind::UnnecessaryListComprehensionSet => "UnnecessaryListComprehensionSet",
             CheckKind::UnnecessaryListComprehensionDict => "UnnecessaryListComprehensionDict",
             // flake8-super
@@ -619,6 +625,7 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
+            CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,
             CheckKind::UnnecessaryListComprehensionSet => &CheckCode::C403,
             CheckKind::UnnecessaryListComprehensionDict => &CheckCode::C404,
             // flake8-super
@@ -778,6 +785,9 @@ impl CheckKind {
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {
                 "Unnecessary generator - rewrite as a list comprehension".to_string()
+            }
+            CheckKind::UnnecessaryGeneratorSet => {
+                "Unnecessary generator - rewrite as a set comprehension".to_string()
             }
             CheckKind::UnnecessaryListComprehensionSet => {
                 "Unnecessary list comprehension - rewrite as a set comprehension".to_string()
