@@ -190,6 +190,25 @@ pub fn check_lines(
         }
     }
 
+    // Enfore newlines at end of files. Don't check if noqa enabled.
+    if settings.enabled.contains(&CheckCode::W292) && !enforce_noqa {
+        // If the file contains a newline at the end of it the last
+        // line would contain an empty string slice.
+        let line = lines.last().unwrap_or(&"");
+
+        let check = Check::new(
+            CheckKind::NoNewLineAtEndOfFile,
+            Range {
+                location: Location::new(lines.len(), line.len() + 1),
+                end_location: Location::new(lines.len(), line.len() + 1),
+            },
+        );
+
+        if !line.is_empty() {
+            line_checks.push(check);
+        }
+    }
+
     ignored.sort();
     for index in ignored.iter().rev() {
         checks.swap_remove(*index);

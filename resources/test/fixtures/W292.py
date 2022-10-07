@@ -1,0 +1,2 @@
+def fn() -> None:
+    pass

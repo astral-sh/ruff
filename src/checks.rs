@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
+pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -51,6 +51,8 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::F831,
     CheckCode::F841,
     CheckCode::F901,
+    // Other pep8
+    CheckCode::W292,
 ];
 
 pub const ALL_CHECK_CODES: [CheckCode; 53] = [
@@ -182,6 +184,8 @@ pub enum CheckCode {
     R002,
     // Meta
     M001,
+    // More style
+    W292,
 }
 
 impl FromStr for CheckCode {
@@ -251,6 +255,8 @@ impl FromStr for CheckCode {
             "R002" => Ok(CheckCode::R002),
             // Meta
             "M001" => Ok(CheckCode::M001),
+            // More style
+            "W292" => Ok(CheckCode::W292),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
         }
     }
@@ -321,6 +327,8 @@ impl CheckCode {
             CheckCode::R002 => "R002",
             // Meta
             CheckCode::M001 => "M001",
+            // More style
+            CheckCode::W292 => "W292",
         }
     }
 
@@ -400,6 +408,8 @@ impl CheckCode {
             CheckCode::R002 => CheckKind::NoAssertEquals,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
+            // More style
+            CheckCode::W292 => CheckKind::NoNewLineAtEndOfFile,
         }
     }
 }
@@ -476,6 +486,8 @@ pub enum CheckKind {
     // flake8-print
     PrintFound,
     PPrintFound,
+    // More style
+    NoNewLineAtEndOfFile,
 }
 
 impl CheckKind {
@@ -542,6 +554,8 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
             // Meta
             CheckKind::UnusedNOQA(_) => "UnusedNOQA",
+            // More style
+            CheckKind::NoNewLineAtEndOfFile => "NoNewLineAtEndOfFile",
         }
     }
 
@@ -608,6 +622,8 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(_) => &CheckCode::R001,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
+            // More style
+            CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
         }
     }
 
@@ -774,6 +790,8 @@ impl CheckKind {
                 None => "Unused `noqa` directive".to_string(),
                 Some(code) => format!("Unused `noqa` directive for: {code}"),
             },
+            // More style
+            CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
         }
     }
 
