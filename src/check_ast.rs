@@ -1698,7 +1698,7 @@ impl<'a> Checker<'a> {
                                         context.defined_by,
                                         context.defined_in,
                                     ))
-                                    .or_insert(vec![]);
+                                    .or_default();
                                 full_names.push(full_name);
                             }
                             BindingKind::Importation(full_name, context)
@@ -1709,7 +1709,7 @@ impl<'a> Checker<'a> {
                                         context.defined_by,
                                         context.defined_in,
                                     ))
-                                    .or_insert(vec![]);
+                                    .or_default();
                                 full_names.push(full_name);
                             }
                             _ => {}
