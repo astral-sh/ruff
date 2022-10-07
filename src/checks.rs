@@ -53,7 +53,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::F901,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 54] = [
+pub const ALL_CHECK_CODES: [CheckCode; 55] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -104,6 +104,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 54] = [
     CheckCode::A003,
     // flake8-comprehensions
     CheckCode::C403,
+    CheckCode::C404,
     // flake8-super
     CheckCode::SPR001,
     // flake8-print
@@ -171,6 +172,7 @@ pub enum CheckCode {
     A003,
     // flake8-comprehensions
     C403,
+    C404,
     // flake8-super
     SPR001,
     // flake8-print
@@ -241,6 +243,7 @@ impl FromStr for CheckCode {
             "A003" => Ok(CheckCode::A003),
             // flake8-comprehensions
             "C403" => Ok(CheckCode::C403),
+            "C404" => Ok(CheckCode::C404),
             // flake8-super
             "SPR001" => Ok(CheckCode::SPR001),
             // flake8-print
@@ -312,6 +315,7 @@ impl CheckCode {
             CheckCode::A003 => "A003",
             // flake8-comprehensions
             CheckCode::C403 => "C403",
+            CheckCode::C404 => "C404",
             // flake8-super
             CheckCode::SPR001 => "SPR001",
             // flake8-print
@@ -392,6 +396,7 @@ impl CheckCode {
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-comprehensions
             CheckCode::C403 => CheckKind::UnnecessaryListComprehensionSet,
+            CheckCode::C404 => CheckKind::UnnecessaryListComprehensionDict,
             // flake8-super
             CheckCode::SPR001 => CheckKind::SuperCallWithParameters,
             // flake8-print
@@ -472,6 +477,7 @@ pub enum CheckKind {
     BuiltinAttributeShadowing(String),
     // flakes8-comprehensions
     UnnecessaryListComprehensionSet,
+    UnnecessaryListComprehensionDict,
     // flake8-super
     SuperCallWithParameters,
     // flake8-print
@@ -539,6 +545,7 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => "BuiltinAttributeShadowing",
             // flake8-comprehensions
             CheckKind::UnnecessaryListComprehensionSet => "UnnecessaryListComprehensionSet",
+            CheckKind::UnnecessaryListComprehensionDict => "UnnecessaryListComprehensionDict",
             // flake8-super
             CheckKind::SuperCallWithParameters => "SuperCallWithParameters",
             // flake8-print
@@ -606,6 +613,7 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-comprehensions
             CheckKind::UnnecessaryListComprehensionSet => &CheckCode::C403,
+            CheckKind::UnnecessaryListComprehensionDict => &CheckCode::C404,
             // flake8-super
             CheckKind::SuperCallWithParameters => &CheckCode::SPR001,
             // flake8-print
@@ -763,6 +771,9 @@ impl CheckKind {
             // flake8-comprehensions
             CheckKind::UnnecessaryListComprehensionSet => {
                 "Unnecessary list comprehension - rewrite as a set comprehension".to_string()
+            }
+            CheckKind::UnnecessaryListComprehensionDict => {
+                "Unnecessary list comprehension - rewrite as a dict comprehension".to_string()
             }
             // flake8-super
             CheckKind::SuperCallWithParameters => {

@@ -276,6 +276,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |  |
 | C403 | UnnecessaryListComprehensionSet | Unnecessary list comprehension - rewrite as a set comprehension |  |  |
+| C404 | UnnecessaryListComprehensionDict | Unnecessary list comprehension - rewrite as a dict comprehension |  |  |
 | SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
 | T201 | PrintFound | `print` found |  | 🛠 |
 | T203 | PPrintFound | `pprint` found |  | 🛠 |

@@ -714,14 +714,47 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &Vec<Expr>) -> bool {
 }
 
 // flakes8-comprehensions
-pub fn unnecessary_list_comprehension(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if id == "set" && args.len() == 1 {
-            if let ExprKind::ListComp { .. } = &args[0].node {
-                return Some(Check::new(
-                    CheckKind::UnnecessaryListComprehensionSet,
-                    Range::from_located(expr),
-                ));
+/// Check `set([...])` compliance.
+pub fn unnecessary_list_comprehension_set(
+    expr: &Expr,
+    func: &Expr,
+    args: &Vec<Expr>,
+) -> Option<Check> {
+    if args.len() == 1 {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "set" {
+                if let ExprKind::ListComp { .. } = &args[0].node {
+                    return Some(Check::new(
+                        CheckKind::UnnecessaryListComprehensionSet,
+                        Range::from_located(expr),
+                    ));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Check `dict([...])` compliance.
+pub fn unnecessary_list_comprehension_dict(
+    expr: &Expr,
+    func: &Expr,
+    args: &Vec<Expr>,
+) -> Option<Check> {
+    if args.len() == 1 {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "dict" {
+                if let ExprKind::ListComp { elt, .. } = &args[0].node {
+                    match &elt.node {
+                        ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryListComprehensionDict,
+                                Range::from_located(expr),
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     }
