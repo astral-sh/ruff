@@ -388,7 +388,7 @@ where
                 decorator_list,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::R001) {
+                if self.settings.enabled.contains(&CheckCode::U004) {
                     plugins::useless_object_inheritance(self, stmt, name, bases, keywords);
                 }
 
@@ -749,7 +749,7 @@ where
                 ExprContext::Del => self.handle_node_delete(expr),
             },
             ExprKind::Call { func, args, .. } => {
-                if self.settings.enabled.contains(&CheckCode::R002) {
+                if self.settings.enabled.contains(&CheckCode::U005) {
                     plugins::assert_equals(self, func);
                 }
 

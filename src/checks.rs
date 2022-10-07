@@ -118,9 +118,8 @@ pub const ALL_CHECK_CODES: [CheckCode; 58] = [
     CheckCode::U001,
     CheckCode::U002,
     CheckCode::U003,
-    // Refactor
-    CheckCode::R001,
-    CheckCode::R002,
+    CheckCode::U004,
+    CheckCode::U005,
     // Meta
     CheckCode::M001,
 ];
@@ -189,9 +188,8 @@ pub enum CheckCode {
     U001,
     U002,
     U003,
-    // Refactor
-    R001,
-    R002,
+    U004,
+    U005,
     // Meta
     M001,
 }
@@ -261,9 +259,8 @@ impl FromStr for CheckCode {
             "U001" => Ok(CheckCode::U001),
             "U002" => Ok(CheckCode::U002),
             "U003" => Ok(CheckCode::U003),
-            // Refactor
-            "R001" => Ok(CheckCode::R001),
-            "R002" => Ok(CheckCode::R002),
+            "U004" => Ok(CheckCode::U004),
+            "U005" => Ok(CheckCode::U005),
             // Meta
             "M001" => Ok(CheckCode::M001),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
@@ -336,9 +333,8 @@ impl CheckCode {
             CheckCode::U001 => "U001",
             CheckCode::U002 => "U002",
             CheckCode::U003 => "U003",
-            // Refactor
-            CheckCode::R001 => "R001",
-            CheckCode::R002 => "R002",
+            CheckCode::U004 => "U004",
+            CheckCode::U005 => "U005",
             // Meta
             CheckCode::M001 => "M001",
         }
@@ -420,9 +416,8 @@ impl CheckCode {
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
             CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
-            // Refactor
-            CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
-            CheckCode::R002 => CheckKind::NoAssertEquals,
+            CheckCode::U004 => CheckKind::UselessObjectInheritance("...".to_string()),
+            CheckCode::U005 => CheckKind::NoAssertEquals,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -504,7 +499,6 @@ pub enum CheckKind {
     TypeOfPrimitive(Primitive),
     UnnecessaryAbspath,
     UselessMetaclassType,
-    // Refactor
     NoAssertEquals,
     UselessObjectInheritance(String),
     // Meta
@@ -575,7 +569,6 @@ impl CheckKind {
             CheckKind::TypeOfPrimitive(_) => "TypeOfPrimitive",
             CheckKind::UnnecessaryAbspath => "UnnecessaryAbspath",
             CheckKind::UselessMetaclassType => "UselessMetaclassType",
-            // Refactor
             CheckKind::NoAssertEquals => "NoAssertEquals",
             CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
             // Meta
@@ -646,9 +639,8 @@ impl CheckKind {
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
-            // Refactor
-            CheckKind::NoAssertEquals => &CheckCode::R002,
-            CheckKind::UselessObjectInheritance(_) => &CheckCode::R001,
+            CheckKind::NoAssertEquals => &CheckCode::U005,
+            CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -823,7 +815,6 @@ impl CheckKind {
                 "`abspath(__file__)` is unnecessary in Python 3.9 and later".to_string()
             }
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
-            // Refactor
             CheckKind::NoAssertEquals => {
                 "`assertEquals` is deprecated, use `assertEqual` instead".to_string()
             }
