@@ -716,12 +716,26 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &Vec<Expr>) -> bool {
 // flakes8-comprehensions
 pub fn unnecessary_list_comprehension(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
     if let ExprKind::Name { id, .. } = &func.node {
-        if id == "set" && args.len() == 1 {
-            if let ExprKind::ListComp { .. } = &args[0].node {
-                return Some(Check::new(
-                    CheckKind::UnnecessaryListComprehensionSet,
-                    Range::from_located(expr),
-                ));
+        if (id == "set" || id == "dict") && args.len() == 1 {
+            if let ExprKind::ListComp { elt, .. } = &args[0].node {
+                if id == "set" {
+                    return Some(Check::new(
+                        CheckKind::UnnecessaryListComprehensionSet,
+                        Range::from_located(expr),
+                    ));
+                }
+
+                if id == "dict" {
+                    match &elt.node {
+                        ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryListComprehensionDict,
+                                Range::from_located(expr),
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     }
