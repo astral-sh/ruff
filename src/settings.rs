@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -8,6 +7,7 @@ use anyhow::{anyhow, Result};
 use glob::Pattern;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 use crate::checks::{CheckCode, DEFAULT_CHECK_CODES};
 use crate::fs;
@@ -94,8 +94,6 @@ pub struct RawSettings {
     pub ignore: Vec<CheckCode>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
-    pub project_root: Option<PathBuf>,
-    pub pyproject: Option<PathBuf>,
     pub select: Vec<CheckCode>,
     pub target_version: PythonVersion,
 }
@@ -129,10 +127,10 @@ static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
 
 impl RawSettings {
     pub fn from_pyproject(
-        pyproject: Option<PathBuf>,
-        project_root: Option<PathBuf>,
+        pyproject: &Option<PathBuf>,
+        project_root: &Option<PathBuf>,
     ) -> Result<Self> {
-        let config = load_config(&pyproject)?;
+        let config = load_config(pyproject)?;
         Ok(RawSettings {
             dummy_variable_rgx: match config.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
@@ -145,14 +143,14 @@ impl RawSettings {
                 .map(|paths| {
                     paths
                         .iter()
-                        .map(|path| FilePattern::from_user(path, &project_root))
+                        .map(|path| FilePattern::from_user(path, project_root))
                         .collect()
                 })
                 .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
             extend_exclude: config
                 .extend_exclude
                 .iter()
-                .map(|path| FilePattern::from_user(path, &project_root))
+                .map(|path| FilePattern::from_user(path, project_root))
                 .collect(),
             extend_ignore: config.extend_ignore,
             select: config
@@ -164,10 +162,8 @@ impl RawSettings {
             per_file_ignores: config
                 .per_file_ignores
                 .into_iter()
-                .map(|pair| PerFileIgnore::new(pair, &project_root))
+                .map(|pair| PerFileIgnore::new(pair, project_root))
                 .collect(),
-            project_root,
-            pyproject,
         })
     }
 }
@@ -278,14 +274,18 @@ pub struct CurrentSettings {
     pub ignore: Vec<CheckCode>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
-    pub project_root: Option<PathBuf>,
-    pub pyproject: Option<PathBuf>,
     pub select: Vec<CheckCode>,
     pub target_version: PythonVersion,
+    pub project_root: Option<PathBuf>,
+    pub pyproject: Option<PathBuf>,
 }
 
 impl CurrentSettings {
-    pub fn from_settings(settings: RawSettings) -> Self {
+    pub fn from_settings(
+        settings: RawSettings,
+        project_root: Option<PathBuf>,
+        pyproject: Option<PathBuf>,
+    ) -> Self {
         Self {
             dummy_variable_rgx: settings.dummy_variable_rgx,
             exclude: settings
@@ -303,10 +303,10 @@ impl CurrentSettings {
             ignore: settings.ignore,
             line_length: settings.line_length,
             per_file_ignores: settings.per_file_ignores,
-            project_root: settings.project_root,
-            pyproject: settings.pyproject,
             select: settings.select,
             target_version: settings.target_version,
+            project_root,
+            pyproject,
         }
     }
 }
