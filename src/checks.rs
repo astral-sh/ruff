@@ -1,10 +1,12 @@
 use std::str::FromStr;
 
-use crate::ast::types::Range;
+use crate::ast::checks::Primitive;
 use anyhow::Result;
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
+
+use crate::ast::types::Range;
 
 pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
     // pycodestyle
@@ -22,6 +24,8 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
     CheckCode::E743,
     CheckCode::E902,
     CheckCode::E999,
+    // pycodestyle warnings
+    CheckCode::W292,
     // pyflakes
     CheckCode::F401,
     CheckCode::F402,
@@ -51,11 +55,9 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
     CheckCode::F831,
     CheckCode::F841,
     CheckCode::F901,
-    // Other pep8
-    CheckCode::W292,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 54] = [
+pub const ALL_CHECK_CODES: [CheckCode; 59] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -71,6 +73,8 @@ pub const ALL_CHECK_CODES: [CheckCode; 54] = [
     CheckCode::E743,
     CheckCode::E902,
     CheckCode::E999,
+    // pycodestyle warnings
+    CheckCode::W292,
     // pyflakes
     CheckCode::F401,
     CheckCode::F402,
@@ -105,7 +109,10 @@ pub const ALL_CHECK_CODES: [CheckCode; 54] = [
     CheckCode::A002,
     CheckCode::A003,
     // flake8-comprehensions
+    CheckCode::C400,
+    CheckCode::C401,
     CheckCode::C403,
+    CheckCode::C404,
     // flake8-super
     CheckCode::SPR001,
     // flake8-print
@@ -114,9 +121,9 @@ pub const ALL_CHECK_CODES: [CheckCode; 54] = [
     // pyupgrade
     CheckCode::U001,
     CheckCode::U002,
-    // Refactor
-    CheckCode::R001,
-    CheckCode::R002,
+    CheckCode::U003,
+    CheckCode::U004,
+    CheckCode::U005,
     // Meta
     CheckCode::M001,
 ];
@@ -138,6 +145,8 @@ pub enum CheckCode {
     E743,
     E902,
     E999,
+    // pycodestyle warnings
+    W292,
     // pyflakes
     F401,
     F402,
@@ -172,7 +181,10 @@ pub enum CheckCode {
     A002,
     A003,
     // flake8-comprehensions
+    C400,
+    C401,
     C403,
+    C404,
     // flake8-super
     SPR001,
     // flake8-print
@@ -181,13 +193,11 @@ pub enum CheckCode {
     // pyupgrade
     U001,
     U002,
-    // Refactor
-    R001,
-    R002,
+    U003,
+    U004,
+    U005,
     // Meta
     M001,
-    // More style
-    W292,
 }
 
 impl FromStr for CheckCode {
@@ -210,6 +220,8 @@ impl FromStr for CheckCode {
             "E743" => Ok(CheckCode::E743),
             "E902" => Ok(CheckCode::E902),
             "E999" => Ok(CheckCode::E999),
+            // pycodestyle warnings
+            "W292" => Ok(CheckCode::W292),
             // pyflakes
             "F401" => Ok(CheckCode::F401),
             "F402" => Ok(CheckCode::F402),
@@ -245,6 +257,7 @@ impl FromStr for CheckCode {
             "A003" => Ok(CheckCode::A003),
             // flake8-comprehensions
             "C403" => Ok(CheckCode::C403),
+            "C404" => Ok(CheckCode::C404),
             // flake8-super
             "SPR001" => Ok(CheckCode::SPR001),
             // flake8-print
@@ -253,13 +266,11 @@ impl FromStr for CheckCode {
             // pyupgrade
             "U001" => Ok(CheckCode::U001),
             "U002" => Ok(CheckCode::U002),
-            // Refactor
-            "R001" => Ok(CheckCode::R001),
-            "R002" => Ok(CheckCode::R002),
+            "U003" => Ok(CheckCode::U003),
+            "U004" => Ok(CheckCode::U004),
+            "U005" => Ok(CheckCode::U005),
             // Meta
             "M001" => Ok(CheckCode::M001),
-            // More style
-            "W292" => Ok(CheckCode::W292),
             _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
         }
     }
@@ -283,6 +294,8 @@ impl CheckCode {
             CheckCode::E743 => "E743",
             CheckCode::E902 => "E902",
             CheckCode::E999 => "E999",
+            // pycodestyle warnings
+            CheckCode::W292 => "W292",
             // pyflakes
             CheckCode::F401 => "F401",
             CheckCode::F402 => "F402",
@@ -317,7 +330,10 @@ impl CheckCode {
             CheckCode::A002 => "A002",
             CheckCode::A003 => "A003",
             // flake8-comprehensions
+            CheckCode::C400 => "C400",
+            CheckCode::C401 => "C401",
             CheckCode::C403 => "C403",
+            CheckCode::C404 => "C404",
             // flake8-super
             CheckCode::SPR001 => "SPR001",
             // flake8-print
@@ -326,13 +342,11 @@ impl CheckCode {
             // pyupgrade
             CheckCode::U001 => "U001",
             CheckCode::U002 => "U002",
-            // Refactor
-            CheckCode::R001 => "R001",
-            CheckCode::R002 => "R002",
+            CheckCode::U003 => "U003",
+            CheckCode::U004 => "U004",
+            CheckCode::U005 => "U005",
             // Meta
             CheckCode::M001 => "M001",
-            // More style
-            CheckCode::W292 => "W292",
         }
     }
 
@@ -363,8 +377,10 @@ impl CheckCode {
             CheckCode::E743 => CheckKind::AmbiguousFunctionName("...".to_string()),
             CheckCode::E902 => CheckKind::IOError("IOError: `...`".to_string()),
             CheckCode::E999 => CheckKind::SyntaxError("`...`".to_string()),
+            // pycodestyle warnings
+            CheckCode::W292 => CheckKind::NoNewLineAtEndOfFile,
             // pyflakes
-            CheckCode::F401 => CheckKind::UnusedImport("...".to_string()),
+            CheckCode::F401 => CheckKind::UnusedImport(vec!["...".to_string()]),
             CheckCode::F402 => CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
             CheckCode::F403 => CheckKind::ImportStarUsed("...".to_string()),
             CheckCode::F404 => CheckKind::LateFutureImport,
@@ -399,7 +415,10 @@ impl CheckCode {
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-comprehensions
+            CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
+            CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
             CheckCode::C403 => CheckKind::UnnecessaryListComprehensionSet,
+            CheckCode::C404 => CheckKind::UnnecessaryListComprehensionDict,
             // flake8-super
             CheckCode::SPR001 => CheckKind::SuperCallWithParameters,
             // flake8-print
@@ -408,13 +427,11 @@ impl CheckCode {
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
-            // Refactor
-            CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
-            CheckCode::R002 => CheckKind::NoAssertEquals,
+            CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
+            CheckCode::U004 => CheckKind::UselessObjectInheritance("...".to_string()),
+            CheckCode::U005 => CheckKind::NoAssertEquals,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
-            // More style
-            CheckCode::W292 => CheckKind::NoNewLineAtEndOfFile,
         }
     }
 }
@@ -473,30 +490,33 @@ pub enum CheckKind {
     UndefinedExport(String),
     UndefinedLocal(String),
     UndefinedName(String),
-    UnusedImport(String),
+    UnusedImport(Vec<String>),
     UnusedVariable(String),
     YieldOutsideFunction,
+    // More style
+    NoNewLineAtEndOfFile,
     // flake8-builtin
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
     BuiltinAttributeShadowing(String),
     // flakes8-comprehensions
+    UnnecessaryGeneratorList,
+    UnnecessaryGeneratorSet,
     UnnecessaryListComprehensionSet,
+    UnnecessaryListComprehensionDict,
     // flake8-super
     SuperCallWithParameters,
     // flake8-print
     PrintFound,
     PPrintFound,
     // pyupgrade
+    TypeOfPrimitive(Primitive),
     UnnecessaryAbspath,
     UselessMetaclassType,
-    // Refactor
     NoAssertEquals,
     UselessObjectInheritance(String),
     // Meta
     UnusedNOQA(Option<String>),
-    // More style
-    NoNewLineAtEndOfFile,
 }
 
 impl CheckKind {
@@ -545,27 +565,30 @@ impl CheckKind {
             CheckKind::UnusedImport(_) => "UnusedImport",
             CheckKind::UnusedVariable(_) => "UnusedVariable",
             CheckKind::YieldOutsideFunction => "YieldOutsideFunction",
+            // More style
+            CheckKind::NoNewLineAtEndOfFile => "NoNewLineAtEndOfFile",
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => "BuiltinVariableShadowing",
             CheckKind::BuiltinArgumentShadowing(_) => "BuiltinArgumentShadowing",
             CheckKind::BuiltinAttributeShadowing(_) => "BuiltinAttributeShadowing",
             // flake8-comprehensions
+            CheckKind::UnnecessaryGeneratorList => "UnnecessaryGeneratorList",
+            CheckKind::UnnecessaryGeneratorSet => "UnnecessaryGeneratorSet",
             CheckKind::UnnecessaryListComprehensionSet => "UnnecessaryListComprehensionSet",
+            CheckKind::UnnecessaryListComprehensionDict => "UnnecessaryListComprehensionDict",
             // flake8-super
             CheckKind::SuperCallWithParameters => "SuperCallWithParameters",
             // flake8-print
             CheckKind::PrintFound => "PrintFound",
             CheckKind::PPrintFound => "PPrintFound",
             // pyupgrade
+            CheckKind::TypeOfPrimitive(_) => "TypeOfPrimitive",
             CheckKind::UnnecessaryAbspath => "UnnecessaryAbspath",
             CheckKind::UselessMetaclassType => "UselessMetaclassType",
-            // Refactor
             CheckKind::NoAssertEquals => "NoAssertEquals",
             CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
             // Meta
             CheckKind::UnusedNOQA(_) => "UnusedNOQA",
-            // More style
-            CheckKind::NoNewLineAtEndOfFile => "NoNewLineAtEndOfFile",
         }
     }
 
@@ -614,27 +637,30 @@ impl CheckKind {
             CheckKind::UnusedImport(_) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
+            // More style
+            CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-comprehensions
+            CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
+            CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,
             CheckKind::UnnecessaryListComprehensionSet => &CheckCode::C403,
+            CheckKind::UnnecessaryListComprehensionDict => &CheckCode::C404,
             // flake8-super
             CheckKind::SuperCallWithParameters => &CheckCode::SPR001,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
             // pyupgrade
+            CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
-            // Refactor
-            CheckKind::NoAssertEquals => &CheckCode::R002,
-            CheckKind::UselessObjectInheritance(_) => &CheckCode::R001,
+            CheckKind::NoAssertEquals => &CheckCode::U005,
+            CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
-            // More style
-            CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
         }
     }
 
@@ -758,14 +784,18 @@ impl CheckKind {
             CheckKind::UndefinedName(name) => {
                 format!("Undefined name `{name}`")
             }
-            CheckKind::UnusedImport(name) => format!("`{name}` imported but unused"),
+            CheckKind::UnusedImport(names) => {
+                let names = names.iter().map(|name| format!("`{name}`")).join(", ");
+                format!("{names} imported but unused")
+            }
             CheckKind::UnusedVariable(name) => {
                 format!("Local variable `{name}` is assigned to but never used")
             }
             CheckKind::YieldOutsideFunction => {
                 "`yield` or `yield from` statement outside of a function/method".to_string()
             }
-
+            // More style
+            CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
                 format!("Variable `{name}` is shadowing a python builtin")
@@ -777,8 +807,17 @@ impl CheckKind {
                 format!("Class attribute `{name}` is shadowing a python builtin")
             }
             // flake8-comprehensions
+            CheckKind::UnnecessaryGeneratorList => {
+                "Unnecessary generator - rewrite as a list comprehension".to_string()
+            }
+            CheckKind::UnnecessaryGeneratorSet => {
+                "Unnecessary generator - rewrite as a set comprehension".to_string()
+            }
             CheckKind::UnnecessaryListComprehensionSet => {
                 "Unnecessary list comprehension - rewrite as a set comprehension".to_string()
+            }
+            CheckKind::UnnecessaryListComprehensionDict => {
+                "Unnecessary list comprehension - rewrite as a dict comprehension".to_string()
             }
             // flake8-super
             CheckKind::SuperCallWithParameters => {
@@ -788,11 +827,13 @@ impl CheckKind {
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),
             // pyupgrade
+            CheckKind::TypeOfPrimitive(primitive) => {
+                format!("Use `{}` instead of `type(...)`", primitive.builtin())
+            }
             CheckKind::UnnecessaryAbspath => {
                 "`abspath(__file__)` is unnecessary in Python 3.9 and later".to_string()
             }
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
-            // Refactor
             CheckKind::NoAssertEquals => {
                 "`assertEquals` is deprecated, use `assertEqual` instead".to_string()
             }
@@ -804,8 +845,6 @@ impl CheckKind {
                 None => "Unused `noqa` directive".to_string(),
                 Some(code) => format!("Unused `noqa` directive for: {code}"),
             },
-            // More style
-            CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
         }
     }
 
@@ -817,6 +856,7 @@ impl CheckKind {
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::SuperCallWithParameters
+                | CheckKind::TypeOfPrimitive(_)
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnusedImport(_)
                 | CheckKind::UnusedNOQA(_)

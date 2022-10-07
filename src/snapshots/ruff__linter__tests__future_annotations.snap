@@ -3,7 +3,8 @@ source: src/linter.rs
 expression: checks
 ---
 - kind:
-    UnusedImport: models.Nut
+    UnusedImport:
+      - models.Nut
   location:
     row: 5
     column: 1

@@ -5,98 +5,32 @@ use std::sync::mpsc::channel;
 use std::time::Instant;
 
 use anyhow::Result;
-use clap::{command, Parser};
+use clap::Parser;
 use colored::Colorize;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
-use regex::Regex;
 use walkdir::DirEntry;
 
-use ::ruff::cache;
-use ::ruff::checks::CheckCode;
-use ::ruff::checks::CheckKind;
-use ::ruff::fs::iter_python_files;
-use ::ruff::linter::add_noqa_to_path;
-use ::ruff::linter::lint_path;
-use ::ruff::logging::set_up_logging;
-use ::ruff::message::Message;
-use ::ruff::printer::{Printer, SerializationFormat};
-use ::ruff::pyproject::{self, StrCheckCodePair};
-use ::ruff::settings::CurrentSettings;
-use ::ruff::settings::{FilePattern, PerFileIgnore, Settings};
-use ::ruff::tell_user;
+use ruff::cache;
+use ruff::checks::CheckCode;
+use ruff::checks::CheckKind;
+use ruff::cli::{warn_on, Cli, Warnable};
+use ruff::fs::iter_python_files;
+use ruff::linter::add_noqa_to_path;
 use ruff::linter::autoformat_path;
+use ruff::linter::lint_path;
+use ruff::logging::set_up_logging;
+use ruff::message::Message;
+use ruff::printer::{Printer, SerializationFormat};
+use ruff::pyproject::{self};
+use ruff::settings::CurrentSettings;
 use ruff::settings::RawSettings;
+use ruff::settings::{FilePattern, PerFileIgnore, Settings};
+use ruff::tell_user;
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-#[derive(Debug, Parser)]
-#[command(author, about = "ruff: An extremely fast Python linter.")]
-#[command(version)]
-struct Cli {
-    #[arg(required = true)]
-    files: Vec<PathBuf>,
-    /// Enable verbose logging.
-    #[arg(short, long)]
-    verbose: bool,
-    /// Disable all logging (but still exit with status code "1" upon detecting errors).
-    #[arg(short, long)]
-    quiet: bool,
-    /// Exit with status code "0", even upon detecting errors.
-    #[arg(short, long)]
-    exit_zero: bool,
-    /// Run in watch mode by re-running whenever files change.
-    #[arg(short, long)]
-    watch: bool,
-    /// Attempt to automatically fix lint errors.
-    #[arg(short, long)]
-    fix: bool,
-    /// Disable cache reads.
-    #[arg(short, long)]
-    no_cache: bool,
-    /// List of error codes to enable.
-    #[arg(long, value_delimiter = ',')]
-    select: Vec<CheckCode>,
-    /// Like --select, but adds additional error codes on top of the selected ones.
-    #[arg(long, value_delimiter = ',')]
-    extend_select: Vec<CheckCode>,
-    /// List of error codes to ignore.
-    #[arg(long, value_delimiter = ',')]
-    ignore: Vec<CheckCode>,
-    /// Like --ignore, but adds additional error codes on top of the ignored ones.
-    #[arg(long, value_delimiter = ',')]
-    extend_ignore: Vec<CheckCode>,
-    /// List of paths, used to exclude files and/or directories from checks.
-    #[arg(long, value_delimiter = ',')]
-    exclude: Vec<String>,
-    /// Like --exclude, but adds additional files and directories on top of the excluded ones.
-    #[arg(long, value_delimiter = ',')]
-    extend_exclude: Vec<String>,
-    /// List of mappings from file pattern to code to exclude
-    #[arg(long, value_delimiter = ',')]
-    per_file_ignores: Vec<StrCheckCodePair>,
-    /// Output serialization format for error messages.
-    #[arg(long, value_enum, default_value_t=SerializationFormat::Text)]
-    format: SerializationFormat,
-    /// See the files ruff will be run against with the current settings.
-    #[arg(long)]
-    show_files: bool,
-    /// See ruff's settings.
-    #[arg(long)]
-    show_settings: bool,
-    /// Enable automatic additions of noqa directives to failing lines.
-    #[arg(long)]
-    add_noqa: bool,
-    /// Regular expression matching the name of dummy variables.
-    #[arg(long)]
-    dummy_variable_rgx: Option<Regex>,
-    /// Round-trip auto-formatting.
-    // TODO(charlie): This should be a sub-command.
-    #[arg(long, hide = true)]
-    autoformat: bool,
-}
 
 #[cfg(feature = "update-informer")]
 fn check_for_updates() {
@@ -122,8 +56,11 @@ fn check_for_updates() {
     }
 }
 
-fn show_settings(settings: RawSettings) {
-    println!("{:#?}", CurrentSettings::from_settings(settings));
+fn show_settings(settings: RawSettings, project_root: Option<PathBuf>, pyproject: Option<PathBuf>) {
+    println!(
+        "{:#?}",
+        CurrentSettings::from_settings(settings, project_root, pyproject)
+    );
 }
 
 fn show_files(files: &[PathBuf], settings: &Settings) {
@@ -289,7 +226,7 @@ fn inner_main() -> Result<ExitCode> {
         .map(|pair| PerFileIgnore::new(pair, &project_root))
         .collect();
 
-    let mut settings = RawSettings::from_pyproject(pyproject, project_root)?;
+    let mut settings = RawSettings::from_pyproject(&pyproject, &project_root)?;
     if !exclude.is_empty() {
         settings.exclude = exclude;
     }
@@ -300,9 +237,25 @@ fn inner_main() -> Result<ExitCode> {
         settings.per_file_ignores = per_file_ignores;
     }
     if !cli.select.is_empty() {
+        warn_on(
+            Warnable::Select,
+            &cli.select,
+            &cli.ignore,
+            &cli.extend_ignore,
+            &settings,
+            &pyproject,
+        );
         settings.select = cli.select;
     }
     if !cli.extend_select.is_empty() {
+        warn_on(
+            Warnable::ExtendSelect,
+            &cli.extend_select,
+            &cli.ignore,
+            &cli.extend_ignore,
+            &settings,
+            &pyproject,
+        );
         settings.extend_select = cli.extend_select;
     }
     if !cli.ignore.is_empty() {
@@ -310,6 +263,9 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !cli.extend_ignore.is_empty() {
         settings.extend_ignore = cli.extend_ignore;
+    }
+    if let Some(target_version) = cli.target_version {
+        settings.target_version = target_version;
     }
     if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
         settings.dummy_variable_rgx = dummy_variable_rgx;
@@ -320,7 +276,7 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::FAILURE);
     }
     if cli.show_settings {
-        show_settings(settings);
+        show_settings(settings, project_root, pyproject);
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -404,7 +360,7 @@ fn inner_main() -> Result<ExitCode> {
         #[cfg(feature = "update-informer")]
         check_for_updates();
 
-        if !messages.is_empty() && !cli.exit_zero {
+        if messages.iter().any(|message| !message.fixed) && !cli.exit_zero {
             return Ok(ExitCode::FAILURE);
         }
     }

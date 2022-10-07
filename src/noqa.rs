@@ -104,9 +104,7 @@ fn add_noqa_inner(
             .unwrap_or(lineno);
 
         if !codes.is_empty() {
-            let matches = matches_by_line
-                .entry(noqa_lineno)
-                .or_insert_with(BTreeSet::new);
+            let matches = matches_by_line.entry(noqa_lineno).or_default();
             matches.append(&mut codes);
         }
     }

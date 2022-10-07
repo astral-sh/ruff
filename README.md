@@ -130,6 +130,8 @@ Options:
           Enable automatic additions of noqa directives to failing lines
       --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
           Regular expression matching the name of dummy variables
+      --target-version <TARGET_VERSION>
+          The minimum Python version that should be supported
   -h, --help
           Print help information
   -V, --version
@@ -275,14 +277,18 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |  |  |
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |  |
+| C400 | UnnecessaryGeneratorList | Unnecessary generator - rewrite as a list comprehension |  |  |
+| C401 | UnnecessaryGeneratorSet | Unnecessary generator - rewrite as a set comprehension |  |  |
 | C403 | UnnecessaryListComprehensionSet | Unnecessary list comprehension - rewrite as a set comprehension |  |  |
+| C404 | UnnecessaryListComprehensionDict | Unnecessary list comprehension - rewrite as a dict comprehension |  |  |
 | SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
 | T201 | PrintFound | `print` found |  | 🛠 |
 | T203 | PPrintFound | `pprint` found |  | 🛠 |
 | U001 | UselessMetaclassType | `__metaclass__ = type` is implied |  | 🛠 |
 | U002 | UnnecessaryAbspath | `abspath(__file__)` is unnecessary in Python 3.9 and later |  | 🛠 |
-| R001 | UselessObjectInheritance | Class `...` inherits from object |  | 🛠 |
-| R002 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
+| U003 | TypeOfPrimitive | Use `str` instead of `type(...)` |  | 🛠 |
+| U004 | UselessObjectInheritance | Class `...` inherits from object |  | 🛠 |
+| U005 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations

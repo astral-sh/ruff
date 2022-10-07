@@ -9,6 +9,7 @@ use serde::{Deserialize, Deserializer};
 
 use crate::checks::CheckCode;
 use crate::fs;
+use crate::settings::PythonVersion;
 
 pub fn load_config(pyproject: &Option<PathBuf>) -> Result<Config> {
     match pyproject {
@@ -41,6 +42,7 @@ pub struct Config {
     #[serde(default)]
     pub per_file_ignores: Vec<StrCheckCodePair>,
     pub dummy_variable_rgx: Option<String>,
+    pub target_version: Option<PythonVersion>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -189,6 +191,7 @@ mod tests {
                     extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
+                    target_version: None,
                 })
             })
         );
@@ -213,6 +216,7 @@ line-length = 79
                     extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
+                    target_version: None,
                 })
             })
         );
@@ -237,6 +241,7 @@ exclude = ["foo.py"]
                     extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
+                    target_version: None,
                 })
             })
         );
@@ -261,6 +266,7 @@ select = ["E501"]
                     extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
+                    target_version: None,
                 })
             })
         );
@@ -286,6 +292,7 @@ ignore = ["E501"]
                     extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
+                    target_version: None,
                 })
             })
         );
@@ -354,6 +361,7 @@ other-attribute = 1
                 extend_ignore: vec![],
                 per_file_ignores: vec![],
                 dummy_variable_rgx: None,
+                target_version: None,
             }
         );
 

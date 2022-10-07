@@ -25,7 +25,7 @@ use crate::plugins;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
-use crate::settings::Settings;
+use crate::settings::{PythonVersion, Settings};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
@@ -388,7 +388,7 @@ where
                 decorator_list,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::R001) {
+                if self.settings.enabled.contains(&CheckCode::U004) {
                     plugins::useless_object_inheritance(self, stmt, name, bases, keywords);
                 }
 
@@ -749,7 +749,7 @@ where
                 ExprContext::Del => self.handle_node_delete(expr),
             },
             ExprKind::Call { func, args, .. } => {
-                if self.settings.enabled.contains(&CheckCode::R002) {
+                if self.settings.enabled.contains(&CheckCode::U005) {
                     plugins::assert_equals(self, func);
                 }
 
@@ -766,15 +766,43 @@ where
                 }
 
                 // flake8-comprehensions
+                if self.settings.enabled.contains(&CheckCode::C400) {
+                    if let Some(check) = checks::unnecessary_generator_list(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
+                if self.settings.enabled.contains(&CheckCode::C401) {
+                    if let Some(check) = checks::unnecessary_generator_set(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
                 if self.settings.enabled.contains(&CheckCode::C403) {
-                    if let Some(check) = checks::unnecessary_list_comprehension(expr, func, args) {
+                    if let Some(check) =
+                        checks::unnecessary_list_comprehension_set(expr, func, args)
+                    {
+                        self.checks.push(check);
+                    };
+                }
+
+                if self.settings.enabled.contains(&CheckCode::C404) {
+                    if let Some(check) =
+                        checks::unnecessary_list_comprehension_dict(expr, func, args)
+                    {
                         self.checks.push(check);
                     };
                 }
 
                 // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::U002) {
+                if self.settings.enabled.contains(&CheckCode::U002)
+                    && self.settings.target_version >= PythonVersion::Py310
+                {
                     plugins::unnecessary_abspath(self, expr, func, args);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::U003) {
+                    plugins::type_of_primitive(self, expr, func, args);
                 }
 
                 if let ExprKind::Name { id, ctx } = &func.node {
@@ -1697,12 +1725,8 @@ impl<'a> Checker<'a> {
                     let child = self.parents[defined_by];
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
-                    let mut check = Check::new(
-                        CheckKind::UnusedImport(full_names.join(", ")),
-                        self.locate_check(Range::from_located(child)),
-                    );
-
-                    if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    let fix = if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
+                    {
                         let deleted: Vec<&Stmt> = self
                             .deletions
                             .iter()
@@ -1715,14 +1739,22 @@ impl<'a> Checker<'a> {
                         };
 
                         match removal_fn(&mut self.locator, &full_names, child, parent, &deleted) {
-                            Ok(fix) => {
-                                if fix.content.is_empty() || fix.content == "pass" {
-                                    self.deletions.insert(defined_by);
-                                }
-                                check.amend(fix)
+                            Ok(fix) => Some(fix),
+                            Err(e) => {
+                                error!("Failed to fix unused imports: {}", e);
+                                None
                             }
-                            Err(e) => error!("Failed to fix unused imports: {}", e),
                         }
+                    } else {
+                        None
+                    };
+
+                    let mut check = Check::new(
+                        CheckKind::UnusedImport(full_names.into_iter().map(String::from).collect()),
+                        self.locate_check(Range::from_located(child)),
+                    );
+                    if let Some(fix) = fix {
+                        check.amend(fix);
                     }
 
                     self.checks.push(check);
