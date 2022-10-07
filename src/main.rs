@@ -89,12 +89,13 @@ struct Cli {
     /// Enable automatic additions of noqa directives to failing lines.
     #[arg(long)]
     add_noqa: bool,
-    /// Enable automatic formatting.
-    #[arg(long)]
-    autoformat: bool,
     /// Regular expression matching the name of dummy variables.
     #[arg(long)]
     dummy_variable_rgx: Option<Regex>,
+    /// Round-trip auto-formatting.
+    // TODO(charlie): This should be a sub-command.
+    #[arg(long, hide = true)]
+    autoformat: bool,
 }
 
 #[cfg(feature = "update-informer")]
