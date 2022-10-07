@@ -366,7 +366,7 @@ impl CheckCode {
             CheckCode::E902 => CheckKind::IOError("IOError: `...`".to_string()),
             CheckCode::E999 => CheckKind::SyntaxError("`...`".to_string()),
             // pyflakes
-            CheckCode::F401 => CheckKind::UnusedImport("...".to_string()),
+            CheckCode::F401 => CheckKind::UnusedImport(vec!["...".to_string()]),
             CheckCode::F402 => CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
             CheckCode::F403 => CheckKind::ImportStarUsed("...".to_string()),
             CheckCode::F404 => CheckKind::LateFutureImport,
@@ -476,7 +476,7 @@ pub enum CheckKind {
     UndefinedExport(String),
     UndefinedLocal(String),
     UndefinedName(String),
-    UnusedImport(String),
+    UnusedImport(Vec<String>),
     UnusedVariable(String),
     YieldOutsideFunction,
     // flake8-builtin
@@ -764,7 +764,10 @@ impl CheckKind {
             CheckKind::UndefinedName(name) => {
                 format!("Undefined name `{name}`")
             }
-            CheckKind::UnusedImport(name) => format!("`{name}` imported but unused"),
+            CheckKind::UnusedImport(names) => {
+                let names = names.iter().map(|name| format!("`{name}`")).join(", ");
+                format!("{names} imported but unused")
+            }
             CheckKind::UnusedVariable(name) => {
                 format!("Local variable `{name}` is assigned to but never used")
             }

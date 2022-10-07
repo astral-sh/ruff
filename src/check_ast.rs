@@ -1721,12 +1721,8 @@ impl<'a> Checker<'a> {
                     let child = self.parents[defined_by];
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
-                    let mut check = Check::new(
-                        CheckKind::UnusedImport(full_names.join(", ")),
-                        self.locate_check(Range::from_located(child)),
-                    );
-
-                    if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    let fix = if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
+                    {
                         let deleted: Vec<&Stmt> = self
                             .deletions
                             .iter()
@@ -1739,14 +1735,22 @@ impl<'a> Checker<'a> {
                         };
 
                         match removal_fn(&mut self.locator, &full_names, child, parent, &deleted) {
-                            Ok(fix) => {
-                                if fix.content.is_empty() || fix.content == "pass" {
-                                    self.deletions.insert(defined_by);
-                                }
-                                check.amend(fix)
+                            Ok(fix) => Some(fix),
+                            Err(e) => {
+                                error!("Failed to fix unused imports: {}", e);
+                                None
                             }
-                            Err(e) => error!("Failed to fix unused imports: {}", e),
                         }
+                    } else {
+                        None
+                    };
+
+                    let mut check = Check::new(
+                        CheckKind::UnusedImport(full_names.into_iter().map(String::from).collect()),
+                        self.locate_check(Range::from_located(child)),
+                    );
+                    if let Some(fix) = fix {
+                        check.amend(fix);
                     }
 
                     self.checks.push(check);
