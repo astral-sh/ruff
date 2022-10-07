@@ -15,6 +15,7 @@ pub mod cache;
 pub mod check_ast;
 mod check_lines;
 pub mod checks;
+pub mod cli;
 pub mod code_gen;
 pub mod fs;
 pub mod linter;
@@ -41,7 +42,7 @@ pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
         None => debug!("Unable to find pyproject.toml; using default settings..."),
     };
 
-    let settings = Settings::from_raw(RawSettings::from_pyproject(pyproject, project_root)?);
+    let settings = Settings::from_raw(RawSettings::from_pyproject(&pyproject, &project_root)?);
 
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);
