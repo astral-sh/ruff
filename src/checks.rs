@@ -53,7 +53,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::F901,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 54] = [
+pub const ALL_CHECK_CODES: [CheckCode; 55] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
