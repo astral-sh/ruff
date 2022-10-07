@@ -53,7 +53,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::F901,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 55] = [
+pub const ALL_CHECK_CODES: [CheckCode; 56] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -103,6 +103,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 55] = [
     CheckCode::A002,
     CheckCode::A003,
     // flake8-comprehensions
+    CheckCode::C400,
     CheckCode::C403,
     CheckCode::C404,
     // flake8-super
@@ -171,6 +172,7 @@ pub enum CheckCode {
     A002,
     A003,
     // flake8-comprehensions
+    C400,
     C403,
     C404,
     // flake8-super
@@ -314,6 +316,7 @@ impl CheckCode {
             CheckCode::A002 => "A002",
             CheckCode::A003 => "A003",
             // flake8-comprehensions
+            CheckCode::C400 => "C400",
             CheckCode::C403 => "C403",
             CheckCode::C404 => "C404",
             // flake8-super
@@ -395,6 +398,7 @@ impl CheckCode {
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-comprehensions
+            CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
             CheckCode::C403 => CheckKind::UnnecessaryListComprehensionSet,
             CheckCode::C404 => CheckKind::UnnecessaryListComprehensionDict,
             // flake8-super
@@ -476,6 +480,7 @@ pub enum CheckKind {
     BuiltinArgumentShadowing(String),
     BuiltinAttributeShadowing(String),
     // flakes8-comprehensions
+    UnnecessaryGeneratorList,
     UnnecessaryListComprehensionSet,
     UnnecessaryListComprehensionDict,
     // flake8-super
@@ -544,6 +549,7 @@ impl CheckKind {
             CheckKind::BuiltinArgumentShadowing(_) => "BuiltinArgumentShadowing",
             CheckKind::BuiltinAttributeShadowing(_) => "BuiltinAttributeShadowing",
             // flake8-comprehensions
+            CheckKind::UnnecessaryGeneratorList => "UnnecessaryGeneratorList",
             CheckKind::UnnecessaryListComprehensionSet => "UnnecessaryListComprehensionSet",
             CheckKind::UnnecessaryListComprehensionDict => "UnnecessaryListComprehensionDict",
             // flake8-super
@@ -612,6 +618,7 @@ impl CheckKind {
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-comprehensions
+            CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
             CheckKind::UnnecessaryListComprehensionSet => &CheckCode::C403,
             CheckKind::UnnecessaryListComprehensionDict => &CheckCode::C404,
             // flake8-super
@@ -769,6 +776,9 @@ impl CheckKind {
                 format!("Class attribute `{name}` is shadowing a python builtin")
             }
             // flake8-comprehensions
+            CheckKind::UnnecessaryGeneratorList => {
+                "Unnecessary generator - rewrite as a list comprehension".to_string()
+            }
             CheckKind::UnnecessaryListComprehensionSet => {
                 "Unnecessary list comprehension - rewrite as a set comprehension".to_string()
             }

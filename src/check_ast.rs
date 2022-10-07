@@ -766,6 +766,12 @@ where
                 }
 
                 // flake8-comprehensions
+                if self.settings.enabled.contains(&CheckCode::C400) {
+                    if let Some(check) = checks::unnecessary_generator_list(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
                 if self.settings.enabled.contains(&CheckCode::C403) {
                     if let Some(check) =
                         checks::unnecessary_list_comprehension_set(expr, func, args)

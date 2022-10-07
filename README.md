@@ -275,6 +275,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |  |  |
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |  |
+| C400 | UnnecessaryGeneratorList | Unnecessary generator - rewrite as a list comprehension |  |  |
 | C403 | UnnecessaryListComprehensionSet | Unnecessary list comprehension - rewrite as a set comprehension |  |  |
 | C404 | UnnecessaryListComprehensionDict | Unnecessary list comprehension - rewrite as a dict comprehension |  |  |
 | SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
