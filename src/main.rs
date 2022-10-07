@@ -404,7 +404,7 @@ fn inner_main() -> Result<ExitCode> {
         #[cfg(feature = "update-informer")]
         check_for_updates();
 
-        if !messages.is_empty() && !cli.exit_zero {
+        if messages.iter().any(|message| !message.fixed) && !cli.exit_zero {
             return Ok(ExitCode::FAILURE);
         }
     }
