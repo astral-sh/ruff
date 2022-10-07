@@ -419,7 +419,7 @@ impl CheckCode {
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
-            CheckCode::U003 => CheckKind::UnnecessaryAbspath,
+            CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
             // Refactor
             CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::R002 => CheckKind::NoAssertEquals,
