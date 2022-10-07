@@ -55,7 +55,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
     CheckCode::W292,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 53] = [
+pub const ALL_CHECK_CODES: [CheckCode; 54] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -113,6 +113,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 53] = [
     CheckCode::T203,
     // pyupgrade
     CheckCode::U001,
+    CheckCode::U002,
     // Refactor
     CheckCode::R001,
     CheckCode::R002,
@@ -179,6 +180,7 @@ pub enum CheckCode {
     T203,
     // pyupgrade
     U001,
+    U002,
     // Refactor
     R001,
     R002,
@@ -250,6 +252,7 @@ impl FromStr for CheckCode {
             "T203" => Ok(CheckCode::T203),
             // pyupgrade
             "U001" => Ok(CheckCode::U001),
+            "U002" => Ok(CheckCode::U002),
             // Refactor
             "R001" => Ok(CheckCode::R001),
             "R002" => Ok(CheckCode::R002),
@@ -322,6 +325,7 @@ impl CheckCode {
             CheckCode::T203 => "T203",
             // pyupgrade
             CheckCode::U001 => "U001",
+            CheckCode::U002 => "U002",
             // Refactor
             CheckCode::R001 => "R001",
             CheckCode::R002 => "R002",
@@ -403,6 +407,7 @@ impl CheckCode {
             CheckCode::T203 => CheckKind::PPrintFound,
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
+            CheckCode::U002 => CheckKind::UnnecessaryAbspath,
             // Refactor
             CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::R002 => CheckKind::NoAssertEquals,
@@ -456,7 +461,6 @@ pub enum CheckKind {
     ModuleImportNotAtTopOfFile,
     MultiValueRepeatedKeyLiteral,
     MultiValueRepeatedKeyVariable(String),
-    NoAssertEquals,
     NoneComparison(RejectedCmpop),
     NotInTest,
     NotIsTest,
@@ -470,10 +474,7 @@ pub enum CheckKind {
     UndefinedLocal(String),
     UndefinedName(String),
     UnusedImport(String),
-    UnusedNOQA(Option<String>),
     UnusedVariable(String),
-    UselessMetaclassType,
-    UselessObjectInheritance(String),
     YieldOutsideFunction,
     // flake8-builtin
     BuiltinVariableShadowing(String),
@@ -486,6 +487,14 @@ pub enum CheckKind {
     // flake8-print
     PrintFound,
     PPrintFound,
+    // pyupgrade
+    UnnecessaryAbspath,
+    UselessMetaclassType,
+    // Refactor
+    NoAssertEquals,
+    UselessObjectInheritance(String),
+    // Meta
+    UnusedNOQA(Option<String>),
     // More style
     NoNewLineAtEndOfFile,
 }
@@ -548,6 +557,7 @@ impl CheckKind {
             CheckKind::PrintFound => "PrintFound",
             CheckKind::PPrintFound => "PPrintFound",
             // pyupgrade
+            CheckKind::UnnecessaryAbspath => "UnnecessaryAbspath",
             CheckKind::UselessMetaclassType => "UselessMetaclassType",
             // Refactor
             CheckKind::NoAssertEquals => "NoAssertEquals",
@@ -616,6 +626,7 @@ impl CheckKind {
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
             // pyupgrade
+            CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
             // Refactor
             CheckKind::NoAssertEquals => &CheckCode::R002,
@@ -777,6 +788,9 @@ impl CheckKind {
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),
             // pyupgrade
+            CheckKind::UnnecessaryAbspath => {
+                "`abspath(__file__)` is unnecessary in Python 3.9 and later".to_string()
+            }
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
             // Refactor
             CheckKind::NoAssertEquals => {
@@ -803,6 +817,7 @@ impl CheckKind {
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::SuperCallWithParameters
+                | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnusedImport(_)
                 | CheckKind::UnusedNOQA(_)
                 | CheckKind::UselessMetaclassType

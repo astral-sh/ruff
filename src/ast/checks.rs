@@ -134,6 +134,27 @@ pub fn check_useless_metaclass_type(
     None
 }
 
+/// Check UnnecessaryAbspath compliance.
+pub fn check_unnecessary_abspath(func: &Expr, args: &Vec<Expr>, location: Range) -> Option<Check> {
+    // Validate the arguments.
+    if args.len() == 1 {
+        if let ExprKind::Name { id, .. } = &args[0].node {
+            if id == "__file__" {
+                match &func.node {
+                    ExprKind::Attribute { attr: id, .. } | ExprKind::Name { id, .. } => {
+                        if id == "abspath" {
+                            return Some(Check::new(CheckKind::UnnecessaryAbspath, location));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    None
+}
+
 fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }
