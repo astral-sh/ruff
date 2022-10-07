@@ -25,7 +25,7 @@ use crate::plugins;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
-use crate::settings::Settings;
+use crate::settings::{PythonVersion, Settings};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
@@ -795,7 +795,9 @@ where
                 }
 
                 // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::U002) {
+                if self.settings.enabled.contains(&CheckCode::U002)
+                    && self.settings.target_version >= PythonVersion::Py310
+                {
                     plugins::unnecessary_abspath(self, expr, func, args);
                 }
 
