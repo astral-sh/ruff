@@ -731,6 +731,23 @@ pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &Vec<Expr>) ->
     None
 }
 
+/// Check `set(generator)` compliance.
+pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+    if args.len() == 1 {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "set" {
+                if let ExprKind::GeneratorExp { .. } = &args[0].node {
+                    return Some(Check::new(
+                        CheckKind::UnnecessaryGeneratorList,
+                        Range::from_located(expr),
+                    ));
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Check `set([...])` compliance.
 pub fn unnecessary_list_comprehension_set(
     expr: &Expr,
