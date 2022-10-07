@@ -6,6 +6,7 @@ use rustpython_parser::ast::{
     Arg, ArgData, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind,
     Stmt, StmtKind, Unaryop,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::ast::types::{
     Binding, BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind,
@@ -149,6 +150,65 @@ pub fn check_unnecessary_abspath(func: &Expr, args: &Vec<Expr>, location: Range)
                     _ => {}
                 }
             }
+        }
+    }
+
+    None
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Primitive {
+    Bool,
+    Str,
+    Bytes,
+    Int,
+    Float,
+    Complex,
+}
+
+impl Primitive {
+    fn from_constant(constant: &Constant) -> Option<Self> {
+        match constant {
+            Constant::Bool(_) => Some(Primitive::Bool),
+            Constant::Str(_) => Some(Primitive::Str),
+            Constant::Bytes(_) => Some(Primitive::Bytes),
+            Constant::Int(_) => Some(Primitive::Int),
+            Constant::Float(_) => Some(Primitive::Float),
+            Constant::Complex { .. } => Some(Primitive::Complex),
+            _ => None,
+        }
+    }
+
+    pub fn builtin(&self) -> String {
+        match self {
+            Primitive::Bool => "bool".to_string(),
+            Primitive::Str => "str".to_string(),
+            Primitive::Bytes => "bytes".to_string(),
+            Primitive::Int => "int".to_string(),
+            Primitive::Float => "float".to_string(),
+            Primitive::Complex => "complex".to_string(),
+        }
+    }
+}
+
+/// Check TypeOfPrimitive compliance.
+pub fn check_type_of_primitive(func: &Expr, args: &Vec<Expr>, location: Range) -> Option<Check> {
+    // Validate the arguments.
+    if args.len() == 1 {
+        match &func.node {
+            ExprKind::Attribute { attr: id, .. } | ExprKind::Name { id, .. } => {
+                if id == "type" {
+                    if let ExprKind::Constant { value, .. } = &args[0].node {
+                        if let Some(primitive) = Primitive::from_constant(value) {
+                            return Some(Check::new(
+                                CheckKind::TypeOfPrimitive(primitive),
+                                location,
+                            ));
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     }
 

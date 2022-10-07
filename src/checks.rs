@@ -1,10 +1,12 @@
 use std::str::FromStr;
 
-use crate::ast::types::Range;
+use crate::ast::checks::Primitive;
 use anyhow::Result;
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
+
+use crate::ast::types::Range;
 
 pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     // pycodestyle
@@ -53,7 +55,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::F901,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 57] = [
+pub const ALL_CHECK_CODES: [CheckCode; 58] = [
     // pycodestyle
     CheckCode::E402,
     CheckCode::E501,
@@ -115,6 +117,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 57] = [
     // pyupgrade
     CheckCode::U001,
     CheckCode::U002,
+    CheckCode::U003,
     // Refactor
     CheckCode::R001,
     CheckCode::R002,
@@ -185,6 +188,7 @@ pub enum CheckCode {
     // pyupgrade
     U001,
     U002,
+    U003,
     // Refactor
     R001,
     R002,
@@ -256,6 +260,7 @@ impl FromStr for CheckCode {
             // pyupgrade
             "U001" => Ok(CheckCode::U001),
             "U002" => Ok(CheckCode::U002),
+            "U003" => Ok(CheckCode::U003),
             // Refactor
             "R001" => Ok(CheckCode::R001),
             "R002" => Ok(CheckCode::R002),
@@ -330,6 +335,7 @@ impl CheckCode {
             // pyupgrade
             CheckCode::U001 => "U001",
             CheckCode::U002 => "U002",
+            CheckCode::U003 => "U003",
             // Refactor
             CheckCode::R001 => "R001",
             CheckCode::R002 => "R002",
@@ -413,6 +419,7 @@ impl CheckCode {
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
+            CheckCode::U003 => CheckKind::UnnecessaryAbspath,
             // Refactor
             CheckCode::R001 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::R002 => CheckKind::NoAssertEquals,
@@ -494,6 +501,7 @@ pub enum CheckKind {
     PrintFound,
     PPrintFound,
     // pyupgrade
+    TypeOfPrimitive(Primitive),
     UnnecessaryAbspath,
     UselessMetaclassType,
     // Refactor
@@ -564,6 +572,7 @@ impl CheckKind {
             CheckKind::PrintFound => "PrintFound",
             CheckKind::PPrintFound => "PPrintFound",
             // pyupgrade
+            CheckKind::TypeOfPrimitive(_) => "TypeOfPrimitive",
             CheckKind::UnnecessaryAbspath => "UnnecessaryAbspath",
             CheckKind::UselessMetaclassType => "UselessMetaclassType",
             // Refactor
@@ -634,6 +643,7 @@ impl CheckKind {
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
             // pyupgrade
+            CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
             // Refactor
@@ -806,6 +816,9 @@ impl CheckKind {
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),
             // pyupgrade
+            CheckKind::TypeOfPrimitive(primitive) => {
+                format!("Use `{}` instead of `type(...)`", primitive.builtin())
+            }
             CheckKind::UnnecessaryAbspath => {
                 "`abspath(__file__)` is unnecessary in Python 3.9 and later".to_string()
             }
@@ -833,6 +846,7 @@ impl CheckKind {
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::SuperCallWithParameters
+                | CheckKind::TypeOfPrimitive(_)
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnusedImport(_)
                 | CheckKind::UnusedNOQA(_)

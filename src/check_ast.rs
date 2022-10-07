@@ -801,6 +801,10 @@ where
                     plugins::unnecessary_abspath(self, expr, func, args);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::U003) {
+                    plugins::type_of_primitive(self, expr, func, args);
+                }
+
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = &mut self.scopes[*(self
