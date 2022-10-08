@@ -1,10 +1,7 @@
-use std::str::FromStr;
-
-use anyhow::Result;
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumIter;
+use strum_macros::{AsRefStr, EnumIter, EnumString};
 
 use crate::ast::checks::Primitive;
 use crate::ast::types::Range;
@@ -58,7 +55,20 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
     CheckCode::F901,
 ];
 
-#[derive(EnumIter, Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(
+    AsRefStr,
+    EnumIter,
+    EnumString,
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    Serialize,
+    Deserialize,
+    Hash,
+    PartialOrd,
+    Ord,
+)]
 pub enum CheckCode {
     // pycodestyle errors
     E402,
@@ -134,166 +144,94 @@ pub enum CheckCode {
     M001,
 }
 
-impl FromStr for CheckCode {
-    type Err = anyhow::Error;
+#[allow(clippy::upper_case_acronyms)]
+pub enum LintSource {
+    AST,
+    Lines,
+    FileSystem,
+}
 
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            // pycodestyle errors
-            "E402" => Ok(CheckCode::E402),
-            "E501" => Ok(CheckCode::E501),
-            "E711" => Ok(CheckCode::E711),
-            "E712" => Ok(CheckCode::E712),
-            "E713" => Ok(CheckCode::E713),
-            "E714" => Ok(CheckCode::E714),
-            "E721" => Ok(CheckCode::E721),
-            "E722" => Ok(CheckCode::E722),
-            "E731" => Ok(CheckCode::E731),
-            "E741" => Ok(CheckCode::E741),
-            "E742" => Ok(CheckCode::E742),
-            "E743" => Ok(CheckCode::E743),
-            "E902" => Ok(CheckCode::E902),
-            "E999" => Ok(CheckCode::E999),
-            // pycodestyle warnings
-            "W292" => Ok(CheckCode::W292),
-            // pyflakes
-            "F401" => Ok(CheckCode::F401),
-            "F402" => Ok(CheckCode::F402),
-            "F403" => Ok(CheckCode::F403),
-            "F404" => Ok(CheckCode::F404),
-            "F405" => Ok(CheckCode::F405),
-            "F406" => Ok(CheckCode::F406),
-            "F407" => Ok(CheckCode::F407),
-            "F541" => Ok(CheckCode::F541),
-            "F601" => Ok(CheckCode::F601),
-            "F602" => Ok(CheckCode::F602),
-            "F621" => Ok(CheckCode::F621),
-            "F622" => Ok(CheckCode::F622),
-            "F631" => Ok(CheckCode::F631),
-            "F632" => Ok(CheckCode::F632),
-            "F633" => Ok(CheckCode::F633),
-            "F634" => Ok(CheckCode::F634),
-            "F701" => Ok(CheckCode::F701),
-            "F702" => Ok(CheckCode::F702),
-            "F704" => Ok(CheckCode::F704),
-            "F706" => Ok(CheckCode::F706),
-            "F707" => Ok(CheckCode::F707),
-            "F722" => Ok(CheckCode::F722),
-            "F821" => Ok(CheckCode::F821),
-            "F822" => Ok(CheckCode::F822),
-            "F823" => Ok(CheckCode::F823),
-            "F831" => Ok(CheckCode::F831),
-            "F841" => Ok(CheckCode::F841),
-            "F901" => Ok(CheckCode::F901),
-            // flake8-builtins
-            "A001" => Ok(CheckCode::A001),
-            "A002" => Ok(CheckCode::A002),
-            "A003" => Ok(CheckCode::A003),
-            // flake8-comprehensions
-            "C400" => Ok(CheckCode::C400),
-            "C401" => Ok(CheckCode::C401),
-            "C402" => Ok(CheckCode::C402),
-            "C403" => Ok(CheckCode::C403),
-            "C404" => Ok(CheckCode::C404),
-            "C405" => Ok(CheckCode::C405),
-            "C406" => Ok(CheckCode::C406),
-            "C408" => Ok(CheckCode::C408),
-            // flake8-super
-            "SPR001" => Ok(CheckCode::SPR001),
-            // flake8-print
-            "T201" => Ok(CheckCode::T201),
-            "T203" => Ok(CheckCode::T203),
-            // pyupgrade
-            "U001" => Ok(CheckCode::U001),
-            "U002" => Ok(CheckCode::U002),
-            "U003" => Ok(CheckCode::U003),
-            "U004" => Ok(CheckCode::U004),
-            "U005" => Ok(CheckCode::U005),
-            // Meta
-            "M001" => Ok(CheckCode::M001),
-            _ => Err(anyhow::anyhow!("Unknown check code: {s}")),
-        }
-    }
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RejectedCmpop {
+    Eq,
+    NotEq,
+}
+
+#[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CheckKind {
+    AmbiguousClassName(String),
+    AmbiguousFunctionName(String),
+    AmbiguousVariableName(String),
+    AssertTuple,
+    BreakOutsideLoop,
+    ContinueOutsideLoop,
+    DefaultExceptNotLast,
+    DoNotAssignLambda,
+    DoNotUseBareExcept,
+    DuplicateArgumentName,
+    ExpressionsInStarAssignment,
+    FStringMissingPlaceholders,
+    ForwardAnnotationSyntaxError(String),
+    FutureFeatureNotDefined(String),
+    IOError(String),
+    IfTuple,
+    ImportShadowedByLoopVar(String, usize),
+    ImportStarNotPermitted(String),
+    ImportStarUsage(String, Vec<String>),
+    ImportStarUsed(String),
+    InvalidPrintSyntax,
+    IsLiteral,
+    LateFutureImport,
+    LineTooLong(usize, usize),
+    ModuleImportNotAtTopOfFile,
+    MultiValueRepeatedKeyLiteral,
+    MultiValueRepeatedKeyVariable(String),
+    NoneComparison(RejectedCmpop),
+    NotInTest,
+    NotIsTest,
+    RaiseNotImplemented,
+    ReturnOutsideFunction,
+    SyntaxError(String),
+    TrueFalseComparison(bool, RejectedCmpop),
+    TwoStarredExpressions,
+    TypeComparison,
+    UndefinedExport(String),
+    UndefinedLocal(String),
+    UndefinedName(String),
+    UnusedImport(Vec<String>),
+    UnusedVariable(String),
+    YieldOutsideFunction,
+    // More style
+    NoNewLineAtEndOfFile,
+    // flake8-builtin
+    BuiltinVariableShadowing(String),
+    BuiltinArgumentShadowing(String),
+    BuiltinAttributeShadowing(String),
+    // flakes8-comprehensions
+    UnnecessaryGeneratorList,
+    UnnecessaryGeneratorSet,
+    UnnecessaryGeneratorDict,
+    UnnecessaryListComprehensionSet,
+    UnnecessaryListComprehensionDict,
+    UnnecessaryLiteralSet(String),
+    UnnecessaryLiteralDict(String),
+    UnnecessaryCollectionCall(String),
+    // flake8-super
+    SuperCallWithParameters,
+    // flake8-print
+    PrintFound,
+    PPrintFound,
+    // pyupgrade
+    TypeOfPrimitive(Primitive),
+    UnnecessaryAbspath,
+    UselessMetaclassType,
+    NoAssertEquals,
+    UselessObjectInheritance(String),
+    // Meta
+    UnusedNOQA(Option<String>),
 }
 
 impl CheckCode {
-    pub fn as_str(&self) -> &str {
-        match self {
-            // pycodestyle errors
-            CheckCode::E402 => "E402",
-            CheckCode::E501 => "E501",
-            CheckCode::E711 => "E711",
-            CheckCode::E712 => "E712",
-            CheckCode::E713 => "E713",
-            CheckCode::E714 => "E714",
-            CheckCode::E721 => "E721",
-            CheckCode::E722 => "E722",
-            CheckCode::E731 => "E731",
-            CheckCode::E741 => "E741",
-            CheckCode::E742 => "E742",
-            CheckCode::E743 => "E743",
-            CheckCode::E902 => "E902",
-            CheckCode::E999 => "E999",
-            // pycodestyle warnings
-            CheckCode::W292 => "W292",
-            // pyflakes
-            CheckCode::F401 => "F401",
-            CheckCode::F402 => "F402",
-            CheckCode::F403 => "F403",
-            CheckCode::F404 => "F404",
-            CheckCode::F405 => "F405",
-            CheckCode::F406 => "F406",
-            CheckCode::F407 => "F407",
-            CheckCode::F541 => "F541",
-            CheckCode::F601 => "F601",
-            CheckCode::F602 => "F602",
-            CheckCode::F621 => "F621",
-            CheckCode::F622 => "F622",
-            CheckCode::F631 => "F631",
-            CheckCode::F632 => "F632",
-            CheckCode::F633 => "F633",
-            CheckCode::F634 => "F634",
-            CheckCode::F701 => "F701",
-            CheckCode::F702 => "F702",
-            CheckCode::F704 => "F704",
-            CheckCode::F706 => "F706",
-            CheckCode::F707 => "F707",
-            CheckCode::F722 => "F722",
-            CheckCode::F821 => "F821",
-            CheckCode::F822 => "F822",
-            CheckCode::F823 => "F823",
-            CheckCode::F831 => "F831",
-            CheckCode::F841 => "F841",
-            CheckCode::F901 => "F901",
-            // flake8-builtins
-            CheckCode::A001 => "A001",
-            CheckCode::A002 => "A002",
-            CheckCode::A003 => "A003",
-            // flake8-comprehensions
-            CheckCode::C400 => "C400",
-            CheckCode::C401 => "C401",
-            CheckCode::C402 => "C402",
-            CheckCode::C403 => "C403",
-            CheckCode::C404 => "C404",
-            CheckCode::C405 => "C405",
-            CheckCode::C406 => "C406",
-            CheckCode::C408 => "C408",
-            // flake8-super
-            CheckCode::SPR001 => "SPR001",
-            // flake8-print
-            CheckCode::T201 => "T201",
-            CheckCode::T203 => "T203",
-            // pyupgrade
-            CheckCode::U001 => "U001",
-            CheckCode::U002 => "U002",
-            CheckCode::U003 => "U003",
-            CheckCode::U004 => "U004",
-            CheckCode::U005 => "U005",
-            // Meta
-            CheckCode::M001 => "M001",
-        }
-    }
-
     /// The source for the check (either the AST, the filesystem, or the physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
@@ -386,170 +324,7 @@ impl CheckCode {
     }
 }
 
-#[allow(clippy::upper_case_acronyms)]
-pub enum LintSource {
-    AST,
-    Lines,
-    FileSystem,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RejectedCmpop {
-    Eq,
-    NotEq,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CheckKind {
-    AmbiguousClassName(String),
-    AmbiguousFunctionName(String),
-    AmbiguousVariableName(String),
-    AssertTuple,
-    BreakOutsideLoop,
-    ContinueOutsideLoop,
-    DefaultExceptNotLast,
-    DoNotAssignLambda,
-    DoNotUseBareExcept,
-    DuplicateArgumentName,
-    ExpressionsInStarAssignment,
-    FStringMissingPlaceholders,
-    ForwardAnnotationSyntaxError(String),
-    FutureFeatureNotDefined(String),
-    IOError(String),
-    IfTuple,
-    ImportShadowedByLoopVar(String, usize),
-    ImportStarNotPermitted(String),
-    ImportStarUsage(String, Vec<String>),
-    ImportStarUsed(String),
-    InvalidPrintSyntax,
-    IsLiteral,
-    LateFutureImport,
-    LineTooLong(usize, usize),
-    ModuleImportNotAtTopOfFile,
-    MultiValueRepeatedKeyLiteral,
-    MultiValueRepeatedKeyVariable(String),
-    NoneComparison(RejectedCmpop),
-    NotInTest,
-    NotIsTest,
-    RaiseNotImplemented,
-    ReturnOutsideFunction,
-    SyntaxError(String),
-    TrueFalseComparison(bool, RejectedCmpop),
-    TwoStarredExpressions,
-    TypeComparison,
-    UndefinedExport(String),
-    UndefinedLocal(String),
-    UndefinedName(String),
-    UnusedImport(Vec<String>),
-    UnusedVariable(String),
-    YieldOutsideFunction,
-    // More style
-    NoNewLineAtEndOfFile,
-    // flake8-builtin
-    BuiltinVariableShadowing(String),
-    BuiltinArgumentShadowing(String),
-    BuiltinAttributeShadowing(String),
-    // flakes8-comprehensions
-    UnnecessaryGeneratorList,
-    UnnecessaryGeneratorSet,
-    UnnecessaryGeneratorDict,
-    UnnecessaryListComprehensionSet,
-    UnnecessaryListComprehensionDict,
-    UnnecessaryLiteralSet(String),
-    UnnecessaryLiteralDict(String),
-    UnnecessaryCollectionCall(String),
-    // flake8-super
-    SuperCallWithParameters,
-    // flake8-print
-    PrintFound,
-    PPrintFound,
-    // pyupgrade
-    TypeOfPrimitive(Primitive),
-    UnnecessaryAbspath,
-    UselessMetaclassType,
-    NoAssertEquals,
-    UselessObjectInheritance(String),
-    // Meta
-    UnusedNOQA(Option<String>),
-}
-
 impl CheckKind {
-    /// The name of the check.
-    pub fn name(&self) -> &'static str {
-        match self {
-            CheckKind::AmbiguousClassName(_) => "AmbiguousClassName",
-            CheckKind::AmbiguousFunctionName(_) => "AmbiguousFunctionName",
-            CheckKind::AmbiguousVariableName(_) => "AmbiguousVariableName",
-            CheckKind::AssertTuple => "AssertTuple",
-            CheckKind::BreakOutsideLoop => "BreakOutsideLoop",
-            CheckKind::ContinueOutsideLoop => "ContinueOutsideLoop",
-            CheckKind::DefaultExceptNotLast => "DefaultExceptNotLast",
-            CheckKind::DoNotAssignLambda => "DoNotAssignLambda",
-            CheckKind::DoNotUseBareExcept => "DoNotUseBareExcept",
-            CheckKind::DuplicateArgumentName => "DuplicateArgumentName",
-            CheckKind::ExpressionsInStarAssignment => "ExpressionsInStarAssignment",
-            CheckKind::FStringMissingPlaceholders => "FStringMissingPlaceholders",
-            CheckKind::ForwardAnnotationSyntaxError(_) => "ForwardAnnotationSyntaxError",
-            CheckKind::FutureFeatureNotDefined(_) => "FutureFeatureNotDefined",
-            CheckKind::IOError(_) => "IOError",
-            CheckKind::IfTuple => "IfTuple",
-            CheckKind::ImportShadowedByLoopVar(_, _) => "ImportShadowedByLoopVar",
-            CheckKind::ImportStarNotPermitted(_) => "ImportStarNotPermitted",
-            CheckKind::ImportStarUsage(_, _) => "ImportStarUsage",
-            CheckKind::ImportStarUsed(_) => "ImportStarUsed",
-            CheckKind::InvalidPrintSyntax => "InvalidPrintSyntax",
-            CheckKind::IsLiteral => "IsLiteral",
-            CheckKind::LateFutureImport => "LateFutureImport",
-            CheckKind::LineTooLong(_, _) => "LineTooLong",
-            CheckKind::ModuleImportNotAtTopOfFile => "ModuleImportNotAtTopOfFile",
-            CheckKind::MultiValueRepeatedKeyLiteral => "MultiValueRepeatedKeyLiteral",
-            CheckKind::MultiValueRepeatedKeyVariable(_) => "MultiValueRepeatedKeyVariable",
-            CheckKind::NoneComparison(_) => "NoneComparison",
-            CheckKind::NotInTest => "NotInTest",
-            CheckKind::NotIsTest => "NotIsTest",
-            CheckKind::RaiseNotImplemented => "RaiseNotImplemented",
-            CheckKind::ReturnOutsideFunction => "ReturnOutsideFunction",
-            CheckKind::SyntaxError(_) => "SyntaxError",
-            CheckKind::TrueFalseComparison(_, _) => "TrueFalseComparison",
-            CheckKind::TwoStarredExpressions => "TwoStarredExpressions",
-            CheckKind::TypeComparison => "TypeComparison",
-            CheckKind::UndefinedExport(_) => "UndefinedExport",
-            CheckKind::UndefinedLocal(_) => "UndefinedLocal",
-            CheckKind::UndefinedName(_) => "UndefinedName",
-            CheckKind::UnusedImport(_) => "UnusedImport",
-            CheckKind::UnusedVariable(_) => "UnusedVariable",
-            CheckKind::YieldOutsideFunction => "YieldOutsideFunction",
-            // More style
-            CheckKind::NoNewLineAtEndOfFile => "NoNewLineAtEndOfFile",
-            // flake8-builtins
-            CheckKind::BuiltinVariableShadowing(_) => "BuiltinVariableShadowing",
-            CheckKind::BuiltinArgumentShadowing(_) => "BuiltinArgumentShadowing",
-            CheckKind::BuiltinAttributeShadowing(_) => "BuiltinAttributeShadowing",
-            // flake8-comprehensions
-            CheckKind::UnnecessaryGeneratorList => "UnnecessaryGeneratorList",
-            CheckKind::UnnecessaryGeneratorSet => "UnnecessaryGeneratorSet",
-            CheckKind::UnnecessaryGeneratorDict => "UnnecessaryGeneratorDict",
-            CheckKind::UnnecessaryListComprehensionSet => "UnnecessaryListComprehensionSet",
-            CheckKind::UnnecessaryListComprehensionDict => "UnnecessaryListComprehensionDict",
-            CheckKind::UnnecessaryLiteralSet(_) => "UnnecessaryLiteralSet",
-            CheckKind::UnnecessaryLiteralDict(_) => "UnnecessaryLiteralDict",
-            CheckKind::UnnecessaryCollectionCall(_) => "UnnecessaryCollectionCall",
-            // flake8-super
-            CheckKind::SuperCallWithParameters => "SuperCallWithParameters",
-            // flake8-print
-            CheckKind::PrintFound => "PrintFound",
-            CheckKind::PPrintFound => "PPrintFound",
-            // pyupgrade
-            CheckKind::TypeOfPrimitive(_) => "TypeOfPrimitive",
-            CheckKind::UnnecessaryAbspath => "UnnecessaryAbspath",
-            CheckKind::UselessMetaclassType => "UselessMetaclassType",
-            CheckKind::NoAssertEquals => "NoAssertEquals",
-            CheckKind::UselessObjectInheritance(_) => "UselessObjectInheritance",
-            // Meta
-            CheckKind::UnusedNOQA(_) => "UnusedNOQA",
-        }
-    }
-
     /// A four-letter shorthand code for the check.
     pub fn code(&self) -> &'static CheckCode {
         match self {
@@ -868,5 +643,27 @@ impl Check {
 
     pub fn amend(&mut self, fix: Fix) {
         self.fix = Some(fix);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use anyhow::Result;
+    use strum::IntoEnumIterator;
+
+    use crate::checks::CheckCode;
+
+    #[test]
+    fn check_code_serialization() -> Result<()> {
+        for check_code in CheckCode::iter() {
+            assert!(
+                CheckCode::from_str(check_code.as_ref()).is_ok(),
+                "{:?} could not be round-trip serialized.",
+                check_code
+            );
+        }
+        Ok(())
     }
 }

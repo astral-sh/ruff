@@ -66,12 +66,12 @@ pub fn check_lines(
 
                 match noqa {
                     (Directive::All(_, _), matches) => {
-                        matches.push(check.kind.code().as_str());
+                        matches.push(check.kind.code().as_ref());
                         ignored.push(index)
                     }
                     (Directive::Codes(_, _, codes), matches) => {
-                        if codes.contains(&check.kind.code().as_str()) {
-                            matches.push(check.kind.code().as_str());
+                        if codes.contains(&check.kind.code().as_ref()) {
+                            matches.push(check.kind.code().as_ref());
                             ignored.push(index);
                         }
                     }
@@ -98,11 +98,11 @@ pub fn check_lines(
 
                 match noqa {
                     (Directive::All(_, _), matches) => {
-                        matches.push(check.kind.code().as_str());
+                        matches.push(check.kind.code().as_ref());
                     }
                     (Directive::Codes(_, _, codes), matches) => {
-                        if codes.contains(&check.kind.code().as_str()) {
-                            matches.push(check.kind.code().as_str());
+                        if codes.contains(&check.kind.code().as_ref()) {
+                            matches.push(check.kind.code().as_ref());
                         } else {
                             line_checks.push(check);
                         }
@@ -138,11 +138,11 @@ pub fn check_lines(
 
             match noqa {
                 (Directive::All(_, _), matches) => {
-                    matches.push(check.kind.code().as_str());
+                    matches.push(check.kind.code().as_ref());
                 }
                 (Directive::Codes(_, _, codes), matches) => {
-                    if codes.contains(&check.kind.code().as_str()) {
-                        matches.push(check.kind.code().as_str());
+                    if codes.contains(&check.kind.code().as_ref()) {
+                        matches.push(check.kind.code().as_ref());
                     } else {
                         line_checks.push(check);
                     }

@@ -296,7 +296,6 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | U005 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
-
 ## Integrations
 
 ### PyCharm

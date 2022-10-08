@@ -16,8 +16,8 @@ fn main() {
         let fix_token = if check_kind.fixable() { "🛠" } else { "" };
         println!(
             "| {} | {} | {} | {} | {} |",
-            check_kind.code().as_str(),
-            check_kind.name(),
+            check_kind.code().as_ref(),
+            check_kind.as_ref(),
             check_kind.body(),
             default_token,
             fix_token
