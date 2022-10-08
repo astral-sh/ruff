@@ -1,11 +1,12 @@
 use std::str::FromStr;
 
-use crate::ast::checks::Primitive;
 use anyhow::Result;
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
+use crate::ast::checks::Primitive;
 use crate::ast::types::Range;
 
 pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
@@ -57,82 +58,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
     CheckCode::F901,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 63] = [
-    // pycodestyle errors
-    CheckCode::E402,
-    CheckCode::E501,
-    CheckCode::E711,
-    CheckCode::E712,
-    CheckCode::E713,
-    CheckCode::E714,
-    CheckCode::E721,
-    CheckCode::E722,
-    CheckCode::E731,
-    CheckCode::E741,
-    CheckCode::E742,
-    CheckCode::E743,
-    CheckCode::E902,
-    CheckCode::E999,
-    // pycodestyle warnings
-    CheckCode::W292,
-    // pyflakes
-    CheckCode::F401,
-    CheckCode::F402,
-    CheckCode::F403,
-    CheckCode::F404,
-    CheckCode::F405,
-    CheckCode::F406,
-    CheckCode::F407,
-    CheckCode::F541,
-    CheckCode::F601,
-    CheckCode::F602,
-    CheckCode::F621,
-    CheckCode::F622,
-    CheckCode::F631,
-    CheckCode::F632,
-    CheckCode::F633,
-    CheckCode::F634,
-    CheckCode::F701,
-    CheckCode::F702,
-    CheckCode::F704,
-    CheckCode::F706,
-    CheckCode::F707,
-    CheckCode::F722,
-    CheckCode::F821,
-    CheckCode::F822,
-    CheckCode::F823,
-    CheckCode::F831,
-    CheckCode::F841,
-    CheckCode::F901,
-    // flake8-builtins
-    CheckCode::A001,
-    CheckCode::A002,
-    CheckCode::A003,
-    // flake8-comprehensions
-    CheckCode::C400,
-    CheckCode::C401,
-    CheckCode::C402,
-    CheckCode::C403,
-    CheckCode::C404,
-    CheckCode::C405,
-    CheckCode::C406,
-    CheckCode::C408,
-    // flake8-super
-    CheckCode::SPR001,
-    // flake8-print
-    CheckCode::T201,
-    CheckCode::T203,
-    // pyupgrade
-    CheckCode::U001,
-    CheckCode::U002,
-    CheckCode::U003,
-    CheckCode::U004,
-    CheckCode::U005,
-    // Meta
-    CheckCode::M001,
-];
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(EnumIter, Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub enum CheckCode {
     // pycodestyle errors
     E402,
