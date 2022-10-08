@@ -258,6 +258,9 @@ impl FromStr for CheckCode {
             "A002" => Ok(CheckCode::A002),
             "A003" => Ok(CheckCode::A003),
             // flake8-comprehensions
+            "C400" => Ok(CheckCode::C400),
+            "C401" => Ok(CheckCode::C401),
+            "C402" => Ok(CheckCode::C402),
             "C403" => Ok(CheckCode::C403),
             "C404" => Ok(CheckCode::C404),
             // flake8-super
