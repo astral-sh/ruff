@@ -9,7 +9,10 @@ use crate::python::typing;
 pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr, id: &str) {
     // TODO(charlie): Verify that the builtin is imported from the `typing` module.
     if typing::is_pep585_builtin(id) {
-        let mut check = Check::new(CheckKind::UsePEP585Annotation, Range::from_located(expr));
+        let mut check = Check::new(
+            CheckKind::UsePEP585Annotation(id.to_string()),
+            Range::from_located(expr),
+        );
         if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
             check.amend(Fix {
                 content: id.to_lowercase(),

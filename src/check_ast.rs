@@ -732,10 +732,11 @@ where
             }
             ExprKind::Name { id, ctx } => match ctx {
                 ExprContext::Load => {
+                    // Ex) List[...]
                     if self.settings.enabled.contains(&CheckCode::U006)
                         && self.settings.target_version >= PythonVersion::Py39
                     {
-                        plugins::use_pep585_annotation(self, &expr, &id);
+                        plugins::use_pep585_annotation(self, expr, id);
                     }
 
                     self.handle_node_load(expr);
@@ -757,12 +758,13 @@ where
                 ExprContext::Del => self.handle_node_delete(expr),
             },
             ExprKind::Attribute { value, attr, .. } => {
+                // Ex) typing.List[...]
                 if self.settings.enabled.contains(&CheckCode::U006)
                     && self.settings.target_version >= PythonVersion::Py39
                 {
                     if let ExprKind::Name { id, .. } = &value.node {
                         if id == "typing" {
-                            plugins::use_pep585_annotation(self, &expr, &attr);
+                            plugins::use_pep585_annotation(self, expr, attr);
                         }
                     }
                 }

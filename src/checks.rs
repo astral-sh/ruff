@@ -229,8 +229,7 @@ pub enum CheckKind {
     UselessMetaclassType,
     NoAssertEquals,
     UselessObjectInheritance(String),
-    UsePEP585Annotation,
-    UsePEP604Annotation,
+    UsePEP585Annotation(String),
     // Meta
     UnusedNOQA(Option<String>),
 }
@@ -322,7 +321,7 @@ impl CheckCode {
             CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
             CheckCode::U004 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::U005 => CheckKind::NoAssertEquals,
-            CheckCode::U006 => CheckKind::UsePEP585Annotation,
+            CheckCode::U006 => CheckKind::UsePEP585Annotation("List".to_string()),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -401,7 +400,7 @@ impl CheckKind {
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
             CheckKind::NoAssertEquals => &CheckCode::U005,
-            CheckKind::UsePEP585Annotation => &CheckCode::U006,
+            CheckKind::UsePEP585Annotation(_) => &CheckCode::U006,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
@@ -597,8 +596,13 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(name) => {
                 format!("Class `{name}` inherits from object")
             }
-            CheckKind::UsePEP585Annotation => "Use PEP 585-style annotation".to_string(),
-            CheckKind::UsePEP604Annotation => "Use PEP 604-style annotation".to_string(),
+            CheckKind::UsePEP585Annotation(name) => {
+                format!(
+                    "Use `{}` instead of `{}` for type annotations",
+                    name.to_lowercase(),
+                    name,
+                )
+            }
             // Meta
             CheckKind::UnusedNOQA(code) => match code {
                 None => "Unused `noqa` directive".to_string(),
@@ -621,7 +625,7 @@ impl CheckKind {
                 | CheckKind::UnusedNOQA(_)
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(_)
-                | CheckKind::UsePEP585Annotation
+                | CheckKind::UsePEP585Annotation(_)
         )
     }
 }
