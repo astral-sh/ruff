@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::ast::types::Range;
 
 pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
-    // pycodestyle
+    // pycodestyle errors
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -58,7 +58,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
 ];
 
 pub const ALL_CHECK_CODES: [CheckCode; 59] = [
-    // pycodestyle
+    // pycodestyle errors
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -130,7 +130,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 59] = [
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub enum CheckCode {
-    // pycodestyle
+    // pycodestyle errors
     E402,
     E501,
     E711,
@@ -205,7 +205,7 @@ impl FromStr for CheckCode {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            // pycodestyle
+            // pycodestyle errors
             "E402" => Ok(CheckCode::E402),
             "E501" => Ok(CheckCode::E501),
             "E711" => Ok(CheckCode::E711),
@@ -279,7 +279,7 @@ impl FromStr for CheckCode {
 impl CheckCode {
     pub fn as_str(&self) -> &str {
         match self {
-            // pycodestyle
+            // pycodestyle errors
             CheckCode::E402 => "E402",
             CheckCode::E501 => "E501",
             CheckCode::E711 => "E711",
@@ -362,7 +362,7 @@ impl CheckCode {
     /// A placeholder representation of the CheckKind for the check.
     pub fn kind(&self) -> CheckKind {
         match self {
-            // pycodestyle
+            // pycodestyle errors
             CheckCode::E402 => CheckKind::ModuleImportNotAtTopOfFile,
             CheckCode::E501 => CheckKind::LineTooLong(89, 88),
             CheckCode::E711 => CheckKind::NoneComparison(RejectedCmpop::Eq),

@@ -246,6 +246,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` | ✅ |  |
 | E902 | IOError | IOError: `...` | ✅ |  |
 | E999 | SyntaxError | SyntaxError: `...` | ✅ |  |
+| W292 | NoNewLineAtEndOfFile | No newline at end of file | ✅ |  |
 | F401 | UnusedImport | `...` imported but unused | ✅ | 🛠 |
 | F402 | ImportShadowedByLoopVar | Import `...` from line 1 shadowed by loop variable | ✅ |  |
 | F403 | ImportStarUsed | `from ... import *` used; unable to detect undefined names | ✅ |  |
@@ -290,6 +291,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | U004 | UselessObjectInheritance | Class `...` inherits from object |  | 🛠 |
 | U005 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
+
 
 ## Integrations
 
