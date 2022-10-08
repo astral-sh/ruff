@@ -1,0 +1,41 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UnnecessaryLiteralSet: list
+  location:
+    row: 1
+    column: 6
+  end_location:
+    row: 1
+    column: 17
+  fix: ~
+- kind:
+    UnnecessaryLiteralSet: tuple
+  location:
+    row: 2
+    column: 6
+  end_location:
+    row: 2
+    column: 17
+  fix: ~
+- kind:
+    UnnecessaryLiteralSet: list
+  location:
+    row: 3
+    column: 6
+  end_location:
+    row: 3
+    column: 13
+  fix: ~
+- kind:
+    UnnecessaryLiteralSet: tuple
+  location:
+    row: 4
+    column: 6
+  end_location:
+    row: 4
+    column: 13
+  fix: ~
+

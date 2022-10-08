@@ -877,6 +877,32 @@ pub fn unnecessary_list_comprehension_dict(
     None
 }
 
+/// Check `set([1, 2])` compliance.
+pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+    if args.len() == 1 {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "set" {
+                match &args[0].node {
+                    ExprKind::List { .. } => {
+                        return Some(Check::new(
+                            CheckKind::UnnecessaryLiteralSet("list".to_string()),
+                            Range::from_located(expr),
+                        ));
+                    }
+                    ExprKind::Tuple { .. } => {
+                        return Some(Check::new(
+                            CheckKind::UnnecessaryLiteralSet("tuple".to_string()),
+                            Range::from_located(expr),
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    None
+}
+
 // flake8-super
 /// Check that `super()` has no args
 pub fn check_super_args(

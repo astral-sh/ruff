@@ -800,6 +800,12 @@ where
                     };
                 }
 
+                if self.settings.enabled.contains(&CheckCode::C405) {
+                    if let Some(check) = checks::unnecessary_literal_set(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
                 // pyupgrade
                 if self.settings.enabled.contains(&CheckCode::U002)
                     && self.settings.target_version >= PythonVersion::Py310
