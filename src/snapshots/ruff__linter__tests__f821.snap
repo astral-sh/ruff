@@ -45,7 +45,7 @@ expression: checks
     column: 5
   end_location:
     row: 58
-    column: 9
+    column: 8
   fix: ~
 - kind:
     UndefinedName: TOMATO
@@ -81,7 +81,7 @@ expression: checks
     column: 10
   end_location:
     row: 114
-    column: 24
+    column: 23
   fix: ~
 - kind:
     UndefinedName: foo
@@ -90,7 +90,7 @@ expression: checks
     column: 15
   end_location:
     row: 122
-    column: 19
+    column: 18
   fix: ~
 - kind:
     UndefinedName: bar
@@ -99,6 +99,6 @@ expression: checks
     column: 22
   end_location:
     row: 122
-    column: 26
+    column: 25
   fix: ~
 

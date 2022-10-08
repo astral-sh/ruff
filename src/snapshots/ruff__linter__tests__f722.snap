@@ -9,6 +9,6 @@ expression: checks
     column: 13
   end_location:
     row: 9
-    column: 17
+    column: 16
   fix: ~
 

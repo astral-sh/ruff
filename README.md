@@ -294,6 +294,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | U003 | TypeOfPrimitive | Use `str` instead of `type(...)` |  | 🛠 |
 | U004 | UselessObjectInheritance | Class `...` inherits from object |  | 🛠 |
 | U005 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
+| U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations |  | 🛠 |
+| U007 | UsePEP604Annotation | Use `X | Y` for type annotations |  | 🛠 |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations

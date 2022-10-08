@@ -547,7 +547,7 @@ impl SourceGenerator {
         Ok(())
     }
 
-    fn unparse_expr<U>(&mut self, ast: &Expr<U>, level: u8) -> fmt::Result {
+    pub fn unparse_expr<U>(&mut self, ast: &Expr<U>, level: u8) -> fmt::Result {
         macro_rules! opprec {
             ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
                 match $x {
