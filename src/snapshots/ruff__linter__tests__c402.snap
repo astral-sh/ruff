@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: UnnecessaryListComprehensionDict
+  location:
+    row: 1
+    column: 5
+  end_location:
+    row: 1
+    column: 35
+  fix: ~
+
