@@ -92,3 +92,10 @@ pub fn is_annotated_subscript(name: &str) -> bool {
 pub fn is_pep593_annotated_subscript(name: &str) -> bool {
     name == "Annotated"
 }
+
+static PEP_585_BUILTINS: Lazy<BTreeSet<&'static str>> =
+    Lazy::new(|| BTreeSet::from(["Dict", "FrozenSet", "List", "Set", "Tuple", "Type"]));
+
+pub fn is_pep585_builtin(name: &str) -> bool {
+    PEP_585_BUILTINS.contains(name)
+}

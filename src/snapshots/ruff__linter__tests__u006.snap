@@ -1,0 +1,39 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UsePEP585Annotation: List
+  location:
+    row: 4
+    column: 10
+  end_location:
+    row: 4
+    column: 14
+  fix:
+    content: list
+    location:
+      row: 4
+      column: 10
+    end_location:
+      row: 4
+      column: 14
+    applied: false
+- kind:
+    UsePEP585Annotation: List
+  location:
+    row: 11
+    column: 10
+  end_location:
+    row: 11
+    column: 21
+  fix:
+    content: list
+    location:
+      row: 11
+      column: 10
+    end_location:
+      row: 11
+      column: 21
+    applied: false
+
