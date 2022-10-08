@@ -4,7 +4,7 @@ use itertools::izip;
 use regex::Regex;
 use rustpython_parser::ast::{
     Arg, ArgData, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind,
-    Stmt, StmtKind, Unaryop,
+    KeywordData, Located, Stmt, StmtKind, Unaryop,
 };
 use serde::{Deserialize, Serialize};
 
@@ -950,6 +950,34 @@ pub fn unnecessary_literal_dict(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> O
                         }
                     }
                     _ => {}
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn unnecessary_collection_call(
+    expr: &Expr,
+    func: &Expr,
+    args: &Vec<Expr>,
+    keywords: &Vec<Located<KeywordData>>,
+) -> Option<Check> {
+    if args.is_empty() {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "list" || id == "tuple" {
+                // list() or tuple()
+                return Some(Check::new(
+                    CheckKind::UnnecessaryCollectionCall(id.to_string()),
+                    Range::from_located(expr),
+                ));
+            } else if id == "dict" {
+                // dict() or dict(a=1)
+                if keywords.is_empty() || keywords.iter().all(|kw| kw.node.arg.is_some()) {
+                    return Some(Check::new(
+                        CheckKind::UnnecessaryCollectionCall(id.to_string()),
+                        Range::from_located(expr),
+                    ));
                 }
             }
         }

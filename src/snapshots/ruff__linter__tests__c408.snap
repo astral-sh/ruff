@@ -1,0 +1,41 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UnnecessaryCollectionCall: tuple
+  location:
+    row: 1
+    column: 5
+  end_location:
+    row: 1
+    column: 12
+  fix: ~
+- kind:
+    UnnecessaryCollectionCall: list
+  location:
+    row: 2
+    column: 5
+  end_location:
+    row: 2
+    column: 11
+  fix: ~
+- kind:
+    UnnecessaryCollectionCall: dict
+  location:
+    row: 3
+    column: 6
+  end_location:
+    row: 3
+    column: 12
+  fix: ~
+- kind:
+    UnnecessaryCollectionCall: dict
+  location:
+    row: 4
+    column: 6
+  end_location:
+    row: 4
+    column: 15
+  fix: ~
+
