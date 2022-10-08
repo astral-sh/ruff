@@ -808,6 +808,28 @@ pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> 
     None
 }
 
+/// Check `dict((x, y) for x, y in iterable)` compliance.
+pub fn unnecessary_generator_dict(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+    if args.len() == 1 {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "dict" {
+                if let ExprKind::GeneratorExp { elt, .. } = &args[0].node {
+                    match &elt.node {
+                        ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryListComprehensionDict,
+                                Range::from_located(expr),
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Check `set([...])` compliance.
 pub fn unnecessary_list_comprehension_set(
     expr: &Expr,
