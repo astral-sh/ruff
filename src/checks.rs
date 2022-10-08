@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
 
-pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
-    // pycodestyle
+pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
+    // pycodestyle errors
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -24,6 +24,8 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::E743,
     CheckCode::E902,
     CheckCode::E999,
+    // pycodestyle warnings
+    CheckCode::W292,
     // pyflakes
     CheckCode::F401,
     CheckCode::F402,
@@ -55,8 +57,8 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 42] = [
     CheckCode::F901,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 58] = [
-    // pycodestyle
+pub const ALL_CHECK_CODES: [CheckCode; 59] = [
+    // pycodestyle errors
     CheckCode::E402,
     CheckCode::E501,
     CheckCode::E711,
@@ -71,6 +73,8 @@ pub const ALL_CHECK_CODES: [CheckCode; 58] = [
     CheckCode::E743,
     CheckCode::E902,
     CheckCode::E999,
+    // pycodestyle warnings
+    CheckCode::W292,
     // pyflakes
     CheckCode::F401,
     CheckCode::F402,
@@ -126,7 +130,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 58] = [
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub enum CheckCode {
-    // pycodestyle
+    // pycodestyle errors
     E402,
     E501,
     E711,
@@ -141,6 +145,8 @@ pub enum CheckCode {
     E743,
     E902,
     E999,
+    // pycodestyle warnings
+    W292,
     // pyflakes
     F401,
     F402,
@@ -199,7 +205,7 @@ impl FromStr for CheckCode {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            // pycodestyle
+            // pycodestyle errors
             "E402" => Ok(CheckCode::E402),
             "E501" => Ok(CheckCode::E501),
             "E711" => Ok(CheckCode::E711),
@@ -214,6 +220,8 @@ impl FromStr for CheckCode {
             "E743" => Ok(CheckCode::E743),
             "E902" => Ok(CheckCode::E902),
             "E999" => Ok(CheckCode::E999),
+            // pycodestyle warnings
+            "W292" => Ok(CheckCode::W292),
             // pyflakes
             "F401" => Ok(CheckCode::F401),
             "F402" => Ok(CheckCode::F402),
@@ -271,7 +279,7 @@ impl FromStr for CheckCode {
 impl CheckCode {
     pub fn as_str(&self) -> &str {
         match self {
-            // pycodestyle
+            // pycodestyle errors
             CheckCode::E402 => "E402",
             CheckCode::E501 => "E501",
             CheckCode::E711 => "E711",
@@ -286,6 +294,8 @@ impl CheckCode {
             CheckCode::E743 => "E743",
             CheckCode::E902 => "E902",
             CheckCode::E999 => "E999",
+            // pycodestyle warnings
+            CheckCode::W292 => "W292",
             // pyflakes
             CheckCode::F401 => "F401",
             CheckCode::F402 => "F402",
@@ -352,7 +362,7 @@ impl CheckCode {
     /// A placeholder representation of the CheckKind for the check.
     pub fn kind(&self) -> CheckKind {
         match self {
-            // pycodestyle
+            // pycodestyle errors
             CheckCode::E402 => CheckKind::ModuleImportNotAtTopOfFile,
             CheckCode::E501 => CheckKind::LineTooLong(89, 88),
             CheckCode::E711 => CheckKind::NoneComparison(RejectedCmpop::Eq),
@@ -367,6 +377,8 @@ impl CheckCode {
             CheckCode::E743 => CheckKind::AmbiguousFunctionName("...".to_string()),
             CheckCode::E902 => CheckKind::IOError("IOError: `...`".to_string()),
             CheckCode::E999 => CheckKind::SyntaxError("`...`".to_string()),
+            // pycodestyle warnings
+            CheckCode::W292 => CheckKind::NoNewLineAtEndOfFile,
             // pyflakes
             CheckCode::F401 => CheckKind::UnusedImport(vec!["...".to_string()]),
             CheckCode::F402 => CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
@@ -481,6 +493,8 @@ pub enum CheckKind {
     UnusedImport(Vec<String>),
     UnusedVariable(String),
     YieldOutsideFunction,
+    // More style
+    NoNewLineAtEndOfFile,
     // flake8-builtin
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
@@ -551,6 +565,8 @@ impl CheckKind {
             CheckKind::UnusedImport(_) => "UnusedImport",
             CheckKind::UnusedVariable(_) => "UnusedVariable",
             CheckKind::YieldOutsideFunction => "YieldOutsideFunction",
+            // More style
+            CheckKind::NoNewLineAtEndOfFile => "NoNewLineAtEndOfFile",
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => "BuiltinVariableShadowing",
             CheckKind::BuiltinArgumentShadowing(_) => "BuiltinArgumentShadowing",
@@ -621,6 +637,8 @@ impl CheckKind {
             CheckKind::UnusedImport(_) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
+            // More style
+            CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
@@ -776,7 +794,8 @@ impl CheckKind {
             CheckKind::YieldOutsideFunction => {
                 "`yield` or `yield from` statement outside of a function/method".to_string()
             }
-
+            // More style
+            CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
                 format!("Variable `{name}` is shadowing a python builtin")

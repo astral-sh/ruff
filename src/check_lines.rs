@@ -113,6 +113,46 @@ pub fn check_lines(
         }
     }
 
+    // Enforce newlines at end of files.
+    if settings.enabled.contains(&CheckCode::W292) {
+        // If the file terminates with a newline, the last line should be an empty string slice.
+        if let Some(line) = lines.last() {
+            if !line.is_empty() {
+                let lineno = lines.len() - 1;
+                let noqa_lineno = noqa_line_for
+                    .get(lineno)
+                    .map(|lineno| lineno - 1)
+                    .unwrap_or(lineno);
+
+                let noqa = noqa_directives
+                    .entry(noqa_lineno)
+                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
+
+                let check = Check::new(
+                    CheckKind::NoNewLineAtEndOfFile,
+                    Range {
+                        location: Location::new(lines.len(), line.len() + 1),
+                        end_location: Location::new(lines.len(), line.len() + 1),
+                    },
+                );
+
+                match noqa {
+                    (Directive::All(_, _), matches) => {
+                        matches.push(check.kind.code().as_str());
+                    }
+                    (Directive::Codes(_, _, codes), matches) => {
+                        if codes.contains(&check.kind.code().as_str()) {
+                            matches.push(check.kind.code().as_str());
+                        } else {
+                            line_checks.push(check);
+                        }
+                    }
+                    (Directive::None, _) => line_checks.push(check),
+                }
+            }
+        }
+    }
+
     // Enforce that the noqa directive was actually used.
     if enforce_noqa {
         for (row, (directive, matches)) in noqa_directives {
