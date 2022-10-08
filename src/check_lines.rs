@@ -113,10 +113,9 @@ pub fn check_lines(
         }
     }
 
-    // Enfore newlines at end of files.
+    // Enforce newlines at end of files.
     if settings.enabled.contains(&CheckCode::W292) {
-        // If the file contains a newline at the end of it the last
-        // line would contain an empty string slice.
+        // If the file terminates with a newline, the last line should be an empty string slice.
         if let Some(line) = lines.last() {
             if !line.is_empty() {
                 let lineno = lines.len() - 1;
