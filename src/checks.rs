@@ -57,7 +57,7 @@ pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [
     CheckCode::F901,
 ];
 
-pub const ALL_CHECK_CODES: [CheckCode; 61] = [
+pub const ALL_CHECK_CODES: [CheckCode; 62] = [
     // pycodestyle errors
     CheckCode::E402,
     CheckCode::E501,
@@ -115,6 +115,7 @@ pub const ALL_CHECK_CODES: [CheckCode; 61] = [
     CheckCode::C403,
     CheckCode::C404,
     CheckCode::C405,
+    CheckCode::C406,
     // flake8-super
     CheckCode::SPR001,
     // flake8-print
@@ -189,6 +190,7 @@ pub enum CheckCode {
     C403,
     C404,
     C405,
+    C406,
     // flake8-super
     SPR001,
     // flake8-print
@@ -265,6 +267,8 @@ impl FromStr for CheckCode {
             "C402" => Ok(CheckCode::C402),
             "C403" => Ok(CheckCode::C403),
             "C404" => Ok(CheckCode::C404),
+            "C405" => Ok(CheckCode::C405),
+            "C406" => Ok(CheckCode::C406),
             // flake8-super
             "SPR001" => Ok(CheckCode::SPR001),
             // flake8-print
@@ -343,6 +347,7 @@ impl CheckCode {
             CheckCode::C403 => "C403",
             CheckCode::C404 => "C404",
             CheckCode::C405 => "C405",
+            CheckCode::C406 => "C406",
             // flake8-super
             CheckCode::SPR001 => "SPR001",
             // flake8-print
@@ -430,6 +435,7 @@ impl CheckCode {
             CheckCode::C403 => CheckKind::UnnecessaryListComprehensionSet,
             CheckCode::C404 => CheckKind::UnnecessaryListComprehensionDict,
             CheckCode::C405 => CheckKind::UnnecessaryLiteralSet("<list/tuple>".to_string()),
+            CheckCode::C406 => CheckKind::UnnecessaryLiteralDict("<list/tuple>".to_string()),
             // flake8-super
             CheckCode::SPR001 => CheckKind::SuperCallWithParameters,
             // flake8-print
@@ -517,6 +523,7 @@ pub enum CheckKind {
     UnnecessaryListComprehensionSet,
     UnnecessaryListComprehensionDict,
     UnnecessaryLiteralSet(String),
+    UnnecessaryLiteralDict(String),
     // flake8-super
     SuperCallWithParameters,
     // flake8-print
@@ -591,6 +598,7 @@ impl CheckKind {
             CheckKind::UnnecessaryListComprehensionSet => "UnnecessaryListComprehensionSet",
             CheckKind::UnnecessaryListComprehensionDict => "UnnecessaryListComprehensionDict",
             CheckKind::UnnecessaryLiteralSet(_) => "UnnecessaryLiteralSet",
+            CheckKind::UnnecessaryLiteralDict(_) => "UnnecessaryLiteralDict",
             // flake8-super
             CheckKind::SuperCallWithParameters => "SuperCallWithParameters",
             // flake8-print
@@ -665,6 +673,7 @@ impl CheckKind {
             CheckKind::UnnecessaryListComprehensionSet => &CheckCode::C403,
             CheckKind::UnnecessaryListComprehensionDict => &CheckCode::C404,
             CheckKind::UnnecessaryLiteralSet(_) => &CheckCode::C405,
+            CheckKind::UnnecessaryLiteralDict(_) => &CheckCode::C406,
             // flake8-super
             CheckKind::SuperCallWithParameters => &CheckCode::SPR001,
             // flake8-print
@@ -841,6 +850,9 @@ impl CheckKind {
             }
             CheckKind::UnnecessaryLiteralSet(obj_type) => {
                 format!("Unnecessary {obj_type} literal - rewrite as a set literal")
+            }
+            CheckKind::UnnecessaryLiteralDict(obj_type) => {
+                format!("Unnecessary {obj_type} literal - rewrite as a dict literal")
             }
             // flake8-super
             CheckKind::SuperCallWithParameters => {

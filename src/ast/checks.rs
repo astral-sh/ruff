@@ -903,6 +903,60 @@ pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Op
     None
 }
 
+/// Check `dict([(1, 2)])` compliance.
+pub fn unnecessary_literal_dict(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+    if args.len() == 1 {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "dict" {
+                match &args[0].node {
+                    ExprKind::Tuple { elts, .. } => {
+                        if let Some(elt) = elts.first() {
+                            match &elt.node {
+                                // dict((1, 2), ...))
+                                ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+                                    return Some(Check::new(
+                                        CheckKind::UnnecessaryLiteralDict("tuple".to_string()),
+                                        Range::from_located(expr),
+                                    ));
+                                }
+                                _ => {}
+                            }
+                        } else {
+                            // dict(())
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryLiteralDict("tuple".to_string()),
+                                Range::from_located(expr),
+                            ));
+                        }
+                    }
+                    ExprKind::List { elts, .. } => {
+                        if let Some(elt) = elts.first() {
+                            match &elt.node {
+                                // dict([(1, 2), ...])
+                                ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+                                    return Some(Check::new(
+                                        CheckKind::UnnecessaryLiteralDict("list".to_string()),
+                                        Range::from_located(expr),
+                                    ));
+                                }
+                                _ => {}
+                            }
+                        } else {
+                            // dict([])
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryLiteralDict("list".to_string()),
+                                Range::from_located(expr),
+                            ));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    None
+}
+
 // flake8-super
 /// Check that `super()` has no args
 pub fn check_super_args(
