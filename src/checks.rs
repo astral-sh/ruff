@@ -140,6 +140,8 @@ pub enum CheckCode {
     U003,
     U004,
     U005,
+    U006,
+    U007,
     // Meta
     M001,
 }
@@ -159,6 +161,7 @@ pub enum RejectedCmpop {
 
 #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckKind {
+    // pycodestyle errors
     AmbiguousClassName(String),
     AmbiguousFunctionName(String),
     AmbiguousVariableName(String),
@@ -201,7 +204,7 @@ pub enum CheckKind {
     UnusedImport(Vec<String>),
     UnusedVariable(String),
     YieldOutsideFunction,
-    // More style
+    // pycodestyle warnings
     NoNewLineAtEndOfFile,
     // flake8-builtin
     BuiltinVariableShadowing(String),
@@ -227,6 +230,8 @@ pub enum CheckKind {
     UselessMetaclassType,
     NoAssertEquals,
     UselessObjectInheritance(String),
+    UsePEP585Annotation,
+    UsePEP604Annotation,
     // Meta
     UnusedNOQA(Option<String>),
 }
@@ -318,6 +323,8 @@ impl CheckCode {
             CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
             CheckCode::U004 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::U005 => CheckKind::NoAssertEquals,
+            CheckCode::U006 => CheckKind::UsePEP585Annotation,
+            CheckCode::U007 => CheckKind::UsePEP604Annotation,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -328,6 +335,7 @@ impl CheckKind {
     /// A four-letter shorthand code for the check.
     pub fn code(&self) -> &'static CheckCode {
         match self {
+            // pycodestyle errors
             CheckKind::AmbiguousClassName(_) => &CheckCode::E742,
             CheckKind::AmbiguousFunctionName(_) => &CheckCode::E743,
             CheckKind::AmbiguousVariableName(_) => &CheckCode::E741,
@@ -370,7 +378,7 @@ impl CheckKind {
             CheckKind::UnusedImport(_) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
-            // More style
+            // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
@@ -395,6 +403,8 @@ impl CheckKind {
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
             CheckKind::NoAssertEquals => &CheckCode::U005,
+            CheckKind::UsePEP585Annotation => &CheckCode::U006,
+            CheckKind::UsePEP604Annotation => &CheckCode::U007,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
@@ -404,6 +414,7 @@ impl CheckKind {
     /// The body text for the check.
     pub fn body(&self) -> String {
         match self {
+            // pycodestyle errors
             CheckKind::AmbiguousClassName(name) => {
                 format!("Ambiguous class name: `{}`", name)
             }
@@ -531,7 +542,7 @@ impl CheckKind {
             CheckKind::YieldOutsideFunction => {
                 "`yield` or `yield from` statement outside of a function/method".to_string()
             }
-            // More style
+            // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
@@ -589,6 +600,8 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(name) => {
                 format!("Class `{name}` inherits from object")
             }
+            CheckKind::UsePEP585Annotation => "Use PEP 585-style annotation".to_string(),
+            CheckKind::UsePEP604Annotation => "Use PEP 604-style annotation".to_string(),
             // Meta
             CheckKind::UnusedNOQA(code) => match code {
                 None => "Unused `noqa` directive".to_string(),
@@ -611,6 +624,7 @@ impl CheckKind {
                 | CheckKind::UnusedNOQA(_)
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(_)
+                | CheckKind::UsePEP585Annotation
         )
     }
 }
