@@ -748,7 +748,12 @@ where
                 }
                 ExprContext::Del => self.handle_node_delete(expr),
             },
-            ExprKind::Call { func, args, .. } => {
+            ExprKind::Call {
+                func,
+                args,
+                keywords,
+                ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::U005) {
                     plugins::assert_equals(self, func);
                 }
@@ -808,6 +813,14 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C406) {
                     if let Some(check) = checks::unnecessary_literal_dict(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
+                if self.settings.enabled.contains(&CheckCode::C408) {
+                    if let Some(check) =
+                        checks::unnecessary_collection_call(expr, func, args, keywords)
+                    {
                         self.checks.push(check);
                     };
                 }
