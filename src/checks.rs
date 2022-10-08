@@ -141,7 +141,6 @@ pub enum CheckCode {
     U004,
     U005,
     U006,
-    U007,
     // Meta
     M001,
 }
@@ -324,7 +323,6 @@ impl CheckCode {
             CheckCode::U004 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::U005 => CheckKind::NoAssertEquals,
             CheckCode::U006 => CheckKind::UsePEP585Annotation,
-            CheckCode::U007 => CheckKind::UsePEP604Annotation,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -404,7 +402,6 @@ impl CheckKind {
             CheckKind::UselessMetaclassType => &CheckCode::U001,
             CheckKind::NoAssertEquals => &CheckCode::U005,
             CheckKind::UsePEP585Annotation => &CheckCode::U006,
-            CheckKind::UsePEP604Annotation => &CheckCode::U007,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
