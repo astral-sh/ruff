@@ -859,6 +859,18 @@ mod tests {
     }
 
     #[test]
+    fn c406() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/C406.py"),
+            &settings::Settings::for_rule(CheckCode::C406),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn spr001() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/SPR001.py"),
