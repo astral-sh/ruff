@@ -836,8 +836,8 @@ impl CheckKind {
             CheckKind::UnnecessaryListComprehensionDict => {
                 "Unnecessary list comprehension - rewrite as a dict comprehension".to_string()
             }
-            CheckKind::UnnecessaryLiteralSet(type_) => {
-                format!("Unnecessary {type_} literal - rewrite as a set literal")
+            CheckKind::UnnecessaryLiteralSet(obj_type) => {
+                format!("Unnecessary {obj_type} literal - rewrite as a set literal")
             }
             // flake8-super
             CheckKind::SuperCallWithParameters => {
