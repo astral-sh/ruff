@@ -283,6 +283,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | C402 | UnnecessaryGeneratorDict | Unnecessary generator - rewrite as a dict comprehension |  |  |
 | C403 | UnnecessaryListComprehensionSet | Unnecessary list comprehension - rewrite as a set comprehension |  |  |
 | C404 | UnnecessaryListComprehensionDict | Unnecessary list comprehension - rewrite as a dict comprehension |  |  |
+| C405 | UnnecessaryLiteralSet | Unnecessary <list/tuple> literal - rewrite as a set literal |  |  |
 | SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
 | T201 | PrintFound | `print` found |  | 🛠 |
 | T203 | PPrintFound | `pprint` found |  | 🛠 |
