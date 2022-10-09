@@ -74,9 +74,9 @@ pub enum BindingKind {
     Export(Vec<String>),
     FutureImportation,
     StarImportation,
-    Importation(String, BindingContext),
-    FromImportation(String, BindingContext),
-    SubmoduleImportation(String, BindingContext),
+    Importation(String, String, BindingContext),
+    FromImportation(String, String, BindingContext),
+    SubmoduleImportation(String, String, BindingContext),
 }
 
 #[derive(Clone, Debug)]
