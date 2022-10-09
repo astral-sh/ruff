@@ -1,3 +1,4 @@
+use crate::ast::helpers::match_name_or_attr;
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern,
@@ -148,7 +149,11 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         } => {
             visitor.visit_annotation(annotation);
             if let Some(expr) = value {
-                visitor.visit_expr(expr);
+                if match_name_or_attr(annotation, "TypeAlias") {
+                    visitor.visit_annotation(expr);
+                } else {
+                    visitor.visit_expr(expr);
+                }
             }
             visitor.visit_expr(target);
         }
