@@ -141,6 +141,7 @@ pub enum CheckCode {
     U004,
     U005,
     U006,
+    U007,
     // Meta
     M001,
 }
@@ -230,6 +231,7 @@ pub enum CheckKind {
     NoAssertEquals,
     UselessObjectInheritance(String),
     UsePEP585Annotation(String),
+    UsePEP604Annotation,
     // Meta
     UnusedNOQA(Option<String>),
 }
@@ -322,6 +324,7 @@ impl CheckCode {
             CheckCode::U004 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::U005 => CheckKind::NoAssertEquals,
             CheckCode::U006 => CheckKind::UsePEP585Annotation("List".to_string()),
+            CheckCode::U007 => CheckKind::UsePEP604Annotation,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -401,6 +404,7 @@ impl CheckKind {
             CheckKind::UselessMetaclassType => &CheckCode::U001,
             CheckKind::NoAssertEquals => &CheckCode::U005,
             CheckKind::UsePEP585Annotation(_) => &CheckCode::U006,
+            CheckKind::UsePEP604Annotation => &CheckCode::U007,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
@@ -603,6 +607,7 @@ impl CheckKind {
                     name,
                 )
             }
+            CheckKind::UsePEP604Annotation => "Use `X | Y` for type annotations".to_string(),
             // Meta
             CheckKind::UnusedNOQA(code) => match code {
                 None => "Unused `noqa` directive".to_string(),
@@ -626,6 +631,7 @@ impl CheckKind {
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(_)
                 | CheckKind::UsePEP585Annotation(_)
+                | CheckKind::UsePEP604Annotation
         )
     }
 }

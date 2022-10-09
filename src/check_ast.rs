@@ -5,12 +5,14 @@ use std::path::Path;
 use log::error;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rustpython_ast::Location;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
 
+use crate::ast::helpers::match_name_or_attr;
 use crate::ast::operations::{extract_all_names, SourceCodeLocator};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -97,14 +99,6 @@ impl<'a> Checker<'a> {
             annotations_future_enabled: false,
             deletions: Default::default(),
         }
-    }
-}
-
-fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
-    match &expr.node {
-        ExprKind::Attribute { attr, .. } => target == attr,
-        ExprKind::Name { id, .. } => target == id,
-        _ => false,
     }
 }
 
@@ -709,7 +703,14 @@ where
 
         // Pre-visit.
         match &expr.node {
-            ExprKind::Subscript { value, .. } => {
+            ExprKind::Subscript { value, slice, .. } => {
+                // Ex) typing.List[...]
+                if self.settings.enabled.contains(&CheckCode::U007)
+                    && self.settings.target_version >= PythonVersion::Py39
+                {
+                    plugins::use_pep604_annotation(self, expr, value, slice);
+                }
+
                 if match_name_or_attr(value, "Literal") {
                     self.in_literal = true;
                 }
@@ -1605,14 +1606,37 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        while let Some((location, expression)) = self.deferred_string_annotations.pop() {
+        while let Some((range, expression)) = self.deferred_string_annotations.pop() {
+            // HACK(charlie): We need to modify `range` such that it represents the range of the
+            // expression _within_ the string annotation (as opposed to the range of the string
+            // annotation itself). RustPython seems to return an off-by-one start column for every
+            // string value, so we check for double quotes (which are really triple quotes).
+            let contents = self.locator.slice_source_code_at(&range.location);
+            let range = if contents.starts_with("\"\"") || contents.starts_with("\'\'") {
+                Range {
+                    location: Location::new(range.location.row(), range.location.column() + 2),
+                    end_location: Location::new(
+                        range.end_location.row(),
+                        range.end_location.column() - 2,
+                    ),
+                }
+            } else {
+                Range {
+                    location: Location::new(range.location.row(), range.location.column()),
+                    end_location: Location::new(
+                        range.end_location.row(),
+                        range.end_location.column() - 1,
+                    ),
+                }
+            };
+
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
-                relocate_expr(&mut expr, location);
+                relocate_expr(&mut expr, range);
                 allocator.push(expr);
             } else if self.settings.enabled.contains(&CheckCode::F722) {
                 self.checks.push(Check::new(
                     CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
-                    self.locate_check(location),
+                    self.locate_check(range),
                 ));
             }
         }

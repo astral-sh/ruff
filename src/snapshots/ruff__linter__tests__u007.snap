@@ -1,0 +1,133 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: UsePEP604Annotation
+  location:
+    row: 4
+    column: 10
+  end_location:
+    row: 4
+    column: 23
+  fix:
+    content: str | None
+    location:
+      row: 4
+      column: 10
+    end_location:
+      row: 4
+      column: 23
+    applied: false
+- kind: UsePEP604Annotation
+  location:
+    row: 11
+    column: 10
+  end_location:
+    row: 11
+    column: 30
+  fix:
+    content: str | None
+    location:
+      row: 11
+      column: 10
+    end_location:
+      row: 11
+      column: 30
+    applied: false
+- kind: UsePEP604Annotation
+  location:
+    row: 18
+    column: 10
+  end_location:
+    row: 18
+    column: 46
+  fix:
+    content: "str | int | Union[float, bytes]"
+    location:
+      row: 18
+      column: 10
+    end_location:
+      row: 18
+      column: 46
+    applied: false
+- kind: UsePEP604Annotation
+  location:
+    row: 18
+    column: 26
+  end_location:
+    row: 18
+    column: 45
+  fix:
+    content: float | bytes
+    location:
+      row: 18
+      column: 26
+    end_location:
+      row: 18
+      column: 45
+    applied: false
+- kind: UsePEP604Annotation
+  location:
+    row: 25
+    column: 10
+  end_location:
+    row: 25
+    column: 32
+  fix:
+    content: str | int
+    location:
+      row: 25
+      column: 10
+    end_location:
+      row: 25
+      column: 32
+    applied: false
+- kind: UsePEP604Annotation
+  location:
+    row: 32
+    column: 11
+  end_location:
+    row: 32
+    column: 47
+  fix:
+    content: "str | int | Union[float, bytes]"
+    location:
+      row: 32
+      column: 11
+    end_location:
+      row: 32
+      column: 47
+    applied: false
+- kind: UsePEP604Annotation
+  location:
+    row: 32
+    column: 11
+  end_location:
+    row: 32
+    column: 47
+  fix:
+    content: float | bytes
+    location:
+      row: 32
+      column: 11
+    end_location:
+      row: 32
+      column: 47
+    applied: false
+- kind: UsePEP604Annotation
+  location:
+    row: 39
+    column: 11
+  end_location:
+    row: 39
+    column: 33
+  fix:
+    content: str | int
+    location:
+      row: 39
+      column: 11
+    end_location:
+      row: 39
+      column: 33
+    applied: false
+
