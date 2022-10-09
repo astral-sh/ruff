@@ -67,7 +67,22 @@ c = cast("Vegetable", b)
 Field = lambda default=MISSING: field(default=default)
 
 
+# Test: access a sub-importation via an alias.
 import pyarrow as pa
 import pyarrow.csv
 
 print(pa.csv.read_csv("test.csv"))
+
+
+# Test: referencing an import via TypeAlias.
+import sys
+
+import numpy as np
+
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
+
+
+CustomInt: TypeAlias = "np.int8 | np.int16"
