@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use itertools::izip;
+use num_bigint::BigInt;
 use regex::Regex;
 use rustpython_parser::ast::{
     Arg, ArgData, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind,
@@ -1003,7 +1004,7 @@ pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -
                                         ..
                                     } = &operand.node
                                     {
-                                        if val.to_string() == "1" {
+                                        if *val == BigInt::from(1) {
                                             return Some(Check::new(
                                                 CheckKind::UnnecessarySubscriptReversal(
                                                     id.to_string(),

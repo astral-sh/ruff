@@ -1926,6 +1926,7 @@ dependencies = [
  "libcst",
  "log",
  "notify",
+ "num-bigint",
  "once_cell",
  "path-absolutize",
  "rayon",
