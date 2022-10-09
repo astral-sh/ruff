@@ -65,3 +65,9 @@ b = Union["Nut", None]
 c = cast("Vegetable", b)
 
 Field = lambda default=MISSING: field(default=default)
+
+
+import pyarrow as pa
+import pyarrow.csv
+
+print(pa.csv.read_csv("test.csv"))

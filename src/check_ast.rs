@@ -364,13 +364,16 @@ where
 
                 for alias in names {
                     if alias.node.name.contains('.') && alias.node.asname.is_none() {
-                        // TODO(charlie): Multiple submodule imports with the same parent module
-                        // will be merged into a single binding.
+                        // Given `import foo.bar`, `name` would be "foo", and `full_name` would be
+                        // "foo.bar".
+                        let name = alias.node.name.split('.').next().unwrap();
+                        let full_name = &alias.node.name;
                         self.add_binding(
-                            alias.node.name.split('.').next().unwrap().to_string(),
+                            name.to_string(),
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(
-                                    alias.node.name.to_string(),
+                                    name.to_string(),
+                                    full_name.to_string(),
                                     self.binding_context(),
                                 ),
                                 used: None,
@@ -382,19 +385,17 @@ where
                             self.check_builtin_shadowing(asname, Range::from_located(stmt), false);
                         }
 
+                        // Given `import foo`, `name` and `full_name` would both be `foo`.
+                        // Given `import foo as bar`, `name` would be `bar` and `full_name` would
+                        // be `foo`.
+                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
+                        let full_name = &alias.node.name;
                         self.add_binding(
-                            alias
-                                .node
-                                .asname
-                                .clone()
-                                .unwrap_or_else(|| alias.node.name.clone()),
+                            name.to_string(),
                             Binding {
                                 kind: BindingKind::Importation(
-                                    alias
-                                        .node
-                                        .asname
-                                        .clone()
-                                        .unwrap_or_else(|| alias.node.name.clone()),
+                                    name.to_string(),
+                                    full_name.to_string(),
                                     self.binding_context(),
                                 ),
                                 used: None,
@@ -423,14 +424,10 @@ where
                 }
 
                 for alias in names {
-                    let name = alias
-                        .node
-                        .asname
-                        .clone()
-                        .unwrap_or_else(|| alias.node.name.clone());
                     if let Some("__future__") = module.as_deref() {
+                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         self.add_binding(
-                            name,
+                            name.to_string(),
                             Binding {
                                 kind: BindingKind::FutureImportation,
                                 used: Some((
@@ -509,18 +506,26 @@ where
                             self.check_builtin_shadowing(asname, Range::from_located(stmt), false);
                         }
 
-                        let binding = Binding {
-                            kind: BindingKind::FromImportation(
-                                match module {
-                                    None => name.clone(),
-                                    Some(parent) => format!("{}.{}", parent, name),
-                                },
-                                self.binding_context(),
-                            ),
-                            used: None,
-                            range: Range::from_located(stmt),
+                        // Given `from foo import bar`, `name` would be "bar" and `full_name` would
+                        // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
+                        // and `full_name` would be "foo.bar".
+                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
+                        let full_name = match module {
+                            None => alias.node.name.to_string(),
+                            Some(parent) => format!("{}.{}", parent, alias.node.name),
                         };
-                        self.add_binding(name, binding)
+                        self.add_binding(
+                            name.to_string(),
+                            Binding {
+                                kind: BindingKind::FromImportation(
+                                    name.to_string(),
+                                    full_name,
+                                    self.binding_context(),
+                                ),
+                                used: None,
+                                range: Range::from_located(stmt),
+                            },
+                        )
                     }
                 }
             }
@@ -1249,6 +1254,47 @@ impl CheckLocator for Checker<'_> {
     }
 }
 
+fn try_mark_used(scope: &mut Scope, scope_id: usize, id: &str, expr: &Expr) -> bool {
+    let alias = if let Some(binding) = scope.values.get_mut(id) {
+        // Mark the binding as used.
+        binding.used = Some((scope_id, Range::from_located(expr)));
+
+        // If the name of the sub-importation is the same as an alias of another importation and the
+        // alias is used, that sub-importation should be marked as used too.
+        //
+        // This handles code like:
+        //   import pyarrow as pa
+        //   import pyarrow.csv
+        //   print(pa.csv.read_csv("test.csv"))
+        if let BindingKind::Importation(name, full_name, _)
+        | BindingKind::FromImportation(name, full_name, _)
+        | BindingKind::SubmoduleImportation(name, full_name, _) = &binding.kind
+        {
+            let has_alias = full_name
+                .split('.')
+                .last()
+                .map(|segment| segment != name)
+                .unwrap_or_default();
+            if has_alias {
+                // Clone the alias. (We'll mutate it below.)
+                full_name.to_string()
+            } else {
+                return true;
+            }
+        } else {
+            return true;
+        }
+    } else {
+        return false;
+    };
+
+    // Mark the sub-importation as used.
+    if let Some(binding) = scope.values.get_mut(&alias) {
+        binding.used = Some((scope_id, Range::from_located(expr)));
+    }
+    true
+}
+
 impl<'a> Checker<'a> {
     pub fn add_check(&mut self, check: Check) {
         self.checks.push(check);
@@ -1332,7 +1378,11 @@ impl<'a> Checker<'a> {
                     && matches!(binding.kind, BindingKind::LoopVar)
                     && matches!(
                         existing.kind,
-                        BindingKind::Importation(_, _) | BindingKind::FromImportation(_, _)
+                        BindingKind::Importation(_, _, _)
+                            | BindingKind::FromImportation(_, _, _)
+                            | BindingKind::SubmoduleImportation(_, _, _)
+                            | BindingKind::StarImportation
+                            | BindingKind::FutureImportation
                     )
                 {
                     self.checks.push(Check::new(
@@ -1371,8 +1421,8 @@ impl<'a> Checker<'a> {
                         continue;
                     }
                 }
-                if let Some(binding) = scope.values.get_mut(id) {
-                    binding.used = Some((scope_id, Range::from_located(expr)));
+
+                if try_mark_used(scope, scope_id, id, expr) {
                     return;
                 }
 
@@ -1707,7 +1757,7 @@ impl<'a> Checker<'a> {
 
                     if !used {
                         match &binding.kind {
-                            BindingKind::FromImportation(full_name, context) => {
+                            BindingKind::FromImportation(_, full_name, context) => {
                                 let full_names = unused
                                     .entry((
                                         ImportKind::ImportFrom,
@@ -1717,8 +1767,8 @@ impl<'a> Checker<'a> {
                                     .or_default();
                                 full_names.push(full_name);
                             }
-                            BindingKind::Importation(full_name, context)
-                            | BindingKind::SubmoduleImportation(full_name, context) => {
+                            BindingKind::Importation(_, full_name, context)
+                            | BindingKind::SubmoduleImportation(_, full_name, context) => {
                                 let full_names = unused
                                     .entry((
                                         ImportKind::Import,
