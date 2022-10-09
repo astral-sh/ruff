@@ -27,9 +27,9 @@ once_cell = { version = "1.13.1" }
 path-absolutize = { version = "3.0.13", features = ["once_cell_cache"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/charliermarsh/RustPython.git", rev = "4f457893efc381ad5c432576b24bcc7e4a08c641" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "4f457893efc381ad5c432576b24bcc7e4a08c641" }
-rustpython-common = { git = "https://github.com/charliermarsh/RustPython.git", rev = "4f457893efc381ad5c432576b24bcc7e4a08c641" }
+rustpython-ast = { features = ["unparse"], git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
+rustpython-common = { git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }
