@@ -3,8 +3,6 @@ use std::ops::Deref;
 use std::path::Path;
 
 use log::error;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustpython_ast::Location;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
@@ -12,7 +10,7 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast::helpers::match_name_or_attr;
+use crate::ast::helpers::{match_name_or_attr, SubscriptKind};
 use crate::ast::operations::{extract_all_names, SourceCodeLocator};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -20,18 +18,15 @@ use crate::ast::types::{
     ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
-use crate::ast::{checks, operations, visitor};
+use crate::ast::{checks, helpers, operations, visitor};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::plugins;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
-use crate::python::typing;
 use crate::settings::{PythonVersion, Settings};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
-
-static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
 pub struct Checker<'a> {
     // Input data.
@@ -102,65 +97,6 @@ impl<'a> Checker<'a> {
     }
 }
 
-enum SubscriptKind {
-    AnnotatedSubscript,
-    PEP593AnnotatedSubscript,
-}
-
-fn match_annotated_subscript(expr: &Expr) -> Option<SubscriptKind> {
-    match &expr.node {
-        ExprKind::Attribute { attr, .. } => {
-            if typing::is_annotated_subscript(attr) {
-                Some(SubscriptKind::AnnotatedSubscript)
-            } else if typing::is_pep593_annotated_subscript(attr) {
-                Some(SubscriptKind::PEP593AnnotatedSubscript)
-            } else {
-                None
-            }
-        }
-        ExprKind::Name { id, .. } => {
-            if typing::is_annotated_subscript(id) {
-                Some(SubscriptKind::AnnotatedSubscript)
-            } else if typing::is_pep593_annotated_subscript(id) {
-                Some(SubscriptKind::PEP593AnnotatedSubscript)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
-fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
-    // Check whether it's an assignment to a dunder, with or without a type annotation.
-    // This is what pycodestyle (as of 2.9.1) does.
-    match node {
-        StmtKind::Assign {
-            targets,
-            value: _,
-            type_comment: _,
-        } => {
-            if targets.len() != 1 {
-                return false;
-            }
-            match &targets[0].node {
-                ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
-                _ => false,
-            }
-        }
-        StmtKind::AnnAssign {
-            target,
-            annotation: _,
-            value: _,
-            simple: _,
-        } => match &target.node {
-            ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
-            _ => false,
-        },
-        _ => false,
-    }
-}
-
 impl<'a, 'b> Visitor<'b> for Checker<'a>
 where
     'b: 'a,
@@ -221,7 +157,7 @@ where
                 self.futures_allowed = false;
 
                 if !self.seen_non_import
-                    && !is_assignment_to_a_dunder(node)
+                    && !helpers::is_assignment_to_a_dunder(node)
                     && !operations::in_nested_block(&self.parent_stack, &self.parents)
                 {
                     self.seen_non_import = true;
@@ -1131,7 +1067,7 @@ where
                 }
             }
             ExprKind::Subscript { value, slice, ctx } => {
-                match match_annotated_subscript(value) {
+                match helpers::match_annotated_subscript(value) {
                     Some(subscript) => match subscript {
                         // Ex) Optional[int]
                         SubscriptKind::AnnotatedSubscript => {
