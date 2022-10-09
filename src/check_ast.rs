@@ -783,6 +783,12 @@ where
                     };
                 }
 
+                if self.settings.enabled.contains(&CheckCode::C415) {
+                    if let Some(check) = checks::unnecessary_subscript_reversal(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
                 // pyupgrade
                 if self.settings.enabled.contains(&CheckCode::U002)
                     && self.settings.target_version >= PythonVersion::Py310

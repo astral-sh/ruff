@@ -286,6 +286,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | C405 | UnnecessaryLiteralSet | Unnecessary <list/tuple> literal - rewrite as a set literal |  |  |
 | C406 | UnnecessaryLiteralDict | Unnecessary <list/tuple> literal - rewrite as a dict literal |  |  |
 | C408 | UnnecessaryCollectionCall | Unnecessary <dict/list/tuple> call - rewrite as a literal |  |  |
+| C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within <reversed/set/sorted>() |  |  |
 | SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
 | T201 | PrintFound | `print` found |  | 🛠 |
 | T203 | PPrintFound | `pprint` found |  | 🛠 |

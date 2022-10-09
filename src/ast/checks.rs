@@ -985,6 +985,40 @@ pub fn unnecessary_collection_call(
     None
 }
 
+pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+    if let Some(first_arg) = args.first() {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "set" || id == "sorted" || id == "reversed" {
+                if let ExprKind::Subscript { slice, .. } = &first_arg.node {
+                    if let ExprKind::Slice { lower, upper, step } = &slice.node {
+                        if lower.is_none() && upper.is_none() {
+                            if let Some(step) = step {
+                                if let ExprKind::UnaryOp { op, operand } = &step.node {
+                                    if let Unaryop::USub = op {
+                                        if let ExprKind::Constant { value, .. } = &operand.node {
+                                            if let Constant::Int(val) = value {
+                                                if val.to_string() == "1" {
+                                                    return Some(Check::new(
+                                                        CheckKind::UnnecessarySubscriptReversal(
+                                                            id.to_string(),
+                                                        ),
+                                                        Range::from_located(expr),
+                                                    ));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 // flake8-super
 /// Check that `super()` has no args
 pub fn check_super_args(
