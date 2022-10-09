@@ -150,12 +150,12 @@ pub fn add_noqa(
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::types::Range;
     use anyhow::Result;
     use rustpython_parser::ast::Location;
     use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
 
+    use crate::ast::types::Range;
     use crate::checks::{Check, CheckKind};
     use crate::noqa::{add_noqa_inner, extract_noqa_line_for};
 

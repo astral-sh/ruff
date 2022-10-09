@@ -154,11 +154,12 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::StrCheckCodePair;
     use crate::checks::CheckCode;
     use crate::pyproject::{
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Config, PyProject, Tools,
     };
+
+    use super::StrCheckCodePair;
 
     #[test]
     fn deserialize() -> Result<()> {

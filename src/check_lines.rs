@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::ast::types::Range;
 use rustpython_parser::ast::Location;
 
+use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode, CheckKind, Fix};
 use crate::noqa;
