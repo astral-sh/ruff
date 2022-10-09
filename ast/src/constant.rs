@@ -1,7 +1,7 @@
 use num_bigint::BigInt;
 pub use rustpython_compiler_core::ConversionFlag;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Constant {
     None,
     Bool(bool),
