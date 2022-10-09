@@ -129,6 +129,7 @@ pub enum CheckCode {
     C405,
     C406,
     C408,
+    C415,
     // flake8-super
     SPR001,
     // flake8-print
@@ -219,6 +220,7 @@ pub enum CheckKind {
     UnnecessaryLiteralSet(String),
     UnnecessaryLiteralDict(String),
     UnnecessaryCollectionCall(String),
+    UnnecessarySubscriptReversal(String),
     // flake8-super
     SuperCallWithParameters,
     // flake8-print
@@ -312,6 +314,9 @@ impl CheckCode {
             CheckCode::C408 => {
                 CheckKind::UnnecessaryCollectionCall("<dict/list/tuple>".to_string())
             }
+            CheckCode::C415 => {
+                CheckKind::UnnecessarySubscriptReversal("<reversed/set/sorted>".to_string())
+            }
             // flake8-super
             CheckCode::SPR001 => CheckKind::SuperCallWithParameters,
             // flake8-print
@@ -393,6 +398,7 @@ impl CheckKind {
             CheckKind::UnnecessaryLiteralSet(_) => &CheckCode::C405,
             CheckKind::UnnecessaryLiteralDict(_) => &CheckCode::C406,
             CheckKind::UnnecessaryCollectionCall(_) => &CheckCode::C408,
+            CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
             // flake8-super
             CheckKind::SuperCallWithParameters => &CheckCode::SPR001,
             // flake8-print
@@ -578,6 +584,9 @@ impl CheckKind {
             }
             CheckKind::UnnecessaryCollectionCall(obj_type) => {
                 format!("Unnecessary {obj_type} call - rewrite as a literal")
+            }
+            CheckKind::UnnecessarySubscriptReversal(func) => {
+                format!("Unnecessary subscript reversal of iterable within {func}()")
             }
             // flake8-super
             CheckKind::SuperCallWithParameters => {

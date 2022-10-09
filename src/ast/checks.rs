@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use itertools::izip;
+use num_bigint::BigInt;
 use regex::Regex;
 use rustpython_parser::ast::{
     Arg, ArgData, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind,
@@ -978,6 +979,44 @@ pub fn unnecessary_collection_call(
                         CheckKind::UnnecessaryCollectionCall(id.to_string()),
                         Range::from_located(expr),
                     ));
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
+    if let Some(first_arg) = args.first() {
+        if let ExprKind::Name { id, .. } = &func.node {
+            if id == "set" || id == "sorted" || id == "reversed" {
+                if let ExprKind::Subscript { slice, .. } = &first_arg.node {
+                    if let ExprKind::Slice { lower, upper, step } = &slice.node {
+                        if lower.is_none() && upper.is_none() {
+                            if let Some(step) = step {
+                                if let ExprKind::UnaryOp {
+                                    op: Unaryop::USub,
+                                    operand,
+                                } = &step.node
+                                {
+                                    if let ExprKind::Constant {
+                                        value: Constant::Int(val),
+                                        ..
+                                    } = &operand.node
+                                    {
+                                        if *val == BigInt::from(1) {
+                                            return Some(Check::new(
+                                                CheckKind::UnnecessarySubscriptReversal(
+                                                    id.to_string(),
+                                                ),
+                                                Range::from_located(expr),
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
