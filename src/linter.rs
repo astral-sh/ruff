@@ -376,9 +376,57 @@ mod tests {
     }
 
     #[test]
-    fn f401() -> Result<()> {
+    fn f401_0() -> Result<()> {
         let mut checks = check_path(
-            Path::new("./resources/test/fixtures/F401.py"),
+            Path::new("./resources/test/fixtures/F401_0.py"),
+            &settings::Settings::for_rule(CheckCode::F401),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn f401_1() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/F401_1.py"),
+            &settings::Settings::for_rule(CheckCode::F401),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn f401_2() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/F401_2.py"),
+            &settings::Settings::for_rule(CheckCode::F401),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn f401_3() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/F401_3.py"),
+            &settings::Settings::for_rule(CheckCode::F401),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn f401_4() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/F401_4.py"),
             &settings::Settings::for_rule(CheckCode::F401),
             &fixer::Mode::Generate,
         )?;

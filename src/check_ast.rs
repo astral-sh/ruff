@@ -633,12 +633,20 @@ where
         let prev_in_annotation = self.in_annotation;
 
         if self.in_annotation && self.annotations_future_enabled {
-            self.deferred_annotations.push((
-                expr,
-                self.scope_stack.clone(),
-                self.parent_stack.clone(),
-            ));
-            visitor::walk_expr(self, expr);
+            if let ExprKind::Constant {
+                value: Constant::Str(value),
+                ..
+            } = &expr.node
+            {
+                self.deferred_string_annotations
+                    .push((Range::from_located(expr), value));
+            } else {
+                self.deferred_annotations.push((
+                    expr,
+                    self.scope_stack.clone(),
+                    self.parent_stack.clone(),
+                ));
+            }
             return;
         }
 
