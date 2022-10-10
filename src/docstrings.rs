@@ -61,6 +61,33 @@ pub fn extract<'a, 'b>(
     None
 }
 
+pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
+    if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.expr.node
+    {
+        let mut line_count = 0;
+        let mut non_empty_line_count = 0;
+        for line in string.lines() {
+            line_count += 1;
+            if !line.trim().is_empty() {
+                non_empty_line_count += 1;
+            }
+            if non_empty_line_count > 1 {
+                return;
+            }
+        }
+
+        if non_empty_line_count == 1 && line_count > 1 {
+            checker.add_check(Check::new(
+                CheckKind::OneLinerDocstring,
+                Range::from_located(docstring.expr),
+            ));
+        }
+    }
+}
+
 pub fn not_empty(checker: &mut Checker, docstring: &Docstring) {
     if let ExprKind::Constant {
         value: Constant::Str(string),

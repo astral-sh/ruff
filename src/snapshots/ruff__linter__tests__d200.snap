@@ -1,0 +1,29 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: OneLinerDocstring
+  location:
+    row: 2
+    column: 6
+  end_location:
+    row: 4
+    column: 8
+  fix: ~
+- kind: OneLinerDocstring
+  location:
+    row: 8
+    column: 6
+  end_location:
+    row: 9
+    column: 8
+  fix: ~
+- kind: OneLinerDocstring
+  location:
+    row: 13
+    column: 6
+  end_location:
+    row: 14
+    column: 13
+  fix: ~
+

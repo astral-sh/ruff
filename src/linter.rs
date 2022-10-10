@@ -979,6 +979,18 @@ mod tests {
     }
 
     #[test]
+    fn d200() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/D200.py"),
+            &settings::Settings::for_rule(CheckCode::D200),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn d400() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/D400.py"),
