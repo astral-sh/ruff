@@ -215,7 +215,8 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
-- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (partial)
+- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (11/16)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (1/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (partial)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -278,6 +279,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |  |  |
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |  |
+| B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls). Instead, raise `AssertionError()`. |  | 🛠 |
 | C400 | UnnecessaryGeneratorList | Unnecessary generator - rewrite as a list comprehension |  |  |
 | C401 | UnnecessaryGeneratorSet | Unnecessary generator - rewrite as a set comprehension |  |  |
 | C402 | UnnecessaryGeneratorDict | Unnecessary generator - rewrite as a dict comprehension |  |  |
@@ -295,7 +297,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | U002 | UnnecessaryAbspath | `abspath(__file__)` is unnecessary in Python 3.9 and later |  | 🛠 |
 | U003 | TypeOfPrimitive | Use `str` instead of `type(...)` |  | 🛠 |
 | U004 | UselessObjectInheritance | Class `...` inherits from object |  | 🛠 |
-| U005 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
+| U005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
 | U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations |  | 🛠 |
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations |  | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |

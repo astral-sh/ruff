@@ -1,0 +1,61 @@
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+
+use crate::ast::types::Range;
+use crate::autofix::fixer;
+use crate::check_ast::Checker;
+use crate::checks::{Check, CheckKind, Fix};
+use crate::code_gen::SourceGenerator;
+
+fn assertion_error(msg: &Option<Box<Expr>>) -> Stmt {
+    Stmt::new(
+        Default::default(),
+        Default::default(),
+        StmtKind::Raise {
+            exc: Some(Box::new(Expr::new(
+                Default::default(),
+                Default::default(),
+                ExprKind::Call {
+                    func: Box::new(Expr::new(
+                        Default::default(),
+                        Default::default(),
+                        ExprKind::Name {
+                            id: "AssertionError".to_string(),
+                            ctx: ExprContext::Load,
+                        },
+                    )),
+                    args: if let Some(msg) = msg {
+                        vec![*msg.clone()]
+                    } else {
+                        vec![]
+                    },
+                    keywords: vec![],
+                },
+            ))),
+            cause: None,
+        },
+    )
+}
+
+pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: &Option<Box<Expr>>) {
+    if let ExprKind::Constant {
+        value: Constant::Bool(false),
+        ..
+    } = &test.node
+    {
+        let mut check = Check::new(CheckKind::DoNotAssertFalse, Range::from_located(test));
+        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+            let mut generator = SourceGenerator::new();
+            if let Ok(()) = generator.unparse_stmt(&assertion_error(msg)) {
+                if let Ok(content) = generator.generate() {
+                    check.amend(Fix {
+                        content,
+                        location: stmt.location,
+                        end_location: stmt.end_location,
+                        applied: false,
+                    })
+                }
+            }
+        }
+        checker.add_check(check);
+    }
+}

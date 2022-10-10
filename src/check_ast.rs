@@ -548,9 +548,12 @@ where
                     plugins::if_tuple(self, stmt, test);
                 }
             }
-            StmtKind::Assert { test, .. } => {
+            StmtKind::Assert { test, msg } => {
                 if self.settings.enabled.contains(&CheckCode::F631) {
                     plugins::assert_tuple(self, stmt, test);
+                }
+                if self.settings.enabled.contains(&CheckCode::B011) {
+                    plugins::assert_false(self, stmt, test, msg);
                 }
             }
             StmtKind::Try { handlers, .. } => {

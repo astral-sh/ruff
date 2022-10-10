@@ -115,7 +115,7 @@ impl SourceGenerator {
         Ok(())
     }
 
-    fn unparse_stmt<U>(&mut self, ast: &Stmt<U>) -> fmt::Result {
+    pub fn unparse_stmt<U>(&mut self, ast: &Stmt<U>) -> fmt::Result {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline()?;
