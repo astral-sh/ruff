@@ -15,6 +15,9 @@ def f() -> None:
     # Invalid
     d = 1  # noqa: F841, E501
 
+    # Invalid (and unimplemented)
+    d = 1  # noqa: F841, W191
+
 
 # Valid
 _ = """Lorem ipsum dolor sit amet.

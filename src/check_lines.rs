@@ -184,15 +184,15 @@ pub fn check_lines(
                     let mut valid_codes = vec![];
                     for code in codes {
                         if !matches.contains(&code) {
-                            invalid_codes.push(code);
+                            invalid_codes.push(code.to_string());
                         } else {
-                            valid_codes.push(code);
+                            valid_codes.push(code.to_string());
                         }
                     }
 
                     if !invalid_codes.is_empty() {
                         let mut check = Check::new(
-                            CheckKind::UnusedNOQA(Some(invalid_codes.join(", "))),
+                            CheckKind::UnusedNOQA(Some(invalid_codes)),
                             Range {
                                 location: Location::new(row + 1, start + 1),
                                 end_location: Location::new(row + 1, end + 1),
