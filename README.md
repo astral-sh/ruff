@@ -216,7 +216,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (11/16)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (2/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (partial)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -280,7 +280,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |  |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` |  | 🛠 |
-| B025 | DuplicateExceptions | try-except block with duplicate exception `Exception` |  |  |
+| B014 | DuplicateHandlerException | Exception handler with duplicate exception `Exception` |  |  |
+| B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |  |
 | C400 | UnnecessaryGeneratorList | Unnecessary generator - rewrite as a list comprehension |  |  |
 | C401 | UnnecessaryGeneratorSet | Unnecessary generator - rewrite as a set comprehension |  |  |
 | C402 | UnnecessaryGeneratorDict | Unnecessary generator - rewrite as a dict comprehension |  |  |

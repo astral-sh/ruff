@@ -562,11 +562,10 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::B025) {
-                    self.checks.extend(checks::duplicate_exceptions(
-                        handlers,
-                        self.locate_check(Range::from_located(stmt)),
-                    ));
+                if self.settings.enabled.contains(&CheckCode::B014)
+                    || self.settings.enabled.contains(&CheckCode::B025)
+                {
+                    plugins::duplicate_exceptions(self, stmt, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
