@@ -804,6 +804,13 @@ where
                     };
                 }
 
+                if self.settings.enabled.contains(&CheckCode::C410) {
+                    if let Some(check) =
+                        checks::unnecessary_literal_within_list_call(expr, func, args)
+                    {
+                        self.checks.push(check);
+                    };
+                }
                 if self.settings.enabled.contains(&CheckCode::C415) {
                     if let Some(check) = checks::unnecessary_subscript_reversal(expr, func, args) {
                         self.checks.push(check);

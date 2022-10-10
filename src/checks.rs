@@ -130,6 +130,7 @@ pub enum CheckCode {
     C406,
     C408,
     C409,
+    C410,
     C415,
     // flake8-print
     T201,
@@ -221,6 +222,7 @@ pub enum CheckKind {
     UnnecessaryLiteralDict(String),
     UnnecessaryCollectionCall(String),
     UnnecessaryLiteralWithinTupleCall(String),
+    UnnecessaryLiteralWithinListCall(String),
     UnnecessarySubscriptReversal(String),
     // flake8-print
     PrintFound,
@@ -317,6 +319,9 @@ impl CheckCode {
             CheckCode::C409 => {
                 CheckKind::UnnecessaryLiteralWithinTupleCall("<list/tuple>".to_string())
             }
+            CheckCode::C410 => {
+                CheckKind::UnnecessaryLiteralWithinListCall("<list/tuple>".to_string())
+            }
             CheckCode::C415 => {
                 CheckKind::UnnecessarySubscriptReversal("<reversed/set/sorted>".to_string())
             }
@@ -404,6 +409,7 @@ impl CheckKind {
             CheckKind::UnnecessaryLiteralDict(_) => &CheckCode::C406,
             CheckKind::UnnecessaryCollectionCall(_) => &CheckCode::C408,
             CheckKind::UnnecessaryLiteralWithinTupleCall(..) => &CheckCode::C409,
+            CheckKind::UnnecessaryLiteralWithinListCall(..) => &CheckCode::C410,
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
@@ -598,6 +604,17 @@ impl CheckKind {
                 } else {
                     format!(
                         "Unnecessary {literal} literal passed to tuple() - remove the outer call to tuple()"
+                    )
+                }
+            }
+            CheckKind::UnnecessaryLiteralWithinListCall(literal) => {
+                if literal == "list" {
+                    format!(
+                        "Unnecessary {literal} literal passed to list() - remove the outer call to list()"
+                    )
+                } else {
+                    format!(
+                        "Unnecessary {literal} literal passed to list() - rewrite as a list literal"
                     )
                 }
             }
