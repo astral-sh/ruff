@@ -85,7 +85,7 @@ fn run_once_stdin(settings: &Settings, filename: &str) -> Result<Vec<Message>> {
     let stdin = read_from_stdin()?;
     let mut messages = lint_stdin(filename, &stdin, settings)?;
     messages.sort_unstable();
-    return Ok(messages);
+    Ok(messages)
 }
 
 fn run_once(
@@ -368,7 +368,7 @@ fn inner_main() -> Result<ExitCode> {
         let messages = if cli.files == vec![PathBuf::from("-")] {
             run_once_stdin(
                 &settings,
-                &cli.stdin_filename.unwrap_or("(stdin)".to_string()),
+                &cli.stdin_filename.unwrap_or_else(|| "(stdin)".to_string()),
             )?
         } else {
             run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?

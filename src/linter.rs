@@ -85,7 +85,7 @@ pub(crate) fn check_path(
 
 pub fn lint_stdin(path: &str, stdin: &str, settings: &Settings) -> Result<Vec<Message>> {
     // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(&stdin);
+    let tokens: Vec<LexResult> = tokenize(stdin);
 
     // Determine the noqa line for every line in the source.
     let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
@@ -94,7 +94,7 @@ pub fn lint_stdin(path: &str, stdin: &str, settings: &Settings) -> Result<Vec<Me
     let path = Path::new(path);
     let checks = check_path(
         path,
-        &stdin,
+        stdin,
         tokens,
         &noqa_line_for,
         settings,
