@@ -1,3 +1,4 @@
+pub use assert_false::assert_false;
 pub use assert_tuple::assert_tuple;
 pub use deprecated_unittest_alias::deprecated_unittest_alias;
 pub use if_tuple::if_tuple;
@@ -11,6 +12,7 @@ pub use use_pep604_annotation::use_pep604_annotation;
 pub use useless_metaclass_type::useless_metaclass_type;
 pub use useless_object_inheritance::useless_object_inheritance;
 
+mod assert_false;
 mod assert_tuple;
 mod deprecated_unittest_alias;
 mod if_tuple;

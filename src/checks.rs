@@ -121,6 +121,8 @@ pub enum CheckCode {
     A001,
     A002,
     A003,
+    // flake8-bugbear
+    B011,
     // flake8-comprehensions
     C400,
     C401,
@@ -213,6 +215,8 @@ pub enum CheckKind {
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
     BuiltinAttributeShadowing(String),
+    // flake8-bugbear
+    DoNotAssertFalse,
     // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
@@ -306,6 +310,8 @@ impl CheckCode {
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
+            // flake8-bugbear
+            CheckCode::B011 => CheckKind::DoNotAssertFalse,
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
             CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
@@ -400,6 +406,8 @@ impl CheckKind {
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
+            // flake8-bugbear
+            CheckKind::DoNotAssertFalse => &CheckCode::B011,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
             CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,
@@ -572,6 +580,10 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(name) => {
                 format!("Class attribute `{name}` is shadowing a python builtin")
             }
+            // flake8-bugbear
+            CheckKind::DoNotAssertFalse => {
+                "Do not `assert False` (`python -O` removes these calls). Instead, raise `AssertionError()`.".to_string()
+            }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {
                 "Unnecessary generator - rewrite as a list comprehension".to_string()
@@ -675,6 +687,7 @@ impl CheckKind {
         matches!(
             self,
             CheckKind::DeprecatedUnittestAlias(_, _)
+                | CheckKind::DoNotAssertFalse
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::SuperCallWithParameters
