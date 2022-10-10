@@ -287,7 +287,6 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | C406 | UnnecessaryLiteralDict | Unnecessary <list/tuple> literal - rewrite as a dict literal |  |  |
 | C408 | UnnecessaryCollectionCall | Unnecessary <dict/list/tuple> call - rewrite as a literal |  |  |
 | C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within <reversed/set/sorted>() |  |  |
-| SPR001 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
 | T201 | PrintFound | `print` found |  | 🛠 |
 | T203 | PPrintFound | `pprint` found |  | 🛠 |
 | U001 | UselessMetaclassType | `__metaclass__ = type` is implied |  | 🛠 |
@@ -297,6 +296,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | U005 | NoAssertEquals | `assertEquals` is deprecated, use `assertEqual` instead |  | 🛠 |
 | U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations |  | 🛠 |
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations |  | 🛠 |
+| U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations

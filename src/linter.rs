@@ -955,10 +955,10 @@ mod tests {
     }
 
     #[test]
-    fn spr001() -> Result<()> {
+    fn u008() -> Result<()> {
         let mut checks = check_path(
-            Path::new("./resources/test/fixtures/SPR001.py"),
-            &settings::Settings::for_rule(CheckCode::SPR001),
+            Path::new("./resources/test/fixtures/U008.py"),
+            &settings::Settings::for_rule(CheckCode::U008),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);

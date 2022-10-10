@@ -1,0 +1,85 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: SuperCallWithParameters
+  location:
+    row: 17
+    column: 18
+  end_location:
+    row: 17
+    column: 36
+  fix:
+    content: super()
+    location:
+      row: 17
+      column: 18
+    end_location:
+      row: 17
+      column: 36
+    applied: false
+- kind: SuperCallWithParameters
+  location:
+    row: 18
+    column: 9
+  end_location:
+    row: 18
+    column: 27
+  fix:
+    content: super()
+    location:
+      row: 18
+      column: 9
+    end_location:
+      row: 18
+      column: 27
+    applied: false
+- kind: SuperCallWithParameters
+  location:
+    row: 19
+    column: 9
+  end_location:
+    row: 22
+    column: 10
+  fix:
+    content: super()
+    location:
+      row: 19
+      column: 9
+    end_location:
+      row: 22
+      column: 10
+    applied: false
+- kind: SuperCallWithParameters
+  location:
+    row: 36
+    column: 9
+  end_location:
+    row: 36
+    column: 29
+  fix:
+    content: super()
+    location:
+      row: 36
+      column: 9
+    end_location:
+      row: 36
+      column: 29
+    applied: false
+- kind: SuperCallWithParameters
+  location:
+    row: 50
+    column: 13
+  end_location:
+    row: 50
+    column: 33
+  fix:
+    content: super()
+    location:
+      row: 50
+      column: 13
+    end_location:
+      row: 50
+      column: 33
+    applied: false
+

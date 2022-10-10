@@ -730,7 +730,7 @@ where
                 }
 
                 // flake8-super
-                if self.settings.enabled.contains(&CheckCode::SPR001) {
+                if self.settings.enabled.contains(&CheckCode::U008) {
                     plugins::super_call_with_parameters(self, expr, func, args);
                 }
 
