@@ -280,7 +280,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |  |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` |  | 🛠 |
-| B014 | DuplicateHandlerException | Exception handler with duplicate exception `Exception` |  |  |
+| B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError |  | 🛠 |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |  |
 | C400 | UnnecessaryGeneratorList | Unnecessary generator - rewrite as a list comprehension |  |  |
 | C401 | UnnecessaryGeneratorSet | Unnecessary generator - rewrite as a set comprehension |  |  |
