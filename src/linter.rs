@@ -981,8 +981,44 @@ mod tests {
     #[test]
     fn d200() -> Result<()> {
         let mut checks = check_path(
-            Path::new("./resources/test/fixtures/D200.py"),
+            Path::new("./resources/test/fixtures/D.py"),
             &settings::Settings::for_rule(CheckCode::D200),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d205() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/D.py"),
+            &settings::Settings::for_rule(CheckCode::D205),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d209() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/D.py"),
+            &settings::Settings::for_rule(CheckCode::D209),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d210() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/D.py"),
+            &settings::Settings::for_rule(CheckCode::D210),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);
@@ -993,7 +1029,7 @@ mod tests {
     #[test]
     fn d400() -> Result<()> {
         let mut checks = check_path(
-            Path::new("./resources/test/fixtures/D400.py"),
+            Path::new("./resources/test/fixtures/D.py"),
             &settings::Settings::for_rule(CheckCode::D400),
             &fixer::Mode::Generate,
         )?;
@@ -1005,7 +1041,7 @@ mod tests {
     #[test]
     fn d419() -> Result<()> {
         let mut checks = check_path(
-            Path::new("./resources/test/fixtures/D419.py"),
+            Path::new("./resources/test/fixtures/D.py"),
             &settings::Settings::for_rule(CheckCode::D419),
             &fixer::Mode::Generate,
         )?;
