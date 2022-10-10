@@ -1,5 +1,7 @@
+use crate::ast::types::Range;
 use crate::check_ast::Checker;
-use rustpython_ast::{Expr, Stmt, StmtKind};
+use crate::checks::{Check, CheckKind};
+use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 #[derive(Debug)]
 pub enum DocstringKind {
@@ -12,7 +14,7 @@ pub enum DocstringKind {
 pub struct Docstring<'a> {
     pub kind: DocstringKind,
     pub parent: Option<&'a Stmt>,
-    pub node: &'a Expr,
+    pub expr: &'a Expr,
 }
 
 /// Extract a docstring from an expression.
@@ -32,7 +34,7 @@ pub fn extract<'a, 'b>(
                 return Some(Docstring {
                     kind: DocstringKind::Module,
                     parent: None,
-                    node: expr,
+                    expr,
                 });
             }
         }
@@ -49,7 +51,7 @@ pub fn extract<'a, 'b>(
                             DocstringKind::Function
                         },
                         parent: None,
-                        node: expr,
+                        expr,
                     });
                 }
             }
@@ -57,4 +59,20 @@ pub fn extract<'a, 'b>(
     }
 
     None
+}
+
+pub fn docstring_empty(checker: &mut Checker, docstring: &Docstring) {
+    // Extract the source.
+    if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.expr.node
+    {
+        if string.trim().is_empty() {
+            checker.add_check(Check::new(
+                CheckKind::EmptyDocstring,
+                Range::from_located(docstring.expr),
+            ));
+        }
+    }
 }

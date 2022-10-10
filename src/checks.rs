@@ -150,6 +150,8 @@ pub enum CheckCode {
     U006,
     U007,
     U008,
+    // pydocstyle
+    D419,
     // Meta
     M001,
 }
@@ -246,6 +248,8 @@ pub enum CheckKind {
     UsePEP585Annotation(String),
     UsePEP604Annotation,
     SuperCallWithParameters,
+    // pydocstyle
+    EmptyDocstring,
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -354,6 +358,8 @@ impl CheckCode {
             CheckCode::U006 => CheckKind::UsePEP585Annotation("List".to_string()),
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
+            // pydocstyle
+            CheckCode::D419 => CheckKind::EmptyDocstring,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -441,6 +447,8 @@ impl CheckKind {
             CheckKind::UsePEP604Annotation => &CheckCode::U007,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             CheckKind::SuperCallWithParameters => &CheckCode::U008,
+            // pydocstyle
+            CheckKind::EmptyDocstring => &CheckCode::D419,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -684,6 +692,8 @@ impl CheckKind {
             CheckKind::SuperCallWithParameters => {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
+            // pydocstyle
+            CheckKind::EmptyDocstring => "Docstring is empty".to_string(),
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),
