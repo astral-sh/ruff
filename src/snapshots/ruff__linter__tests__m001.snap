@@ -20,7 +20,8 @@ expression: checks
       column: 18
     applied: false
 - kind:
-    UnusedNOQA: E501
+    UnusedNOQA:
+      - E501
   location:
     row: 13
     column: 10
@@ -37,7 +38,9 @@ expression: checks
       column: 24
     applied: false
 - kind:
-    UnusedNOQA: E501
+    UnusedNOQA:
+      - F841
+      - E501
   location:
     row: 16
     column: 10
@@ -45,7 +48,7 @@ expression: checks
     row: 16
     column: 30
   fix:
-    content: "  # noqa: F841"
+    content: ""
     location:
       row: 16
       column: 10
@@ -54,54 +57,74 @@ expression: checks
       column: 30
     applied: false
 - kind:
-    UnusedNOQA: F841
+    UnusedNOQA:
+      - W191
   location:
-    row: 41
+    row: 19
+    column: 10
+  end_location:
+    row: 19
+    column: 30
+  fix:
+    content: "  # noqa: F841"
+    location:
+      row: 19
+      column: 10
+    end_location:
+      row: 19
+      column: 30
+    applied: false
+- kind:
+    UnusedNOQA:
+      - F841
+  location:
+    row: 44
     column: 4
   end_location:
-    row: 41
+    row: 44
     column: 24
   fix:
     content: "  # noqa: E501"
     location:
-      row: 41
+      row: 44
       column: 4
     end_location:
-      row: 41
+      row: 44
       column: 24
     applied: false
 - kind:
-    UnusedNOQA: E501
+    UnusedNOQA:
+      - E501
   location:
-    row: 49
+    row: 52
     column: 4
   end_location:
-    row: 49
+    row: 52
     column: 18
   fix:
     content: ""
     location:
-      row: 49
+      row: 52
       column: 4
     end_location:
-      row: 49
+      row: 52
       column: 18
     applied: false
 - kind:
     UnusedNOQA: ~
   location:
-    row: 57
+    row: 60
     column: 4
   end_location:
-    row: 57
+    row: 60
     column: 12
   fix:
     content: ""
     location:
-      row: 57
+      row: 60
       column: 4
     end_location:
-      row: 57
+      row: 60
       column: 12
     applied: false
 

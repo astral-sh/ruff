@@ -763,42 +763,6 @@ mod tests {
     }
 
     #[test]
-    fn m001() -> Result<()> {
-        let mut checks = check_path(
-            Path::new("./resources/test/fixtures/M001.py"),
-            &settings::Settings::for_rules(vec![CheckCode::M001, CheckCode::E501, CheckCode::F841]),
-            &fixer::Mode::Generate,
-        )?;
-        checks.sort_by_key(|check| check.location);
-        insta::assert_yaml_snapshot!(checks);
-        Ok(())
-    }
-
-    #[test]
-    fn init() -> Result<()> {
-        let mut checks = check_path(
-            Path::new("./resources/test/fixtures/__init__.py"),
-            &settings::Settings::for_rules(vec![CheckCode::F821, CheckCode::F822]),
-            &fixer::Mode::Generate,
-        )?;
-        checks.sort_by_key(|check| check.location);
-        insta::assert_yaml_snapshot!(checks);
-        Ok(())
-    }
-
-    #[test]
-    fn future_annotations() -> Result<()> {
-        let mut checks = check_path(
-            Path::new("./resources/test/fixtures/future_annotations.py"),
-            &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
-            &fixer::Mode::Generate,
-        )?;
-        checks.sort_by_key(|check| check.location);
-        insta::assert_yaml_snapshot!(checks);
-        Ok(())
-    }
-
-    #[test]
     fn e999() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/E999.py"),
@@ -1091,6 +1055,42 @@ mod tests {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/U007.py"),
             &settings::Settings::for_rule(CheckCode::U007),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn m001() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/M001.py"),
+            &settings::Settings::for_rules(vec![CheckCode::M001, CheckCode::E501, CheckCode::F841]),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn init() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/__init__.py"),
+            &settings::Settings::for_rules(vec![CheckCode::F821, CheckCode::F822]),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn future_annotations() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/future_annotations.py"),
+            &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);

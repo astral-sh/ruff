@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use strum_macros::{AsRefStr, EnumIter, EnumString};
 
 use crate::ast::checks::Primitive;
@@ -237,7 +238,7 @@ pub enum CheckKind {
     UsePEP604Annotation,
     SuperCallWithParameters,
     // Meta
-    UnusedNOQA(Option<String>),
+    UnusedNOQA(Option<Vec<String>>),
 }
 
 impl CheckCode {
@@ -650,9 +651,21 @@ impl CheckKind {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
             // Meta
-            CheckKind::UnusedNOQA(code) => match code {
+            CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),
-                Some(code) => format!("Unused `noqa` directive for: {code}"),
+                Some(codes) => {
+                    let codes = codes
+                        .iter()
+                        .map(|code| {
+                            if CheckCode::from_str(code).is_ok() {
+                                code.to_string()
+                            } else {
+                                format!("{code} (not implemented)")
+                            }
+                        })
+                        .join(", ");
+                    format!("Unused `noqa` directive for: {codes}")
+                }
             },
         }
     }
