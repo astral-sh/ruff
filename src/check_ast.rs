@@ -60,7 +60,7 @@ pub struct Checker<'a> {
     seen_docstring: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
-    except_handlers: Vec<Vec<&'a str>>,
+    except_handlers: Vec<Vec<String>>,
 }
 
 impl<'a> Checker<'a> {
@@ -561,6 +561,12 @@ where
                     if let Some(check) = checks::check_default_except_not_last(handlers) {
                         self.checks.push(check);
                     }
+                }
+                if self.settings.enabled.contains(&CheckCode::B025) {
+                    self.checks.extend(checks::duplicate_exceptions(
+                        handlers,
+                        self.locate_check(Range::from_located(stmt)),
+                    ));
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -1515,7 +1521,7 @@ impl<'a> Checker<'a> {
 
                 // Avoid flagging if NameError is handled.
                 if let Some(handler_names) = self.except_handlers.last() {
-                    if handler_names.contains(&"NameError") {
+                    if handler_names.contains(&"NameError".to_string()) {
                         return;
                     }
                 }

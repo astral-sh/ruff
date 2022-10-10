@@ -123,6 +123,7 @@ pub enum CheckCode {
     A003,
     // flake8-bugbear
     B011,
+    B025,
     // flake8-comprehensions
     C400,
     C401,
@@ -217,6 +218,7 @@ pub enum CheckKind {
     BuiltinAttributeShadowing(String),
     // flake8-bugbear
     DoNotAssertFalse,
+    DuplicateExceptions(String),
     // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
@@ -312,6 +314,7 @@ impl CheckCode {
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-bugbear
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
+            CheckCode::B025 => CheckKind::DuplicateExceptions("Exception".to_string()),
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
             CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
@@ -408,6 +411,7 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-bugbear
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
+            CheckKind::DuplicateExceptions(_) => &CheckCode::B025,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
             CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,
@@ -582,7 +586,11 @@ impl CheckKind {
             }
             // flake8-bugbear
             CheckKind::DoNotAssertFalse => {
-                "Do not `assert False` (`python -O` removes these calls). Instead, raise `AssertionError()`.".to_string()
+                "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
+                    .to_string()
+            }
+            CheckKind::DuplicateExceptions(name) => {
+                format!("try-except block with duplicate exception `{name}`")
             }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {

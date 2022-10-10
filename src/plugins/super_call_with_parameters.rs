@@ -1,6 +1,6 @@
 use rustpython_ast::{Expr, Stmt};
 
-use crate::ast::checks;
+use crate::ast::{checks, helpers};
 use crate::autofix::{fixer, fixes};
 use crate::check_ast::Checker;
 
@@ -12,7 +12,7 @@ pub fn super_call_with_parameters(
 ) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `check_super_args` too, so this is just an optimization.)
-    if checks::is_super_call_with_arguments(func, args) {
+    if helpers::is_super_call_with_arguments(func, args) {
         let scope = checker.current_scope();
         let parents: Vec<&Stmt> = checker
             .parent_stack
