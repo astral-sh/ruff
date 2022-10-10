@@ -999,6 +999,36 @@ pub fn unnecessary_literal_within_tuple_call(
     None
 }
 
+pub fn unnecessary_literal_within_list_call(
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) -> Option<Check> {
+    if let ExprKind::Name { id, .. } = &func.node {
+        if id == "list" {
+            if let Some(arg) = args.first() {
+                match &arg.node {
+                    ExprKind::Tuple { .. } => {
+                        return Some(Check::new(
+                            CheckKind::UnnecessaryLiteralWithinListCall("tuple".to_string()),
+                            Range::from_located(expr),
+                        ));
+                    }
+                    ExprKind::List { .. } => {
+                        return Some(Check::new(
+                            CheckKind::UnnecessaryLiteralWithinListCall("list".to_string()),
+                            Range::from_located(expr),
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    None
+}
+
 pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     if let Some(first_arg) = args.first() {
         if let ExprKind::Name { id, .. } = &func.node {
