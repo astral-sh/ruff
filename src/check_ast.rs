@@ -21,10 +21,11 @@ use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checkers, helpers, operations, visitor};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::plugins;
+use crate::docstrings::{Docstring, DocstringKind};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::settings::{PythonVersion, Settings};
+use crate::{docstrings, plugins};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
@@ -37,6 +38,8 @@ pub struct Checker<'a> {
     pub(crate) autofix: &'a fixer::Mode,
     // Computed checks.
     checks: Vec<Check>,
+    // Docstring tracking.
+    docstrings: Vec<Docstring<'a>>,
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
     pub(crate) deletions: BTreeSet<usize>,
@@ -53,11 +56,11 @@ pub struct Checker<'a> {
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_assignments: Vec<usize>,
     // Internal, derivative state.
+    pub(crate) initial: bool,
     in_f_string: Option<Range>,
     in_annotation: bool,
     in_literal: bool,
-    seen_non_import: bool,
-    seen_docstring: bool,
+    seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
     except_handlers: Vec<Vec<String>>,
@@ -76,6 +79,7 @@ impl<'a> Checker<'a> {
             path,
             locator: SourceCodeLocator::new(content),
             checks: Default::default(),
+            docstrings: Default::default(),
             deletions: Default::default(),
             parents: Default::default(),
             parent_stack: Default::default(),
@@ -87,11 +91,11 @@ impl<'a> Checker<'a> {
             deferred_functions: Default::default(),
             deferred_lambdas: Default::default(),
             deferred_assignments: Default::default(),
+            initial: true,
             in_f_string: None,
             in_annotation: Default::default(),
             in_literal: Default::default(),
-            seen_non_import: Default::default(),
-            seen_docstring: Default::default(),
+            seen_import_boundary: Default::default(),
             futures_allowed: true,
             annotations_future_enabled: Default::default(),
             except_handlers: Default::default(),
@@ -122,47 +126,40 @@ where
                 self.futures_allowed = false;
             }
             StmtKind::Expr { value } => {
-                if self.seen_docstring
-                    && !self.seen_non_import
-                    && !operations::in_nested_block(&self.parent_stack, &self.parents)
-                {
-                    self.seen_non_import = true;
+                // Track all docstrings: module-, class-, and function-level.
+                let mut is_module_docstring = false;
+                if matches!(
+                    &value.node,
+                    ExprKind::Constant {
+                        value: Constant::Str(_),
+                        ..
+                    }
+                ) {
+                    if let Some(docstring) = docstrings::extract(self, stmt, value) {
+                        if matches!(&docstring.kind, DocstringKind::Module) {
+                            is_module_docstring = true;
+                        }
+                        self.docstrings.push(docstring);
+                    }
                 }
 
-                if !self.seen_docstring
-                    && !operations::in_nested_block(&self.parent_stack, &self.parents)
-                    && matches!(
-                        &value.node,
-                        ExprKind::Constant {
-                            value: Constant::Str(_),
-                            ..
-                        },
-                    )
-                {
-                    self.seen_docstring = true;
-                }
-
-                // Allow docstrings to interrupt __future__ imports.
-                if self.futures_allowed
-                    && !matches!(
-                        &value.node,
-                        ExprKind::Constant {
-                            value: Constant::Str(_),
-                            ..
-                        },
-                    )
-                {
+                if !is_module_docstring {
+                    if !self.seen_import_boundary
+                        && !operations::in_nested_block(&self.parent_stack, &self.parents)
+                    {
+                        self.seen_import_boundary = true;
+                    }
                     self.futures_allowed = false;
                 }
             }
             node => {
                 self.futures_allowed = false;
 
-                if !self.seen_non_import
+                if !self.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(node)
                     && !operations::in_nested_block(&self.parent_stack, &self.parents)
                 {
-                    self.seen_non_import = true;
+                    self.seen_import_boundary = true;
                 }
             }
         }
@@ -352,7 +349,7 @@ where
                     .settings
                     .enabled
                     .contains(CheckKind::ModuleImportNotAtTopOfFile.code())
-                    && self.seen_non_import
+                    && self.seen_import_boundary
                     && stmt.location.column() == 1
                 {
                     self.checks.push(Check::new(
@@ -413,7 +410,7 @@ where
                     .settings
                     .enabled
                     .contains(CheckKind::ModuleImportNotAtTopOfFile.code())
-                    && self.seen_non_import
+                    && self.seen_import_boundary
                     && stmt.location.column() == 1
                 {
                     self.checks.push(Check::new(
@@ -593,6 +590,7 @@ where
             StmtKind::Delete { .. } => {}
             _ => {}
         }
+        self.initial = false;
 
         // Recurse.
         match &stmt.node {

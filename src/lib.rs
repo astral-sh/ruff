@@ -17,6 +17,7 @@ mod check_lines;
 pub mod checks;
 pub mod cli;
 pub mod code_gen;
+pub mod docstrings;
 pub mod fs;
 pub mod linter;
 pub mod logging;
