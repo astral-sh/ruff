@@ -218,7 +218,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (11/16)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (6/47)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (partial)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
 
