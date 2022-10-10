@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::ast::helpers;
-use itertools::{izip, Itertools};
+use itertools::izip;
 use num_bigint::BigInt;
 use regex::Regex;
 use rustpython_parser::ast::{
@@ -10,6 +9,7 @@ use rustpython_parser::ast::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::ast::helpers;
 use crate::ast::types::{
     Binding, BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind,
 };
@@ -746,57 +746,6 @@ pub fn check_builtin_shadowing(
     } else {
         None
     }
-}
-
-// flake8-bugbear
-/// Check DuplicateExceptions compliance.
-pub fn duplicate_exceptions(handlers: &[Excepthandler], location: Range) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
-
-    let mut seen: BTreeSet<String> = Default::default();
-    let mut duplicates: BTreeSet<String> = Default::default();
-    for handler in handlers {
-        match &handler.node {
-            ExcepthandlerKind::ExceptHandler { type_, .. } => {
-                if let Some(type_) = type_ {
-                    match &type_.node {
-                        ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
-                            if let Some(name) = helpers::compose_call_path(type_) {
-                                if seen.contains(&name) {
-                                    duplicates.insert(name);
-                                } else {
-                                    seen.insert(name);
-                                }
-                            }
-                        }
-                        ExprKind::Tuple { elts, .. } => {
-                            // TODO(charlie): If we have duplicates within a single handler, that
-                            // should be handled by B014 (as yet unimplemented).
-                            for type_ in elts {
-                                if let Some(name) = helpers::compose_call_path(type_) {
-                                    if seen.contains(&name) {
-                                        duplicates.insert(name);
-                                    } else {
-                                        seen.insert(name);
-                                    }
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-    }
-
-    for duplicate in duplicates.into_iter().sorted() {
-        checks.push(Check::new(
-            CheckKind::DuplicateExceptions(duplicate),
-            location,
-        ));
-    }
-
-    checks
 }
 
 // flake8-comprehensions

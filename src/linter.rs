@@ -823,6 +823,18 @@ mod tests {
     }
 
     #[test]
+    fn b014() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/B014.py"),
+            &settings::Settings::for_rule(CheckCode::B014),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn b025() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/B025.py"),

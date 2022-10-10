@@ -1,0 +1,32 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    DuplicateHandlerException: OSError
+  location:
+    row: 15
+    column: 1
+  end_location:
+    row: 22
+    column: 1
+  fix: ~
+- kind:
+    DuplicateHandlerException: MyError
+  location:
+    row: 26
+    column: 1
+  end_location:
+    row: 33
+    column: 1
+  fix: ~
+- kind:
+    DuplicateHandlerException: re.error
+  location:
+    row: 47
+    column: 1
+  end_location:
+    row: 54
+    column: 1
+  fix: ~
+

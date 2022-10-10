@@ -1,61 +1,82 @@
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use itertools::Itertools;
+use std::collections::BTreeSet;
 
-use crate::ast::types::Range;
-use crate::autofix::fixer;
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt};
+
+use crate::ast::helpers;
+use crate::ast::types::{CheckLocator, Range};
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckKind, Fix};
-use crate::code_gen::SourceGenerator;
+use crate::checks::{Check, CheckCode, CheckKind};
 
-fn assertion_error(msg: &Option<Box<Expr>>) -> Stmt {
-    Stmt::new(
-        Default::default(),
-        Default::default(),
-        StmtKind::Raise {
-            exc: Some(Box::new(Expr::new(
-                Default::default(),
-                Default::default(),
-                ExprKind::Call {
-                    func: Box::new(Expr::new(
-                        Default::default(),
-                        Default::default(),
-                        ExprKind::Name {
-                            id: "AssertionError".to_string(),
-                            ctx: ExprContext::Load,
-                        },
-                    )),
-                    args: if let Some(msg) = msg {
-                        vec![*msg.clone()]
-                    } else {
-                        vec![]
-                    },
-                    keywords: vec![],
-                },
-            ))),
-            cause: None,
-        },
-    )
+pub fn duplicate_handler_exceptions(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    elts: &Vec<Expr>,
+) -> BTreeSet<String> {
+    let mut seen: BTreeSet<String> = Default::default();
+    let mut duplicates: BTreeSet<String> = Default::default();
+    for type_ in elts {
+        if let Some(name) = helpers::compose_call_path(type_) {
+            if seen.contains(&name) {
+                duplicates.insert(name);
+            } else {
+                seen.insert(name);
+            }
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::B014) {
+        // TODO(charlie): Handle "BaseException" and redundant exception aliases.
+        for duplicate in duplicates.into_iter().sorted() {
+            checker.add_check(Check::new(
+                CheckKind::DuplicateHandlerException(duplicate),
+                checker.locate_check(Range::from_located(stmt)),
+            ));
+        }
+    }
+
+    seen
 }
 
-pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: &Option<Box<Expr>>) {
-    if let ExprKind::Constant {
-        value: Constant::Bool(false),
-        ..
-    } = &test.node
-    {
-        let mut check = Check::new(CheckKind::DoNotAssertFalse, Range::from_located(test));
-        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-            let mut generator = SourceGenerator::new();
-            if let Ok(()) = generator.unparse_stmt(&assertion_error(msg)) {
-                if let Ok(content) = generator.generate() {
-                    check.amend(Fix {
-                        content,
-                        location: stmt.location,
-                        end_location: stmt.end_location,
-                        applied: false,
-                    })
+pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Excepthandler]) {
+    let mut seen: BTreeSet<String> = Default::default();
+    let mut duplicates: BTreeSet<String> = Default::default();
+    for handler in handlers {
+        match &handler.node {
+            ExcepthandlerKind::ExceptHandler { type_, .. } => {
+                if let Some(type_) = type_ {
+                    match &type_.node {
+                        ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
+                            if let Some(name) = helpers::compose_call_path(type_) {
+                                if seen.contains(&name) {
+                                    duplicates.insert(name);
+                                } else {
+                                    seen.insert(name);
+                                }
+                            }
+                        }
+                        ExprKind::Tuple { elts, .. } => {
+                            for name in duplicate_handler_exceptions(checker, stmt, elts) {
+                                if seen.contains(&name) {
+                                    duplicates.insert(name);
+                                } else {
+                                    seen.insert(name);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
-        checker.add_check(check);
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::B025) {
+        for duplicate in duplicates.into_iter().sorted() {
+            checker.add_check(Check::new(
+                CheckKind::DuplicateTryBlockException(duplicate),
+                checker.locate_check(Range::from_located(stmt)),
+            ));
+        }
     }
 }
