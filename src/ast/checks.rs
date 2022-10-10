@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
-use itertools::izip;
+use crate::ast::helpers;
+use itertools::{izip, Itertools};
 use num_bigint::BigInt;
 use regex::Regex;
 use rustpython_parser::ast::{
@@ -747,14 +748,55 @@ pub fn check_builtin_shadowing(
     }
 }
 
-/// Returns `true` if a call is an argumented `super` invocation.
-pub fn is_super_call_with_arguments(func: &Expr, args: &Vec<Expr>) -> bool {
-    // Check: is this a `super` call?
-    if let ExprKind::Name { id, .. } = &func.node {
-        id == "super" && !args.is_empty()
-    } else {
-        false
+// flake8-bugbear
+/// Check DuplicateExceptions compliance.
+pub fn duplicate_exceptions(handlers: &[Excepthandler], location: Range) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+
+    let mut seen: BTreeSet<String> = Default::default();
+    let mut duplicates: BTreeSet<String> = Default::default();
+    for handler in handlers {
+        match &handler.node {
+            ExcepthandlerKind::ExceptHandler { type_, .. } => {
+                if let Some(type_) = type_ {
+                    match &type_.node {
+                        ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
+                            if let Some(name) = helpers::compose_call_path(type_) {
+                                if seen.contains(&name) {
+                                    duplicates.insert(name);
+                                } else {
+                                    seen.insert(name);
+                                }
+                            }
+                        }
+                        ExprKind::Tuple { elts, .. } => {
+                            // TODO(charlie): If we have duplicates within a single handler, that
+                            // should be handled by B014 (as yet unimplemented).
+                            for type_ in elts {
+                                if let Some(name) = helpers::compose_call_path(type_) {
+                                    if seen.contains(&name) {
+                                        duplicates.insert(name);
+                                    } else {
+                                        seen.insert(name);
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
+
+    for duplicate in duplicates.into_iter().sorted() {
+        checks.push(Check::new(
+            CheckKind::DuplicateExceptions(duplicate),
+            location,
+        ));
+    }
+
+    checks
 }
 
 // flake8-comprehensions
@@ -1076,7 +1118,7 @@ pub fn check_super_args(
     func: &Expr,
     args: &Vec<Expr>,
 ) -> Option<Check> {
-    if !is_super_call_with_arguments(func, args) {
+    if !helpers::is_super_call_with_arguments(func, args) {
         return None;
     }
 

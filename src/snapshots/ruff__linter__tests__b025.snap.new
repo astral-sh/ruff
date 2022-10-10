@@ -1,0 +1,42 @@
+---
+source: src/linter.rs
+assertion_line: 833
+expression: checks
+---
+- kind:
+    DuplicateExceptions: ValueError
+  location:
+    row: 15
+    column: 1
+  end_location:
+    row: 22
+    column: 1
+  fix: ~
+- kind:
+    DuplicateExceptions: pickle.PickleError
+  location:
+    row: 22
+    column: 1
+  end_location:
+    row: 31
+    column: 1
+  fix: ~
+- kind:
+    DuplicateExceptions: TypeError
+  location:
+    row: 31
+    column: 1
+  end_location:
+    row: 39
+    column: 1
+  fix: ~
+- kind:
+    DuplicateExceptions: ValueError
+  location:
+    row: 31
+    column: 1
+  end_location:
+    row: 39
+    column: 1
+  fix: ~
+

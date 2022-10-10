@@ -4,7 +4,39 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, StmtKind}
 
 use crate::python::typing;
 
-static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
+fn compose_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
+    match &expr.node {
+        ExprKind::Call { func, .. } => {
+            compose_call_path_inner(func, parts);
+        }
+        ExprKind::Attribute { value, attr, .. } => {
+            compose_call_path_inner(value, parts);
+            parts.push(attr);
+        }
+        ExprKind::Name { id, .. } => {
+            parts.push(id);
+        }
+        _ => {}
+    }
+}
+
+pub fn compose_call_path(expr: &Expr) -> Option<String> {
+    let mut segments = vec![];
+    compose_call_path_inner(expr, &mut segments);
+    if segments.is_empty() {
+        None
+    } else {
+        Some(segments.join("."))
+    }
+}
+
+pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
+    match &expr.node {
+        ExprKind::Attribute { attr, .. } => target == attr,
+        ExprKind::Name { id, .. } => target == id,
+        _ => false,
+    }
+}
 
 pub enum SubscriptKind {
     AnnotatedSubscript,
@@ -35,21 +67,7 @@ pub fn match_annotated_subscript(expr: &Expr) -> Option<SubscriptKind> {
     }
 }
 
-fn node_name(expr: &Expr) -> Option<&str> {
-    if let ExprKind::Name { id, .. } = &expr.node {
-        Some(id)
-    } else {
-        None
-    }
-}
-
-pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
-    match &expr.node {
-        ExprKind::Attribute { attr, .. } => target == attr,
-        ExprKind::Name { id, .. } => target == id,
-        _ => false,
-    }
-}
+static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
 pub fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
     // Check whether it's an assignment to a dunder, with or without a type annotation.
@@ -82,9 +100,7 @@ pub fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
 }
 
 /// Extract the names of all handled exceptions.
-/// Note that, for now, this only matches on ExprKind::Name, and so won't catch exceptions like
-/// `module.CustomException`. (But will catch all builtin exceptions.)
-pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<&str> {
+pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<String> {
     let mut handler_names = vec![];
     for handler in handlers {
         match &handler.node {
@@ -92,11 +108,11 @@ pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<&str> {
                 if let Some(type_) = type_ {
                     if let ExprKind::Tuple { elts, .. } = &type_.node {
                         for type_ in elts {
-                            if let Some(name) = node_name(type_) {
+                            if let Some(name) = compose_call_path(type_) {
                                 handler_names.push(name);
                             }
                         }
-                    } else if let Some(name) = node_name(type_) {
+                    } else if let Some(name) = compose_call_path(type_) {
                         handler_names.push(name);
                     }
                 }
@@ -104,4 +120,14 @@ pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<&str> {
         }
     }
     handler_names
+}
+
+/// Returns `true` if a call is an argumented `super` invocation.
+pub fn is_super_call_with_arguments(func: &Expr, args: &Vec<Expr>) -> bool {
+    // Check: is this a `super` call?
+    if let ExprKind::Name { id, .. } = &func.node {
+        id == "super" && !args.is_empty()
+    } else {
+        false
+    }
 }
