@@ -757,7 +757,7 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &Vec<Expr>) -> bool {
     }
 }
 
-// flakes8-comprehensions
+// flake8-comprehensions
 /// Check `list(generator)` compliance.
 pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
     if args.len() == 1 {

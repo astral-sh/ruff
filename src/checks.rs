@@ -211,7 +211,7 @@ pub enum CheckKind {
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
     BuiltinAttributeShadowing(String),
-    // flakes8-comprehensions
+    // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
     UnnecessaryGeneratorDict,
