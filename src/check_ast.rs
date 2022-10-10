@@ -1890,6 +1890,9 @@ impl<'a> Checker<'a> {
 
     fn check_docstrings(&mut self) {
         while let Some(docstring) = self.docstrings.pop() {
+            if self.settings.enabled.contains(&CheckCode::D200) {
+                docstrings::one_liner(self, &docstring);
+            }
             if self.settings.enabled.contains(&CheckCode::D400) {
                 docstrings::ends_with_period(self, &docstring);
             }

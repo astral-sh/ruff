@@ -151,6 +151,7 @@ pub enum CheckCode {
     U007,
     U008,
     // pydocstyle
+    D200,
     D400,
     D419,
     // Meta
@@ -250,6 +251,7 @@ pub enum CheckKind {
     UsePEP604Annotation,
     SuperCallWithParameters,
     // pydocstyle
+    OneLinerDocstring,
     EmptyDocstring,
     DocstringEndsInNonPeriod,
     // Meta
@@ -361,6 +363,7 @@ impl CheckCode {
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             // pydocstyle
+            CheckCode::D200 => CheckKind::OneLinerDocstring,
             CheckCode::D400 => CheckKind::DocstringEndsInNonPeriod,
             CheckCode::D419 => CheckKind::EmptyDocstring,
             // Meta
@@ -451,6 +454,7 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             CheckKind::SuperCallWithParameters => &CheckCode::U008,
             // pydocstyle
+            CheckKind::OneLinerDocstring => &CheckCode::D200,
             CheckKind::DocstringEndsInNonPeriod => &CheckCode::D400,
             CheckKind::EmptyDocstring => &CheckCode::D419,
             // Meta
@@ -697,6 +701,7 @@ impl CheckKind {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
             // pydocstyle
+            CheckKind::OneLinerDocstring => "One-line docstring should fit on one line".to_string(),
             CheckKind::DocstringEndsInNonPeriod => {
                 "First line should end with a period".to_string()
             }
