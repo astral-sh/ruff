@@ -1,0 +1,32 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UnnecessaryLiteralWithinTupleCall: list
+  location:
+    row: 1
+    column: 6
+  end_location:
+    row: 1
+    column: 19
+  fix: ~
+- kind:
+    UnnecessaryLiteralWithinTupleCall: tuple
+  location:
+    row: 2
+    column: 6
+  end_location:
+    row: 2
+    column: 19
+  fix: ~
+- kind:
+    UnnecessaryLiteralWithinTupleCall: list
+  location:
+    row: 3
+    column: 6
+  end_location:
+    row: 3
+    column: 15
+  fix: ~
+
