@@ -1888,6 +1888,12 @@ impl<'a> Checker<'a> {
         }
     }
 
+    fn check_docstrings(&mut self) {
+        while let Some(docstring) = self.docstrings.pop() {
+            docstrings::docstring_empty(self, &docstring);
+        }
+    }
+
     fn check_builtin_shadowing(&mut self, name: &str, location: Range, is_attribute: bool) {
         let scope = self.current_scope();
 
@@ -1954,6 +1960,9 @@ pub fn check_ast(
     checker.scope_stack = vec![GLOBAL_SCOPE_INDEX];
     checker.pop_scope();
     checker.check_dead_scopes();
+
+    // Check docstrings.
+    checker.check_docstrings();
 
     checker.checks
 }
