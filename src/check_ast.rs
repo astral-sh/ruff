@@ -1893,6 +1893,15 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::D200) {
                 docstrings::one_liner(self, &docstring);
             }
+            if self.settings.enabled.contains(&CheckCode::D205) {
+                docstrings::blank_after_summary(self, &docstring);
+            }
+            if self.settings.enabled.contains(&CheckCode::D209) {
+                docstrings::newline_after_last_paragraph(self, &docstring);
+            }
+            if self.settings.enabled.contains(&CheckCode::D210) {
+                docstrings::no_surrounding_whitespace(self, &docstring);
+            }
             if self.settings.enabled.contains(&CheckCode::D400) {
                 docstrings::ends_with_period(self, &docstring);
             }

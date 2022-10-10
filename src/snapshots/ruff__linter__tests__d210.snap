@@ -1,0 +1,29 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: NoSurroundingWhitespace
+  location:
+    row: 283
+    column: 6
+  end_location:
+    row: 283
+    column: 34
+  fix: ~
+- kind: NoSurroundingWhitespace
+  location:
+    row: 288
+    column: 6
+  end_location:
+    row: 288
+    column: 38
+  fix: ~
+- kind: NoSurroundingWhitespace
+  location:
+    row: 294
+    column: 6
+  end_location:
+    row: 297
+    column: 8
+  fix: ~
+

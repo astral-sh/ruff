@@ -88,6 +88,83 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
     }
 }
 
+pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
+    if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.expr.node
+    {
+        let mut lines_count = 1;
+        let mut blanks_count = 0;
+        for line in string.trim().lines().skip(1) {
+            lines_count += 1;
+            if line.trim().is_empty() {
+                blanks_count += 1;
+            } else {
+                break;
+            }
+        }
+        if lines_count > 1 && blanks_count != 1 {
+            checker.add_check(Check::new(
+                CheckKind::BlankLineAfterSummary,
+                Range::from_located(docstring.expr),
+            ));
+        }
+    }
+}
+
+pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
+    if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.expr.node
+    {
+        let mut line_count = 0;
+        for line in string.lines() {
+            if !line.trim().is_empty() {
+                line_count += 1;
+            }
+            if line_count > 1 {
+                let content = checker
+                    .locator
+                    .slice_source_code_range(&Range::from_located(docstring.expr));
+                if let Some(line) = content.lines().last() {
+                    let line = line.trim();
+                    if line != "\"\"\"" && line != "'''" {
+                        checker.add_check(Check::new(
+                            CheckKind::NewLineAfterLastParagraph,
+                            Range::from_located(docstring.expr),
+                        ));
+                    }
+                }
+                return;
+            }
+        }
+    }
+}
+
+pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
+    if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.expr.node
+    {
+        let mut lines = string.lines();
+        if let Some(line) = lines.next() {
+            if line.trim().is_empty() {
+                return;
+            }
+
+            if line.starts_with(' ') || (matches!(lines.next(), None) && line.ends_with(' ')) {
+                checker.add_check(Check::new(
+                    CheckKind::NoSurroundingWhitespace,
+                    Range::from_located(docstring.expr),
+                ));
+            }
+        }
+    }
+}
+
 pub fn not_empty(checker: &mut Checker, docstring: &Docstring) {
     if let ExprKind::Constant {
         value: Constant::Str(string),

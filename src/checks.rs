@@ -152,6 +152,9 @@ pub enum CheckCode {
     U008,
     // pydocstyle
     D200,
+    D205,
+    D209,
+    D210,
     D400,
     D419,
     // Meta
@@ -252,6 +255,9 @@ pub enum CheckKind {
     SuperCallWithParameters,
     // pydocstyle
     OneLinerDocstring,
+    BlankLineAfterSummary,
+    NewLineAfterLastParagraph,
+    NoSurroundingWhitespace,
     EmptyDocstring,
     DocstringEndsInNonPeriod,
     // Meta
@@ -364,6 +370,9 @@ impl CheckCode {
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             // pydocstyle
             CheckCode::D200 => CheckKind::OneLinerDocstring,
+            CheckCode::D205 => CheckKind::BlankLineAfterSummary,
+            CheckCode::D209 => CheckKind::NewLineAfterLastParagraph,
+            CheckCode::D210 => CheckKind::NoSurroundingWhitespace,
             CheckCode::D400 => CheckKind::DocstringEndsInNonPeriod,
             CheckCode::D419 => CheckKind::EmptyDocstring,
             // Meta
@@ -455,6 +464,9 @@ impl CheckKind {
             CheckKind::SuperCallWithParameters => &CheckCode::U008,
             // pydocstyle
             CheckKind::OneLinerDocstring => &CheckCode::D200,
+            CheckKind::BlankLineAfterSummary => &CheckCode::D205,
+            CheckKind::NewLineAfterLastParagraph => &CheckCode::D209,
+            CheckKind::NoSurroundingWhitespace => &CheckCode::D210,
             CheckKind::DocstringEndsInNonPeriod => &CheckCode::D400,
             CheckKind::EmptyDocstring => &CheckCode::D419,
             // Meta
@@ -702,6 +714,15 @@ impl CheckKind {
             }
             // pydocstyle
             CheckKind::OneLinerDocstring => "One-line docstring should fit on one line".to_string(),
+            CheckKind::BlankLineAfterSummary => {
+                "1 blank line required between summary line and description".to_string()
+            }
+            CheckKind::NewLineAfterLastParagraph => {
+                "Multi-line docstring closing quotes should be on a separate line".to_string()
+            }
+            CheckKind::NoSurroundingWhitespace => {
+                "No whitespaces allowed surrounding docstring text".to_string()
+            }
             CheckKind::DocstringEndsInNonPeriod => {
                 "First line should end with a period".to_string()
             }

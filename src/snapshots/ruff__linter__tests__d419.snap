@@ -4,26 +4,26 @@ expression: checks
 ---
 - kind: EmptyDocstring
   location:
-    row: 1
-    column: 2
+    row: 19
+    column: 10
   end_location:
-    row: 1
-    column: 7
+    row: 19
+    column: 15
   fix: ~
 - kind: EmptyDocstring
   location:
-    row: 5
+    row: 69
     column: 6
   end_location:
-    row: 5
+    row: 69
+    column: 12
+  fix: ~
+- kind: EmptyDocstring
+  location:
+    row: 75
+    column: 10
+  end_location:
+    row: 75
     column: 11
-  fix: ~
-- kind: EmptyDocstring
-  location:
-    row: 9
-    column: 6
-  end_location:
-    row: 9
-    column: 7
   fix: ~
 

@@ -4,18 +4,138 @@ expression: checks
 ---
 - kind: DocstringEndsInNonPeriod
   location:
-    row: 9
+    row: 69
     column: 6
   end_location:
-    row: 12
+    row: 69
+    column: 12
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 124
+    column: 6
+  end_location:
+    row: 126
     column: 8
   fix: ~
 - kind: DocstringEndsInNonPeriod
   location:
-    row: 16
+    row: 283
     column: 6
   end_location:
-    row: 19
-    column: 8
+    row: 283
+    column: 34
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 288
+    column: 6
+  end_location:
+    row: 288
+    column: 38
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 350
+    column: 6
+  end_location:
+    row: 350
+    column: 18
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 401
+    column: 26
+  end_location:
+    row: 401
+    column: 40
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 405
+    column: 6
+  end_location:
+    row: 405
+    column: 25
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 411
+    column: 6
+  end_location:
+    row: 411
+    column: 25
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 417
+    column: 36
+  end_location:
+    row: 417
+    column: 50
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 424
+    column: 50
+  end_location:
+    row: 424
+    column: 64
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 465
+    column: 6
+  end_location:
+    row: 465
+    column: 25
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 470
+    column: 6
+  end_location:
+    row: 470
+    column: 25
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 475
+    column: 6
+  end_location:
+    row: 475
+    column: 25
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 482
+    column: 6
+  end_location:
+    row: 482
+    column: 25
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 504
+    column: 6
+  end_location:
+    row: 504
+    column: 35
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 509
+    column: 6
+  end_location:
+    row: 509
+    column: 34
+  fix: ~
+- kind: DocstringEndsInNonPeriod
+  location:
+    row: 515
+    column: 6
+  end_location:
+    row: 515
+    column: 33
   fix: ~
 
