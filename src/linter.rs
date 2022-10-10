@@ -991,18 +991,6 @@ mod tests {
     }
 
     #[test]
-    fn u008() -> Result<()> {
-        let mut checks = check_path(
-            Path::new("./resources/test/fixtures/U008.py"),
-            &settings::Settings::for_rule(CheckCode::U008),
-            &fixer::Mode::Generate,
-        )?;
-        checks.sort_by_key(|check| check.location);
-        insta::assert_yaml_snapshot!(checks);
-        Ok(())
-    }
-
-    #[test]
     fn t201() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/T201.py"),
@@ -1103,6 +1091,18 @@ mod tests {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/U007.py"),
             &settings::Settings::for_rule(CheckCode::U007),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn u008() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/U008.py"),
+            &settings::Settings::for_rule(CheckCode::U008),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);

@@ -217,6 +217,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (11/16)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
+- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (1/47)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (partial)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -303,6 +304,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations |  | 🛠 |
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations |  | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
+| D419 | EmptyDocstring | Docstring is empty |  |  |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations
