@@ -129,6 +129,7 @@ pub enum CheckCode {
     C405,
     C406,
     C408,
+    C409,
     C415,
     // flake8-super
     SPR001,
@@ -220,6 +221,7 @@ pub enum CheckKind {
     UnnecessaryLiteralSet(String),
     UnnecessaryLiteralDict(String),
     UnnecessaryCollectionCall(String),
+    UnnecessaryLiteralWithinTupleCall(String),
     UnnecessarySubscriptReversal(String),
     // flake8-super
     SuperCallWithParameters,
@@ -314,6 +316,9 @@ impl CheckCode {
             CheckCode::C408 => {
                 CheckKind::UnnecessaryCollectionCall("<dict/list/tuple>".to_string())
             }
+            CheckCode::C409 => {
+                CheckKind::UnnecessaryLiteralWithinTupleCall("<list/tuple>".to_string())
+            }
             CheckCode::C415 => {
                 CheckKind::UnnecessarySubscriptReversal("<reversed/set/sorted>".to_string())
             }
@@ -398,6 +403,7 @@ impl CheckKind {
             CheckKind::UnnecessaryLiteralSet(_) => &CheckCode::C405,
             CheckKind::UnnecessaryLiteralDict(_) => &CheckCode::C406,
             CheckKind::UnnecessaryCollectionCall(_) => &CheckCode::C408,
+            CheckKind::UnnecessaryLiteralWithinTupleCall(..) => &CheckCode::C409,
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
             // flake8-super
             CheckKind::SuperCallWithParameters => &CheckCode::SPR001,
@@ -584,6 +590,17 @@ impl CheckKind {
             }
             CheckKind::UnnecessaryCollectionCall(obj_type) => {
                 format!("Unnecessary {obj_type} call - rewrite as a literal")
+            }
+            CheckKind::UnnecessaryLiteralWithinTupleCall(literal) => {
+                if literal == "list" {
+                    format!(
+                        "Unnecessary {literal} literal passed to tuple() - rewrite as a tuple literal"
+                    )
+                } else {
+                    format!(
+                        "Unnecessary {literal} literal passed to tuple() - remove the outer call to tuple()"
+                    )
+                }
             }
             CheckKind::UnnecessarySubscriptReversal(func) => {
                 format!("Unnecessary subscript reversal of iterable within {func}()")
