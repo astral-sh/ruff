@@ -61,8 +61,7 @@ pub fn extract<'a, 'b>(
     None
 }
 
-pub fn docstring_empty(checker: &mut Checker, docstring: &Docstring) {
-    // Extract the source.
+pub fn not_empty(checker: &mut Checker, docstring: &Docstring) {
     if let ExprKind::Constant {
         value: Constant::Str(string),
         ..
@@ -73,6 +72,23 @@ pub fn docstring_empty(checker: &mut Checker, docstring: &Docstring) {
                 CheckKind::EmptyDocstring,
                 Range::from_located(docstring.expr),
             ));
+        }
+    }
+}
+
+pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
+    if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.expr.node
+    {
+        if let Some(string) = string.lines().next() {
+            if !string.ends_with('.') {
+                checker.add_check(Check::new(
+                    CheckKind::DocstringEndsInNonPeriod,
+                    Range::from_located(docstring.expr),
+                ));
+            }
         }
     }
 }
