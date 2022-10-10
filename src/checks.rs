@@ -227,7 +227,7 @@ pub enum CheckKind {
     TypeOfPrimitive(Primitive),
     UnnecessaryAbspath,
     UselessMetaclassType,
-    NoAssertEquals,
+    DeprecatedUnittestAlias(String, String),
     UselessObjectInheritance(String),
     UsePEP585Annotation(String),
     UsePEP604Annotation,
@@ -323,7 +323,10 @@ impl CheckCode {
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
             CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
             CheckCode::U004 => CheckKind::UselessObjectInheritance("...".to_string()),
-            CheckCode::U005 => CheckKind::NoAssertEquals,
+            CheckCode::U005 => CheckKind::DeprecatedUnittestAlias(
+                "assertEquals".to_string(),
+                "assertEqual".to_string(),
+            ),
             CheckCode::U006 => CheckKind::UsePEP585Annotation("List".to_string()),
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
@@ -403,7 +406,7 @@ impl CheckKind {
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
-            CheckKind::NoAssertEquals => &CheckCode::U005,
+            CheckKind::DeprecatedUnittestAlias(_, _) => &CheckCode::U005,
             CheckKind::UsePEP585Annotation(_) => &CheckCode::U006,
             CheckKind::UsePEP604Annotation => &CheckCode::U007,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
@@ -595,8 +598,8 @@ impl CheckKind {
                 "`abspath(__file__)` is unnecessary in Python 3.9 and later".to_string()
             }
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
-            CheckKind::NoAssertEquals => {
-                "`assertEquals` is deprecated, use `assertEqual` instead".to_string()
+            CheckKind::DeprecatedUnittestAlias(alias, target) => {
+                format!("`{}` is deprecated, use `{}` instead", alias, target)
             }
             CheckKind::UselessObjectInheritance(name) => {
                 format!("Class `{name}` inherits from object")
@@ -624,7 +627,7 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            CheckKind::NoAssertEquals
+            CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::SuperCallWithParameters

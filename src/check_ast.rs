@@ -726,7 +726,7 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::U005) {
-                    plugins::assert_equals(self, func);
+                    plugins::deprecated_unittest_alias(self, func);
                 }
 
                 // flake8-super

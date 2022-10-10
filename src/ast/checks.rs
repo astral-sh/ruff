@@ -361,23 +361,6 @@ pub fn check_duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
     checks
 }
 
-/// Check AssertEquals compliance.
-pub fn check_assert_equals(expr: &Expr) -> Option<Check> {
-    if let ExprKind::Attribute { value, attr, .. } = &expr.node {
-        if attr == "assertEquals" {
-            if let ExprKind::Name { id, .. } = &value.node {
-                if id == "self" {
-                    return Some(Check::new(
-                        CheckKind::NoAssertEquals,
-                        Range::from_located(expr),
-                    ));
-                }
-            }
-        }
-    }
-    None
-}
-
 #[derive(Debug, PartialEq)]
 enum DictionaryKey<'a> {
     Constant(&'a Constant),
