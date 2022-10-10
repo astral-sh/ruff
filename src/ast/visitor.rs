@@ -1,9 +1,10 @@
-use crate::ast::helpers::match_name_or_attr;
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern,
     PatternKind, Stmt, StmtKind, Unaryop, Withitem,
 };
+
+use crate::ast::helpers::match_name_or_attr;
 
 pub trait Visitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {

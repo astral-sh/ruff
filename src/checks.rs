@@ -1,10 +1,11 @@
+use std::str::FromStr;
+
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 use strum_macros::{AsRefStr, EnumIter, EnumString};
 
-use crate::ast::checks::Primitive;
+use crate::ast::checkers::Primitive;
 use crate::ast::types::Range;
 
 pub const DEFAULT_CHECK_CODES: [CheckCode; 43] = [

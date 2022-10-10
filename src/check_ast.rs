@@ -18,7 +18,7 @@ use crate::ast::types::{
     ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
-use crate::ast::{checks, helpers, operations, visitor};
+use crate::ast::{checkers, helpers, operations, visitor};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::plugins;
@@ -192,27 +192,24 @@ where
                 if self.settings.enabled.contains(&CheckCode::E741) {
                     let location = self.locate_check(Range::from_located(stmt));
                     self.checks.extend(
-                        names.iter().filter_map(|name| {
-                            checks::check_ambiguous_variable_name(name, location)
-                        }),
+                        names
+                            .iter()
+                            .filter_map(|name| checkers::ambiguous_variable_name(name, location)),
                     );
                 }
             }
             StmtKind::Break => {
                 if self.settings.enabled.contains(&CheckCode::F701) {
-                    if let Some(check) = checks::check_break_outside_loop(
-                        stmt,
-                        &self.parents,
-                        &self.parent_stack,
-                        self,
-                    ) {
+                    if let Some(check) =
+                        checkers::break_outside_loop(stmt, &self.parents, &self.parent_stack, self)
+                    {
                         self.checks.push(check);
                     }
                 }
             }
             StmtKind::Continue => {
                 if self.settings.enabled.contains(&CheckCode::F702) {
-                    if let Some(check) = checks::check_continue_outside_loop(
+                    if let Some(check) = checkers::continue_outside_loop(
                         stmt,
                         &self.parents,
                         &self.parent_stack,
@@ -237,7 +234,7 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::E743) {
-                    if let Some(check) = checks::check_ambiguous_function_name(
+                    if let Some(check) = checkers::ambiguous_function_name(
                         name,
                         self.locate_check(Range::from_located(stmt)),
                     ) {
@@ -325,7 +322,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E742) {
-                    if let Some(check) = checks::check_ambiguous_class_name(
+                    if let Some(check) = checkers::ambiguous_class_name(
                         name,
                         self.locate_check(Range::from_located(stmt)),
                     ) {
@@ -534,7 +531,7 @@ where
             StmtKind::Raise { exc, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F901) {
                     if let Some(expr) = exc {
-                        if let Some(check) = checks::check_raise_not_implemented(expr) {
+                        if let Some(check) = checkers::raise_not_implemented(expr) {
                             self.checks.push(check);
                         }
                     }
@@ -558,7 +555,7 @@ where
             }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
-                    if let Some(check) = checks::check_default_except_not_last(handlers) {
+                    if let Some(check) = checkers::default_except_not_last(handlers) {
                         self.checks.push(check);
                     }
                 }
@@ -570,7 +567,7 @@ where
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
-                    if let Some(check) = checks::check_do_not_assign_lambda(
+                    if let Some(check) = checkers::do_not_assign_lambda(
                         value,
                         self.locate_check(Range::from_located(stmt)),
                     ) {
@@ -584,7 +581,7 @@ where
             StmtKind::AnnAssign { value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
                     if let Some(value) = value {
-                        if let Some(check) = checks::check_do_not_assign_lambda(
+                        if let Some(check) = checkers::do_not_assign_lambda(
                             value,
                             self.locate_check(Range::from_located(stmt)),
                         ) {
@@ -701,7 +698,7 @@ where
                         self.settings.enabled.contains(&CheckCode::F621);
                     let check_two_starred_expressions =
                         self.settings.enabled.contains(&CheckCode::F622);
-                    if let Some(check) = checks::check_starred_expressions(
+                    if let Some(check) = checkers::starred_expressions(
                         elts,
                         check_too_many_expressions,
                         check_two_starred_expressions,
@@ -724,7 +721,7 @@ where
                 }
                 ExprContext::Store => {
                     if self.settings.enabled.contains(&CheckCode::E741) {
-                        if let Some(check) = checks::check_ambiguous_variable_name(
+                        if let Some(check) = checkers::ambiguous_variable_name(
                             id,
                             self.locate_check(Range::from_located(expr)),
                         ) {
@@ -774,26 +771,26 @@ where
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {
-                    if let Some(check) = checks::unnecessary_generator_list(expr, func, args) {
+                    if let Some(check) = checkers::unnecessary_generator_list(expr, func, args) {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C401) {
-                    if let Some(check) = checks::unnecessary_generator_set(expr, func, args) {
+                    if let Some(check) = checkers::unnecessary_generator_set(expr, func, args) {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C402) {
-                    if let Some(check) = checks::unnecessary_generator_dict(expr, func, args) {
+                    if let Some(check) = checkers::unnecessary_generator_dict(expr, func, args) {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C403) {
                     if let Some(check) =
-                        checks::unnecessary_list_comprehension_set(expr, func, args)
+                        checkers::unnecessary_list_comprehension_set(expr, func, args)
                     {
                         self.checks.push(check);
                     };
@@ -801,27 +798,27 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C404) {
                     if let Some(check) =
-                        checks::unnecessary_list_comprehension_dict(expr, func, args)
+                        checkers::unnecessary_list_comprehension_dict(expr, func, args)
                     {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C405) {
-                    if let Some(check) = checks::unnecessary_literal_set(expr, func, args) {
+                    if let Some(check) = checkers::unnecessary_literal_set(expr, func, args) {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C406) {
-                    if let Some(check) = checks::unnecessary_literal_dict(expr, func, args) {
+                    if let Some(check) = checkers::unnecessary_literal_dict(expr, func, args) {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C408) {
                     if let Some(check) =
-                        checks::unnecessary_collection_call(expr, func, args, keywords)
+                        checkers::unnecessary_collection_call(expr, func, args, keywords)
                     {
                         self.checks.push(check);
                     };
@@ -829,7 +826,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C409) {
                     if let Some(check) =
-                        checks::unnecessary_literal_within_tuple_call(expr, func, args)
+                        checkers::unnecessary_literal_within_tuple_call(expr, func, args)
                     {
                         self.checks.push(check);
                     };
@@ -837,13 +834,14 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C410) {
                     if let Some(check) =
-                        checks::unnecessary_literal_within_list_call(expr, func, args)
+                        checkers::unnecessary_literal_within_list_call(expr, func, args)
                     {
                         self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C415) {
-                    if let Some(check) = checks::unnecessary_subscript_reversal(expr, func, args) {
+                    if let Some(check) = checkers::unnecessary_subscript_reversal(expr, func, args)
+                    {
                         self.checks.push(check);
                     };
                 }
@@ -878,7 +876,7 @@ where
                 let check_repeated_literals = self.settings.enabled.contains(&CheckCode::F601);
                 let check_repeated_variables = self.settings.enabled.contains(&CheckCode::F602);
                 if check_repeated_literals || check_repeated_variables {
-                    self.checks.extend(checks::check_repeated_keys(
+                    self.checks.extend(checkers::repeated_keys(
                         keys,
                         check_repeated_literals,
                         check_repeated_variables,
@@ -930,7 +928,7 @@ where
                 let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
                 let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
                 if check_not_in || check_not_is {
-                    self.checks.extend(checks::check_not_tests(
+                    self.checks.extend(checkers::not_tests(
                         op,
                         operand,
                         check_not_in,
@@ -947,7 +945,7 @@ where
                 let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
                 let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
                 if check_none_comparisons || check_true_false_comparisons {
-                    self.checks.extend(checks::check_literal_comparisons(
+                    self.checks.extend(checkers::literal_comparisons(
                         left,
                         ops,
                         comparators,
@@ -958,7 +956,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::F632) {
-                    self.checks.extend(checks::check_is_literal(
+                    self.checks.extend(checkers::is_literal(
                         left,
                         ops,
                         comparators,
@@ -967,7 +965,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E721) {
-                    self.checks.extend(checks::check_type_comparison(
+                    self.checks.extend(checkers::type_comparison(
                         ops,
                         comparators,
                         self.locate_check(Range::from_located(expr)),
@@ -1194,7 +1192,7 @@ where
                 match name {
                     Some(name) => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) = checks::check_ambiguous_variable_name(
+                            if let Some(check) = checkers::ambiguous_variable_name(
                                 name,
                                 self.locate_check(Range::from_located(excepthandler)),
                             ) {
@@ -1262,8 +1260,7 @@ where
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
         if self.settings.enabled.contains(&CheckCode::F831) {
-            self.checks
-                .extend(checks::check_duplicate_arguments(arguments));
+            self.checks.extend(checkers::duplicate_arguments(arguments));
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them upstream.
@@ -1296,7 +1293,7 @@ where
         );
 
         if self.settings.enabled.contains(&CheckCode::E741) {
-            if let Some(check) = checks::check_ambiguous_variable_name(
+            if let Some(check) = checkers::ambiguous_variable_name(
                 &arg.node.arg,
                 self.locate_check(Range::from_located(arg)),
             ) {
@@ -1744,7 +1741,7 @@ impl<'a> Checker<'a> {
     fn check_deferred_assignments(&mut self) {
         if self.settings.enabled.contains(&CheckCode::F841) {
             while let Some(index) = self.deferred_assignments.pop() {
-                self.checks.extend(checks::check_unused_variables(
+                self.checks.extend(checkers::unused_variables(
                     &self.scopes[index],
                     self,
                     &self.settings.dummy_variable_rgx,
@@ -1899,19 +1896,19 @@ impl<'a> Checker<'a> {
         // flake8-builtins
         if is_attribute && matches!(scope.kind, ScopeKind::Class) {
             if self.settings.enabled.contains(&CheckCode::A003) {
-                if let Some(check) = checks::check_builtin_shadowing(
+                if let Some(check) = checkers::builtin_shadowing(
                     name,
                     self.locate_check(location),
-                    checks::ShadowingType::Attribute,
+                    checkers::ShadowingType::Attribute,
                 ) {
                     self.checks.push(check);
                 }
             }
         } else if self.settings.enabled.contains(&CheckCode::A001) {
-            if let Some(check) = checks::check_builtin_shadowing(
+            if let Some(check) = checkers::builtin_shadowing(
                 name,
                 self.locate_check(location),
-                checks::ShadowingType::Variable,
+                checkers::ShadowingType::Variable,
             ) {
                 self.checks.push(check);
             }
@@ -1920,10 +1917,10 @@ impl<'a> Checker<'a> {
 
     fn check_builtin_arg_shadowing(&mut self, name: &str, location: Range) {
         if self.settings.enabled.contains(&CheckCode::A002) {
-            if let Some(check) = checks::check_builtin_shadowing(
+            if let Some(check) = checkers::builtin_shadowing(
                 name,
                 self.locate_check(location),
-                checks::ShadowingType::Argument,
+                checkers::ShadowingType::Argument,
             ) {
                 self.checks.push(check);
             }
