@@ -625,7 +625,7 @@ impl CheckKind {
             CheckKind::DuplicateHandlerException(names) => {
                 if names.len() == 1 {
                     let name = &names[0];
-                    format!("Exception handler with duplicate exception: `{name}")
+                    format!("Exception handler with duplicate exception: `{name}`")
                 } else {
                     let names = names.iter().map(|name| format!("`{name}`")).join(", ");
                     format!("Exception handler with duplicate exceptions: {names}")
