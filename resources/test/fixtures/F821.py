@@ -122,3 +122,12 @@ class PEP593Test:
         dict["foo", "bar"],  # Expected to fail as undefined.
         123,
     ]
+
+
+def in_ipython_notebook() -> bool:
+    try:
+        # autoimported by notebooks
+        get_ipython()  # type: ignore[name-defined]
+    except NameError:
+        return False  # not in notebook
+    return True

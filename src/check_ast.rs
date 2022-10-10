@@ -10,7 +10,7 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast::helpers::{match_name_or_attr, SubscriptKind};
+use crate::ast::helpers::{extract_handler_names, match_name_or_attr, SubscriptKind};
 use crate::ast::operations::{extract_all_names, SourceCodeLocator};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -60,6 +60,7 @@ pub struct Checker<'a> {
     seen_docstring: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
+    except_handlers: Vec<Vec<&'a str>>,
 }
 
 impl<'a> Checker<'a> {
@@ -74,25 +75,26 @@ impl<'a> Checker<'a> {
             autofix,
             path,
             locator: SourceCodeLocator::new(content),
-            checks: vec![],
-            parents: vec![],
-            parent_stack: vec![],
-            scopes: vec![],
-            scope_stack: vec![],
-            dead_scopes: vec![],
-            deferred_string_annotations: vec![],
-            deferred_annotations: vec![],
-            deferred_functions: vec![],
-            deferred_lambdas: vec![],
-            deferred_assignments: vec![],
-            in_f_string: None,
-            in_annotation: false,
-            in_literal: false,
-            seen_non_import: false,
-            seen_docstring: false,
-            futures_allowed: true,
-            annotations_future_enabled: false,
+            checks: Default::default(),
             deletions: Default::default(),
+            parents: Default::default(),
+            parent_stack: Default::default(),
+            scopes: Default::default(),
+            scope_stack: Default::default(),
+            dead_scopes: Default::default(),
+            deferred_string_annotations: Default::default(),
+            deferred_annotations: Default::default(),
+            deferred_functions: Default::default(),
+            deferred_lambdas: Default::default(),
+            deferred_assignments: Default::default(),
+            in_f_string: None,
+            in_annotation: Default::default(),
+            in_literal: Default::default(),
+            seen_non_import: Default::default(),
+            seen_docstring: Default::default(),
+            futures_allowed: true,
+            annotations_future_enabled: Default::default(),
+            except_handlers: Default::default(),
         }
     }
 }
@@ -598,6 +600,27 @@ where
             }
             StmtKind::ClassDef { body, .. } => {
                 for stmt in body {
+                    self.visit_stmt(stmt);
+                }
+            }
+            StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => {
+                self.except_handlers.push(extract_handler_names(handlers));
+                for stmt in body {
+                    self.visit_stmt(stmt);
+                }
+                self.except_handlers.pop();
+                for excepthandler in handlers {
+                    self.visit_excepthandler(excepthandler)
+                }
+                for stmt in orelse {
+                    self.visit_stmt(stmt);
+                }
+                for stmt in finalbody {
                     self.visit_stmt(stmt);
                 }
             }
@@ -1486,6 +1509,14 @@ impl<'a> Checker<'a> {
                 if self.path.ends_with("__init__.py") && id == "__path__" {
                     return;
                 }
+
+                // Avoid flagging if NameError is handled.
+                if let Some(handler_names) = self.except_handlers.last() {
+                    if handler_names.contains(&"NameError") {
+                        return;
+                    }
+                }
+
                 self.checks.push(Check::new(
                     CheckKind::UndefinedName(id.clone()),
                     self.locate_check(Range::from_located(expr)),
