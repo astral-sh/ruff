@@ -78,6 +78,9 @@ pub struct Cli {
     // TODO(charlie): This should be a sub-command.
     #[arg(long, hide = true)]
     pub autoformat: bool,
+    /// File name to use when reading from stdin.
+    #[arg(long)]
+    pub stdin_filename: Option<String>,
 }
 
 pub enum Warnable {

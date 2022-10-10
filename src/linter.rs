@@ -83,6 +83,39 @@ pub(crate) fn check_path(
     Ok(checks)
 }
 
+pub fn lint_stdin(path: &str, stdin: &str, settings: &Settings) -> Result<Vec<Message>> {
+    // Tokenize once.
+    let tokens: Vec<LexResult> = tokenize(&stdin);
+
+    // Determine the noqa line for every line in the source.
+    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+
+    // Generate checks.
+    let path = Path::new(path);
+    let checks = check_path(
+        path,
+        &stdin,
+        tokens,
+        &noqa_line_for,
+        settings,
+        &fixer::Mode::None,
+    )?;
+
+    // Convert to messages.
+    let messages: Vec<Message> = checks
+        .into_iter()
+        .map(|check| Message {
+            kind: check.kind,
+            fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
+            location: check.location,
+            end_location: check.end_location,
+            filename: path.to_string_lossy().to_string(),
+        })
+        .collect();
+
+    Ok(messages)
+}
+
 pub fn lint_path(
     path: &Path,
     settings: &Settings,

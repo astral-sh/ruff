@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -19,7 +19,7 @@ use ruff::cli::{warn_on, Cli, Warnable};
 use ruff::fs::iter_python_files;
 use ruff::linter::add_noqa_to_path;
 use ruff::linter::autoformat_path;
-use ruff::linter::lint_path;
+use ruff::linter::{lint_path, lint_stdin};
 use ruff::logging::set_up_logging;
 use ruff::message::Message;
 use ruff::printer::{Printer, SerializationFormat};
@@ -73,6 +73,19 @@ fn show_files(files: &[PathBuf], settings: &Settings) {
     for entry in entries {
         println!("{}", entry.path().to_string_lossy());
     }
+}
+
+fn read_from_stdin() -> Result<String> {
+    let mut buffer = String::new();
+    io::stdin().lock().read_to_string(&mut buffer)?;
+    Ok(buffer)
+}
+
+fn run_once_stdin(settings: &Settings, filename: &str) -> Result<Vec<Message>> {
+    let stdin = read_from_stdin()?;
+    let mut messages = lint_stdin(filename, &stdin, settings)?;
+    messages.sort_unstable();
+    return Ok(messages);
 }
 
 fn run_once(
@@ -352,7 +365,14 @@ fn inner_main() -> Result<ExitCode> {
             println!("Formatted {modifications} files.");
         }
     } else {
-        let messages = run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?;
+        let messages = if cli.files == vec![PathBuf::from("-")] {
+            run_once_stdin(
+                &settings,
+                &cli.stdin_filename.unwrap_or("(stdin)".to_string()),
+            )?
+        } else {
+            run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?
+        };
         if !cli.quiet {
             printer.write_once(&messages)?;
         }
