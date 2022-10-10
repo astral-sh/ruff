@@ -220,7 +220,7 @@ pub enum CheckKind {
     BuiltinAttributeShadowing(String),
     // flake8-bugbear
     DoNotAssertFalse,
-    DuplicateHandlerException(String),
+    DuplicateHandlerException(Vec<String>),
     DuplicateTryBlockException(String),
     // flake8-comprehensions
     UnnecessaryGeneratorList,
@@ -317,7 +317,7 @@ impl CheckCode {
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-bugbear
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
-            CheckCode::B014 => CheckKind::DuplicateHandlerException("Exception".to_string()),
+            CheckCode::B014 => CheckKind::DuplicateHandlerException(vec!["ValueError".to_string()]),
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
@@ -594,8 +594,14 @@ impl CheckKind {
                 "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
                     .to_string()
             }
-            CheckKind::DuplicateHandlerException(name) => {
-                format!("Exception handler with duplicate exception `{name}`")
+            CheckKind::DuplicateHandlerException(names) => {
+                if names.len() == 1 {
+                    let name = &names[0];
+                    format!("Exception handler with duplicate exception: `{name}")
+                } else {
+                    let names = names.iter().map(|name| format!("`{name}`")).join(", ");
+                    format!("Exception handler with duplicate exceptions: {names}")
+                }
             }
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
@@ -704,6 +710,7 @@ impl CheckKind {
             self,
             CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::DoNotAssertFalse
+                | CheckKind::DuplicateHandlerException(_)
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::SuperCallWithParameters

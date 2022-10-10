@@ -1,37 +1,69 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Stmt};
 
 use crate::ast::helpers;
 use crate::ast::types::{CheckLocator, Range};
+use crate::autofix::fixer;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind, Fix};
+use crate::code_gen::SourceGenerator;
+
+fn type_pattern(elts: Vec<&Expr>) -> Expr {
+    Expr::new(
+        Default::default(),
+        Default::default(),
+        ExprKind::Tuple {
+            elts: elts.into_iter().cloned().collect(),
+            ctx: ExprContext::Load,
+        },
+    )
+}
 
 pub fn duplicate_handler_exceptions(
     checker: &mut Checker,
-    stmt: &Stmt,
+    expr: &Expr,
     elts: &Vec<Expr>,
 ) -> BTreeSet<String> {
     let mut seen: BTreeSet<String> = Default::default();
     let mut duplicates: BTreeSet<String> = Default::default();
+    let mut unique_elts: Vec<&Expr> = Default::default();
     for type_ in elts {
         if let Some(name) = helpers::compose_call_path(type_) {
             if seen.contains(&name) {
                 duplicates.insert(name);
             } else {
                 seen.insert(name);
+                unique_elts.push(type_);
             }
         }
     }
 
     if checker.settings.enabled.contains(&CheckCode::B014) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
-        for duplicate in duplicates.into_iter().sorted() {
-            checker.add_check(Check::new(
-                CheckKind::DuplicateHandlerException(duplicate),
-                checker.locate_check(Range::from_located(stmt)),
-            ));
+        if !duplicates.is_empty() {
+            let mut check = Check::new(
+                CheckKind::DuplicateHandlerException(
+                    duplicates.into_iter().sorted().collect::<Vec<String>>(),
+                ),
+                checker.locate_check(Range::from_located(expr)),
+            );
+            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                // TODO(charlie): If we have a single element, remove the tuple.
+                let mut generator = SourceGenerator::new();
+                if let Ok(()) = generator.unparse_expr(&type_pattern(unique_elts), 0) {
+                    if let Ok(content) = generator.generate() {
+                        check.amend(Fix {
+                            content,
+                            location: expr.location,
+                            end_location: expr.end_location,
+                            applied: false,
+                        })
+                    }
+                }
+            }
+            checker.add_check(check);
         }
     }
 
@@ -56,7 +88,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Exce
                             }
                         }
                         ExprKind::Tuple { elts, .. } => {
-                            for name in duplicate_handler_exceptions(checker, stmt, elts) {
+                            for name in duplicate_handler_exceptions(checker, type_, elts) {
                                 if seen.contains(&name) {
                                     duplicates.insert(name);
                                 } else {

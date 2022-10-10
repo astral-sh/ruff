@@ -3,30 +3,57 @@ source: src/linter.rs
 expression: checks
 ---
 - kind:
-    DuplicateHandlerException: OSError
+    DuplicateHandlerException:
+      - OSError
   location:
-    row: 15
-    column: 1
+    row: 17
+    column: 9
   end_location:
-    row: 22
-    column: 1
-  fix: ~
+    row: 17
+    column: 25
+  fix:
+    content: "OSError,"
+    location:
+      row: 17
+      column: 9
+    end_location:
+      row: 17
+      column: 25
+    applied: false
 - kind:
-    DuplicateHandlerException: MyError
+    DuplicateHandlerException:
+      - MyError
   location:
-    row: 26
-    column: 1
+    row: 28
+    column: 9
   end_location:
-    row: 33
-    column: 1
-  fix: ~
+    row: 28
+    column: 25
+  fix:
+    content: "MyError,"
+    location:
+      row: 28
+      column: 9
+    end_location:
+      row: 28
+      column: 25
+    applied: false
 - kind:
-    DuplicateHandlerException: re.error
+    DuplicateHandlerException:
+      - re.error
   location:
-    row: 47
-    column: 1
+    row: 49
+    column: 9
   end_location:
-    row: 54
-    column: 1
-  fix: ~
+    row: 49
+    column: 27
+  fix:
+    content: "re.error,"
+    location:
+      row: 49
+      column: 9
+    end_location:
+      row: 49
+      column: 27
+    applied: false
 
