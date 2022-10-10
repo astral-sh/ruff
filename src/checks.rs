@@ -130,8 +130,6 @@ pub enum CheckCode {
     C406,
     C408,
     C415,
-    // flake8-super
-    SPR001,
     // flake8-print
     T201,
     T203,
@@ -143,6 +141,7 @@ pub enum CheckCode {
     U005,
     U006,
     U007,
+    U008,
     // Meta
     M001,
 }
@@ -221,8 +220,6 @@ pub enum CheckKind {
     UnnecessaryLiteralDict(String),
     UnnecessaryCollectionCall(String),
     UnnecessarySubscriptReversal(String),
-    // flake8-super
-    SuperCallWithParameters,
     // flake8-print
     PrintFound,
     PPrintFound,
@@ -234,6 +231,7 @@ pub enum CheckKind {
     UselessObjectInheritance(String),
     UsePEP585Annotation(String),
     UsePEP604Annotation,
+    SuperCallWithParameters,
     // Meta
     UnusedNOQA(Option<String>),
 }
@@ -317,8 +315,6 @@ impl CheckCode {
             CheckCode::C415 => {
                 CheckKind::UnnecessarySubscriptReversal("<reversed/set/sorted>".to_string())
             }
-            // flake8-super
-            CheckCode::SPR001 => CheckKind::SuperCallWithParameters,
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
@@ -330,6 +326,7 @@ impl CheckCode {
             CheckCode::U005 => CheckKind::NoAssertEquals,
             CheckCode::U006 => CheckKind::UsePEP585Annotation("List".to_string()),
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
+            CheckCode::U008 => CheckKind::SuperCallWithParameters,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -399,8 +396,6 @@ impl CheckKind {
             CheckKind::UnnecessaryLiteralDict(_) => &CheckCode::C406,
             CheckKind::UnnecessaryCollectionCall(_) => &CheckCode::C408,
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
-            // flake8-super
-            CheckKind::SuperCallWithParameters => &CheckCode::SPR001,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
@@ -412,6 +407,7 @@ impl CheckKind {
             CheckKind::UsePEP585Annotation(_) => &CheckCode::U006,
             CheckKind::UsePEP604Annotation => &CheckCode::U007,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
+            CheckKind::SuperCallWithParameters => &CheckCode::U008,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -588,10 +584,6 @@ impl CheckKind {
             CheckKind::UnnecessarySubscriptReversal(func) => {
                 format!("Unnecessary subscript reversal of iterable within {func}()")
             }
-            // flake8-super
-            CheckKind::SuperCallWithParameters => {
-                "Use `super()` instead of `super(__class__, self)`".to_string()
-            }
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),
@@ -617,6 +609,9 @@ impl CheckKind {
                 )
             }
             CheckKind::UsePEP604Annotation => "Use `X | Y` for type annotations".to_string(),
+            CheckKind::SuperCallWithParameters => {
+                "Use `super()` instead of `super(__class__, self)`".to_string()
+            }
             // Meta
             CheckKind::UnusedNOQA(code) => match code {
                 None => "Unused `noqa` directive".to_string(),
