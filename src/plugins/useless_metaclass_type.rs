@@ -1,7 +1,7 @@
 use log::error;
 use rustpython_ast::{Expr, Stmt};
 
-use crate::ast::checks;
+use crate::ast::checkers;
 use crate::ast::types::{CheckLocator, Range};
 use crate::autofix::{fixer, fixes};
 use crate::check_ast::Checker;
@@ -12,7 +12,7 @@ pub fn useless_metaclass_type(
     value: &Expr,
     targets: &Vec<Expr>,
 ) {
-    if let Some(mut check) = checks::check_useless_metaclass_type(
+    if let Some(mut check) = checkers::useless_metaclass_type(
         targets,
         value,
         checker.locate_check(Range::from_located(stmt)),

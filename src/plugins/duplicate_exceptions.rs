@@ -1,6 +1,6 @@
-use itertools::Itertools;
 use std::collections::BTreeSet;
 
+use itertools::Itertools;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt};
 
 use crate::ast::helpers;

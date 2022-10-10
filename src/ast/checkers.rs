@@ -17,7 +17,7 @@ use crate::checks::{Check, CheckKind, RejectedCmpop};
 use crate::python::builtins::BUILTINS;
 
 /// Check IfTuple compliance.
-pub fn check_if_tuple(test: &Expr, location: Range) -> Option<Check> {
+pub fn if_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
         if !elts.is_empty() {
             return Some(Check::new(CheckKind::IfTuple, location));
@@ -27,7 +27,7 @@ pub fn check_if_tuple(test: &Expr, location: Range) -> Option<Check> {
 }
 
 /// Check AssertTuple compliance.
-pub fn check_assert_tuple(test: &Expr, location: Range) -> Option<Check> {
+pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
         if !elts.is_empty() {
             return Some(Check::new(CheckKind::AssertTuple, location));
@@ -37,7 +37,7 @@ pub fn check_assert_tuple(test: &Expr, location: Range) -> Option<Check> {
 }
 
 /// Check NotInTest and NotIsTest compliance.
-pub fn check_not_tests(
+pub fn not_tests(
     op: &Unaryop,
     operand: &Expr,
     check_not_in: bool,
@@ -76,7 +76,7 @@ pub fn check_not_tests(
 }
 
 /// Check UnusedVariable compliance.
-pub fn check_unused_variables(
+pub fn unused_variables(
     scope: &Scope,
     locator: &dyn CheckLocator,
     dummy_variable_rgx: &Regex,
@@ -109,7 +109,7 @@ pub fn check_unused_variables(
 }
 
 /// Check DoNotAssignLambda compliance.
-pub fn check_do_not_assign_lambda(value: &Expr, location: Range) -> Option<Check> {
+pub fn do_not_assign_lambda(value: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Lambda { .. } = &value.node {
         Some(Check::new(CheckKind::DoNotAssignLambda, location))
     } else {
@@ -118,11 +118,7 @@ pub fn check_do_not_assign_lambda(value: &Expr, location: Range) -> Option<Check
 }
 
 /// Check UselessMetaclassType compliance.
-pub fn check_useless_metaclass_type(
-    targets: &Vec<Expr>,
-    value: &Expr,
-    location: Range,
-) -> Option<Check> {
+pub fn useless_metaclass_type(targets: &Vec<Expr>, value: &Expr, location: Range) -> Option<Check> {
     if targets.len() == 1 {
         if let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() {
             if id == "__metaclass__" {
@@ -138,7 +134,7 @@ pub fn check_useless_metaclass_type(
 }
 
 /// Check UnnecessaryAbspath compliance.
-pub fn check_unnecessary_abspath(func: &Expr, args: &Vec<Expr>, location: Range) -> Option<Check> {
+pub fn unnecessary_abspath(func: &Expr, args: &Vec<Expr>, location: Range) -> Option<Check> {
     // Validate the arguments.
     if args.len() == 1 {
         if let ExprKind::Name { id, .. } = &args[0].node {
@@ -194,7 +190,7 @@ impl Primitive {
 }
 
 /// Check TypeOfPrimitive compliance.
-pub fn check_type_of_primitive(func: &Expr, args: &Vec<Expr>, location: Range) -> Option<Check> {
+pub fn type_of_primitive(func: &Expr, args: &Vec<Expr>, location: Range) -> Option<Check> {
     // Validate the arguments.
     if args.len() == 1 {
         match &func.node {
@@ -222,7 +218,7 @@ fn is_ambiguous_name(name: &str) -> bool {
 }
 
 /// Check AmbiguousVariableName compliance.
-pub fn check_ambiguous_variable_name(name: &str, location: Range) -> Option<Check> {
+pub fn ambiguous_variable_name(name: &str, location: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousVariableName(name.to_string()),
@@ -234,7 +230,7 @@ pub fn check_ambiguous_variable_name(name: &str, location: Range) -> Option<Chec
 }
 
 /// Check AmbiguousClassName compliance.
-pub fn check_ambiguous_class_name(name: &str, location: Range) -> Option<Check> {
+pub fn ambiguous_class_name(name: &str, location: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousClassName(name.to_string()),
@@ -246,7 +242,7 @@ pub fn check_ambiguous_class_name(name: &str, location: Range) -> Option<Check> 
 }
 
 /// Check AmbiguousFunctionName compliance.
-pub fn check_ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
+pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousFunctionName(name.to_string()),
@@ -258,11 +254,7 @@ pub fn check_ambiguous_function_name(name: &str, location: Range) -> Option<Chec
 }
 
 /// Check UselessObjectInheritance compliance.
-pub fn check_useless_object_inheritance(
-    name: &str,
-    bases: &[Expr],
-    scope: &Scope,
-) -> Option<Check> {
+pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> Option<Check> {
     for expr in bases {
         if let ExprKind::Name { id, .. } = &expr.node {
             if id == "object" {
@@ -287,7 +279,7 @@ pub fn check_useless_object_inheritance(
 }
 
 /// Check DefaultExceptNotLast compliance.
-pub fn check_default_except_not_last(handlers: &Vec<Excepthandler>) -> Option<Check> {
+pub fn default_except_not_last(handlers: &Vec<Excepthandler>) -> Option<Check> {
     for (idx, handler) in handlers.iter().enumerate() {
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
         if type_.is_none() && idx < handlers.len() - 1 {
@@ -302,7 +294,7 @@ pub fn check_default_except_not_last(handlers: &Vec<Excepthandler>) -> Option<Ch
 }
 
 /// Check RaiseNotImplemented compliance.
-pub fn check_raise_not_implemented(expr: &Expr) -> Option<Check> {
+pub fn raise_not_implemented(expr: &Expr) -> Option<Check> {
     match &expr.node {
         ExprKind::Call { func, .. } => {
             if let ExprKind::Name { id, .. } = &func.node {
@@ -329,7 +321,7 @@ pub fn check_raise_not_implemented(expr: &Expr) -> Option<Check> {
 }
 
 /// Check DuplicateArgumentName compliance.
-pub fn check_duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
+pub fn duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
     // Collect all the arguments into a single vector.
@@ -377,7 +369,7 @@ fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {
 }
 
 /// Check MultiValueRepeatedKeyLiteral and MultiValueRepeatedKeyVariable compliance.
-pub fn check_repeated_keys(
+pub fn repeated_keys(
     keys: &Vec<Expr>,
     check_repeated_literals: bool,
     check_repeated_variables: bool,
@@ -417,7 +409,7 @@ pub fn check_repeated_keys(
 }
 
 /// Check TrueFalseComparison and NoneComparison compliance.
-pub fn check_literal_comparisons(
+pub fn literal_comparisons(
     left: &Expr,
     ops: &Vec<Cmpop>,
     comparators: &Vec<Expr>,
@@ -548,7 +540,7 @@ fn is_constant_non_singleton(expr: &Expr) -> bool {
 }
 
 /// Check IsLiteral compliance.
-pub fn check_is_literal(
+pub fn is_literal(
     left: &Expr,
     ops: &Vec<Cmpop>,
     comparators: &Vec<Expr>,
@@ -570,11 +562,7 @@ pub fn check_is_literal(
 }
 
 /// Check TypeComparison compliance.
-pub fn check_type_comparison(
-    ops: &Vec<Cmpop>,
-    comparators: &Vec<Expr>,
-    location: Range,
-) -> Vec<Check> {
+pub fn type_comparison(ops: &Vec<Cmpop>, comparators: &Vec<Expr>, location: Range) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
     for (op, right) in izip!(ops, comparators) {
@@ -610,7 +598,7 @@ pub fn check_type_comparison(
 }
 
 /// Check TwoStarredExpressions and TooManyExpressionsInStarredAssignment compliance.
-pub fn check_starred_expressions(
+pub fn starred_expressions(
     elts: &[Expr],
     check_too_many_expressions: bool,
     check_two_starred_expressions: bool,
@@ -640,7 +628,7 @@ pub fn check_starred_expressions(
 }
 
 /// Check BreakOutsideLoop compliance.
-pub fn check_break_outside_loop(
+pub fn break_outside_loop(
     stmt: &Stmt,
     parents: &[&Stmt],
     parent_stack: &[usize],
@@ -681,7 +669,7 @@ pub fn check_break_outside_loop(
 }
 
 /// Check ContinueOutsideLoop compliance.
-pub fn check_continue_outside_loop(
+pub fn continue_outside_loop(
     stmt: &Stmt,
     parents: &[&Stmt],
     parent_stack: &[usize],
@@ -729,11 +717,7 @@ pub enum ShadowingType {
 }
 
 /// Check builtin name shadowing
-pub fn check_builtin_shadowing(
-    name: &str,
-    location: Range,
-    node_type: ShadowingType,
-) -> Option<Check> {
+pub fn builtin_shadowing(name: &str, location: Range, node_type: ShadowingType) -> Option<Check> {
     if BUILTINS.contains(&name) {
         Some(Check::new(
             match node_type {
@@ -1060,7 +1044,7 @@ pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -
 
 // flake8-super
 /// Check that `super()` has no args
-pub fn check_super_args(
+pub fn super_args(
     scope: &Scope,
     parents: &[&Stmt],
     expr: &Expr,
@@ -1126,7 +1110,7 @@ pub fn check_super_args(
 
 // flake8-print
 /// Check whether a function call is a `print` or `pprint` invocation
-pub fn check_print_call(
+pub fn print_call(
     expr: &Expr,
     func: &Expr,
     check_print: bool,
