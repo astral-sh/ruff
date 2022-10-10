@@ -4,34 +4,34 @@ expression: checks
 ---
 - kind: NoAssertEquals
   location:
-    row: 1
-    column: 1
+    row: 6
+    column: 9
   end_location:
-    row: 1
-    column: 18
+    row: 6
+    column: 26
   fix:
-    content: assertEqual
+    content: self.assertEqual
     location:
-      row: 1
-      column: 2
+      row: 6
+      column: 9
     end_location:
-      row: 1
-      column: 14
+      row: 6
+      column: 26
     applied: false
 - kind: NoAssertEquals
   location:
-    row: 2
-    column: 1
+    row: 7
+    column: 9
   end_location:
-    row: 2
-    column: 18
+    row: 7
+    column: 26
   fix:
-    content: assertEqual
+    content: self.assertEqual
     location:
-      row: 2
-      column: 2
+      row: 7
+      column: 9
     end_location:
-      row: 2
-      column: 14
+      row: 7
+      column: 26
     applied: false
 
