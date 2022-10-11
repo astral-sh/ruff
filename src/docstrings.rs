@@ -5,22 +5,21 @@ use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 
 #[derive(Debug)]
-pub enum DocstringKind {
+pub enum DocstringKind<'a> {
     Module,
-    Function,
-    Class,
+    Function(&'a Stmt),
+    Class(&'a Stmt),
 }
 
 #[derive(Debug)]
 pub struct Docstring<'a> {
-    pub kind: DocstringKind,
-    pub parent: Option<&'a Stmt>,
+    pub kind: DocstringKind<'a>,
     pub expr: &'a Expr,
 }
 
 /// Extract a `Docstring` from an `Expr`.
 pub fn extract<'a, 'b>(
-    checker: &'a Checker,
+    checker: &'a Checker<'b>,
     stmt: &'b Stmt,
     expr: &'b Expr,
 ) -> Option<Docstring<'b>> {
@@ -33,7 +32,6 @@ pub fn extract<'a, 'b>(
             if checker.initial {
                 return Some(Docstring {
                     kind: DocstringKind::Module,
-                    parent: None,
                     expr,
                 });
             }
@@ -46,11 +44,10 @@ pub fn extract<'a, 'b>(
                 if body.first().map(|node| node == stmt).unwrap_or_default() {
                     return Some(Docstring {
                         kind: if matches!(&parent.node, StmtKind::ClassDef { .. }) {
-                            DocstringKind::Class
+                            DocstringKind::Class(parent)
                         } else {
-                            DocstringKind::Function
+                            DocstringKind::Function(parent)
                         },
-                        parent: None,
                         expr,
                     });
                 }
@@ -257,9 +254,28 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
     }
 }
 
+/// D402
+pub fn no_signature(checker: &mut Checker, docstring: &Docstring) {
+    if let DocstringKind::Function(parent) = docstring.kind {
+        if let StmtKind::FunctionDef { name, .. } = &parent.node {
+            if let ExprKind::Constant {
+                value: Constant::Str(string),
+                ..
+            } = &docstring.expr.node
+            {
+                if let Some(first_line) = string.lines().next() {
+                    if first_line.contains(&format!("{name}(")) {
+                        checker.add_check(Check::new(CheckKind::NoSignature, range_for(docstring)));
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// D403
 pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
-    if !matches!(docstring.kind, DocstringKind::Function) {
+    if !matches!(docstring.kind, DocstringKind::Function(_)) {
         return;
     }
 

@@ -1105,6 +1105,18 @@ mod tests {
     }
 
     #[test]
+    fn d402() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/D.py"),
+            &settings::Settings::for_rule(CheckCode::D402),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn d403() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/D.py"),
