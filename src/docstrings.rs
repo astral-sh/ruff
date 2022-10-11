@@ -308,14 +308,18 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
 }
 
 /// D419
-pub fn not_empty(checker: &mut Checker, docstring: &Docstring) {
+pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
     if let ExprKind::Constant {
         value: Constant::Str(string),
         ..
     } = &docstring.expr.node
     {
         if string.trim().is_empty() {
-            checker.add_check(Check::new(CheckKind::NonEmpty, range_for(docstring)));
+            if checker.settings.enabled.contains(&CheckCode::D419) {
+                checker.add_check(Check::new(CheckKind::NonEmpty, range_for(docstring)));
+            }
+            return false;
         }
     }
+    true
 }

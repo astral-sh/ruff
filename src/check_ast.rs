@@ -1890,6 +1890,9 @@ impl<'a> Checker<'a> {
 
     fn check_docstrings(&mut self) {
         while let Some(docstring) = self.docstrings.pop() {
+            if !docstrings::not_empty(self, &docstring) {
+                continue;
+            }
             if self.settings.enabled.contains(&CheckCode::D200) {
                 docstrings::one_liner(self, &docstring);
             }
@@ -1918,9 +1921,6 @@ impl<'a> Checker<'a> {
             }
             if self.settings.enabled.contains(&CheckCode::D415) {
                 docstrings::ends_with_punctuation(self, &docstring);
-            }
-            if self.settings.enabled.contains(&CheckCode::D419) {
-                docstrings::not_empty(self, &docstring);
             }
         }
     }
