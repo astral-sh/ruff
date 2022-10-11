@@ -41,7 +41,7 @@ fn test_stdin_autofix() -> Result<()> {
         .args(&["-", "--fix"])
         .write_stdin("import os\n")
         .assert()
-        .success();
-    assert!(str::from_utf8(&output.get_output().stdout)?.contains("Found 0 error(s) (1 fixed)"));
+        .failure();
+    assert!(str::from_utf8(&output.get_output().stdout)?.contains("-:1:1: F401"));
     Ok(())
 }

@@ -8,7 +8,7 @@ use rustpython_parser::{lexer, parser};
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
-use crate::autofix::fixer::{apply_fixes, fix_file};
+use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
@@ -83,12 +83,7 @@ pub(crate) fn check_path(
     Ok(checks)
 }
 
-pub fn lint_stdin(
-    path: &str,
-    stdin: &str,
-    settings: &Settings,
-    autofix: &fixer::Mode,
-) -> Result<Vec<Message>> {
+pub fn lint_stdin(path: &Path, stdin: &str, settings: &Settings) -> Result<Vec<Message>> {
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(stdin);
 
@@ -96,19 +91,17 @@ pub fn lint_stdin(
     let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
     // Generate checks.
-    let path = Path::new(path);
-    let mut checks = check_path(path, stdin, tokens, &noqa_line_for, settings, autofix)?;
-
-    // Apply autofix.
-    if matches!(autofix, fixer::Mode::Apply) {
-        apply_fixes(
-            checks.iter_mut().filter_map(|check| check.fix.as_mut()),
-            stdin,
-        );
-    };
+    let checks = check_path(
+        path,
+        stdin,
+        tokens,
+        &noqa_line_for,
+        settings,
+        &fixer::Mode::None,
+    )?;
 
     // Convert to messages.
-    let messages: Vec<Message> = checks
+    Ok(checks
         .into_iter()
         .map(|check| Message {
             kind: check.kind,
@@ -117,9 +110,7 @@ pub fn lint_stdin(
             end_location: check.end_location,
             filename: path.to_string_lossy().to_string(),
         })
-        .collect();
-
-    Ok(messages)
+        .collect())
 }
 
 pub fn lint_path(

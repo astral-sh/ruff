@@ -38,7 +38,7 @@ pub fn fix_file(checks: &mut [Check], contents: &str, path: &Path) -> Result<()>
 }
 
 /// Apply a series of fixes.
-pub fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> String {
+fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> String {
     let lines: Vec<&str> = contents.lines().collect();
 
     let mut output = "".to_string();
