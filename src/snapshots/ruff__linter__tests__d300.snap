@@ -2,15 +2,7 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: TripleQuotes
-  location:
-    row: 75
-    column: 9
-  end_location:
-    row: 75
-    column: 11
-  fix: ~
-- kind: TripleQuotes
+- kind: UsesTripleQuotes
   location:
     row: 302
     column: 6
@@ -18,7 +10,7 @@ expression: checks
     row: 302
     column: 20
   fix: ~
-- kind: TripleQuotes
+- kind: UsesTripleQuotes
   location:
     row: 307
     column: 6
@@ -26,7 +18,7 @@ expression: checks
     row: 307
     column: 20
   fix: ~
-- kind: TripleQuotes
+- kind: UsesTripleQuotes
   location:
     row: 312
     column: 6
@@ -34,7 +26,7 @@ expression: checks
     row: 312
     column: 16
   fix: ~
-- kind: TripleQuotes
+- kind: UsesTripleQuotes
   location:
     row: 317
     column: 6
@@ -42,7 +34,7 @@ expression: checks
     row: 317
     column: 16
   fix: ~
-- kind: TripleQuotes
+- kind: UsesTripleQuotes
   location:
     row: 323
     column: 6

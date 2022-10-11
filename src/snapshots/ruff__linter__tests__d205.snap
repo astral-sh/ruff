@@ -2,7 +2,7 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: BlankLineAfterSummary
+- kind: NoBlankLineAfterSummary
   location:
     row: 195
     column: 5
@@ -10,7 +10,7 @@ expression: checks
     row: 198
     column: 8
   fix: ~
-- kind: BlankLineAfterSummary
+- kind: NoBlankLineAfterSummary
   location:
     row: 205
     column: 5

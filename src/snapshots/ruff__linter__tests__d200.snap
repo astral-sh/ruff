@@ -2,7 +2,7 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: OneLinerDocstring
+- kind: FitsOnOneLine
   location:
     row: 124
     column: 5
