@@ -2,12 +2,12 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: NewLineAfterLastParagraph
+- kind: MultiLineSummaryFirstLine
   location:
-    row: 276
+    row: 124
     column: 5
   end_location:
-    row: 278
-    column: 20
+    row: 126
+    column: 8
   fix: ~
 

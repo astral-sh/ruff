@@ -5,7 +5,7 @@ expression: checks
 - kind: NoSurroundingWhitespace
   location:
     row: 283
-    column: 6
+    column: 5
   end_location:
     row: 283
     column: 34
@@ -13,7 +13,7 @@ expression: checks
 - kind: NoSurroundingWhitespace
   location:
     row: 288
-    column: 6
+    column: 5
   end_location:
     row: 288
     column: 38
@@ -21,7 +21,7 @@ expression: checks
 - kind: NoSurroundingWhitespace
   location:
     row: 294
-    column: 6
+    column: 5
   end_location:
     row: 297
     column: 8

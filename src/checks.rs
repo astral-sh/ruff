@@ -155,7 +155,12 @@ pub enum CheckCode {
     D205,
     D209,
     D210,
+    D212,
+    D213,
+    D300,
     D400,
+    D403,
+    D415,
     D419,
     // Meta
     M001,
@@ -254,12 +259,17 @@ pub enum CheckKind {
     UsePEP604Annotation,
     SuperCallWithParameters,
     // pydocstyle
-    OneLinerDocstring,
-    BlankLineAfterSummary,
+    EndsInPeriod,
+    EndsInPunctuation,
+    FirstLineCapitalized,
+    FitsOnOneLine,
+    MultiLineSummaryFirstLine,
+    MultiLineSummarySecondLine,
     NewLineAfterLastParagraph,
+    NoBlankLineAfterSummary,
     NoSurroundingWhitespace,
-    EmptyDocstring,
-    DocstringEndsInNonPeriod,
+    NonEmpty,
+    UsesTripleQuotes,
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -369,12 +379,17 @@ impl CheckCode {
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             // pydocstyle
-            CheckCode::D200 => CheckKind::OneLinerDocstring,
-            CheckCode::D205 => CheckKind::BlankLineAfterSummary,
+            CheckCode::D200 => CheckKind::FitsOnOneLine,
+            CheckCode::D205 => CheckKind::NoBlankLineAfterSummary,
             CheckCode::D209 => CheckKind::NewLineAfterLastParagraph,
             CheckCode::D210 => CheckKind::NoSurroundingWhitespace,
-            CheckCode::D400 => CheckKind::DocstringEndsInNonPeriod,
-            CheckCode::D419 => CheckKind::EmptyDocstring,
+            CheckCode::D400 => CheckKind::EndsInPeriod,
+            CheckCode::D419 => CheckKind::NonEmpty,
+            CheckCode::D212 => CheckKind::MultiLineSummaryFirstLine,
+            CheckCode::D213 => CheckKind::MultiLineSummarySecondLine,
+            CheckCode::D300 => CheckKind::UsesTripleQuotes,
+            CheckCode::D403 => CheckKind::FirstLineCapitalized,
+            CheckCode::D415 => CheckKind::EndsInPunctuation,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -463,12 +478,17 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             CheckKind::SuperCallWithParameters => &CheckCode::U008,
             // pydocstyle
-            CheckKind::OneLinerDocstring => &CheckCode::D200,
-            CheckKind::BlankLineAfterSummary => &CheckCode::D205,
+            CheckKind::FitsOnOneLine => &CheckCode::D200,
+            CheckKind::NoBlankLineAfterSummary => &CheckCode::D205,
             CheckKind::NewLineAfterLastParagraph => &CheckCode::D209,
             CheckKind::NoSurroundingWhitespace => &CheckCode::D210,
-            CheckKind::DocstringEndsInNonPeriod => &CheckCode::D400,
-            CheckKind::EmptyDocstring => &CheckCode::D419,
+            CheckKind::EndsInPeriod => &CheckCode::D400,
+            CheckKind::NonEmpty => &CheckCode::D419,
+            CheckKind::MultiLineSummaryFirstLine => &CheckCode::D212,
+            CheckKind::MultiLineSummarySecondLine => &CheckCode::D213,
+            CheckKind::UsesTripleQuotes => &CheckCode::D300,
+            CheckKind::FirstLineCapitalized => &CheckCode::D403,
+            CheckKind::EndsInPunctuation => &CheckCode::D415,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -713,8 +733,8 @@ impl CheckKind {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
             // pydocstyle
-            CheckKind::OneLinerDocstring => "One-line docstring should fit on one line".to_string(),
-            CheckKind::BlankLineAfterSummary => {
+            CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
+            CheckKind::NoBlankLineAfterSummary => {
                 "1 blank line required between summary line and description".to_string()
             }
             CheckKind::NewLineAfterLastParagraph => {
@@ -723,10 +743,22 @@ impl CheckKind {
             CheckKind::NoSurroundingWhitespace => {
                 "No whitespaces allowed surrounding docstring text".to_string()
             }
-            CheckKind::DocstringEndsInNonPeriod => {
-                "First line should end with a period".to_string()
+            CheckKind::EndsInPeriod => "First line should end with a period".to_string(),
+            CheckKind::NonEmpty => "Docstring is empty".to_string(),
+            CheckKind::EndsInPunctuation => {
+                "First line should end with a period, question mark, or exclamation point"
+                    .to_string()
             }
-            CheckKind::EmptyDocstring => "Docstring is empty".to_string(),
+            CheckKind::FirstLineCapitalized => {
+                "First word of the first line should be properly capitalized".to_string()
+            }
+            CheckKind::UsesTripleQuotes => r#"Use """triple double quotes""""#.to_string(),
+            CheckKind::MultiLineSummaryFirstLine => {
+                "Multi-line docstring summary should start at the first line".to_string()
+            }
+            CheckKind::MultiLineSummarySecondLine => {
+                "Multi-line docstring summary should start at the second line".to_string()
+            }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),

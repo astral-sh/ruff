@@ -5,7 +5,7 @@ expression: checks
 - kind: BlankLineAfterSummary
   location:
     row: 195
-    column: 6
+    column: 5
   end_location:
     row: 198
     column: 8
@@ -13,7 +13,7 @@ expression: checks
 - kind: BlankLineAfterSummary
   location:
     row: 205
-    column: 6
+    column: 5
   end_location:
     row: 210
     column: 8

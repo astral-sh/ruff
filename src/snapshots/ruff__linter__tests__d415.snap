@@ -2,7 +2,7 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 69
     column: 5
@@ -10,7 +10,7 @@ expression: checks
     row: 69
     column: 12
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 124
     column: 5
@@ -18,7 +18,7 @@ expression: checks
     row: 126
     column: 8
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 283
     column: 5
@@ -26,7 +26,7 @@ expression: checks
     row: 283
     column: 34
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 288
     column: 5
@@ -34,7 +34,7 @@ expression: checks
     row: 288
     column: 38
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 350
     column: 5
@@ -42,7 +42,7 @@ expression: checks
     row: 350
     column: 18
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 401
     column: 25
@@ -50,7 +50,7 @@ expression: checks
     row: 401
     column: 40
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 405
     column: 5
@@ -58,7 +58,7 @@ expression: checks
     row: 405
     column: 25
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 411
     column: 5
@@ -66,7 +66,7 @@ expression: checks
     row: 411
     column: 25
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 417
     column: 35
@@ -74,7 +74,7 @@ expression: checks
     row: 417
     column: 50
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 424
     column: 49
@@ -82,7 +82,7 @@ expression: checks
     row: 424
     column: 64
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 465
     column: 5
@@ -90,7 +90,7 @@ expression: checks
     row: 465
     column: 25
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 470
     column: 5
@@ -98,7 +98,7 @@ expression: checks
     row: 470
     column: 25
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 475
     column: 5
@@ -106,7 +106,7 @@ expression: checks
     row: 475
     column: 25
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 482
     column: 5
@@ -114,7 +114,7 @@ expression: checks
     row: 482
     column: 25
   fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 504
     column: 5
@@ -122,15 +122,7 @@ expression: checks
     row: 504
     column: 35
   fix: ~
-- kind: DocstringEndsInNonPeriod
-  location:
-    row: 509
-    column: 5
-  end_location:
-    row: 509
-    column: 34
-  fix: ~
-- kind: DocstringEndsInNonPeriod
+- kind: DocstringEndsInNonPunctuation
   location:
     row: 515
     column: 5
