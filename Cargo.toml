@@ -40,6 +40,7 @@ strum_macros = "0.24.3"
 num-bigint = "0.4.3"
 
 [dev-dependencies]
+assert_cmd = "2.0.4"
 insta = { version = "1.19.1", features = ["yaml"] }
 
 [features]
