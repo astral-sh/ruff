@@ -159,6 +159,7 @@ pub enum CheckCode {
     D213,
     D300,
     D400,
+    D402,
     D403,
     D415,
     D419,
@@ -270,6 +271,7 @@ pub enum CheckKind {
     NoSurroundingWhitespace,
     NonEmpty,
     UsesTripleQuotes,
+    NoSignature,
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -388,6 +390,7 @@ impl CheckCode {
             CheckCode::D212 => CheckKind::MultiLineSummaryFirstLine,
             CheckCode::D213 => CheckKind::MultiLineSummarySecondLine,
             CheckCode::D300 => CheckKind::UsesTripleQuotes,
+            CheckCode::D402 => CheckKind::NoSignature,
             CheckCode::D403 => CheckKind::FirstLineCapitalized,
             CheckCode::D415 => CheckKind::EndsInPunctuation,
             // Meta
@@ -487,6 +490,7 @@ impl CheckKind {
             CheckKind::MultiLineSummaryFirstLine => &CheckCode::D212,
             CheckKind::MultiLineSummarySecondLine => &CheckCode::D213,
             CheckKind::UsesTripleQuotes => &CheckCode::D300,
+            CheckKind::NoSignature => &CheckCode::D402,
             CheckKind::FirstLineCapitalized => &CheckCode::D403,
             CheckKind::EndsInPunctuation => &CheckCode::D415,
             // Meta
@@ -758,6 +762,9 @@ impl CheckKind {
             }
             CheckKind::MultiLineSummarySecondLine => {
                 "Multi-line docstring summary should start at the second line".to_string()
+            }
+            CheckKind::NoSignature => {
+                "First line should not be the function's 'signature'".to_string()
             }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {

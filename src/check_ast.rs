@@ -1916,6 +1916,9 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::D400) {
                 docstrings::ends_with_period(self, &docstring);
             }
+            if self.settings.enabled.contains(&CheckCode::D402) {
+                docstrings::no_signature(self, &docstring);
+            }
             if self.settings.enabled.contains(&CheckCode::D403) {
                 docstrings::capitalized(self, &docstring);
             }

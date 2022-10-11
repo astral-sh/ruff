@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: NoSignature
+  location:
+    row: 373
+    column: 5
+  end_location:
+    row: 373
+    column: 31
+  fix: ~
+
