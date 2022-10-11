@@ -217,7 +217,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (11/16)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
-- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (6/47)
+- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (11/47)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -304,12 +304,17 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations |  | 🛠 |
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations |  | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
-| D200 | OneLinerDocstring | One-line docstring should fit on one line |  |  |
-| D205 | BlankLineAfterSummary | 1 blank line required between summary line and description |  |  |
+| D200 | FitsOnOneLine | One-line docstring should fit on one line |  |  |
+| D205 | NoBlankLineAfterSummary | 1 blank line required between summary line and description |  |  |
 | D209 | NewLineAfterLastParagraph | Multi-line docstring closing quotes should be on a separate line |  |  |
 | D210 | NoSurroundingWhitespace | No whitespaces allowed surrounding docstring text |  |  |
-| D400 | DocstringEndsInNonPeriod | First line should end with a period |  |  |
-| D419 | EmptyDocstring | Docstring is empty |  |  |
+| D212 | MultiLineSummaryFirstLine | Multi-line docstring summary should start at the first line |  |  |
+| D213 | MultiLineSummarySecondLine | Multi-line docstring summary should start at the second line |  |  |
+| D300 | UsesTripleQuotes | Use """triple double quotes""" |  |  |
+| D400 | EndsInPeriod | First line should end with a period |  |  |
+| D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |  |
+| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |  |
+| D419 | NonEmpty | Docstring is empty |  |  |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations

@@ -1,0 +1,133 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 195
+    column: 5
+  end_location:
+    row: 198
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 205
+    column: 5
+  end_location:
+    row: 210
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 215
+    column: 5
+  end_location:
+    row: 219
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 225
+    column: 5
+  end_location:
+    row: 229
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 235
+    column: 5
+  end_location:
+    row: 239
+    column: 4
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 245
+    column: 5
+  end_location:
+    row: 249
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 255
+    column: 5
+  end_location:
+    row: 259
+    column: 12
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 265
+    column: 5
+  end_location:
+    row: 269
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 276
+    column: 5
+  end_location:
+    row: 278
+    column: 20
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 294
+    column: 5
+  end_location:
+    row: 297
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 338
+    column: 5
+  end_location:
+    row: 343
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 378
+    column: 5
+  end_location:
+    row: 381
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 387
+    column: 5
+  end_location:
+    row: 391
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 433
+    column: 37
+  end_location:
+    row: 436
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 445
+    column: 5
+  end_location:
+    row: 449
+    column: 8
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 521
+    column: 5
+  end_location:
+    row: 527
+    column: 8
+  fix: ~
+

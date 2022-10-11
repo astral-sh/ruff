@@ -1,0 +1,53 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: TripleQuotes
+  location:
+    row: 75
+    column: 9
+  end_location:
+    row: 75
+    column: 11
+  fix: ~
+- kind: TripleQuotes
+  location:
+    row: 302
+    column: 6
+  end_location:
+    row: 302
+    column: 20
+  fix: ~
+- kind: TripleQuotes
+  location:
+    row: 307
+    column: 6
+  end_location:
+    row: 307
+    column: 20
+  fix: ~
+- kind: TripleQuotes
+  location:
+    row: 312
+    column: 6
+  end_location:
+    row: 312
+    column: 16
+  fix: ~
+- kind: TripleQuotes
+  location:
+    row: 317
+    column: 6
+  end_location:
+    row: 317
+    column: 16
+  fix: ~
+- kind: TripleQuotes
+  location:
+    row: 323
+    column: 6
+  end_location:
+    row: 323
+    column: 17
+  fix: ~
+

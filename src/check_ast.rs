@@ -1902,8 +1902,22 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::D210) {
                 docstrings::no_surrounding_whitespace(self, &docstring);
             }
+            if self.settings.enabled.contains(&CheckCode::D212)
+                || self.settings.enabled.contains(&CheckCode::D213)
+            {
+                docstrings::multi_line_summary_start(self, &docstring);
+            }
+            if self.settings.enabled.contains(&CheckCode::D300) {
+                docstrings::triple_quotes(self, &docstring);
+            }
             if self.settings.enabled.contains(&CheckCode::D400) {
                 docstrings::ends_with_period(self, &docstring);
+            }
+            if self.settings.enabled.contains(&CheckCode::D403) {
+                docstrings::capitalized(self, &docstring);
+            }
+            if self.settings.enabled.contains(&CheckCode::D415) {
+                docstrings::ends_with_punctuation(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D419) {
                 docstrings::not_empty(self, &docstring);
