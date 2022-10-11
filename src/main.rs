@@ -81,9 +81,9 @@ fn read_from_stdin() -> Result<String> {
     Ok(buffer)
 }
 
-fn run_once_stdin(settings: &Settings, filename: &str) -> Result<Vec<Message>> {
+fn run_once_stdin(settings: &Settings, filename: &str, autofix: bool) -> Result<Vec<Message>> {
     let stdin = read_from_stdin()?;
-    let mut messages = lint_stdin(filename, &stdin, settings)?;
+    let mut messages = lint_stdin(filename, &stdin, settings, &autofix.into())?;
     messages.sort_unstable();
     Ok(messages)
 }
@@ -369,6 +369,7 @@ fn inner_main() -> Result<ExitCode> {
             run_once_stdin(
                 &settings,
                 &cli.stdin_filename.unwrap_or_else(|| "-".to_string()),
+                cli.fix,
             )?
         } else {
             run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?
