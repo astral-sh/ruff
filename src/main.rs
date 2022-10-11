@@ -368,7 +368,7 @@ fn inner_main() -> Result<ExitCode> {
         let messages = if cli.files == vec![PathBuf::from("-")] {
             run_once_stdin(
                 &settings,
-                &cli.stdin_filename.unwrap_or_else(|| "(stdin)".to_string()),
+                &cli.stdin_filename.unwrap_or_else(|| "-".to_string()),
             )?
         } else {
             run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?
