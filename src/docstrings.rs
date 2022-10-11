@@ -95,6 +95,119 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
     }
 }
 
+/// D201, D202
+pub fn no_blank_before(checker: &mut Checker, docstring: &Docstring) {
+    if !matches!(docstring.kind, DocstringKind::Function(_)) {
+        return;
+    }
+
+    if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.expr.node
+    {
+        let (before, _, after) = checker
+            .locator
+            .partition_source_code_at(&range_for(docstring));
+
+        let mut blanks_before = 0;
+        for line in before.lines().rev() {
+            if line.trim().is_empty() {
+                blanks_before += 1;
+            } else {
+                break;
+            }
+        }
+        if blanks_before != 0 {
+            checker.add_check(Check::new(
+                // TODO: D211
+                CheckKind::NoBlanksBeforeClass(blanks_before),
+                range_for(docstring),
+            ));
+        }
+
+        let mut blanks_after = 0;
+        for line in after.lines() {
+            if line.trim().is_empty() {
+                blanks_after += 1;
+            } else {
+                break;
+            }
+        }
+        //                 # Report a D202 violation if the docstring is followed by a blank line
+        //                 # and the blank line is not itself followed by an inner function or
+        //                 # class.
+        //                 if not (
+        //                     blanks_after_count == 1
+        //                     and re(r"\s+(?:(?:class|def|async def)\s|@)").match(after)
+        //                 ):
+        //                     yield violations.D202(blanks_after_count)
+        if blanks_after != 1 {
+            // TODO: D204
+            checker.add_check(Check::new(
+                CheckKind::OneBlankLineAfterClass(blanks_after),
+                range_for(docstring),
+            ));
+        }
+    }
+}
+
+/// D203, D204, D211
+pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
+    if !matches!(docstring.kind, DocstringKind::Class(_)) {
+        return;
+    }
+
+    if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.expr.node
+    {
+        let (before, _, after) = checker
+            .locator
+            .partition_source_code_at(&range_for(docstring));
+
+        let mut blanks_before = 0;
+        for line in before.lines().rev() {
+            if line.trim().is_empty() {
+                blanks_before += 1;
+            } else {
+                break;
+            }
+        }
+        if blanks_before != 0 {
+            checker.add_check(Check::new(
+                // TODO: D211
+                CheckKind::NoBlanksBeforeClass(blanks_before),
+                range_for(docstring),
+            ));
+        }
+        if blanks_before != 1 {
+            // TODO: D203
+            checker.add_check(Check::new(
+                CheckKind::OneBlankLineBeforeClass(blanks_before),
+                range_for(docstring),
+            ));
+        }
+
+        let mut blanks_after = 0;
+        for line in after.lines() {
+            if line.trim().is_empty() {
+                blanks_after += 1;
+            } else {
+                break;
+            }
+        }
+        if blanks_after != 1 {
+            // TODO: D204
+            checker.add_check(Check::new(
+                CheckKind::OneBlankLineAfterClass(blanks_after),
+                range_for(docstring),
+            ));
+        }
+    }
+}
+
 /// D205
 pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     if let ExprKind::Constant {

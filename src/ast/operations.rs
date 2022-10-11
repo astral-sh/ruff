@@ -134,7 +134,7 @@ impl<'a> SourceCodeLocator<'a> {
         }
     }
 
-    pub fn slice_source_code_at(&mut self, location: &Location) -> &'a str {
+    fn init(&mut self) {
         if !self.initialized {
             let mut offset = 0;
             for i in self.content.lines() {
@@ -144,22 +144,29 @@ impl<'a> SourceCodeLocator<'a> {
             }
             self.initialized = true;
         }
+    }
+
+    pub fn slice_source_code_at(&mut self, location: &Location) -> &'a str {
+        self.init();
         let offset = self.offsets[location.row() - 1] + location.column() - 1;
         &self.content[offset..]
     }
 
     pub fn slice_source_code_range(&mut self, range: &Range) -> &'a str {
-        if !self.initialized {
-            let mut offset = 0;
-            for i in self.content.lines() {
-                self.offsets.push(offset);
-                offset += i.len();
-                offset += 1;
-            }
-            self.initialized = true;
-        }
+        self.init();
         let start = self.offsets[range.location.row() - 1] + range.location.column() - 1;
         let end = self.offsets[range.end_location.row() - 1] + range.end_location.column() - 1;
         &self.content[start..end]
+    }
+
+    pub fn partition_source_code_at(&mut self, range: &Range) -> (&'a str, &'a str, &'a str) {
+        self.init();
+        let start = self.offsets[range.location.row() - 1] + range.location.column() - 1;
+        let end = self.offsets[range.end_location.row() - 1] + range.end_location.column() - 1;
+        (
+            &self.content[..start],
+            &self.content[start..end],
+            &self.content[end..],
+        )
     }
 }
