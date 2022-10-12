@@ -38,6 +38,7 @@ walkdir = { version = "2.3.2" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = "0.24.3"
 num-bigint = "0.4.3"
+titlecase = "2.2.1"
 
 [dev-dependencies]
 assert_cmd = "2.0.4"

@@ -1,3 +1,4 @@
+#![allow(clippy::collapsible_if, clippy::collapsible_else_if)]
 use std::path::Path;
 
 use anyhow::Result;
@@ -17,7 +18,7 @@ mod check_lines;
 pub mod checks;
 pub mod cli;
 pub mod code_gen;
-pub mod docstrings;
+mod docstrings;
 pub mod fs;
 pub mod linter;
 pub mod logging;
