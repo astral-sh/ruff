@@ -137,6 +137,7 @@ pub enum CheckCode {
     C408,
     C409,
     C410,
+    C414,
     C415,
     // flake8-print
     T201,
@@ -251,6 +252,7 @@ pub enum CheckKind {
     UnnecessaryCollectionCall(String),
     UnnecessaryLiteralWithinTupleCall(String),
     UnnecessaryLiteralWithinListCall(String),
+    UnnecessaryDoubleCastOrProcess(String, String),
     UnnecessarySubscriptReversal(String),
     // flake8-print
     PrintFound,
@@ -372,6 +374,10 @@ impl CheckCode {
             CheckCode::C410 => {
                 CheckKind::UnnecessaryLiteralWithinListCall("<list/tuple>".to_string())
             }
+            CheckCode::C414 => CheckKind::UnnecessaryDoubleCastOrProcess(
+                "<list/reversed/set/sorted/tuple>".to_string(),
+                "<list/set/sorted/tuple>".to_string(),
+            ),
             CheckCode::C415 => {
                 CheckKind::UnnecessarySubscriptReversal("<reversed/set/sorted>".to_string())
             }
@@ -482,6 +488,7 @@ impl CheckKind {
             CheckKind::UnnecessaryCollectionCall(_) => &CheckCode::C408,
             CheckKind::UnnecessaryLiteralWithinTupleCall(..) => &CheckCode::C409,
             CheckKind::UnnecessaryLiteralWithinListCall(..) => &CheckCode::C410,
+            CheckKind::UnnecessaryDoubleCastOrProcess(..) => &CheckCode::C414,
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
@@ -724,6 +731,9 @@ impl CheckKind {
                         "Unnecessary {literal} literal passed to list() - rewrite as a list literal"
                     )
                 }
+            }
+            CheckKind::UnnecessaryDoubleCastOrProcess(inner, outer) => {
+                format!("Unnecessary {inner} call within {outer}().")
             }
             CheckKind::UnnecessarySubscriptReversal(func) => {
                 format!("Unnecessary subscript reversal of iterable within {func}()")

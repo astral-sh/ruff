@@ -1004,6 +1004,40 @@ pub fn unnecessary_literal_within_list_call(
     None
 }
 
+pub fn unnecessary_double_cast_or_process(
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) -> Option<Check> {
+    if let ExprKind::Name { id: outer, .. } = &func.node {
+        if vec!["list", "tuple", "set", "reversed", "sorted"].contains(&outer.as_str()) {
+            if let Some(arg) = args.first() {
+                if let ExprKind::Call { func, .. } = &arg.node {
+                    if let ExprKind::Name { id: inner, .. } = &func.node {
+                        if (vec!["set", "sorted"].contains(&outer.as_str())
+                            && vec!["list", "tuple", "reversed", "sorted"]
+                                .contains(&inner.as_str()))
+                            | (vec!["list", "tuple"].contains(&outer.as_str())
+                                && vec!["list", "tuple"].contains(&inner.as_str()))
+                            | (outer == "set" && inner == "set")
+                        {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryDoubleCastOrProcess(
+                                    inner.to_string(),
+                                    outer.to_string(),
+                                ),
+                                Range::from_located(expr),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
 pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     if let Some(first_arg) = args.first() {
         if let ExprKind::Name { id, .. } = &func.node {

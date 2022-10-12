@@ -837,6 +837,15 @@ where
                         self.checks.push(check);
                     };
                 }
+
+                if self.settings.enabled.contains(&CheckCode::C414) {
+                    if let Some(check) =
+                        checkers::unnecessary_double_cast_or_process(expr, func, args)
+                    {
+                        self.checks.push(check);
+                    };
+                }
+
                 if self.settings.enabled.contains(&CheckCode::C415) {
                     if let Some(check) = checkers::unnecessary_subscript_reversal(expr, func, args)
                     {
