@@ -25,6 +25,7 @@ use crate::docstrings::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::settings::{PythonVersion, Settings};
+use crate::visibility::{module_visibility, transition_scope, Modifier, VisibleScope};
 use crate::{docstrings, plugins};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -39,7 +40,7 @@ pub struct Checker<'a> {
     // Computed checks.
     checks: Vec<Check>,
     // Docstring tracking.
-    docstrings: Vec<Definition<'a>>,
+    docstrings: Vec<(Definition<'a>, VisibleScope)>,
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
     pub(crate) deletions: BTreeSet<usize>,
@@ -52,10 +53,11 @@ pub struct Checker<'a> {
     dead_scopes: Vec<usize>,
     deferred_string_annotations: Vec<(Range, &'a str)>,
     deferred_annotations: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
-    deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>)>,
+    deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_assignments: Vec<usize>,
     // Internal, derivative state.
+    visibility: VisibleScope,
     in_f_string: Option<Range>,
     in_annotation: bool,
     in_literal: bool,
@@ -90,6 +92,10 @@ impl<'a> Checker<'a> {
             deferred_functions: Default::default(),
             deferred_lambdas: Default::default(),
             deferred_assignments: Default::default(),
+            visibility: VisibleScope {
+                modifier: Modifier::Module,
+                visibility: module_visibility(path),
+            },
             in_f_string: None,
             in_annotation: Default::default(),
             in_literal: Default::default(),
@@ -562,46 +568,28 @@ where
         }
 
         // Recurse.
+        let prev_visibility = self.visibility.clone();
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
-                // TODO(charlie): Track public / private.
-                // Grab all parents, to enable nested definition tracking. (Ignore the most recent
-                // parent which, confusingly, is `stmt`.)
-                let parents = self
-                    .parent_stack
-                    .iter()
-                    .take(self.parents.len() - 1)
-                    .map(|index| self.parents[*index])
-                    .collect();
-                self.docstrings.push(docstrings::extract(
-                    parents,
-                    stmt,
-                    body,
-                    Documentable::Function,
-                ));
+                let visibility = transition_scope(&self.visibility, stmt, &Documentable::Function);
+                let definition =
+                    docstrings::extract(&self.visibility, stmt, body, &Documentable::Function);
+                self.visibility = visibility.clone();
+                self.docstrings.push((definition, visibility));
 
                 self.deferred_functions.push((
                     stmt,
                     self.scope_stack.clone(),
                     self.parent_stack.clone(),
+                    self.visibility.clone(),
                 ));
             }
             StmtKind::ClassDef { body, .. } => {
-                // TODO(charlie): Track public / priva
-                // Grab all parents, to enable nested definition tracking. (Ignore the most recent
-                // parent which, confusingly, is `stmt`.)
-                let parents = self
-                    .parent_stack
-                    .iter()
-                    .take(self.parents.len() - 1)
-                    .map(|index| self.parents[*index])
-                    .collect();
-                self.docstrings.push(docstrings::extract(
-                    parents,
-                    stmt,
-                    body,
-                    Documentable::Class,
-                ));
+                let visibility = transition_scope(&self.visibility, stmt, &Documentable::Class);
+                let definition =
+                    docstrings::extract(&self.visibility, stmt, body, &Documentable::Class);
+                self.visibility = visibility.clone();
+                self.docstrings.push((definition, visibility));
 
                 for stmt in body {
                     self.visit_stmt(stmt);
@@ -630,6 +618,7 @@ where
             }
             _ => visitor::walk_stmt(self, stmt),
         };
+        self.visibility = prev_visibility;
 
         // Post-visit.
         if let StmtKind::ClassDef { name, .. } = &stmt.node {
@@ -1649,14 +1638,20 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         let docstring = docstrings::docstring_from(python_ast);
-        self.docstrings.push(Definition {
-            kind: if self.path.ends_with("__init__.py") {
-                DefinitionKind::Package
-            } else {
-                DefinitionKind::Module
+        self.docstrings.push((
+            Definition {
+                kind: if self.path.ends_with("__init__.py") {
+                    DefinitionKind::Package
+                } else {
+                    DefinitionKind::Module
+                },
+                docstring,
             },
-            docstring,
-        });
+            VisibleScope {
+                modifier: Modifier::Module,
+                visibility: module_visibility(self.path),
+            },
+        ));
         docstring.is_some()
     }
 
@@ -1712,9 +1707,10 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_functions(&mut self) {
-        while let Some((stmt, scopes, parents)) = self.deferred_functions.pop() {
+        while let Some((stmt, scopes, parents, visibility)) = self.deferred_functions.pop() {
             self.parent_stack = parents;
             self.scope_stack = scopes;
+            self.visibility = visibility;
             self.push_scope(Scope::new(ScopeKind::Function(Default::default())));
 
             match &stmt.node {
@@ -1906,8 +1902,11 @@ impl<'a> Checker<'a> {
     }
 
     fn check_docstrings(&mut self) {
-        while let Some(docstring) = self.docstrings.pop() {
+        while let Some((docstring, scope)) = self.docstrings.pop() {
             if !docstrings::not_empty(self, &docstring) {
+                continue;
+            }
+            if !docstrings::not_missing(self, &docstring, &scope) {
                 continue;
             }
             if self.settings.enabled.contains(&CheckCode::D200) {

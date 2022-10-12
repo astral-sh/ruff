@@ -5,6 +5,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
+use crate::visibility::{is_init, is_magic, is_overload, Modifier, Visibility, VisibleScope};
 
 #[derive(Debug)]
 pub enum DefinitionKind<'a> {
@@ -28,19 +29,6 @@ pub enum Documentable {
     Function,
 }
 
-fn nest(parents: &[&Stmt]) -> Option<Documentable> {
-    for parent in parents.iter().rev() {
-        match &parent.node {
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                return Some(Documentable::Function)
-            }
-            StmtKind::ClassDef { .. } => return Some(Documentable::Class),
-            _ => {}
-        }
-    }
-    None
-}
-
 /// Extract a docstring from a function or class body.
 pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
     if let Some(stmt) = suite.first() {
@@ -61,27 +49,58 @@ pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
 
 /// Extract a `Definition` from the AST node defined by a `Stmt`.
 pub fn extract<'a>(
-    parents: Vec<&'a Stmt>,
+    scope: &VisibleScope,
     stmt: &'a Stmt,
     body: &'a [Stmt],
-    kind: Documentable,
+    kind: &Documentable,
 ) -> Definition<'a> {
     let expr = docstring_from(body);
     match kind {
-        Documentable::Function => Definition {
-            kind: match nest(&parents) {
-                None => DefinitionKind::Function(stmt),
-                Some(Documentable::Function) => DefinitionKind::NestedFunction(stmt),
-                Some(Documentable::Class) => DefinitionKind::Method(stmt),
+        Documentable::Function => match scope {
+            VisibleScope {
+                modifier: Modifier::Module,
+                ..
+            } => Definition {
+                kind: DefinitionKind::Function(stmt),
+                docstring: expr,
             },
-            docstring: expr,
+            VisibleScope {
+                modifier: Modifier::Class,
+                ..
+            } => Definition {
+                kind: DefinitionKind::Method(stmt),
+                docstring: expr,
+            },
+            VisibleScope {
+                modifier: Modifier::Function,
+                ..
+            } => Definition {
+                kind: DefinitionKind::NestedFunction(stmt),
+                docstring: expr,
+            },
         },
-        Documentable::Class => Definition {
-            kind: match nest(&parents) {
-                None => DefinitionKind::Class(stmt),
-                Some(_) => DefinitionKind::NestedClass(stmt),
+        Documentable::Class => match scope {
+            VisibleScope {
+                modifier: Modifier::Module,
+                ..
+            } => Definition {
+                kind: DefinitionKind::Class(stmt),
+                docstring: expr,
             },
-            docstring: expr,
+            VisibleScope {
+                modifier: Modifier::Class,
+                ..
+            } => Definition {
+                kind: DefinitionKind::NestedClass(stmt),
+                docstring: expr,
+            },
+            VisibleScope {
+                modifier: Modifier::Function,
+                ..
+            } => Definition {
+                kind: DefinitionKind::NestedClass(stmt),
+                docstring: expr,
+            },
         },
     }
 }
@@ -92,6 +111,101 @@ fn range_for(docstring: &Expr) -> Range {
     Range {
         location: Location::new(docstring.location.row(), docstring.location.column() - 1),
         end_location: docstring.end_location,
+    }
+}
+
+/// D100, D101, D102, D103, D104, D105, D106, D107
+pub fn not_missing(checker: &mut Checker, definition: &Definition, scope: &VisibleScope) -> bool {
+    if definition.docstring.is_some() {
+        return true;
+    }
+
+    if matches!(scope.visibility, Visibility::Private) {
+        return true;
+    }
+
+    match definition.kind {
+        DefinitionKind::Module => {
+            if checker.settings.enabled.contains(&CheckCode::D100) {
+                checker.add_check(Check::new(
+                    CheckKind::PublicModule,
+                    Range {
+                        location: Location::new(1, 1),
+                        end_location: Location::new(1, 1),
+                    },
+                ));
+            }
+            false
+        }
+        DefinitionKind::Package => {
+            if checker.settings.enabled.contains(&CheckCode::D104) {
+                checker.add_check(Check::new(
+                    CheckKind::PublicPackage,
+                    Range {
+                        location: Location::new(1, 1),
+                        end_location: Location::new(1, 1),
+                    },
+                ));
+            }
+            false
+        }
+        DefinitionKind::Class(stmt) => {
+            if checker.settings.enabled.contains(&CheckCode::D101) {
+                checker.add_check(Check::new(
+                    CheckKind::PublicClass,
+                    Range::from_located(stmt),
+                ));
+            }
+            false
+        }
+        DefinitionKind::NestedClass(stmt) => {
+            if checker.settings.enabled.contains(&CheckCode::D106) {
+                checker.add_check(Check::new(
+                    CheckKind::PublicNestedClass,
+                    Range::from_located(stmt),
+                ));
+            }
+            false
+        }
+        DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
+            if is_overload(stmt) {
+                true
+            } else {
+                if checker.settings.enabled.contains(&CheckCode::D103) {
+                    checker.add_check(Check::new(
+                        CheckKind::PublicFunction,
+                        Range::from_located(stmt),
+                    ));
+                }
+                false
+            }
+        }
+        DefinitionKind::Method(stmt) => {
+            if is_overload(stmt) {
+                true
+            } else if is_magic(stmt) {
+                if checker.settings.enabled.contains(&CheckCode::D105) {
+                    checker.add_check(Check::new(
+                        CheckKind::MagicMethod,
+                        Range::from_located(stmt),
+                    ));
+                }
+                true
+            } else if is_init(stmt) {
+                if checker.settings.enabled.contains(&CheckCode::D107) {
+                    checker.add_check(Check::new(CheckKind::PublicInit, Range::from_located(stmt)));
+                }
+                true
+            } else {
+                if checker.settings.enabled.contains(&CheckCode::D102) {
+                    checker.add_check(Check::new(
+                        CheckKind::PublicMethod,
+                        Range::from_located(stmt),
+                    ));
+                }
+                true
+            }
+        }
     }
 }
 

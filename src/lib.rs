@@ -28,6 +28,7 @@ pub mod printer;
 pub mod pyproject;
 mod python;
 pub mod settings;
+pub mod visibility;
 
 /// Run ruff over Python source code directly.
 pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
