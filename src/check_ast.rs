@@ -56,7 +56,6 @@ pub struct Checker<'a> {
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_assignments: Vec<usize>,
     // Internal, derivative state.
-    pub(crate) initial: bool,
     in_f_string: Option<Range>,
     in_annotation: bool,
     in_literal: bool,
@@ -91,7 +90,6 @@ impl<'a> Checker<'a> {
             deferred_functions: Default::default(),
             deferred_lambdas: Default::default(),
             deferred_assignments: Default::default(),
-            initial: true,
             in_f_string: None,
             in_annotation: Default::default(),
             in_literal: Default::default(),
@@ -562,7 +560,6 @@ where
             StmtKind::Delete { .. } => {}
             _ => {}
         }
-        self.initial = false;
 
         // Recurse.
         match &stmt.node {
