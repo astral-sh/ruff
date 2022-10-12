@@ -1010,16 +1010,46 @@ pub fn unnecessary_double_cast_or_process(
     args: &[Expr],
 ) -> Option<Check> {
     if let ExprKind::Name { id: outer, .. } = &func.node {
-        if ["list", "tuple", "set", "reversed", "sorted"].contains(&outer.as_str()) {
+        if outer == "list"
+            || outer == "tuple"
+            || outer == "set"
+            || outer == "reversed"
+            || outer == "sorted"
+        {
             if let Some(arg) = args.first() {
                 if let ExprKind::Call { func, .. } = &arg.node {
                     if let ExprKind::Name { id: inner, .. } = &func.node {
-                        if (["set", "sorted"].contains(&outer.as_str())
-                            && ["list", "tuple", "reversed", "sorted"].contains(&inner.as_str()))
-                            | (["list", "tuple"].contains(&outer.as_str())
-                                && ["list", "tuple"].contains(&inner.as_str()))
-                            | (outer == "set" && inner == "set")
+                        // Ex) set(tuple(...))
+                        if (outer == "set" || outer == "sorted")
+                            && (inner == "list"
+                                || inner == "tuple"
+                                || inner == "reversed"
+                                || inner == "sorted")
                         {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryDoubleCastOrProcess(
+                                    inner.to_string(),
+                                    outer.to_string(),
+                                ),
+                                Range::from_located(expr),
+                            ));
+                        }
+
+                        // Ex) list(tuple(...))
+                        if (outer == "list" || outer == "tuple")
+                            && (inner == "list" || inner == "tuple")
+                        {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryDoubleCastOrProcess(
+                                    inner.to_string(),
+                                    outer.to_string(),
+                                ),
+                                Range::from_located(expr),
+                            ));
+                        }
+
+                        // Ex) set(set(...))
+                        if outer == "set" && inner == "set" {
                             return Some(Check::new(
                                 CheckKind::UnnecessaryDoubleCastOrProcess(
                                     inner.to_string(),
