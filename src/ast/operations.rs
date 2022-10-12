@@ -142,6 +142,7 @@ impl<'a> SourceCodeLocator<'a> {
                 offset += i.len();
                 offset += 1;
             }
+            self.offsets.push(offset);
             self.initialized = true;
         }
     }
@@ -159,14 +160,22 @@ impl<'a> SourceCodeLocator<'a> {
         &self.content[start..end]
     }
 
-    pub fn partition_source_code_at(&mut self, range: &Range) -> (&'a str, &'a str, &'a str) {
+    pub fn partition_source_code_at(
+        &mut self,
+        outer: &Range,
+        inner: &Range,
+    ) -> (&'a str, &'a str, &'a str) {
         self.init();
-        let start = self.offsets[range.location.row() - 1] + range.location.column() - 1;
-        let end = self.offsets[range.end_location.row() - 1] + range.end_location.column() - 1;
+        let outer_start = self.offsets[outer.location.row() - 1] + outer.location.column() - 1;
+        let outer_end =
+            self.offsets[outer.end_location.row() - 1] + outer.end_location.column() - 1;
+        let inner_start = self.offsets[inner.location.row() - 1] + inner.location.column() - 1;
+        let inner_end =
+            self.offsets[inner.end_location.row() - 1] + inner.end_location.column() - 1;
         (
-            &self.content[..start],
-            &self.content[start..end],
-            &self.content[end..],
+            &self.content[outer_start..inner_start],
+            &self.content[inner_start..inner_end],
+            &self.content[inner_end..outer_end],
         )
     }
 }

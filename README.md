@@ -217,7 +217,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (11/16)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
-- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (12/47)
+- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (17/48)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -316,6 +316,11 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |  |
 | D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |  |
 | D419 | NonEmpty | Docstring is empty |  |  |
+| D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found 1) |  |  |
+| D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) |  |  |
+| D211 | NoBlankLineBeforeClass | NoBlankLineBeforeClass |  |  |
+| D203 | OneBlankLineBeforeClass | OneBlankLineBeforeClass |  |  |
+| D204 | OneBlankLineAfterClass | OneBlankLineAfterClass |  |  |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations

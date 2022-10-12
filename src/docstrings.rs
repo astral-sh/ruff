@@ -1,3 +1,5 @@
+use once_cell::sync::Lazy;
+use regex::Regex;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::types::Range;
@@ -85,7 +87,7 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 non_empty_line_count += 1;
             }
             if non_empty_line_count > 1 {
-                return;
+                break;
             }
         }
 
@@ -95,115 +97,117 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
     }
 }
 
+static COMMENT_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\s*#").unwrap());
+
+static INNER_FUNCTION_OR_CLASS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\s+(?:(?:class|def|async def)\s|@)").unwrap());
+
 /// D201, D202
-pub fn no_blank_before(checker: &mut Checker, docstring: &Docstring) {
-    if !matches!(docstring.kind, DocstringKind::Function(_)) {
-        return;
-    }
+pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
+    if let DocstringKind::Function(parent) = &docstring.kind {
+        if let ExprKind::Constant {
+            value: Constant::Str(_),
+            ..
+        } = &docstring.expr.node
+        {
+            let (before, _, after) = checker
+                .locator
+                .partition_source_code_at(&Range::from_located(parent), &range_for(docstring));
 
-    if let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.expr.node
-    {
-        let (before, _, after) = checker
-            .locator
-            .partition_source_code_at(&range_for(docstring));
-
-        let mut blanks_before = 0;
-        for line in before.lines().rev() {
-            if line.trim().is_empty() {
-                blanks_before += 1;
-            } else {
-                break;
+            if checker.settings.enabled.contains(&CheckCode::D201) {
+                let blank_lines_before = before
+                    .lines()
+                    .rev()
+                    .skip(1)
+                    .take_while(|line| line.trim().is_empty())
+                    .count();
+                if blank_lines_before != 0 {
+                    checker.add_check(Check::new(
+                        CheckKind::NoBlankLineBeforeFunction(blank_lines_before),
+                        range_for(docstring),
+                    ));
+                }
             }
-        }
-        if blanks_before != 0 {
-            checker.add_check(Check::new(
-                // TODO: D211
-                CheckKind::NoBlanksBeforeClass(blanks_before),
-                range_for(docstring),
-            ));
-        }
 
-        let mut blanks_after = 0;
-        for line in after.lines() {
-            if line.trim().is_empty() {
-                blanks_after += 1;
-            } else {
-                break;
+            if checker.settings.enabled.contains(&CheckCode::D202) {
+                let blank_lines_after = after
+                    .lines()
+                    .skip(1)
+                    .take_while(|line| line.trim().is_empty())
+                    .count();
+                let all_blank_after = after
+                    .lines()
+                    .skip(1)
+                    .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
+                // Report a D202 violation if the docstring is followed by a blank line
+                // and the blank line is not itself followed by an inner function or
+                // class.
+                if !all_blank_after
+                    && blank_lines_after != 0
+                    && !(blank_lines_after == 1 && INNER_FUNCTION_OR_CLASS_REGEX.is_match(after))
+                {
+                    checker.add_check(Check::new(
+                        CheckKind::NoBlankLineAfterFunction(blank_lines_after),
+                        range_for(docstring),
+                    ));
+                }
             }
-        }
-        //                 # Report a D202 violation if the docstring is followed by a blank line
-        //                 # and the blank line is not itself followed by an inner function or
-        //                 # class.
-        //                 if not (
-        //                     blanks_after_count == 1
-        //                     and re(r"\s+(?:(?:class|def|async def)\s|@)").match(after)
-        //                 ):
-        //                     yield violations.D202(blanks_after_count)
-        if blanks_after != 1 {
-            // TODO: D204
-            checker.add_check(Check::new(
-                CheckKind::OneBlankLineAfterClass(blanks_after),
-                range_for(docstring),
-            ));
         }
     }
 }
 
 /// D203, D204, D211
 pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
-    if !matches!(docstring.kind, DocstringKind::Class(_)) {
-        return;
-    }
+    if let DocstringKind::Class(parent) = &docstring.kind {
+        if let ExprKind::Constant {
+            value: Constant::Str(_),
+            ..
+        } = &docstring.expr.node
+        {
+            let (before, _, after) = checker
+                .locator
+                .partition_source_code_at(&Range::from_located(parent), &range_for(docstring));
 
-    if let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.expr.node
-    {
-        let (before, _, after) = checker
-            .locator
-            .partition_source_code_at(&range_for(docstring));
-
-        let mut blanks_before = 0;
-        for line in before.lines().rev() {
-            if line.trim().is_empty() {
-                blanks_before += 1;
-            } else {
-                break;
+            if checker.settings.enabled.contains(&CheckCode::D203)
+                || checker.settings.enabled.contains(&CheckCode::D211)
+            {
+                let blank_lines_before = before
+                    .lines()
+                    .rev()
+                    .skip(1)
+                    .take_while(|line| line.trim().is_empty())
+                    .count();
+                if blank_lines_before != 0 && checker.settings.enabled.contains(&CheckCode::D211) {
+                    checker.add_check(Check::new(
+                        CheckKind::NoBlankLineBeforeClass(blank_lines_before),
+                        range_for(docstring),
+                    ));
+                }
+                if blank_lines_before != 1 && checker.settings.enabled.contains(&CheckCode::D203) {
+                    checker.add_check(Check::new(
+                        CheckKind::OneBlankLineBeforeClass(blank_lines_before),
+                        range_for(docstring),
+                    ));
+                }
             }
-        }
-        if blanks_before != 0 {
-            checker.add_check(Check::new(
-                // TODO: D211
-                CheckKind::NoBlanksBeforeClass(blanks_before),
-                range_for(docstring),
-            ));
-        }
-        if blanks_before != 1 {
-            // TODO: D203
-            checker.add_check(Check::new(
-                CheckKind::OneBlankLineBeforeClass(blanks_before),
-                range_for(docstring),
-            ));
-        }
 
-        let mut blanks_after = 0;
-        for line in after.lines() {
-            if line.trim().is_empty() {
-                blanks_after += 1;
-            } else {
-                break;
+            if checker.settings.enabled.contains(&CheckCode::D204) {
+                let blank_lines_after = after
+                    .lines()
+                    .skip(1)
+                    .take_while(|line| line.trim().is_empty())
+                    .count();
+                let all_blank_after = after
+                    .lines()
+                    .skip(1)
+                    .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
+                if !all_blank_after && blank_lines_after != 1 {
+                    checker.add_check(Check::new(
+                        CheckKind::OneBlankLineAfterClass(blank_lines_after),
+                        range_for(docstring),
+                    ));
+                }
             }
-        }
-        if blanks_after != 1 {
-            // TODO: D204
-            checker.add_check(Check::new(
-                CheckKind::OneBlankLineAfterClass(blanks_after),
-                range_for(docstring),
-            ));
         }
     }
 }
@@ -300,15 +304,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 .slice_source_code_range(&range_for(docstring));
             if let Some(first_line) = content.lines().next() {
                 let first_line = first_line.trim();
-                if first_line == "\"\"\""
-                    || first_line == "'''"
-                    || first_line == "u\"\"\""
-                    || first_line == "u'''"
-                    || first_line == "r\"\"\""
-                    || first_line == "r'''"
-                    || first_line == "ur\"\"\""
-                    || first_line == "ur'''"
-                {
+                if first_line == "\"\"\"" || first_line == "'''" {
                     if checker.settings.enabled.contains(&CheckCode::D212) {
                         checker.add_check(Check::new(
                             CheckKind::MultiLineSummaryFirstLine,

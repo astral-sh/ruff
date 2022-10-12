@@ -1896,6 +1896,17 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::D200) {
                 docstrings::one_liner(self, &docstring);
             }
+            if self.settings.enabled.contains(&CheckCode::D201)
+                || self.settings.enabled.contains(&CheckCode::D202)
+            {
+                docstrings::blank_before_after_function(self, &docstring);
+            }
+            if self.settings.enabled.contains(&CheckCode::D203)
+                || self.settings.enabled.contains(&CheckCode::D204)
+                || self.settings.enabled.contains(&CheckCode::D211)
+            {
+                docstrings::blank_before_after_class(self, &docstring);
+            }
             if self.settings.enabled.contains(&CheckCode::D205) {
                 docstrings::blank_after_summary(self, &docstring);
             }

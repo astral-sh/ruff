@@ -1,4 +1,4 @@
-# No docstring, so we can test D100
+r# No docstring, so we can test D100
 from functools import wraps
 import os
 from .expected import Expectation
