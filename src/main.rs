@@ -365,14 +365,20 @@ fn inner_main() -> Result<ExitCode> {
             println!("Formatted {modifications} files.");
         }
     } else {
-        let messages = if cli.files == vec![PathBuf::from("-")] {
+        let (messages, print_messages) = if cli.files == vec![PathBuf::from("-")] {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            run_once_stdin(&settings, path, cli.fix)?
+            (
+                run_once_stdin(&settings, path, cli.fix)?,
+                !cli.quiet && !cli.fix,
+            )
         } else {
-            run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?
+            (
+                run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?,
+                !cli.quiet,
+            )
         };
-        if !cli.quiet && !cli.fix {
+        if print_messages {
             printer.write_once(&messages)?;
         }
 

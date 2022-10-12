@@ -1,6 +1,6 @@
 use std::fs::write;
-use std::fs::File;
 use std::io;
+use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
@@ -100,11 +100,14 @@ pub fn lint_stdin(
     // Generate checks.
     let mut checks = check_path(path, stdin, tokens, &noqa_line_for, settings, autofix)?;
 
-    // Apply autofix, writing it to stdout.
+    // Apply autofix, write results to stdout.
     if matches!(autofix, fixer::Mode::Apply) {
-        let mut output_file: Box<dyn io::Write> = Box::new(io::stdout());
-        fix_file(&mut checks, &stdin, &mut output_file)?;
-    };
+        let output = match fix_file(&mut checks, stdin) {
+            None => stdin.to_string(),
+            Some(content) => content,
+        };
+        io::stdout().write_all(output.as_bytes())?;
+    }
 
     // Convert to messages.
     Ok(checks
@@ -147,8 +150,9 @@ pub fn lint_path(
 
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
-        let mut output_file: Box<dyn io::Write> = Box::new(File::create(path)?);
-        fix_file(&mut checks, &contents, &mut output_file)?;
+        if let Some(fixed_contents) = fix_file(&mut checks, &contents) {
+            write(path, fixed_contents)?;
+        }
     };
 
     // Convert to messages.
