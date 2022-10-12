@@ -25,7 +25,7 @@ use crate::docstrings::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::settings::{PythonVersion, Settings};
-use crate::visibility::{module_visibility, transition_scope, Modifier, VisibleScope};
+use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{docstrings, plugins};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -40,7 +40,7 @@ pub struct Checker<'a> {
     // Computed checks.
     checks: Vec<Check>,
     // Docstring tracking.
-    docstrings: Vec<(Definition<'a>, VisibleScope)>,
+    docstrings: Vec<(Definition<'a>, Visibility)>,
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
     pub(crate) deletions: BTreeSet<usize>,
@@ -57,7 +57,7 @@ pub struct Checker<'a> {
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_assignments: Vec<usize>,
     // Internal, derivative state.
-    visibility: VisibleScope,
+    visible_scope: VisibleScope,
     in_f_string: Option<Range>,
     in_annotation: bool,
     in_literal: bool,
@@ -92,7 +92,7 @@ impl<'a> Checker<'a> {
             deferred_functions: Default::default(),
             deferred_lambdas: Default::default(),
             deferred_assignments: Default::default(),
-            visibility: VisibleScope {
+            visible_scope: VisibleScope {
                 modifier: Modifier::Module,
                 visibility: module_visibility(path),
             },
@@ -568,28 +568,28 @@ where
         }
 
         // Recurse.
-        let prev_visibility = self.visibility.clone();
+        let prev_visibile_scope = self.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
-                let visibility = transition_scope(&self.visibility, stmt, &Documentable::Function);
                 let definition =
-                    docstrings::extract(&self.visibility, stmt, body, &Documentable::Function);
-                self.visibility = visibility.clone();
-                self.docstrings.push((definition, visibility));
+                    docstrings::extract(&self.visible_scope, stmt, body, &Documentable::Function);
+                let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Function);
+                self.docstrings.push((definition, scope.visibility.clone()));
+                self.visible_scope = scope;
 
                 self.deferred_functions.push((
                     stmt,
                     self.scope_stack.clone(),
                     self.parent_stack.clone(),
-                    self.visibility.clone(),
+                    self.visible_scope.clone(),
                 ));
             }
             StmtKind::ClassDef { body, .. } => {
-                let visibility = transition_scope(&self.visibility, stmt, &Documentable::Class);
                 let definition =
-                    docstrings::extract(&self.visibility, stmt, body, &Documentable::Class);
-                self.visibility = visibility.clone();
-                self.docstrings.push((definition, visibility));
+                    docstrings::extract(&self.visible_scope, stmt, body, &Documentable::Class);
+                let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Class);
+                self.docstrings.push((definition, scope.visibility.clone()));
+                self.visible_scope = scope;
 
                 for stmt in body {
                     self.visit_stmt(stmt);
@@ -618,7 +618,7 @@ where
             }
             _ => visitor::walk_stmt(self, stmt),
         };
-        self.visibility = prev_visibility;
+        self.visible_scope = prev_visibile_scope;
 
         // Post-visit.
         if let StmtKind::ClassDef { name, .. } = &stmt.node {
@@ -1647,10 +1647,7 @@ impl<'a> Checker<'a> {
                 },
                 docstring,
             },
-            VisibleScope {
-                modifier: Modifier::Module,
-                visibility: module_visibility(self.path),
-            },
+            self.visible_scope.visibility.clone(),
         ));
         docstring.is_some()
     }
@@ -1710,7 +1707,7 @@ impl<'a> Checker<'a> {
         while let Some((stmt, scopes, parents, visibility)) = self.deferred_functions.pop() {
             self.parent_stack = parents;
             self.scope_stack = scopes;
-            self.visibility = visibility;
+            self.visible_scope = visibility;
             self.push_scope(Scope::new(ScopeKind::Function(Default::default())));
 
             match &stmt.node {
@@ -1902,11 +1899,11 @@ impl<'a> Checker<'a> {
     }
 
     fn check_docstrings(&mut self) {
-        while let Some((docstring, scope)) = self.docstrings.pop() {
+        while let Some((docstring, visibility)) = self.docstrings.pop() {
             if !docstrings::not_empty(self, &docstring) {
                 continue;
             }
-            if !docstrings::not_missing(self, &docstring, &scope) {
+            if !docstrings::not_missing(self, &docstring, &visibility) {
                 continue;
             }
             if self.settings.enabled.contains(&CheckCode::D200) {

@@ -115,12 +115,16 @@ fn range_for(docstring: &Expr) -> Range {
 }
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
-pub fn not_missing(checker: &mut Checker, definition: &Definition, scope: &VisibleScope) -> bool {
-    if definition.docstring.is_some() {
+pub fn not_missing(
+    checker: &mut Checker,
+    definition: &Definition,
+    visibility: &Visibility,
+) -> bool {
+    if matches!(visibility, Visibility::Private) {
         return true;
     }
 
-    if matches!(scope.visibility, Visibility::Private) {
+    if definition.docstring.is_some() {
         return true;
     }
 
