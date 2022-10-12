@@ -21,7 +21,7 @@ use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checkers, helpers, operations, visitor};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::docstrings::{Docstring, DocstringKind};
+use crate::docstrings::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::settings::{PythonVersion, Settings};
@@ -31,7 +31,7 @@ pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
 pub struct Checker<'a> {
     // Input data.
-    path: &'a Path,
+    pub(crate) path: &'a Path,
     // TODO(charlie): Separate immutable from mutable state. (None of these should ever change.)
     pub(crate) locator: SourceCodeLocator<'a>,
     pub(crate) settings: &'a Settings,
@@ -39,7 +39,7 @@ pub struct Checker<'a> {
     // Computed checks.
     checks: Vec<Check>,
     // Docstring tracking.
-    docstrings: Vec<Docstring<'a>>,
+    docstrings: Vec<Definition<'a>>,
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
     pub(crate) deletions: BTreeSet<usize>,
@@ -125,36 +125,8 @@ where
             StmtKind::Import { .. } => {
                 self.futures_allowed = false;
             }
-            StmtKind::Expr { value } => {
-                // Track all docstrings: module-, class-, and function-level.
-                let mut is_module_docstring = false;
-                if matches!(
-                    &value.node,
-                    ExprKind::Constant {
-                        value: Constant::Str(_),
-                        ..
-                    }
-                ) {
-                    if let Some(docstring) = docstrings::extract(self, stmt, value) {
-                        if matches!(&docstring.kind, DocstringKind::Module) {
-                            is_module_docstring = true;
-                        }
-                        self.docstrings.push(docstring);
-                    }
-                }
-
-                if !is_module_docstring {
-                    if !self.seen_import_boundary
-                        && !operations::in_nested_block(&self.parent_stack, &self.parents)
-                    {
-                        self.seen_import_boundary = true;
-                    }
-                    self.futures_allowed = false;
-                }
-            }
             node => {
                 self.futures_allowed = false;
-
                 if !self.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(node)
                     && !operations::in_nested_block(&self.parent_stack, &self.parents)
@@ -594,7 +566,23 @@ where
 
         // Recurse.
         match &stmt.node {
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+            StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
+                // TODO(charlie): Track public / private.
+                // Grab all parents, to enable nested definition tracking. (Ignore the most recent
+                // parent which, confusingly, is `stmt`.)
+                let parents = self
+                    .parent_stack
+                    .iter()
+                    .take(self.parents.len() - 1)
+                    .map(|index| self.parents[*index])
+                    .collect();
+                self.docstrings.push(docstrings::extract(
+                    parents,
+                    stmt,
+                    body,
+                    Documentable::Function,
+                ));
+
                 self.deferred_functions.push((
                     stmt,
                     self.scope_stack.clone(),
@@ -602,6 +590,22 @@ where
                 ));
             }
             StmtKind::ClassDef { body, .. } => {
+                // TODO(charlie): Track public / priva
+                // Grab all parents, to enable nested definition tracking. (Ignore the most recent
+                // parent which, confusingly, is `stmt`.)
+                let parents = self
+                    .parent_stack
+                    .iter()
+                    .take(self.parents.len() - 1)
+                    .map(|index| self.parents[*index])
+                    .collect();
+                self.docstrings.push(docstrings::extract(
+                    parents,
+                    stmt,
+                    body,
+                    Documentable::Class,
+                ));
+
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -1643,6 +1647,22 @@ impl<'a> Checker<'a> {
         }
     }
 
+    fn visit_docstring<'b>(&mut self, python_ast: &'b Suite) -> bool
+    where
+        'b: 'a,
+    {
+        let docstring = docstrings::docstring_from(python_ast);
+        self.docstrings.push(Definition {
+            kind: if self.path.ends_with("__init__.py") {
+                DefinitionKind::Package
+            } else {
+                DefinitionKind::Module
+            },
+            docstring,
+        });
+        docstring.is_some()
+    }
+
     fn check_deferred_annotations(&mut self) {
         while let Some((expr, scopes, parents)) = self.deferred_annotations.pop() {
             self.parent_stack = parents;
@@ -1987,6 +2007,13 @@ pub fn check_ast(
     let mut checker = Checker::new(settings, autofix, path, contents);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
+
+    // Check for module docstring.
+    let python_ast = if checker.visit_docstring(python_ast) {
+        &python_ast[1..]
+    } else {
+        python_ast
+    };
 
     // Iterate over the AST.
     for stmt in python_ast {
