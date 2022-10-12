@@ -1,6 +1,5 @@
 ---
 source: src/linter.rs
-assertion_line: 1007
 expression: checks
 ---
 - kind:
