@@ -151,6 +151,14 @@ pub enum CheckCode {
     U007,
     U008,
     // pydocstyle
+    D100,
+    D101,
+    D102,
+    D103,
+    D104,
+    D105,
+    D106,
+    D107,
     D200,
     D205,
     D209,
@@ -282,6 +290,14 @@ pub enum CheckKind {
     NoBlankLineBeforeClass(usize),
     OneBlankLineBeforeClass(usize),
     OneBlankLineAfterClass(usize),
+    PublicModule,
+    PublicClass,
+    PublicMethod,
+    PublicFunction,
+    PublicPackage,
+    MagicMethod,
+    PublicNestedClass,
+    PublicInit,
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -391,6 +407,14 @@ impl CheckCode {
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             // pydocstyle
+            CheckCode::D100 => CheckKind::PublicModule,
+            CheckCode::D101 => CheckKind::PublicClass,
+            CheckCode::D102 => CheckKind::PublicMethod,
+            CheckCode::D103 => CheckKind::PublicFunction,
+            CheckCode::D104 => CheckKind::PublicPackage,
+            CheckCode::D105 => CheckKind::MagicMethod,
+            CheckCode::D106 => CheckKind::PublicNestedClass,
+            CheckCode::D107 => CheckKind::PublicInit,
             CheckCode::D200 => CheckKind::FitsOnOneLine,
             CheckCode::D205 => CheckKind::NoBlankLineAfterSummary,
             CheckCode::D209 => CheckKind::NewLineAfterLastParagraph,
@@ -496,6 +520,14 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             CheckKind::SuperCallWithParameters => &CheckCode::U008,
             // pydocstyle
+            CheckKind::PublicModule => &CheckCode::D100,
+            CheckKind::PublicClass => &CheckCode::D101,
+            CheckKind::PublicMethod => &CheckCode::D102,
+            CheckKind::PublicFunction => &CheckCode::D103,
+            CheckKind::PublicPackage => &CheckCode::D104,
+            CheckKind::MagicMethod => &CheckCode::D105,
+            CheckKind::PublicNestedClass => &CheckCode::D106,
+            CheckKind::PublicInit => &CheckCode::D107,
             CheckKind::FitsOnOneLine => &CheckCode::D200,
             CheckKind::NoBlankLineAfterSummary => &CheckCode::D205,
             CheckKind::NewLineAfterLastParagraph => &CheckCode::D209,
@@ -792,9 +824,23 @@ impl CheckKind {
             CheckKind::NoBlankLineAfterFunction(num_lines) => {
                 format!("No blank lines allowed after function docstring (found {num_lines})")
             }
-            CheckKind::NoBlankLineBeforeClass(_) => "NoBlankLineBeforeClass".to_string(),
-            CheckKind::OneBlankLineBeforeClass(_) => "OneBlankLineBeforeClass".to_string(),
-            CheckKind::OneBlankLineAfterClass(_) => "OneBlankLineAfterClass".to_string(),
+            CheckKind::NoBlankLineBeforeClass(_) => {
+                "No blank lines allowed before class docstring".to_string()
+            }
+            CheckKind::OneBlankLineBeforeClass(_) => {
+                "1 blank line required before class docstring".to_string()
+            }
+            CheckKind::OneBlankLineAfterClass(_) => {
+                "1 blank line required after class docstring".to_string()
+            }
+            CheckKind::PublicModule => "Missing docstring in public module".to_string(),
+            CheckKind::PublicClass => "Missing docstring in public class".to_string(),
+            CheckKind::PublicMethod => "Missing docstring in public method".to_string(),
+            CheckKind::PublicFunction => "Missing docstring in public function".to_string(),
+            CheckKind::PublicPackage => "Missing docstring in public package".to_string(),
+            CheckKind::MagicMethod => "Missing docstring in magic method".to_string(),
+            CheckKind::PublicNestedClass => "Missing docstring in public nested class".to_string(),
+            CheckKind::PublicInit => "Missing docstring in __init__".to_string(),
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),

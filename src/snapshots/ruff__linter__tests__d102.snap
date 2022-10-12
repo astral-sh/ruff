@@ -1,0 +1,29 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: PublicMethod
+  location:
+    row: 22
+    column: 5
+  end_location:
+    row: 25
+    column: 5
+  fix: ~
+- kind: PublicMethod
+  location:
+    row: 51
+    column: 5
+  end_location:
+    row: 54
+    column: 5
+  fix: ~
+- kind: PublicMethod
+  location:
+    row: 63
+    column: 5
+  end_location:
+    row: 67
+    column: 1
+  fix: ~
+

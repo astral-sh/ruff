@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: PublicFunction
+  location:
+    row: 395
+    column: 1
+  end_location:
+    row: 396
+    column: 1
+  fix: ~
+

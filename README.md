@@ -217,7 +217,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (11/16)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
-- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (17/48)
+- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (25/48)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -304,6 +304,14 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations |  | 🛠 |
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations |  | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |  | 🛠 |
+| D100 | PublicModule | Missing docstring in public module |  |  |
+| D101 | PublicClass | Missing docstring in public class |  |  |
+| D102 | PublicMethod | Missing docstring in public method |  |  |
+| D103 | PublicFunction | Missing docstring in public function |  |  |
+| D104 | PublicPackage | Missing docstring in public package |  |  |
+| D105 | MagicMethod | Missing docstring in magic method |  |  |
+| D106 | PublicNestedClass | Missing docstring in public nested class |  |  |
+| D107 | PublicInit | Missing docstring in __init__ |  |  |
 | D200 | FitsOnOneLine | One-line docstring should fit on one line |  |  |
 | D205 | NoBlankLineAfterSummary | 1 blank line required between summary line and description |  |  |
 | D209 | NewLineAfterLastParagraph | Multi-line docstring closing quotes should be on a separate line |  |  |
@@ -318,9 +326,9 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D419 | NonEmpty | Docstring is empty |  |  |
 | D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found 1) |  |  |
 | D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) |  |  |
-| D211 | NoBlankLineBeforeClass | NoBlankLineBeforeClass |  |  |
-| D203 | OneBlankLineBeforeClass | OneBlankLineBeforeClass |  |  |
-| D204 | OneBlankLineAfterClass | OneBlankLineAfterClass |  |  |
+| D211 | NoBlankLineBeforeClass | No blank lines allowed before class docstring |  |  |
+| D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring |  |  |
+| D204 | OneBlankLineAfterClass | 1 blank line required after class docstring |  |  |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations
