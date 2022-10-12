@@ -161,9 +161,14 @@ pub enum CheckCode {
     D106,
     D107,
     D200,
+    D201,
+    D202,
+    D203,
+    D204,
     D205,
     D209,
     D210,
+    D211,
     D212,
     D213,
     D300,
@@ -171,19 +176,19 @@ pub enum CheckCode {
     D402,
     D403,
     D404,
+    D405,
+    D406,
+    D407,
+    D408,
+    D409,
+    D410,
+    D411,
+    D412,
+    D413,
+    D414,
     D415,
     D418,
     D419,
-    D201,
-    D202,
-    D211,
-    D203,
-    D204,
-    D405,
-    D413,
-    D410,
-    D411,
-    D406,
     // Meta
     M001,
 }
@@ -282,6 +287,11 @@ pub enum CheckKind {
     UsePEP604Annotation,
     SuperCallWithParameters,
     // pydocstyle
+    BlankLineAfterLastSection(String),
+    BlankLineAfterSection(String),
+    BlankLineBeforeSection(String),
+    CapitalizeSectionName(String),
+    DashedUnderlineAfterSection(String),
     EndsInPeriod,
     EndsInPunctuation,
     FirstLineCapitalized,
@@ -290,14 +300,17 @@ pub enum CheckKind {
     MultiLineSummaryFirstLine,
     MultiLineSummarySecondLine,
     NewLineAfterLastParagraph,
+    NewLineAfterSectionName(String),
     NoBlankLineAfterFunction(usize),
     NoBlankLineAfterSummary,
     NoBlankLineBeforeClass(usize),
     NoBlankLineBeforeFunction(usize),
+    NoBlankLinesBetweenHeaderAndContent(String),
     NoSignature,
     NoSurroundingWhitespace,
     NoThisPrefix,
     NonEmpty,
+    NonEmptySection(String),
     OneBlankLineAfterClass(usize),
     OneBlankLineBeforeClass(usize),
     PublicClass,
@@ -307,13 +320,10 @@ pub enum CheckKind {
     PublicModule,
     PublicNestedClass,
     PublicPackage,
+    SectionUnderlineAfterName(String),
+    SectionUnderlineMatchesSectionLength(String),
     SkipDocstring,
     UsesTripleQuotes,
-    CapitalizeSectionName(String),
-    BlankLineAfterLastSection(String),
-    BlankLineAfterSection(String),
-    BlankLineBeforeSection(String),
-    NewLineAfterSectionName(String),
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -451,14 +461,23 @@ impl CheckCode {
             CheckCode::D402 => CheckKind::NoSignature,
             CheckCode::D403 => CheckKind::FirstLineCapitalized,
             CheckCode::D404 => CheckKind::NoThisPrefix,
+            CheckCode::D405 => CheckKind::CapitalizeSectionName("returns".to_string()),
+            CheckCode::D406 => CheckKind::NewLineAfterSectionName("Returns".to_string()),
+            CheckCode::D407 => CheckKind::DashedUnderlineAfterSection("Returns".to_string()),
+            CheckCode::D408 => CheckKind::SectionUnderlineAfterName("Returns".to_string()),
+            CheckCode::D409 => {
+                CheckKind::SectionUnderlineMatchesSectionLength("Returns".to_string())
+            }
+            CheckCode::D410 => CheckKind::BlankLineAfterSection("Returns".to_string()),
+            CheckCode::D411 => CheckKind::BlankLineBeforeSection("Returns".to_string()),
+            CheckCode::D412 => {
+                CheckKind::NoBlankLinesBetweenHeaderAndContent("Returns".to_string())
+            }
+            CheckCode::D413 => CheckKind::BlankLineAfterLastSection("Returns".to_string()),
+            CheckCode::D414 => CheckKind::NonEmptySection("Returns".to_string()),
             CheckCode::D415 => CheckKind::EndsInPunctuation,
             CheckCode::D418 => CheckKind::SkipDocstring,
             CheckCode::D419 => CheckKind::NonEmpty,
-            CheckCode::D405 => CheckKind::CapitalizeSectionName("returns".to_string()),
-            CheckCode::D413 => CheckKind::BlankLineAfterLastSection("Returns".to_string()),
-            CheckCode::D410 => CheckKind::BlankLineAfterSection("Returns".to_string()),
-            CheckCode::D411 => CheckKind::BlankLineBeforeSection("Returns".to_string()),
-            CheckCode::D406 => CheckKind::NewLineAfterSectionName("Returns".to_string()),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -548,6 +567,11 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             CheckKind::SuperCallWithParameters => &CheckCode::U008,
             // pydocstyle
+            CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
+            CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
+            CheckKind::BlankLineBeforeSection(_) => &CheckCode::D411,
+            CheckKind::CapitalizeSectionName(_) => &CheckCode::D405,
+            CheckKind::DashedUnderlineAfterSection(_) => &CheckCode::D407,
             CheckKind::EndsInPeriod => &CheckCode::D400,
             CheckKind::EndsInPunctuation => &CheckCode::D415,
             CheckKind::FirstLineCapitalized => &CheckCode::D403,
@@ -556,14 +580,17 @@ impl CheckKind {
             CheckKind::MultiLineSummaryFirstLine => &CheckCode::D212,
             CheckKind::MultiLineSummarySecondLine => &CheckCode::D213,
             CheckKind::NewLineAfterLastParagraph => &CheckCode::D209,
+            CheckKind::NewLineAfterSectionName(_) => &CheckCode::D406,
             CheckKind::NoBlankLineAfterFunction(_) => &CheckCode::D202,
             CheckKind::NoBlankLineAfterSummary => &CheckCode::D205,
             CheckKind::NoBlankLineBeforeClass(_) => &CheckCode::D211,
             CheckKind::NoBlankLineBeforeFunction(_) => &CheckCode::D201,
+            CheckKind::NoBlankLinesBetweenHeaderAndContent(_) => &CheckCode::D412,
             CheckKind::NoSignature => &CheckCode::D402,
             CheckKind::NoSurroundingWhitespace => &CheckCode::D210,
             CheckKind::NoThisPrefix => &CheckCode::D404,
             CheckKind::NonEmpty => &CheckCode::D419,
+            CheckKind::NonEmptySection(_) => &CheckCode::D414,
             CheckKind::OneBlankLineAfterClass(_) => &CheckCode::D204,
             CheckKind::OneBlankLineBeforeClass(_) => &CheckCode::D203,
             CheckKind::PublicClass => &CheckCode::D101,
@@ -573,13 +600,10 @@ impl CheckKind {
             CheckKind::PublicModule => &CheckCode::D100,
             CheckKind::PublicNestedClass => &CheckCode::D106,
             CheckKind::PublicPackage => &CheckCode::D104,
+            CheckKind::SectionUnderlineAfterName(_) => &CheckCode::D408,
+            CheckKind::SectionUnderlineMatchesSectionLength(_) => &CheckCode::D409,
             CheckKind::SkipDocstring => &CheckCode::D418,
             CheckKind::UsesTripleQuotes => &CheckCode::D300,
-            CheckKind::CapitalizeSectionName(_) => &CheckCode::D405,
-            CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
-            CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
-            CheckKind::BlankLineBeforeSection(_) => &CheckCode::D411,
-            CheckKind::NewLineAfterSectionName(_) => &CheckCode::D406,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -900,6 +924,21 @@ impl CheckKind {
             CheckKind::NewLineAfterSectionName(name) => {
                 format!("Section name should end with a newline (\"{name}\")")
             }
+            CheckKind::DashedUnderlineAfterSection(name) => {
+                format!("Missing dashed underline after section (\"{name}\")")
+            }
+            CheckKind::SectionUnderlineAfterName(name) => {
+                format!("Section underline should be in the line following the section's name (\"{name}\")")
+            }
+            CheckKind::SectionUnderlineMatchesSectionLength(name) => {
+                format!("Section underline should match the length of its name (\"{name}\")")
+            }
+            CheckKind::NoBlankLinesBetweenHeaderAndContent(name) => {
+                format!(
+                    "No blank lines allowed between a section header and its content (\"{name}\")"
+                )
+            }
+            CheckKind::NonEmptySection(name) => format!("Section has no content (\"{name}\")"),
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),

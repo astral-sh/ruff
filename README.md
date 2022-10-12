@@ -217,7 +217,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (12/16)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
-- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (32/48)
+- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (37/48)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -337,6 +337,11 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D410 | BlankLineAfterSection | Missing blank line after section ("Returns") |  |  |
 | D411 | BlankLineBeforeSection | Missing blank line before section ("Returns") |  |  |
 | D406 | NewLineAfterSectionName | Section name should end with a newline ("Returns") |  |  |
+| D407 | DashedUnderlineAfterSection | Missing dashed underline after section ("Returns") |  |  |
+| D408 | SectionUnderlineAfterName | Section underline should be in the line following the section's name ("Returns") |  |  |
+| D409 | SectionUnderlineMatchesSectionLength | Section underline should match the length of its name ("Returns") |  |  |
+| D412 | NoBlankLinesBetweenHeaderAndContent | No blank lines allowed between a section header and its content ("Returns") |  |  |
+| D414 | NonEmptySection | Section has no content ("Returns") |  |  |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations

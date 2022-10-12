@@ -1321,6 +1321,42 @@ mod tests {
     }
 
     #[test]
+    fn d407() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D407),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d408() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D408),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d409() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D409),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn d410() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/sections.py"),
@@ -1345,10 +1381,34 @@ mod tests {
     }
 
     #[test]
+    fn d412() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D412),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn d413() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/sections.py"),
             &settings::Settings::for_rule(CheckCode::D413),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d414() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D414),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);

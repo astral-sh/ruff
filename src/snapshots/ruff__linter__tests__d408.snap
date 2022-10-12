@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    SectionUnderlineAfterName: Returns
+  location:
+    row: 85
+    column: 5
+  end_location:
+    row: 92
+    column: 8
+  fix: ~
+
