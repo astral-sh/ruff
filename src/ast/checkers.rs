@@ -1010,15 +1010,14 @@ pub fn unnecessary_double_cast_or_process(
     args: &[Expr],
 ) -> Option<Check> {
     if let ExprKind::Name { id: outer, .. } = &func.node {
-        if vec!["list", "tuple", "set", "reversed", "sorted"].contains(&outer.as_str()) {
+        if ["list", "tuple", "set", "reversed", "sorted"].contains(&outer.as_str()) {
             if let Some(arg) = args.first() {
                 if let ExprKind::Call { func, .. } = &arg.node {
                     if let ExprKind::Name { id: inner, .. } = &func.node {
-                        if (vec!["set", "sorted"].contains(&outer.as_str())
-                            && vec!["list", "tuple", "reversed", "sorted"]
-                                .contains(&inner.as_str()))
-                            | (vec!["list", "tuple"].contains(&outer.as_str())
-                                && vec!["list", "tuple"].contains(&inner.as_str()))
+                        if (["set", "sorted"].contains(&outer.as_str())
+                            && ["list", "tuple", "reversed", "sorted"].contains(&inner.as_str()))
+                            | (["list", "tuple"].contains(&outer.as_str())
+                                && ["list", "tuple"].contains(&inner.as_str()))
                             | (outer == "set" && inner == "set")
                         {
                             return Some(Check::new(
