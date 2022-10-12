@@ -196,14 +196,12 @@ fn check_blanks_and_section_underline(
 
     // Nothing but blank lines after the section header.
     if blank_lines_after_header == context.following_lines.len() {
-        // D407
         if checker.settings.enabled.contains(&CheckCode::D407) {
             checker.add_check(Check::new(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
                 range_for(docstring),
             ));
         }
-        // D414
         if checker.settings.enabled.contains(&CheckCode::D414) {
             checker.add_check(Check::new(
                 CheckKind::NonEmptySection(context.section_name.to_string()),
@@ -219,7 +217,6 @@ fn check_blanks_and_section_underline(
         .all(|char| char.is_whitespace() || char == '-');
 
     if !dash_line_found {
-        // D407
         if checker.settings.enabled.contains(&CheckCode::D407) {
             checker.add_check(Check::new(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
@@ -227,7 +224,6 @@ fn check_blanks_and_section_underline(
             ));
         }
         if blank_lines_after_header > 0 {
-            // D212
             if checker.settings.enabled.contains(&CheckCode::D212) {
                 checker.add_check(Check::new(
                     CheckKind::NoBlankLinesBetweenHeaderAndContent(
@@ -239,7 +235,6 @@ fn check_blanks_and_section_underline(
         }
     } else {
         if blank_lines_after_header > 0 {
-            // D408
             if checker.settings.enabled.contains(&CheckCode::D408) {
                 checker.add_check(Check::new(
                     CheckKind::SectionUnderlineAfterName(context.section_name.to_string()),
@@ -255,7 +250,6 @@ fn check_blanks_and_section_underline(
             .count()
             != context.section_name.len()
         {
-            // D409
             if checker.settings.enabled.contains(&CheckCode::D409) {
                 checker.add_check(Check::new(
                     CheckKind::SectionUnderlineMatchesSectionLength(
@@ -275,7 +269,6 @@ fn check_blanks_and_section_underline(
             if line_after_dashes.trim().is_empty() {
                 let rest_of_lines = &context.following_lines[line_after_dashes_index..];
                 if rest_of_lines.iter().all(|line| line.trim().is_empty()) {
-                    // D414
                     if checker.settings.enabled.contains(&CheckCode::D414) {
                         checker.add_check(Check::new(
                             CheckKind::NonEmptySection(context.section_name.to_string()),
@@ -283,7 +276,6 @@ fn check_blanks_and_section_underline(
                         ));
                     }
                 } else {
-                    // 412
                     if checker.settings.enabled.contains(&CheckCode::D412) {
                         checker.add_check(Check::new(
                             CheckKind::NoBlankLinesBetweenHeaderAndContent(
@@ -295,7 +287,6 @@ fn check_blanks_and_section_underline(
                 }
             }
         } else {
-            // D414
             if checker.settings.enabled.contains(&CheckCode::D414) {
                 checker.add_check(Check::new(
                     CheckKind::NonEmptySection(context.section_name.to_string()),

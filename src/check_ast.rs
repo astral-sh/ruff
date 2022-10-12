@@ -1657,7 +1657,6 @@ impl<'a> Checker<'a> {
 
     fn handle_node_delete(&mut self, expr: &Expr) {
         if let ExprKind::Name { id, .. } = &expr.node {
-            // Check if we're on a conditional branch.
             if operations::on_conditional_branch(&self.parent_stack, &self.parents) {
                 return;
             }
