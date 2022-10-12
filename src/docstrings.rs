@@ -1,3 +1,5 @@
+//! Abstractions for tracking and validationg docstrings in Python code.
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
