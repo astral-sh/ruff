@@ -146,7 +146,7 @@ pub fn section_contexts<'a>(lines: &'a [&'a str]) -> Vec<SectionContext<'a>> {
             section_name: get_leading_words(lines[lineno]),
             previous_line: lines[lineno - 1],
             line: lines[lineno],
-            following_lines: &lines[lineno..],
+            following_lines: &lines[lineno + 1..],
             original_index: lineno,
             is_last_section: false,
         };
@@ -164,7 +164,7 @@ pub fn section_contexts<'a>(lines: &'a [&'a str]) -> Vec<SectionContext<'a>> {
             previous_line: context.previous_line,
             line: context.line,
             following_lines: if let Some(end) = end {
-                &lines[context.original_index..end]
+                &lines[context.original_index + 1..end]
             } else {
                 context.following_lines
             },
@@ -177,9 +177,137 @@ pub fn section_contexts<'a>(lines: &'a [&'a str]) -> Vec<SectionContext<'a>> {
     truncated_contexts
 }
 
+fn check_blanks_and_section_underline(
+    checker: &mut Checker,
+    definition: &Definition,
+    context: &SectionContext,
+) {
+    let docstring = definition
+        .docstring
+        .expect("Sections are only available for docstrings.");
+
+    let mut blank_lines_after_header = 0;
+    for line in context.following_lines {
+        if !line.trim().is_empty() {
+            break;
+        }
+        blank_lines_after_header += 1;
+    }
+
+    // Nothing but blank lines after the section header.
+    if blank_lines_after_header == context.following_lines.len() {
+        // D407
+        if checker.settings.enabled.contains(&CheckCode::D407) {
+            checker.add_check(Check::new(
+                CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
+                range_for(docstring),
+            ));
+        }
+        // D414
+        if checker.settings.enabled.contains(&CheckCode::D414) {
+            checker.add_check(Check::new(
+                CheckKind::NonEmptySection(context.section_name.to_string()),
+                range_for(docstring),
+            ));
+        }
+        return;
+    }
+
+    let non_empty_line = context.following_lines[blank_lines_after_header];
+    let dash_line_found = non_empty_line
+        .chars()
+        .all(|char| char.is_whitespace() || char == '-');
+
+    if !dash_line_found {
+        // D407
+        if checker.settings.enabled.contains(&CheckCode::D407) {
+            checker.add_check(Check::new(
+                CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
+                range_for(docstring),
+            ));
+        }
+        if blank_lines_after_header > 0 {
+            // D212
+            if checker.settings.enabled.contains(&CheckCode::D212) {
+                checker.add_check(Check::new(
+                    CheckKind::NoBlankLinesBetweenHeaderAndContent(
+                        context.section_name.to_string(),
+                    ),
+                    range_for(docstring),
+                ));
+            }
+        }
+    } else {
+        if blank_lines_after_header > 0 {
+            // D408
+            if checker.settings.enabled.contains(&CheckCode::D408) {
+                checker.add_check(Check::new(
+                    CheckKind::SectionUnderlineAfterName(context.section_name.to_string()),
+                    range_for(docstring),
+                ));
+            }
+        }
+
+        if non_empty_line
+            .trim()
+            .chars()
+            .filter(|char| *char == '-')
+            .count()
+            != context.section_name.len()
+        {
+            // D409
+            if checker.settings.enabled.contains(&CheckCode::D409) {
+                checker.add_check(Check::new(
+                    CheckKind::SectionUnderlineMatchesSectionLength(
+                        context.section_name.to_string(),
+                    ),
+                    range_for(docstring),
+                ));
+            }
+        }
+
+        // TODO(charlie): Implement D215, which requires indentation and leading space tracking.
+        let line_after_dashes_index = blank_lines_after_header + 1;
+
+        if line_after_dashes_index < context.following_lines.len() {
+            let line_after_dashes = context.following_lines[line_after_dashes_index];
+
+            if line_after_dashes.trim().is_empty() {
+                let rest_of_lines = &context.following_lines[line_after_dashes_index..];
+                if rest_of_lines.iter().all(|line| line.trim().is_empty()) {
+                    // D414
+                    if checker.settings.enabled.contains(&CheckCode::D414) {
+                        checker.add_check(Check::new(
+                            CheckKind::NonEmptySection(context.section_name.to_string()),
+                            range_for(docstring),
+                        ));
+                    }
+                } else {
+                    // 412
+                    if checker.settings.enabled.contains(&CheckCode::D412) {
+                        checker.add_check(Check::new(
+                            CheckKind::NoBlankLinesBetweenHeaderAndContent(
+                                context.section_name.to_string(),
+                            ),
+                            range_for(docstring),
+                        ));
+                    }
+                }
+            }
+        } else {
+            // D414
+            if checker.settings.enabled.contains(&CheckCode::D414) {
+                checker.add_check(Check::new(
+                    CheckKind::NonEmptySection(context.section_name.to_string()),
+                    range_for(docstring),
+                ));
+            }
+        }
+    }
+}
+
 fn check_common_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
-    // TODO(charlie): Implement D214.
-    // TODO(charlie): Implement `_check_blanks_and_section_underline`.
+    // TODO(charlie): Implement D214, which requires indentation and leading space tracking.
     let docstring = definition
         .docstring
         .expect("Sections are only available for docstrings.");
@@ -235,6 +363,7 @@ pub fn check_numpy_section(
 ) {
     // TODO(charlie): Implement `_check_parameters_section`.
     check_common_section(checker, definition, context);
+    check_blanks_and_section_underline(checker, definition, context);
 
     if checker.settings.enabled.contains(&CheckCode::D406) {
         let suffix = context
