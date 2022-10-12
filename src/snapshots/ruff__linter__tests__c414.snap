@@ -1,5 +1,6 @@
 ---
 source: src/linter.rs
+assertion_line: 1007
 expression: checks
 ---
 - kind:
@@ -15,8 +16,8 @@ expression: checks
   fix: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - list
       - tuple
+      - list
   location:
     row: 3
     column: 1
@@ -26,8 +27,8 @@ expression: checks
   fix: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - tuple
       - list
+      - tuple
   location:
     row: 4
     column: 1
@@ -59,8 +60,8 @@ expression: checks
   fix: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - set
       - list
+      - set
   location:
     row: 7
     column: 1
@@ -70,8 +71,8 @@ expression: checks
   fix: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - set
       - tuple
+      - set
   location:
     row: 8
     column: 1
@@ -81,8 +82,8 @@ expression: checks
   fix: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - set
       - sorted
+      - set
   location:
     row: 9
     column: 1
@@ -92,8 +93,8 @@ expression: checks
   fix: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - set
       - reversed
+      - set
   location:
     row: 10
     column: 1
@@ -103,8 +104,8 @@ expression: checks
   fix: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - sorted
       - list
+      - sorted
   location:
     row: 11
     column: 1
@@ -114,8 +115,8 @@ expression: checks
   fix: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - sorted
       - tuple
+      - sorted
   location:
     row: 12
     column: 1
@@ -136,8 +137,8 @@ expression: checks
   fix: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - sorted
       - reversed
+      - sorted
   location:
     row: 14
     column: 1
