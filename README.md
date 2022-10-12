@@ -215,7 +215,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
-- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (11/16)
+- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (12/16)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (25/48)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
@@ -293,6 +293,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | C408 | UnnecessaryCollectionCall | Unnecessary <dict/list/tuple> call - rewrite as a literal |  |  |
 | C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary <list/tuple> literal passed to tuple() - remove the outer call to tuple() |  |  |
 | C410 | UnnecessaryLiteralWithinListCall | Unnecessary <list/tuple> literal passed to list() - rewrite as a list literal |  |  |
+| C414 | UnnecessaryDoubleCastOrProcess | Unnecessary <list/reversed/set/sorted/tuple> call within <list/set/sorted/tuple>(). |  |  |
 | C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within <reversed/set/sorted>() |  |  |
 | T201 | PrintFound | `print` found |  | 🛠 |
 | T203 | PPrintFound | `pprint` found |  | 🛠 |

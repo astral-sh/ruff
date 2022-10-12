@@ -1004,6 +1004,68 @@ pub fn unnecessary_literal_within_list_call(
     None
 }
 
+pub fn unnecessary_double_cast_or_process(
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) -> Option<Check> {
+    if let ExprKind::Name { id: outer, .. } = &func.node {
+        if outer == "list"
+            || outer == "tuple"
+            || outer == "set"
+            || outer == "reversed"
+            || outer == "sorted"
+        {
+            if let Some(arg) = args.first() {
+                if let ExprKind::Call { func, .. } = &arg.node {
+                    if let ExprKind::Name { id: inner, .. } = &func.node {
+                        // Ex) set(tuple(...))
+                        if (outer == "set" || outer == "sorted")
+                            && (inner == "list"
+                                || inner == "tuple"
+                                || inner == "reversed"
+                                || inner == "sorted")
+                        {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryDoubleCastOrProcess(
+                                    inner.to_string(),
+                                    outer.to_string(),
+                                ),
+                                Range::from_located(expr),
+                            ));
+                        }
+
+                        // Ex) list(tuple(...))
+                        if (outer == "list" || outer == "tuple")
+                            && (inner == "list" || inner == "tuple")
+                        {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryDoubleCastOrProcess(
+                                    inner.to_string(),
+                                    outer.to_string(),
+                                ),
+                                Range::from_located(expr),
+                            ));
+                        }
+
+                        // Ex) set(set(...))
+                        if outer == "set" && inner == "set" {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryDoubleCastOrProcess(
+                                    inner.to_string(),
+                                    outer.to_string(),
+                                ),
+                                Range::from_located(expr),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     if let Some(first_arg) = args.first() {
         if let ExprKind::Name { id, .. } = &func.node {
