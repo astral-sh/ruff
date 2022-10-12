@@ -21,12 +21,13 @@ use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checkers, helpers, operations, visitor};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::docstrings::{Definition, DefinitionKind, Documentable};
+use crate::docstrings::docstring_checks;
+use crate::docstrings::types::{Definition, DefinitionKind, Documentable};
+use crate::plugins;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::settings::{PythonVersion, Settings};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
-use crate::{docstrings, plugins};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
@@ -571,8 +572,12 @@ where
         let prev_visibile_scope = self.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
-                let definition =
-                    docstrings::extract(&self.visible_scope, stmt, body, &Documentable::Function);
+                let definition = docstring_checks::extract(
+                    &self.visible_scope,
+                    stmt,
+                    body,
+                    &Documentable::Function,
+                );
                 let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Function);
                 self.docstrings.push((definition, scope.visibility.clone()));
                 self.visible_scope = scope;
@@ -585,8 +590,12 @@ where
                 ));
             }
             StmtKind::ClassDef { body, .. } => {
-                let definition =
-                    docstrings::extract(&self.visible_scope, stmt, body, &Documentable::Class);
+                let definition = docstring_checks::extract(
+                    &self.visible_scope,
+                    stmt,
+                    body,
+                    &Documentable::Class,
+                );
                 let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Class);
                 self.docstrings.push((definition, scope.visibility.clone()));
                 self.visible_scope = scope;
@@ -1646,7 +1655,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let docstring = docstrings::docstring_from(python_ast);
+        let docstring = docstring_checks::docstring_from(python_ast);
         self.docstrings.push((
             Definition {
                 kind: if self.path.ends_with("__init__.py") {
@@ -1909,61 +1918,63 @@ impl<'a> Checker<'a> {
 
     fn check_docstrings(&mut self) {
         while let Some((docstring, visibility)) = self.docstrings.pop() {
-            if !docstrings::not_empty(self, &docstring) {
+            if !docstring_checks::not_empty(self, &docstring) {
                 continue;
             }
-            if !docstrings::not_missing(self, &docstring, &visibility) {
+            if !docstring_checks::not_missing(self, &docstring, &visibility) {
                 continue;
             }
             if self.settings.enabled.contains(&CheckCode::D200) {
-                docstrings::one_liner(self, &docstring);
+                docstring_checks::one_liner(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D201)
                 || self.settings.enabled.contains(&CheckCode::D202)
             {
-                docstrings::blank_before_after_function(self, &docstring);
+                docstring_checks::blank_before_after_function(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D203)
                 || self.settings.enabled.contains(&CheckCode::D204)
                 || self.settings.enabled.contains(&CheckCode::D211)
             {
-                docstrings::blank_before_after_class(self, &docstring);
+                docstring_checks::blank_before_after_class(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D205) {
-                docstrings::blank_after_summary(self, &docstring);
+                docstring_checks::blank_after_summary(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D209) {
-                docstrings::newline_after_last_paragraph(self, &docstring);
+                docstring_checks::newline_after_last_paragraph(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D210) {
-                docstrings::no_surrounding_whitespace(self, &docstring);
+                docstring_checks::no_surrounding_whitespace(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D212)
                 || self.settings.enabled.contains(&CheckCode::D213)
             {
-                docstrings::multi_line_summary_start(self, &docstring);
+                docstring_checks::multi_line_summary_start(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D300) {
-                docstrings::triple_quotes(self, &docstring);
+                docstring_checks::triple_quotes(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D400) {
-                docstrings::ends_with_period(self, &docstring);
+                docstring_checks::ends_with_period(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D402) {
-                docstrings::no_signature(self, &docstring);
+                docstring_checks::no_signature(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D403) {
-                docstrings::capitalized(self, &docstring);
+                docstring_checks::capitalized(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D404) {
-                docstrings::starts_with_this(self, &docstring);
+                docstring_checks::starts_with_this(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D415) {
-                docstrings::ends_with_punctuation(self, &docstring);
+                docstring_checks::ends_with_punctuation(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D418) {
-                docstrings::if_needed(self, &docstring);
+                docstring_checks::if_needed(self, &docstring);
             }
+
+            docstring_checks::check_sections(self, &docstring);
         }
     }
 

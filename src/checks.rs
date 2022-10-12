@@ -179,6 +179,11 @@ pub enum CheckCode {
     D211,
     D203,
     D204,
+    D405,
+    D413,
+    D410,
+    D411,
+    D406,
     // Meta
     M001,
 }
@@ -304,6 +309,11 @@ pub enum CheckKind {
     PublicPackage,
     SkipDocstring,
     UsesTripleQuotes,
+    CapitalizeSectionName(String),
+    BlankLineAfterLastSection(String),
+    BlankLineAfterSection(String),
+    BlankLineBeforeSection(String),
+    NewLineAfterSectionName(String),
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -444,6 +454,11 @@ impl CheckCode {
             CheckCode::D415 => CheckKind::EndsInPunctuation,
             CheckCode::D418 => CheckKind::SkipDocstring,
             CheckCode::D419 => CheckKind::NonEmpty,
+            CheckCode::D405 => CheckKind::CapitalizeSectionName("returns".to_string()),
+            CheckCode::D413 => CheckKind::BlankLineAfterLastSection("Returns".to_string()),
+            CheckCode::D410 => CheckKind::BlankLineAfterSection("Returns".to_string()),
+            CheckCode::D411 => CheckKind::BlankLineBeforeSection("Returns".to_string()),
+            CheckCode::D406 => CheckKind::NewLineAfterSectionName("Returns".to_string()),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -560,6 +575,11 @@ impl CheckKind {
             CheckKind::PublicPackage => &CheckCode::D104,
             CheckKind::SkipDocstring => &CheckCode::D418,
             CheckKind::UsesTripleQuotes => &CheckCode::D300,
+            CheckKind::CapitalizeSectionName(_) => &CheckCode::D405,
+            CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
+            CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
+            CheckKind::BlankLineBeforeSection(_) => &CheckCode::D411,
+            CheckKind::NewLineAfterSectionName(_) => &CheckCode::D406,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -864,6 +884,21 @@ impl CheckKind {
             }
             CheckKind::SkipDocstring => {
                 "Function decorated with @overload shouldn't contain a docstring".to_string()
+            }
+            CheckKind::CapitalizeSectionName(name) => {
+                format!("Section name should be properly capitalized (\"{name}\")")
+            }
+            CheckKind::BlankLineAfterLastSection(name) => {
+                format!("Missing blank line after last section (\"{name}\")")
+            }
+            CheckKind::BlankLineAfterSection(name) => {
+                format!("Missing blank line after section (\"{name}\")")
+            }
+            CheckKind::BlankLineBeforeSection(name) => {
+                format!("Missing blank line before section (\"{name}\")")
+            }
+            CheckKind::NewLineAfterSectionName(name) => {
+                format!("Section name should end with a newline (\"{name}\")")
             }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {

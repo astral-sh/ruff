@@ -1297,6 +1297,66 @@ mod tests {
     }
 
     #[test]
+    fn d405() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D405),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d406() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D406),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d410() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D410),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d411() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D411),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d413() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/sections.py"),
+            &settings::Settings::for_rule(CheckCode::D413),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn d415() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/D.py"),

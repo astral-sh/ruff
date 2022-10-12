@@ -2,10 +2,10 @@
 
 use std::path::Path;
 
-use crate::ast::helpers::match_name_or_attr;
 use rustpython_ast::{Stmt, StmtKind};
 
-use crate::docstrings::Documentable;
+use crate::ast::helpers::match_name_or_attr;
+use crate::docstrings::types::Documentable;
 
 #[derive(Debug, Clone)]
 pub enum Modifier {
