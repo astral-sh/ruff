@@ -1285,10 +1285,34 @@ mod tests {
     }
 
     #[test]
+    fn d404() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/D.py"),
+            &settings::Settings::for_rule(CheckCode::D404),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn d415() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/D.py"),
             &settings::Settings::for_rule(CheckCode::D415),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d418() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/D.py"),
+            &settings::Settings::for_rule(CheckCode::D418),
             &fixer::Mode::Generate,
         )?;
         checks.sort_by_key(|check| check.location);

@@ -1,3 +1,5 @@
+//! Abstractions for tracking and validationg docstrings in Python code.
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
@@ -593,6 +595,32 @@ pub fn capitalized(checker: &mut Checker, definition: &Definition) {
     }
 }
 
+/// D404
+pub fn starts_with_this(checker: &mut Checker, definition: &Definition) {
+    if let Some(docstring) = definition.docstring {
+        if let ExprKind::Constant {
+            value: Constant::Str(string),
+            ..
+        } = &docstring.node
+        {
+            let trimmed = string.trim();
+            if trimmed.is_empty() {
+                return;
+            }
+
+            if let Some(first_word) = string.split(' ').next() {
+                if first_word
+                    .replace(|c: char| !c.is_alphanumeric(), "")
+                    .to_lowercase()
+                    == "this"
+                {
+                    checker.add_check(Check::new(CheckKind::NoThisPrefix, range_for(docstring)));
+                }
+            }
+        }
+    }
+}
+
 /// D415
 pub fn ends_with_punctuation(checker: &mut Checker, definition: &Definition) {
     if let Some(docstring) = definition.docstring {
@@ -608,6 +636,23 @@ pub fn ends_with_punctuation(checker: &mut Checker, definition: &Definition) {
                         range_for(docstring),
                     ));
                 }
+            }
+        }
+    }
+}
+
+/// D418
+pub fn if_needed(checker: &mut Checker, definition: &Definition) {
+    if definition.docstring.is_some() {
+        if let DefinitionKind::Function(stmt)
+        | DefinitionKind::NestedFunction(stmt)
+        | DefinitionKind::Method(stmt) = definition.kind
+        {
+            if is_overload(stmt) {
+                checker.add_check(Check::new(
+                    CheckKind::SkipDocstring,
+                    Range::from_located(stmt),
+                ));
             }
         }
     }

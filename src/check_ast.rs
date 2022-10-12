@@ -1955,8 +1955,14 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::D403) {
                 docstrings::capitalized(self, &docstring);
             }
+            if self.settings.enabled.contains(&CheckCode::D404) {
+                docstrings::starts_with_this(self, &docstring);
+            }
             if self.settings.enabled.contains(&CheckCode::D415) {
                 docstrings::ends_with_punctuation(self, &docstring);
+            }
+            if self.settings.enabled.contains(&CheckCode::D418) {
+                docstrings::if_needed(self, &docstring);
             }
         }
     }

@@ -1,3 +1,5 @@
+//! Abstractions for tracking public and private visibility across modules, classes, and functions.
+
 use std::path::Path;
 
 use crate::ast::helpers::match_name_or_attr;
@@ -24,6 +26,7 @@ pub struct VisibleScope {
     pub visibility: Visibility,
 }
 
+/// Returns `true` if a function definition is an `@overload`.
 pub fn is_overload(stmt: &Stmt) -> bool {
     match &stmt.node {
         StmtKind::FunctionDef { decorator_list, .. }
@@ -34,6 +37,7 @@ pub fn is_overload(stmt: &Stmt) -> bool {
     }
 }
 
+/// Returns `true` if a function is a "magic method".
 pub fn is_magic(stmt: &Stmt) -> bool {
     match &stmt.node {
         StmtKind::FunctionDef { name, .. } | StmtKind::AsyncFunctionDef { name, .. } => {
@@ -47,6 +51,7 @@ pub fn is_magic(stmt: &Stmt) -> bool {
     }
 }
 
+/// Returns `true` if a function is an `__init__`.
 pub fn is_init(stmt: &Stmt) -> bool {
     match &stmt.node {
         StmtKind::FunctionDef { name, .. } | StmtKind::AsyncFunctionDef { name, .. } => {
@@ -56,13 +61,14 @@ pub fn is_init(stmt: &Stmt) -> bool {
     }
 }
 
-fn is_private_name(module_name: &str) -> bool {
+/// Returns `true` if a module name indicates private visibility.
+fn is_private_module(module_name: &str) -> bool {
     module_name.starts_with('_') || (module_name.starts_with("__") && module_name.ends_with("__"))
 }
 
 pub fn module_visibility(path: &Path) -> Visibility {
     for component in path.iter().rev() {
-        if is_private_name(&component.to_string_lossy()) {
+        if is_private_module(&component.to_string_lossy()) {
             return Visibility::Private;
         }
     }
@@ -115,6 +121,9 @@ fn class_visibility(stmt: &Stmt) -> Visibility {
 }
 
 /// Transition a `VisibleScope` based on a new `Documentable` definition.
+///
+/// `scope` is the current `VisibleScope`, while `Documentable` and `Stmt` describe the current
+/// node used to modify visibility.
 pub fn transition_scope(scope: &VisibleScope, stmt: &Stmt, kind: &Documentable) -> VisibleScope {
     match kind {
         Documentable::Function => VisibleScope {

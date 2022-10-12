@@ -1,0 +1,29 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: SkipDocstring
+  location:
+    row: 33
+    column: 5
+  end_location:
+    row: 37
+    column: 5
+  fix: ~
+- kind: SkipDocstring
+  location:
+    row: 85
+    column: 5
+  end_location:
+    row: 89
+    column: 5
+  fix: ~
+- kind: SkipDocstring
+  location:
+    row: 105
+    column: 1
+  end_location:
+    row: 110
+    column: 1
+  fix: ~
+
