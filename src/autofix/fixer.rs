@@ -1,5 +1,4 @@
-use std::fs;
-use std::path::Path;
+use std::io;
 
 use anyhow::Result;
 use itertools::Itertools;
@@ -24,17 +23,19 @@ impl From<bool> for Mode {
 }
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file(checks: &mut [Check], contents: &str, path: &Path) -> Result<()> {
-    if checks.iter().all(|check| check.fix.is_none()) {
-        return Ok(());
-    }
-
+pub fn fix_file(
+    checks: &mut [Check],
+    contents: &str,
+    output_file: &mut Box<dyn io::Write>,
+) -> Result<()> {
     let output = apply_fixes(
         checks.iter_mut().filter_map(|check| check.fix.as_mut()),
         contents,
     );
 
-    fs::write(path, output).map_err(|e| e.into())
+    output_file
+        .write_all(output.as_bytes())
+        .map_err(|e| e.into())
 }
 
 /// Apply a series of fixes.
