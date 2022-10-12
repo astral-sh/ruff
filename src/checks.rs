@@ -163,6 +163,11 @@ pub enum CheckCode {
     D403,
     D415,
     D419,
+    D201,
+    D202,
+    D211,
+    D203,
+    D204,
     // Meta
     M001,
 }
@@ -272,6 +277,11 @@ pub enum CheckKind {
     NonEmpty,
     UsesTripleQuotes,
     NoSignature,
+    NoBlankLineBeforeFunction(usize),
+    NoBlankLineAfterFunction(usize),
+    NoBlankLineBeforeClass(usize),
+    OneBlankLineBeforeClass(usize),
+    OneBlankLineAfterClass(usize),
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -393,6 +403,11 @@ impl CheckCode {
             CheckCode::D402 => CheckKind::NoSignature,
             CheckCode::D403 => CheckKind::FirstLineCapitalized,
             CheckCode::D415 => CheckKind::EndsInPunctuation,
+            CheckCode::D201 => CheckKind::NoBlankLineBeforeFunction(1),
+            CheckCode::D202 => CheckKind::NoBlankLineAfterFunction(1),
+            CheckCode::D211 => CheckKind::NoBlankLineBeforeClass(1),
+            CheckCode::D203 => CheckKind::OneBlankLineBeforeClass(0),
+            CheckCode::D204 => CheckKind::OneBlankLineAfterClass(0),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -493,6 +508,11 @@ impl CheckKind {
             CheckKind::NoSignature => &CheckCode::D402,
             CheckKind::FirstLineCapitalized => &CheckCode::D403,
             CheckKind::EndsInPunctuation => &CheckCode::D415,
+            CheckKind::NoBlankLineBeforeFunction(_) => &CheckCode::D201,
+            CheckKind::NoBlankLineAfterFunction(_) => &CheckCode::D202,
+            CheckKind::NoBlankLineBeforeClass(_) => &CheckCode::D211,
+            CheckKind::OneBlankLineBeforeClass(_) => &CheckCode::D203,
+            CheckKind::OneBlankLineAfterClass(_) => &CheckCode::D204,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -766,6 +786,15 @@ impl CheckKind {
             CheckKind::NoSignature => {
                 "First line should not be the function's 'signature'".to_string()
             }
+            CheckKind::NoBlankLineBeforeFunction(num_lines) => {
+                format!("No blank lines allowed before function docstring (found {num_lines})")
+            }
+            CheckKind::NoBlankLineAfterFunction(num_lines) => {
+                format!("No blank lines allowed after function docstring (found {num_lines})")
+            }
+            CheckKind::NoBlankLineBeforeClass(_) => "NoBlankLineBeforeClass".to_string(),
+            CheckKind::OneBlankLineBeforeClass(_) => "OneBlankLineBeforeClass".to_string(),
+            CheckKind::OneBlankLineAfterClass(_) => "OneBlankLineAfterClass".to_string(),
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),

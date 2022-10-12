@@ -1,0 +1,23 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    NoBlankLineAfterFunction: 1
+  location:
+    row: 137
+    column: 5
+  end_location:
+    row: 137
+    column: 25
+  fix: ~
+- kind:
+    NoBlankLineAfterFunction: 1
+  location:
+    row: 146
+    column: 5
+  end_location:
+    row: 146
+    column: 38
+  fix: ~
+

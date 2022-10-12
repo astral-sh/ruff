@@ -134,7 +134,7 @@ impl<'a> SourceCodeLocator<'a> {
         }
     }
 
-    pub fn slice_source_code_at(&mut self, location: &Location) -> &'a str {
+    fn init(&mut self) {
         if !self.initialized {
             let mut offset = 0;
             for i in self.content.lines() {
@@ -142,24 +142,40 @@ impl<'a> SourceCodeLocator<'a> {
                 offset += i.len();
                 offset += 1;
             }
+            self.offsets.push(offset);
             self.initialized = true;
         }
+    }
+
+    pub fn slice_source_code_at(&mut self, location: &Location) -> &'a str {
+        self.init();
         let offset = self.offsets[location.row() - 1] + location.column() - 1;
         &self.content[offset..]
     }
 
     pub fn slice_source_code_range(&mut self, range: &Range) -> &'a str {
-        if !self.initialized {
-            let mut offset = 0;
-            for i in self.content.lines() {
-                self.offsets.push(offset);
-                offset += i.len();
-                offset += 1;
-            }
-            self.initialized = true;
-        }
+        self.init();
         let start = self.offsets[range.location.row() - 1] + range.location.column() - 1;
         let end = self.offsets[range.end_location.row() - 1] + range.end_location.column() - 1;
         &self.content[start..end]
+    }
+
+    pub fn partition_source_code_at(
+        &mut self,
+        outer: &Range,
+        inner: &Range,
+    ) -> (&'a str, &'a str, &'a str) {
+        self.init();
+        let outer_start = self.offsets[outer.location.row() - 1] + outer.location.column() - 1;
+        let outer_end =
+            self.offsets[outer.end_location.row() - 1] + outer.end_location.column() - 1;
+        let inner_start = self.offsets[inner.location.row() - 1] + inner.location.column() - 1;
+        let inner_end =
+            self.offsets[inner.end_location.row() - 1] + inner.end_location.column() - 1;
+        (
+            &self.content[outer_start..inner_start],
+            &self.content[inner_start..inner_end],
+            &self.content[inner_end..outer_end],
+        )
     }
 }
