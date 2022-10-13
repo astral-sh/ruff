@@ -94,6 +94,8 @@ Arguments:
   <FILES>...
 
 Options:
+      --config <CONFIG>
+          Path to the `pyproject.toml` file to use for configuration
   -v, --verbose
           Enable verbose logging
   -q, --quiet
@@ -132,6 +134,8 @@ Options:
           Regular expression matching the name of dummy variables
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported
+      --stdin-filename <STDIN_FILENAME>
+          The name of the file when passing it through stdin
   -h, --help
           Print help information
   -V, --version
