@@ -4,8 +4,8 @@ use itertools::izip;
 use num_bigint::BigInt;
 use regex::Regex;
 use rustpython_parser::ast::{
-    Arg, ArgData, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind,
-    KeywordData, Located, Stmt, StmtKind, Unaryop,
+    Arg, ArgData, Arguments, Cmpop, Comprehension, Constant, Excepthandler, ExcepthandlerKind,
+    Expr, ExprKind, KeywordData, Located, Stmt, StmtKind, Unaryop,
 };
 use serde::{Deserialize, Serialize};
 
@@ -1101,6 +1101,41 @@ pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -
             }
         }
     }
+    None
+}
+
+pub fn unnecessary_comprehension(
+    expr: &Expr,
+    elt: &Located<ExprKind>,
+    generators: &Vec<Comprehension>,
+) -> Option<Check> {
+    if generators.len() == 1 {
+        let generator = &generators[0];
+        if generator.ifs.is_empty() && generator.is_async == 0 {
+            if let ExprKind::Name { id: elt_id, .. } = &elt.node {
+                if let ExprKind::Name { id: target_id, .. } = &generator.target.node {
+                    if elt_id == target_id {
+                        match &expr.node {
+                            ExprKind::ListComp { .. } => {
+                                return Some(Check::new(
+                                    CheckKind::UnnecessaryComprehension("list".to_string()),
+                                    Range::from_located(expr),
+                                ))
+                            }
+                            ExprKind::SetComp { .. } => {
+                                return Some(Check::new(
+                                    CheckKind::UnnecessaryComprehension("set".to_string()),
+                                    Range::from_located(expr),
+                                ))
+                            }
+                            _ => {}
+                        };
+                    }
+                }
+            }
+        }
+    }
+
     None
 }
 

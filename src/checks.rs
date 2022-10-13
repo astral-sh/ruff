@@ -139,6 +139,7 @@ pub enum CheckCode {
     C410,
     C414,
     C415,
+    C416,
     // flake8-print
     T201,
     T203,
@@ -274,6 +275,7 @@ pub enum CheckKind {
     UnnecessaryLiteralWithinListCall(String),
     UnnecessaryDoubleCastOrProcess(String, String),
     UnnecessarySubscriptReversal(String),
+    UnnecessaryComprehension(String),
     // flake8-print
     PrintFound,
     PPrintFound,
@@ -421,6 +423,7 @@ impl CheckCode {
             CheckCode::C415 => {
                 CheckKind::UnnecessarySubscriptReversal("<reversed/set/sorted>".to_string())
             }
+            CheckCode::C416 => CheckKind::UnnecessaryComprehension("<list/set>".to_string()),
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
@@ -554,6 +557,7 @@ impl CheckKind {
             CheckKind::UnnecessaryLiteralWithinListCall(..) => &CheckCode::C410,
             CheckKind::UnnecessaryDoubleCastOrProcess(..) => &CheckCode::C414,
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
+            CheckKind::UnnecessaryComprehension(..) => &CheckCode::C416,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
@@ -821,6 +825,9 @@ impl CheckKind {
             }
             CheckKind::UnnecessarySubscriptReversal(func) => {
                 format!("Unnecessary subscript reversal of iterable within {func}()")
+            }
+            CheckKind::UnnecessaryComprehension(obj_type) => {
+                format!(" Unnecessary {obj_type} comprehension - rewrite using {obj_type}()")
             }
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),

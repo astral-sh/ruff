@@ -1021,10 +1021,20 @@ where
                     self.visit_expr(expr);
                 }
             }
-            ExprKind::GeneratorExp { .. }
-            | ExprKind::ListComp { .. }
-            | ExprKind::DictComp { .. }
-            | ExprKind::SetComp { .. } => self.push_scope(Scope::new(ScopeKind::Generator)),
+
+            ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
+                if self.settings.enabled.contains(&CheckCode::C416) {
+                    if let Some(check) = checkers::unnecessary_comprehension(expr, elt, generators)
+                    {
+                        self.checks.push(check);
+                    };
+                }
+                self.push_scope(Scope::new(ScopeKind::Generator))
+            }
+
+            ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
+                self.push_scope(Scope::new(ScopeKind::Generator))
+            }
             _ => {}
         };
 
