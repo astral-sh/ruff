@@ -1004,6 +1004,22 @@ pub fn unnecessary_literal_within_list_call(
     None
 }
 
+pub fn unnecessary_list_call(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
+    if let ExprKind::Name { id, .. } = &func.node {
+        if id == "list" {
+            if let Some(arg) = args.first() {
+                if let ExprKind::ListComp { .. } = &arg.node {
+                    return Some(Check::new(
+                        CheckKind::UnnecessaryListCall,
+                        Range::from_located(expr),
+                    ));
+                }
+            }
+        }
+    }
+    None
+}
+
 pub fn unnecessary_double_cast_or_process(
     expr: &Expr,
     func: &Expr,
