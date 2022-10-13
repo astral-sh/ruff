@@ -39,9 +39,42 @@ fn test_stdin_autofix() -> Result<()> {
     let mut cmd = Command::cargo_bin(crate_name!())?;
     let output = cmd
         .args(&["-", "--fix"])
-        .write_stdin("import os\n")
+        .write_stdin("import os\nimport sys\n\nprint(sys.version)\n")
+        .assert()
+        .success();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "import sys\n\nprint(sys.version)\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_stdin_autofix_when_not_fixable_should_still_print_contents() -> Result<()> {
+    let mut cmd = Command::cargo_bin(crate_name!())?;
+    let output = cmd
+        .args(&["-", "--fix"])
+        .write_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n")
         .assert()
         .failure();
-    assert!(str::from_utf8(&output.get_output().stdout)?.contains("-:1:1: F401"));
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "import sys\n\nif (1, 2):\n     print(sys.version)\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_stdin_autofix_when_no_issues_should_still_print_contents() -> Result<()> {
+    let mut cmd = Command::cargo_bin(crate_name!())?;
+    let output = cmd
+        .args(&["-", "--fix"])
+        .write_stdin("import sys\n\nprint(sys.version)\n")
+        .assert()
+        .success();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "import sys\n\nprint(sys.version)\n"
+    );
     Ok(())
 }

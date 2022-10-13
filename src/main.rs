@@ -81,9 +81,9 @@ fn read_from_stdin() -> Result<String> {
     Ok(buffer)
 }
 
-fn run_once_stdin(settings: &Settings, filename: &Path) -> Result<Vec<Message>> {
+fn run_once_stdin(settings: &Settings, filename: &Path, autofix: bool) -> Result<Vec<Message>> {
     let stdin = read_from_stdin()?;
-    let mut messages = lint_stdin(filename, &stdin, settings)?;
+    let mut messages = lint_stdin(filename, &stdin, settings, &autofix.into())?;
     messages.sort_unstable();
     Ok(messages)
 }
@@ -365,18 +365,20 @@ fn inner_main() -> Result<ExitCode> {
             println!("Formatted {modifications} files.");
         }
     } else {
-        let messages = if cli.files == vec![PathBuf::from("-")] {
-            if cli.fix {
-                eprintln!("Warning: --fix is not enabled when reading from stdin.");
-            }
-
+        let (messages, print_messages) = if cli.files == vec![PathBuf::from("-")] {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            run_once_stdin(&settings, path)?
+            (
+                run_once_stdin(&settings, path, cli.fix)?,
+                !cli.quiet && !cli.fix,
+            )
         } else {
-            run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?
+            (
+                run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?,
+                !cli.quiet,
+            )
         };
-        if !cli.quiet {
+        if print_messages {
             printer.write_once(&messages)?;
         }
 

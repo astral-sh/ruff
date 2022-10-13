@@ -1,4 +1,6 @@
 use std::fs::write;
+use std::io;
+use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
@@ -83,7 +85,12 @@ pub(crate) fn check_path(
     Ok(checks)
 }
 
-pub fn lint_stdin(path: &Path, stdin: &str, settings: &Settings) -> Result<Vec<Message>> {
+pub fn lint_stdin(
+    path: &Path,
+    stdin: &str,
+    settings: &Settings,
+    autofix: &fixer::Mode,
+) -> Result<Vec<Message>> {
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(stdin);
 
@@ -91,14 +98,16 @@ pub fn lint_stdin(path: &Path, stdin: &str, settings: &Settings) -> Result<Vec<M
     let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
     // Generate checks.
-    let checks = check_path(
-        path,
-        stdin,
-        tokens,
-        &noqa_line_for,
-        settings,
-        &fixer::Mode::None,
-    )?;
+    let mut checks = check_path(path, stdin, tokens, &noqa_line_for, settings, autofix)?;
+
+    // Apply autofix, write results to stdout.
+    if matches!(autofix, fixer::Mode::Apply) {
+        let output = match fix_file(&mut checks, stdin) {
+            None => stdin.to_string(),
+            Some(content) => content,
+        };
+        io::stdout().write_all(output.as_bytes())?;
+    }
 
     // Convert to messages.
     Ok(checks
@@ -141,7 +150,9 @@ pub fn lint_path(
 
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
-        fix_file(&mut checks, &contents, path)?;
+        if let Some(fixed_contents) = fix_file(&mut checks, &contents) {
+            write(path, fixed_contents)?;
+        }
     };
 
     // Convert to messages.

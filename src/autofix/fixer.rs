@@ -1,7 +1,3 @@
-use std::fs;
-use std::path::Path;
-
-use anyhow::Result;
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 
@@ -24,17 +20,15 @@ impl From<bool> for Mode {
 }
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file(checks: &mut [Check], contents: &str, path: &Path) -> Result<()> {
+pub fn fix_file(checks: &mut [Check], contents: &str) -> Option<String> {
     if checks.iter().all(|check| check.fix.is_none()) {
-        return Ok(());
+        return None;
     }
 
-    let output = apply_fixes(
+    Some(apply_fixes(
         checks.iter_mut().filter_map(|check| check.fix.as_mut()),
         contents,
-    );
-
-    fs::write(path, output).map_err(|e| e.into())
+    ))
 }
 
 /// Apply a series of fixes.
