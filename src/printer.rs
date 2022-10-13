@@ -104,6 +104,7 @@ impl Printer {
     }
 
     pub fn clear_screen(&mut self) -> Result<()> {
+        #[cfg(not(target_family = "wasm"))]
         clearscreen::clear()?;
         Ok(())
     }

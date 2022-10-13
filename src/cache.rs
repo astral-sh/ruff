@@ -1,3 +1,9 @@
+// cacache uses asyncd-std which has no wasm support, so currently no caching support on wasm
+#![cfg_attr(
+    target_family = "wasm",
+    allow(unused_imports, unused_variables, dead_code)
+)]
+
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{create_dir_all, File, Metadata};
 use std::hash::{Hash, Hasher};
@@ -5,6 +11,7 @@ use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
+#[cfg(not(target_family = "wasm"))]
 use cacache::Error::EntryNotFound;
 use filetime::FileTime;
 use log::error;
@@ -107,6 +114,7 @@ pub fn get(
         return None;
     };
 
+    #[cfg(not(target_family = "wasm"))] // cacache needs async-std which doesn't support wasm
     match cacache::read_sync(cache_dir(), cache_key(path, settings, autofix)) {
         Ok(encoded) => match bincode::deserialize::<CheckResult>(&encoded[..]) {
             Ok(CheckResult {
@@ -137,12 +145,14 @@ pub fn set(
         return;
     };
 
+    #[cfg(not(target_family = "wasm"))] // modification date not supported on wasm
     let check_result = CheckResultRef {
         metadata: &CacheMetadata {
             mtime: FileTime::from_last_modification_time(metadata).unix_seconds(),
         },
         messages,
     };
+    #[cfg(not(target_family = "wasm"))] // cacache needs async-std which doesn't support wasm
     if let Err(e) = cacache::write_sync(
         cache_dir(),
         cache_key(path, settings, autofix),

@@ -9,10 +9,8 @@ name = "ruff"
 [dependencies]
 anyhow = { version = "1.0.60" }
 bincode = { version = "1.3.3" }
-cacache = { version = "10.0.1" }
 chrono = { version = "0.4.21" }
 clap = { version = "4.0.1", features = ["derive"] }
-clearscreen = { version = "1.0.10" }
 colored = { version = "2.0.0" }
 common-path = { version = "1.0.0" }
 dirs = { version = "4.0.0" }
@@ -24,7 +22,8 @@ libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "32a044c127668
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 once_cell = { version = "1.13.1" }
-path-absolutize = { version = "3.0.13", features = ["once_cell_cache"] }
+# https://github.com/magiclen/path-absolutize/pull/12
+path-absolutize = { git = "https://github.com/konstin/path-absolutize", rev = "a7b29a5dfee4eee4e6f1c7bf5bc53011066b7161", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
@@ -39,6 +38,10 @@ strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = "0.24.3"
 num-bigint = "0.4.3"
 titlecase = "2.2.1"
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+cacache = { version = "10.0.1" } # uses async-std
+clearscreen = { version = "1.0.10" } # uses which
 
 [dev-dependencies]
 assert_cmd = "2.0.4"
