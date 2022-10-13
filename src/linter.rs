@@ -1020,6 +1020,18 @@ mod tests {
     }
 
     #[test]
+    fn c413() -> Result<()> {
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/C413.py"),
+            &settings::Settings::for_rule(CheckCode::C413),
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
     fn c414() -> Result<()> {
         let mut checks = check_path(
             Path::new("./resources/test/fixtures/C414.py"),
