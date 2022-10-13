@@ -17,6 +17,9 @@ use crate::RawSettings;
 pub struct Cli {
     #[arg(required = true)]
     pub files: Vec<PathBuf>,
+    /// Path to the `pyproject.toml` file to use for configuration.
+    #[arg(long)]
+    pub config: Option<PathBuf>,
     /// Enable verbose logging.
     #[arg(short, long)]
     pub verbose: bool,

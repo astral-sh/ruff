@@ -216,7 +216,9 @@ fn inner_main() -> Result<ExitCode> {
         Some(path) => debug!("Found project root at: {:?}", path),
         None => debug!("Unable to identify project root; assuming current directory..."),
     };
-    let pyproject = pyproject::find_pyproject_toml(&project_root);
+    let pyproject = cli
+        .config
+        .or_else(|| pyproject::find_pyproject_toml(&project_root));
     match &pyproject {
         Some(path) => debug!("Found pyproject.toml at: {:?}", path),
         None => debug!("Unable to find pyproject.toml; using default settings..."),
