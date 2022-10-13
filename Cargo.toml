@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.71"
+version = "0.0.72"
 edition = "2021"
 
 [lib]
