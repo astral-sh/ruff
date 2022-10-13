@@ -843,6 +843,13 @@ where
                     };
                 }
 
+                if self.settings.enabled.contains(&CheckCode::C413) {
+                    if let Some(check) = checkers::unnecessary_call_around_sorted(expr, func, args)
+                    {
+                        self.checks.push(check);
+                    };
+                }
+
                 if self.settings.enabled.contains(&CheckCode::C414) {
                     if let Some(check) =
                         checkers::unnecessary_double_cast_or_process(expr, func, args)

@@ -1,0 +1,32 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UnnecessaryCallAroundSorted: list
+  location:
+    row: 2
+    column: 1
+  end_location:
+    row: 2
+    column: 16
+  fix: ~
+- kind:
+    UnnecessaryCallAroundSorted: reversed
+  location:
+    row: 3
+    column: 1
+  end_location:
+    row: 3
+    column: 20
+  fix: ~
+- kind:
+    UnnecessaryCallAroundSorted: reversed
+  location:
+    row: 4
+    column: 1
+  end_location:
+    row: 4
+    column: 34
+  fix: ~
+

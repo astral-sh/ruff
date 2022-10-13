@@ -138,6 +138,7 @@ pub enum CheckCode {
     C409,
     C410,
     C411,
+    C413,
     C414,
     C415,
     C416,
@@ -275,6 +276,7 @@ pub enum CheckKind {
     UnnecessaryLiteralWithinTupleCall(String),
     UnnecessaryLiteralWithinListCall(String),
     UnnecessaryListCall,
+    UnnecessaryCallAroundSorted(String),
     UnnecessaryDoubleCastOrProcess(String, String),
     UnnecessarySubscriptReversal(String),
     UnnecessaryComprehension(String),
@@ -419,6 +421,9 @@ impl CheckCode {
                 CheckKind::UnnecessaryLiteralWithinListCall("<list/tuple>".to_string())
             }
             CheckCode::C411 => CheckKind::UnnecessaryListCall,
+            CheckCode::C413 => {
+                CheckKind::UnnecessaryCallAroundSorted("<list/reversed>".to_string())
+            }
             CheckCode::C414 => CheckKind::UnnecessaryDoubleCastOrProcess(
                 "<list/reversed/set/sorted/tuple>".to_string(),
                 "<list/set/sorted/tuple>".to_string(),
@@ -559,6 +564,7 @@ impl CheckKind {
             CheckKind::UnnecessaryLiteralWithinTupleCall(..) => &CheckCode::C409,
             CheckKind::UnnecessaryLiteralWithinListCall(..) => &CheckCode::C410,
             CheckKind::UnnecessaryListCall => &CheckCode::C411,
+            CheckKind::UnnecessaryCallAroundSorted(_) => &CheckCode::C413,
             CheckKind::UnnecessaryDoubleCastOrProcess(..) => &CheckCode::C414,
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
             CheckKind::UnnecessaryComprehension(..) => &CheckCode::C416,
@@ -826,6 +832,9 @@ impl CheckKind {
             }
             CheckKind::UnnecessaryListCall => {
                 "Unnecessary list call - remove the outer call to list()".to_string()
+            }
+            CheckKind::UnnecessaryCallAroundSorted(func) => {
+                format!("Unnecessary {func} call around sorted()")
             }
             CheckKind::UnnecessaryDoubleCastOrProcess(inner, outer) => {
                 format!("Unnecessary {inner} call within {outer}().")

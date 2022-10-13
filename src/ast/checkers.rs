@@ -1020,6 +1020,26 @@ pub fn unnecessary_list_call(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<
     None
 }
 
+pub fn unnecessary_call_around_sorted(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
+    if let ExprKind::Name { id: outer, .. } = &func.node {
+        if outer == "list" || outer == "reversed" {
+            if let Some(arg) = args.first() {
+                if let ExprKind::Call { func, .. } = &arg.node {
+                    if let ExprKind::Name { id: inner, .. } = &func.node {
+                        if inner == "sorted" {
+                            return Some(Check::new(
+                                CheckKind::UnnecessaryCallAroundSorted(outer.to_string()),
+                                Range::from_located(expr),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 pub fn unnecessary_double_cast_or_process(
     expr: &Expr,
     func: &Expr,
