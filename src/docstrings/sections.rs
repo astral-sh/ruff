@@ -1,12 +1,14 @@
 use std::collections::BTreeSet;
 
+use crate::ast::types::Range;
 use once_cell::sync::Lazy;
+use rustpython_ast::{Expr, Location};
 use titlecase::titlecase;
 
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::docstring_checks::range_for;
-use crate::docstrings::types::Definition;
+use crate::docstrings::types::{Definition, DefinitionKind};
 
 static NUMPY_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
     BTreeSet::from([
@@ -78,7 +80,21 @@ static NUMPY_SECTION_NAMES_LOWERCASE: Lazy<BTreeSet<&'static str>> = Lazy::new(|
 //     ])
 // });
 
-fn get_leading_words(line: &str) -> String {
+fn indentation<'a>(checker: &'a mut Checker, docstring: &Expr) -> &'a str {
+    let range = range_for(docstring);
+    checker.locator.slice_source_code_range(&Range {
+        location: Location::new(range.location.row(), 1),
+        end_location: Location::new(range.location.row(), range.location.column()),
+    })
+}
+
+fn leading_space(line: &str) -> String {
+    line.chars()
+        .take_while(|char| char.is_whitespace())
+        .collect()
+}
+
+fn leading_words(line: &str) -> String {
     line.trim()
         .chars()
         .take_while(|char| char.is_alphanumeric() || char.is_whitespace())
@@ -86,7 +102,7 @@ fn get_leading_words(line: &str) -> String {
 }
 
 fn suspected_as_section(line: &str) -> bool {
-    NUMPY_SECTION_NAMES_LOWERCASE.contains(&get_leading_words(line).to_lowercase().as_str())
+    NUMPY_SECTION_NAMES_LOWERCASE.contains(&leading_words(line).to_lowercase().as_str())
 }
 
 #[derive(Debug)]
@@ -143,7 +159,7 @@ pub fn section_contexts<'a>(lines: &'a [&'a str]) -> Vec<SectionContext<'a>> {
     let mut contexts = vec![];
     for lineno in suspected_section_indices {
         let context = SectionContext {
-            section_name: get_leading_words(lines[lineno]),
+            section_name: leading_words(lines[lineno]),
             previous_line: lines[lineno - 1],
             line: lines[lineno],
             following_lines: &lines[lineno + 1..],
@@ -260,7 +276,11 @@ fn check_blanks_and_section_underline(
             }
         }
 
-        // TODO(charlie): Implement D215, which requires indentation and leading space tracking.
+        if leading_space(non_empty_line).len() > indentation(checker, docstring).len() {
+            // D215
+            println!("D215: {:?}", docstring);
+        }
+
         let line_after_dashes_index = blank_lines_after_header + 1;
 
         if line_after_dashes_index < context.following_lines.len() {
@@ -298,7 +318,6 @@ fn check_blanks_and_section_underline(
 }
 
 fn check_common_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
-    // TODO(charlie): Implement D214, which requires indentation and leading space tracking.
     let docstring = definition
         .docstring
         .expect("Sections are only available for docstrings.");
@@ -312,6 +331,10 @@ fn check_common_section(checker: &mut Checker, definition: &Definition, context:
                 range_for(docstring),
             ))
         }
+    }
+
+    if leading_space(context.line).len() > indentation(checker, docstring).len() {
+        // D214
     }
 
     if context
@@ -345,6 +368,16 @@ fn check_common_section(checker: &mut Checker, definition: &Definition, context:
             ))
         }
     }
+}
+
+fn check_parameters_section(
+    checker: &mut Checker,
+    definition: &Definition,
+    context: &SectionContext,
+) {
+    let section_level_indent = leading_space(context.line);
+
+    for line, next_line in context.following_lines.chunks()
 }
 
 pub fn check_numpy_section(

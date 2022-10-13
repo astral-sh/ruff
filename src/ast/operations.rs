@@ -153,6 +153,12 @@ impl<'a> SourceCodeLocator<'a> {
         &self.content[offset..]
     }
 
+    pub fn slice_source_code_to(&mut self, location: &Location) -> &'a str {
+        self.init();
+        let offset = self.offsets[location.row() - 1] + location.column() - 1;
+        &self.content[..offset]
+    }
+
     pub fn slice_source_code_range(&mut self, range: &Range) -> &'a str {
         self.init();
         let start = self.offsets[range.location.row() - 1] + range.location.column() - 1;
