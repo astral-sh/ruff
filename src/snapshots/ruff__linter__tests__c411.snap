@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: UnnecessaryListCall
+  location:
+    row: 2
+    column: 1
+  end_location:
+    row: 2
+    column: 21
+  fix: ~
+

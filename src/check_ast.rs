@@ -837,6 +837,12 @@ where
                     };
                 }
 
+                if self.settings.enabled.contains(&CheckCode::C411) {
+                    if let Some(check) = checkers::unnecessary_list_call(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
                 if self.settings.enabled.contains(&CheckCode::C414) {
                     if let Some(check) =
                         checkers::unnecessary_double_cast_or_process(expr, func, args)
