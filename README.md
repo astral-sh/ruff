@@ -219,7 +219,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
-- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (15/16)
+- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (37/48)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
