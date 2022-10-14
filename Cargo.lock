@@ -1969,7 +1969,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.74"
+version = "0.0.75"
 dependencies = [
  "anyhow",
  "assert_cmd",
