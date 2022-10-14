@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    SectionNotOverIndented: Returns
+  location:
+    row: 135
+    column: 5
+  end_location:
+    row: 141
+    column: 8
+  fix: ~
+

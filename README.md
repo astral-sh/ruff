@@ -321,34 +321,37 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D106 | PublicNestedClass | Missing docstring in public nested class |  |  |
 | D107 | PublicInit | Missing docstring in __init__ |  |  |
 | D200 | FitsOnOneLine | One-line docstring should fit on one line |  |  |
+| D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found 1) |  |  |
+| D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) |  |  |
+| D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring |  |  |
+| D204 | OneBlankLineAfterClass | 1 blank line required after class docstring |  |  |
 | D205 | NoBlankLineAfterSummary | 1 blank line required between summary line and description |  |  |
 | D209 | NewLineAfterLastParagraph | Multi-line docstring closing quotes should be on a separate line |  |  |
 | D210 | NoSurroundingWhitespace | No whitespaces allowed surrounding docstring text |  |  |
+| D211 | NoBlankLineBeforeClass | No blank lines allowed before class docstring |  |  |
 | D212 | MultiLineSummaryFirstLine | Multi-line docstring summary should start at the first line |  |  |
 | D213 | MultiLineSummarySecondLine | Multi-line docstring summary should start at the second line |  |  |
+| D214 | SectionNotOverIndented | Section is over-indented ("Returns") |  |  |
+| D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("Returns") |  |  |
 | D300 | UsesTripleQuotes | Use """triple double quotes""" |  |  |
 | D400 | EndsInPeriod | First line should end with a period |  |  |
 | D402 | NoSignature | First line should not be the function's 'signature' |  |  |
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |  |
 | D404 | NoThisPrefix | First word of the docstring should not be `This` |  |  |
-| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |  |
-| D418 | SkipDocstring | Function decorated with @overload shouldn't contain a docstring |  |  |
-| D419 | NonEmpty | Docstring is empty |  |  |
-| D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found 1) |  |  |
-| D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) |  |  |
-| D211 | NoBlankLineBeforeClass | No blank lines allowed before class docstring |  |  |
-| D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring |  |  |
-| D204 | OneBlankLineAfterClass | 1 blank line required after class docstring |  |  |
 | D405 | CapitalizeSectionName | Section name should be properly capitalized ("returns") |  |  |
-| D413 | BlankLineAfterLastSection | Missing blank line after last section ("Returns") |  |  |
-| D410 | BlankLineAfterSection | Missing blank line after section ("Returns") |  |  |
-| D411 | BlankLineBeforeSection | Missing blank line before section ("Returns") |  |  |
 | D406 | NewLineAfterSectionName | Section name should end with a newline ("Returns") |  |  |
 | D407 | DashedUnderlineAfterSection | Missing dashed underline after section ("Returns") |  |  |
 | D408 | SectionUnderlineAfterName | Section underline should be in the line following the section's name ("Returns") |  |  |
 | D409 | SectionUnderlineMatchesSectionLength | Section underline should match the length of its name ("Returns") |  |  |
+| D410 | BlankLineAfterSection | Missing blank line after section ("Returns") |  |  |
+| D411 | BlankLineBeforeSection | Missing blank line before section ("Returns") |  |  |
 | D412 | NoBlankLinesBetweenHeaderAndContent | No blank lines allowed between a section header and its content ("Returns") |  |  |
+| D413 | BlankLineAfterLastSection | Missing blank line after last section ("Returns") |  |  |
 | D414 | NonEmptySection | Section has no content ("Returns") |  |  |
+| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |  |
+| D417 | DocumentAllArguments | Missing argument descriptions in the docstring: `x`, `y` |  |  |
+| D418 | SkipDocstring | Function decorated with @overload shouldn't contain a docstring |  |  |
+| D419 | NonEmpty | Docstring is empty |  |  |
 | M001 | UnusedNOQA | Unused `noqa` directive |  | 🛠 |
 
 ## Integrations

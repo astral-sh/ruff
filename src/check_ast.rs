@@ -1995,20 +1995,23 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::D418) {
                 docstring_checks::if_needed(self, &docstring);
             }
-            if self.settings.enabled.contains(&CheckCode::D407)
-                || self.settings.enabled.contains(&CheckCode::D414)
+            if self.settings.enabled.contains(&CheckCode::D212)
+                || self.settings.enabled.contains(&CheckCode::D214)
+                || self.settings.enabled.contains(&CheckCode::D215)
+                || self.settings.enabled.contains(&CheckCode::D405)
+                || self.settings.enabled.contains(&CheckCode::D406)
                 || self.settings.enabled.contains(&CheckCode::D407)
-                || self.settings.enabled.contains(&CheckCode::D212)
+                || self.settings.enabled.contains(&CheckCode::D407)
                 || self.settings.enabled.contains(&CheckCode::D408)
                 || self.settings.enabled.contains(&CheckCode::D409)
-                || self.settings.enabled.contains(&CheckCode::D414)
-                || self.settings.enabled.contains(&CheckCode::D412)
-                || self.settings.enabled.contains(&CheckCode::D414)
-                || self.settings.enabled.contains(&CheckCode::D405)
-                || self.settings.enabled.contains(&CheckCode::D413)
                 || self.settings.enabled.contains(&CheckCode::D410)
                 || self.settings.enabled.contains(&CheckCode::D411)
-                || self.settings.enabled.contains(&CheckCode::D406)
+                || self.settings.enabled.contains(&CheckCode::D412)
+                || self.settings.enabled.contains(&CheckCode::D413)
+                || self.settings.enabled.contains(&CheckCode::D414)
+                || self.settings.enabled.contains(&CheckCode::D414)
+                || self.settings.enabled.contains(&CheckCode::D414)
+                || self.settings.enabled.contains(&CheckCode::D417)
             {
                 docstring_checks::check_sections(self, &docstring);
             }

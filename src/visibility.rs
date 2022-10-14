@@ -26,6 +26,17 @@ pub struct VisibleScope {
     pub visibility: Visibility,
 }
 
+/// Returns `true` if a function is a "static method".
+pub fn is_static(stmt: &Stmt) -> bool {
+    match &stmt.node {
+        StmtKind::FunctionDef { decorator_list, .. }
+        | StmtKind::AsyncFunctionDef { decorator_list, .. } => decorator_list
+            .iter()
+            .any(|expr| match_name_or_attr(expr, "staticmethod")),
+        _ => panic!("Found non-FunctionDef in is_overload"),
+    }
+}
+
 /// Returns `true` if a function definition is an `@overload`.
 pub fn is_overload(stmt: &Stmt) -> bool {
     match &stmt.node {

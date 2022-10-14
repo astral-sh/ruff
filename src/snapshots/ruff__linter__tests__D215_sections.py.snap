@@ -1,0 +1,23 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    SectionUnderlineNotOverIndented: Returns
+  location:
+    row: 147
+    column: 5
+  end_location:
+    row: 153
+    column: 8
+  fix: ~
+- kind:
+    SectionUnderlineNotOverIndented: Returns
+  location:
+    row: 161
+    column: 5
+  end_location:
+    row: 165
+    column: 8
+  fix: ~
+

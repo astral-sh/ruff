@@ -1,14 +1,16 @@
+use itertools::Itertools;
 use std::collections::BTreeSet;
 
-use crate::ast::types::Range;
 use once_cell::sync::Lazy;
-use rustpython_ast::{Expr, Location};
+use rustpython_ast::{Arg, Expr, Location, StmtKind};
 use titlecase::titlecase;
 
+use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::docstring_checks::range_for;
 use crate::docstrings::types::{Definition, DefinitionKind};
+use crate::visibility::is_static;
 
 static NUMPY_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
     BTreeSet::from([
@@ -276,16 +278,19 @@ fn check_blanks_and_section_underline(
             }
         }
 
-        if leading_space(non_empty_line).len() > indentation(checker, docstring).len() {
-            // D215
-            println!("D215: {:?}", docstring);
+        if checker.settings.enabled.contains(&CheckCode::D215) {
+            if leading_space(non_empty_line).len() > indentation(checker, docstring).len() {
+                checker.add_check(Check::new(
+                    CheckKind::SectionUnderlineNotOverIndented(context.section_name.to_string()),
+                    range_for(docstring),
+                ));
+            }
         }
 
         let line_after_dashes_index = blank_lines_after_header + 1;
 
         if line_after_dashes_index < context.following_lines.len() {
             let line_after_dashes = context.following_lines[line_after_dashes_index];
-
             if line_after_dashes.trim().is_empty() {
                 let rest_of_lines = &context.following_lines[line_after_dashes_index..];
                 if rest_of_lines.iter().all(|line| line.trim().is_empty()) {
@@ -333,8 +338,13 @@ fn check_common_section(checker: &mut Checker, definition: &Definition, context:
         }
     }
 
-    if leading_space(context.line).len() > indentation(checker, docstring).len() {
-        // D214
+    if checker.settings.enabled.contains(&CheckCode::D214) {
+        if leading_space(context.line).len() > indentation(checker, docstring).len() {
+            checker.add_check(Check::new(
+                CheckKind::SectionNotOverIndented(context.section_name.to_string()),
+                range_for(docstring),
+            ))
+        }
     }
 
     if context
@@ -370,14 +380,103 @@ fn check_common_section(checker: &mut Checker, definition: &Definition, context:
     }
 }
 
+fn check_missing_args(
+    checker: &mut Checker,
+    definition: &Definition,
+    docstrings_args: BTreeSet<&str>,
+) {
+    if let DefinitionKind::Function(parent)
+    | DefinitionKind::NestedFunction(parent)
+    | DefinitionKind::Method(parent) = definition.kind
+    {
+        if let StmtKind::FunctionDef {
+            args: arguments, ..
+        }
+        | StmtKind::AsyncFunctionDef {
+            args: arguments, ..
+        } = &parent.node
+        {
+            // Collect all the arguments into a single vector.
+            let mut all_arguments: Vec<&Arg> = arguments
+                .args
+                .iter()
+                .chain(arguments.posonlyargs.iter())
+                .chain(arguments.kwonlyargs.iter())
+                .skip(
+                    // If this is a non-static method, skip `cls` or `self`.
+                    if matches!(definition.kind, DefinitionKind::Method(_)) && !is_static(parent) {
+                        1
+                    } else {
+                        0
+                    },
+                )
+                .collect();
+            if let Some(arg) = &arguments.vararg {
+                all_arguments.push(arg);
+            }
+            if let Some(arg) = &arguments.kwarg {
+                all_arguments.push(arg);
+            }
+
+            // Look for arguments that weren't included in the docstring.
+            let mut missing_args: BTreeSet<&str> = Default::default();
+            for arg in all_arguments {
+                let arg_name = arg.node.arg.as_str();
+                if arg_name.starts_with('_') {
+                    continue;
+                }
+                if docstrings_args.contains(&arg_name) {
+                    continue;
+                }
+                missing_args.insert(arg_name);
+            }
+
+            if !missing_args.is_empty() {
+                let names = missing_args
+                    .into_iter()
+                    .map(String::from)
+                    .sorted()
+                    .collect();
+                checker.add_check(Check::new(
+                    CheckKind::DocumentAllArguments(names),
+                    Range::from_located(parent),
+                ));
+            }
+        }
+    }
+}
+
 fn check_parameters_section(
     checker: &mut Checker,
     definition: &Definition,
     context: &SectionContext,
 ) {
+    // Collect the list of arguments documented in the docstring.
+    let mut docstring_args: BTreeSet<&str> = Default::default();
     let section_level_indent = leading_space(context.line);
-
-    for line, next_line in context.following_lines.chunks()
+    for i in 1..context.following_lines.len() {
+        let current_line = context.following_lines[i - 1];
+        let current_leading_space = leading_space(current_line);
+        let next_line = context.following_lines[i];
+        if current_leading_space == section_level_indent
+            && (leading_space(next_line).len() > current_leading_space.len())
+            && !next_line.trim().is_empty()
+        {
+            let parameters = if let Some(semi_index) = current_line.find(':') {
+                // If the parameter has a type annotation, exclude it.
+                &current_line[..semi_index]
+            } else {
+                // Otherwise, it's just a list of parameters on the current line.
+                current_line.trim()
+            };
+            // Notably, NumPy lets you put multiple parameters of the same type on the same line.
+            for parameter in parameters.split(',') {
+                docstring_args.insert(parameter.trim());
+            }
+        }
+    }
+    // Validate that all arguments were documented.
+    check_missing_args(checker, definition, docstring_args);
 }
 
 pub fn check_numpy_section(
@@ -385,7 +484,6 @@ pub fn check_numpy_section(
     definition: &Definition,
     context: &SectionContext,
 ) {
-    // TODO(charlie): Implement `_check_parameters_section`.
     check_common_section(checker, definition, context);
     check_blanks_and_section_underline(checker, definition, context);
 
@@ -403,6 +501,12 @@ pub fn check_numpy_section(
                 CheckKind::NewLineAfterSectionName(context.section_name.to_string()),
                 range_for(docstring),
             ))
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D417) {
+        if titlecase(&context.section_name) == "Parameters" {
+            check_parameters_section(checker, definition, context);
         }
     }
 }
