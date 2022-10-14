@@ -865,6 +865,12 @@ where
                     };
                 }
 
+                if self.settings.enabled.contains(&CheckCode::C417) {
+                    if let Some(check) = checkers::unnecessary_map(expr, func, args) {
+                        self.checks.push(check);
+                    };
+                }
+
                 // pyupgrade
                 if self.settings.enabled.contains(&CheckCode::U002)
                     && self.settings.target_version >= PythonVersion::Py310

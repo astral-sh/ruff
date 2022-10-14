@@ -142,6 +142,7 @@ pub enum CheckCode {
     C414,
     C415,
     C416,
+    C417,
     // flake8-print
     T201,
     T203,
@@ -280,6 +281,7 @@ pub enum CheckKind {
     UnnecessaryDoubleCastOrProcess(String, String),
     UnnecessarySubscriptReversal(String),
     UnnecessaryComprehension(String),
+    UnnecessaryMap(String),
     // flake8-print
     PrintFound,
     PPrintFound,
@@ -432,6 +434,7 @@ impl CheckCode {
                 CheckKind::UnnecessarySubscriptReversal("<reversed/set/sorted>".to_string())
             }
             CheckCode::C416 => CheckKind::UnnecessaryComprehension("<list/set>".to_string()),
+            CheckCode::C417 => CheckKind::UnnecessaryMap("<list/set/dict>".to_string()),
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
@@ -568,6 +571,7 @@ impl CheckKind {
             CheckKind::UnnecessaryDoubleCastOrProcess(..) => &CheckCode::C414,
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
             CheckKind::UnnecessaryComprehension(..) => &CheckCode::C416,
+            CheckKind::UnnecessaryMap(_) => &CheckCode::C417,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
@@ -844,6 +848,13 @@ impl CheckKind {
             }
             CheckKind::UnnecessaryComprehension(obj_type) => {
                 format!(" Unnecessary {obj_type} comprehension - rewrite using {obj_type}()")
+            }
+            CheckKind::UnnecessaryMap(obj_type) => {
+                if obj_type == "generator" {
+                    "Unnecessary map usage - rewrite using a generator expression".to_string()
+                } else {
+                    format!("Unnecessary map usage - rewrite using a {obj_type} comprehension")
+                }
             }
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),

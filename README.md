@@ -302,6 +302,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | C414 | UnnecessaryDoubleCastOrProcess | Unnecessary <list/reversed/set/sorted/tuple> call within <list/set/sorted/tuple>(). |  |  |
 | C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within <reversed/set/sorted>() |  |  |
 | C416 | UnnecessaryComprehension |  Unnecessary <list/set> comprehension - rewrite using <list/set>() |  |  |
+| C417 | UnnecessaryMap | Unnecessary map usage - rewrite using a <list/set/dict> comprehension |  |  |
 | T201 | PrintFound | `print` found |  | 🛠 |
 | T203 | PPrintFound | `pprint` found |  | 🛠 |
 | U001 | UselessMetaclassType | `__metaclass__ = type` is implied |  | 🛠 |
