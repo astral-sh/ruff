@@ -9,6 +9,7 @@ use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::google::check_google_section;
 use crate::docstrings::helpers;
+use crate::docstrings::helpers::{indentation, leading_space};
 use crate::docstrings::numpy::check_numpy_section;
 use crate::docstrings::sections::section_contexts;
 use crate::docstrings::styles::SectionStyle;
@@ -298,6 +299,89 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
                     CheckKind::NoBlankLineAfterSummary,
                     helpers::range_for(docstring),
                 ));
+            }
+        }
+    }
+}
+
+/// D206, D207, D208
+pub fn indent(checker: &mut Checker, definition: &Definition) {
+    if let Some(docstring) = definition.docstring {
+        if let ExprKind::Constant {
+            value: Constant::Str(string),
+            ..
+        } = &docstring.node
+        {
+            let lines: Vec<&str> = string.lines().collect();
+            if lines.len() <= 1 {
+                return;
+            }
+
+            let mut has_seen_tab = false;
+            let mut has_seen_over_indent = false;
+            let mut has_seen_under_indent = false;
+
+            let docstring_indent = indentation(checker, docstring).to_string();
+            if !has_seen_tab {
+                if docstring_indent.contains('\t') {
+                    if checker.settings.enabled.contains(&CheckCode::D206) {
+                        checker.add_check(Check::new(
+                            CheckKind::IndentWithSpaces,
+                            helpers::range_for(docstring),
+                        ));
+                    }
+                    has_seen_tab = true;
+                }
+            }
+
+            for i in 0..lines.len() {
+                // First lines and continuations doesn't need any indentation.
+                if i == 0 || lines[i - 1].ends_with('\\') {
+                    continue;
+                }
+
+                // Omit empty lines, except for the last line, which is non-empty by way of
+                // containing the closing quotation marks.
+                if i < lines.len() - 1 && lines[i].trim().is_empty() {
+                    continue;
+                }
+
+                let line_indent = leading_space(lines[i]);
+                if !has_seen_tab {
+                    if line_indent.contains('\t') {
+                        if checker.settings.enabled.contains(&CheckCode::D206) {
+                            checker.add_check(Check::new(
+                                CheckKind::IndentWithSpaces,
+                                helpers::range_for(docstring),
+                            ));
+                        }
+                        has_seen_tab = true;
+                    }
+                }
+
+                if !has_seen_over_indent {
+                    if line_indent.len() > docstring_indent.len() {
+                        if checker.settings.enabled.contains(&CheckCode::D208) {
+                            checker.add_check(Check::new(
+                                CheckKind::NoOverIndentation,
+                                helpers::range_for(docstring),
+                            ));
+                        }
+                        has_seen_over_indent = true;
+                    }
+                }
+
+                if !has_seen_under_indent {
+                    if line_indent.len() < docstring_indent.len() {
+                        if checker.settings.enabled.contains(&CheckCode::D207) {
+                            checker.add_check(Check::new(
+                                CheckKind::NoUnderIndentation,
+                                helpers::range_for(docstring),
+                            ));
+                        }
+                        has_seen_under_indent = true;
+                    }
+                }
             }
         }
     }

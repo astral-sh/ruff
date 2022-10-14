@@ -170,6 +170,9 @@ pub enum CheckCode {
     D203,
     D204,
     D205,
+    D206,
+    D207,
+    D208,
     D209,
     D210,
     D211,
@@ -309,6 +312,7 @@ pub enum CheckKind {
     EndsInPunctuation,
     FirstLineCapitalized,
     FitsOnOneLine,
+    IndentWithSpaces,
     MagicMethod,
     MultiLineSummaryFirstLine,
     MultiLineSummarySecondLine,
@@ -319,9 +323,11 @@ pub enum CheckKind {
     NoBlankLineBeforeClass(usize),
     NoBlankLineBeforeFunction(usize),
     NoBlankLinesBetweenHeaderAndContent(String),
+    NoOverIndentation,
     NoSignature,
     NoSurroundingWhitespace,
     NoThisPrefix,
+    NoUnderIndentation,
     NonEmpty,
     NonEmptySection(String),
     OneBlankLineAfterClass(usize),
@@ -473,6 +479,9 @@ impl CheckCode {
             CheckCode::D203 => CheckKind::OneBlankLineBeforeClass(0),
             CheckCode::D204 => CheckKind::OneBlankLineAfterClass(0),
             CheckCode::D205 => CheckKind::NoBlankLineAfterSummary,
+            CheckCode::D206 => CheckKind::IndentWithSpaces,
+            CheckCode::D207 => CheckKind::NoUnderIndentation,
+            CheckCode::D208 => CheckKind::NoOverIndentation,
             CheckCode::D209 => CheckKind::NewLineAfterLastParagraph,
             CheckCode::D210 => CheckKind::NoSurroundingWhitespace,
             CheckCode::D211 => CheckKind::NoBlankLineBeforeClass(1),
@@ -609,6 +618,7 @@ impl CheckKind {
             CheckKind::EndsInPunctuation => &CheckCode::D415,
             CheckKind::FirstLineCapitalized => &CheckCode::D403,
             CheckKind::FitsOnOneLine => &CheckCode::D200,
+            CheckKind::IndentWithSpaces => &CheckCode::D206,
             CheckKind::MagicMethod => &CheckCode::D105,
             CheckKind::MultiLineSummaryFirstLine => &CheckCode::D212,
             CheckKind::MultiLineSummarySecondLine => &CheckCode::D213,
@@ -619,9 +629,11 @@ impl CheckKind {
             CheckKind::NoBlankLineBeforeClass(_) => &CheckCode::D211,
             CheckKind::NoBlankLineBeforeFunction(_) => &CheckCode::D201,
             CheckKind::NoBlankLinesBetweenHeaderAndContent(_) => &CheckCode::D412,
+            CheckKind::NoOverIndentation => &CheckCode::D208,
             CheckKind::NoSignature => &CheckCode::D402,
             CheckKind::NoSurroundingWhitespace => &CheckCode::D210,
             CheckKind::NoThisPrefix => &CheckCode::D404,
+            CheckKind::NoUnderIndentation => &CheckCode::D207,
             CheckKind::NonEmpty => &CheckCode::D419,
             CheckKind::NonEmptySection(_) => &CheckCode::D414,
             CheckKind::OneBlankLineAfterClass(_) => &CheckCode::D204,
@@ -1009,6 +1021,11 @@ impl CheckKind {
                     format!("Missing argument descriptions in the docstring: {names}")
                 }
             }
+            CheckKind::IndentWithSpaces => {
+                "Docstring should be indented with spaces, not tabs".to_string()
+            }
+            CheckKind::NoUnderIndentation => "Docstring is under-indented".to_string(),
+            CheckKind::NoOverIndentation => "Docstring is over-indented".to_string(),
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),
