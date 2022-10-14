@@ -1,0 +1,19 @@
+[flake8]
+exclude =
+    # Defaults
+    .svn,
+    CVS,
+    .bzr,
+    .hg,
+    .git,
+    __pycache__,
+    .tox,
+    .idea,
+    .mypy_cache,
+    .venv,
+    node_modules,
+    # Custom
+    _state_machine.py,
+    test_fstring.py,
+    bad_coding2.py,
+    badsyntax_*.py
