@@ -192,6 +192,7 @@ pub enum CheckCode {
     D413,
     D414,
     D415,
+    D416,
     D417,
     D418,
     D419,
@@ -330,6 +331,7 @@ pub enum CheckKind {
     PublicModule,
     PublicNestedClass,
     PublicPackage,
+    SectionNameEndsInColon(String),
     SectionNotOverIndented(String),
     SectionUnderlineAfterName(String),
     SectionUnderlineMatchesSectionLength(String),
@@ -473,6 +475,8 @@ impl CheckCode {
             CheckCode::D211 => CheckKind::NoBlankLineBeforeClass(1),
             CheckCode::D212 => CheckKind::MultiLineSummaryFirstLine,
             CheckCode::D213 => CheckKind::MultiLineSummarySecondLine,
+            CheckCode::D214 => CheckKind::SectionNotOverIndented("Returns".to_string()),
+            CheckCode::D215 => CheckKind::SectionUnderlineNotOverIndented("Returns".to_string()),
             CheckCode::D300 => CheckKind::UsesTripleQuotes,
             CheckCode::D400 => CheckKind::EndsInPeriod,
             CheckCode::D402 => CheckKind::NoSignature,
@@ -493,13 +497,12 @@ impl CheckCode {
             CheckCode::D413 => CheckKind::BlankLineAfterLastSection("Returns".to_string()),
             CheckCode::D414 => CheckKind::NonEmptySection("Returns".to_string()),
             CheckCode::D415 => CheckKind::EndsInPunctuation,
-            CheckCode::D418 => CheckKind::SkipDocstring,
-            CheckCode::D419 => CheckKind::NonEmpty,
-            CheckCode::D214 => CheckKind::SectionNotOverIndented("Returns".to_string()),
-            CheckCode::D215 => CheckKind::SectionUnderlineNotOverIndented("Returns".to_string()),
+            CheckCode::D416 => CheckKind::SectionNameEndsInColon("Returns".to_string()),
             CheckCode::D417 => {
                 CheckKind::DocumentAllArguments(vec!["x".to_string(), "y".to_string()])
             }
+            CheckCode::D418 => CheckKind::SkipDocstring,
+            CheckCode::D419 => CheckKind::NonEmpty,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -626,6 +629,7 @@ impl CheckKind {
             CheckKind::PublicModule => &CheckCode::D100,
             CheckKind::PublicNestedClass => &CheckCode::D106,
             CheckKind::PublicPackage => &CheckCode::D104,
+            CheckKind::SectionNameEndsInColon(_) => &CheckCode::D416,
             CheckKind::SectionNotOverIndented(_) => &CheckCode::D214,
             CheckKind::SectionUnderlineAfterName(_) => &CheckCode::D408,
             CheckKind::SectionUnderlineMatchesSectionLength(_) => &CheckCode::D409,
@@ -981,6 +985,9 @@ impl CheckKind {
             }
             CheckKind::SectionUnderlineNotOverIndented(name) => {
                 format!("Section underline is over-indented (\"{name}\")")
+            }
+            CheckKind::SectionNameEndsInColon(name) => {
+                format!("Section name should end with a colon (\"{name}\")")
             }
             CheckKind::DocumentAllArguments(names) => {
                 if names.len() == 1 {

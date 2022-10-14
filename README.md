@@ -221,7 +221,7 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/) (15/16)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
-- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (37/48)
+- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (41/48)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -349,6 +349,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D413 | BlankLineAfterLastSection | Missing blank line after last section ("Returns") |  |  |
 | D414 | NonEmptySection | Section has no content ("Returns") |  |  |
 | D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |  |
+| D416 | SectionNameEndsInColon | Section name should end with a colon ("Returns") |  |  |
 | D417 | DocumentAllArguments | Missing argument descriptions in the docstring: `x`, `y` |  |  |
 | D418 | SkipDocstring | Function decorated with @overload shouldn't contain a docstring |  |  |
 | D419 | NonEmpty | Docstring is empty |  |  |

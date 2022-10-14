@@ -7,7 +7,9 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::docstrings::sections::{check_numpy_section, section_contexts};
+use crate::docstrings::sections::{
+    check_google_section, check_numpy_section, section_contexts, SectionStyle,
+};
 use crate::docstrings::types::{Definition, DefinitionKind, Documentable};
 use crate::visibility::{is_init, is_magic, is_overload, Modifier, Visibility, VisibleScope};
 
@@ -668,8 +670,19 @@ pub fn check_sections(checker: &mut Checker, definition: &Definition) {
             if lines.len() < 2 {
                 return;
             }
-            for context in &section_contexts(&lines) {
+
+            // First, try to interpret as NumPy-style sections.
+            let mut found_numpy_section = false;
+            for context in &section_contexts(&lines, &SectionStyle::NumPy) {
+                found_numpy_section = true;
                 check_numpy_section(checker, definition, context);
+            }
+
+            // If no such sections were identified, interpret as Google-style sections.
+            if !found_numpy_section {
+                for context in &section_contexts(&lines, &SectionStyle::Google) {
+                    check_google_section(checker, definition, context);
+                }
             }
         }
     }
