@@ -6,6 +6,73 @@ expression: checks
     DocumentAllArguments:
       - y
   location:
+    row: 283
+    column: 5
+  end_location:
+    row: 296
+    column: 1
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
+    row: 300
+    column: 1
+  end_location:
+    row: 309
+    column: 1
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - test
+      - y
+      - z
+  location:
+    row: 324
+    column: 5
+  end_location:
+    row: 332
+    column: 5
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - test
+      - y
+      - z
+  location:
+    row: 336
+    column: 5
+  end_location:
+    row: 345
+    column: 5
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - a
+      - y
+      - z
+  location:
+    row: 349
+    column: 5
+  end_location:
+    row: 357
+    column: 5
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - a
+      - b
+  location:
+    row: 361
+    column: 5
+  end_location:
+    row: 369
+    column: 5
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
     row: 389
     column: 1
   end_location:
@@ -46,5 +113,15 @@ expression: checks
   end_location:
     row: 471
     column: 5
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
+    row: 489
+    column: 5
+  end_location:
+    row: 498
+    column: 1
   fix: ~
 

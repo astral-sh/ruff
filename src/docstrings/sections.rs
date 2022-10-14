@@ -2,6 +2,7 @@ use itertools::Itertools;
 use std::collections::BTreeSet;
 
 use once_cell::sync::Lazy;
+use regex::Regex;
 use rustpython_ast::{Arg, Expr, Location, StmtKind};
 use titlecase::titlecase;
 
@@ -30,7 +31,7 @@ static NUMPY_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
     ])
 });
 
-static NUMPY_SECTION_NAMES_LOWERCASE: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
+static LOWERCASE_NUMPY_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
     BTreeSet::from([
         "short summary",
         "extended summary",
@@ -48,39 +49,92 @@ static NUMPY_SECTION_NAMES_LOWERCASE: Lazy<BTreeSet<&'static str>> = Lazy::new(|
     ])
 });
 
-// TODO(charlie): Include Google section names.
-// static GOOGLE_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
-//     BTreeSet::from([
-//         "Args",
-//         "Arguments",
-//         "Attention",
-//         "Attributes",
-//         "Caution",
-//         "Danger",
-//         "Error",
-//         "Example",
-//         "Examples",
-//         "Hint",
-//         "Important",
-//         "Keyword Args",
-//         "Keyword Arguments",
-//         "Methods",
-//         "Note",
-//         "Notes",
-//         "Return",
-//         "Returns",
-//         "Raises",
-//         "References",
-//         "See Also",
-//         "Tip",
-//         "Todo",
-//         "Warning",
-//         "Warnings",
-//         "Warns",
-//         "Yield",
-//         "Yields",
-//     ])
-// });
+static GOOGLE_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
+    BTreeSet::from([
+        "Args",
+        "Arguments",
+        "Attention",
+        "Attributes",
+        "Caution",
+        "Danger",
+        "Error",
+        "Example",
+        "Examples",
+        "Hint",
+        "Important",
+        "Keyword Args",
+        "Keyword Arguments",
+        "Methods",
+        "Note",
+        "Notes",
+        "Return",
+        "Returns",
+        "Raises",
+        "References",
+        "See Also",
+        "Tip",
+        "Todo",
+        "Warning",
+        "Warnings",
+        "Warns",
+        "Yield",
+        "Yields",
+    ])
+});
+
+static LOWERCASE_GOOGLE_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
+    BTreeSet::from([
+        "args",
+        "arguments",
+        "attention",
+        "attributes",
+        "caution",
+        "danger",
+        "error",
+        "example",
+        "examples",
+        "hint",
+        "important",
+        "keyword args",
+        "keyword arguments",
+        "methods",
+        "note",
+        "notes",
+        "return",
+        "returns",
+        "raises",
+        "references",
+        "see also",
+        "tip",
+        "todo",
+        "warning",
+        "warnings",
+        "warns",
+        "yield",
+        "yields",
+    ])
+});
+
+pub enum SectionStyle {
+    NumPy,
+    Google,
+}
+
+impl SectionStyle {
+    fn section_names(&self) -> &Lazy<BTreeSet<&'static str>> {
+        match self {
+            SectionStyle::NumPy => &NUMPY_SECTION_NAMES,
+            SectionStyle::Google => &GOOGLE_SECTION_NAMES,
+        }
+    }
+
+    fn lowercase_section_names(&self) -> &Lazy<BTreeSet<&'static str>> {
+        match self {
+            SectionStyle::NumPy => &LOWERCASE_NUMPY_SECTION_NAMES,
+            SectionStyle::Google => &LOWERCASE_GOOGLE_SECTION_NAMES,
+        }
+    }
+}
 
 fn indentation<'a>(checker: &'a mut Checker, docstring: &Expr) -> &'a str {
     let range = range_for(docstring);
@@ -103,8 +157,10 @@ fn leading_words(line: &str) -> String {
         .collect()
 }
 
-fn suspected_as_section(line: &str) -> bool {
-    NUMPY_SECTION_NAMES_LOWERCASE.contains(&leading_words(line).to_lowercase().as_str())
+fn suspected_as_section(line: &str, style: &SectionStyle) -> bool {
+    style
+        .lowercase_section_names()
+        .contains(&leading_words(line).to_lowercase().as_str())
 }
 
 #[derive(Debug)]
@@ -145,12 +201,12 @@ fn is_docstring_section(context: &SectionContext) -> bool {
 }
 
 /// Extract all `SectionContext` values from a docstring.
-pub fn section_contexts<'a>(lines: &'a [&'a str]) -> Vec<SectionContext<'a>> {
+pub fn section_contexts<'a>(lines: &'a [&'a str], style: &SectionStyle) -> Vec<SectionContext<'a>> {
     let suspected_section_indices: Vec<usize> = lines
         .iter()
         .enumerate()
         .filter_map(|(lineno, line)| {
-            if lineno > 0 && suspected_as_section(line) {
+            if lineno > 0 && suspected_as_section(line, style) {
                 Some(lineno)
             } else {
                 None
@@ -322,14 +378,23 @@ fn check_blanks_and_section_underline(
     }
 }
 
-fn check_common_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
+fn check_common_section(
+    checker: &mut Checker,
+    definition: &Definition,
+    context: &SectionContext,
+    style: &SectionStyle,
+) {
     let docstring = definition
         .docstring
         .expect("Sections are only available for docstrings.");
 
     if checker.settings.enabled.contains(&CheckCode::D405) {
-        if !NUMPY_SECTION_NAMES.contains(&context.section_name.as_str())
-            && NUMPY_SECTION_NAMES.contains(titlecase(&context.section_name).as_str())
+        if !style
+            .section_names()
+            .contains(&context.section_name.as_str())
+            && style
+                .section_names()
+                .contains(titlecase(&context.section_name).as_str())
         {
             checker.add_check(Check::new(
                 CheckKind::CapitalizeSectionName(context.section_name.to_string()),
@@ -383,7 +448,7 @@ fn check_common_section(checker: &mut Checker, definition: &Definition, context:
 fn check_missing_args(
     checker: &mut Checker,
     definition: &Definition,
-    docstrings_args: BTreeSet<&str>,
+    docstrings_args: &BTreeSet<&str>,
 ) {
     if let DefinitionKind::Function(parent)
     | DefinitionKind::NestedFunction(parent)
@@ -476,7 +541,7 @@ fn check_parameters_section(
         }
     }
     // Validate that all arguments were documented.
-    check_missing_args(checker, definition, docstring_args);
+    check_missing_args(checker, definition, &docstring_args);
 }
 
 pub fn check_numpy_section(
@@ -484,7 +549,7 @@ pub fn check_numpy_section(
     definition: &Definition,
     context: &SectionContext,
 ) {
-    check_common_section(checker, definition, context);
+    check_common_section(checker, definition, context, &SectionStyle::NumPy);
     check_blanks_and_section_underline(checker, definition, context);
 
     if checker.settings.enabled.contains(&CheckCode::D406) {
@@ -507,6 +572,77 @@ pub fn check_numpy_section(
     if checker.settings.enabled.contains(&CheckCode::D417) {
         if titlecase(&context.section_name) == "Parameters" {
             check_parameters_section(checker, definition, context);
+        }
+    }
+}
+
+// See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
+static GOOGLE_ARGS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\s*(\w+)\s*(\(.*?\))?\s*:\n?\s*.+").expect("Invalid regex"));
+
+fn check_args_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
+    let mut args_sections: Vec<String> = vec![];
+    for line in textwrap::dedent(&context.following_lines.join("\n")).lines() {
+        if line
+            .chars()
+            .next()
+            .map(|char| char.is_whitespace())
+            .unwrap_or(true)
+        {
+            // This is a continuation of documentation for the last
+            // parameter because it does start with whitespace.
+            if let Some(current) = args_sections.last_mut() {
+                current.push_str(line);
+            }
+        } else {
+            // This line is the start of documentation for the next
+            // parameter because it doesn't start with any whitespace.
+            args_sections.push(line.to_string());
+        }
+    }
+
+    check_missing_args(
+        checker,
+        definition,
+        // Collect the list of arguments documented in the docstring.
+        &BTreeSet::from_iter(args_sections.iter().filter_map(|section| {
+            match GOOGLE_ARGS_REGEX.captures(section.as_str()) {
+                Some(caps) => caps.get(1).map(|arg_name| arg_name.as_str()),
+                None => None,
+            }
+        })),
+    )
+}
+
+pub fn check_google_section(
+    checker: &mut Checker,
+    definition: &Definition,
+    context: &SectionContext,
+) {
+    check_common_section(checker, definition, context, &SectionStyle::Google);
+    check_blanks_and_section_underline(checker, definition, context);
+
+    if checker.settings.enabled.contains(&CheckCode::D416) {
+        let suffix = context
+            .line
+            .trim()
+            .strip_prefix(&context.section_name)
+            .unwrap();
+        if suffix != ":" {
+            let docstring = definition
+                .docstring
+                .expect("Sections are only available for docstrings.");
+            checker.add_check(Check::new(
+                CheckKind::SectionNameEndsInColon(context.section_name.to_string()),
+                range_for(docstring),
+            ))
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D417) {
+        let capitalized_section_name = titlecase(&context.section_name);
+        if capitalized_section_name == "Args" || capitalized_section_name == "Arguments" {
+            check_args_section(checker, definition, context);
         }
     }
 }

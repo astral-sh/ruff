@@ -47,4 +47,94 @@ expression: checks
     row: 262
     column: 8
   fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 269
+    column: 5
+  end_location:
+    row: 274
+    column: 8
+  fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 284
+    column: 9
+  end_location:
+    row: 292
+    column: 12
+  fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 301
+    column: 5
+  end_location:
+    row: 306
+    column: 8
+  fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 313
+    column: 9
+  end_location:
+    row: 319
+    column: 12
+  fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 325
+    column: 9
+  end_location:
+    row: 330
+    column: 12
+  fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 337
+    column: 9
+  end_location:
+    row: 343
+    column: 12
+  fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 350
+    column: 9
+  end_location:
+    row: 355
+    column: 12
+  fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 362
+    column: 9
+  end_location:
+    row: 367
+    column: 12
+  fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 371
+    column: 9
+  end_location:
+    row: 382
+    column: 12
+  fix: ~
+- kind:
+    DashedUnderlineAfterSection: Args
+  location:
+    row: 490
+    column: 9
+  end_location:
+    row: 497
+    column: 12
+  fix: ~
 
