@@ -1175,6 +1175,64 @@ pub fn unnecessary_comprehension(
     None
 }
 
+pub fn unnecessary_map(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
+    if let ExprKind::Name { id, .. } = &func.node {
+        if id == "map" {
+            if args.len() == 2 {
+                if let ExprKind::Lambda { .. } = &args[0].node {
+                    return Some(Check::new(
+                        CheckKind::UnnecessaryMap("generator".to_string()),
+                        Range::from_located(expr),
+                    ));
+                }
+            }
+        } else if id == "list" || id == "set" {
+            if let Some(arg) = args.first() {
+                if let ExprKind::Call { func, args, .. } = &arg.node {
+                    if let ExprKind::Name { id: f, .. } = &func.node {
+                        if f == "map" {
+                            if let Some(arg) = args.first() {
+                                if let ExprKind::Lambda { .. } = &arg.node {
+                                    return Some(Check::new(
+                                        CheckKind::UnnecessaryMap(id.to_string()),
+                                        Range::from_located(expr),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if id == "dict" {
+            if args.len() == 1 {
+                if let ExprKind::Call { func, args, .. } = &args[0].node {
+                    if let ExprKind::Name { id: f, .. } = &func.node {
+                        if f == "map" {
+                            if let Some(arg) = args.first() {
+                                if let ExprKind::Lambda { body, .. } = &arg.node {
+                                    match &body.node {
+                                        ExprKind::Tuple { elts, .. }
+                                        | ExprKind::List { elts, .. }
+                                            if elts.len() == 2 =>
+                                        {
+                                            return Some(Check::new(
+                                                CheckKind::UnnecessaryMap(id.to_string()),
+                                                Range::from_located(expr),
+                                            ))
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 // flake8-super
 /// Check that `super()` has no args
 pub fn super_args(
