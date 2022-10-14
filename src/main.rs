@@ -13,6 +13,7 @@ use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
 use walkdir::DirEntry;
 
+#[cfg(not(target_family = "wasm"))]
 use ruff::cache;
 use ruff::checks::CheckCode;
 use ruff::checks::CheckKind;
@@ -313,6 +314,7 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
+    #[cfg(not(target_family = "wasm"))]
     cache::init()?;
 
     let mut printer = Printer::new(cli.format, cli.verbose);
