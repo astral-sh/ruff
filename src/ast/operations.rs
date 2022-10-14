@@ -121,7 +121,7 @@ pub fn is_unpacking_assignment(stmt: &Stmt) -> bool {
 /// Struct used to efficiently slice source code at (row, column) Locations.
 pub struct SourceCodeLocator<'a> {
     content: &'a str,
-    offsets: Vec<usize>,
+    offsets: Vec<Vec<usize>>,
     initialized: bool,
 }
 
@@ -137,26 +137,32 @@ impl<'a> SourceCodeLocator<'a> {
     fn init(&mut self) {
         if !self.initialized {
             let mut offset = 0;
-            for i in self.content.lines() {
-                self.offsets.push(offset);
-                offset += i.len();
-                offset += 1;
+            for line in self.content.lines() {
+                let mut newline = 0;
+                let mut line_offsets: Vec<usize> = vec![];
+                for (i, _char) in line.char_indices() {
+                    line_offsets.push(offset + i);
+                    newline = i + 1;
+                }
+                line_offsets.push(offset + newline);
+                self.offsets.push(line_offsets);
+                offset += newline + 1;
             }
-            self.offsets.push(offset);
+            self.offsets.push(vec![offset]);
             self.initialized = true;
         }
     }
 
     pub fn slice_source_code_at(&mut self, location: &Location) -> &'a str {
         self.init();
-        let offset = self.offsets[location.row() - 1] + location.column() - 1;
+        let offset = self.offsets[location.row() - 1][location.column() - 1];
         &self.content[offset..]
     }
 
     pub fn slice_source_code_range(&mut self, range: &Range) -> &'a str {
         self.init();
-        let start = self.offsets[range.location.row() - 1] + range.location.column() - 1;
-        let end = self.offsets[range.end_location.row() - 1] + range.end_location.column() - 1;
+        let start = self.offsets[range.location.row() - 1][range.location.column() - 1];
+        let end = self.offsets[range.end_location.row() - 1][range.end_location.column() - 1];
         &self.content[start..end]
     }
 
@@ -166,12 +172,10 @@ impl<'a> SourceCodeLocator<'a> {
         inner: &Range,
     ) -> (&'a str, &'a str, &'a str) {
         self.init();
-        let outer_start = self.offsets[outer.location.row() - 1] + outer.location.column() - 1;
-        let outer_end =
-            self.offsets[outer.end_location.row() - 1] + outer.end_location.column() - 1;
-        let inner_start = self.offsets[inner.location.row() - 1] + inner.location.column() - 1;
-        let inner_end =
-            self.offsets[inner.end_location.row() - 1] + inner.end_location.column() - 1;
+        let outer_start = self.offsets[outer.location.row() - 1][outer.location.column() - 1];
+        let outer_end = self.offsets[outer.end_location.row() - 1][outer.end_location.column() - 1];
+        let inner_start = self.offsets[inner.location.row() - 1][inner.location.column() - 1];
+        let inner_end = self.offsets[inner.end_location.row() - 1][inner.end_location.column() - 1];
         (
             &self.content[outer_start..inner_start],
             &self.content[inner_start..inner_end],
