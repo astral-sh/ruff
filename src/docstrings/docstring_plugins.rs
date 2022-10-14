@@ -465,11 +465,13 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
                                 helpers::range_for(docstring),
                             ));
                         }
-                    } else if checker.settings.enabled.contains(&CheckCode::D213) {
-                        checker.add_check(Check::new(
-                            CheckKind::MultiLineSummarySecondLine,
-                            helpers::range_for(docstring),
-                        ));
+                    } else {
+                        if checker.settings.enabled.contains(&CheckCode::D213) {
+                            checker.add_check(Check::new(
+                                CheckKind::MultiLineSummarySecondLine,
+                                helpers::range_for(docstring),
+                            ));
+                        }
                     }
                 }
             }
