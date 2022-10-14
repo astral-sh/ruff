@@ -2,101 +2,18 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
+use rustpython_ast::{Constant, ExprKind, Location, StmtKind};
 
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::docstrings::sections::{
-    check_google_section, check_numpy_section, section_contexts, SectionStyle,
-};
-use crate::docstrings::types::{Definition, DefinitionKind, Documentable};
-use crate::visibility::{is_init, is_magic, is_overload, Modifier, Visibility, VisibleScope};
-
-/// Extract a docstring from a function or class body.
-pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
-    if let Some(stmt) = suite.first() {
-        if let StmtKind::Expr { value } = &stmt.node {
-            if matches!(
-                &value.node,
-                ExprKind::Constant {
-                    value: Constant::Str(_),
-                    ..
-                }
-            ) {
-                return Some(value);
-            }
-        }
-    }
-    None
-}
-
-/// Extract a `Definition` from the AST node defined by a `Stmt`.
-pub fn extract<'a>(
-    scope: &VisibleScope,
-    stmt: &'a Stmt,
-    body: &'a [Stmt],
-    kind: &Documentable,
-) -> Definition<'a> {
-    let expr = docstring_from(body);
-    match kind {
-        Documentable::Function => match scope {
-            VisibleScope {
-                modifier: Modifier::Module,
-                ..
-            } => Definition {
-                kind: DefinitionKind::Function(stmt),
-                docstring: expr,
-            },
-            VisibleScope {
-                modifier: Modifier::Class,
-                ..
-            } => Definition {
-                kind: DefinitionKind::Method(stmt),
-                docstring: expr,
-            },
-            VisibleScope {
-                modifier: Modifier::Function,
-                ..
-            } => Definition {
-                kind: DefinitionKind::NestedFunction(stmt),
-                docstring: expr,
-            },
-        },
-        Documentable::Class => match scope {
-            VisibleScope {
-                modifier: Modifier::Module,
-                ..
-            } => Definition {
-                kind: DefinitionKind::Class(stmt),
-                docstring: expr,
-            },
-            VisibleScope {
-                modifier: Modifier::Class,
-                ..
-            } => Definition {
-                kind: DefinitionKind::NestedClass(stmt),
-                docstring: expr,
-            },
-            VisibleScope {
-                modifier: Modifier::Function,
-                ..
-            } => Definition {
-                kind: DefinitionKind::NestedClass(stmt),
-                docstring: expr,
-            },
-        },
-    }
-}
-
-/// Extract the source code range for a docstring.
-pub fn range_for(docstring: &Expr) -> Range {
-    // RustPython currently omits the first quotation mark in a string, so offset the location.
-    Range {
-        location: Location::new(docstring.location.row(), docstring.location.column() - 1),
-        end_location: docstring.end_location,
-    }
-}
+use crate::docstrings::google::check_google_section;
+use crate::docstrings::helpers;
+use crate::docstrings::numpy::check_numpy_section;
+use crate::docstrings::sections::section_contexts;
+use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::types::{Definition, DefinitionKind};
+use crate::visibility::{is_init, is_magic, is_overload, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub fn not_missing(
@@ -218,7 +135,10 @@ pub fn one_liner(checker: &mut Checker, definition: &Definition) {
             }
 
             if non_empty_line_count == 1 && line_count > 1 {
-                checker.add_check(Check::new(CheckKind::FitsOnOneLine, range_for(docstring)));
+                checker.add_check(Check::new(
+                    CheckKind::FitsOnOneLine,
+                    helpers::range_for(docstring),
+                ));
             }
         }
     }
@@ -241,9 +161,10 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                 ..
             } = &docstring.node
             {
-                let (before, _, after) = checker
-                    .locator
-                    .partition_source_code_at(&Range::from_located(parent), &range_for(docstring));
+                let (before, _, after) = checker.locator.partition_source_code_at(
+                    &Range::from_located(parent),
+                    &helpers::range_for(docstring),
+                );
 
                 if checker.settings.enabled.contains(&CheckCode::D201) {
                     let blank_lines_before = before
@@ -255,7 +176,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                     if blank_lines_before != 0 {
                         checker.add_check(Check::new(
                             CheckKind::NoBlankLineBeforeFunction(blank_lines_before),
-                            range_for(docstring),
+                            helpers::range_for(docstring),
                         ));
                     }
                 }
@@ -280,7 +201,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                     {
                         checker.add_check(Check::new(
                             CheckKind::NoBlankLineAfterFunction(blank_lines_after),
-                            range_for(docstring),
+                            helpers::range_for(docstring),
                         ));
                     }
                 }
@@ -300,9 +221,10 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                 ..
             } = &docstring.node
             {
-                let (before, _, after) = checker
-                    .locator
-                    .partition_source_code_at(&Range::from_located(parent), &range_for(docstring));
+                let (before, _, after) = checker.locator.partition_source_code_at(
+                    &Range::from_located(parent),
+                    &helpers::range_for(docstring),
+                );
 
                 if checker.settings.enabled.contains(&CheckCode::D203)
                     || checker.settings.enabled.contains(&CheckCode::D211)
@@ -318,7 +240,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                     {
                         checker.add_check(Check::new(
                             CheckKind::NoBlankLineBeforeClass(blank_lines_before),
-                            range_for(docstring),
+                            helpers::range_for(docstring),
                         ));
                     }
                     if blank_lines_before != 1
@@ -326,7 +248,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                     {
                         checker.add_check(Check::new(
                             CheckKind::OneBlankLineBeforeClass(blank_lines_before),
-                            range_for(docstring),
+                            helpers::range_for(docstring),
                         ));
                     }
                 }
@@ -344,7 +266,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                     if !all_blank_after && blank_lines_after != 1 {
                         checker.add_check(Check::new(
                             CheckKind::OneBlankLineAfterClass(blank_lines_after),
-                            range_for(docstring),
+                            helpers::range_for(docstring),
                         ));
                     }
                 }
@@ -374,7 +296,7 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
             if lines_count > 1 && blanks_count != 1 {
                 checker.add_check(Check::new(
                     CheckKind::NoBlankLineAfterSummary,
-                    range_for(docstring),
+                    helpers::range_for(docstring),
                 ));
             }
         }
@@ -397,13 +319,13 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                 if line_count > 1 {
                     let content = checker
                         .locator
-                        .slice_source_code_range(&range_for(docstring));
+                        .slice_source_code_range(&helpers::range_for(docstring));
                     if let Some(line) = content.lines().last() {
                         let line = line.trim();
                         if line != "\"\"\"" && line != "'''" {
                             checker.add_check(Check::new(
                                 CheckKind::NewLineAfterLastParagraph,
-                                range_for(docstring),
+                                helpers::range_for(docstring),
                             ));
                         }
                     }
@@ -430,7 +352,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
                 if line.starts_with(' ') || (matches!(lines.next(), None) && line.ends_with(' ')) {
                     checker.add_check(Check::new(
                         CheckKind::NoSurroundingWhitespace,
-                        range_for(docstring),
+                        helpers::range_for(docstring),
                     ));
                 }
             }
@@ -449,20 +371,20 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
             if string.lines().nth(1).is_some() {
                 let content = checker
                     .locator
-                    .slice_source_code_range(&range_for(docstring));
+                    .slice_source_code_range(&helpers::range_for(docstring));
                 if let Some(first_line) = content.lines().next() {
                     let first_line = first_line.trim();
                     if first_line == "\"\"\"" || first_line == "'''" {
                         if checker.settings.enabled.contains(&CheckCode::D212) {
                             checker.add_check(Check::new(
                                 CheckKind::MultiLineSummaryFirstLine,
-                                range_for(docstring),
+                                helpers::range_for(docstring),
                             ));
                         }
                     } else if checker.settings.enabled.contains(&CheckCode::D213) {
                         checker.add_check(Check::new(
                             CheckKind::MultiLineSummarySecondLine,
-                            range_for(docstring),
+                            helpers::range_for(docstring),
                         ));
                     }
                 }
@@ -481,18 +403,18 @@ pub fn triple_quotes(checker: &mut Checker, definition: &Definition) {
         {
             let content = checker
                 .locator
-                .slice_source_code_range(&range_for(docstring));
+                .slice_source_code_range(&helpers::range_for(docstring));
             if string.contains("\"\"\"") {
                 if !content.starts_with("'''") {
                     checker.add_check(Check::new(
                         CheckKind::UsesTripleQuotes,
-                        range_for(docstring),
+                        helpers::range_for(docstring),
                     ));
                 }
             } else if !content.starts_with("\"\"\"") {
                 checker.add_check(Check::new(
                     CheckKind::UsesTripleQuotes,
-                    range_for(docstring),
+                    helpers::range_for(docstring),
                 ));
             }
         }
@@ -509,7 +431,10 @@ pub fn ends_with_period(checker: &mut Checker, definition: &Definition) {
         {
             if let Some(string) = string.lines().next() {
                 if !string.ends_with('.') {
-                    checker.add_check(Check::new(CheckKind::EndsInPeriod, range_for(docstring)));
+                    checker.add_check(Check::new(
+                        CheckKind::EndsInPeriod,
+                        helpers::range_for(docstring),
+                    ));
                 }
             }
         }
@@ -533,7 +458,7 @@ pub fn no_signature(checker: &mut Checker, definition: &Definition) {
                         if first_line.contains(&format!("{name}(")) {
                             checker.add_check(Check::new(
                                 CheckKind::NoSignature,
-                                range_for(docstring),
+                                helpers::range_for(docstring),
                             ));
                         }
                     }
@@ -568,7 +493,7 @@ pub fn capitalized(checker: &mut Checker, definition: &Definition) {
                     if !first_char.is_uppercase() {
                         checker.add_check(Check::new(
                             CheckKind::FirstLineCapitalized,
-                            range_for(docstring),
+                            helpers::range_for(docstring),
                         ));
                     }
                 }
@@ -596,7 +521,10 @@ pub fn starts_with_this(checker: &mut Checker, definition: &Definition) {
                     .to_lowercase()
                     == "this"
                 {
-                    checker.add_check(Check::new(CheckKind::NoThisPrefix, range_for(docstring)));
+                    checker.add_check(Check::new(
+                        CheckKind::NoThisPrefix,
+                        helpers::range_for(docstring),
+                    ));
                 }
             }
         }
@@ -615,7 +543,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, definition: &Definition) {
                 if !(string.ends_with('.') || string.ends_with('!') || string.ends_with('?')) {
                     checker.add_check(Check::new(
                         CheckKind::EndsInPunctuation,
-                        range_for(docstring),
+                        helpers::range_for(docstring),
                     ));
                 }
             }
@@ -650,7 +578,10 @@ pub fn not_empty(checker: &mut Checker, definition: &Definition) -> bool {
         {
             if string.trim().is_empty() {
                 if checker.settings.enabled.contains(&CheckCode::D419) {
-                    checker.add_check(Check::new(CheckKind::NonEmpty, range_for(docstring)));
+                    checker.add_check(Check::new(
+                        CheckKind::NonEmpty,
+                        helpers::range_for(docstring),
+                    ));
                 }
                 return false;
             }
@@ -659,7 +590,8 @@ pub fn not_empty(checker: &mut Checker, definition: &Definition) -> bool {
     true
 }
 
-pub fn check_sections(checker: &mut Checker, definition: &Definition) {
+/// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413, D414, D416, D417
+pub fn sections(checker: &mut Checker, definition: &Definition) {
     if let Some(docstring) = definition.docstring {
         if let ExprKind::Constant {
             value: Constant::Str(string),
@@ -671,7 +603,7 @@ pub fn check_sections(checker: &mut Checker, definition: &Definition) {
                 return;
             }
 
-            // First, try to interpret as NumPy-style sections.
+            // First, interpret as NumPy-style sections.
             let mut found_numpy_section = false;
             for context in &section_contexts(&lines, &SectionStyle::NumPy) {
                 found_numpy_section = true;
