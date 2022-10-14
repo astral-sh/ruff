@@ -20,9 +20,16 @@ An extremely fast Python linter, written in Rust.
 - 🤝 Python 3.10 compatibility
 - 🛠️ `pyproject.toml` support
 - 📦 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache support
-- 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix)-inspired `--fix` support
-- 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` support
-- ⚖️ [Near-complete parity](#Parity-with-Flake8) with the built-in Flake8 rule set
+- 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix)-inspired autofix support, to correct errors automatically
+- 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` support, for continuous file monitoring
+- ⚖️ [Near-parity](#Parity-with-Flake8) with the built-in Flake8 rule set
+- 🔌 Native re-implementations of popular Flake8 plugins, like [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) ([`pydocstyle`](https://pypi.org/project/pydocstyle/))
+
+Ruff aims to be orders of magnitude faster than alternative tools while integrating more
+functionality behind a single, common interface. Ruff can be used to replace Flake8 (plus a variety
+of plugins), [`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](https://github.com/asottile/yesqa),
+and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/), all while executing tens or
+hundreds of times faster than any individual tool.
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -30,7 +37,7 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
 
 ### Installation
 
-Available as [ruff](https://pypi.org/project/ruff/) on PyPI:
+Available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
 ```shell
 pip install ruff
@@ -38,7 +45,7 @@ pip install ruff
 
 ### Usage
 
-To run ruff, try any of the following:
+To run Ruff, try any of the following:
 
 ```shell
 ruff path/to/code/to/check.py
@@ -46,13 +53,13 @@ ruff path/to/code/
 ruff path/to/code/*.py
 ```
 
-You can run ruff in `--watch` mode to automatically re-run on-change:
+You can run Ruff in `--watch` mode to automatically re-run on-change:
 
 ```shell
 ruff path/to/code/ --watch
 ```
 
-ruff also works with [pre-commit](https://pre-commit.com):
+Ruff also works with [pre-commit](https://pre-commit.com):
 
 ```yaml
 repos:
@@ -64,9 +71,9 @@ repos:
 
 ## Configuration
 
-ruff is configurable both via `pyproject.toml` and the command line.
+Ruff is configurable both via `pyproject.toml` and the command line.
 
-For example, you could configure ruff to only enforce a subset of rules with:
+For example, you could configure Ruff to only enforce a subset of rules with:
 
 ```toml
 [tool.ruff]
@@ -158,7 +165,7 @@ Exclusions are based on globs, and can be either:
 To omit a lint check entirely, add it to the "ignore" list via `--ignore` or `--extend-ignore`,
 either  on the command-line or in your `project.toml` file.
 
-To ignore an error in-line, ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
+To ignore an error in-line, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual error, add `# noqa: {code}` to the end of the line, like so:
 
 ```python
@@ -182,41 +189,42 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 """  # noqa: E501
 ```
 
-ruff supports several (experimental) workflows to aid in `noqa` management.
+Ruff supports several workflows to aid in `noqa` management.
 
-First, ruff provides a special error code, `M001`, to enforce that your `noqa` directives are
+First, Ruff provides a special error code, `M001`, to enforce that your `noqa` directives are
 "valid", in that the errors they _say_ they ignore are actually being triggered on that line (and
 thus suppressed). **You can run `ruff /path/to/file.py --extend-select M001` to flag unused `noqa`
 directives.**
 
-Second, ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
+Second, Ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
 **You can run `ruff /path/to/file.py --extend-select M001 --fix` to automatically remove unused
 `noqa` directives.**
 
-Third, ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
-migrating a new codebase to ruff. **You can run `ruff /path/to/file.py --add-noqa` to automatically
+Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
+migrating a new codebase to Ruff. **You can run `ruff /path/to/file.py --add-noqa` to automatically
 add `noqa` directives to all failing lines, with the appropriate error codes.**
 
 ### Compatibility with Black
 
-ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
+Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
 the `line-length` setting is consistent between the two.
 
-As a project, ruff is designed to be used alongside Black and, as such, will defer implementing
+As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
 stylistic lint rules that are obviated by autoformatting.
 
 ### Parity with Flake8
 
-ruff's goal is to achieve feature parity with Flake8 when used (1) without plugins, (2) alongside
-Black, and (3) on Python 3 code.
+Ruff can be used as a (near) drop-in replacement for Flake8 when used (1) without plugins, (2)
+alongside Black, and (3) on Python 3 code.
 
-**Under those conditions, ruff implements 44 out of 60 rules.** (ruff is missing: 14 rules related
-to string `.format` calls, 1 rule related to docstring parsing, and 1 rule related to redefined
-variables.)
+Under those conditions Ruff is missing 14 rules related to string `.format` calls, 1 rule related
+to docstring parsing, and 1 rule related to redefined variables.
 
-ruff also implements some of the most popular Flake8 plugins natively, including:
+Ruff re-implements some of the most popular Flake8 plugins and related code quality tools natively,
+including:
 
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
+- [`yesqa`](https://github.com/asottile/yesqa)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
@@ -225,11 +233,12 @@ ruff also implements some of the most popular Flake8 plugins natively, including
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 
-Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
+Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
 
-1. ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
+1. Ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
    pattern matching and parenthesized context managers.
-2. Flake8 has a plugin architecture and supports writing custom lint rules.
+2. Flake8 has a plugin architecture and supports writing custom lint rules. (To date, popular Flake8
+   plugins have been re-implemented within Ruff directly.)
 
 ## Rules
 
@@ -364,19 +373,19 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 ### PyCharm
 
-ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
+Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
 in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
 add a new tool with the following configuration:
 
-![Install ruff as an External Tool](https://user-images.githubusercontent.com/1309177/193155720-336e43f0-1a8d-46b4-bc12-e60f9ae01f7e.png)
+![Install Ruff as an External Tool](https://user-images.githubusercontent.com/1309177/193155720-336e43f0-1a8d-46b4-bc12-e60f9ae01f7e.png)
 
-ruff should then appear as a runnable action:
+Ruff should then appear as a runnable action:
 
-![ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
+![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
 
 ### GitHub Actions
 
-GitHub Actions has everything you need to run ruff out-of-the-box:
+GitHub Actions has everything you need to run Ruff out-of-the-box:
 
 ```yaml
 name: CI
@@ -394,13 +403,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff
-      - name: Run ruff
+      - name: Run Ruff
         run: ruff .
 ```
 
 ## Development
 
-ruff is written in Rust (1.63.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
+Ruff is written in Rust (1.63.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
 for development.
 
 Assuming you have `cargo` installed, you can run:
@@ -414,7 +423,7 @@ cargo test
 
 ## Deployment
 
-ruff is distributed on [PyPI](https://pypi.org/project/ruff/), and published via [`maturin`](https://github.com/PyO3/maturin).
+Ruff is distributed on [PyPI](https://pypi.org/project/ruff/), and published via [`maturin`](https://github.com/PyO3/maturin).
 
 See: `.github/workflows/release.yaml`.
 
@@ -495,7 +504,7 @@ hyperfine --ignore-failure --warmup 5 \
 
 In order, these evaluate:
 
-- ruff
+- Ruff
 - Pylint
 - PyFlakes
 - autoflake
