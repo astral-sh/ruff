@@ -41,7 +41,7 @@ expression: parse_ast
                                     value: Located {
                                         location: Location {
                                             row: 1,
-                                            column: 3,
+                                            column: 2,
                                         },
                                         custom: (),
                                         node: Name {

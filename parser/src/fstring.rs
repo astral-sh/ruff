@@ -4,22 +4,15 @@ use crate::{
     error::{FStringError, FStringErrorType, ParseError},
     parser::parse_expression,
 };
-use itertools::Itertools;
 use std::{iter, mem, str};
 
-struct FStringParser<'a> {
-    chars: iter::Peekable<str::Chars<'a>>,
+struct FStringParser {
     str_location: Location,
-    recurse_lvl: u8,
 }
 
-impl<'a> FStringParser<'a> {
-    fn new(source: &'a str, str_location: Location, recurse_lvl: u8) -> Self {
-        Self {
-            chars: source.chars().peekable(),
-            str_location,
-            recurse_lvl,
-        }
+impl FStringParser {
+    fn new(str_location: Location) -> Self {
+        Self { str_location }
     }
 
     #[inline]
@@ -27,44 +20,48 @@ impl<'a> FStringParser<'a> {
         Expr::new(self.str_location, node)
     }
 
-    fn parse_formatted_value(&mut self) -> Result<Vec<Expr>, FStringErrorType> {
-        let mut expression = String::new();
+    fn parse_formatted_value<'a>(
+        &mut self,
+        mut chars: iter::Peekable<str::Chars<'a>>,
+        nested: u8,
+    ) -> Result<(Vec<Expr>, iter::Peekable<str::Chars<'a>>), FStringErrorType> {
+        let mut expression = String::from("{");
         let mut spec = None;
         let mut delims = Vec::new();
         let mut conversion = ConversionFlag::None;
         let mut self_documenting = false;
         let mut trailing_seq = String::new();
 
-        while let Some(ch) = self.chars.next() {
+        while let Some(ch) = chars.next() {
             match ch {
                 // can be integrated better with the remainign code, but as a starting point ok
                 // in general I would do here a tokenizing of the fstrings to omit this peeking.
-                '!' if self.chars.peek() == Some(&'=') => {
+                '!' if chars.peek() == Some(&'=') => {
                     expression.push_str("!=");
-                    self.chars.next();
+                    chars.next();
                 }
 
-                '=' if self.chars.peek() == Some(&'=') => {
+                '=' if chars.peek() == Some(&'=') => {
                     expression.push_str("==");
-                    self.chars.next();
+                    chars.next();
                 }
 
-                '>' if self.chars.peek() == Some(&'=') => {
+                '>' if chars.peek() == Some(&'=') => {
                     expression.push_str(">=");
-                    self.chars.next();
+                    chars.next();
                 }
 
-                '<' if self.chars.peek() == Some(&'=') => {
+                '<' if chars.peek() == Some(&'=') => {
                     expression.push_str("<=");
-                    self.chars.next();
+                    chars.next();
                 }
 
-                '!' if delims.is_empty() && self.chars.peek() != Some(&'=') => {
+                '!' if delims.is_empty() && chars.peek() != Some(&'=') => {
                     if expression.trim().is_empty() {
                         return Err(EmptyExpression);
                     }
 
-                    conversion = match self.chars.next() {
+                    conversion = match chars.next() {
                         Some('s') => ConversionFlag::Str,
                         Some('a') => ConversionFlag::Ascii,
                         Some('r') => ConversionFlag::Repr,
@@ -76,10 +73,16 @@ impl<'a> FStringParser<'a> {
                         }
                     };
 
-                    if let Some(&peek) = self.chars.peek() {
+                    if let Some(&peek) = chars.peek() {
                         if peek != '}' && peek != ':' {
-                            return Err(ExpectedRbrace);
+                            if expression[1..].trim().is_empty() {
+                                return Err(EmptyExpression);
+                            } else {
+                                return Err(ExpectedRbrace);
+                            }
                         }
+                    } else if expression[1..].trim().is_empty() {
+                        return Err(EmptyExpression);
                     } else {
                         return Err(ExpectedRbrace);
                     }
@@ -87,76 +90,17 @@ impl<'a> FStringParser<'a> {
 
                 // match a python 3.8 self documenting expression
                 // format '{' PYTHON_EXPRESSION '=' FORMAT_SPECIFIER? '}'
-                '=' if self.chars.peek() != Some(&'=') && delims.is_empty() => {
+                '=' if chars.peek() != Some(&'=') && delims.is_empty() => {
                     self_documenting = true;
                 }
 
                 ':' if delims.is_empty() => {
-                    let mut nested = 0;
-                    let mut spec_constructor = Vec::new();
-                    let mut constant_piece = String::new();
-                    let mut formatted_value_piece = String::new();
-                    while let Some(&next) = self.chars.peek() {
-                        match next {
-                            '{' if nested > 0 => {
-                                nested += 1;
-                                formatted_value_piece.push(next);
-                            }
-                            '}' if nested > 0 => {
-                                nested -= 1;
-                                if nested == 0 {
-                                    formatted_value_piece.push(next);
-                                    let values = FStringParser::new(
-                                        &formatted_value_piece,
-                                        Location::default(),
-                                        &self.recurse_lvl + 1,
-                                    )
-                                    .parse()?;
-                                    spec_constructor.push(values
-                                        .into_iter()
-                                        .exactly_one()
-                                        .expect("Expected formatted value to produce exactly one expression.")
-                                    );
-                                    formatted_value_piece.clear();
-                                } else {
-                                    formatted_value_piece.push(next);
-                                }
-                            }
-                            _ if nested > 0 => {
-                                formatted_value_piece.push(next);
-                            }
-                            '{' => {
-                                nested += 1;
-                                if !constant_piece.is_empty() {
-                                    spec_constructor.push(self.expr(ExprKind::Constant {
-                                        value: constant_piece.to_owned().into(),
-                                        kind: None,
-                                    }));
-                                    constant_piece.clear();
-                                }
-                                formatted_value_piece.push(next);
-                                formatted_value_piece.push(' ');
-                            }
-                            '}' => break,
-                            _ => {
-                                constant_piece.push(next);
-                            }
-                        }
-                        self.chars.next();
-                    }
-                    if !constant_piece.is_empty() {
-                        spec_constructor.push(self.expr(ExprKind::Constant {
-                            value: constant_piece.to_owned().into(),
-                            kind: None,
-                        }));
-                        constant_piece.clear();
-                    }
-                    if nested > 0 {
-                        return Err(UnclosedLbrace);
-                    }
+                    let (parsed_spec, remaining_chars) = self.parse_spec(chars, nested)?;
+
                     spec = Some(Box::new(self.expr(ExprKind::JoinedStr {
-                        values: spec_constructor,
-                    })))
+                        values: parsed_spec,
+                    })));
+                    chars = remaining_chars;
                 }
                 '(' | '{' | '[' => {
                     expression.push(ch);
@@ -181,13 +125,15 @@ impl<'a> FStringParser<'a> {
                     expression.push(ch);
                 }
                 '}' => {
-                    if expression.is_empty() {
+                    if expression[1..].trim().is_empty() {
                         return Err(EmptyExpression);
                     }
+                    expression.push(ch);
+
                     let ret = if !self_documenting {
                         vec![self.expr(ExprKind::FormattedValue {
                             value: Box::new(
-                                parse_fstring_expr(&expression)
+                                parse_fstring_expr(&expression[1..expression.len() - 1])
                                     .map_err(|e| InvalidExpression(Box::new(e.error)))?,
                             ),
                             conversion: conversion as _,
@@ -196,7 +142,9 @@ impl<'a> FStringParser<'a> {
                     } else {
                         vec![
                             self.expr(ExprKind::Constant {
-                                value: Constant::Str(expression.clone() + "="),
+                                value: Constant::Str(
+                                    expression[1..expression.len() - 1].to_owned() + "=",
+                                ),
                                 kind: None,
                             }),
                             self.expr(ExprKind::Constant {
@@ -205,7 +153,7 @@ impl<'a> FStringParser<'a> {
                             }),
                             self.expr(ExprKind::FormattedValue {
                                 value: Box::new(
-                                    parse_fstring_expr(&expression)
+                                    parse_fstring_expr(&expression[1..expression.len() - 1])
                                         .map_err(|e| InvalidExpression(Box::new(e.error)))?,
                                 ),
                                 conversion: (if conversion == ConversionFlag::None && spec.is_none()
@@ -218,11 +166,11 @@ impl<'a> FStringParser<'a> {
                             }),
                         ]
                     };
-                    return Ok(ret);
+                    return Ok((ret, chars));
                 }
                 '"' | '\'' => {
                     expression.push(ch);
-                    for next in &mut self.chars {
+                    for next in &mut chars {
                         expression.push(next);
                         if next == ch {
                             break;
@@ -236,6 +184,7 @@ impl<'a> FStringParser<'a> {
                     if self_documenting {
                         return Err(ExpectedRbrace);
                     }
+
                     expression.push(ch);
                 }
             }
@@ -243,34 +192,89 @@ impl<'a> FStringParser<'a> {
         Err(UnclosedLbrace)
     }
 
-    fn parse(mut self) -> Result<Vec<Expr>, FStringErrorType> {
-        if self.recurse_lvl >= 2 {
+    fn parse_spec<'a>(
+        &mut self,
+        mut chars: iter::Peekable<str::Chars<'a>>,
+        nested: u8,
+    ) -> Result<(Vec<Expr>, iter::Peekable<str::Chars<'a>>), FStringErrorType> {
+        let mut spec_constructor = Vec::new();
+        let mut constant_piece = String::new();
+        while let Some(&next) = chars.peek() {
+            match next {
+                '{' => {
+                    if !constant_piece.is_empty() {
+                        spec_constructor.push(self.expr(ExprKind::Constant {
+                            value: constant_piece.to_owned().into(),
+                            kind: None,
+                        }));
+                        constant_piece.clear();
+                    }
+                    let (parsed_expr, remaining_chars) = self.parse(chars, nested + 1)?;
+                    spec_constructor.extend(parsed_expr);
+                    chars = remaining_chars;
+                    continue;
+                }
+                '}' => {
+                    break;
+                }
+                _ => {
+                    constant_piece.push(next);
+                }
+            }
+            chars.next();
+        }
+        if !constant_piece.is_empty() {
+            spec_constructor.push(self.expr(ExprKind::Constant {
+                value: constant_piece.to_owned().into(),
+                kind: None,
+            }));
+            constant_piece.clear();
+        }
+        Ok((spec_constructor, chars))
+    }
+
+    fn parse<'a>(
+        &mut self,
+        mut chars: iter::Peekable<str::Chars<'a>>,
+        nested: u8,
+    ) -> Result<(Vec<Expr>, iter::Peekable<str::Chars<'a>>), FStringErrorType> {
+        if nested >= 2 {
             return Err(ExpressionNestedTooDeeply);
         }
 
         let mut content = String::new();
         let mut values = vec![];
 
-        while let Some(ch) = self.chars.next() {
+        while let Some(&ch) = chars.peek() {
             match ch {
                 '{' => {
-                    if let Some('{') = self.chars.peek() {
-                        self.chars.next();
-                        content.push('{');
-                    } else {
-                        if !content.is_empty() {
-                            values.push(self.expr(ExprKind::Constant {
-                                value: mem::take(&mut content).into(),
-                                kind: None,
-                            }));
+                    chars.next();
+                    if nested == 0 {
+                        if let Some('{') = chars.peek() {
+                            chars.next();
+                            content.push('{');
+                            continue;
                         }
-
-                        values.extend(self.parse_formatted_value()?);
                     }
+                    if !content.is_empty() {
+                        values.push(self.expr(ExprKind::Constant {
+                            value: mem::take(&mut content).into(),
+                            kind: None,
+                        }));
+                    }
+
+                    let (parsed_values, remaining_chars) =
+                        self.parse_formatted_value(chars, nested)?;
+                    values.extend(parsed_values);
+                    chars = remaining_chars;
                 }
                 '}' => {
-                    if let Some('}') = self.chars.peek() {
-                        self.chars.next();
+                    if nested > 0 {
+                        break;
+                    }
+                    chars.next();
+                    if let Some('}') = chars.peek() {
+                        chars.next();
                         content.push('}');
                     } else {
                         return Err(UnopenedRbrace);
@@ -278,6 +282,7 @@ impl<'a> FStringParser<'a> {
                 }
                 _ => {
                     content.push(ch);
+                    chars.next();
                 }
             }
         }
@@ -289,7 +294,7 @@ impl<'a> FStringParser<'a> {
             }))
         }
 
-        Ok(values)
+        Ok((values, chars))
     }
 }
 
@@ -301,8 +306,9 @@ fn parse_fstring_expr(source: &str) -> Result<Expr, ParseError> {
 /// Parse an fstring from a string, located at a certain position in the sourcecode.
 /// In case of errors, we will get the location and the error returned.
 pub fn parse_located_fstring(source: &str, location: Location) -> Result<Vec<Expr>, FStringError> {
-    FStringParser::new(source, location, 0)
-        .parse()
+    FStringParser::new(location)
+        .parse(source.chars().peekable(), 0)
+        .map(|(e, _)| e)
         .map_err(|error| FStringError { error, location })
 }
 
@@ -311,7 +317,9 @@ mod tests {
     use super::*;
 
     fn parse_fstring(source: &str) -> Result<Vec<Expr>, FStringErrorType> {
-        FStringParser::new(source, Location::default(), 0).parse()
+        FStringParser::new(Location::default())
+            .parse(source.chars().peekable(), 0)
+            .map(|(e, _)| e)
     }
 
     #[test]
