@@ -22,8 +22,7 @@ libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "32a044c127668
 log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 once_cell = { version = "1.13.1" }
-# https://github.com/magiclen/path-absolutize/pull/12
-path-absolutize = { git = "https://github.com/konstin/path-absolutize", rev = "a7b29a5dfee4eee4e6f1c7bf5bc53011066b7161", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
+path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
