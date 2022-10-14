@@ -174,6 +174,8 @@ pub enum CheckCode {
     D211,
     D212,
     D213,
+    D214,
+    D215,
     D300,
     D400,
     D402,
@@ -190,6 +192,7 @@ pub enum CheckCode {
     D413,
     D414,
     D415,
+    D417,
     D418,
     D419,
     // Meta
@@ -298,6 +301,7 @@ pub enum CheckKind {
     BlankLineBeforeSection(String),
     CapitalizeSectionName(String),
     DashedUnderlineAfterSection(String),
+    DocumentAllArguments(Vec<String>),
     EndsInPeriod,
     EndsInPunctuation,
     FirstLineCapitalized,
@@ -326,8 +330,10 @@ pub enum CheckKind {
     PublicModule,
     PublicNestedClass,
     PublicPackage,
+    SectionNotOverIndented(String),
     SectionUnderlineAfterName(String),
     SectionUnderlineMatchesSectionLength(String),
+    SectionUnderlineNotOverIndented(String),
     SkipDocstring,
     UsesTripleQuotes,
     // Meta
@@ -489,6 +495,11 @@ impl CheckCode {
             CheckCode::D415 => CheckKind::EndsInPunctuation,
             CheckCode::D418 => CheckKind::SkipDocstring,
             CheckCode::D419 => CheckKind::NonEmpty,
+            CheckCode::D214 => CheckKind::SectionNotOverIndented("Returns".to_string()),
+            CheckCode::D215 => CheckKind::SectionUnderlineNotOverIndented("Returns".to_string()),
+            CheckCode::D417 => {
+                CheckKind::DocumentAllArguments(vec!["x".to_string(), "y".to_string()])
+            }
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -586,6 +597,7 @@ impl CheckKind {
             CheckKind::BlankLineBeforeSection(_) => &CheckCode::D411,
             CheckKind::CapitalizeSectionName(_) => &CheckCode::D405,
             CheckKind::DashedUnderlineAfterSection(_) => &CheckCode::D407,
+            CheckKind::DocumentAllArguments(_) => &CheckCode::D417,
             CheckKind::EndsInPeriod => &CheckCode::D400,
             CheckKind::EndsInPunctuation => &CheckCode::D415,
             CheckKind::FirstLineCapitalized => &CheckCode::D403,
@@ -614,8 +626,10 @@ impl CheckKind {
             CheckKind::PublicModule => &CheckCode::D100,
             CheckKind::PublicNestedClass => &CheckCode::D106,
             CheckKind::PublicPackage => &CheckCode::D104,
+            CheckKind::SectionNotOverIndented(_) => &CheckCode::D214,
             CheckKind::SectionUnderlineAfterName(_) => &CheckCode::D408,
             CheckKind::SectionUnderlineMatchesSectionLength(_) => &CheckCode::D409,
+            CheckKind::SectionUnderlineNotOverIndented(_) => &CheckCode::D215,
             CheckKind::SkipDocstring => &CheckCode::D418,
             CheckKind::UsesTripleQuotes => &CheckCode::D300,
             // Meta
@@ -962,6 +976,21 @@ impl CheckKind {
                 )
             }
             CheckKind::NonEmptySection(name) => format!("Section has no content (\"{name}\")"),
+            CheckKind::SectionNotOverIndented(name) => {
+                format!("Section is over-indented (\"{name}\")")
+            }
+            CheckKind::SectionUnderlineNotOverIndented(name) => {
+                format!("Section underline is over-indented (\"{name}\")")
+            }
+            CheckKind::DocumentAllArguments(names) => {
+                if names.len() == 1 {
+                    let name = &names[0];
+                    format!("Missing argument description in the docstring: `{name}`")
+                } else {
+                    let names = names.iter().map(|name| format!("`{name}`")).join(", ");
+                    format!("Missing argument descriptions in the docstring: {names}")
+                }
+            }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),

@@ -1,0 +1,50 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
+    row: 389
+    column: 1
+  end_location:
+    row: 401
+    column: 1
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - test
+      - y
+      - z
+  location:
+    row: 425
+    column: 5
+  end_location:
+    row: 436
+    column: 5
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - test
+      - y
+      - z
+  location:
+    row: 440
+    column: 5
+  end_location:
+    row: 455
+    column: 5
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - a
+      - z
+  location:
+    row: 459
+    column: 5
+  end_location:
+    row: 471
+    column: 5
+  fix: ~
+
