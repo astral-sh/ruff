@@ -1,5 +1,9 @@
 //! Abstractions for NumPy-style docstrings.
 
+use std::collections::BTreeSet;
+
+use once_cell::sync::Lazy;
+
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::helpers::range_for;
@@ -7,8 +11,6 @@ use crate::docstrings::sections::SectionContext;
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::types::Definition;
 use crate::docstrings::{helpers, sections};
-use once_cell::sync::Lazy;
-use std::collections::BTreeSet;
 
 pub(crate) static LOWERCASE_NUMPY_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
     BTreeSet::from([

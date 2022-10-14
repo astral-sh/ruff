@@ -1,4 +1,5 @@
 #![allow(clippy::collapsible_if, clippy::collapsible_else_if)]
+
 use std::path::Path;
 
 use anyhow::Result;
