@@ -42,6 +42,11 @@ titlecase = "2.2.1"
 cacache = { version = "10.0.1" } # uses async-std
 clearscreen = { version = "1.0.10" } # uses which
 
+# https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
+# For (future) wasm-pack support
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2.7", features = ["js"] }
+
 [dev-dependencies]
 assert_cmd = "2.0.4"
 insta = { version = "1.19.1", features = ["yaml"] }
