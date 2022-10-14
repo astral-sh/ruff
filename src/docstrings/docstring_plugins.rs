@@ -236,13 +236,13 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                         .skip(1)
                         .take_while(|line| line.trim().is_empty())
                         .count();
-                    if blank_lines_before != 0
-                        && checker.settings.enabled.contains(&CheckCode::D211)
-                    {
-                        checker.add_check(Check::new(
-                            CheckKind::NoBlankLineBeforeClass(blank_lines_before),
-                            helpers::range_for(docstring),
-                        ));
+                    if blank_lines_before != 0 {
+                        checker.add_check_if(&CheckCode::D211, || {
+                            Check::new(
+                                CheckKind::NoBlankLineBeforeClass(blank_lines_before),
+                                helpers::range_for(docstring),
+                            )
+                        });
                     }
                     if blank_lines_before != 1
                         && checker.settings.enabled.contains(&CheckCode::D203)

@@ -1392,6 +1392,15 @@ impl<'a> Checker<'a> {
         self.checks.push(check);
     }
 
+    pub fn add_check_if<F>(&mut self, code: &CheckCode, f: F)
+    where
+        F: FnOnce() -> Check,
+    {
+        if self.settings.enabled.contains(code) {
+            self.checks.push(f());
+        }
+    }
+
     fn push_parent(&mut self, parent: &'a Stmt) {
         self.parent_stack.push(self.parents.len());
         self.parents.push(parent);
