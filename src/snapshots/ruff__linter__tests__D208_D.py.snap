@@ -1,0 +1,29 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: NoOverIndentation
+  location:
+    row: 245
+    column: 5
+  end_location:
+    row: 249
+    column: 8
+  fix: ~
+- kind: NoOverIndentation
+  location:
+    row: 255
+    column: 5
+  end_location:
+    row: 259
+    column: 12
+  fix: ~
+- kind: NoOverIndentation
+  location:
+    row: 265
+    column: 5
+  end_location:
+    row: 269
+    column: 8
+  fix: ~
+

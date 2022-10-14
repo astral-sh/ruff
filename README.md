@@ -216,12 +216,13 @@ variables.)
 
 ruff also implements some of the most popular Flake8 plugins natively, including:
 
+- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
+- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
-- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) (41/48)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 
 Beyond rule-set parity, ruff suffers from the following limitations vis-à-vis Flake8:
@@ -327,6 +328,9 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring |  |  |
 | D204 | OneBlankLineAfterClass | 1 blank line required after class docstring |  |  |
 | D205 | NoBlankLineAfterSummary | 1 blank line required between summary line and description |  |  |
+| D206 | IndentWithSpaces | Docstring should be indented with spaces, not tabs |  |  |
+| D207 | NoUnderIndentation | Docstring is under-indented |  |  |
+| D208 | NoOverIndentation | Docstring is over-indented |  |  |
 | D209 | NewLineAfterLastParagraph | Multi-line docstring closing quotes should be on a separate line |  |  |
 | D210 | NoSurroundingWhitespace | No whitespaces allowed surrounding docstring text |  |  |
 | D211 | NoBlankLineBeforeClass | No blank lines allowed before class docstring |  |  |

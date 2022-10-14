@@ -1969,6 +1969,12 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::D205) {
                 docstring_plugins::blank_after_summary(self, &docstring);
             }
+            if self.settings.enabled.contains(&CheckCode::D206)
+                || self.settings.enabled.contains(&CheckCode::D207)
+                || self.settings.enabled.contains(&CheckCode::D208)
+            {
+                docstring_plugins::indent(self, &docstring);
+            }
             if self.settings.enabled.contains(&CheckCode::D209) {
                 docstring_plugins::newline_after_last_paragraph(self, &docstring);
             }
