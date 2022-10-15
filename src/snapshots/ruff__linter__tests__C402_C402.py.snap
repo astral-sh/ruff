@@ -2,7 +2,7 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: UnnecessaryListComprehensionDict
+- kind: UnnecessaryGeneratorDict
   location:
     row: 1
     column: 5
