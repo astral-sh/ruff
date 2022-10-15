@@ -245,7 +245,7 @@ Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis F
 By default, Ruff enables all `E`, `W`, and `F` error codes, which correspond to those built-in to
 Flake8.
 
-## Pyflakes
+### Pyflakes
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
@@ -278,7 +278,7 @@ Flake8.
 | F841 | UnusedVariable | Local variable `...` is assigned to but never used |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` |
 
-## pycodestyle
+### pycodestyle
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
@@ -298,7 +298,7 @@ Flake8.
 | E999 | SyntaxError | SyntaxError: `...` |
 | W292 | NoNewLineAtEndOfFile | No newline at end of file |
 
-## pydocstyle
+### pydocstyle
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
@@ -347,7 +347,7 @@ Flake8.
 | D418 | SkipDocstring | Function decorated with @overload shouldn't contain a docstring |
 | D419 | NonEmpty | Docstring is empty |
 
-## pyupgrade
+### pyupgrade
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
@@ -360,7 +360,7 @@ Flake8.
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |
 
-## flake8-comprehensions
+### flake8-comprehensions
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
@@ -381,7 +381,7 @@ Flake8.
 | C416 | UnnecessaryComprehension |  Unnecessary <list/set> comprehension - rewrite using <list/set>() |
 | C417 | UnnecessaryMap | Unnecessary map usage - rewrite using a <list/set/dict> comprehension |
 
-## flake8-bugbear
+### flake8-bugbear
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
@@ -389,7 +389,7 @@ Flake8.
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |
 
-## flake8-builtins
+### flake8-builtins
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
@@ -397,14 +397,14 @@ Flake8.
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |
 
-## flake8-print
+### flake8-print
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
 | T201 | PrintFound | `print` found |
 | T203 | PPrintFound | `pprint` found |
 
-## Meta rules
+### Meta rules
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
