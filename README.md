@@ -20,7 +20,7 @@ An extremely fast Python linter, written in Rust.
 - 🤝 Python 3.10 compatibility
 - 🛠️ `pyproject.toml` support
 - 📦 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache support
-- 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix)-inspired autofix support, to correct errors automatically
+- 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix)-inspired autofix support (e.g., automatically remove unused imports)
 - 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` support, for continuous file monitoring
 - ⚖️ [Near-parity](#Parity-with-Flake8) with the built-in Flake8 rule set
 - 🔌 Native re-implementations of popular Flake8 plugins, like [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) ([`pydocstyle`](https://pypi.org/project/pydocstyle/))
@@ -28,8 +28,8 @@ An extremely fast Python linter, written in Rust.
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface. Ruff can be used to replace Flake8 (plus a variety
 of plugins), [`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](https://github.com/asottile/yesqa),
-and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/), all while executing tens or
-hundreds of times faster than any individual tool.
+and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/) and [`autoflake`](https://pypi.org/project/autoflake/)
+all while executing tens or hundreds of times faster than any individual tool.
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -455,6 +455,7 @@ including:
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
+- [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
 Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -477,6 +478,8 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34).
 
+If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
+
 ### Do I need to install Rust to use Ruff?
 
 Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
@@ -492,6 +495,97 @@ on Rust at all.
 
 Ruff does not yet support third-party plugins, though a plugin system is within-scope for the
 project. See [#283](https://github.com/charliermarsh/ruff/issues/2830) for more.
+
+### Does Ruff support NumPy- or Google-style docstrings?
+
+Yes! To enable a specific docstring convention, start by enabling all `pydocstyle` error codes, and
+then selectively disabling based on your [preferred convention](https://www.pydocstyle.org/en/latest/error_codes.html#default-conventions).
+
+For example, if you're coming from `flake8-docstrings`, the following configuration is equivalent to
+`--docstring-convention numpy`:
+
+```toml
+[tool.ruff]
+extend-select = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D200",
+    "D201",
+    "D202",
+    "D204",
+    "D205",
+    "D206",
+    "D207",
+    "D208",
+    "D209",
+    "D210",
+    "D211",
+    "D214",
+    "D215",
+    "D300",
+    "D400",
+    "D402",
+    "D403",
+    "D404",
+    "D405",
+    "D406",
+    "D407",
+    "D408",
+    "D409",
+    "D410",
+    "D411",
+    "D412",
+    "D413",
+    "D418",
+    "D419",
+]
+```
+
+Similarly, the following is equivalent to `--docstring-convention google`:
+
+```toml
+[tool.ruff]
+extend-select = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
+    "D200",
+    "D201",
+    "D202",
+    "D205",
+    "D206",
+    "D207",
+    "D208",
+    "D209",
+    "D210",
+    "D211",
+    "D212",
+    "D214",
+    "D300",
+    "D402",
+    "D403",
+    "D405",
+    "D410",
+    "D411",
+    "D412",
+    "D414",
+    "D415",
+    "D416",
+    "D417",
+    "D418",
+    "D419",
+]
+```
 
 ## Development
 
