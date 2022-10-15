@@ -1,4 +1,5 @@
-/// Print the AST for a given Python file.
+//! Print the AST for a given Python file.
+
 use std::path::PathBuf;
 
 use anyhow::Result;

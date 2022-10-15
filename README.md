@@ -242,132 +242,174 @@ Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis F
 
 ## Supported Rules
 
-The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` command-line option. By
-default, Ruff enables all `E`, `W`, and `F` error codes, which correspond to those built-in to
+By default, Ruff enables all `E`, `W`, and `F` error codes, which correspond to those built-in to
 Flake8.
 
-| Code | Name | Message |     |
-| ---- | ---- | ------- | --- |
-| E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |  |
-| E501 | LineTooLong | Line too long (89 > 88 characters) |  |
-| E711 | NoneComparison | Comparison to `None` should be `cond is None` |  |
-| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |  |
-| E713 | NotInTest | Test for membership should be `not in` |  |
-| E714 | NotIsTest | Test for object identity should be `is not` |  |
-| E721 | TypeComparison | Do not compare types, use `isinstance()` |  |
-| E722 | DoNotUseBareExcept | Do not use bare `except` |  |
-| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |  |
-| E741 | AmbiguousVariableName | Ambiguous variable name: `...` |  |
-| E742 | AmbiguousClassName | Ambiguous class name: `...` |  |
-| E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
-| E902 | IOError | IOError: `...` |  |
-| E999 | SyntaxError | SyntaxError: `...` |  |
-| W292 | NoNewLineAtEndOfFile | No newline at end of file |  |
-| F401 | UnusedImport | `...` imported but unused | 🛠 |
-| F402 | ImportShadowedByLoopVar | Import `...` from line 1 shadowed by loop variable |  |
-| F403 | ImportStarUsed | `from ... import *` used; unable to detect undefined names |  |
-| F404 | LateFutureImport | `from __future__` imports must occur at the beginning of the file |  |
-| F405 | ImportStarUsage | `...` may be undefined, or defined from star imports: `...` |  |
-| F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |  |
-| F407 | FutureFeatureNotDefined | Future feature `...` is not defined |  |
-| F541 | FStringMissingPlaceholders | f-string without any placeholders |  |
-| F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |  |
-| F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |  |
-| F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment |  |
-| F622 | TwoStarredExpressions | Two starred expressions in assignment |  |
-| F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |  |
-| F632 | IsLiteral | Use `==` and `!=` to compare constant literals |  |
-| F633 | InvalidPrintSyntax | Use of `>>` is invalid with `print` function |  |
-| F634 | IfTuple | If test is a tuple, which is always `True` |  |
-| F701 | BreakOutsideLoop | `break` outside loop |  |
-| F702 | ContinueOutsideLoop | `continue` not properly in loop |  |
-| F704 | YieldOutsideFunction | `yield` or `yield from` statement outside of a function/method |  |
-| F706 | ReturnOutsideFunction | `return` statement outside of a function/method |  |
-| F707 | DefaultExceptNotLast | An `except:` block as not the last exception handler |  |
-| F722 | ForwardAnnotationSyntaxError | Syntax error in forward annotation: `...` |  |
-| F821 | UndefinedName | Undefined name `...` |  |
-| F822 | UndefinedExport | Undefined name `...` in `__all__` |  |
-| F823 | UndefinedLocal | Local variable `...` referenced before assignment |  |
-| F831 | DuplicateArgumentName | Duplicate argument name in function definition |  |
-| F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
-| F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` |  |
-| A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |  |
-| A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |
-| A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |
-| B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
-| B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
-| B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
-| C400 | UnnecessaryGeneratorList | Unnecessary generator - rewrite as a list comprehension |  |
-| C401 | UnnecessaryGeneratorSet | Unnecessary generator - rewrite as a set comprehension |  |
-| C402 | UnnecessaryGeneratorDict | Unnecessary generator - rewrite as a dict comprehension |  |
-| C403 | UnnecessaryListComprehensionSet | Unnecessary list comprehension - rewrite as a set comprehension |  |
-| C404 | UnnecessaryListComprehensionDict | Unnecessary list comprehension - rewrite as a dict comprehension |  |
-| C405 | UnnecessaryLiteralSet | Unnecessary <list/tuple> literal - rewrite as a set literal |  |
-| C406 | UnnecessaryLiteralDict | Unnecessary <list/tuple> literal - rewrite as a dict literal |  |
-| C408 | UnnecessaryCollectionCall | Unnecessary <dict/list/tuple> call - rewrite as a literal |  |
-| C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary <list/tuple> literal passed to tuple() - remove the outer call to tuple() |  |
-| C410 | UnnecessaryLiteralWithinListCall | Unnecessary <list/tuple> literal passed to list() - rewrite as a list literal |  |
-| C411 | UnnecessaryListCall | Unnecessary list call - remove the outer call to list() |  |
-| C413 | UnnecessaryCallAroundSorted | Unnecessary <list/reversed> call around sorted() |  |
-| C414 | UnnecessaryDoubleCastOrProcess | Unnecessary <list/reversed/set/sorted/tuple> call within <list/set/sorted/tuple>(). |  |
-| C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within <reversed/set/sorted>() |  |
-| C416 | UnnecessaryComprehension |  Unnecessary <list/set> comprehension - rewrite using <list/set>() |  |
-| C417 | UnnecessaryMap | Unnecessary map usage - rewrite using a <list/set/dict> comprehension |  |
-| T201 | PrintFound | `print` found | 🛠 |
-| T203 | PPrintFound | `pprint` found | 🛠 |
-| U001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
-| U002 | UnnecessaryAbspath | `abspath(__file__)` is unnecessary in Python 3.9 and later | 🛠 |
-| U003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
-| U004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
-| U005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead | 🛠 |
-| U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
-| U007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
-| U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
-| D100 | PublicModule | Missing docstring in public module |  |
-| D101 | PublicClass | Missing docstring in public class |  |
-| D102 | PublicMethod | Missing docstring in public method |  |
-| D103 | PublicFunction | Missing docstring in public function |  |
-| D104 | PublicPackage | Missing docstring in public package |  |
-| D105 | MagicMethod | Missing docstring in magic method |  |
-| D106 | PublicNestedClass | Missing docstring in public nested class |  |
-| D107 | PublicInit | Missing docstring in __init__ |  |
-| D200 | FitsOnOneLine | One-line docstring should fit on one line |  |
-| D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found 1) |  |
-| D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) |  |
-| D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring |  |
-| D204 | OneBlankLineAfterClass | 1 blank line required after class docstring |  |
-| D205 | NoBlankLineAfterSummary | 1 blank line required between summary line and description |  |
-| D206 | IndentWithSpaces | Docstring should be indented with spaces, not tabs |  |
-| D207 | NoUnderIndentation | Docstring is under-indented |  |
-| D208 | NoOverIndentation | Docstring is over-indented |  |
-| D209 | NewLineAfterLastParagraph | Multi-line docstring closing quotes should be on a separate line |  |
-| D210 | NoSurroundingWhitespace | No whitespaces allowed surrounding docstring text |  |
-| D211 | NoBlankLineBeforeClass | No blank lines allowed before class docstring |  |
-| D212 | MultiLineSummaryFirstLine | Multi-line docstring summary should start at the first line |  |
-| D213 | MultiLineSummarySecondLine | Multi-line docstring summary should start at the second line |  |
-| D214 | SectionNotOverIndented | Section is over-indented ("Returns") |  |
-| D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("Returns") |  |
-| D300 | UsesTripleQuotes | Use """triple double quotes""" |  |
-| D400 | EndsInPeriod | First line should end with a period |  |
-| D402 | NoSignature | First line should not be the function's 'signature' |  |
-| D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |
-| D404 | NoThisPrefix | First word of the docstring should not be `This` |  |
-| D405 | CapitalizeSectionName | Section name should be properly capitalized ("returns") |  |
-| D406 | NewLineAfterSectionName | Section name should end with a newline ("Returns") |  |
-| D407 | DashedUnderlineAfterSection | Missing dashed underline after section ("Returns") |  |
-| D408 | SectionUnderlineAfterName | Section underline should be in the line following the section's name ("Returns") |  |
-| D409 | SectionUnderlineMatchesSectionLength | Section underline should match the length of its name ("Returns") |  |
-| D410 | BlankLineAfterSection | Missing blank line after section ("Returns") |  |
-| D411 | BlankLineBeforeSection | Missing blank line before section ("Returns") |  |
-| D412 | NoBlankLinesBetweenHeaderAndContent | No blank lines allowed between a section header and its content ("Returns") |  |
-| D413 | BlankLineAfterLastSection | Missing blank line after last section ("Returns") |  |
-| D414 | NonEmptySection | Section has no content ("Returns") |  |
-| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |
-| D416 | SectionNameEndsInColon | Section name should end with a colon ("Returns") |  |
-| D417 | DocumentAllArguments | Missing argument descriptions in the docstring: `x`, `y` |  |
-| D418 | SkipDocstring | Function decorated with @overload shouldn't contain a docstring |  |
-| D419 | NonEmpty | Docstring is empty |  |
-| M001 | UnusedNOQA | Unused `noqa` directive | 🛠 |
+## Pyflakes
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| F401 | UnusedImport | `...` imported but unused |
+| F402 | ImportShadowedByLoopVar | Import `...` from line 1 shadowed by loop variable |
+| F403 | ImportStarUsed | `from ... import *` used; unable to detect undefined names |
+| F404 | LateFutureImport | `from __future__` imports must occur at the beginning of the file |
+| F405 | ImportStarUsage | `...` may be undefined, or defined from star imports: `...` |
+| F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |
+| F407 | FutureFeatureNotDefined | Future feature `...` is not defined |
+| F541 | FStringMissingPlaceholders | f-string without any placeholders |
+| F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |
+| F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |
+| F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment |
+| F622 | TwoStarredExpressions | Two starred expressions in assignment |
+| F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |
+| F632 | IsLiteral | Use `==` and `!=` to compare constant literals |
+| F633 | InvalidPrintSyntax | Use of `>>` is invalid with `print` function |
+| F634 | IfTuple | If test is a tuple, which is always `True` |
+| F701 | BreakOutsideLoop | `break` outside loop |
+| F702 | ContinueOutsideLoop | `continue` not properly in loop |
+| F704 | YieldOutsideFunction | `yield` or `yield from` statement outside of a function/method |
+| F706 | ReturnOutsideFunction | `return` statement outside of a function/method |
+| F707 | DefaultExceptNotLast | An `except:` block as not the last exception handler |
+| F722 | ForwardAnnotationSyntaxError | Syntax error in forward annotation: `...` |
+| F821 | UndefinedName | Undefined name `...` |
+| F822 | UndefinedExport | Undefined name `...` in `__all__` |
+| F823 | UndefinedLocal | Local variable `...` referenced before assignment |
+| F831 | DuplicateArgumentName | Duplicate argument name in function definition |
+| F841 | UnusedVariable | Local variable `...` is assigned to but never used |
+| F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` |
+
+## pycodestyle
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |
+| E501 | LineTooLong | Line too long (89 > 88 characters) |
+| E711 | NoneComparison | Comparison to `None` should be `cond is None` |
+| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |
+| E713 | NotInTest | Test for membership should be `not in` |
+| E714 | NotIsTest | Test for object identity should be `is not` |
+| E721 | TypeComparison | Do not compare types, use `isinstance()` |
+| E722 | DoNotUseBareExcept | Do not use bare `except` |
+| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |
+| E741 | AmbiguousVariableName | Ambiguous variable name: `...` |
+| E742 | AmbiguousClassName | Ambiguous class name: `...` |
+| E743 | AmbiguousFunctionName | Ambiguous function name: `...` |
+| E902 | IOError | IOError: `...` |
+| E999 | SyntaxError | SyntaxError: `...` |
+| W292 | NoNewLineAtEndOfFile | No newline at end of file |
+
+## pydocstyle
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| D100 | PublicModule | Missing docstring in public module |
+| D101 | PublicClass | Missing docstring in public class |
+| D102 | PublicMethod | Missing docstring in public method |
+| D103 | PublicFunction | Missing docstring in public function |
+| D104 | PublicPackage | Missing docstring in public package |
+| D105 | MagicMethod | Missing docstring in magic method |
+| D106 | PublicNestedClass | Missing docstring in public nested class |
+| D107 | PublicInit | Missing docstring in __init__ |
+| D200 | FitsOnOneLine | One-line docstring should fit on one line |
+| D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found 1) |
+| D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) |
+| D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring |
+| D204 | OneBlankLineAfterClass | 1 blank line required after class docstring |
+| D205 | NoBlankLineAfterSummary | 1 blank line required between summary line and description |
+| D206 | IndentWithSpaces | Docstring should be indented with spaces, not tabs |
+| D207 | NoUnderIndentation | Docstring is under-indented |
+| D208 | NoOverIndentation | Docstring is over-indented |
+| D209 | NewLineAfterLastParagraph | Multi-line docstring closing quotes should be on a separate line |
+| D210 | NoSurroundingWhitespace | No whitespaces allowed surrounding docstring text |
+| D211 | NoBlankLineBeforeClass | No blank lines allowed before class docstring |
+| D212 | MultiLineSummaryFirstLine | Multi-line docstring summary should start at the first line |
+| D213 | MultiLineSummarySecondLine | Multi-line docstring summary should start at the second line |
+| D214 | SectionNotOverIndented | Section is over-indented ("Returns") |
+| D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("Returns") |
+| D300 | UsesTripleQuotes | Use """triple double quotes""" |
+| D400 | EndsInPeriod | First line should end with a period |
+| D402 | NoSignature | First line should not be the function's 'signature' |
+| D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |
+| D404 | NoThisPrefix | First word of the docstring should not be `This` |
+| D405 | CapitalizeSectionName | Section name should be properly capitalized ("returns") |
+| D406 | NewLineAfterSectionName | Section name should end with a newline ("Returns") |
+| D407 | DashedUnderlineAfterSection | Missing dashed underline after section ("Returns") |
+| D408 | SectionUnderlineAfterName | Section underline should be in the line following the section's name ("Returns") |
+| D409 | SectionUnderlineMatchesSectionLength | Section underline should match the length of its name ("Returns") |
+| D410 | BlankLineAfterSection | Missing blank line after section ("Returns") |
+| D411 | BlankLineBeforeSection | Missing blank line before section ("Returns") |
+| D412 | NoBlankLinesBetweenHeaderAndContent | No blank lines allowed between a section header and its content ("Returns") |
+| D413 | BlankLineAfterLastSection | Missing blank line after last section ("Returns") |
+| D414 | NonEmptySection | Section has no content ("Returns") |
+| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |
+| D416 | SectionNameEndsInColon | Section name should end with a colon ("Returns") |
+| D417 | DocumentAllArguments | Missing argument descriptions in the docstring: `x`, `y` |
+| D418 | SkipDocstring | Function decorated with @overload shouldn't contain a docstring |
+| D419 | NonEmpty | Docstring is empty |
+
+## pyupgrade
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| U001 | UselessMetaclassType | `__metaclass__ = type` is implied |
+| U002 | UnnecessaryAbspath | `abspath(__file__)` is unnecessary in Python 3.9 and later |
+| U003 | TypeOfPrimitive | Use `str` instead of `type(...)` |
+| U004 | UselessObjectInheritance | Class `...` inherits from object |
+| U005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead |
+| U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations |
+| U007 | UsePEP604Annotation | Use `X \| Y` for type annotations |
+| U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |
+
+## flake8-comprehensions
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| C400 | UnnecessaryGeneratorList | Unnecessary generator - rewrite as a list comprehension |
+| C401 | UnnecessaryGeneratorSet | Unnecessary generator - rewrite as a set comprehension |
+| C402 | UnnecessaryGeneratorDict | Unnecessary generator - rewrite as a dict comprehension |
+| C403 | UnnecessaryListComprehensionSet | Unnecessary list comprehension - rewrite as a set comprehension |
+| C404 | UnnecessaryListComprehensionDict | Unnecessary list comprehension - rewrite as a dict comprehension |
+| C405 | UnnecessaryLiteralSet | Unnecessary <list/tuple> literal - rewrite as a set literal |
+| C406 | UnnecessaryLiteralDict | Unnecessary <list/tuple> literal - rewrite as a dict literal |
+| C408 | UnnecessaryCollectionCall | Unnecessary <dict/list/tuple> call - rewrite as a literal |
+| C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary <list/tuple> literal passed to tuple() - remove the outer call to tuple() |
+| C410 | UnnecessaryLiteralWithinListCall | Unnecessary <list/tuple> literal passed to list() - rewrite as a list literal |
+| C411 | UnnecessaryListCall | Unnecessary list call - remove the outer call to list() |
+| C413 | UnnecessaryCallAroundSorted | Unnecessary <list/reversed> call around sorted() |
+| C414 | UnnecessaryDoubleCastOrProcess | Unnecessary <list/reversed/set/sorted/tuple> call within <list/set/sorted/tuple>(). |
+| C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within <reversed/set/sorted>() |
+| C416 | UnnecessaryComprehension |  Unnecessary <list/set> comprehension - rewrite using <list/set>() |
+| C417 | UnnecessaryMap | Unnecessary map usage - rewrite using a <list/set/dict> comprehension |
+
+## flake8-bugbear
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` |
+| B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` |
+| B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |
+
+## flake8-builtins
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |
+| A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |
+| A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |
+
+## flake8-print
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| T201 | PrintFound | `print` found |
+| T203 | PPrintFound | `pprint` found |
+
+## Meta rules
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| M001 | UnusedNOQA | Unused `noqa` directive |
+
 
 ## Integrations
 
