@@ -18,7 +18,7 @@ expression: parse_ast
                 custom: (),
                 node: Constant {
                     value: Str(
-                        "Hello world",
+                        "Hello, world!",
                     ),
                     kind: Some(
                         "u",

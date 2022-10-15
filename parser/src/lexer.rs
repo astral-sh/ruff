@@ -205,7 +205,9 @@ where
 
             // Check if we have a string:
             if self.chr0 == Some('"') || self.chr0 == Some('\'') {
-                return self.lex_string(saw_b, saw_r, saw_u, saw_f);
+                return self
+                    .lex_string(saw_b, saw_r, saw_u, saw_f)
+                    .map(|(_, tok, end_pos)| (start_pos, tok, end_pos));
             }
         }
 

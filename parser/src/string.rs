@@ -131,4 +131,11 @@ mod tests {
         let parse_ast = parse_program(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
+
+    #[test]
+    fn test_parse_string_triple_quotes_with_kind() {
+        let source = String::from("u'''Hello, world!'''");
+        let parse_ast = parse_program(&source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }

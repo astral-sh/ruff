@@ -1,5 +1,5 @@
 ---
-source: parser/src/string.rs
+source: compiler/parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -34,7 +34,7 @@ expression: parse_ast
                         Located {
                             location: Location {
                                 row: 1,
-                                column: 12,
+                                column: 10,
                             },
                             custom: (),
                             node: FormattedValue {
