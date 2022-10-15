@@ -1,4 +1,4 @@
-# ruff
+# Ruff
 
 [![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
@@ -33,7 +33,19 @@ hundreds of times faster than any individual tool.
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
-## Installation and usage
+## Table of Contents
+
+1. [Installation and Usage](#installation-and-usage)
+2. [Configuration](#configuration)
+3. [Supported Rules](#supported-rules)
+4. [Integrations](#integrations)
+5. [Development](#development)
+6. [Releases](#releases)
+7. [Benchmarks](#benchmarks)
+8. [License](#license)
+9. [Contributing](#contributing)
+
+## Installation and Usage
 
 ### Installation
 
@@ -410,7 +422,6 @@ Flake8.
 | ---- | ---- | ------- |
 | M001 | UnusedNOQA | Unused `noqa` directive |
 
-
 ## Integrations
 
 ### PyCharm
@@ -463,13 +474,13 @@ cargo clippy
 cargo test
 ```
 
-## Deployment
+## Releases
 
 Ruff is distributed on [PyPI](https://pypi.org/project/ruff/), and published via [`maturin`](https://github.com/PyO3/maturin).
 
 See: `.github/workflows/release.yaml`.
 
-## Benchmarking
+## Benchmarks
 
 First, clone [CPython](https://github.com/python/cpython). It's a large and diverse Python codebase,
 which makes it a good target for benchmarking.
