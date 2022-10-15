@@ -38,12 +38,13 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
 1. [Installation and Usage](#installation-and-usage)
 2. [Configuration](#configuration)
 3. [Supported Rules](#supported-rules)
-4. [Integrations](#integrations)
-5. [Development](#development)
-6. [Releases](#releases)
-7. [Benchmarks](#benchmarks)
-8. [License](#license)
-9. [Contributing](#contributing)
+4. [Editor Integrations](#editor-integrations)
+5. [FAQ](#faq)
+6. [Development](#development)
+7. [Releases](#releases)
+8. [Benchmarks](#benchmarks)
+9. [License](#license)
+10. [Contributing](#contributing)
 
 ## Installation and Usage
 
@@ -216,42 +217,6 @@ Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This
 migrating a new codebase to Ruff. **You can run `ruff /path/to/file.py --add-noqa` to automatically
 add `noqa` directives to all failing lines, with the appropriate error codes.**
 
-### Compatibility with Black
-
-Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
-the `line-length` setting is consistent between the two.
-
-As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
-stylistic lint rules that are obviated by autoformatting.
-
-### Parity with Flake8
-
-Ruff can be used as a (near) drop-in replacement for Flake8 when used (1) without plugins, (2)
-alongside Black, and (3) on Python 3 code.
-
-Under those conditions Ruff is missing 14 rules related to string `.format` calls, 1 rule related
-to docstring parsing, and 1 rule related to redefined variables.
-
-Ruff re-implements some of the most popular Flake8 plugins and related code quality tools natively,
-including:
-
-- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
-- [`yesqa`](https://github.com/asottile/yesqa)
-- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
-- [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
-- [`flake8-super`](https://pypi.org/project/flake8-super/)
-- [`flake8-print`](https://pypi.org/project/flake8-print/)
-- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
-
-Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
-
-1. Ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
-   pattern matching and parenthesized context managers.
-2. Flake8 has a plugin architecture and supports writing custom lint rules. (To date, popular Flake8
-   plugins have been re-implemented within Ruff directly.)
-
 ## Supported Rules
 
 By default, Ruff enables all `E`, `W`, and `F` error codes, which correspond to those built-in to
@@ -321,7 +286,7 @@ Flake8.
 | D104 | PublicPackage | Missing docstring in public package |
 | D105 | MagicMethod | Missing docstring in magic method |
 | D106 | PublicNestedClass | Missing docstring in public nested class |
-| D107 | PublicInit | Missing docstring in __init__ |
+| D107 | PublicInit | Missing docstring in `__init__` |
 | D200 | FitsOnOneLine | One-line docstring should fit on one line |
 | D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found 1) |
 | D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) |
@@ -422,7 +387,7 @@ Flake8.
 | ---- | ---- | ------- |
 | M001 | UnusedNOQA | Unused `noqa` directive |
 
-## Integrations
+## Editor Integrations
 
 ### PyCharm
 
@@ -459,6 +424,74 @@ jobs:
       - name: Run Ruff
         run: ruff .
 ```
+
+## FAQ
+
+### Is Ruff compatible with Black?
+
+Yes. Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
+the `line-length` setting is consistent between the two.
+
+As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
+stylistic lint rules that are obviated by autoformatting.
+
+### How does Ruff compare to Flake8?
+
+Ruff can be used as a (near) drop-in replacement for Flake8 when used (1) without or with a small
+number of plugins, (2) alongside Black, and (3) on Python 3 code.
+
+Under those conditions Ruff is missing 14 rules related to string `.format` calls, 1 rule related
+to docstring parsing, and 1 rule related to redefined variables.
+
+Ruff re-implements some of the most popular Flake8 plugins and related code quality tools natively,
+including:
+
+- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
+- [`yesqa`](https://github.com/asottile/yesqa)
+- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
+- [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
+- [`flake8-super`](https://pypi.org/project/flake8-super/)
+- [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
+
+Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
+
+1. Ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
+   pattern matching and parenthesized context managers.
+2. Flake8 has a plugin architecture and supports writing custom lint rules. (To date, popular Flake8
+   plugins have been re-implemented within Ruff directly.)
+
+### Which tools does Ruff replace?
+
+Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
+
+- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
+- [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
+- [`flake8-super`](https://pypi.org/project/flake8-super/)
+- [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (3/32)
+
+Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
+and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34).
+
+### Do I need to install Rust to use Ruff?
+
+Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
+
+```shell
+pip install ruff
+```
+
+Ruff ships with wheels for all major platforms, which enables `pip` to install Ruff without relying
+on Rust at all.
+
+### Can I write my own plugins for Ruff?
+
+Ruff does not yet support third-party plugins, though a plugin system is within-scope for the
+project. See [#283](https://github.com/charliermarsh/ruff/issues/2830) for more.
 
 ## Development
 
@@ -559,7 +592,7 @@ In order, these evaluate:
 
 - Ruff
 - Pylint
-- PyFlakes
+- Pyflakes
 - autoflake
 - pycodestyle
 - Flake8

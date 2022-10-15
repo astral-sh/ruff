@@ -1120,7 +1120,7 @@ impl CheckKind {
             CheckKind::PublicPackage => "Missing docstring in public package".to_string(),
             CheckKind::MagicMethod => "Missing docstring in magic method".to_string(),
             CheckKind::PublicNestedClass => "Missing docstring in public nested class".to_string(),
-            CheckKind::PublicInit => "Missing docstring in __init__".to_string(),
+            CheckKind::PublicInit => "Missing docstring in `__init__`".to_string(),
             CheckKind::NoThisPrefix => {
                 "First word of the docstring should not be `This`".to_string()
             }
