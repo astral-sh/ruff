@@ -757,7 +757,7 @@ pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> 
             if id == "set" {
                 if let ExprKind::GeneratorExp { .. } = &args[0].node {
                     return Some(Check::new(
-                        CheckKind::UnnecessaryGeneratorList,
+                        CheckKind::UnnecessaryGeneratorSet,
                         Range::from_located(expr),
                     ));
                 }
@@ -776,7 +776,7 @@ pub fn unnecessary_generator_dict(expr: &Expr, func: &Expr, args: &Vec<Expr>) ->
                     match &elt.node {
                         ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
                             return Some(Check::new(
-                                CheckKind::UnnecessaryListComprehensionDict,
+                                CheckKind::UnnecessaryGeneratorDict,
                                 Range::from_located(expr),
                             ));
                         }

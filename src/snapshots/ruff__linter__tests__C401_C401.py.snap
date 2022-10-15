@@ -2,7 +2,7 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: UnnecessaryGeneratorList
+- kind: UnnecessaryGeneratorSet
   location:
     row: 1
     column: 5
