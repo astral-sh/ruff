@@ -1,4 +1,5 @@
-/// Print the token stream for a given Python file.
+//! Print the token stream for a given Python file.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
