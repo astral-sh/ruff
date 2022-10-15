@@ -383,7 +383,7 @@ impl CheckCode {
     /// The source for the check (either the AST, the filesystem, or the physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            CheckCode::E501 | CheckCode::M001 => &LintSource::Lines,
+            CheckCode::E501 | CheckCode::W292 | CheckCode::M001 => &LintSource::Lines,
             CheckCode::E902 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
