@@ -367,25 +367,30 @@ fn inner_main() -> Result<ExitCode> {
             println!("Formatted {modifications} files.");
         }
     } else {
-        let (messages, print_messages) = if cli.files == vec![PathBuf::from("-")] {
-            let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
-            let path = Path::new(&filename);
-            (
-                run_once_stdin(&settings, path, cli.fix)?,
-                !cli.quiet && !cli.fix,
-            )
-        } else {
-            (
-                run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?,
-                !cli.quiet,
-            )
-        };
-        if print_messages {
+        let (messages, should_print_messages, should_check_updates) =
+            if cli.files == vec![PathBuf::from("-")] {
+                let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
+                let path = Path::new(&filename);
+                (
+                    run_once_stdin(&settings, path, cli.fix)?,
+                    !cli.quiet && !cli.fix,
+                    false,
+                )
+            } else {
+                (
+                    run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?,
+                    !cli.quiet,
+                    !cli.quiet,
+                )
+            };
+        if should_print_messages {
             printer.write_once(&messages)?;
         }
 
         #[cfg(feature = "update-informer")]
-        check_for_updates();
+        if should_check_updates {
+            check_for_updates();
+        }
 
         if messages.iter().any(|message| !message.fixed) && !cli.exit_zero {
             return Ok(ExitCode::FAILURE);
