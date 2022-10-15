@@ -9,10 +9,8 @@ name = "ruff"
 [dependencies]
 anyhow = { version = "1.0.60" }
 bincode = { version = "1.3.3" }
-cacache = { version = "10.0.1" }
 chrono = { version = "0.4.21" }
 clap = { version = "4.0.1", features = ["derive"] }
-clearscreen = { version = "1.0.10" }
 colored = { version = "2.0.0" }
 common-path = { version = "1.0.0" }
 dirs = { version = "4.0.0" }
@@ -25,7 +23,7 @@ log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 num-bigint = { version = "0.4.3" }
 once_cell = { version = "1.13.1" }
-path-absolutize = { version = "3.0.13", features = ["once_cell_cache"] }
+path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/charliermarsh/RustPython.git", rev = "778ae2aeb521d0438d2a91bd11238bb5c2bf9d4f" }
@@ -40,6 +38,15 @@ titlecase = { version = "2.2.1" }
 toml = { version = "0.5.9" }
 update-informer = { version = "0.5.0", default_features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+cacache = { version = "10.0.1" } # uses async-std
+clearscreen = { version = "1.0.10" } # uses which
+
+# https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
+# For (future) wasm-pack support
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2.7", features = ["js"] }
 
 [dev-dependencies]
 assert_cmd = { version = "2.0.4" }

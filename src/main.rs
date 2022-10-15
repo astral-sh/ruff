@@ -9,9 +9,11 @@ use clap::Parser;
 use colored::Colorize;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
+#[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use walkdir::DirEntry;
 
+#[cfg(not(target_family = "wasm"))]
 use ruff::cache;
 use ruff::checks::CheckCode;
 use ruff::checks::CheckKind;
@@ -29,8 +31,23 @@ use ruff::settings::RawSettings;
 use ruff::settings::{FilePattern, PerFileIgnore, Settings};
 use ruff::tell_user;
 
+#[cfg(feature = "update-informer")]
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
+#[cfg(feature = "update-informer")]
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Shim that calls par_iter except for wasm because there's no wasm support in rayon yet
+/// (there is a shim to be used for the web, but it requires js cooperation)
+/// Unfortunately, ParallelIterator does not implement Iterator so the signatures diverge
+#[cfg(not(target_family = "wasm"))]
+fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl ParallelIterator<Item = &T> {
+    iterable.par_iter()
+}
+
+#[cfg(target_family = "wasm")]
+fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl Iterator<Item = &T> {
+    iterable.iter()
+}
 
 #[cfg(feature = "update-informer")]
 fn check_for_updates() {
@@ -104,8 +121,7 @@ fn run_once(
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
-    let mut messages: Vec<Message> = paths
-        .par_iter()
+    let mut messages: Vec<Message> = par_iter(&paths)
         .map(|entry| {
             match entry {
                 Ok(entry) => {
@@ -160,8 +176,7 @@ fn add_noqa(files: &[PathBuf], settings: &Settings) -> Result<usize> {
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
-    let modifications: usize = paths
-        .par_iter()
+    let modifications: usize = par_iter(&paths)
         .map(|entry| match entry {
             Ok(entry) => {
                 let path = entry.path();
@@ -190,8 +205,7 @@ fn autoformat(files: &[PathBuf], settings: &Settings) -> Result<usize> {
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
-    let modifications = paths
-        .par_iter()
+    let modifications = par_iter(&paths)
         .map(|entry| {
             let path = entry.path();
             autoformat_path(path)
@@ -302,6 +316,7 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
+    #[cfg(not(target_family = "wasm"))]
     cache::init()?;
 
     let mut printer = Printer::new(cli.format, cli.verbose);
