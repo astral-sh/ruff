@@ -1205,6 +1205,12 @@ impl CheckKind {
             CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DuplicateHandlerException(_)
+                | CheckKind::NoBlankLineAfterFunction(_)
+                | CheckKind::NoBlankLineAfterSummary
+                | CheckKind::NoBlankLineBeforeClass(_)
+                | CheckKind::NoBlankLineBeforeFunction(_)
+                | CheckKind::OneBlankLineAfterClass(_)
+                | CheckKind::OneBlankLineBeforeClass(_)
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::SuperCallWithParameters
@@ -1212,10 +1218,10 @@ impl CheckKind {
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnusedImport(_)
                 | CheckKind::UnusedNOQA(_)
-                | CheckKind::UselessMetaclassType
-                | CheckKind::UselessObjectInheritance(_)
                 | CheckKind::UsePEP585Annotation(_)
                 | CheckKind::UsePEP604Annotation
+                | CheckKind::UselessMetaclassType
+                | CheckKind::UselessObjectInheritance(_)
         )
     }
 }
@@ -1228,6 +1234,26 @@ pub struct Fix {
     pub applied: bool,
 }
 
+impl Fix {
+    pub fn deletion(start: Location, end: Location) -> Self {
+        Self {
+            content: "".to_string(),
+            location: start,
+            end_location: end,
+            applied: false,
+        }
+    }
+
+    pub fn insertion(content: String, start: Location, end: Location) -> Self {
+        Self {
+            content,
+            location: start,
+            end_location: end,
+            applied: false,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Check {
     pub kind: CheckKind,
@@ -1237,11 +1263,11 @@ pub struct Check {
 }
 
 impl Check {
-    pub fn new(kind: CheckKind, span: Range) -> Self {
+    pub fn new(kind: CheckKind, rage: Range) -> Self {
         Self {
             kind,
-            location: span.location,
-            end_location: span.end_location,
+            location: rage.location,
+            end_location: rage.end_location,
             fix: None,
         }
     }

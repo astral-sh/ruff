@@ -5,8 +5,9 @@ use regex::Regex;
 use rustpython_ast::{Constant, ExprKind, Location, StmtKind};
 
 use crate::ast::types::Range;
+use crate::autofix::fixer;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind, Fix};
 use crate::docstrings::google::check_google_section;
 use crate::docstrings::helpers::{indentation, leading_space};
 use crate::docstrings::numpy::check_numpy_section;
@@ -174,35 +175,57 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                         .take_while(|line| line.trim().is_empty())
                         .count();
                     if blank_lines_before != 0 {
-                        checker.add_check(Check::new(
+                        let mut check = Check::new(
                             CheckKind::NoBlankLineBeforeFunction(blank_lines_before),
                             Range::from_located(docstring),
-                        ));
+                        );
+                        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            check.amend(Fix::deletion(
+                                Location::new(docstring.location.row() - blank_lines_before, 1),
+                                Location::new(docstring.location.row(), 1),
+                            ));
+                        }
+                        checker.add_check(check);
                     }
                 }
 
                 if checker.settings.enabled.contains(&CheckCode::D202) {
+                    let all_blank_after = after
+                        .lines()
+                        .skip(1)
+                        .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
+                    if all_blank_after {
+                        return;
+                    }
+
                     let blank_lines_after = after
                         .lines()
                         .skip(1)
                         .take_while(|line| line.trim().is_empty())
                         .count();
-                    let all_blank_after = after
-                        .lines()
-                        .skip(1)
-                        .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
-                    // Report a D202 violation if the docstring is followed by a blank line
-                    // and the blank line is not itself followed by an inner function or
-                    // class.
-                    if !all_blank_after
-                        && blank_lines_after != 0
-                        && !(blank_lines_after == 1
-                            && INNER_FUNCTION_OR_CLASS_REGEX.is_match(after))
-                    {
-                        checker.add_check(Check::new(
+                    // Report a D202 violation if the docstring is followed by a blank line and the
+                    // blank line is not itself followed by an inner function or class.
+                    let expected_blank_lines_after =
+                        if INNER_FUNCTION_OR_CLASS_REGEX.is_match(after) {
+                            1
+                        } else {
+                            0
+                        };
+                    if blank_lines_after != expected_blank_lines_after {
+                        let mut check = Check::new(
                             CheckKind::NoBlankLineAfterFunction(blank_lines_after),
                             Range::from_located(docstring),
-                        ));
+                        );
+                        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            check.amend(Fix::deletion(
+                                Location::new(
+                                    docstring.location.row() + 1 + expected_blank_lines_after,
+                                    1,
+                                ),
+                                Location::new(docstring.location.row() + 1 + blank_lines_after, 1),
+                            ));
+                        }
+                        checker.add_check(check);
                     }
                 }
             }
@@ -235,39 +258,71 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                         .skip(1)
                         .take_while(|line| line.trim().is_empty())
                         .count();
-                    if blank_lines_before != 0
-                        && checker.settings.enabled.contains(&CheckCode::D211)
-                    {
-                        checker.add_check(Check::new(
-                            CheckKind::NoBlankLineBeforeClass(blank_lines_before),
-                            Range::from_located(docstring),
-                        ));
+                    if checker.settings.enabled.contains(&CheckCode::D211) {
+                        if blank_lines_before != 0 {
+                            let mut check = Check::new(
+                                CheckKind::NoBlankLineBeforeClass(blank_lines_before),
+                                Range::from_located(docstring),
+                            );
+                            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
+                            {
+                                check.amend(Fix::deletion(
+                                    Location::new(docstring.location.row() - blank_lines_before, 1),
+                                    Location::new(docstring.location.row(), 1),
+                                ));
+                            }
+                            checker.add_check(check);
+                        }
                     }
-                    if blank_lines_before != 1
-                        && checker.settings.enabled.contains(&CheckCode::D203)
-                    {
-                        checker.add_check(Check::new(
-                            CheckKind::OneBlankLineBeforeClass(blank_lines_before),
-                            Range::from_located(docstring),
-                        ));
+                    if checker.settings.enabled.contains(&CheckCode::D203) {
+                        if blank_lines_before != 1 {
+                            let mut check = Check::new(
+                                CheckKind::OneBlankLineBeforeClass(blank_lines_before),
+                                Range::from_located(docstring),
+                            );
+                            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
+                            {
+                                check.amend(Fix::insertion(
+                                    "\n".to_string(),
+                                    Location::new(docstring.location.row() - blank_lines_before, 1),
+                                    Location::new(docstring.location.row(), 1),
+                                ));
+                            }
+                            checker.add_check(check);
+                        }
                     }
                 }
 
                 if checker.settings.enabled.contains(&CheckCode::D204) {
+                    let all_blank_after = after
+                        .lines()
+                        .skip(1)
+                        .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
+                    if all_blank_after {
+                        return;
+                    }
+
                     let blank_lines_after = after
                         .lines()
                         .skip(1)
                         .take_while(|line| line.trim().is_empty())
                         .count();
-                    let all_blank_after = after
-                        .lines()
-                        .skip(1)
-                        .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
-                    if !all_blank_after && blank_lines_after != 1 {
-                        checker.add_check(Check::new(
+                    if blank_lines_after != 1 {
+                        let mut check = Check::new(
                             CheckKind::OneBlankLineAfterClass(blank_lines_after),
                             Range::from_located(docstring),
-                        ));
+                        );
+                        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            check.amend(Fix::insertion(
+                                "\n".to_string(),
+                                Location::new(docstring.end_location.row() + 1, 1),
+                                Location::new(
+                                    docstring.end_location.row() + 1 + blank_lines_after,
+                                    1,
+                                ),
+                            ));
+                        }
+                        checker.add_check(check);
                     }
                 }
             }
@@ -294,10 +349,18 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
                 }
             }
             if lines_count > 1 && blanks_count != 1 {
-                checker.add_check(Check::new(
+                let mut check = Check::new(
                     CheckKind::NoBlankLineAfterSummary,
                     Range::from_located(docstring),
-                ));
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    check.amend(Fix::insertion(
+                        "\n".to_string(),
+                        Location::new(docstring.location.row() + 1, 1),
+                        Location::new(docstring.location.row() + 1 + blanks_count, 1),
+                    ));
+                }
+                checker.add_check(check);
             }
         }
     }

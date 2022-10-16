@@ -10,7 +10,15 @@ expression: checks
   end_location:
     row: 156
     column: 33
-  fix: ~
+  fix:
+    content: "\n"
+    location:
+      row: 156
+      column: 1
+    end_location:
+      row: 156
+      column: 1
+    applied: false
 - kind:
     OneBlankLineBeforeClass: 0
   location:
@@ -19,7 +27,15 @@ expression: checks
   end_location:
     row: 187
     column: 46
-  fix: ~
+  fix:
+    content: "\n"
+    location:
+      row: 187
+      column: 1
+    end_location:
+      row: 187
+      column: 1
+    applied: false
 - kind:
     OneBlankLineBeforeClass: 0
   location:
@@ -28,5 +44,13 @@ expression: checks
   end_location:
     row: 527
     column: 8
-  fix: ~
+  fix:
+    content: "\n"
+    location:
+      row: 521
+      column: 1
+    end_location:
+      row: 521
+      column: 1
+    applied: false
 
