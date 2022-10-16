@@ -25,7 +25,7 @@ use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::settings::{PythonVersion, Settings};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
-use crate::{docstrings, plugins};
+use crate::{docstrings, plugins, pyupgrade};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
@@ -311,7 +311,9 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::U004) {
-                    plugins::useless_object_inheritance(self, stmt, name, bases, keywords);
+                    pyupgrade::plugins::useless_object_inheritance(
+                        self, stmt, name, bases, keywords,
+                    );
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E742) {
@@ -566,7 +568,7 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::U001) {
-                    plugins::useless_metaclass_type(self, stmt, value, targets);
+                    pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
                 }
             }
             StmtKind::AnnAssign { value, .. } => {
@@ -699,7 +701,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::U007)
                     && self.settings.target_version >= PythonVersion::Py39
                 {
-                    plugins::use_pep604_annotation(self, expr, value, slice);
+                    pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
 
                 if match_name_or_attr(value, "Literal") {
@@ -728,7 +730,7 @@ where
                     if self.settings.enabled.contains(&CheckCode::U006)
                         && self.settings.target_version >= PythonVersion::Py39
                     {
-                        plugins::use_pep585_annotation(self, expr, id);
+                        pyupgrade::plugins::use_pep585_annotation(self, expr, id);
                     }
 
                     self.handle_node_load(expr);
@@ -756,7 +758,7 @@ where
                 {
                     if let ExprKind::Name { id, .. } = &value.node {
                         if id == "typing" {
-                            plugins::use_pep585_annotation(self, expr, attr);
+                            pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                         }
                     }
                 }
@@ -768,12 +770,12 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::U005) {
-                    plugins::deprecated_unittest_alias(self, func);
+                    pyupgrade::plugins::deprecated_unittest_alias(self, func);
                 }
 
                 // flake8-super
                 if self.settings.enabled.contains(&CheckCode::U008) {
-                    plugins::super_call_with_parameters(self, expr, func, args);
+                    pyupgrade::plugins::super_call_with_parameters(self, expr, func, args);
                 }
 
                 // flake8-print
@@ -892,11 +894,11 @@ where
                 if self.settings.enabled.contains(&CheckCode::U002)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
-                    plugins::unnecessary_abspath(self, expr, func, args);
+                    pyupgrade::plugins::unnecessary_abspath(self, expr, func, args);
                 }
 
                 if self.settings.enabled.contains(&CheckCode::U003) {
-                    plugins::type_of_primitive(self, expr, func, args);
+                    pyupgrade::plugins::type_of_primitive(self, expr, func, args);
                 }
 
                 if let ExprKind::Name { id, ctx } = &func.node {

@@ -29,6 +29,7 @@ mod plugins;
 pub mod printer;
 pub mod pyproject;
 mod python;
+mod pyupgrade;
 pub mod settings;
 pub mod visibility;
 
