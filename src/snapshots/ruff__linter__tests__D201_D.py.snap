@@ -10,7 +10,15 @@ expression: checks
   end_location:
     row: 132
     column: 25
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 131
+      column: 1
+    end_location:
+      row: 132
+      column: 1
+    applied: false
 - kind:
     NoBlankLineBeforeFunction: 1
   location:
@@ -19,5 +27,13 @@ expression: checks
   end_location:
     row: 146
     column: 38
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 145
+      column: 1
+    end_location:
+      row: 146
+      column: 1
+    applied: false
 
