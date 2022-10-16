@@ -1,6 +1,6 @@
 ---
-source: parser/src/parser.rs
-expression: parse_program(&source).unwrap()
+source: compiler/parser/src/parser.rs
+expression: "parse_program(source, \"<test>\").unwrap()"
 ---
 [
     Located {
@@ -126,7 +126,7 @@ expression: parse_program(&source).unwrap()
                                 Located {
                                     location: Location {
                                         row: 4,
-                                        column: 37,
+                                        column: 36,
                                     },
                                     custom: (),
                                     node: Constant {

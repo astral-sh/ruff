@@ -492,9 +492,9 @@ where
         is_unicode: bool,
         is_fstring: bool,
     ) -> LexResult {
+        let start_pos = self.get_pos();
         let quote_char = self.next_char().unwrap();
         let mut string_content = String::new();
-        let start_pos = self.get_pos();
 
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close

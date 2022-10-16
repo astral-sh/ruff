@@ -1,7 +1,6 @@
 ---
-source: parser/src/parser.rs
+source: compiler/parser/src/parser.rs
 expression: parse_ast
-
 ---
 [
     Located {
@@ -33,7 +32,7 @@ expression: parse_ast
                         Located {
                             location: Location {
                                 row: 1,
-                                column: 10,
+                                column: 9,
                             },
                             custom: (),
                             node: Constant {
