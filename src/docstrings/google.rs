@@ -2,12 +2,12 @@
 
 use std::collections::BTreeSet;
 
+use crate::ast::types::Range;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::docstrings::helpers::range_for;
 use crate::docstrings::sections;
 use crate::docstrings::sections::SectionContext;
 use crate::docstrings::styles::SectionStyle;
@@ -136,7 +136,7 @@ pub(crate) fn check_google_section(
                 .expect("Sections are only available for docstrings.");
             checker.add_check(Check::new(
                 CheckKind::SectionNameEndsInColon(context.section_name.to_string()),
-                range_for(docstring),
+                Range::from_located(docstring),
             ))
         }
     }

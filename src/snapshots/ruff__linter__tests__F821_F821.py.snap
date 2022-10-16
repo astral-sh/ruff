@@ -42,10 +42,10 @@ expression: checks
     UndefinedName: Bar
   location:
     row: 58
-    column: 5
+    column: 4
   end_location:
     row: 58
-    column: 8
+    column: 9
   fix: ~
 - kind:
     UndefinedName: TOMATO
@@ -60,7 +60,7 @@ expression: checks
     UndefinedName: B
   location:
     row: 87
-    column: 7
+    column: 5
   end_location:
     row: 87
     column: 11
@@ -69,7 +69,7 @@ expression: checks
     UndefinedName: B
   location:
     row: 89
-    column: 7
+    column: 5
   end_location:
     row: 89
     column: 9
@@ -78,27 +78,27 @@ expression: checks
     UndefinedName: PEP593Test123
   location:
     row: 114
-    column: 10
+    column: 9
   end_location:
     row: 114
-    column: 23
+    column: 24
   fix: ~
 - kind:
     UndefinedName: foo
   location:
     row: 122
-    column: 15
+    column: 14
   end_location:
     row: 122
-    column: 18
+    column: 19
   fix: ~
 - kind:
     UndefinedName: bar
   location:
     row: 122
-    column: 22
+    column: 21
   end_location:
     row: 122
-    column: 25
+    column: 26
   fix: ~
 

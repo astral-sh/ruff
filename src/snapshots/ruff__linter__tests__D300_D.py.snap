@@ -5,7 +5,7 @@ expression: checks
 - kind: UsesTripleQuotes
   location:
     row: 302
-    column: 6
+    column: 5
   end_location:
     row: 302
     column: 20
@@ -13,7 +13,7 @@ expression: checks
 - kind: UsesTripleQuotes
   location:
     row: 307
-    column: 6
+    column: 5
   end_location:
     row: 307
     column: 20
@@ -21,7 +21,7 @@ expression: checks
 - kind: UsesTripleQuotes
   location:
     row: 312
-    column: 6
+    column: 5
   end_location:
     row: 312
     column: 16
@@ -29,7 +29,7 @@ expression: checks
 - kind: UsesTripleQuotes
   location:
     row: 317
-    column: 6
+    column: 5
   end_location:
     row: 317
     column: 16
@@ -37,7 +37,7 @@ expression: checks
 - kind: UsesTripleQuotes
   location:
     row: 323
-    column: 6
+    column: 5
   end_location:
     row: 323
     column: 17

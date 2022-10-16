@@ -8,7 +8,6 @@ use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::google::check_google_section;
-use crate::docstrings::helpers;
 use crate::docstrings::helpers::{indentation, leading_space};
 use crate::docstrings::numpy::check_numpy_section;
 use crate::docstrings::sections::section_contexts;
@@ -138,7 +137,7 @@ pub fn one_liner(checker: &mut Checker, definition: &Definition) {
             if non_empty_line_count == 1 && line_count > 1 {
                 checker.add_check(Check::new(
                     CheckKind::FitsOnOneLine,
-                    helpers::range_for(docstring),
+                    Range::from_located(docstring),
                 ));
             }
         }
@@ -164,7 +163,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
             {
                 let (before, _, after) = checker.locator.partition_source_code_at(
                     &Range::from_located(parent),
-                    &helpers::range_for(docstring),
+                    &Range::from_located(docstring),
                 );
 
                 if checker.settings.enabled.contains(&CheckCode::D201) {
@@ -177,7 +176,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                     if blank_lines_before != 0 {
                         checker.add_check(Check::new(
                             CheckKind::NoBlankLineBeforeFunction(blank_lines_before),
-                            helpers::range_for(docstring),
+                            Range::from_located(docstring),
                         ));
                     }
                 }
@@ -202,7 +201,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                     {
                         checker.add_check(Check::new(
                             CheckKind::NoBlankLineAfterFunction(blank_lines_after),
-                            helpers::range_for(docstring),
+                            Range::from_located(docstring),
                         ));
                     }
                 }
@@ -224,7 +223,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
             {
                 let (before, _, after) = checker.locator.partition_source_code_at(
                     &Range::from_located(parent),
-                    &helpers::range_for(docstring),
+                    &Range::from_located(docstring),
                 );
 
                 if checker.settings.enabled.contains(&CheckCode::D203)
@@ -241,7 +240,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                     {
                         checker.add_check(Check::new(
                             CheckKind::NoBlankLineBeforeClass(blank_lines_before),
-                            helpers::range_for(docstring),
+                            Range::from_located(docstring),
                         ));
                     }
                     if blank_lines_before != 1
@@ -249,7 +248,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                     {
                         checker.add_check(Check::new(
                             CheckKind::OneBlankLineBeforeClass(blank_lines_before),
-                            helpers::range_for(docstring),
+                            Range::from_located(docstring),
                         ));
                     }
                 }
@@ -267,7 +266,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                     if !all_blank_after && blank_lines_after != 1 {
                         checker.add_check(Check::new(
                             CheckKind::OneBlankLineAfterClass(blank_lines_after),
-                            helpers::range_for(docstring),
+                            Range::from_located(docstring),
                         ));
                     }
                 }
@@ -297,7 +296,7 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
             if lines_count > 1 && blanks_count != 1 {
                 checker.add_check(Check::new(
                     CheckKind::NoBlankLineAfterSummary,
-                    helpers::range_for(docstring),
+                    Range::from_located(docstring),
                 ));
             }
         }
@@ -327,7 +326,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                     if checker.settings.enabled.contains(&CheckCode::D206) {
                         checker.add_check(Check::new(
                             CheckKind::IndentWithSpaces,
-                            helpers::range_for(docstring),
+                            Range::from_located(docstring),
                         ));
                     }
                     has_seen_tab = true;
@@ -352,7 +351,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                         if checker.settings.enabled.contains(&CheckCode::D206) {
                             checker.add_check(Check::new(
                                 CheckKind::IndentWithSpaces,
-                                helpers::range_for(docstring),
+                                Range::from_located(docstring),
                             ));
                         }
                         has_seen_tab = true;
@@ -364,7 +363,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                         if checker.settings.enabled.contains(&CheckCode::D208) {
                             checker.add_check(Check::new(
                                 CheckKind::NoOverIndentation,
-                                helpers::range_for(docstring),
+                                Range::from_located(docstring),
                             ));
                         }
                         has_seen_over_indent = true;
@@ -376,7 +375,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                         if checker.settings.enabled.contains(&CheckCode::D207) {
                             checker.add_check(Check::new(
                                 CheckKind::NoUnderIndentation,
-                                helpers::range_for(docstring),
+                                Range::from_located(docstring),
                             ));
                         }
                         has_seen_under_indent = true;
@@ -403,13 +402,13 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                 if line_count > 1 {
                     let content = checker
                         .locator
-                        .slice_source_code_range(&helpers::range_for(docstring));
+                        .slice_source_code_range(&Range::from_located(docstring));
                     if let Some(line) = content.lines().last() {
                         let line = line.trim();
                         if line != "\"\"\"" && line != "'''" {
                             checker.add_check(Check::new(
                                 CheckKind::NewLineAfterLastParagraph,
-                                helpers::range_for(docstring),
+                                Range::from_located(docstring),
                             ));
                         }
                     }
@@ -436,7 +435,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
                 if line.starts_with(' ') || (matches!(lines.next(), None) && line.ends_with(' ')) {
                     checker.add_check(Check::new(
                         CheckKind::NoSurroundingWhitespace,
-                        helpers::range_for(docstring),
+                        Range::from_located(docstring),
                     ));
                 }
             }
@@ -455,21 +454,29 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
             if string.lines().nth(1).is_some() {
                 let content = checker
                     .locator
-                    .slice_source_code_range(&helpers::range_for(docstring));
+                    .slice_source_code_range(&Range::from_located(docstring));
                 if let Some(first_line) = content.lines().next() {
-                    let first_line = first_line.trim();
-                    if first_line == "\"\"\"" || first_line == "'''" {
+                    let first_line = first_line.trim().to_lowercase();
+                    let starts_with_triple = first_line == "\"\"\""
+                        || first_line == "'''"
+                        || first_line == "u\"\"\""
+                        || first_line == "u'''"
+                        || first_line == "r\"\"\""
+                        || first_line == "r'''"
+                        || first_line == "ur\"\"\""
+                        || first_line == "ur'''";
+                    if starts_with_triple {
                         if checker.settings.enabled.contains(&CheckCode::D212) {
                             checker.add_check(Check::new(
                                 CheckKind::MultiLineSummaryFirstLine,
-                                helpers::range_for(docstring),
+                                Range::from_located(docstring),
                             ));
                         }
                     } else {
                         if checker.settings.enabled.contains(&CheckCode::D213) {
                             checker.add_check(Check::new(
                                 CheckKind::MultiLineSummarySecondLine,
-                                helpers::range_for(docstring),
+                                Range::from_located(docstring),
                             ));
                         }
                     }
@@ -489,19 +496,26 @@ pub fn triple_quotes(checker: &mut Checker, definition: &Definition) {
         {
             let content = checker
                 .locator
-                .slice_source_code_range(&helpers::range_for(docstring));
-            if string.contains("\"\"\"") {
-                if !content.starts_with("'''") {
+                .slice_source_code_range(&Range::from_located(docstring));
+            if let Some(first_line) = content.lines().next() {
+                let first_line = first_line.trim().to_lowercase();
+                let starts_with_triple = if string.contains("\"\"\"") {
+                    first_line.starts_with("'''")
+                        || first_line.starts_with("u'''")
+                        || first_line.starts_with("r'''")
+                        || first_line.starts_with("ur'''")
+                } else {
+                    first_line.starts_with("\"\"\"")
+                        || first_line.starts_with("u\"\"\"")
+                        || first_line.starts_with("r\"\"\"")
+                        || first_line.starts_with("ur\"\"\"")
+                };
+                if !starts_with_triple {
                     checker.add_check(Check::new(
                         CheckKind::UsesTripleQuotes,
-                        helpers::range_for(docstring),
+                        Range::from_located(docstring),
                     ));
                 }
-            } else if !content.starts_with("\"\"\"") {
-                checker.add_check(Check::new(
-                    CheckKind::UsesTripleQuotes,
-                    helpers::range_for(docstring),
-                ));
             }
         }
     }
@@ -519,7 +533,7 @@ pub fn ends_with_period(checker: &mut Checker, definition: &Definition) {
                 if !string.ends_with('.') {
                     checker.add_check(Check::new(
                         CheckKind::EndsInPeriod,
-                        helpers::range_for(docstring),
+                        Range::from_located(docstring),
                     ));
                 }
             }
@@ -544,7 +558,7 @@ pub fn no_signature(checker: &mut Checker, definition: &Definition) {
                         if first_line.contains(&format!("{name}(")) {
                             checker.add_check(Check::new(
                                 CheckKind::NoSignature,
-                                helpers::range_for(docstring),
+                                Range::from_located(docstring),
                             ));
                         }
                     }
@@ -579,7 +593,7 @@ pub fn capitalized(checker: &mut Checker, definition: &Definition) {
                     if !first_char.is_uppercase() {
                         checker.add_check(Check::new(
                             CheckKind::FirstLineCapitalized,
-                            helpers::range_for(docstring),
+                            Range::from_located(docstring),
                         ));
                     }
                 }
@@ -609,7 +623,7 @@ pub fn starts_with_this(checker: &mut Checker, definition: &Definition) {
                 {
                     checker.add_check(Check::new(
                         CheckKind::NoThisPrefix,
-                        helpers::range_for(docstring),
+                        Range::from_located(docstring),
                     ));
                 }
             }
@@ -629,7 +643,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, definition: &Definition) {
                 if !(string.ends_with('.') || string.ends_with('!') || string.ends_with('?')) {
                     checker.add_check(Check::new(
                         CheckKind::EndsInPunctuation,
-                        helpers::range_for(docstring),
+                        Range::from_located(docstring),
                     ));
                 }
             }
@@ -666,7 +680,7 @@ pub fn not_empty(checker: &mut Checker, definition: &Definition) -> bool {
                 if checker.settings.enabled.contains(&CheckCode::D419) {
                     checker.add_check(Check::new(
                         CheckKind::NonEmpty,
-                        helpers::range_for(docstring),
+                        Range::from_located(docstring),
                     ));
                 }
                 return false;

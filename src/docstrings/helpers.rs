@@ -20,18 +20,9 @@ pub fn leading_space(line: &str) -> String {
 
 /// Extract the leading indentation from a docstring.
 pub fn indentation<'a>(checker: &'a mut Checker, docstring: &Expr) -> &'a str {
-    let range = range_for(docstring);
+    let range = Range::from_located(docstring);
     checker.locator.slice_source_code_range(&Range {
         location: Location::new(range.location.row(), 1),
         end_location: Location::new(range.location.row(), range.location.column()),
     })
-}
-
-/// Extract the source code range for a docstring.
-pub fn range_for(docstring: &Expr) -> Range {
-    // RustPython currently omits the first quotation mark in a string, so offset the location.
-    Range {
-        location: Location::new(docstring.location.row(), docstring.location.column() - 1),
-        end_location: docstring.end_location,
-    }
 }

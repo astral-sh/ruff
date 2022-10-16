@@ -85,49 +85,49 @@ expression: checks
 - kind: UsePEP604Annotation
   location:
     row: 32
-    column: 11
+    column: 10
   end_location:
     row: 32
-    column: 47
+    column: 48
   fix:
     content: "str | int | Union[float, bytes]"
     location:
       row: 32
-      column: 11
+      column: 10
     end_location:
       row: 32
-      column: 47
+      column: 48
     applied: false
 - kind: UsePEP604Annotation
   location:
     row: 32
-    column: 11
+    column: 10
   end_location:
     row: 32
-    column: 47
+    column: 48
   fix:
     content: float | bytes
     location:
       row: 32
-      column: 11
+      column: 10
     end_location:
       row: 32
-      column: 47
+      column: 48
     applied: false
 - kind: UsePEP604Annotation
   location:
     row: 39
-    column: 11
+    column: 10
   end_location:
     row: 39
-    column: 33
+    column: 34
   fix:
     content: str | int
     location:
       row: 39
-      column: 11
+      column: 10
     end_location:
       row: 39
-      column: 33
+      column: 34
     applied: false
 
