@@ -8,8 +8,9 @@ use glob::Pattern;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 
-use crate::checks::{CheckCode, DEFAULT_CHECK_CODES};
+use crate::checks::{CheckCategory, CheckCode};
 use crate::fs;
 use crate::pyproject::{load_config, StrCheckCodePair};
 
@@ -153,9 +154,16 @@ impl RawSettings {
                 .map(|path| FilePattern::from_user(path, project_root))
                 .collect(),
             extend_ignore: config.extend_ignore,
-            select: config
-                .select
-                .unwrap_or_else(|| DEFAULT_CHECK_CODES.to_vec()),
+            select: config.select.unwrap_or_else(|| {
+                CheckCode::iter()
+                    .filter(|code| {
+                        matches!(
+                            code.category(),
+                            CheckCategory::Pycodestyle | CheckCategory::Pyflakes
+                        )
+                    })
+                    .collect()
+            }),
             extend_select: config.extend_select,
             ignore: config.ignore,
             line_length: config.line_length.unwrap_or(88),
