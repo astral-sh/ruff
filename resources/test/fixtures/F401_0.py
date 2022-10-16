@@ -61,7 +61,7 @@ Y = TypeVar("Y", bound="Dict")
 Z = TypeVar("Z", "List", "Set")
 
 a = list["Fruit"]
-b = Union["Nut", None]
+b = Union["""Nut""", None]
 c = cast("Vegetable", b)
 
 Field = lambda default=MISSING: field(default=default)

@@ -3,7 +3,6 @@ use std::ops::Deref;
 use std::path::Path;
 
 use log::error;
-use rustpython_ast::Location;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -34,7 +33,6 @@ pub const GLOBAL_SCOPE_INDEX: usize = 0;
 pub struct Checker<'a> {
     // Input data.
     pub(crate) path: &'a Path,
-    // TODO(charlie): Separate immutable from mutable state. (None of these should ever change.)
     pub(crate) locator: SourceCodeLocator<'a>,
     pub(crate) settings: &'a Settings,
     pub(crate) autofix: &'a fixer::Mode,
@@ -1751,29 +1749,6 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         while let Some((range, expression)) = self.deferred_string_annotations.pop() {
-            // HACK(charlie): We need to modify `range` such that it represents the range of the
-            // expression _within_ the string annotation (as opposed to the range of the string
-            // annotation itself). RustPython seems to return an off-by-one start column for every
-            // string value, so we check for double quotes (which are really triple quotes).
-            let contents = self.locator.slice_source_code_at(&range.location);
-            let range = if contents.starts_with("\"\"") || contents.starts_with("\'\'") {
-                Range {
-                    location: Location::new(range.location.row(), range.location.column() + 2),
-                    end_location: Location::new(
-                        range.end_location.row(),
-                        range.end_location.column() - 2,
-                    ),
-                }
-            } else {
-                Range {
-                    location: Location::new(range.location.row(), range.location.column()),
-                    end_location: Location::new(
-                        range.end_location.row(),
-                        range.end_location.column() - 1,
-                    ),
-                }
-            };
-
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 relocate_expr(&mut expr, range);
                 allocator.push(expr);
@@ -2069,10 +2044,8 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_shadowing(&mut self, name: &str, location: Range, is_attribute: bool) {
-        let scope = self.current_scope();
-
         // flake8-builtins
-        if is_attribute && matches!(scope.kind, ScopeKind::Class) {
+        if is_attribute && matches!(self.current_scope().kind, ScopeKind::Class) {
             if self.settings.enabled.contains(&CheckCode::A003) {
                 if let Some(check) = checkers::builtin_shadowing(
                     name,
@@ -2094,6 +2067,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_arg_shadowing(&mut self, name: &str, location: Range) {
+        // flake8-builtins
         if self.settings.enabled.contains(&CheckCode::A002) {
             if let Some(check) = checkers::builtin_shadowing(
                 name,

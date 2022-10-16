@@ -8,7 +8,6 @@ use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::helpers;
-use crate::docstrings::helpers::range_for;
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::types::{Definition, DefinitionKind};
 use crate::visibility::is_static;
@@ -132,13 +131,13 @@ fn check_blanks_and_section_underline(
         if checker.settings.enabled.contains(&CheckCode::D407) {
             checker.add_check(Check::new(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
-                range_for(docstring),
+                Range::from_located(docstring),
             ));
         }
         if checker.settings.enabled.contains(&CheckCode::D414) {
             checker.add_check(Check::new(
                 CheckKind::NonEmptySection(context.section_name.to_string()),
-                range_for(docstring),
+                Range::from_located(docstring),
             ));
         }
         return;
@@ -153,7 +152,7 @@ fn check_blanks_and_section_underline(
         if checker.settings.enabled.contains(&CheckCode::D407) {
             checker.add_check(Check::new(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
-                range_for(docstring),
+                Range::from_located(docstring),
             ));
         }
         if blank_lines_after_header > 0 {
@@ -162,7 +161,7 @@ fn check_blanks_and_section_underline(
                     CheckKind::NoBlankLinesBetweenHeaderAndContent(
                         context.section_name.to_string(),
                     ),
-                    range_for(docstring),
+                    Range::from_located(docstring),
                 ));
             }
         }
@@ -171,7 +170,7 @@ fn check_blanks_and_section_underline(
             if checker.settings.enabled.contains(&CheckCode::D408) {
                 checker.add_check(Check::new(
                     CheckKind::SectionUnderlineAfterName(context.section_name.to_string()),
-                    range_for(docstring),
+                    Range::from_located(docstring),
                 ));
             }
         }
@@ -188,7 +187,7 @@ fn check_blanks_and_section_underline(
                     CheckKind::SectionUnderlineMatchesSectionLength(
                         context.section_name.to_string(),
                     ),
-                    range_for(docstring),
+                    Range::from_located(docstring),
                 ));
             }
         }
@@ -199,7 +198,7 @@ fn check_blanks_and_section_underline(
             {
                 checker.add_check(Check::new(
                     CheckKind::SectionUnderlineNotOverIndented(context.section_name.to_string()),
-                    range_for(docstring),
+                    Range::from_located(docstring),
                 ));
             }
         }
@@ -214,7 +213,7 @@ fn check_blanks_and_section_underline(
                     if checker.settings.enabled.contains(&CheckCode::D414) {
                         checker.add_check(Check::new(
                             CheckKind::NonEmptySection(context.section_name.to_string()),
-                            range_for(docstring),
+                            Range::from_located(docstring),
                         ));
                     }
                 } else {
@@ -223,7 +222,7 @@ fn check_blanks_and_section_underline(
                             CheckKind::NoBlankLinesBetweenHeaderAndContent(
                                 context.section_name.to_string(),
                             ),
-                            range_for(docstring),
+                            Range::from_located(docstring),
                         ));
                     }
                 }
@@ -232,7 +231,7 @@ fn check_blanks_and_section_underline(
             if checker.settings.enabled.contains(&CheckCode::D414) {
                 checker.add_check(Check::new(
                     CheckKind::NonEmptySection(context.section_name.to_string()),
-                    range_for(docstring),
+                    Range::from_located(docstring),
                 ));
             }
         }
@@ -259,7 +258,7 @@ pub(crate) fn check_common_section(
         {
             checker.add_check(Check::new(
                 CheckKind::CapitalizeSectionName(context.section_name.to_string()),
-                range_for(docstring),
+                Range::from_located(docstring),
             ))
         }
     }
@@ -270,7 +269,7 @@ pub(crate) fn check_common_section(
         {
             checker.add_check(Check::new(
                 CheckKind::SectionNotOverIndented(context.section_name.to_string()),
-                range_for(docstring),
+                Range::from_located(docstring),
             ))
         }
     }
@@ -285,14 +284,14 @@ pub(crate) fn check_common_section(
             if checker.settings.enabled.contains(&CheckCode::D413) {
                 checker.add_check(Check::new(
                     CheckKind::BlankLineAfterLastSection(context.section_name.to_string()),
-                    range_for(docstring),
+                    Range::from_located(docstring),
                 ))
             }
         } else {
             if checker.settings.enabled.contains(&CheckCode::D410) {
                 checker.add_check(Check::new(
                     CheckKind::BlankLineAfterSection(context.section_name.to_string()),
-                    range_for(docstring),
+                    Range::from_located(docstring),
                 ))
             }
         }
@@ -302,7 +301,7 @@ pub(crate) fn check_common_section(
         if !context.previous_line.is_empty() {
             checker.add_check(Check::new(
                 CheckKind::BlankLineBeforeSection(context.section_name.to_string()),
-                range_for(docstring),
+                Range::from_located(docstring),
             ))
         }
     }
