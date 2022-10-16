@@ -1213,19 +1213,19 @@ impl CheckKind {
             CheckKind::NoOverIndentation => "Docstring is over-indented".to_string(),
             // pep8-naming
             CheckKind::InvalidClassName(name) => {
-                format!("class name `{name}` should use CapWords convention ")
+                format!("Class name `{name}` should use CapWords convention ")
             }
             CheckKind::InvalidFunctionName(name) => {
-                format!("function name `{name}` should be lowercase")
+                format!("Function name `{name}` should be lowercase")
             }
             CheckKind::InvalidArgumentName(name) => {
-                format!("argument name `{name}` should be lowercase")
+                format!("Argument name `{name}` should be lowercase")
             }
             CheckKind::InvalidFirstArgumentNameForClassMethod => {
-                "first argument of a classmethod should be named `cls`".to_string()
+                "First argument of a class method should be named `cls`".to_string()
             }
             CheckKind::InvalidFirstArgumentNameForMethod => {
-                "first argument of a method should be named `self`".to_string()
+                "First argument of a method should be named `self`".to_string()
             }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {

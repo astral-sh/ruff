@@ -341,11 +341,11 @@ Flake8.
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
-| N801 | InvalidClassName | class name `...` should use CapWords convention  |
-| N802 | InvalidFunctionName | function name `...` should be lowercase |
-| N803 | InvalidArgumentName | argument name `...` should be lowercase |
-| N804 | InvalidFirstArgumentNameForClassMethod | first argument of a classmethod should be named `cls` |
-| N805 | InvalidFirstArgumentNameForMethod | first argument of a method should be named `self` |
+| N801 | InvalidClassName | Class name `...` should use CapWords convention  |
+| N802 | InvalidFunctionName | Function name `...` should be lowercase |
+| N803 | InvalidArgumentName | Argument name `...` should be lowercase |
+| N804 | InvalidFirstArgumentNameForClassMethod | First argument of a class method should be named `cls` |
+| N805 | InvalidFirstArgumentNameForMethod | First argument of a method should be named `self` |
 
 ### flake8-comprehensions
 
@@ -396,6 +396,7 @@ Flake8.
 | Code | Name | Message |
 | ---- | ---- | ------- |
 | M001 | UnusedNOQA | Unused `noqa` directive |
+
 
 ## Editor Integrations
 
