@@ -1,0 +1,41 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    InvalidFunctionName: Bad
+  location:
+    row: 1
+    column: 1
+  end_location:
+    row: 5
+    column: 1
+  fix: ~
+- kind:
+    InvalidFunctionName: _Bad
+  location:
+    row: 5
+    column: 1
+  end_location:
+    row: 9
+    column: 1
+  fix: ~
+- kind:
+    InvalidFunctionName: BAD
+  location:
+    row: 9
+    column: 1
+  end_location:
+    row: 13
+    column: 1
+  fix: ~
+- kind:
+    InvalidFunctionName: BAD_FUNC
+  location:
+    row: 13
+    column: 1
+  end_location:
+    row: 17
+    column: 1
+  fix: ~
+

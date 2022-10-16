@@ -1,0 +1,50 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    InvalidClassName: bad
+  location:
+    row: 1
+    column: 1
+  end_location:
+    row: 5
+    column: 1
+  fix: ~
+- kind:
+    InvalidClassName: _bad
+  location:
+    row: 5
+    column: 1
+  end_location:
+    row: 9
+    column: 1
+  fix: ~
+- kind:
+    InvalidClassName: bad_class
+  location:
+    row: 9
+    column: 1
+  end_location:
+    row: 13
+    column: 1
+  fix: ~
+- kind:
+    InvalidClassName: Bad_Class
+  location:
+    row: 13
+    column: 1
+  end_location:
+    row: 17
+    column: 1
+  fix: ~
+- kind:
+    InvalidClassName: BAD_CLASS
+  location:
+    row: 17
+    column: 1
+  end_location:
+    row: 21
+    column: 1
+  fix: ~
+

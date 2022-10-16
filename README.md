@@ -337,6 +337,16 @@ Flake8.
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` |
 
+### pep8-naming
+
+| Code | Name | Message |
+| ---- | ---- | ------- |
+| N801 | InvalidClassName | class name '...' should use CapWords convention  |
+| N802 | InvalidFunctionName | function name '...' should be lowercase |
+| N803 | InvalidArgumentName | argument name '...' should be lowercase |
+| N804 | InvalidFirstArgumentNameForClassMethod | first argument of a classmethod should be named 'cls' |
+| N805 | InvalidFirstArgumentNameForMethod | first argument of a method should be named 'self' |
+
 ### flake8-comprehensions
 
 | Code | Name | Message |

@@ -216,6 +216,32 @@ where
                     }
                 }
 
+                if self.settings.enabled.contains(&CheckCode::N802) {
+                    if let Some(check) = checkers::invalid_function_name(stmt, name) {
+                        self.checks.push(check);
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::N804) {
+                    if let Some(check) = checkers::invalid_first_argument_name_for_class_method(
+                        self.current_scope(),
+                        decorator_list,
+                        args,
+                    ) {
+                        self.checks.push(check);
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::N805) {
+                    if let Some(check) = checkers::invalid_first_argument_name_for_method(
+                        self.current_scope(),
+                        decorator_list,
+                        args,
+                    ) {
+                        self.checks.push(check);
+                    }
+                }
+
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be deferred.
@@ -300,6 +326,12 @@ where
                         name,
                         self.locate_check(Range::from_located(stmt)),
                     ) {
+                        self.checks.push(check);
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::N801) {
+                    if let Some(check) = checkers::invalid_class_name(stmt, name) {
                         self.checks.push(check);
                     }
                 }
@@ -1332,6 +1364,14 @@ where
                 &arg.node.arg,
                 self.locate_check(Range::from_located(arg)),
             ) {
+                self.checks.push(check);
+            }
+        }
+
+        if self.settings.enabled.contains(&CheckCode::N803) {
+            if let Some(check) =
+                checkers::invalid_argument_name(Range::from_located(arg), &arg.node.arg)
+            {
                 self.checks.push(check);
             }
         }

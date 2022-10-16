@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: InvalidFirstArgumentNameForClassMethod
+  location:
+    row: 3
+    column: 26
+  end_location:
+    row: 3
+    column: 30
+  fix: ~
+
