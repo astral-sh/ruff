@@ -200,6 +200,12 @@ pub enum CheckCode {
     D417,
     D418,
     D419,
+    // pep8-naming
+    N801,
+    N802,
+    N803,
+    N804,
+    N805,
     // Meta
     M001,
 }
@@ -210,6 +216,7 @@ pub enum CheckCategory {
     Pycodestyle,
     Pydocstyle,
     Pyupgrade,
+    Pep8Naming,
     Flake8Comprehensions,
     Flake8Bugbear,
     Flake8Builtins,
@@ -228,6 +235,7 @@ impl CheckCategory {
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Pydocstyle => "pydocstyle",
+            CheckCategory::Pep8Naming => "pep8-naming",
             CheckCategory::Meta => "Meta rules",
         }
     }
@@ -375,6 +383,12 @@ pub enum CheckKind {
     SectionUnderlineNotOverIndented(String),
     SkipDocstring,
     UsesTripleQuotes,
+    // pep8-naming
+    InvalidClassName(String),
+    InvalidFunctionName(String),
+    InvalidArgumentName(String),
+    InvalidFirstArgumentNameForClassMethod,
+    InvalidFirstArgumentNameForMethod,
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -544,6 +558,12 @@ impl CheckCode {
             }
             CheckCode::D418 => CheckKind::SkipDocstring,
             CheckCode::D419 => CheckKind::NonEmpty,
+            // pep8-naming
+            CheckCode::N801 => CheckKind::InvalidClassName("...".to_string()),
+            CheckCode::N802 => CheckKind::InvalidFunctionName("...".to_string()),
+            CheckCode::N803 => CheckKind::InvalidArgumentName("...".to_string()),
+            CheckCode::N804 => CheckKind::InvalidFirstArgumentNameForClassMethod,
+            CheckCode::N805 => CheckKind::InvalidFirstArgumentNameForMethod,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -670,6 +690,11 @@ impl CheckCode {
             CheckCode::D417 => CheckCategory::Pydocstyle,
             CheckCode::D418 => CheckCategory::Pydocstyle,
             CheckCode::D419 => CheckCategory::Pydocstyle,
+            CheckCode::N801 => CheckCategory::Pep8Naming,
+            CheckCode::N802 => CheckCategory::Pep8Naming,
+            CheckCode::N803 => CheckCategory::Pep8Naming,
+            CheckCode::N804 => CheckCategory::Pep8Naming,
+            CheckCode::N805 => CheckCategory::Pep8Naming,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -806,6 +831,12 @@ impl CheckKind {
             CheckKind::SectionUnderlineNotOverIndented(_) => &CheckCode::D215,
             CheckKind::SkipDocstring => &CheckCode::D418,
             CheckKind::UsesTripleQuotes => &CheckCode::D300,
+            // pep8-naming
+            CheckKind::InvalidClassName(_) => &CheckCode::N801,
+            CheckKind::InvalidFunctionName(_) => &CheckCode::N802,
+            CheckKind::InvalidArgumentName(_) => &CheckCode::N803,
+            CheckKind::InvalidFirstArgumentNameForClassMethod => &CheckCode::N804,
+            CheckKind::InvalidFirstArgumentNameForMethod => &CheckCode::N805,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -1180,6 +1211,22 @@ impl CheckKind {
             }
             CheckKind::NoUnderIndentation => "Docstring is under-indented".to_string(),
             CheckKind::NoOverIndentation => "Docstring is over-indented".to_string(),
+            // pep8-naming
+            CheckKind::InvalidClassName(name) => {
+                format!("class name '{name}' should use CapWords convention ")
+            }
+            CheckKind::InvalidFunctionName(name) => {
+                format!("function name '{name}' should be lowercase")
+            }
+            CheckKind::InvalidArgumentName(name) => {
+                format!("argument name '{name}' should be lowercase")
+            }
+            CheckKind::InvalidFirstArgumentNameForClassMethod => {
+                "first argument of a classmethod should be named 'cls'".to_string()
+            }
+            CheckKind::InvalidFirstArgumentNameForMethod => {
+                "first argument of a method should be named 'self'".to_string()
+            }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),
