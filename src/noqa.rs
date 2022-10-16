@@ -81,7 +81,7 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
 }
 
 fn add_noqa_inner(
-    checks: &Vec<Check>,
+    checks: &[Check],
     contents: &str,
     noqa_line_for: &[usize],
 ) -> Result<(usize, String)> {
@@ -138,7 +138,7 @@ fn add_noqa_inner(
 }
 
 pub fn add_noqa(
-    checks: &Vec<Check>,
+    checks: &[Check],
     contents: &str,
     noqa_line_for: &[usize],
     path: &Path,

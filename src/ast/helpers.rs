@@ -123,7 +123,7 @@ pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<String> {
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
-pub fn is_super_call_with_arguments(func: &Expr, args: &Vec<Expr>) -> bool {
+pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
     // Check: is this a `super` call?
     if let ExprKind::Name { id, .. } = &func.node {
         id == "super" && !args.is_empty()

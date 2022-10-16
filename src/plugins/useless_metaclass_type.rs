@@ -6,12 +6,7 @@ use crate::ast::types::{CheckLocator, Range};
 use crate::autofix::{fixer, fixes};
 use crate::check_ast::Checker;
 
-pub fn useless_metaclass_type(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    value: &Expr,
-    targets: &Vec<Expr>,
-) {
+pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
     if let Some(mut check) = checkers::useless_metaclass_type(
         targets,
         value,

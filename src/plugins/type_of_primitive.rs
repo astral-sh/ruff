@@ -6,7 +6,7 @@ use crate::autofix::fixer;
 use crate::check_ast::Checker;
 use crate::checks::{CheckKind, Fix};
 
-pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &Vec<Expr>) {
+pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if let Some(mut check) =
         checkers::type_of_primitive(func, args, checker.locate_check(Range::from_located(expr)))
     {

@@ -6,7 +6,7 @@ use crate::autofix::fixer;
 use crate::check_ast::Checker;
 use crate::checks::Fix;
 
-pub fn unnecessary_abspath(checker: &mut Checker, expr: &Expr, func: &Expr, args: &Vec<Expr>) {
+pub fn unnecessary_abspath(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if let Some(mut check) =
         checkers::unnecessary_abspath(func, args, checker.locate_check(Range::from_located(expr)))
     {

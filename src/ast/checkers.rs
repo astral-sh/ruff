@@ -118,7 +118,7 @@ pub fn do_not_assign_lambda(value: &Expr, location: Range) -> Option<Check> {
 }
 
 /// Check UselessMetaclassType compliance.
-pub fn useless_metaclass_type(targets: &Vec<Expr>, value: &Expr, location: Range) -> Option<Check> {
+pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -> Option<Check> {
     if targets.len() == 1 {
         if let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() {
             if id == "__metaclass__" {
@@ -134,7 +134,7 @@ pub fn useless_metaclass_type(targets: &Vec<Expr>, value: &Expr, location: Range
 }
 
 /// Check UnnecessaryAbspath compliance.
-pub fn unnecessary_abspath(func: &Expr, args: &Vec<Expr>, location: Range) -> Option<Check> {
+pub fn unnecessary_abspath(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
     // Validate the arguments.
     if args.len() == 1 {
         if let ExprKind::Name { id, .. } = &args[0].node {
@@ -190,7 +190,7 @@ impl Primitive {
 }
 
 /// Check TypeOfPrimitive compliance.
-pub fn type_of_primitive(func: &Expr, args: &Vec<Expr>, location: Range) -> Option<Check> {
+pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
     // Validate the arguments.
     if args.len() == 1 {
         match &func.node {
@@ -279,7 +279,7 @@ pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> 
 }
 
 /// Check DefaultExceptNotLast compliance.
-pub fn default_except_not_last(handlers: &Vec<Excepthandler>) -> Option<Check> {
+pub fn default_except_not_last(handlers: &[Excepthandler]) -> Option<Check> {
     for (idx, handler) in handlers.iter().enumerate() {
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
         if type_.is_none() && idx < handlers.len() - 1 {
@@ -370,7 +370,7 @@ fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {
 
 /// Check MultiValueRepeatedKeyLiteral and MultiValueRepeatedKeyVariable compliance.
 pub fn repeated_keys(
-    keys: &Vec<Expr>,
+    keys: &[Expr],
     check_repeated_literals: bool,
     check_repeated_variables: bool,
     locator: &dyn CheckLocator,
@@ -411,8 +411,8 @@ pub fn repeated_keys(
 /// Check TrueFalseComparison and NoneComparison compliance.
 pub fn literal_comparisons(
     left: &Expr,
-    ops: &Vec<Cmpop>,
-    comparators: &Vec<Expr>,
+    ops: &[Cmpop],
+    comparators: &[Expr],
     check_none_comparisons: bool,
     check_true_false_comparisons: bool,
     locator: &dyn CheckLocator,
@@ -540,12 +540,7 @@ fn is_constant_non_singleton(expr: &Expr) -> bool {
 }
 
 /// Check IsLiteral compliance.
-pub fn is_literal(
-    left: &Expr,
-    ops: &Vec<Cmpop>,
-    comparators: &Vec<Expr>,
-    location: Range,
-) -> Vec<Check> {
+pub fn is_literal(left: &Expr, ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
     let mut left = left;
@@ -562,7 +557,7 @@ pub fn is_literal(
 }
 
 /// Check TypeComparison compliance.
-pub fn type_comparison(ops: &Vec<Cmpop>, comparators: &Vec<Expr>, location: Range) -> Vec<Check> {
+pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
     for (op, right) in izip!(ops, comparators) {
@@ -734,7 +729,7 @@ pub fn builtin_shadowing(name: &str, location: Range, node_type: ShadowingType) 
 
 // flake8-comprehensions
 /// Check `list(generator)` compliance.
-pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     if args.len() == 1 {
         if let ExprKind::Name { id, .. } = &func.node {
             if id == "list" {
@@ -751,7 +746,7 @@ pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &Vec<Expr>) ->
 }
 
 /// Check `set(generator)` compliance.
-pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     if args.len() == 1 {
         if let ExprKind::Name { id, .. } = &func.node {
             if id == "set" {
@@ -768,7 +763,7 @@ pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> 
 }
 
 /// Check `dict((x, y) for x, y in iterable)` compliance.
-pub fn unnecessary_generator_dict(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+pub fn unnecessary_generator_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     if args.len() == 1 {
         if let ExprKind::Name { id, .. } = &func.node {
             if id == "dict" {
@@ -793,7 +788,7 @@ pub fn unnecessary_generator_dict(expr: &Expr, func: &Expr, args: &Vec<Expr>) ->
 pub fn unnecessary_list_comprehension_set(
     expr: &Expr,
     func: &Expr,
-    args: &Vec<Expr>,
+    args: &[Expr],
 ) -> Option<Check> {
     if args.len() == 1 {
         if let ExprKind::Name { id, .. } = &func.node {
@@ -814,7 +809,7 @@ pub fn unnecessary_list_comprehension_set(
 pub fn unnecessary_list_comprehension_dict(
     expr: &Expr,
     func: &Expr,
-    args: &Vec<Expr>,
+    args: &[Expr],
 ) -> Option<Check> {
     if args.len() == 1 {
         if let ExprKind::Name { id, .. } = &func.node {
@@ -837,7 +832,7 @@ pub fn unnecessary_list_comprehension_dict(
 }
 
 /// Check `set([1, 2])` compliance.
-pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     if args.len() == 1 {
         if let ExprKind::Name { id, .. } = &func.node {
             if id == "set" {
@@ -863,7 +858,7 @@ pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Op
 }
 
 /// Check `dict([(1, 2)])` compliance.
-pub fn unnecessary_literal_dict(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> Option<Check> {
+pub fn unnecessary_literal_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     if args.len() == 1 {
         if let ExprKind::Name { id, .. } = &func.node {
             if id == "dict" {
@@ -919,8 +914,8 @@ pub fn unnecessary_literal_dict(expr: &Expr, func: &Expr, args: &Vec<Expr>) -> O
 pub fn unnecessary_collection_call(
     expr: &Expr,
     func: &Expr,
-    args: &Vec<Expr>,
-    keywords: &Vec<Located<KeywordData>>,
+    args: &[Expr],
+    keywords: &[Located<KeywordData>],
 ) -> Option<Check> {
     if args.is_empty() {
         if let ExprKind::Name { id, .. } = &func.node {
@@ -1142,8 +1137,8 @@ pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -
 
 pub fn unnecessary_comprehension(
     expr: &Expr,
-    elt: &Located<ExprKind>,
-    generators: &Vec<Comprehension>,
+    elt: &Expr,
+    generators: &[Comprehension],
 ) -> Option<Check> {
     if generators.len() == 1 {
         let generator = &generators[0];
@@ -1240,7 +1235,7 @@ pub fn super_args(
     parents: &[&Stmt],
     expr: &Expr,
     func: &Expr,
-    args: &Vec<Expr>,
+    args: &[Expr],
 ) -> Option<Check> {
     if !helpers::is_super_call_with_arguments(func, args) {
         return None;
@@ -1255,7 +1250,7 @@ pub fn super_args(
 
     // For a `super` invocation to be unnecessary, the first argument needs to match the enclosing
     // class, and the second argument needs to match the first argument to the enclosing function.
-    if let [first_arg, second_arg] = args.as_slice() {
+    if let [first_arg, second_arg] = args {
         // Find the enclosing function definition (if any).
         if let Some(StmtKind::FunctionDef {
             args: parent_args, ..

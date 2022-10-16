@@ -78,7 +78,7 @@ pub(crate) fn check_path(
         if !ignores.is_empty() {
             return Ok(checks
                 .into_iter()
-                .filter(|check| !ignores.contains(check.kind.code()))
+                .filter(|check| !ignores.contains(&check.kind.code()))
                 .collect());
         }
     }

@@ -103,9 +103,9 @@ impl fmt::Display for Warnable {
 /// Warn the user if they attempt to enable a code that won't be respected.
 pub fn warn_on(
     flag: Warnable,
-    codes: &Vec<CheckCode>,
-    cli_ignore: &Vec<CheckCode>,
-    cli_extend_ignore: &Vec<CheckCode>,
+    codes: &[CheckCode],
+    cli_ignore: &[CheckCode],
+    cli_extend_ignore: &[CheckCode],
     pyproject_settings: &RawSettings,
     pyproject_path: &Option<PathBuf>,
 ) {

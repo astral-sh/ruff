@@ -4,12 +4,7 @@ use crate::ast::{checkers, helpers};
 use crate::autofix::{fixer, fixes};
 use crate::check_ast::Checker;
 
-pub fn super_call_with_parameters(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &Vec<Expr>,
-) {
+pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `check_super_args` too, so this is just an optimization.)
     if helpers::is_super_call_with_arguments(func, args) {

@@ -24,7 +24,7 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
 pub fn duplicate_handler_exceptions(
     checker: &mut Checker,
     expr: &Expr,
-    elts: &Vec<Expr>,
+    elts: &[Expr],
 ) -> BTreeSet<String> {
     let mut seen: BTreeSet<String> = Default::default();
     let mut duplicates: BTreeSet<String> = Default::default();

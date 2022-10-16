@@ -290,11 +290,7 @@ where
                 );
             }
             StmtKind::Return { .. } => {
-                if self
-                    .settings
-                    .enabled
-                    .contains(CheckKind::ReturnOutsideFunction.code())
-                {
+                if self.settings.enabled.contains(&CheckCode::F706) {
                     if let Some(scope_index) = self.scope_stack.last().cloned() {
                         match self.scopes[scope_index].kind {
                             ScopeKind::Class | ScopeKind::Module => {
@@ -352,17 +348,13 @@ where
                 self.push_scope(Scope::new(ScopeKind::Class))
             }
             StmtKind::Import { names } => {
-                if self
-                    .settings
-                    .enabled
-                    .contains(CheckKind::ModuleImportNotAtTopOfFile.code())
-                    && self.seen_import_boundary
-                    && stmt.location.column() == 1
-                {
-                    self.checks.push(Check::new(
-                        CheckKind::ModuleImportNotAtTopOfFile,
-                        self.locate_check(Range::from_located(stmt)),
-                    ));
+                if self.seen_import_boundary && stmt.location.column() == 1 {
+                    if self.settings.enabled.contains(&CheckCode::E402) {
+                        self.checks.push(Check::new(
+                            CheckKind::ModuleImportNotAtTopOfFile,
+                            self.locate_check(Range::from_located(stmt)),
+                        ));
+                    }
                 }
 
                 for alias in names {
@@ -413,17 +405,13 @@ where
                 module,
                 level,
             } => {
-                if self
-                    .settings
-                    .enabled
-                    .contains(CheckKind::ModuleImportNotAtTopOfFile.code())
-                    && self.seen_import_boundary
-                    && stmt.location.column() == 1
-                {
-                    self.checks.push(Check::new(
-                        CheckKind::ModuleImportNotAtTopOfFile,
-                        self.locate_check(Range::from_located(stmt)),
-                    ));
+                if self.seen_import_boundary && stmt.location.column() == 1 {
+                    if self.settings.enabled.contains(&CheckCode::E402) {
+                        self.checks.push(Check::new(
+                            CheckKind::ModuleImportNotAtTopOfFile,
+                            self.locate_check(Range::from_located(stmt)),
+                        ));
+                    }
                 }
 
                 for alias in names {
@@ -941,32 +929,27 @@ where
             }
             ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. } => {
                 let scope = self.current_scope();
-                if self
-                    .settings
-                    .enabled
-                    .contains(CheckKind::YieldOutsideFunction.code())
-                    && matches!(scope.kind, ScopeKind::Class | ScopeKind::Module)
-                {
-                    self.checks.push(Check::new(
-                        CheckKind::YieldOutsideFunction,
-                        self.locate_check(Range::from_located(expr)),
-                    ));
+                if self.settings.enabled.contains(&CheckCode::F704) {
+                    if matches!(scope.kind, ScopeKind::Class | ScopeKind::Module) {
+                        self.checks.push(Check::new(
+                            CheckKind::YieldOutsideFunction,
+                            self.locate_check(Range::from_located(expr)),
+                        ));
+                    }
                 }
             }
             ExprKind::JoinedStr { values } => {
-                if self.in_f_string.is_none()
-                    && self
-                        .settings
-                        .enabled
-                        .contains(CheckKind::FStringMissingPlaceholders.code())
-                    && !values
-                        .iter()
-                        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
-                {
-                    self.checks.push(Check::new(
-                        CheckKind::FStringMissingPlaceholders,
-                        self.locate_check(Range::from_located(expr)),
-                    ));
+                if self.settings.enabled.contains(&CheckCode::F541) {
+                    if self.in_f_string.is_none()
+                        && !values
+                            .iter()
+                            .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
+                    {
+                        self.checks.push(Check::new(
+                            CheckKind::FStringMissingPlaceholders,
+                            self.locate_check(Range::from_located(expr)),
+                        ));
+                    }
                 }
                 self.in_f_string = Some(Range::from_located(expr));
             }

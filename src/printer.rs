@@ -50,14 +50,14 @@ impl Printer {
                     serde_json::to_string_pretty(
                         &messages
                             .iter()
-                            .map(|m| ExpandedMessage {
-                                kind: &m.kind,
-                                code: m.kind.code(),
-                                message: m.kind.body(),
-                                fixed: m.fixed,
-                                location: m.location,
-                                end_location: m.end_location,
-                                filename: &m.filename,
+                            .map(|message| ExpandedMessage {
+                                kind: &message.kind,
+                                code: message.kind.code(),
+                                message: message.kind.body(),
+                                fixed: message.fixed,
+                                location: message.location,
+                                end_location: message.end_location,
+                                filename: &message.filename,
                             })
                             .collect::<Vec<_>>()
                     )?
