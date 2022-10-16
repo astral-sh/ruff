@@ -341,11 +341,11 @@ Flake8.
 
 | Code | Name | Message |
 | ---- | ---- | ------- |
-| N801 | InvalidClassName | class name '...' should use CapWords convention  |
-| N802 | InvalidFunctionName | function name '...' should be lowercase |
-| N803 | InvalidArgumentName | argument name '...' should be lowercase |
-| N804 | InvalidFirstArgumentNameForClassMethod | first argument of a classmethod should be named 'cls' |
-| N805 | InvalidFirstArgumentNameForMethod | first argument of a method should be named 'self' |
+| N801 | InvalidClassName | class name `...` should use CapWords convention  |
+| N802 | InvalidFunctionName | function name `...` should be lowercase |
+| N803 | InvalidArgumentName | argument name `...` should be lowercase |
+| N804 | InvalidFirstArgumentNameForClassMethod | first argument of a classmethod should be named `cls` |
+| N805 | InvalidFirstArgumentNameForMethod | first argument of a method should be named `self` |
 
 ### flake8-comprehensions
 
