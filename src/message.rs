@@ -38,12 +38,13 @@ impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{}{}{}{}{} {} {}",
+            "{}{}{}{}{}{} {} {}",
             relativize_path(Path::new(&self.filename)).white().bold(),
             ":".cyan(),
             self.location.row(),
             ":".cyan(),
             self.location.column(),
+            ":".cyan(),
             self.kind.code().as_ref().red().bold(),
             self.kind.body()
         )
