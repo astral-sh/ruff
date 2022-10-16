@@ -1363,7 +1363,7 @@ pub fn invalid_function_name(func_def: &Stmt, name: &str) -> Option<Check> {
 pub fn invalid_argument_name(location: Range, name: &str) -> Option<Check> {
     if name.chars().any(|c| c.is_uppercase()) {
         return Some(Check::new(
-            CheckKind::InvalidFunctionName(name.to_string()),
+            CheckKind::InvalidArgumentName(name.to_string()),
             location,
         ));
     }

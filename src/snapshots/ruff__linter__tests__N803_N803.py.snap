@@ -3,7 +3,7 @@ source: src/linter.rs
 expression: checks
 ---
 - kind:
-    InvalidFunctionName: A
+    InvalidArgumentName: A
   location:
     row: 1
     column: 13
@@ -12,12 +12,12 @@ expression: checks
     column: 14
   fix: ~
 - kind:
-    InvalidFunctionName: A
+    InvalidArgumentName: A
   location:
-    row: 7
+    row: 6
     column: 25
   end_location:
-    row: 7
+    row: 6
     column: 26
   fix: ~
 
