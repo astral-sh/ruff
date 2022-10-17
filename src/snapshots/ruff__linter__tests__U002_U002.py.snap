@@ -10,13 +10,14 @@ expression: checks
     row: 3
     column: 22
   fix:
-    content: __file__
-    location:
-      row: 3
-      column: 5
-    end_location:
-      row: 3
-      column: 22
+    patch:
+      content: __file__
+      location:
+        row: 3
+        column: 5
+      end_location:
+        row: 3
+        column: 22
     applied: false
 - kind: UnnecessaryAbspath
   location:
@@ -26,13 +27,14 @@ expression: checks
     row: 9
     column: 30
   fix:
-    content: __file__
-    location:
-      row: 9
-      column: 5
-    end_location:
-      row: 9
-      column: 30
+    patch:
+      content: __file__
+      location:
+        row: 9
+        column: 5
+      end_location:
+        row: 9
+        column: 30
     applied: false
 - kind: UnnecessaryAbspath
   location:
@@ -42,12 +44,13 @@ expression: checks
     row: 15
     column: 27
   fix:
-    content: __file__
-    location:
-      row: 15
-      column: 5
-    end_location:
-      row: 15
-      column: 27
+    patch:
+      content: __file__
+      location:
+        row: 15
+        column: 5
+      end_location:
+        row: 15
+        column: 27
     applied: false
 

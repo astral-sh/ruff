@@ -11,13 +11,14 @@ expression: checks
     row: 176
     column: 25
   fix:
-    content: "\n"
-    location:
-      row: 177
-      column: 1
-    end_location:
-      row: 177
-      column: 1
+    patch:
+      content: "\n"
+      location:
+        row: 177
+        column: 1
+      end_location:
+        row: 177
+        column: 1
     applied: false
 - kind:
     OneBlankLineAfterClass: 0
@@ -28,12 +29,13 @@ expression: checks
     row: 187
     column: 46
   fix:
-    content: "\n"
-    location:
-      row: 188
-      column: 1
-    end_location:
-      row: 188
-      column: 1
+    patch:
+      content: "\n"
+      location:
+        row: 188
+        column: 1
+      end_location:
+        row: 188
+        column: 1
     applied: false
 

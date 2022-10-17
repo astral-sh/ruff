@@ -5,8 +5,9 @@ use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
+use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckKind, Fix};
+use crate::checks::{Check, CheckKind};
 
 static DEPRECATED_ALIASES: Lazy<BTreeMap<&'static str, &'static str>> = Lazy::new(|| {
     BTreeMap::from([
@@ -38,12 +39,11 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
                         Range::from_located(expr),
                     );
                     if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                        check.amend(Fix {
-                            content: format!("self.{}", target),
-                            location: expr.location,
-                            end_location: expr.end_location.unwrap(),
-                            applied: false,
-                        });
+                        check.amend(Fix::replacement(
+                            format!("self.{}", target),
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ));
                     }
                     checker.add_check(check);
                 }

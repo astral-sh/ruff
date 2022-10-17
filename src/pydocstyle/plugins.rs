@@ -8,8 +8,9 @@ use titlecase::titlecase;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
+use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind, Fix};
+use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::docstrings::helpers;
 use crate::docstrings::sections::{section_contexts, SectionContext};
@@ -1164,7 +1165,7 @@ fn common_section(
                                 + context.following_lines.len(),
                             1,
                         ),
-                    ))
+                    ));
                 }
                 checker.add_check(check);
             }
@@ -1173,10 +1174,18 @@ fn common_section(
 
     if checker.settings.enabled.contains(&CheckCode::D411) {
         if !context.previous_line.is_empty() {
-            checker.add_check(Check::new(
+            let mut check = Check::new(
                 CheckKind::BlankLineBeforeSection(context.section_name.to_string()),
                 Range::from_located(docstring),
-            ))
+            );
+            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                // Add a blank line before the section.
+                check.amend(Fix::insertion(
+                    "\n".to_string(),
+                    Location::new(docstring.location.row() + context.original_index, 1),
+                ));
+            }
+            checker.add_check(check)
         }
     }
 

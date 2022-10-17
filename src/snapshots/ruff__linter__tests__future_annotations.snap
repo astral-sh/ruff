@@ -12,13 +12,14 @@ expression: checks
     row: 8
     column: 2
   fix:
-    content: "from models import (\n    Fruit,\n)"
-    location:
-      row: 5
-      column: 1
-    end_location:
-      row: 8
-      column: 2
+    patch:
+      content: "from models import (\n    Fruit,\n)"
+      location:
+        row: 5
+        column: 1
+      end_location:
+        row: 8
+        column: 2
     applied: false
 - kind:
     UndefinedName: Bar

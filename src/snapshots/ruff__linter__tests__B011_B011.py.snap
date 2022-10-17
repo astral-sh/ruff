@@ -10,13 +10,14 @@ expression: checks
     row: 8
     column: 13
   fix:
-    content: raise AssertionError()
-    location:
-      row: 8
-      column: 1
-    end_location:
-      row: 8
-      column: 13
+    patch:
+      content: raise AssertionError()
+      location:
+        row: 8
+        column: 1
+      end_location:
+        row: 8
+        column: 13
     applied: false
 - kind: DoNotAssertFalse
   location:
@@ -26,12 +27,13 @@ expression: checks
     row: 10
     column: 13
   fix:
-    content: "raise AssertionError('message')"
-    location:
-      row: 10
-      column: 1
-    end_location:
-      row: 10
-      column: 24
+    patch:
+      content: "raise AssertionError('message')"
+      location:
+        row: 10
+        column: 1
+      end_location:
+        row: 10
+        column: 24
     applied: false
 

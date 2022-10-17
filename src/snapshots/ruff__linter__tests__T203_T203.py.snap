@@ -10,13 +10,14 @@ expression: checks
     row: 3
     column: 24
   fix:
-    content: ""
-    location:
-      row: 3
-      column: 1
-    end_location:
-      row: 4
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 3
+        column: 1
+      end_location:
+        row: 4
+        column: 1
     applied: false
 - kind: PPrintFound
   location:
@@ -26,12 +27,13 @@ expression: checks
     row: 8
     column: 31
   fix:
-    content: ""
-    location:
-      row: 8
-      column: 1
-    end_location:
-      row: 9
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 8
+        column: 1
+      end_location:
+        row: 9
+        column: 1
     applied: false
 

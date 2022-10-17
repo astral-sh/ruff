@@ -11,13 +11,14 @@ expression: checks
     row: 4
     column: 14
   fix:
-    content: list
-    location:
-      row: 4
-      column: 10
-    end_location:
-      row: 4
-      column: 14
+    patch:
+      content: list
+      location:
+        row: 4
+        column: 10
+      end_location:
+        row: 4
+        column: 14
     applied: false
 - kind:
     UsePEP585Annotation: List
@@ -28,12 +29,13 @@ expression: checks
     row: 11
     column: 21
   fix:
-    content: list
-    location:
-      row: 11
-      column: 10
-    end_location:
-      row: 11
-      column: 21
+    patch:
+      content: list
+      location:
+        row: 11
+        column: 10
+      end_location:
+        row: 11
+        column: 21
     applied: false
 

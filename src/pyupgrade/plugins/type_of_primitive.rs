@@ -2,8 +2,9 @@ use rustpython_ast::Expr;
 
 use crate::ast::types::{CheckLocator, Range};
 use crate::autofix::fixer;
+use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::checks::{CheckKind, Fix};
+use crate::checks::CheckKind;
 use crate::pyupgrade::checks;
 
 pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
@@ -12,12 +13,11 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
     {
         if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
             if let CheckKind::TypeOfPrimitive(primitive) = &check.kind {
-                check.amend(Fix {
-                    content: primitive.builtin(),
-                    location: expr.location,
-                    end_location: expr.end_location.unwrap(),
-                    applied: false,
-                });
+                check.amend(Fix::replacement(
+                    primitive.builtin(),
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ));
             }
         }
         checker.add_check(check);

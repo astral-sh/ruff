@@ -11,13 +11,14 @@ expression: checks
     row: 79
     column: 33
   fix:
-    content: ""
-    location:
-      row: 81
-      column: 1
-    end_location:
-      row: 80
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 81
+        column: 1
+      end_location:
+        row: 80
+        column: 1
     applied: false
 - kind:
     NoBlankLineAfterFunction: 1
@@ -28,13 +29,14 @@ expression: checks
     row: 137
     column: 25
   fix:
-    content: ""
-    location:
-      row: 138
-      column: 1
-    end_location:
-      row: 139
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 138
+        column: 1
+      end_location:
+        row: 139
+        column: 1
     applied: false
 - kind:
     NoBlankLineAfterFunction: 1
@@ -45,13 +47,14 @@ expression: checks
     row: 146
     column: 38
   fix:
-    content: ""
-    location:
-      row: 147
-      column: 1
-    end_location:
-      row: 148
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 147
+        column: 1
+      end_location:
+        row: 148
+        column: 1
     applied: false
 - kind:
     NoBlankLineAfterFunction: 0
@@ -62,12 +65,13 @@ expression: checks
     row: 453
     column: 24
   fix:
-    content: ""
-    location:
-      row: 455
-      column: 1
-    end_location:
-      row: 454
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 455
+        column: 1
+      end_location:
+        row: 454
+        column: 1
     applied: false
 

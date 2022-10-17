@@ -31,7 +31,7 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
                     &deleted,
                 ) {
                     Ok(fix) => {
-                        if fix.content.is_empty() || fix.content == "pass" {
+                        if fix.patch.content.is_empty() || fix.patch.content == "pass" {
                             checker.deletions.insert(context.defined_by);
                         }
                         check.amend(fix)

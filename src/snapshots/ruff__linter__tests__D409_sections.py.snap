@@ -10,7 +10,16 @@ expression: checks
   end_location:
     row: 105
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    -------\n"
+      location:
+        row: 102
+        column: 1
+      end_location:
+        row: 103
+        column: 1
+    applied: false
 - kind:
     SectionUnderlineMatchesSectionLength: Returns
   location:
@@ -19,5 +28,14 @@ expression: checks
   end_location:
     row: 221
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    -------\n"
+      location:
+        row: 216
+        column: 1
+      end_location:
+        row: 217
+        column: 1
+    applied: false
 

@@ -10,7 +10,16 @@ expression: checks
   end_location:
     row: 153
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 150
+        column: 1
+      end_location:
+        row: 150
+        column: 9
+    applied: false
 - kind:
     SectionUnderlineNotOverIndented: Returns
   location:
@@ -19,5 +28,14 @@ expression: checks
   end_location:
     row: 165
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 164
+        column: 1
+      end_location:
+        row: 164
+        column: 9
+    applied: false
 

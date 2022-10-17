@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter, EnumString};
 
 use crate::ast::types::Range;
+use crate::autofix::Fix;
 use crate::pyupgrade::types::Primitive;
 
 #[derive(
@@ -1205,19 +1206,24 @@ impl CheckKind {
             self,
             CheckKind::BlankLineAfterLastSection(_)
                 | CheckKind::BlankLineAfterSection(_)
+                | CheckKind::BlankLineAfterSummary
+                | CheckKind::BlankLineBeforeSection(_)
+                | CheckKind::DashedUnderlineAfterSection(_)
                 | CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DuplicateHandlerException(_)
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NoBlankLineAfterFunction(_)
-                | CheckKind::BlankLineAfterSummary
                 | CheckKind::NoBlankLineBeforeClass(_)
                 | CheckKind::NoBlankLineBeforeFunction(_)
+                | CheckKind::NoBlankLinesBetweenHeaderAndContent(_)
                 | CheckKind::NoSurroundingWhitespace
                 | CheckKind::OneBlankLineAfterClass(_)
                 | CheckKind::OneBlankLineBeforeClass(_)
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
+                | CheckKind::SectionUnderlineMatchesSectionLength(_)
+                | CheckKind::SectionUnderlineNotOverIndented(_)
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::TypeOfPrimitive(_)
                 | CheckKind::UnnecessaryAbspath
@@ -1232,43 +1238,6 @@ impl CheckKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Fix {
-    pub content: String,
-    pub location: Location,
-    pub end_location: Location,
-    pub applied: bool,
-}
-
-impl Fix {
-    pub fn deletion(start: Location, end: Location) -> Self {
-        Self {
-            content: "".to_string(),
-            location: start,
-            end_location: end,
-            applied: false,
-        }
-    }
-
-    pub fn replacement(content: String, start: Location, end: Location) -> Self {
-        Self {
-            content,
-            location: start,
-            end_location: end,
-            applied: false,
-        }
-    }
-
-    pub fn insertion(content: String, at: Location) -> Self {
-        Self {
-            content,
-            location: at,
-            end_location: at,
-            applied: false,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Check {
     pub kind: CheckKind,
     pub location: Location,
@@ -1277,11 +1246,11 @@ pub struct Check {
 }
 
 impl Check {
-    pub fn new(kind: CheckKind, rage: Range) -> Self {
+    pub fn new(kind: CheckKind, range: Range) -> Self {
         Self {
             kind,
-            location: rage.location,
-            end_location: rage.end_location,
+            location: range.location,
+            end_location: range.end_location,
             fix: None,
         }
     }

@@ -3,8 +3,9 @@ use rustpython_ast::{Constant, Expr, ExprKind, Operator};
 use crate::ast::helpers::match_name_or_attr;
 use crate::ast::types::Range;
 use crate::autofix::fixer;
+use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckKind, Fix};
+use crate::checks::{Check, CheckKind};
 use crate::code_gen::SourceGenerator;
 
 fn optional(expr: &Expr) -> Expr {
@@ -49,12 +50,11 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             let mut generator = SourceGenerator::new();
             if let Ok(()) = generator.unparse_expr(&optional(slice), 0) {
                 if let Ok(content) = generator.generate() {
-                    check.amend(Fix {
+                    check.amend(Fix::replacement(
                         content,
-                        location: expr.location,
-                        end_location: expr.end_location.unwrap(),
-                        applied: false,
-                    })
+                        expr.location,
+                        expr.end_location.unwrap(),
+                    ))
                 }
             }
         }
@@ -70,12 +70,11 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     let mut generator = SourceGenerator::new();
                     if let Ok(()) = generator.unparse_expr(&union(elts), 0) {
                         if let Ok(content) = generator.generate() {
-                            check.amend(Fix {
+                            check.amend(Fix::replacement(
                                 content,
-                                location: expr.location,
-                                end_location: expr.end_location.unwrap(),
-                                applied: false,
-                            })
+                                expr.location,
+                                expr.end_location.unwrap(),
+                            ))
                         }
                     }
                 }
@@ -84,12 +83,11 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     let mut generator = SourceGenerator::new();
                     if let Ok(()) = generator.unparse_expr(slice, 0) {
                         if let Ok(content) = generator.generate() {
-                            check.amend(Fix {
+                            check.amend(Fix::replacement(
                                 content,
-                                location: expr.location,
-                                end_location: expr.end_location.unwrap(),
-                                applied: false,
-                            });
+                                expr.location,
+                                expr.end_location.unwrap(),
+                            ));
                         }
                     }
                 }

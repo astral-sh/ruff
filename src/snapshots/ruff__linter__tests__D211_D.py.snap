@@ -11,13 +11,14 @@ expression: checks
     row: 165
     column: 30
   fix:
-    content: ""
-    location:
-      row: 164
-      column: 1
-    end_location:
-      row: 165
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 164
+        column: 1
+      end_location:
+        row: 165
+        column: 1
     applied: false
 - kind:
     NoBlankLineBeforeClass: 1
@@ -28,12 +29,13 @@ expression: checks
     row: 176
     column: 25
   fix:
-    content: ""
-    location:
-      row: 175
-      column: 1
-    end_location:
-      row: 176
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 175
+        column: 1
+      end_location:
+        row: 176
+        column: 1
     applied: false
 
