@@ -2,7 +2,7 @@ use rustpython_ast::Location;
 use serde::{Deserialize, Serialize};
 
 pub mod fixer;
-pub mod fixes;
+pub mod helpers;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Patch {

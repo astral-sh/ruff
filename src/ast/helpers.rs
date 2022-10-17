@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, StmtKind};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, StmtKind};
 
 use crate::python::typing;
 
@@ -129,5 +129,17 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
         id == "super" && !args.is_empty()
     } else {
         false
+    }
+}
+
+/// Convert a location within a file (relative to `base`) to an absolute position.
+pub fn to_absolute(relative: &Location, base: &Location) -> Location {
+    if relative.row() == 1 {
+        Location::new(
+            relative.row() + base.row() - 1,
+            relative.column() + base.column() - 1,
+        )
+    } else {
+        Location::new(relative.row() + base.row() - 1, relative.column())
     }
 }
