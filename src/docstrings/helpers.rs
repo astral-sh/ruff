@@ -32,3 +32,11 @@ pub fn indentation<'a>(checker: &'a mut Checker, docstring: &Expr) -> &'a str {
         end_location: Location::new(range.location.row(), range.location.column()),
     })
 }
+
+/// Replace any non-whitespace characters from an indentation string.
+pub fn clean(indentation: &str) -> String {
+    indentation
+        .chars()
+        .map(|char| if char.is_whitespace() { char } else { ' ' })
+        .collect()
+}

@@ -296,8 +296,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D204 | OneBlankLineAfterClass | 1 blank line required after class docstring | 🛠 |
 | D205 | BlankLineAfterSummary | 1 blank line required between summary line and description | 🛠 |
 | D206 | IndentWithSpaces | Docstring should be indented with spaces, not tabs |  |
-| D207 | NoUnderIndentation | Docstring is under-indented |  |
-| D208 | NoOverIndentation | Docstring is over-indented |  |
+| D207 | NoUnderIndentation | Docstring is under-indented | 🛠 |
+| D208 | NoOverIndentation | Docstring is over-indented | 🛠 |
 | D209 | NewLineAfterLastParagraph | Multi-line docstring closing quotes should be on a separate line | 🛠 |
 | D210 | NoSurroundingWhitespace | No whitespaces allowed surrounding docstring text | 🛠 |
 | D211 | NoBlankLineBeforeClass | No blank lines allowed before class docstring | 🛠 |
@@ -398,7 +398,6 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | M001 | UnusedNOQA | Unused `noqa` directive | 🛠 |
-
 
 ## Editor Integrations
 
