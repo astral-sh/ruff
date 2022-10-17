@@ -10,13 +10,14 @@ expression: checks
     row: 2
     column: 25
   fix:
-    content: pass
-    location:
-      row: 2
-      column: 5
-    end_location:
-      row: 2
-      column: 25
+    patch:
+      content: pass
+      location:
+        row: 2
+        column: 5
+      end_location:
+        row: 2
+        column: 25
     applied: false
 - kind: UselessMetaclassType
   location:
@@ -26,12 +27,13 @@ expression: checks
     row: 6
     column: 25
   fix:
-    content: ""
-    location:
-      row: 6
-      column: 1
-    end_location:
-      row: 7
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 6
+        column: 1
+      end_location:
+        row: 7
+        column: 1
     applied: false
 

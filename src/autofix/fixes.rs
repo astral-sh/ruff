@@ -9,7 +9,7 @@ use rustpython_parser::token::Tok;
 
 use crate::ast::operations::SourceCodeLocator;
 use crate::ast::types::Range;
-use crate::checks::Fix;
+use crate::autofix::Fix;
 
 /// Convert a location within a file (relative to `base`) to an absolute position.
 fn to_absolute(relative: &Location, base: &Location) -> Location {
@@ -56,12 +56,7 @@ pub fn remove_class_def_base(
         }
 
         return match (fix_start, fix_end) {
-            (Some(start), Some(end)) => Some(Fix {
-                content: "".to_string(),
-                location: start,
-                end_location: end,
-                applied: false,
-            }),
+            (Some(start), Some(end)) => Some(Fix::replacement("".to_string(), start, end)),
             _ => None,
         };
     }
@@ -95,12 +90,7 @@ pub fn remove_class_def_base(
         }
 
         match (fix_start, fix_end) {
-            (Some(start), Some(end)) => Some(Fix {
-                content: "".to_string(),
-                location: start,
-                end_location: end,
-                applied: false,
-            }),
+            (Some(start), Some(end)) => Some(Fix::replacement("".to_string(), start, end)),
             _ => None,
         }
     } else {
@@ -120,12 +110,7 @@ pub fn remove_class_def_base(
         }
 
         match (fix_start, fix_end) {
-            (Some(start), Some(end)) => Some(Fix {
-                content: "".to_string(),
-                location: start,
-                end_location: end,
-                applied: false,
-            }),
+            (Some(start), Some(end)) => Some(Fix::replacement("".to_string(), start, end)),
             _ => None,
         }
     }
@@ -150,12 +135,11 @@ pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> O
                 let mut state = Default::default();
                 tree.codegen(&mut state);
 
-                return Some(Fix {
-                    content: state.to_string(),
-                    location: range.location,
-                    end_location: range.end_location,
-                    applied: false,
-                });
+                return Some(Fix::replacement(
+                    state.to_string(),
+                    range.location,
+                    range.end_location,
+                ));
             }
         }
     }
@@ -232,21 +216,18 @@ pub fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Res
     {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
-        Ok(Fix {
-            location: stmt.location,
-            end_location: stmt.end_location.unwrap(),
-            content: "pass".to_string(),
-            applied: false,
-        })
+        Ok(Fix::replacement(
+            "pass".to_string(),
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ))
     } else {
         // Otherwise, nuke the entire line.
         // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
-        Ok(Fix {
-            location: Location::new(stmt.location.row(), 1),
-            end_location: Location::new(stmt.end_location.unwrap().row() + 1, 1),
-            content: "".to_string(),
-            applied: false,
-        })
+        Ok(Fix::deletion(
+            Location::new(stmt.location.row(), 1),
+            Location::new(stmt.end_location.unwrap().row() + 1, 1),
+        ))
     }
 }
 
@@ -307,12 +288,11 @@ pub fn remove_unused_imports(
         let mut state = Default::default();
         tree.codegen(&mut state);
 
-        Ok(Fix {
-            content: state.to_string(),
-            location: stmt.location,
-            end_location: stmt.end_location.unwrap(),
-            applied: false,
-        })
+        Ok(Fix::replacement(
+            state.to_string(),
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ))
     }
 }
 
@@ -382,11 +362,10 @@ pub fn remove_unused_import_froms(
         let mut state = Default::default();
         tree.codegen(&mut state);
 
-        Ok(Fix {
-            content: state.to_string(),
-            location: stmt.location,
-            end_location: stmt.end_location.unwrap(),
-            applied: false,
-        })
+        Ok(Fix::replacement(
+            state.to_string(),
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ))
     }
 }

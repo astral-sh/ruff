@@ -12,13 +12,14 @@ expression: checks
     row: 2
     column: 21
   fix:
-    content: import os
-    location:
-      row: 2
-      column: 1
-    end_location:
-      row: 2
-      column: 21
+    patch:
+      content: import os
+      location:
+        row: 2
+        column: 1
+      end_location:
+        row: 2
+        column: 21
     applied: false
 - kind:
     UnusedImport:
@@ -30,13 +31,14 @@ expression: checks
     row: 8
     column: 2
   fix:
-    content: "from collections import (\n    Counter,\n    namedtuple,\n)"
-    location:
-      row: 4
-      column: 1
-    end_location:
-      row: 8
-      column: 2
+    patch:
+      content: "from collections import (\n    Counter,\n    namedtuple,\n)"
+      location:
+        row: 4
+        column: 1
+      end_location:
+        row: 8
+        column: 2
     applied: false
 - kind:
     UnusedImport:
@@ -48,13 +50,14 @@ expression: checks
     row: 12
     column: 24
   fix:
-    content: import logging.handlers
-    location:
-      row: 12
-      column: 1
-    end_location:
-      row: 12
-      column: 24
+    patch:
+      content: import logging.handlers
+      location:
+        row: 12
+        column: 1
+      end_location:
+        row: 12
+        column: 24
     applied: false
 - kind:
     UnusedImport:
@@ -66,13 +69,14 @@ expression: checks
     row: 33
     column: 18
   fix:
-    content: ""
-    location:
-      row: 33
-      column: 1
-    end_location:
-      row: 34
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 33
+        column: 1
+      end_location:
+        row: 34
+        column: 1
     applied: false
 - kind:
     UnusedImport:
@@ -84,13 +88,14 @@ expression: checks
     row: 34
     column: 21
   fix:
-    content: ""
-    location:
-      row: 34
-      column: 1
-    end_location:
-      row: 35
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 34
+        column: 1
+      end_location:
+        row: 35
+        column: 1
     applied: false
 - kind:
     UnusedImport:
@@ -102,13 +107,14 @@ expression: checks
     row: 38
     column: 19
   fix:
-    content: ""
-    location:
-      row: 38
-      column: 1
-    end_location:
-      row: 39
-      column: 1
+    patch:
+      content: ""
+      location:
+        row: 38
+        column: 1
+      end_location:
+        row: 39
+        column: 1
     applied: false
 - kind:
     UnusedImport:
@@ -120,12 +126,13 @@ expression: checks
     row: 53
     column: 22
   fix:
-    content: pass
-    location:
-      row: 53
-      column: 9
-    end_location:
-      row: 53
-      column: 22
+    patch:
+      content: pass
+      location:
+        row: 53
+        column: 9
+      end_location:
+        row: 53
+        column: 22
     applied: false
 

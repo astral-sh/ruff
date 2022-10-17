@@ -10,13 +10,14 @@ expression: checks
     row: 4
     column: 23
   fix:
-    content: str | None
-    location:
-      row: 4
-      column: 10
-    end_location:
-      row: 4
-      column: 23
+    patch:
+      content: str | None
+      location:
+        row: 4
+        column: 10
+      end_location:
+        row: 4
+        column: 23
     applied: false
 - kind: UsePEP604Annotation
   location:
@@ -26,13 +27,14 @@ expression: checks
     row: 11
     column: 30
   fix:
-    content: str | None
-    location:
-      row: 11
-      column: 10
-    end_location:
-      row: 11
-      column: 30
+    patch:
+      content: str | None
+      location:
+        row: 11
+        column: 10
+      end_location:
+        row: 11
+        column: 30
     applied: false
 - kind: UsePEP604Annotation
   location:
@@ -42,13 +44,14 @@ expression: checks
     row: 18
     column: 46
   fix:
-    content: "str | int | Union[float, bytes]"
-    location:
-      row: 18
-      column: 10
-    end_location:
-      row: 18
-      column: 46
+    patch:
+      content: "str | int | Union[float, bytes]"
+      location:
+        row: 18
+        column: 10
+      end_location:
+        row: 18
+        column: 46
     applied: false
 - kind: UsePEP604Annotation
   location:
@@ -58,13 +61,14 @@ expression: checks
     row: 18
     column: 45
   fix:
-    content: float | bytes
-    location:
-      row: 18
-      column: 26
-    end_location:
-      row: 18
-      column: 45
+    patch:
+      content: float | bytes
+      location:
+        row: 18
+        column: 26
+      end_location:
+        row: 18
+        column: 45
     applied: false
 - kind: UsePEP604Annotation
   location:
@@ -74,13 +78,14 @@ expression: checks
     row: 25
     column: 32
   fix:
-    content: str | int
-    location:
-      row: 25
-      column: 10
-    end_location:
-      row: 25
-      column: 32
+    patch:
+      content: str | int
+      location:
+        row: 25
+        column: 10
+      end_location:
+        row: 25
+        column: 32
     applied: false
 - kind: UsePEP604Annotation
   location:
@@ -90,13 +95,14 @@ expression: checks
     row: 32
     column: 48
   fix:
-    content: "str | int | Union[float, bytes]"
-    location:
-      row: 32
-      column: 10
-    end_location:
-      row: 32
-      column: 48
+    patch:
+      content: "str | int | Union[float, bytes]"
+      location:
+        row: 32
+        column: 10
+      end_location:
+        row: 32
+        column: 48
     applied: false
 - kind: UsePEP604Annotation
   location:
@@ -106,13 +112,14 @@ expression: checks
     row: 32
     column: 48
   fix:
-    content: float | bytes
-    location:
-      row: 32
-      column: 10
-    end_location:
-      row: 32
-      column: 48
+    patch:
+      content: float | bytes
+      location:
+        row: 32
+        column: 10
+      end_location:
+        row: 32
+        column: 48
     applied: false
 - kind: UsePEP604Annotation
   location:
@@ -122,12 +129,13 @@ expression: checks
     row: 39
     column: 34
   fix:
-    content: str | int
-    location:
-      row: 39
-      column: 10
-    end_location:
-      row: 39
-      column: 34
+    patch:
+      content: str | int
+      location:
+        row: 39
+        column: 10
+      end_location:
+        row: 39
+        column: 34
     applied: false
 

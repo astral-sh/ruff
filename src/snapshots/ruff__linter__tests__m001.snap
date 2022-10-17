@@ -11,13 +11,14 @@ expression: checks
     row: 9
     column: 18
   fix:
-    content: ""
-    location:
-      row: 9
-      column: 10
-    end_location:
-      row: 9
-      column: 18
+    patch:
+      content: ""
+      location:
+        row: 9
+        column: 10
+      end_location:
+        row: 9
+        column: 18
     applied: false
 - kind:
     UnusedNOQA:
@@ -29,13 +30,14 @@ expression: checks
     row: 13
     column: 24
   fix:
-    content: ""
-    location:
-      row: 13
-      column: 10
-    end_location:
-      row: 13
-      column: 24
+    patch:
+      content: ""
+      location:
+        row: 13
+        column: 10
+      end_location:
+        row: 13
+        column: 24
     applied: false
 - kind:
     UnusedNOQA:
@@ -48,13 +50,14 @@ expression: checks
     row: 16
     column: 30
   fix:
-    content: ""
-    location:
-      row: 16
-      column: 10
-    end_location:
-      row: 16
-      column: 30
+    patch:
+      content: ""
+      location:
+        row: 16
+        column: 10
+      end_location:
+        row: 16
+        column: 30
     applied: false
 - kind:
     UnusedNOQA:
@@ -66,13 +69,14 @@ expression: checks
     row: 19
     column: 30
   fix:
-    content: "  # noqa: F841"
-    location:
-      row: 19
-      column: 10
-    end_location:
-      row: 19
-      column: 30
+    patch:
+      content: "  # noqa: F841"
+      location:
+        row: 19
+        column: 10
+      end_location:
+        row: 19
+        column: 30
     applied: false
 - kind:
     UnusedNOQA:
@@ -84,13 +88,14 @@ expression: checks
     row: 44
     column: 24
   fix:
-    content: "  # noqa: E501"
-    location:
-      row: 44
-      column: 4
-    end_location:
-      row: 44
-      column: 24
+    patch:
+      content: "  # noqa: E501"
+      location:
+        row: 44
+        column: 4
+      end_location:
+        row: 44
+        column: 24
     applied: false
 - kind:
     UnusedNOQA:
@@ -102,13 +107,14 @@ expression: checks
     row: 52
     column: 18
   fix:
-    content: ""
-    location:
-      row: 52
-      column: 4
-    end_location:
-      row: 52
-      column: 18
+    patch:
+      content: ""
+      location:
+        row: 52
+        column: 4
+      end_location:
+        row: 52
+        column: 18
     applied: false
 - kind:
     UnusedNOQA: ~
@@ -119,12 +125,13 @@ expression: checks
     row: 60
     column: 12
   fix:
-    content: ""
-    location:
-      row: 60
-      column: 4
-    end_location:
-      row: 60
-      column: 12
+    patch:
+      content: ""
+      location:
+        row: 60
+        column: 4
+      end_location:
+        row: 60
+        column: 12
     applied: false
 

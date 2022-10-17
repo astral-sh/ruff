@@ -2,8 +2,9 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
+use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckKind, Fix};
+use crate::checks::{Check, CheckKind};
 use crate::code_gen::SourceGenerator;
 
 fn assertion_error(msg: &Option<Box<Expr>>) -> Stmt {
@@ -47,12 +48,11 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: &Optio
             let mut generator = SourceGenerator::new();
             if let Ok(()) = generator.unparse_stmt(&assertion_error(msg)) {
                 if let Ok(content) = generator.generate() {
-                    check.amend(Fix {
+                    check.amend(Fix::replacement(
                         content,
-                        location: stmt.location,
-                        end_location: stmt.end_location.unwrap(),
-                        applied: false,
-                    })
+                        stmt.location,
+                        stmt.end_location.unwrap(),
+                    ));
                 }
             }
         }

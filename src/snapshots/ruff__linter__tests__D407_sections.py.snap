@@ -10,7 +10,16 @@ expression: checks
   end_location:
     row: 47
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    -------\n"
+      location:
+        row: 45
+        column: 1
+      end_location:
+        row: 45
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Returns
   location:
@@ -19,7 +28,16 @@ expression: checks
   end_location:
     row: 58
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    -------\n"
+      location:
+        row: 57
+        column: 1
+      end_location:
+        row: 57
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Raises
   location:
@@ -28,7 +46,16 @@ expression: checks
   end_location:
     row: 221
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    ------\n"
+      location:
+        row: 219
+        column: 1
+      end_location:
+        row: 219
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Returns
   location:
@@ -37,7 +64,16 @@ expression: checks
   end_location:
     row: 262
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    -------\n"
+      location:
+        row: 258
+        column: 1
+      end_location:
+        row: 258
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Raises
   location:
@@ -46,7 +82,16 @@ expression: checks
   end_location:
     row: 262
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    ------\n"
+      location:
+        row: 260
+        column: 1
+      end_location:
+        row: 260
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -55,7 +100,16 @@ expression: checks
   end_location:
     row: 274
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    ----\n"
+      location:
+        row: 272
+        column: 1
+      end_location:
+        row: 272
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -64,7 +118,16 @@ expression: checks
   end_location:
     row: 292
     column: 12
-  fix: ~
+  fix:
+    patch:
+      content: "        ----\n"
+      location:
+        row: 289
+        column: 1
+      end_location:
+        row: 289
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -73,7 +136,16 @@ expression: checks
   end_location:
     row: 306
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    ----\n"
+      location:
+        row: 304
+        column: 1
+      end_location:
+        row: 304
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -82,7 +154,16 @@ expression: checks
   end_location:
     row: 319
     column: 12
-  fix: ~
+  fix:
+    patch:
+      content: "        ----\n"
+      location:
+        row: 316
+        column: 1
+      end_location:
+        row: 316
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -91,7 +172,16 @@ expression: checks
   end_location:
     row: 330
     column: 12
-  fix: ~
+  fix:
+    patch:
+      content: "        ----\n"
+      location:
+        row: 328
+        column: 1
+      end_location:
+        row: 328
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -100,7 +190,16 @@ expression: checks
   end_location:
     row: 343
     column: 12
-  fix: ~
+  fix:
+    patch:
+      content: "        ----\n"
+      location:
+        row: 340
+        column: 1
+      end_location:
+        row: 340
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -109,7 +208,16 @@ expression: checks
   end_location:
     row: 355
     column: 12
-  fix: ~
+  fix:
+    patch:
+      content: "        ----\n"
+      location:
+        row: 353
+        column: 1
+      end_location:
+        row: 353
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -118,7 +226,16 @@ expression: checks
   end_location:
     row: 367
     column: 12
-  fix: ~
+  fix:
+    patch:
+      content: "        ----\n"
+      location:
+        row: 365
+        column: 1
+      end_location:
+        row: 365
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -127,7 +244,16 @@ expression: checks
   end_location:
     row: 382
     column: 12
-  fix: ~
+  fix:
+    patch:
+      content: "        ----\n"
+      location:
+        row: 374
+        column: 1
+      end_location:
+        row: 374
+        column: 1
+    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -136,5 +262,14 @@ expression: checks
   end_location:
     row: 497
     column: 12
-  fix: ~
+  fix:
+    patch:
+      content: "        ----\n"
+      location:
+        row: 495
+        column: 1
+      end_location:
+        row: 495
+        column: 1
+    applied: false
 

@@ -11,13 +11,14 @@ expression: checks
     row: 5
     column: 15
   fix:
-    content: ""
-    location:
-      row: 5
-      column: 8
-    end_location:
-      row: 5
-      column: 16
+    patch:
+      content: ""
+      location:
+        row: 5
+        column: 8
+      end_location:
+        row: 5
+        column: 16
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -28,13 +29,14 @@ expression: checks
     row: 10
     column: 11
   fix:
-    content: ""
-    location:
-      row: 9
-      column: 8
-    end_location:
-      row: 11
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 9
+        column: 8
+      end_location:
+        row: 11
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -45,13 +47,14 @@ expression: checks
     row: 16
     column: 11
   fix:
-    content: ""
-    location:
-      row: 15
-      column: 8
-    end_location:
-      row: 18
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 15
+        column: 8
+      end_location:
+        row: 18
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -62,13 +65,14 @@ expression: checks
     row: 24
     column: 11
   fix:
-    content: ""
-    location:
-      row: 22
-      column: 8
-    end_location:
-      row: 25
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 22
+        column: 8
+      end_location:
+        row: 25
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -79,13 +83,14 @@ expression: checks
     row: 31
     column: 11
   fix:
-    content: ""
-    location:
-      row: 29
-      column: 8
-    end_location:
-      row: 32
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 29
+        column: 8
+      end_location:
+        row: 32
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -96,13 +101,14 @@ expression: checks
     row: 37
     column: 11
   fix:
-    content: ""
-    location:
-      row: 36
-      column: 8
-    end_location:
-      row: 39
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 36
+        column: 8
+      end_location:
+        row: 39
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -113,13 +119,14 @@ expression: checks
     row: 45
     column: 11
   fix:
-    content: ""
-    location:
-      row: 43
-      column: 8
-    end_location:
-      row: 47
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 43
+        column: 8
+      end_location:
+        row: 47
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -130,13 +137,14 @@ expression: checks
     row: 53
     column: 11
   fix:
-    content: ""
-    location:
-      row: 51
-      column: 8
-    end_location:
-      row: 55
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 51
+        column: 8
+      end_location:
+        row: 55
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -147,13 +155,14 @@ expression: checks
     row: 61
     column: 11
   fix:
-    content: ""
-    location:
-      row: 59
-      column: 8
-    end_location:
-      row: 63
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 59
+        column: 8
+      end_location:
+        row: 63
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -164,13 +173,14 @@ expression: checks
     row: 69
     column: 11
   fix:
-    content: ""
-    location:
-      row: 67
-      column: 8
-    end_location:
-      row: 71
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 67
+        column: 8
+      end_location:
+        row: 71
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: B
@@ -181,13 +191,14 @@ expression: checks
     row: 75
     column: 18
   fix:
-    content: ""
-    location:
-      row: 75
-      column: 10
-    end_location:
-      row: 75
-      column: 18
+    patch:
+      content: ""
+      location:
+        row: 75
+        column: 10
+      end_location:
+        row: 75
+        column: 18
     applied: false
 - kind:
     UselessObjectInheritance: B
@@ -198,13 +209,14 @@ expression: checks
     row: 79
     column: 15
   fix:
-    content: ""
-    location:
-      row: 79
-      column: 9
-    end_location:
-      row: 79
-      column: 17
+    patch:
+      content: ""
+      location:
+        row: 79
+        column: 9
+      end_location:
+        row: 79
+        column: 17
     applied: false
 - kind:
     UselessObjectInheritance: B
@@ -215,13 +227,14 @@ expression: checks
     row: 84
     column: 11
   fix:
-    content: ""
-    location:
-      row: 84
-      column: 5
-    end_location:
-      row: 85
-      column: 5
+    patch:
+      content: ""
+      location:
+        row: 84
+        column: 5
+      end_location:
+        row: 85
+        column: 5
     applied: false
 - kind:
     UselessObjectInheritance: B
@@ -232,13 +245,14 @@ expression: checks
     row: 92
     column: 11
   fix:
-    content: ""
-    location:
-      row: 91
-      column: 6
-    end_location:
-      row: 92
-      column: 11
+    patch:
+      content: ""
+      location:
+        row: 91
+        column: 6
+      end_location:
+        row: 92
+        column: 11
     applied: false
 - kind:
     UselessObjectInheritance: B
@@ -249,13 +263,14 @@ expression: checks
     row: 98
     column: 11
   fix:
-    content: ""
-    location:
-      row: 98
-      column: 5
-    end_location:
-      row: 100
-      column: 5
+    patch:
+      content: ""
+      location:
+        row: 98
+        column: 5
+      end_location:
+        row: 100
+        column: 5
     applied: false
 - kind:
     UselessObjectInheritance: B
@@ -266,13 +281,14 @@ expression: checks
     row: 108
     column: 11
   fix:
-    content: ""
-    location:
-      row: 107
-      column: 6
-    end_location:
-      row: 108
-      column: 11
+    patch:
+      content: ""
+      location:
+        row: 107
+        column: 6
+      end_location:
+        row: 108
+        column: 11
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -283,13 +299,14 @@ expression: checks
     row: 114
     column: 19
   fix:
-    content: ""
-    location:
-      row: 114
-      column: 12
-    end_location:
-      row: 114
-      column: 20
+    patch:
+      content: ""
+      location:
+        row: 114
+        column: 12
+      end_location:
+        row: 114
+        column: 20
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -300,13 +317,14 @@ expression: checks
     row: 119
     column: 11
   fix:
-    content: ""
-    location:
-      row: 118
-      column: 8
-    end_location:
-      row: 120
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 118
+        column: 8
+      end_location:
+        row: 120
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -317,13 +335,14 @@ expression: checks
     row: 125
     column: 11
   fix:
-    content: ""
-    location:
-      row: 124
-      column: 8
-    end_location:
-      row: 126
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 124
+        column: 8
+      end_location:
+        row: 126
+        column: 2
     applied: false
 - kind:
     UselessObjectInheritance: A
@@ -334,12 +353,13 @@ expression: checks
     row: 131
     column: 11
   fix:
-    content: ""
-    location:
-      row: 130
-      column: 8
-    end_location:
-      row: 133
-      column: 2
+    patch:
+      content: ""
+      location:
+        row: 130
+        column: 8
+      end_location:
+        row: 133
+        column: 2
     applied: false
 

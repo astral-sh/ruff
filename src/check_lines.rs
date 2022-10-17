@@ -4,7 +4,8 @@ use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
-use crate::checks::{Check, CheckCode, CheckKind, Fix};
+use crate::autofix::Fix;
+use crate::checks::{Check, CheckCode, CheckKind};
 use crate::noqa;
 use crate::noqa::Directive;
 use crate::settings::Settings;
@@ -166,15 +167,10 @@ pub fn check_lines(
                             },
                         );
                         if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                            check.amend(Fix {
-                                content: "".to_string(),
-                                location: Location::new(row + 1, start + 1),
-                                end_location: Location::new(
-                                    row + 1,
-                                    lines[row].chars().count() + 1,
-                                ),
-                                applied: false,
-                            });
+                            check.amend(Fix::deletion(
+                                Location::new(row + 1, start + 1),
+                                Location::new(row + 1, lines[row].chars().count() + 1),
+                            ));
                         }
                         line_checks.push(check);
                     }
@@ -200,25 +196,16 @@ pub fn check_lines(
                         );
                         if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                             if valid_codes.is_empty() {
-                                check.amend(Fix {
-                                    content: "".to_string(),
-                                    location: Location::new(row + 1, start + 1),
-                                    end_location: Location::new(
-                                        row + 1,
-                                        lines[row].chars().count() + 1,
-                                    ),
-                                    applied: false,
-                                });
+                                check.amend(Fix::deletion(
+                                    Location::new(row + 1, start + 1),
+                                    Location::new(row + 1, lines[row].chars().count() + 1),
+                                ));
                             } else {
-                                check.amend(Fix {
-                                    content: format!("  # noqa: {}", valid_codes.join(", ")),
-                                    location: Location::new(row + 1, start + 1),
-                                    end_location: Location::new(
-                                        row + 1,
-                                        lines[row].chars().count() + 1,
-                                    ),
-                                    applied: false,
-                                });
+                                check.amend(Fix::replacement(
+                                    format!("  # noqa: {}", valid_codes.join(", ")),
+                                    Location::new(row + 1, start + 1),
+                                    Location::new(row + 1, lines[row].chars().count() + 1),
+                                ));
                             }
                         }
                         line_checks.push(check);

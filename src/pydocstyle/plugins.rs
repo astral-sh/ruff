@@ -8,8 +8,9 @@ use titlecase::titlecase;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
+use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind, Fix};
+use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::docstrings::helpers;
 use crate::docstrings::sections::{section_contexts, SectionContext};
@@ -180,6 +181,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                             Range::from_located(docstring),
                         );
                         if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            // Delete the blank line before the docstring.
                             check.amend(Fix::deletion(
                                 Location::new(docstring.location.row() - blank_lines_before, 1),
                                 Location::new(docstring.location.row(), 1),
@@ -217,6 +219,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                             Range::from_located(docstring),
                         );
                         if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            // Delete the blank line after the docstring.
                             check.amend(Fix::deletion(
                                 Location::new(
                                     docstring.location.row() + 1 + expected_blank_lines_after,
@@ -266,6 +269,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                             );
                             if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
                             {
+                                // Delete the blank line before the class.
                                 check.amend(Fix::deletion(
                                     Location::new(docstring.location.row() - blank_lines_before, 1),
                                     Location::new(docstring.location.row(), 1),
@@ -282,6 +286,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                             );
                             if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
                             {
+                                // Insert one blank line before the class.
                                 check.amend(Fix::replacement(
                                     "\n".to_string(),
                                     Location::new(docstring.location.row() - blank_lines_before, 1),
@@ -313,6 +318,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                             Range::from_located(docstring),
                         );
                         if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            // Insert a blank line before the class (replacing any existing lines).
                             check.amend(Fix::replacement(
                                 "\n".to_string(),
                                 Location::new(docstring.end_location.unwrap().row() + 1, 1),
@@ -350,10 +356,11 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
             }
             if lines_count > 1 && blanks_count != 1 {
                 let mut check = Check::new(
-                    CheckKind::NoBlankLineAfterSummary,
+                    CheckKind::BlankLineAfterSummary,
                     Range::from_located(docstring),
                 );
                 if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    // Insert one blank line after the summary (replacing any existing lines).
                     check.amend(Fix::replacement(
                         "\n".to_string(),
                         Location::new(docstring.location.row() + 1, 1),
@@ -845,10 +852,22 @@ fn blanks_and_section_underline(
     // Nothing but blank lines after the section header.
     if blank_lines_after_header == context.following_lines.len() {
         if checker.settings.enabled.contains(&CheckCode::D407) {
-            checker.add_check(Check::new(
+            let mut check = Check::new(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring),
-            ));
+            );
+            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                // Add a dashed line (of the appropriate length) under the section header.
+                let mut content = "".to_string();
+                content.push_str(helpers::indentation(checker, docstring));
+                content.push_str(&"-".repeat(context.section_name.len()));
+                content.push('\n');
+                check.amend(Fix::insertion(
+                    content,
+                    Location::new(docstring.location.row() + context.original_index + 1, 1),
+                ));
+            }
+            checker.add_check(check);
         }
         if checker.settings.enabled.contains(&CheckCode::D414) {
             checker.add_check(Check::new(
@@ -866,28 +885,68 @@ fn blanks_and_section_underline(
 
     if !dash_line_found {
         if checker.settings.enabled.contains(&CheckCode::D407) {
-            checker.add_check(Check::new(
+            let mut check = Check::new(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring),
-            ));
+            );
+            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                // Add a dashed line (of the appropriate length) under the section header.
+                let mut content = "".to_string();
+                content.push_str(helpers::indentation(checker, docstring));
+                content.push_str(&"-".repeat(context.section_name.len()));
+                content.push('\n');
+                check.amend(Fix::insertion(
+                    content,
+                    Location::new(docstring.location.row() + context.original_index + 1, 1),
+                ));
+            }
+            checker.add_check(check);
         }
         if blank_lines_after_header > 0 {
-            if checker.settings.enabled.contains(&CheckCode::D212) {
-                checker.add_check(Check::new(
+            if checker.settings.enabled.contains(&CheckCode::D412) {
+                let mut check = Check::new(
                     CheckKind::NoBlankLinesBetweenHeaderAndContent(
                         context.section_name.to_string(),
                     ),
                     Range::from_located(docstring),
-                ));
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    // Delete any blank lines between the header and content.
+                    check.amend(Fix::deletion(
+                        Location::new(docstring.location.row() + context.original_index + 1, 1),
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + blank_lines_after_header,
+                            1,
+                        ),
+                    ));
+                }
+                checker.add_check(check);
             }
         }
     } else {
         if blank_lines_after_header > 0 {
             if checker.settings.enabled.contains(&CheckCode::D408) {
-                checker.add_check(Check::new(
+                let mut check = Check::new(
                     CheckKind::SectionUnderlineAfterName(context.section_name.to_string()),
                     Range::from_located(docstring),
-                ));
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    // Delete any blank lines between the header and the underline.
+                    check.amend(Fix::deletion(
+                        Location::new(docstring.location.row() + context.original_index + 1, 1),
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + blank_lines_after_header,
+                            1,
+                        ),
+                    ));
+                }
+                checker.add_check(check);
             }
         }
 
@@ -899,23 +958,70 @@ fn blanks_and_section_underline(
             != context.section_name.len()
         {
             if checker.settings.enabled.contains(&CheckCode::D409) {
-                checker.add_check(Check::new(
+                let mut check = Check::new(
                     CheckKind::SectionUnderlineMatchesSectionLength(
                         context.section_name.to_string(),
                     ),
                     Range::from_located(docstring),
-                ));
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    // Replace the existing underline with a line of the appropriate length.
+                    let mut content = "".to_string();
+                    content.push_str(helpers::indentation(checker, docstring));
+                    content.push_str(&"-".repeat(context.section_name.len()));
+                    content.push('\n');
+                    check.amend(Fix::replacement(
+                        content,
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + blank_lines_after_header,
+                            1,
+                        ),
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + blank_lines_after_header
+                                + 1,
+                            1,
+                        ),
+                    ));
+                };
+                checker.add_check(check);
             }
         }
 
         if checker.settings.enabled.contains(&CheckCode::D215) {
-            if helpers::leading_space(non_empty_line).len()
-                > helpers::indentation(checker, docstring).len()
-            {
-                checker.add_check(Check::new(
+            let leading_space = helpers::leading_space(non_empty_line);
+            let indentation = helpers::indentation(checker, docstring).to_string();
+            if leading_space.len() > indentation.len() {
+                let mut check = Check::new(
                     CheckKind::SectionUnderlineNotOverIndented(context.section_name.to_string()),
                     Range::from_located(docstring),
-                ));
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    // Replace the existing indentation with whitespace of the appropriate length.
+                    check.amend(Fix::replacement(
+                        indentation,
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + blank_lines_after_header,
+                            1,
+                        ),
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + blank_lines_after_header,
+                            1 + leading_space.len(),
+                        ),
+                    ));
+                };
+                checker.add_check(check);
             }
         }
 
@@ -925,7 +1031,11 @@ fn blanks_and_section_underline(
             let line_after_dashes = context.following_lines[line_after_dashes_index];
             if line_after_dashes.trim().is_empty() {
                 let rest_of_lines = &context.following_lines[line_after_dashes_index..];
-                if rest_of_lines.iter().all(|line| line.trim().is_empty()) {
+                let blank_lines_after_dashes = rest_of_lines
+                    .iter()
+                    .take_while(|line| line.trim().is_empty())
+                    .count();
+                if blank_lines_after_dashes == rest_of_lines.len() {
                     if checker.settings.enabled.contains(&CheckCode::D414) {
                         checker.add_check(Check::new(
                             CheckKind::NonEmptySection(context.section_name.to_string()),
@@ -934,12 +1044,33 @@ fn blanks_and_section_underline(
                     }
                 } else {
                     if checker.settings.enabled.contains(&CheckCode::D412) {
-                        checker.add_check(Check::new(
+                        let mut check = Check::new(
                             CheckKind::NoBlankLinesBetweenHeaderAndContent(
                                 context.section_name.to_string(),
                             ),
                             Range::from_located(docstring),
-                        ));
+                        );
+                        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            // Delete any blank lines between the header and content.
+                            check.amend(Fix::deletion(
+                                Location::new(
+                                    docstring.location.row()
+                                        + context.original_index
+                                        + 1
+                                        + line_after_dashes_index,
+                                    1,
+                                ),
+                                Location::new(
+                                    docstring.location.row()
+                                        + context.original_index
+                                        + 1
+                                        + line_after_dashes_index
+                                        + blank_lines_after_dashes,
+                                    1,
+                                ),
+                            ));
+                        }
+                        checker.add_check(check);
                     }
                 }
             }
@@ -1003,6 +1134,7 @@ fn common_section(
                     Range::from_located(docstring),
                 );
                 if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    // Add a newline after the section.
                     check.amend(Fix::insertion(
                         "\n".to_string(),
                         Location::new(
@@ -1023,6 +1155,7 @@ fn common_section(
                     Range::from_located(docstring),
                 );
                 if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    // Add a newline after the section.
                     check.amend(Fix::insertion(
                         "\n".to_string(),
                         Location::new(
@@ -1032,7 +1165,7 @@ fn common_section(
                                 + context.following_lines.len(),
                             1,
                         ),
-                    ))
+                    ));
                 }
                 checker.add_check(check);
             }
@@ -1041,10 +1174,18 @@ fn common_section(
 
     if checker.settings.enabled.contains(&CheckCode::D411) {
         if !context.previous_line.is_empty() {
-            checker.add_check(Check::new(
+            let mut check = Check::new(
                 CheckKind::BlankLineBeforeSection(context.section_name.to_string()),
                 Range::from_located(docstring),
-            ))
+            );
+            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                // Add a blank line before the section.
+                check.amend(Fix::insertion(
+                    "\n".to_string(),
+                    Location::new(docstring.location.row() + context.original_index, 1),
+                ));
+            }
+            checker.add_check(check)
         }
     }
 

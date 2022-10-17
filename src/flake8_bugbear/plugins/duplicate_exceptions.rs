@@ -6,8 +6,9 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKi
 use crate::ast::helpers;
 use crate::ast::types::{CheckLocator, Range};
 use crate::autofix::fixer;
+use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind, Fix};
+use crate::checks::{Check, CheckCode, CheckKind};
 use crate::code_gen::SourceGenerator;
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
@@ -54,12 +55,11 @@ pub fn duplicate_handler_exceptions(
                 let mut generator = SourceGenerator::new();
                 if let Ok(()) = generator.unparse_expr(&type_pattern(unique_elts), 0) {
                     if let Ok(content) = generator.generate() {
-                        check.amend(Fix {
+                        check.amend(Fix::replacement(
                             content,
-                            location: expr.location,
-                            end_location: expr.end_location.unwrap(),
-                            applied: false,
-                        })
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ))
                     }
                 }
             }

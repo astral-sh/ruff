@@ -11,13 +11,14 @@ expression: checks
     row: 1
     column: 9
   fix:
-    content: str
-    location:
-      row: 1
-      column: 1
-    end_location:
-      row: 1
-      column: 9
+    patch:
+      content: str
+      location:
+        row: 1
+        column: 1
+      end_location:
+        row: 1
+        column: 9
     applied: false
 - kind:
     TypeOfPrimitive: Bytes
@@ -28,13 +29,14 @@ expression: checks
     row: 2
     column: 10
   fix:
-    content: bytes
-    location:
-      row: 2
-      column: 1
-    end_location:
-      row: 2
-      column: 10
+    patch:
+      content: bytes
+      location:
+        row: 2
+        column: 1
+      end_location:
+        row: 2
+        column: 10
     applied: false
 - kind:
     TypeOfPrimitive: Int
@@ -45,13 +47,14 @@ expression: checks
     row: 3
     column: 8
   fix:
-    content: int
-    location:
-      row: 3
-      column: 1
-    end_location:
-      row: 3
-      column: 8
+    patch:
+      content: int
+      location:
+        row: 3
+        column: 1
+      end_location:
+        row: 3
+        column: 8
     applied: false
 - kind:
     TypeOfPrimitive: Float
@@ -62,13 +65,14 @@ expression: checks
     row: 4
     column: 9
   fix:
-    content: float
-    location:
-      row: 4
-      column: 1
-    end_location:
-      row: 4
-      column: 9
+    patch:
+      content: float
+      location:
+        row: 4
+        column: 1
+      end_location:
+        row: 4
+        column: 9
     applied: false
 - kind:
     TypeOfPrimitive: Complex
@@ -79,12 +83,13 @@ expression: checks
     row: 5
     column: 9
   fix:
-    content: complex
-    location:
-      row: 5
-      column: 1
-    end_location:
-      row: 5
-      column: 9
+    patch:
+      content: complex
+      location:
+        row: 5
+        column: 1
+      end_location:
+        row: 5
+        column: 9
     applied: false
 

@@ -13,13 +13,14 @@ expression: checks
     row: 6
     column: 26
   fix:
-    content: self.assertEqual
-    location:
-      row: 6
-      column: 9
-    end_location:
-      row: 6
-      column: 26
+    patch:
+      content: self.assertEqual
+      location:
+        row: 6
+        column: 9
+      end_location:
+        row: 6
+        column: 26
     applied: false
 - kind:
     DeprecatedUnittestAlias:
@@ -32,13 +33,14 @@ expression: checks
     row: 7
     column: 26
   fix:
-    content: self.assertEqual
-    location:
-      row: 7
-      column: 9
-    end_location:
-      row: 7
-      column: 26
+    patch:
+      content: self.assertEqual
+      location:
+        row: 7
+        column: 9
+      end_location:
+        row: 7
+        column: 26
     applied: false
 - kind:
     DeprecatedUnittestAlias:
@@ -51,13 +53,14 @@ expression: checks
     row: 9
     column: 35
   fix:
-    content: self.assertAlmostEqual
-    location:
-      row: 9
-      column: 9
-    end_location:
-      row: 9
-      column: 35
+    patch:
+      content: self.assertAlmostEqual
+      location:
+        row: 9
+        column: 9
+      end_location:
+        row: 9
+        column: 35
     applied: false
 - kind:
     DeprecatedUnittestAlias:
@@ -70,12 +73,13 @@ expression: checks
     row: 10
     column: 36
   fix:
-    content: self.assertNotRegex
-    location:
-      row: 10
-      column: 9
-    end_location:
-      row: 10
-      column: 36
+    patch:
+      content: self.assertNotRegex
+      location:
+        row: 10
+        column: 9
+      end_location:
+        row: 10
+        column: 36
     applied: false
 

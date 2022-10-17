@@ -10,7 +10,16 @@ expression: checks
   end_location:
     row: 78
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "\n"
+      location:
+        row: 71
+        column: 1
+      end_location:
+        row: 71
+        column: 1
+    applied: false
 - kind:
     BlankLineBeforeSection: Returns
   location:
@@ -19,7 +28,16 @@ expression: checks
   end_location:
     row: 129
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "\n"
+      location:
+        row: 125
+        column: 1
+      end_location:
+        row: 125
+        column: 1
+    applied: false
 - kind:
     BlankLineBeforeSection: Raises
   location:
@@ -28,5 +46,14 @@ expression: checks
   end_location:
     row: 221
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "\n"
+      location:
+        row: 218
+        column: 1
+      end_location:
+        row: 218
+        column: 1
+    applied: false
 
