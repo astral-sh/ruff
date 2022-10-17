@@ -8,9 +8,9 @@ use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind, Fix};
-use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::docstrings::helpers;
-use crate::docstrings::styles::SectionStyle;
+use crate::pydocstyle::definition::{Definition, DefinitionKind};
+use crate::pydocstyle::helpers;
+use crate::pydocstyle::styles::SectionStyle;
 use crate::visibility::is_static;
 
 #[derive(Debug)]

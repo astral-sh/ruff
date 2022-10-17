@@ -20,12 +20,12 @@ use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{checkers, helpers, operations, visitor};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
+use crate::pydocstyle::definition::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::settings::{PythonVersion, Settings};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
-use crate::{docstrings, plugins, pyupgrade};
+use crate::{plugins, pydocstyle, pyupgrade};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
@@ -591,7 +591,7 @@ where
         let prev_visible_scope = self.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
-                let definition = docstrings::extraction::extract(
+                let definition = pydocstyle::extraction::extract(
                     &self.visible_scope,
                     stmt,
                     body,
@@ -609,7 +609,7 @@ where
                 ));
             }
             StmtKind::ClassDef { body, .. } => {
-                let definition = docstrings::extraction::extract(
+                let definition = pydocstyle::extraction::extract(
                     &self.visible_scope,
                     stmt,
                     body,
@@ -1707,7 +1707,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let docstring = docstrings::extraction::docstring_from(python_ast);
+        let docstring = pydocstyle::extraction::docstring_from(python_ast);
         self.docstrings.push((
             Definition {
                 kind: if self.path.ends_with("__init__.py") {
@@ -1948,66 +1948,66 @@ impl<'a> Checker<'a> {
 
     fn check_docstrings(&mut self) {
         while let Some((docstring, visibility)) = self.docstrings.pop() {
-            if !docstrings::plugins::not_empty(self, &docstring) {
+            if !pydocstyle::plugins::not_empty(self, &docstring) {
                 continue;
             }
-            if !docstrings::plugins::not_missing(self, &docstring, &visibility) {
+            if !pydocstyle::plugins::not_missing(self, &docstring, &visibility) {
                 continue;
             }
             if self.settings.enabled.contains(&CheckCode::D200) {
-                docstrings::plugins::one_liner(self, &docstring);
+                pydocstyle::plugins::one_liner(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D201)
                 || self.settings.enabled.contains(&CheckCode::D202)
             {
-                docstrings::plugins::blank_before_after_function(self, &docstring);
+                pydocstyle::plugins::blank_before_after_function(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D203)
                 || self.settings.enabled.contains(&CheckCode::D204)
                 || self.settings.enabled.contains(&CheckCode::D211)
             {
-                docstrings::plugins::blank_before_after_class(self, &docstring);
+                pydocstyle::plugins::blank_before_after_class(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D205) {
-                docstrings::plugins::blank_after_summary(self, &docstring);
+                pydocstyle::plugins::blank_after_summary(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D206)
                 || self.settings.enabled.contains(&CheckCode::D207)
                 || self.settings.enabled.contains(&CheckCode::D208)
             {
-                docstrings::plugins::indent(self, &docstring);
+                pydocstyle::plugins::indent(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D209) {
-                docstrings::plugins::newline_after_last_paragraph(self, &docstring);
+                pydocstyle::plugins::newline_after_last_paragraph(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D210) {
-                docstrings::plugins::no_surrounding_whitespace(self, &docstring);
+                pydocstyle::plugins::no_surrounding_whitespace(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D212)
                 || self.settings.enabled.contains(&CheckCode::D213)
             {
-                docstrings::plugins::multi_line_summary_start(self, &docstring);
+                pydocstyle::plugins::multi_line_summary_start(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D300) {
-                docstrings::plugins::triple_quotes(self, &docstring);
+                pydocstyle::plugins::triple_quotes(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D400) {
-                docstrings::plugins::ends_with_period(self, &docstring);
+                pydocstyle::plugins::ends_with_period(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D402) {
-                docstrings::plugins::no_signature(self, &docstring);
+                pydocstyle::plugins::no_signature(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D403) {
-                docstrings::plugins::capitalized(self, &docstring);
+                pydocstyle::plugins::capitalized(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D404) {
-                docstrings::plugins::starts_with_this(self, &docstring);
+                pydocstyle::plugins::starts_with_this(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D415) {
-                docstrings::plugins::ends_with_punctuation(self, &docstring);
+                pydocstyle::plugins::ends_with_punctuation(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D418) {
-                docstrings::plugins::if_needed(self, &docstring);
+                pydocstyle::plugins::if_needed(self, &docstring);
             }
             if self.settings.enabled.contains(&CheckCode::D212)
                 || self.settings.enabled.contains(&CheckCode::D214)
@@ -2025,7 +2025,7 @@ impl<'a> Checker<'a> {
                 || self.settings.enabled.contains(&CheckCode::D416)
                 || self.settings.enabled.contains(&CheckCode::D417)
             {
-                docstrings::plugins::sections(self, &docstring);
+                pydocstyle::plugins::sections(self, &docstring);
             }
         }
     }

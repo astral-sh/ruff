@@ -8,14 +8,14 @@ use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind, Fix};
-use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::docstrings::google::check_google_section;
-use crate::docstrings::helpers::{
+use crate::pydocstyle::definition::{Definition, DefinitionKind};
+use crate::pydocstyle::google::check_google_section;
+use crate::pydocstyle::helpers::{
     indentation, leading_space, SINGLE_QUOTE_PREFIXES, TRIPLE_QUOTE_PREFIXES,
 };
-use crate::docstrings::numpy::check_numpy_section;
-use crate::docstrings::sections::section_contexts;
-use crate::docstrings::styles::SectionStyle;
+use crate::pydocstyle::numpy::check_numpy_section;
+use crate::pydocstyle::sections::section_contexts;
+use crate::pydocstyle::styles::SectionStyle;
 use crate::visibility::{is_init, is_magic, is_overload, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107

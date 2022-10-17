@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 
 use once_cell::sync::Lazy;
 
-use crate::docstrings::google::{GOOGLE_SECTION_NAMES, LOWERCASE_GOOGLE_SECTION_NAMES};
-use crate::docstrings::numpy::{LOWERCASE_NUMPY_SECTION_NAMES, NUMPY_SECTION_NAMES};
+use crate::pydocstyle::google::{GOOGLE_SECTION_NAMES, LOWERCASE_GOOGLE_SECTION_NAMES};
+use crate::pydocstyle::numpy::{LOWERCASE_NUMPY_SECTION_NAMES, NUMPY_SECTION_NAMES};
 
 pub(crate) enum SectionStyle {
     NumPy,

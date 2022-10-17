@@ -8,10 +8,10 @@ use regex::Regex;
 
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::docstrings::definition::Definition;
-use crate::docstrings::sections;
-use crate::docstrings::sections::SectionContext;
-use crate::docstrings::styles::SectionStyle;
+use crate::pydocstyle::definition::Definition;
+use crate::pydocstyle::sections;
+use crate::pydocstyle::sections::SectionContext;
+use crate::pydocstyle::styles::SectionStyle;
 
 pub(crate) static GOOGLE_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
     BTreeSet::from([
