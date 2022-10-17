@@ -6,12 +6,12 @@ expression: parse_ast
     Located {
         location: Location {
             row: 1,
-            column: 1,
+            column: 0,
         },
         end_location: Some(
             Location {
                 row: 1,
-                column: 19,
+                column: 18,
             },
         ),
         custom: (),
@@ -19,12 +19,12 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 1,
+                    column: 0,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 19,
+                        column: 18,
                     },
                 ),
                 custom: (),
@@ -35,12 +35,12 @@ expression: parse_ast
                             Located {
                                 location: Location {
                                     row: 1,
-                                    column: 8,
+                                    column: 7,
                                 },
                                 end_location: Some(
                                     Location {
                                         row: 1,
-                                        column: 9,
+                                        column: 8,
                                     },
                                 ),
                                 custom: (),
@@ -53,12 +53,12 @@ expression: parse_ast
                             Located {
                                 location: Location {
                                     row: 1,
-                                    column: 11,
+                                    column: 10,
                                 },
                                 end_location: Some(
                                     Location {
                                         row: 1,
-                                        column: 12,
+                                        column: 11,
                                     },
                                 ),
                                 custom: (),
@@ -78,12 +78,12 @@ expression: parse_ast
                     body: Located {
                         location: Location {
                             row: 1,
-                            column: 16,
+                            column: 15,
                         },
                         end_location: Some(
                             Location {
                                 row: 1,
-                                column: 19,
+                                column: 18,
                             },
                         ),
                         custom: (),
@@ -91,12 +91,12 @@ expression: parse_ast
                             left: Located {
                                 location: Location {
                                     row: 1,
-                                    column: 14,
+                                    column: 13,
                                 },
                                 end_location: Some(
                                     Location {
                                         row: 1,
-                                        column: 15,
+                                        column: 14,
                                     },
                                 ),
                                 custom: (),
@@ -109,12 +109,12 @@ expression: parse_ast
                             right: Located {
                                 location: Location {
                                     row: 1,
-                                    column: 18,
+                                    column: 17,
                                 },
                                 end_location: Some(
                                     Location {
                                         row: 1,
-                                        column: 19,
+                                        column: 18,
                                     },
                                 ),
                                 custom: (),

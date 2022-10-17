@@ -19,12 +19,12 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 2,
+                    column: 1,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 5,
+                        column: 4,
                     },
                 ),
                 custom: (),

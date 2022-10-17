@@ -6,12 +6,12 @@ expression: parse_ast
     Located {
         location: Location {
             row: 1,
-            column: 1,
+            column: 0,
         },
         end_location: Some(
             Location {
                 row: 1,
-                column: 17,
+                column: 16,
             },
         ),
         custom: (),
@@ -20,12 +20,12 @@ expression: parse_ast
                 Located {
                     location: Location {
                         row: 1,
-                        column: 1,
+                        column: 0,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 5,
+                            column: 4,
                         },
                     ),
                     custom: (),
@@ -33,12 +33,12 @@ expression: parse_ast
                         value: Located {
                             location: Location {
                                 row: 1,
-                                column: 1,
+                                column: 0,
                             },
                             end_location: Some(
                                 Location {
                                     row: 1,
-                                    column: 2,
+                                    column: 1,
                                 },
                             ),
                             custom: (),
@@ -50,12 +50,12 @@ expression: parse_ast
                         slice: Located {
                             location: Location {
                                 row: 1,
-                                column: 3,
+                                column: 2,
                             },
                             end_location: Some(
                                 Location {
                                     row: 1,
-                                    column: 4,
+                                    column: 3,
                                 },
                             ),
                             custom: (),
@@ -71,12 +71,12 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 9,
+                    column: 8,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 16,
+                        column: 15,
                     },
                 ),
                 custom: (),
@@ -85,12 +85,12 @@ expression: parse_ast
                         Located {
                             location: Location {
                                 row: 1,
-                                column: 9,
+                                column: 8,
                             },
                             end_location: Some(
                                 Location {
                                     row: 1,
-                                    column: 10,
+                                    column: 9,
                                 },
                             ),
                             custom: (),
@@ -104,12 +104,12 @@ expression: parse_ast
                         Located {
                             location: Location {
                                 row: 1,
-                                column: 12,
+                                column: 11,
                             },
                             end_location: Some(
                                 Location {
                                     row: 1,
-                                    column: 13,
+                                    column: 12,
                                 },
                             ),
                             custom: (),
@@ -123,12 +123,12 @@ expression: parse_ast
                         Located {
                             location: Location {
                                 row: 1,
-                                column: 15,
+                                column: 14,
                             },
                             end_location: Some(
                                 Location {
                                     row: 1,
-                                    column: 16,
+                                    column: 15,
                                 },
                             ),
                             custom: (),

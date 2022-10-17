@@ -6,7 +6,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
     Located {
         location: Location {
             row: 1,
-            column: 1,
+            column: 0,
         },
         end_location: Some(
             Location {
@@ -21,12 +21,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                 Located {
                     location: Location {
                         row: 1,
-                        column: 11,
+                        column: 10,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 12,
+                            column: 11,
                         },
                     ),
                     custom: (),
@@ -38,12 +38,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                 Located {
                     location: Location {
                         row: 1,
-                        column: 14,
+                        column: 13,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 15,
+                            column: 14,
                         },
                     ),
                     custom: (),

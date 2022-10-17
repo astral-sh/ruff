@@ -5,12 +5,12 @@ expression: parse_ast
 Located {
     location: Location {
         row: 1,
-        column: 1,
+        column: 0,
     },
     end_location: Some(
         Location {
             row: 1,
-            column: 20,
+            column: 19,
         },
     ),
     custom: (),
@@ -18,12 +18,12 @@ Located {
         key: Located {
             location: Location {
                 row: 1,
-                column: 2,
+                column: 1,
             },
             end_location: Some(
                 Location {
                     row: 1,
-                    column: 4,
+                    column: 3,
                 },
             ),
             custom: (),
@@ -35,12 +35,12 @@ Located {
         value: Located {
             location: Location {
                 row: 1,
-                column: 6,
+                column: 5,
             },
             end_location: Some(
                 Location {
                     row: 1,
-                    column: 8,
+                    column: 7,
                 },
             ),
             custom: (),
@@ -54,12 +54,12 @@ Located {
                 target: Located {
                     location: Location {
                         row: 1,
-                        column: 13,
+                        column: 12,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 14,
+                            column: 13,
                         },
                     ),
                     custom: (),
@@ -71,12 +71,12 @@ Located {
                 iter: Located {
                     location: Location {
                         row: 1,
-                        column: 18,
+                        column: 17,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 19,
+                            column: 18,
                         },
                     ),
                     custom: (),

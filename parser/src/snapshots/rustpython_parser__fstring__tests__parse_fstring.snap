@@ -19,12 +19,12 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 2,
+                    column: 1,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 3,
+                        column: 2,
                     },
                 ),
                 custom: (),
@@ -53,12 +53,12 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 3,
+                    column: 2,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 4,
+                        column: 3,
                     },
                 ),
                 custom: (),
