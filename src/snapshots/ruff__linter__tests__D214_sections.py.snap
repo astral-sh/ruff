@@ -10,5 +10,14 @@ expression: checks
   end_location:
     row: 141
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 137
+        column: 1
+      end_location:
+        row: 137
+        column: 9
+    applied: false
 

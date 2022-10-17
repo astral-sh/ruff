@@ -303,15 +303,15 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D211 | NoBlankLineBeforeClass | No blank lines allowed before class docstring | 🛠 |
 | D212 | MultiLineSummaryFirstLine | Multi-line docstring summary should start at the first line |  |
 | D213 | MultiLineSummarySecondLine | Multi-line docstring summary should start at the second line |  |
-| D214 | SectionNotOverIndented | Section is over-indented ("Returns") |  |
+| D214 | SectionNotOverIndented | Section is over-indented ("Returns") | 🛠 |
 | D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("Returns") | 🛠 |
 | D300 | UsesTripleQuotes | Use """triple double quotes""" |  |
 | D400 | EndsInPeriod | First line should end with a period |  |
 | D402 | NoSignature | First line should not be the function's 'signature' |  |
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |
 | D404 | NoThisPrefix | First word of the docstring should not be `This` |  |
-| D405 | CapitalizeSectionName | Section name should be properly capitalized ("returns") |  |
-| D406 | NewLineAfterSectionName | Section name should end with a newline ("Returns") |  |
+| D405 | CapitalizeSectionName | Section name should be properly capitalized ("returns") | 🛠 |
+| D406 | NewLineAfterSectionName | Section name should end with a newline ("Returns") | 🛠 |
 | D407 | DashedUnderlineAfterSection | Missing dashed underline after section ("Returns") | 🛠 |
 | D408 | SectionUnderlineAfterName | Section underline should be in the line following the section's name ("Returns") |  |
 | D409 | SectionUnderlineMatchesSectionLength | Section underline should match the length of its name ("Returns") | 🛠 |
@@ -321,7 +321,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D413 | BlankLineAfterLastSection | Missing blank line after last section ("Returns") | 🛠 |
 | D414 | NonEmptySection | Section has no content ("Returns") |  |
 | D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |
-| D416 | SectionNameEndsInColon | Section name should end with a colon ("Returns") |  |
+| D416 | SectionNameEndsInColon | Section name should end with a colon ("Returns") | 🛠 |
 | D417 | DocumentAllArguments | Missing argument descriptions in the docstring: `x`, `y` |  |
 | D418 | SkipDocstring | Function decorated with @overload shouldn't contain a docstring |  |
 | D419 | NonEmpty | Docstring is empty |  |
@@ -398,6 +398,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | M001 | UnusedNOQA | Unused `noqa` directive | 🛠 |
+
 
 ## Editor Integrations
 

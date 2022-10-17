@@ -10,7 +10,16 @@ expression: checks
   end_location:
     row: 36
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 32
+        column: 12
+      end_location:
+        row: 32
+        column: 13
+    applied: false
 - kind:
     NewLineAfterSectionName: Raises
   location:
@@ -19,7 +28,16 @@ expression: checks
   end_location:
     row: 221
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 218
+        column: 11
+      end_location:
+        row: 218
+        column: 12
+    applied: false
 - kind:
     NewLineAfterSectionName: Returns
   location:
@@ -28,7 +46,16 @@ expression: checks
   end_location:
     row: 262
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 257
+        column: 12
+      end_location:
+        row: 257
+        column: 13
+    applied: false
 - kind:
     NewLineAfterSectionName: Raises
   location:
@@ -37,5 +64,14 @@ expression: checks
   end_location:
     row: 262
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 259
+        column: 11
+      end_location:
+        row: 259
+        column: 12
+    applied: false
 
