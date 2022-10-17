@@ -22,7 +22,7 @@ An extremely fast Python linter, written in Rust.
 - 📦 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache support
 - 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix)-inspired autofix support (e.g., automatically remove unused imports)
 - 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` support, for continuous file monitoring
-- ⚖️ [Near-parity](#Parity-with-Flake8) with the built-in Flake8 rule set
+- ⚖️ [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
 - 🔌 Native re-implementations of popular Flake8 plugins, like [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) ([`pydocstyle`](https://pypi.org/project/pydocstyle/))
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
