@@ -1208,11 +1208,13 @@ impl CheckKind {
                 | CheckKind::BlankLineAfterSection(_)
                 | CheckKind::BlankLineAfterSummary
                 | CheckKind::BlankLineBeforeSection(_)
+                | CheckKind::CapitalizeSectionName(_)
                 | CheckKind::DashedUnderlineAfterSection(_)
                 | CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DuplicateHandlerException(_)
                 | CheckKind::NewLineAfterLastParagraph
+                | CheckKind::NewLineAfterSectionName(_)
                 | CheckKind::NoBlankLineAfterFunction(_)
                 | CheckKind::NoBlankLineBeforeClass(_)
                 | CheckKind::NoBlankLineBeforeFunction(_)
@@ -1222,6 +1224,8 @@ impl CheckKind {
                 | CheckKind::OneBlankLineBeforeClass(_)
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
+                | CheckKind::SectionNameEndsInColon(_)
+                | CheckKind::SectionNotOverIndented(_)
                 | CheckKind::SectionUnderlineMatchesSectionLength(_)
                 | CheckKind::SectionUnderlineNotOverIndented(_)
                 | CheckKind::SuperCallWithParameters

@@ -10,7 +10,16 @@ expression: checks
   end_location:
     row: 23
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: Returns
+      location:
+        row: 19
+        column: 5
+      end_location:
+        row: 19
+        column: 12
+    applied: false
 - kind:
     CapitalizeSectionName: Short summary
   location:
@@ -19,5 +28,14 @@ expression: checks
   end_location:
     row: 221
     column: 8
-  fix: ~
+  fix:
+    patch:
+      content: Short Summary
+      location:
+        row: 209
+        column: 5
+      end_location:
+        row: 209
+        column: 18
+    applied: false
 

@@ -4,7 +4,6 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_ast::{Arg, Constant, ExprKind, Location, StmtKind};
-use titlecase::titlecase;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
@@ -1099,25 +1098,61 @@ fn common_section(
         if !style
             .section_names()
             .contains(&context.section_name.as_str())
-            && style
-                .section_names()
-                .contains(titlecase(&context.section_name).as_str())
         {
-            checker.add_check(Check::new(
-                CheckKind::CapitalizeSectionName(context.section_name.to_string()),
-                Range::from_located(docstring),
-            ))
+            let capitalized_section_name = titlecase::titlecase(&context.section_name);
+            if style
+                .section_names()
+                .contains(capitalized_section_name.as_str())
+            {
+                let mut check = Check::new(
+                    CheckKind::CapitalizeSectionName(context.section_name.to_string()),
+                    Range::from_located(docstring),
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    // Replace the section title with the capitalized variant. This requires
+                    // locating the start and end of the section name.
+                    if let Some(index) = context.line.find(&context.section_name) {
+                        // Map from bytes to characters.
+                        let section_name_start = &context.line[..index].chars().count();
+                        let section_name_length = &context.section_name.chars().count();
+                        check.amend(Fix::replacement(
+                            capitalized_section_name,
+                            Location::new(
+                                docstring.location.row() + context.original_index,
+                                1 + section_name_start,
+                            ),
+                            Location::new(
+                                docstring.location.row() + context.original_index,
+                                1 + section_name_start + section_name_length,
+                            ),
+                        ))
+                    }
+                }
+                checker.add_check(check);
+            }
         }
     }
 
     if checker.settings.enabled.contains(&CheckCode::D214) {
-        if helpers::leading_space(context.line).len()
-            > helpers::indentation(checker, docstring).len()
-        {
-            checker.add_check(Check::new(
+        let leading_space = helpers::leading_space(context.line);
+        let indentation = helpers::indentation(checker, docstring).to_string();
+        if leading_space.len() > indentation.len() {
+            let mut check = Check::new(
                 CheckKind::SectionNotOverIndented(context.section_name.to_string()),
                 Range::from_located(docstring),
-            ))
+            );
+            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                // Replace the existing indentation with whitespace of the appropriate length.
+                check.amend(Fix::replacement(
+                    indentation,
+                    Location::new(docstring.location.row() + context.original_index, 1),
+                    Location::new(
+                        docstring.location.row() + context.original_index,
+                        1 + leading_space.len(),
+                    ),
+                ));
+            };
+            checker.add_check(check);
         }
     }
 
@@ -1144,7 +1179,7 @@ fn common_section(
                                 + context.following_lines.len(),
                             1,
                         ),
-                    ))
+                    ));
                 }
                 checker.add_check(check);
             }
@@ -1334,10 +1369,31 @@ fn numpy_section(checker: &mut Checker, definition: &Definition, context: &Secti
             let docstring = definition
                 .docstring
                 .expect("Sections are only available for docstrings.");
-            checker.add_check(Check::new(
+            let mut check = Check::new(
                 CheckKind::NewLineAfterSectionName(context.section_name.to_string()),
                 Range::from_located(docstring),
-            ))
+            );
+            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                // Delete the suffix. This requires locating the end of the section name.
+                if let Some(index) = context.line.find(&context.section_name) {
+                    // Map from bytes to characters.
+                    let suffix_start = &context.line[..index + context.section_name.len()]
+                        .chars()
+                        .count();
+                    let suffix_length = suffix.chars().count();
+                    check.amend(Fix::deletion(
+                        Location::new(
+                            docstring.location.row() + context.original_index,
+                            1 + suffix_start,
+                        ),
+                        Location::new(
+                            docstring.location.row() + context.original_index,
+                            1 + suffix_start + suffix_length,
+                        ),
+                    ));
+                }
+            }
+            checker.add_check(check)
         }
     }
 
@@ -1362,10 +1418,32 @@ fn google_section(checker: &mut Checker, definition: &Definition, context: &Sect
             let docstring = definition
                 .docstring
                 .expect("Sections are only available for docstrings.");
-            checker.add_check(Check::new(
+            let mut check = Check::new(
                 CheckKind::SectionNameEndsInColon(context.section_name.to_string()),
                 Range::from_located(docstring),
-            ))
+            );
+            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                // Replace the suffix. This requires locating the end of the section name.
+                if let Some(index) = context.line.find(&context.section_name) {
+                    // Map from bytes to characters.
+                    let suffix_start = &context.line[..index + context.section_name.len()]
+                        .chars()
+                        .count();
+                    let suffix_length = suffix.chars().count();
+                    check.amend(Fix::replacement(
+                        ":".to_string(),
+                        Location::new(
+                            docstring.location.row() + context.original_index,
+                            1 + suffix_start,
+                        ),
+                        Location::new(
+                            docstring.location.row() + context.original_index,
+                            1 + suffix_start + suffix_length,
+                        ),
+                    ));
+                }
+            }
+            checker.add_check(check);
         }
     }
 
