@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use once_cell::sync::Lazy;
-use rustpython_ast::{Expr, ExprKind, Location};
+use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
@@ -40,11 +40,8 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
                     if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                         check.amend(Fix {
                             content: format!("self.{}", target),
-                            location: Location::new(expr.location.row(), expr.location.column()),
-                            end_location: Location::new(
-                                expr.end_location.row(),
-                                expr.end_location.column(),
-                            ),
+                            location: expr.location,
+                            end_location: expr.end_location.unwrap(),
                             applied: false,
                         });
                     }

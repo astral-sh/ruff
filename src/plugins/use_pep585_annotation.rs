@@ -17,7 +17,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr, id: &str) {
             check.amend(Fix {
                 content: id.to_lowercase(),
                 location: expr.location,
-                end_location: expr.end_location,
+                end_location: expr.end_location.unwrap(),
                 applied: false,
             })
         }

@@ -317,9 +317,9 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                         if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                             check.amend(Fix::replacement(
                                 "\n".to_string(),
-                                Location::new(docstring.end_location.row() + 1, 1),
+                                Location::new(docstring.end_location.unwrap().row() + 1, 1),
                                 Location::new(
-                                    docstring.end_location.row() + 1 + blank_lines_after,
+                                    docstring.end_location.unwrap().row() + 1 + blank_lines_after,
                                     1,
                                 ),
                             ));
@@ -482,8 +482,8 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                                 check.amend(Fix::insertion(
                                     content,
                                     Location::new(
-                                        docstring.end_location.row(),
-                                        docstring.end_location.column() - "\"\"\"".len(),
+                                        docstring.end_location.unwrap().row(),
+                                        docstring.end_location.unwrap().column() - "\"\"\"".len(),
                                     ),
                                 ));
                             }

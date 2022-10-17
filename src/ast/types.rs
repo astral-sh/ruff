@@ -18,7 +18,9 @@ impl Range {
     pub fn from_located<T>(located: &Located<T>) -> Self {
         Range {
             location: located.location,
-            end_location: located.end_location,
+            end_location: located
+                .end_location
+                .expect("AST nodes should have end_location."),
         }
     }
 }

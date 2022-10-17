@@ -1257,7 +1257,7 @@ where
                             self.handle_node_store(
                                 &Expr::new(
                                     excepthandler.location,
-                                    excepthandler.end_location,
+                                    excepthandler.end_location.unwrap(),
                                     ExprKind::Name {
                                         id: name.to_string(),
                                         ctx: ExprContext::Store,
@@ -1271,7 +1271,7 @@ where
                         self.handle_node_store(
                             &Expr::new(
                                 excepthandler.location,
-                                excepthandler.end_location,
+                                excepthandler.end_location.unwrap(),
                                 ExprKind::Name {
                                     id: name.to_string(),
                                     ctx: ExprContext::Store,

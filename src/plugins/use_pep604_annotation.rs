@@ -52,7 +52,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     check.amend(Fix {
                         content,
                         location: expr.location,
-                        end_location: expr.end_location,
+                        end_location: expr.end_location.unwrap(),
                         applied: false,
                     })
                 }
@@ -73,7 +73,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                             check.amend(Fix {
                                 content,
                                 location: expr.location,
-                                end_location: expr.end_location,
+                                end_location: expr.end_location.unwrap(),
                                 applied: false,
                             })
                         }
@@ -87,7 +87,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                             check.amend(Fix {
                                 content,
                                 location: expr.location,
-                                end_location: expr.end_location,
+                                end_location: expr.end_location.unwrap(),
                                 applied: false,
                             });
                         }
