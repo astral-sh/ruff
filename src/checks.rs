@@ -293,6 +293,7 @@ pub enum CheckKind {
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
+    BlankLineAfterSummary,
     BlankLineBeforeSection(String),
     CapitalizeSectionName(String),
     DashedUnderlineAfterSection(String),
@@ -308,7 +309,6 @@ pub enum CheckKind {
     NewLineAfterLastParagraph,
     NewLineAfterSectionName(String),
     NoBlankLineAfterFunction(usize),
-    NoBlankLineAfterSummary,
     NoBlankLineBeforeClass(usize),
     NoBlankLineBeforeFunction(usize),
     NoBlankLinesBetweenHeaderAndContent(String),
@@ -473,7 +473,7 @@ impl CheckCode {
             CheckCode::D202 => CheckKind::NoBlankLineAfterFunction(1),
             CheckCode::D203 => CheckKind::OneBlankLineBeforeClass(0),
             CheckCode::D204 => CheckKind::OneBlankLineAfterClass(0),
-            CheckCode::D205 => CheckKind::NoBlankLineAfterSummary,
+            CheckCode::D205 => CheckKind::BlankLineAfterSummary,
             CheckCode::D206 => CheckKind::IndentWithSpaces,
             CheckCode::D207 => CheckKind::NoUnderIndentation,
             CheckCode::D208 => CheckKind::NoOverIndentation,
@@ -756,7 +756,7 @@ impl CheckKind {
             CheckKind::NewLineAfterLastParagraph => &CheckCode::D209,
             CheckKind::NewLineAfterSectionName(_) => &CheckCode::D406,
             CheckKind::NoBlankLineAfterFunction(_) => &CheckCode::D202,
-            CheckKind::NoBlankLineAfterSummary => &CheckCode::D205,
+            CheckKind::BlankLineAfterSummary => &CheckCode::D205,
             CheckKind::NoBlankLineBeforeClass(_) => &CheckCode::D211,
             CheckKind::NoBlankLineBeforeFunction(_) => &CheckCode::D201,
             CheckKind::NoBlankLinesBetweenHeaderAndContent(_) => &CheckCode::D412,
@@ -1053,7 +1053,7 @@ impl CheckKind {
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
-            CheckKind::NoBlankLineAfterSummary => {
+            CheckKind::BlankLineAfterSummary => {
                 "1 blank line required between summary line and description".to_string()
             }
             CheckKind::NewLineAfterLastParagraph => {
@@ -1210,7 +1210,7 @@ impl CheckKind {
                 | CheckKind::DuplicateHandlerException(_)
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NoBlankLineAfterFunction(_)
-                | CheckKind::NoBlankLineAfterSummary
+                | CheckKind::BlankLineAfterSummary
                 | CheckKind::NoBlankLineBeforeClass(_)
                 | CheckKind::NoBlankLineBeforeFunction(_)
                 | CheckKind::NoSurroundingWhitespace
