@@ -8,6 +8,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             row: 1,
             column: 1,
         },
+        end_location: Some(
+            Location {
+                row: 5,
+                column: 7,
+            },
+        ),
         custom: (),
         node: ClassDef {
             name: "Foo",
@@ -17,6 +23,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         row: 1,
                         column: 11,
                     },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 12,
+                        },
+                    ),
                     custom: (),
                     node: Name {
                         id: "A",
@@ -28,6 +40,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         row: 1,
                         column: 14,
                     },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 15,
+                        },
+                    ),
                     custom: (),
                     node: Name {
                         id: "B",
@@ -42,6 +60,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         row: 2,
                         column: 2,
                     },
+                    end_location: Some(
+                        Location {
+                            row: 4,
+                            column: 2,
+                        },
+                    ),
                     custom: (),
                     node: FunctionDef {
                         name: "__init__",
@@ -53,6 +77,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                         row: 2,
                                         column: 15,
                                     },
+                                    end_location: Some(
+                                        Location {
+                                            row: 2,
+                                            column: 19,
+                                        },
+                                    ),
                                     custom: (),
                                     node: ArgData {
                                         arg: "self",
@@ -73,6 +103,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                     row: 3,
                                     column: 3,
                                 },
+                                end_location: Some(
+                                    Location {
+                                        row: 3,
+                                        column: 7,
+                                    },
+                                ),
                                 custom: (),
                                 node: Pass,
                             },
@@ -87,6 +123,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         row: 4,
                         column: 2,
                     },
+                    end_location: Some(
+                        Location {
+                            row: 5,
+                            column: 7,
+                        },
+                    ),
                     custom: (),
                     node: FunctionDef {
                         name: "method_with_default",
@@ -98,6 +140,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                         row: 4,
                                         column: 26,
                                     },
+                                    end_location: Some(
+                                        Location {
+                                            row: 4,
+                                            column: 30,
+                                        },
+                                    ),
                                     custom: (),
                                     node: ArgData {
                                         arg: "self",
@@ -110,6 +158,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                         row: 4,
                                         column: 32,
                                     },
+                                    end_location: Some(
+                                        Location {
+                                            row: 4,
+                                            column: 35,
+                                        },
+                                    ),
                                     custom: (),
                                     node: ArgData {
                                         arg: "arg",
@@ -128,6 +182,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                         row: 4,
                                         column: 36,
                                     },
+                                    end_location: Some(
+                                        Location {
+                                            row: 4,
+                                            column: 45,
+                                        },
+                                    ),
                                     custom: (),
                                     node: Constant {
                                         value: Str(
@@ -144,6 +204,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                     row: 5,
                                     column: 3,
                                 },
+                                end_location: Some(
+                                    Location {
+                                        row: 5,
+                                        column: 7,
+                                    },
+                                ),
                                 custom: (),
                                 node: Pass,
                             },

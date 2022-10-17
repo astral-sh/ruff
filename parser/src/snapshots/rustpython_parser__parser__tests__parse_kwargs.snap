@@ -8,13 +8,25 @@ expression: parse_ast
             row: 1,
             column: 1,
         },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 33,
+            },
+        ),
         custom: (),
         node: Expr {
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 8,
+                    column: 1,
                 },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 33,
+                    },
+                ),
                 custom: (),
                 node: Call {
                     func: Located {
@@ -22,6 +34,12 @@ expression: parse_ast
                             row: 1,
                             column: 1,
                         },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 8,
+                            },
+                        ),
                         custom: (),
                         node: Name {
                             id: "my_func",
@@ -34,6 +52,12 @@ expression: parse_ast
                                 row: 1,
                                 column: 9,
                             },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 21,
+                                },
+                            ),
                             custom: (),
                             node: Constant {
                                 value: Str(
@@ -49,6 +73,12 @@ expression: parse_ast
                                 row: 1,
                                 column: 23,
                             },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 32,
+                                },
+                            ),
                             custom: (),
                             node: KeywordData {
                                 arg: Some(
@@ -59,6 +89,12 @@ expression: parse_ast
                                         row: 1,
                                         column: 31,
                                     },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 32,
+                                        },
+                                    ),
                                     custom: (),
                                     node: Constant {
                                         value: Int(

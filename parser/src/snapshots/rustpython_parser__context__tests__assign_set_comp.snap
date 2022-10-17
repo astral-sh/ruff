@@ -1,0 +1,153 @@
+---
+source: compiler/parser/src/context.rs
+expression: parse_ast
+---
+[
+    Located {
+        start: Location {
+            row: 1,
+            column: 1,
+        },
+        end: Location {
+            row: 1,
+            column: 27,
+        },
+        custom: (),
+        node: Assign {
+            targets: [
+                Located {
+                    start: Location {
+                        row: 1,
+                        column: 1,
+                    },
+                    end: Location {
+                        row: 1,
+                        column: 2,
+                    },
+                    custom: (),
+                    node: Name {
+                        id: "x",
+                        ctx: Store,
+                    },
+                },
+            ],
+            value: Located {
+                start: Location {
+                    row: 1,
+                    column: 5,
+                },
+                end: Location {
+                    row: 1,
+                    column: 27,
+                },
+                custom: (),
+                node: SetComp {
+                    elt: Located {
+                        start: Location {
+                            row: 1,
+                            column: 6,
+                        },
+                        end: Location {
+                            row: 1,
+                            column: 7,
+                        },
+                        custom: (),
+                        node: Name {
+                            id: "y",
+                            ctx: Load,
+                        },
+                    },
+                    generators: [
+                        Comprehension {
+                            target: Located {
+                                start: Location {
+                                    row: 1,
+                                    column: 12,
+                                },
+                                end: Location {
+                                    row: 1,
+                                    column: 13,
+                                },
+                                custom: (),
+                                node: Name {
+                                    id: "y",
+                                    ctx: Store,
+                                },
+                            },
+                            iter: Located {
+                                start: Location {
+                                    row: 1,
+                                    column: 18,
+                                },
+                                end: Location {
+                                    row: 1,
+                                    column: 25,
+                                },
+                                custom: (),
+                                node: Tuple {
+                                    elts: [
+                                        Located {
+                                            start: Location {
+                                                row: 1,
+                                                column: 18,
+                                            },
+                                            end: Location {
+                                                row: 1,
+                                                column: 19,
+                                            },
+                                            custom: (),
+                                            node: Constant {
+                                                value: Int(
+                                                    1,
+                                                ),
+                                                kind: None,
+                                            },
+                                        },
+                                        Located {
+                                            start: Location {
+                                                row: 1,
+                                                column: 21,
+                                            },
+                                            end: Location {
+                                                row: 1,
+                                                column: 22,
+                                            },
+                                            custom: (),
+                                            node: Constant {
+                                                value: Int(
+                                                    2,
+                                                ),
+                                                kind: None,
+                                            },
+                                        },
+                                        Located {
+                                            start: Location {
+                                                row: 1,
+                                                column: 24,
+                                            },
+                                            end: Location {
+                                                row: 1,
+                                                column: 25,
+                                            },
+                                            custom: (),
+                                            node: Constant {
+                                                value: Int(
+                                                    3,
+                                                ),
+                                                kind: None,
+                                            },
+                                        },
+                                    ],
+                                    ctx: Load,
+                                },
+                            },
+                            ifs: [],
+                            is_async: 0,
+                        },
+                    ],
+                },
+            },
+            type_comment: None,
+        },
+    },
+]

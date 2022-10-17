@@ -1,0 +1,131 @@
+---
+source: compiler/parser/src/context.rs
+expression: parse_ast
+---
+[
+    Located {
+        start: Location {
+            row: 1,
+            column: 1,
+        },
+        end: Location {
+            row: 1,
+            column: 18,
+        },
+        custom: (),
+        node: AugAssign {
+            target: Located {
+                start: Location {
+                    row: 1,
+                    column: 2,
+                },
+                end: Location {
+                    row: 1,
+                    column: 5,
+                },
+                custom: (),
+                node: Subscript {
+                    value: Located {
+                        start: Location {
+                            row: 1,
+                            column: 1,
+                        },
+                        end: Location {
+                            row: 1,
+                            column: 2,
+                        },
+                        custom: (),
+                        node: Name {
+                            id: "x",
+                            ctx: Load,
+                        },
+                    },
+                    slice: Located {
+                        start: Location {
+                            row: 1,
+                            column: 3,
+                        },
+                        end: Location {
+                            row: 1,
+                            column: 4,
+                        },
+                        custom: (),
+                        node: Name {
+                            id: "y",
+                            ctx: Load,
+                        },
+                    },
+                    ctx: Store,
+                },
+            },
+            op: Add,
+            value: Located {
+                start: Location {
+                    row: 1,
+                    column: 10,
+                },
+                end: Location {
+                    row: 1,
+                    column: 17,
+                },
+                custom: (),
+                node: Tuple {
+                    elts: [
+                        Located {
+                            start: Location {
+                                row: 1,
+                                column: 10,
+                            },
+                            end: Location {
+                                row: 1,
+                                column: 11,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    1,
+                                ),
+                                kind: None,
+                            },
+                        },
+                        Located {
+                            start: Location {
+                                row: 1,
+                                column: 13,
+                            },
+                            end: Location {
+                                row: 1,
+                                column: 14,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    2,
+                                ),
+                                kind: None,
+                            },
+                        },
+                        Located {
+                            start: Location {
+                                row: 1,
+                                column: 16,
+                            },
+                            end: Location {
+                                row: 1,
+                                column: 17,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    3,
+                                ),
+                                kind: None,
+                            },
+                        },
+                    ],
+                    ctx: Load,
+                },
+            },
+        },
+    },
+]

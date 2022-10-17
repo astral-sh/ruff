@@ -8,13 +8,25 @@ expression: parse_ast
             row: 1,
             column: 1,
         },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 24,
+            },
+        ),
         custom: (),
         node: Expr {
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 6,
+                    column: 1,
                 },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 24,
+                    },
+                ),
                 custom: (),
                 node: Call {
                     func: Located {
@@ -22,6 +34,12 @@ expression: parse_ast
                             row: 1,
                             column: 1,
                         },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 6,
+                            },
+                        ),
                         custom: (),
                         node: Name {
                             id: "print",
@@ -34,6 +52,12 @@ expression: parse_ast
                                 row: 1,
                                 column: 7,
                             },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 20,
+                                },
+                            ),
                             custom: (),
                             node: Constant {
                                 value: Str(
@@ -47,6 +71,12 @@ expression: parse_ast
                                 row: 1,
                                 column: 22,
                             },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 23,
+                                },
+                            ),
                             custom: (),
                             node: Constant {
                                 value: Int(

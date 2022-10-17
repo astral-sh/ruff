@@ -10,14 +10,16 @@ type Ident = String;
 #[derive(Debug, PartialEq)]
 pub struct Located<T, U = ()> {
     pub location: Location,
+    pub end_location: Option<Location>,
     pub custom: U,
     pub node: T,
 }
 
 impl<T> Located<T> {
-    pub fn new(location: Location, node: T) -> Self {
+    pub fn new(location: Location, end_location: Location, node: T) -> Self {
         Self {
             location,
+            end_location: Some(end_location),
             custom: (),
             node,
         }
@@ -529,6 +531,7 @@ pub mod fold {
         Ok(Located {
             custom: folder.map_user(node.custom)?,
             location: node.location,
+            end_location: node.end_location,
             node: f(folder, node.node)?,
         })
     }

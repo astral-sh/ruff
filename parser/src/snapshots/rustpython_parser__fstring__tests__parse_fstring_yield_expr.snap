@@ -8,6 +8,12 @@ expression: parse_ast
             row: 0,
             column: 0,
         },
+        end_location: Some(
+            Location {
+                row: 0,
+                column: 0,
+            },
+        ),
         custom: (),
         node: FormattedValue {
             value: Located {
@@ -15,6 +21,12 @@ expression: parse_ast
                     row: 1,
                     column: 2,
                 },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 7,
+                    },
+                ),
                 custom: (),
                 node: Yield {
                     value: None,

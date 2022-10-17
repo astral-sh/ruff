@@ -121,6 +121,7 @@ impl<U> crate::fold::Fold<U> for ConstantOptimizer {
                     node: expr,
                     custom: node.custom,
                     location: node.location,
+                    end_location: node.end_location,
                 })
             }
             _ => crate::fold::fold_expr(self, node),
@@ -137,16 +138,19 @@ mod tests {
         use crate::fold::Fold;
         use crate::*;
 
-        let location = Location::new(0, 0);
+        let start = Default::default();
+        let end = None;
         let custom = ();
         let ast = Located {
-            location,
+            location: start,
+            end_location: end,
             custom,
             node: ExprKind::Tuple {
                 ctx: ExprContext::Load,
                 elts: vec![
                     Located {
-                        location,
+                        location: start,
+                        end_location: end,
                         custom,
                         node: ExprKind::Constant {
                             value: BigInt::from(1).into(),
@@ -154,7 +158,8 @@ mod tests {
                         },
                     },
                     Located {
-                        location,
+                        location: start,
+                        end_location: end,
                         custom,
                         node: ExprKind::Constant {
                             value: BigInt::from(2).into(),
@@ -162,13 +167,15 @@ mod tests {
                         },
                     },
                     Located {
-                        location,
+                        location: start,
+                        end_location: end,
                         custom,
                         node: ExprKind::Tuple {
                             ctx: ExprContext::Load,
                             elts: vec![
                                 Located {
-                                    location,
+                                    location: start,
+                                    end_location: end,
                                     custom,
                                     node: ExprKind::Constant {
                                         value: BigInt::from(3).into(),
@@ -176,7 +183,8 @@ mod tests {
                                     },
                                 },
                                 Located {
-                                    location,
+                                    location: start,
+                                    end_location: end,
                                     custom,
                                     node: ExprKind::Constant {
                                         value: BigInt::from(4).into(),
@@ -184,7 +192,8 @@ mod tests {
                                     },
                                 },
                                 Located {
-                                    location,
+                                    location: start,
+                                    end_location: end,
                                     custom,
                                     node: ExprKind::Constant {
                                         value: BigInt::from(5).into(),
@@ -203,7 +212,8 @@ mod tests {
         assert_eq!(
             new_ast,
             Located {
-                location,
+                location: start,
+                end_location: end,
                 custom,
                 node: ExprKind::Constant {
                     value: Constant::Tuple(vec![

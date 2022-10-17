@@ -1,0 +1,79 @@
+---
+source: compiler/parser/src/context.rs
+expression: parse_ast
+---
+[
+    Located {
+        start: Location {
+            row: 1,
+            column: 1,
+        },
+        end: Location {
+            row: 1,
+            column: 15,
+        },
+        custom: (),
+        node: If {
+            test: Located {
+                start: Location {
+                    row: 1,
+                    column: 4,
+                },
+                end: Location {
+                    row: 1,
+                    column: 9,
+                },
+                custom: (),
+                node: NamedExpr {
+                    target: Located {
+                        start: Location {
+                            row: 1,
+                            column: 4,
+                        },
+                        end: Location {
+                            row: 1,
+                            column: 9,
+                        },
+                        custom: (),
+                        node: Name {
+                            id: "x",
+                            ctx: Store,
+                        },
+                    },
+                    value: Located {
+                        start: Location {
+                            row: 1,
+                            column: 8,
+                        },
+                        end: Location {
+                            row: 1,
+                            column: 9,
+                        },
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
+                        },
+                    },
+                },
+            },
+            body: [
+                Located {
+                    start: Location {
+                        row: 1,
+                        column: 11,
+                    },
+                    end: Location {
+                        row: 1,
+                        column: 15,
+                    },
+                    custom: (),
+                    node: Pass,
+                },
+            ],
+            orelse: [],
+        },
+    },
+]

@@ -7,17 +7,18 @@ use crate::{
 use std::{iter, mem, str};
 
 struct FStringParser {
-    str_location: Location,
+    str_start: Location,
+    str_end: Location,
 }
 
 impl FStringParser {
-    fn new(str_location: Location) -> Self {
-        Self { str_location }
+    fn new(str_start: Location, str_end: Location) -> Self {
+        Self { str_start, str_end }
     }
 
     #[inline]
     fn expr(&self, node: ExprKind) -> Expr {
-        Expr::new(self.str_location, node)
+        Expr::new(self.str_start, self.str_end, node)
     }
 
     fn parse_formatted_value<'a>(
@@ -305,11 +306,18 @@ fn parse_fstring_expr(source: &str) -> Result<Expr, ParseError> {
 
 /// Parse an fstring from a string, located at a certain position in the sourcecode.
 /// In case of errors, we will get the location and the error returned.
-pub fn parse_located_fstring(source: &str, location: Location) -> Result<Vec<Expr>, FStringError> {
-    FStringParser::new(location)
+pub fn parse_located_fstring(
+    source: &str,
+    start: Location,
+    end: Location,
+) -> Result<Vec<Expr>, FStringError> {
+    FStringParser::new(start, end)
         .parse(source.chars().peekable(), 0)
         .map(|(e, _)| e)
-        .map_err(|error| FStringError { error, location })
+        .map_err(|error| FStringError {
+            error,
+            location: start,
+        })
 }
 
 #[cfg(test)]
@@ -317,7 +325,7 @@ mod tests {
     use super::*;
 
     fn parse_fstring(source: &str) -> Result<Vec<Expr>, FStringErrorType> {
-        FStringParser::new(Location::default())
+        FStringParser::new(Location::default(), Location::default())
             .parse(source.chars().peekable(), 0)
             .map(|(e, _)| e)
     }

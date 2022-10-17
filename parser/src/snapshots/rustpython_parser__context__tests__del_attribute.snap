@@ -1,0 +1,51 @@
+---
+source: compiler/parser/src/context.rs
+expression: parse_ast
+---
+[
+    Located {
+        start: Location {
+            row: 1,
+            column: 1,
+        },
+        end: Location {
+            row: 1,
+            column: 8,
+        },
+        custom: (),
+        node: Delete {
+            targets: [
+                Located {
+                    start: Location {
+                        row: 1,
+                        column: 6,
+                    },
+                    end: Location {
+                        row: 1,
+                        column: 8,
+                    },
+                    custom: (),
+                    node: Attribute {
+                        value: Located {
+                            start: Location {
+                                row: 1,
+                                column: 5,
+                            },
+                            end: Location {
+                                row: 1,
+                                column: 6,
+                            },
+                            custom: (),
+                            node: Name {
+                                id: "x",
+                                ctx: Load,
+                            },
+                        },
+                        attr: "y",
+                        ctx: Del,
+                    },
+                },
+            ],
+        },
+    },
+]

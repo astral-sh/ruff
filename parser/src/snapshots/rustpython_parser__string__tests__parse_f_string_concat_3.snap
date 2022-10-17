@@ -8,6 +8,12 @@ expression: parse_ast
             row: 1,
             column: 1,
         },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 23,
+            },
+        ),
         custom: (),
         node: Expr {
             value: Located {
@@ -15,6 +21,12 @@ expression: parse_ast
                     row: 1,
                     column: 1,
                 },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 9,
+                    },
+                ),
                 custom: (),
                 node: JoinedStr {
                     values: [
@@ -23,6 +35,12 @@ expression: parse_ast
                                 row: 1,
                                 column: 1,
                             },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 9,
+                                },
+                            ),
                             custom: (),
                             node: Constant {
                                 value: Str(
@@ -36,6 +54,12 @@ expression: parse_ast
                                 row: 1,
                                 column: 10,
                             },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 23,
+                                },
+                            ),
                             custom: (),
                             node: FormattedValue {
                                 value: Located {
@@ -43,6 +67,12 @@ expression: parse_ast
                                         row: 1,
                                         column: 2,
                                     },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 5,
+                                        },
+                                    ),
                                     custom: (),
                                     node: Constant {
                                         value: Str(

@@ -8,6 +8,12 @@ expression: parse_ast
             row: 1,
             column: 1,
         },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 21,
+            },
+        ),
         custom: (),
         node: Expr {
             value: Located {
@@ -15,6 +21,12 @@ expression: parse_ast
                     row: 1,
                     column: 1,
                 },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 21,
+                    },
+                ),
                 custom: (),
                 node: Constant {
                     value: Str(

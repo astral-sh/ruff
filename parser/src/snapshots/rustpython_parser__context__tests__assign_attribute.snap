@@ -1,0 +1,119 @@
+---
+source: compiler/parser/src/context.rs
+expression: parse_ast
+---
+[
+    Located {
+        start: Location {
+            row: 1,
+            column: 1,
+        },
+        end: Location {
+            row: 1,
+            column: 16,
+        },
+        custom: (),
+        node: Assign {
+            targets: [
+                Located {
+                    start: Location {
+                        row: 1,
+                        column: 2,
+                    },
+                    end: Location {
+                        row: 1,
+                        column: 4,
+                    },
+                    custom: (),
+                    node: Attribute {
+                        value: Located {
+                            start: Location {
+                                row: 1,
+                                column: 1,
+                            },
+                            end: Location {
+                                row: 1,
+                                column: 2,
+                            },
+                            custom: (),
+                            node: Name {
+                                id: "x",
+                                ctx: Load,
+                            },
+                        },
+                        attr: "y",
+                        ctx: Store,
+                    },
+                },
+            ],
+            value: Located {
+                start: Location {
+                    row: 1,
+                    column: 8,
+                },
+                end: Location {
+                    row: 1,
+                    column: 15,
+                },
+                custom: (),
+                node: Tuple {
+                    elts: [
+                        Located {
+                            start: Location {
+                                row: 1,
+                                column: 8,
+                            },
+                            end: Location {
+                                row: 1,
+                                column: 9,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    1,
+                                ),
+                                kind: None,
+                            },
+                        },
+                        Located {
+                            start: Location {
+                                row: 1,
+                                column: 11,
+                            },
+                            end: Location {
+                                row: 1,
+                                column: 12,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    2,
+                                ),
+                                kind: None,
+                            },
+                        },
+                        Located {
+                            start: Location {
+                                row: 1,
+                                column: 14,
+                            },
+                            end: Location {
+                                row: 1,
+                                column: 15,
+                            },
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    3,
+                                ),
+                                kind: None,
+                            },
+                        },
+                    ],
+                    ctx: Load,
+                },
+            },
+            type_comment: None,
+        },
+    },
+]

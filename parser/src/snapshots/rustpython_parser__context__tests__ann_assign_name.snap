@@ -1,0 +1,69 @@
+---
+source: compiler/parser/src/context.rs
+expression: parse_ast
+---
+[
+    Located {
+        start: Location {
+            row: 1,
+            column: 1,
+        },
+        end: Location {
+            row: 1,
+            column: 11,
+        },
+        custom: (),
+        node: AnnAssign {
+            target: Located {
+                start: Location {
+                    row: 1,
+                    column: 1,
+                },
+                end: Location {
+                    row: 1,
+                    column: 2,
+                },
+                custom: (),
+                node: Name {
+                    id: "x",
+                    ctx: Store,
+                },
+            },
+            annotation: Located {
+                start: Location {
+                    row: 1,
+                    column: 4,
+                },
+                end: Location {
+                    row: 1,
+                    column: 7,
+                },
+                custom: (),
+                node: Name {
+                    id: "int",
+                    ctx: Load,
+                },
+            },
+            value: Some(
+                Located {
+                    start: Location {
+                        row: 1,
+                        column: 10,
+                    },
+                    end: Location {
+                        row: 1,
+                        column: 11,
+                    },
+                    custom: (),
+                    node: Constant {
+                        value: Int(
+                            1,
+                        ),
+                        kind: None,
+                    },
+                },
+            ),
+            simple: 1,
+        },
+    },
+]

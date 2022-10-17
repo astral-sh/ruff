@@ -1,5 +1,5 @@
 ---
-source: parser/src/parser.rs
+source: compiler/parser/src/parser.rs
 expression: parse_ast
 ---
 [
@@ -8,6 +8,12 @@ expression: parse_ast
             row: 1,
             column: 1,
         },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 19,
+            },
+        ),
         custom: (),
         node: Expr {
             value: Located {
@@ -15,6 +21,12 @@ expression: parse_ast
                     row: 1,
                     column: 1,
                 },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 19,
+                    },
+                ),
                 custom: (),
                 node: Lambda {
                     args: Arguments {
@@ -25,6 +37,12 @@ expression: parse_ast
                                     row: 1,
                                     column: 8,
                                 },
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 9,
+                                    },
+                                ),
                                 custom: (),
                                 node: ArgData {
                                     arg: "x",
@@ -37,6 +55,12 @@ expression: parse_ast
                                     row: 1,
                                     column: 11,
                                 },
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 12,
+                                    },
+                                ),
                                 custom: (),
                                 node: ArgData {
                                     arg: "y",
@@ -56,6 +80,12 @@ expression: parse_ast
                             row: 1,
                             column: 16,
                         },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 19,
+                            },
+                        ),
                         custom: (),
                         node: BinOp {
                             left: Located {
@@ -63,6 +93,12 @@ expression: parse_ast
                                     row: 1,
                                     column: 14,
                                 },
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 15,
+                                    },
+                                ),
                                 custom: (),
                                 node: Name {
                                     id: "x",
@@ -75,6 +111,12 @@ expression: parse_ast
                                     row: 1,
                                     column: 18,
                                 },
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 19,
+                                    },
+                                ),
                                 custom: (),
                                 node: Name {
                                     id: "y",

@@ -1,0 +1,72 @@
+---
+source: compiler/parser/src/context.rs
+expression: parse_ast
+---
+[
+    Located {
+        start: Location {
+            row: 1,
+            column: 1,
+        },
+        end: Location {
+            row: 1,
+            column: 18,
+        },
+        custom: (),
+        node: With {
+            items: [
+                Withitem {
+                    context_expr: Located {
+                        start: Location {
+                            row: 1,
+                            column: 6,
+                        },
+                        end: Location {
+                            row: 1,
+                            column: 7,
+                        },
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
+                        },
+                    },
+                    optional_vars: Some(
+                        Located {
+                            start: Location {
+                                row: 1,
+                                column: 11,
+                            },
+                            end: Location {
+                                row: 1,
+                                column: 12,
+                            },
+                            custom: (),
+                            node: Name {
+                                id: "x",
+                                ctx: Store,
+                            },
+                        },
+                    ),
+                },
+            ],
+            body: [
+                Located {
+                    start: Location {
+                        row: 1,
+                        column: 14,
+                    },
+                    end: Location {
+                        row: 1,
+                        column: 18,
+                    },
+                    custom: (),
+                    node: Pass,
+                },
+            ],
+            type_comment: None,
+        },
+    },
+]

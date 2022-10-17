@@ -1,7 +1,6 @@
 ---
-source: parser/src/parser.rs
+source: compiler/parser/src/parser.rs
 expression: parse_ast
-
 ---
 [
     Located {
@@ -9,6 +8,12 @@ expression: parse_ast
             row: 1,
             column: 1,
         },
+        end_location: Some(
+            Location {
+                row: 3,
+                column: 9,
+            },
+        ),
         custom: (),
         node: If {
             test: Located {
@@ -16,6 +21,12 @@ expression: parse_ast
                     row: 1,
                     column: 4,
                 },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 5,
+                    },
+                ),
                 custom: (),
                 node: Constant {
                     value: Int(
@@ -30,6 +41,12 @@ expression: parse_ast
                         row: 1,
                         column: 7,
                     },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 9,
+                        },
+                    ),
                     custom: (),
                     node: Expr {
                         value: Located {
@@ -37,6 +54,12 @@ expression: parse_ast
                                 row: 1,
                                 column: 7,
                             },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 9,
+                                },
+                            ),
                             custom: (),
                             node: Constant {
                                 value: Int(
@@ -54,6 +77,12 @@ expression: parse_ast
                         row: 2,
                         column: 1,
                     },
+                    end_location: Some(
+                        Location {
+                            row: 3,
+                            column: 1,
+                        },
+                    ),
                     custom: (),
                     node: If {
                         test: Located {
@@ -61,6 +90,12 @@ expression: parse_ast
                                 row: 2,
                                 column: 6,
                             },
+                            end_location: Some(
+                                Location {
+                                    row: 2,
+                                    column: 7,
+                                },
+                            ),
                             custom: (),
                             node: Constant {
                                 value: Int(
@@ -75,6 +110,12 @@ expression: parse_ast
                                     row: 2,
                                     column: 9,
                                 },
+                                end_location: Some(
+                                    Location {
+                                        row: 2,
+                                        column: 11,
+                                    },
+                                ),
                                 custom: (),
                                 node: Expr {
                                     value: Located {
@@ -82,6 +123,12 @@ expression: parse_ast
                                             row: 2,
                                             column: 9,
                                         },
+                                        end_location: Some(
+                                            Location {
+                                                row: 2,
+                                                column: 11,
+                                            },
+                                        ),
                                         custom: (),
                                         node: Constant {
                                             value: Int(
@@ -99,6 +146,12 @@ expression: parse_ast
                                     row: 3,
                                     column: 7,
                                 },
+                                end_location: Some(
+                                    Location {
+                                        row: 3,
+                                        column: 9,
+                                    },
+                                ),
                                 custom: (),
                                 node: Expr {
                                     value: Located {
@@ -106,6 +159,12 @@ expression: parse_ast
                                             row: 3,
                                             column: 7,
                                         },
+                                        end_location: Some(
+                                            Location {
+                                                row: 3,
+                                                column: 9,
+                                            },
+                                        ),
                                         custom: (),
                                         node: Constant {
                                             value: Int(

@@ -8,6 +8,12 @@ expression: parse_ast
             row: 0,
             column: 0,
         },
+        end_location: Some(
+            Location {
+                row: 0,
+                column: 0,
+            },
+        ),
         custom: (),
         node: FormattedValue {
             value: Located {
@@ -15,6 +21,12 @@ expression: parse_ast
                     row: 1,
                     column: 2,
                 },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 5,
+                    },
+                ),
                 custom: (),
                 node: Name {
                     id: "foo",
@@ -28,6 +40,12 @@ expression: parse_ast
                         row: 0,
                         column: 0,
                     },
+                    end_location: Some(
+                        Location {
+                            row: 0,
+                            column: 0,
+                        },
+                    ),
                     custom: (),
                     node: JoinedStr {
                         values: [
@@ -36,6 +54,12 @@ expression: parse_ast
                                     row: 0,
                                     column: 0,
                                 },
+                                end_location: Some(
+                                    Location {
+                                        row: 0,
+                                        column: 0,
+                                    },
+                                ),
                                 custom: (),
                                 node: FormattedValue {
                                     value: Located {
@@ -43,6 +67,12 @@ expression: parse_ast
                                             row: 1,
                                             column: 2,
                                         },
+                                        end_location: Some(
+                                            Location {
+                                                row: 1,
+                                                column: 6,
+                                            },
+                                        ),
                                         custom: (),
                                         node: Name {
                                             id: "spec",
