@@ -347,8 +347,8 @@ where
                 self.push_scope(Scope::new(ScopeKind::Class))
             }
             StmtKind::Import { names } => {
-                if self.seen_import_boundary && stmt.location.column() == 1 {
-                    if self.settings.enabled.contains(&CheckCode::E402) {
+                if self.settings.enabled.contains(&CheckCode::E402) {
+                    if self.seen_import_boundary && stmt.location.column() == 1 {
                         self.checks.push(Check::new(
                             CheckKind::ModuleImportNotAtTopOfFile,
                             self.locate_check(Range::from_located(stmt)),
@@ -404,8 +404,8 @@ where
                 module,
                 level,
             } => {
-                if self.seen_import_boundary && stmt.location.column() == 1 {
-                    if self.settings.enabled.contains(&CheckCode::E402) {
+                if self.settings.enabled.contains(&CheckCode::E402) {
+                    if self.seen_import_boundary && stmt.location.column() == 1 {
                         self.checks.push(Check::new(
                             CheckKind::ModuleImportNotAtTopOfFile,
                             self.locate_check(Range::from_located(stmt)),
@@ -436,13 +436,13 @@ where
                             self.annotations_future_enabled = true;
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::F407)
-                            && !ALL_FEATURE_NAMES.contains(&alias.node.name.deref())
-                        {
-                            self.checks.push(Check::new(
-                                CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
-                                self.locate_check(Range::from_located(stmt)),
-                            ));
+                        if self.settings.enabled.contains(&CheckCode::F407) {
+                            if !ALL_FEATURE_NAMES.contains(&alias.node.name.deref()) {
+                                self.checks.push(Check::new(
+                                    CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
+                                    self.locate_check(Range::from_located(stmt)),
+                                ));
+                            }
                         }
 
                         if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
@@ -1285,13 +1285,13 @@ where
                         let scope = &mut self.scopes
                             [*(self.scope_stack.last().expect("No current scope found."))];
                         if let Some(binding) = &scope.values.remove(name) {
-                            if self.settings.enabled.contains(&CheckCode::F841)
-                                && binding.used.is_none()
-                            {
-                                self.checks.push(Check::new(
-                                    CheckKind::UnusedVariable(name.to_string()),
-                                    Range::from_located(excepthandler),
-                                ));
+                            if binding.used.is_none() {
+                                if self.settings.enabled.contains(&CheckCode::F841) {
+                                    self.checks.push(Check::new(
+                                        CheckKind::UnusedVariable(name.to_string()),
+                                        Range::from_located(excepthandler),
+                                    ));
+                                }
                             }
                         }
 
@@ -1486,24 +1486,25 @@ impl<'a> Checker<'a> {
         let binding = match scope.values.get(&name) {
             None => binding,
             Some(existing) => {
-                if self.settings.enabled.contains(&CheckCode::F402)
-                    && matches!(binding.kind, BindingKind::LoopVar)
-                    && matches!(
-                        existing.kind,
-                        BindingKind::Importation(_, _, _)
-                            | BindingKind::FromImportation(_, _, _)
-                            | BindingKind::SubmoduleImportation(_, _, _)
-                            | BindingKind::StarImportation
-                            | BindingKind::FutureImportation
-                    )
-                {
-                    self.checks.push(Check::new(
-                        CheckKind::ImportShadowedByLoopVar(
-                            name.clone(),
-                            existing.range.location.row(),
-                        ),
-                        binding.range,
-                    ));
+                if self.settings.enabled.contains(&CheckCode::F402) {
+                    if matches!(binding.kind, BindingKind::LoopVar)
+                        && matches!(
+                            existing.kind,
+                            BindingKind::Importation(_, _, _)
+                                | BindingKind::FromImportation(_, _, _)
+                                | BindingKind::SubmoduleImportation(_, _, _)
+                                | BindingKind::StarImportation
+                                | BindingKind::FutureImportation
+                        )
+                    {
+                        self.checks.push(Check::new(
+                            CheckKind::ImportShadowedByLoopVar(
+                                name.clone(),
+                                existing.range.location.row(),
+                            ),
+                            binding.range,
+                        ));
+                    }
                 }
                 Binding {
                     kind: binding.kind,
@@ -1590,19 +1591,20 @@ impl<'a> Checker<'a> {
             let current =
                 &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
 
-            if self.settings.enabled.contains(&CheckCode::F823)
-                && matches!(current.kind, ScopeKind::Function(_))
-                && !current.values.contains_key(id)
-            {
-                for scope in self.scopes.iter().rev().skip(1) {
-                    if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
-                        if let Some(binding) = scope.values.get(id) {
-                            if let Some((scope_id, location)) = binding.used {
-                                if scope_id == current.id {
-                                    self.checks.push(Check::new(
-                                        CheckKind::UndefinedLocal(id.clone()),
-                                        self.locate_check(location),
-                                    ));
+            if self.settings.enabled.contains(&CheckCode::F823) {
+                if matches!(current.kind, ScopeKind::Function(_))
+                    && !current.values.contains_key(id)
+                {
+                    for scope in self.scopes.iter().rev().skip(1) {
+                        if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
+                            if let Some(binding) = scope.values.get(id) {
+                                if let Some((scope_id, location)) = binding.used {
+                                    if scope_id == current.id {
+                                        self.checks.push(Check::new(
+                                            CheckKind::UndefinedLocal(id.clone()),
+                                            self.locate_check(location),
+                                        ));
+                                    }
                                 }
                             }
                         }
@@ -1734,11 +1736,13 @@ impl<'a> Checker<'a> {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 relocate_expr(&mut expr, range);
                 allocator.push(expr);
-            } else if self.settings.enabled.contains(&CheckCode::F722) {
-                self.checks.push(Check::new(
-                    CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
-                    self.locate_check(range),
-                ));
+            } else {
+                if self.settings.enabled.contains(&CheckCode::F722) {
+                    self.checks.push(Check::new(
+                        CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
+                        self.locate_check(range),
+                    ));
+                }
             }
         }
         for expr in allocator {
@@ -1818,18 +1822,17 @@ impl<'a> Checker<'a> {
                 _ => None,
             });
 
-            if self.settings.enabled.contains(&CheckCode::F822)
-                && !scope.import_starred
-                && !self.path.ends_with("__init__.py")
-            {
-                if let Some(all_binding) = all_binding {
-                    if let Some(names) = all_names {
-                        for name in names {
-                            if !scope.values.contains_key(name) {
-                                self.checks.push(Check::new(
-                                    CheckKind::UndefinedExport(name.to_string()),
-                                    self.locate_check(all_binding.range),
-                                ));
+            if self.settings.enabled.contains(&CheckCode::F822) {
+                if !scope.import_starred && !self.path.ends_with("__init__.py") {
+                    if let Some(all_binding) = all_binding {
+                        if let Some(names) = all_names {
+                            for name in names {
+                                if !scope.values.contains_key(name) {
+                                    self.checks.push(Check::new(
+                                        CheckKind::UndefinedExport(name.to_string()),
+                                        self.locate_check(all_binding.range),
+                                    ));
+                                }
                             }
                         }
                     }
@@ -2037,13 +2040,15 @@ impl<'a> Checker<'a> {
                     self.checks.push(check);
                 }
             }
-        } else if self.settings.enabled.contains(&CheckCode::A001) {
-            if let Some(check) = checkers::builtin_shadowing(
-                name,
-                self.locate_check(location),
-                checkers::ShadowingType::Variable,
-            ) {
-                self.checks.push(check);
+        } else {
+            if self.settings.enabled.contains(&CheckCode::A001) {
+                if let Some(check) = checkers::builtin_shadowing(
+                    name,
+                    self.locate_check(location),
+                    checkers::ShadowingType::Variable,
+                ) {
+                    self.checks.push(check);
+                }
             }
         }
     }
