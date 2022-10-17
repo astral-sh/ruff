@@ -67,25 +67,35 @@ impl FStringParser {
                         Some('a') => ConversionFlag::Ascii,
                         Some('r') => ConversionFlag::Repr,
                         Some(_) => {
-                            return Err(InvalidConversionFlag);
+                            return Err(if expression[1..].trim().is_empty() {
+                                EmptyExpression
+                            } else {
+                                InvalidConversionFlag
+                            });
                         }
                         None => {
-                            return Err(ExpectedRbrace);
+                            return Err(if expression[1..].trim().is_empty() {
+                                EmptyExpression
+                            } else {
+                                UnclosedLbrace
+                            });
                         }
                     };
 
                     if let Some(&peek) = chars.peek() {
                         if peek != '}' && peek != ':' {
-                            if expression[1..].trim().is_empty() {
-                                return Err(EmptyExpression);
+                            return Err(if expression[1..].trim().is_empty() {
+                                EmptyExpression
                             } else {
-                                return Err(ExpectedRbrace);
-                            }
+                                UnclosedLbrace
+                            });
                         }
-                    } else if expression[1..].trim().is_empty() {
-                        return Err(EmptyExpression);
                     } else {
-                        return Err(ExpectedRbrace);
+                        return Err(if expression[1..].trim().is_empty() {
+                            EmptyExpression
+                        } else {
+                            UnclosedLbrace
+                        });
                     }
                 }
 
@@ -108,22 +118,42 @@ impl FStringParser {
                     delims.push(ch);
                 }
                 ')' => {
-                    if delims.pop() != Some('(') {
-                        return Err(MismatchedDelimiter);
+                    let last_delim = delims.pop();
+                    match last_delim {
+                        Some('(') => {
+                            expression.push(ch);
+                        }
+                        Some(c) => {
+                            return Err(MismatchedDelimiter(c, ')'));
+                        }
+                        None => {
+                            return Err(Unmatched(')'));
+                        }
                     }
-                    expression.push(ch);
                 }
                 ']' => {
-                    if delims.pop() != Some('[') {
-                        return Err(MismatchedDelimiter);
+                    let last_delim = delims.pop();
+                    match last_delim {
+                        Some('[') => {
+                            expression.push(ch);
+                        }
+                        Some(c) => {
+                            return Err(MismatchedDelimiter(c, ']'));
+                        }
+                        None => {
+                            return Err(Unmatched(']'));
+                        }
                     }
-                    expression.push(ch);
                 }
                 '}' if !delims.is_empty() => {
-                    if delims.pop() != Some('{') {
-                        return Err(MismatchedDelimiter);
+                    let last_delim = delims.pop();
+                    match last_delim {
+                        Some('{') => {
+                            expression.push(ch);
+                        }
+                        Some(c) => return Err(MismatchedDelimiter(c, '}')),
+                        None => {}
                     }
-                    expression.push(ch);
                 }
                 '}' => {
                     if expression[1..].trim().is_empty() {
@@ -171,26 +201,36 @@ impl FStringParser {
                 }
                 '"' | '\'' => {
                     expression.push(ch);
+                    let mut string_ended = false;
                     for next in &mut chars {
                         expression.push(next);
                         if next == ch {
+                            string_ended = true;
                             break;
                         }
+                    }
+                    if !string_ended {
+                        return Err(UnterminatedString);
                     }
                 }
                 ' ' if self_documenting => {
                     trailing_seq.push(ch);
                 }
+                '\\' => return Err(ExpressionCannotInclude('\\')),
                 _ => {
                     if self_documenting {
-                        return Err(ExpectedRbrace);
+                        return Err(UnclosedLbrace);
                     }
 
                     expression.push(ch);
                 }
             }
         }
-        Err(UnclosedLbrace)
+        Err(if expression[1..].trim().is_empty() {
+            EmptyExpression
+        } else {
+            UnclosedLbrace
+        })
     }
 
     fn parse_spec<'a>(
@@ -251,10 +291,14 @@ impl FStringParser {
                 '{' => {
                     chars.next();
                     if nested == 0 {
-                        if let Some('{') = chars.peek() {
-                            chars.next();
-                            content.push('{');
-                            continue;
+                        match chars.peek() {
+                            Some('{') => {
+                                chars.next();
+                                content.push('{');
+                                continue;
+                            }
+                            None => return Err(UnclosedLbrace),
+                            _ => {}
                         }
                     }
                     if !content.is_empty() {
@@ -278,7 +322,7 @@ impl FStringParser {
                         chars.next();
                         content.push('}');
                     } else {
-                        return Err(UnopenedRbrace);
+                        return Err(SingleRbrace);
                     }
                 }
                 _ => {
@@ -385,9 +429,9 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_fstring() {
-        assert_eq!(parse_fstring("{5!a"), Err(ExpectedRbrace));
-        assert_eq!(parse_fstring("{5!a1}"), Err(ExpectedRbrace));
-        assert_eq!(parse_fstring("{5!"), Err(ExpectedRbrace));
+        assert_eq!(parse_fstring("{5!a"), Err(UnclosedLbrace));
+        assert_eq!(parse_fstring("{5!a1}"), Err(UnclosedLbrace));
+        assert_eq!(parse_fstring("{5!"), Err(UnclosedLbrace));
         assert_eq!(parse_fstring("abc{!a 'cat'}"), Err(EmptyExpression));
         assert_eq!(parse_fstring("{!a"), Err(EmptyExpression));
         assert_eq!(parse_fstring("{ !a}"), Err(EmptyExpression));
@@ -397,8 +441,8 @@ mod tests {
 
         assert_eq!(parse_fstring("{a:{a:{b}}}"), Err(ExpressionNestedTooDeeply));
 
-        assert_eq!(parse_fstring("{a:b}}"), Err(UnopenedRbrace));
-        assert_eq!(parse_fstring("}"), Err(UnopenedRbrace));
+        assert_eq!(parse_fstring("{a:b}}"), Err(SingleRbrace));
+        assert_eq!(parse_fstring("}"), Err(SingleRbrace));
         assert_eq!(parse_fstring("{a:{b}"), Err(UnclosedLbrace));
         assert_eq!(parse_fstring("{"), Err(UnclosedLbrace));
 

@@ -82,24 +82,44 @@ pub enum FStringErrorType {
     InvalidExpression(Box<ParseErrorType>),
     InvalidConversionFlag,
     EmptyExpression,
-    MismatchedDelimiter,
+    MismatchedDelimiter(char, char),
     ExpressionNestedTooDeeply,
+    ExpressionCannotInclude(char),
+    SingleRbrace,
+    Unmatched(char),
+    UnterminatedString,
 }
 
 impl fmt::Display for FStringErrorType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            FStringErrorType::UnclosedLbrace => write!(f, "Unclosed '{{'"),
+            FStringErrorType::UnclosedLbrace => write!(f, "expecting '}}'"),
             FStringErrorType::UnopenedRbrace => write!(f, "Unopened '}}'"),
             FStringErrorType::ExpectedRbrace => write!(f, "Expected '}}' after conversion flag."),
             FStringErrorType::InvalidExpression(error) => {
-                write!(f, "Invalid expression: {}", error)
+                write!(f, "{}", error)
             }
-            FStringErrorType::InvalidConversionFlag => write!(f, "Invalid conversion flag"),
-            FStringErrorType::EmptyExpression => write!(f, "Empty expression"),
-            FStringErrorType::MismatchedDelimiter => write!(f, "Mismatched delimiter"),
+            FStringErrorType::InvalidConversionFlag => write!(f, "invalid conversion character"),
+            FStringErrorType::EmptyExpression => write!(f, "empty expression not allowed"),
+            FStringErrorType::MismatchedDelimiter(first, second) => write!(
+                f,
+                "closing parenthesis '{}' does not match opening parenthesis '{}'",
+                second, first
+            ),
+            FStringErrorType::SingleRbrace => write!(f, "single '}}' is not allowed"),
+            FStringErrorType::Unmatched(delim) => write!(f, "unmatched '{}'", delim),
             FStringErrorType::ExpressionNestedTooDeeply => {
                 write!(f, "expressions nested too deeply")
+            }
+            FStringErrorType::UnterminatedString => {
+                write!(f, "unterminated string")
+            }
+            FStringErrorType::ExpressionCannotInclude(c) => {
+                if *c == '\\' {
+                    write!(f, "f-string expression part cannot include a backslash")
+                } else {
+                    write!(f, "f-string expression part cannot include '{}'s", c)
+                }
             }
         }
     }
@@ -162,7 +182,7 @@ pub(crate) fn parse_error_from_lalrpop(
             let expected = (expected.len() == 1).then(|| expected[0].clone());
             ParseError {
                 error: ParseErrorType::UnrecognizedToken(token.1, expected),
-                location: token.0,
+                location: Location::new(token.0.row(), token.0.column() + 1),
                 source_path,
             }
         }
