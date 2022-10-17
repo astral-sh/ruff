@@ -1,7 +1,7 @@
 use log::error;
 use rustpython_ast::{Expr, Stmt, StmtKind};
 
-use crate::autofix::{fixer, fixes};
+use crate::autofix::{fixer, helpers};
 use crate::check_ast::Checker;
 use crate::checks::CheckCode;
 use crate::flake8_print::checks;
@@ -25,7 +25,7 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
                     .map(|index| checker.parents[*index])
                     .collect();
 
-                match fixes::remove_stmt(
+                match helpers::remove_stmt(
                     checker.parents[context.defined_by],
                     context.defined_in.map(|index| checker.parents[index]),
                     &deleted,

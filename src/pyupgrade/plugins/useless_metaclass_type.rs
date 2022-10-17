@@ -2,7 +2,7 @@ use log::error;
 use rustpython_ast::{Expr, Stmt};
 
 use crate::ast::types::{CheckLocator, Range};
-use crate::autofix::{fixer, fixes};
+use crate::autofix::{fixer, helpers};
 use crate::check_ast::Checker;
 use crate::pyupgrade::checks;
 
@@ -20,7 +20,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
                 .map(|index| checker.parents[*index])
                 .collect();
 
-            match fixes::remove_stmt(
+            match helpers::remove_stmt(
                 checker.parents[context.defined_by],
                 context.defined_in.map(|index| checker.parents[index]),
                 &deleted,

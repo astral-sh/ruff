@@ -18,7 +18,7 @@ use crate::ast::types::{
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
-use crate::autofix::{fixer, fixes};
+use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -1955,8 +1955,8 @@ impl<'a> Checker<'a> {
                             .collect();
 
                         let removal_fn = match kind {
-                            ImportKind::Import => fixes::remove_unused_imports,
-                            ImportKind::ImportFrom => fixes::remove_unused_import_froms,
+                            ImportKind::Import => pyflakes::fixes::remove_unused_imports,
+                            ImportKind::ImportFrom => pyflakes::fixes::remove_unused_import_froms,
                         };
 
                         match removal_fn(&mut self.locator, &full_names, child, parent, &deleted) {
