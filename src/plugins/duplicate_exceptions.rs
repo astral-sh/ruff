@@ -57,7 +57,7 @@ pub fn duplicate_handler_exceptions(
                         check.amend(Fix {
                             content,
                             location: expr.location,
-                            end_location: expr.end_location,
+                            end_location: expr.end_location.unwrap(),
                             applied: false,
                         })
                     }

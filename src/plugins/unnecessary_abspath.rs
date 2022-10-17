@@ -14,7 +14,7 @@ pub fn unnecessary_abspath(checker: &mut Checker, expr: &Expr, func: &Expr, args
             check.amend(Fix {
                 content: "__file__".to_string(),
                 location: expr.location,
-                end_location: expr.end_location,
+                end_location: expr.end_location.unwrap(),
                 applied: false,
             });
         }

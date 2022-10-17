@@ -234,7 +234,7 @@ pub fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Res
         // it with a `pass`.
         Ok(Fix {
             location: stmt.location,
-            end_location: stmt.end_location,
+            end_location: stmt.end_location.unwrap(),
             content: "pass".to_string(),
             applied: false,
         })
@@ -243,7 +243,7 @@ pub fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Res
         // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
         Ok(Fix {
             location: Location::new(stmt.location.row(), 1),
-            end_location: Location::new(stmt.end_location.row() + 1, 1),
+            end_location: Location::new(stmt.end_location.unwrap().row() + 1, 1),
             content: "".to_string(),
             applied: false,
         })
@@ -310,7 +310,7 @@ pub fn remove_unused_imports(
         Ok(Fix {
             content: state.to_string(),
             location: stmt.location,
-            end_location: stmt.end_location,
+            end_location: stmt.end_location.unwrap(),
             applied: false,
         })
     }
@@ -385,7 +385,7 @@ pub fn remove_unused_import_froms(
         Ok(Fix {
             content: state.to_string(),
             location: stmt.location,
-            end_location: stmt.end_location,
+            end_location: stmt.end_location.unwrap(),
             applied: false,
         })
     }

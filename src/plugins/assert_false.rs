@@ -50,7 +50,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: &Optio
                     check.amend(Fix {
                         content,
                         location: stmt.location,
-                        end_location: stmt.end_location,
+                        end_location: stmt.end_location.unwrap(),
                         applied: false,
                     })
                 }
