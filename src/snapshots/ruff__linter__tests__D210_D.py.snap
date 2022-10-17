@@ -9,7 +9,15 @@ expression: checks
   end_location:
     row: 283
     column: 34
-  fix: ~
+  fix:
+    content: Whitespace at the end.
+    location:
+      row: 283
+      column: 8
+    end_location:
+      row: 283
+      column: 31
+    applied: false
 - kind: NoSurroundingWhitespace
   location:
     row: 288
@@ -17,7 +25,15 @@ expression: checks
   end_location:
     row: 288
     column: 38
-  fix: ~
+  fix:
+    content: Whitespace at everywhere.
+    location:
+      row: 288
+      column: 8
+    end_location:
+      row: 288
+      column: 35
+    applied: false
 - kind: NoSurroundingWhitespace
   location:
     row: 294
@@ -25,5 +41,13 @@ expression: checks
   end_location:
     row: 297
     column: 8
-  fix: ~
+  fix:
+    content: Whitespace at the beginning.
+    location:
+      row: 294
+      column: 8
+    end_location:
+      row: 294
+      column: 37
+    applied: false
 

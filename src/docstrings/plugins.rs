@@ -8,12 +8,14 @@ use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind, Fix};
+use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::docstrings::google::check_google_section;
-use crate::docstrings::helpers::{indentation, leading_space};
+use crate::docstrings::helpers::{
+    indentation, leading_space, SINGLE_QUOTE_PREFIXES, TRIPLE_QUOTE_PREFIXES,
+};
 use crate::docstrings::numpy::check_numpy_section;
 use crate::docstrings::sections::section_contexts;
 use crate::docstrings::styles::SectionStyle;
-use crate::docstrings::types::{Definition, DefinitionKind};
 use crate::visibility::{is_init, is_magic, is_overload, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
@@ -282,7 +284,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                             );
                             if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
                             {
-                                check.amend(Fix::insertion(
+                                check.amend(Fix::replacement(
                                     "\n".to_string(),
                                     Location::new(docstring.location.row() - blank_lines_before, 1),
                                     Location::new(docstring.location.row(), 1),
@@ -313,7 +315,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                             Range::from_located(docstring),
                         );
                         if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                            check.amend(Fix::insertion(
+                            check.amend(Fix::replacement(
                                 "\n".to_string(),
                                 Location::new(docstring.end_location.row() + 1, 1),
                                 Location::new(
@@ -354,7 +356,7 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
                     Range::from_located(docstring),
                 );
                 if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
-                    check.amend(Fix::insertion(
+                    check.amend(Fix::replacement(
                         "\n".to_string(),
                         Location::new(docstring.location.row() + 1, 1),
                         Location::new(docstring.location.row() + 1 + blanks_count, 1),
@@ -466,13 +468,26 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                     let content = checker
                         .locator
                         .slice_source_code_range(&Range::from_located(docstring));
-                    if let Some(line) = content.lines().last() {
-                        let line = line.trim();
-                        if line != "\"\"\"" && line != "'''" {
-                            checker.add_check(Check::new(
+                    if let Some(last_line) = content.lines().last().map(|line| line.trim()) {
+                        if last_line != "\"\"\"" && last_line != "'''" {
+                            let mut check = Check::new(
                                 CheckKind::NewLineAfterLastParagraph,
                                 Range::from_located(docstring),
-                            ));
+                            );
+                            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
+                            {
+                                // Insert a newline just before the end-quote(s).
+                                let mut content = "\n".to_string();
+                                content.push_str(indentation(checker, docstring));
+                                check.amend(Fix::insertion(
+                                    content,
+                                    Location::new(
+                                        docstring.end_location.row(),
+                                        docstring.end_location.column() - "\"\"\"".len(),
+                                    ),
+                                ));
+                            }
+                            checker.add_check(check);
                         }
                     }
                     return;
@@ -492,14 +507,45 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
         {
             let mut lines = string.lines();
             if let Some(line) = lines.next() {
-                if line.trim().is_empty() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
                     return;
                 }
-                if line.starts_with(' ') || (matches!(lines.next(), None) && line.ends_with(' ')) {
-                    checker.add_check(Check::new(
+                if line != trimmed {
+                    let mut check = Check::new(
                         CheckKind::NoSurroundingWhitespace,
                         Range::from_located(docstring),
-                    ));
+                    );
+                    if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                        if let Some(first_line) = checker
+                            .locator
+                            .slice_source_code_range(&Range::from_located(docstring))
+                            .lines()
+                            .next()
+                            .map(|line| line.to_lowercase())
+                        {
+                            for pattern in TRIPLE_QUOTE_PREFIXES.iter().chain(SINGLE_QUOTE_PREFIXES)
+                            {
+                                if first_line.starts_with(pattern) {
+                                    check.amend(Fix::replacement(
+                                        trimmed.to_string(),
+                                        Location::new(
+                                            docstring.location.row(),
+                                            docstring.location.column() + pattern.len(),
+                                        ),
+                                        Location::new(
+                                            docstring.location.row(),
+                                            docstring.location.column()
+                                                + pattern.len()
+                                                + line.chars().count(),
+                                        ),
+                                    ));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    checker.add_check(check);
                 }
             }
         }
@@ -515,20 +561,14 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
         } = &docstring.node
         {
             if string.lines().nth(1).is_some() {
-                let content = checker
+                if let Some(first_line) = checker
                     .locator
-                    .slice_source_code_range(&Range::from_located(docstring));
-                if let Some(first_line) = content.lines().next() {
-                    let first_line = first_line.trim().to_lowercase();
-                    let starts_with_triple = first_line == "\"\"\""
-                        || first_line == "'''"
-                        || first_line == "u\"\"\""
-                        || first_line == "u'''"
-                        || first_line == "r\"\"\""
-                        || first_line == "r'''"
-                        || first_line == "ur\"\"\""
-                        || first_line == "ur'''";
-                    if starts_with_triple {
+                    .slice_source_code_range(&Range::from_located(docstring))
+                    .lines()
+                    .next()
+                    .map(|line| line.to_lowercase())
+                {
+                    if TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
                         if checker.settings.enabled.contains(&CheckCode::D212) {
                             checker.add_check(Check::new(
                                 CheckKind::MultiLineSummaryFirstLine,
@@ -557,11 +597,13 @@ pub fn triple_quotes(checker: &mut Checker, definition: &Definition) {
             ..
         } = &docstring.node
         {
-            let content = checker
+            if let Some(first_line) = checker
                 .locator
-                .slice_source_code_range(&Range::from_located(docstring));
-            if let Some(first_line) = content.lines().next() {
-                let first_line = first_line.trim().to_lowercase();
+                .slice_source_code_range(&Range::from_located(docstring))
+                .lines()
+                .next()
+                .map(|line| line.to_lowercase())
+            {
                 let starts_with_triple = if string.contains("\"\"\"") {
                     first_line.starts_with("'''")
                         || first_line.starts_with("u'''")

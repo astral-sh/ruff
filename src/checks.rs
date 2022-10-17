@@ -1202,13 +1202,16 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            CheckKind::DeprecatedUnittestAlias(_, _)
+            |CheckKind::BlankLineAfterLastSection(_)| CheckKind::BlankLineAfterSection(_)
+                | CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DuplicateHandlerException(_)
+                | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NoBlankLineAfterFunction(_)
                 | CheckKind::NoBlankLineAfterSummary
                 | CheckKind::NoBlankLineBeforeClass(_)
                 | CheckKind::NoBlankLineBeforeFunction(_)
+                | CheckKind::NoSurroundingWhitespace
                 | CheckKind::OneBlankLineAfterClass(_)
                 | CheckKind::OneBlankLineBeforeClass(_)
                 | CheckKind::PPrintFound
@@ -1244,11 +1247,20 @@ impl Fix {
         }
     }
 
-    pub fn insertion(content: String, start: Location, end: Location) -> Self {
+    pub fn replacement(content: String, start: Location, end: Location) -> Self {
         Self {
             content,
             location: start,
             end_location: end,
+            applied: false,
+        }
+    }
+
+    pub fn insertion(content: String, at: Location) -> Self {
+        Self {
+            content,
+            location: at,
+            end_location: at,
             applied: false,
         }
     }

@@ -7,9 +7,9 @@ use once_cell::sync::Lazy;
 
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
+use crate::docstrings::definition::Definition;
 use crate::docstrings::sections::SectionContext;
 use crate::docstrings::styles::SectionStyle;
-use crate::docstrings::types::Definition;
 use crate::docstrings::{helpers, sections};
 
 pub(crate) static LOWERCASE_NUMPY_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
