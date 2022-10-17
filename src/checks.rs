@@ -419,30 +419,30 @@ impl CheckCode {
             CheckCode::C402 => CheckKind::UnnecessaryGeneratorDict,
             CheckCode::C403 => CheckKind::UnnecessaryListComprehensionSet,
             CheckCode::C404 => CheckKind::UnnecessaryListComprehensionDict,
-            CheckCode::C405 => CheckKind::UnnecessaryLiteralSet("<list/tuple>".to_string()),
-            CheckCode::C406 => CheckKind::UnnecessaryLiteralDict("<list/tuple>".to_string()),
+            CheckCode::C405 => CheckKind::UnnecessaryLiteralSet("(list|tuple)".to_string()),
+            CheckCode::C406 => CheckKind::UnnecessaryLiteralDict("(list|tuple)".to_string()),
             CheckCode::C408 => {
-                CheckKind::UnnecessaryCollectionCall("<dict/list/tuple>".to_string())
+                CheckKind::UnnecessaryCollectionCall("(dict|list|tuple)".to_string())
             }
             CheckCode::C409 => {
-                CheckKind::UnnecessaryLiteralWithinTupleCall("<list/tuple>".to_string())
+                CheckKind::UnnecessaryLiteralWithinTupleCall("(list|tuple)".to_string())
             }
             CheckCode::C410 => {
-                CheckKind::UnnecessaryLiteralWithinListCall("<list/tuple>".to_string())
+                CheckKind::UnnecessaryLiteralWithinListCall("(list|tuple)".to_string())
             }
             CheckCode::C411 => CheckKind::UnnecessaryListCall,
             CheckCode::C413 => {
-                CheckKind::UnnecessaryCallAroundSorted("<list/reversed>".to_string())
+                CheckKind::UnnecessaryCallAroundSorted("(list|reversed)".to_string())
             }
             CheckCode::C414 => CheckKind::UnnecessaryDoubleCastOrProcess(
-                "<list/reversed/set/sorted/tuple>".to_string(),
-                "<list/set/sorted/tuple>".to_string(),
+                "(list|reversed|set|sorted|tuple)".to_string(),
+                "(list|set|sorted|tuple)".to_string(),
             ),
             CheckCode::C415 => {
-                CheckKind::UnnecessarySubscriptReversal("<reversed/set/sorted>".to_string())
+                CheckKind::UnnecessarySubscriptReversal("(reversed|set|sorted)".to_string())
             }
-            CheckCode::C416 => CheckKind::UnnecessaryComprehension("<list/set>".to_string()),
-            CheckCode::C417 => CheckKind::UnnecessaryMap("<list/set/dict>".to_string()),
+            CheckCode::C416 => CheckKind::UnnecessaryComprehension("(list|set)".to_string()),
+            CheckCode::C417 => CheckKind::UnnecessaryMap("(list|set|dict)".to_string()),
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
@@ -955,71 +955,71 @@ impl CheckKind {
             }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {
-                "Unnecessary generator - rewrite as a list comprehension".to_string()
+                "Unnecessary generator (rewrite as a `list` comprehension)".to_string()
             }
             CheckKind::UnnecessaryGeneratorSet => {
-                "Unnecessary generator - rewrite as a set comprehension".to_string()
+                "Unnecessary generator (rewrite as a `set` comprehension)".to_string()
             }
             CheckKind::UnnecessaryGeneratorDict => {
-                "Unnecessary generator - rewrite as a dict comprehension".to_string()
+                "Unnecessary generator (rewrite as a `dict` comprehension)".to_string()
             }
             CheckKind::UnnecessaryListComprehensionSet => {
-                "Unnecessary list comprehension - rewrite as a set comprehension".to_string()
+                "Unnecessary `list` comprehension (rewrite as a `set` comprehension)".to_string()
             }
             CheckKind::UnnecessaryListComprehensionDict => {
-                "Unnecessary list comprehension - rewrite as a dict comprehension".to_string()
+                "Unnecessary `list` comprehension (rewrite as a `dict` comprehension)".to_string()
             }
             CheckKind::UnnecessaryLiteralSet(obj_type) => {
-                format!("Unnecessary {obj_type} literal - rewrite as a set literal")
+                format!("Unnecessary `{obj_type}` literal (rewrite as a `set` literal)")
             }
             CheckKind::UnnecessaryLiteralDict(obj_type) => {
-                format!("Unnecessary {obj_type} literal - rewrite as a dict literal")
+                format!("Unnecessary `{obj_type}` literal (rewrite as a `dict` literal)")
             }
             CheckKind::UnnecessaryCollectionCall(obj_type) => {
-                format!("Unnecessary {obj_type} call - rewrite as a literal")
+                format!("Unnecessary `{obj_type}` call (rewrite as a literal)")
             }
             CheckKind::UnnecessaryLiteralWithinTupleCall(literal) => {
                 if literal == "list" {
                     format!(
-                        "Unnecessary {literal} literal passed to tuple() - rewrite as a tuple literal"
+                        "Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` literal)"
                     )
                 } else {
                     format!(
-                        "Unnecessary {literal} literal passed to tuple() - remove the outer call to tuple()"
+                        "Unnecessary `{literal}` literal passed to `tuple()` (remove the outer call to `tuple()`)"
                     )
                 }
             }
             CheckKind::UnnecessaryLiteralWithinListCall(literal) => {
                 if literal == "list" {
                     format!(
-                        "Unnecessary {literal} literal passed to list() - remove the outer call to list()"
+                        "Unnecessary `{literal}` literal passed to `list()` (remove the outer call to `list()`)"
                     )
                 } else {
                     format!(
-                        "Unnecessary {literal} literal passed to list() - rewrite as a list literal"
+                        "Unnecessary `{literal}` literal passed to `list()` (rewrite as a `list` literal)"
                     )
                 }
             }
             CheckKind::UnnecessaryListCall => {
-                "Unnecessary list call - remove the outer call to list()".to_string()
+                "Unnecessary `list` call (remove the outer call to `list()`)".to_string()
             }
             CheckKind::UnnecessaryCallAroundSorted(func) => {
-                format!("Unnecessary {func} call around sorted()")
+                format!("Unnecessary `{func}` call around `sorted()`")
             }
             CheckKind::UnnecessaryDoubleCastOrProcess(inner, outer) => {
-                format!("Unnecessary {inner} call within {outer}()")
+                format!("Unnecessary `{inner}` call within `{outer}()`")
             }
             CheckKind::UnnecessarySubscriptReversal(func) => {
-                format!("Unnecessary subscript reversal of iterable within {func}()")
+                format!("Unnecessary subscript reversal of iterable within `{func}()`")
             }
             CheckKind::UnnecessaryComprehension(obj_type) => {
-                format!(" Unnecessary {obj_type} comprehension - rewrite using {obj_type}()")
+                format!(" Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`)")
             }
             CheckKind::UnnecessaryMap(obj_type) => {
                 if obj_type == "generator" {
-                    "Unnecessary map usage - rewrite using a generator expression".to_string()
+                    "Unnecessary `map` usage (rewrite using a generator expression)".to_string()
                 } else {
-                    format!("Unnecessary map usage - rewrite using a {obj_type} comprehension")
+                    format!("Unnecessary `map` usage (rewrite using a `{obj_type}` comprehension)")
                 }
             }
             // flake8-print
