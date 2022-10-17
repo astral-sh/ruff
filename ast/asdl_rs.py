@@ -190,7 +190,7 @@ class StructVisitor(TypeInfoEmitVisitor):
             self.sum_with_constructors(sum, name, depth)
 
     def emit_attrs(self, depth):
-        self.emit("#[derive(Debug, PartialEq)]", depth)
+        self.emit("#[derive(Clone, Debug, PartialEq)]", depth)
 
     def simple_sum(self, sum, name, depth):
         rustname = get_rust_type(name)
