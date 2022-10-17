@@ -5,7 +5,7 @@ use std::path::Path;
 use rustpython_ast::{Stmt, StmtKind};
 
 use crate::ast::helpers::match_name_or_attr;
-use crate::docstrings::types::Documentable;
+use crate::docstrings::definition::Documentable;
 
 #[derive(Debug, Clone)]
 pub enum Modifier {

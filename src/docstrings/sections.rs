@@ -1,15 +1,16 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
-use rustpython_ast::{Arg, StmtKind};
+use rustpython_ast::{Arg, Location, StmtKind};
 use titlecase::titlecase;
 
 use crate::ast::types::Range;
+use crate::autofix::fixer;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind, Fix};
+use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::docstrings::helpers;
 use crate::docstrings::styles::SectionStyle;
-use crate::docstrings::types::{Definition, DefinitionKind};
 use crate::visibility::is_static;
 
 #[derive(Debug)]
@@ -282,17 +283,43 @@ pub(crate) fn check_common_section(
     {
         if context.is_last_section {
             if checker.settings.enabled.contains(&CheckCode::D413) {
-                checker.add_check(Check::new(
+                let mut check = Check::new(
                     CheckKind::BlankLineAfterLastSection(context.section_name.to_string()),
                     Range::from_located(docstring),
-                ))
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    check.amend(Fix::insertion(
+                        "\n".to_string(),
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + context.following_lines.len(),
+                            1,
+                        ),
+                    ))
+                }
+                checker.add_check(check);
             }
         } else {
             if checker.settings.enabled.contains(&CheckCode::D410) {
-                checker.add_check(Check::new(
+                let mut check = Check::new(
                     CheckKind::BlankLineAfterSection(context.section_name.to_string()),
                     Range::from_located(docstring),
-                ))
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    check.amend(Fix::insertion(
+                        "\n".to_string(),
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + context.following_lines.len(),
+                            1,
+                        ),
+                    ))
+                }
+                checker.add_check(check);
             }
         }
     }

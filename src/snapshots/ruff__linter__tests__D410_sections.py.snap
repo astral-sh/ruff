@@ -10,7 +10,15 @@ expression: checks
   end_location:
     row: 78
     column: 8
-  fix: ~
+  fix:
+    content: "\n"
+    location:
+      row: 71
+      column: 1
+    end_location:
+      row: 71
+      column: 1
+    applied: false
 - kind:
     BlankLineAfterSection: Returns
   location:
@@ -19,5 +27,13 @@ expression: checks
   end_location:
     row: 221
     column: 8
-  fix: ~
+  fix:
+    content: "\n"
+    location:
+      row: 218
+      column: 1
+    end_location:
+      row: 218
+      column: 1
+    applied: false
 
