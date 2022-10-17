@@ -1,8 +1,8 @@
 use rustpython_ast::{Expr, Keyword, Stmt};
 
-use crate::ast::checkers;
 use crate::autofix::{fixer, fixes};
 use crate::check_ast::Checker;
+use crate::pyupgrade::checks;
 
 pub fn useless_object_inheritance(
     checker: &mut Checker,
@@ -12,7 +12,7 @@ pub fn useless_object_inheritance(
     keywords: &[Keyword],
 ) {
     let scope = checker.current_scope();
-    if let Some(mut check) = checkers::useless_object_inheritance(name, bases, scope) {
+    if let Some(mut check) = checks::useless_object_inheritance(name, bases, scope) {
         if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
             if let Some(fix) = fixes::remove_class_def_base(
                 &mut checker.locator,

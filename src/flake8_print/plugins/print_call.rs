@@ -1,13 +1,13 @@
 use log::error;
 use rustpython_ast::{Expr, Stmt, StmtKind};
 
-use crate::ast::checkers;
 use crate::autofix::{fixer, fixes};
 use crate::check_ast::Checker;
 use crate::checks::CheckCode;
+use crate::flake8_print::checks;
 
 pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let Some(mut check) = checkers::print_call(
+    if let Some(mut check) = checks::print_call(
         expr,
         func,
         checker.settings.enabled.contains(&CheckCode::T201),

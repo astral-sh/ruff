@@ -17,15 +17,18 @@ use crate::ast::types::{
     ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
-use crate::ast::{checkers, helpers, operations, visitor};
+use crate::ast::{helpers, operations, visitor};
 use crate::autofix::{fixer, fixes};
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::pydocstyle::definition::{Definition, DefinitionKind, Documentable};
+use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::settings::{PythonVersion, Settings};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
-use crate::{plugins, pydocstyle, pyupgrade};
+use crate::{
+    docstrings, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pyupgrade,
+};
 
 pub const GLOBAL_SCOPE_INDEX: usize = 0;
 
@@ -162,25 +165,26 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
                     let location = self.locate_check(Range::from_located(stmt));
-                    self.checks.extend(
-                        names
-                            .iter()
-                            .filter_map(|name| checkers::ambiguous_variable_name(name, location)),
-                    );
+                    self.checks.extend(names.iter().filter_map(|name| {
+                        pycodestyle::checks::ambiguous_variable_name(name, location)
+                    }));
                 }
             }
             StmtKind::Break => {
                 if self.settings.enabled.contains(&CheckCode::F701) {
-                    if let Some(check) =
-                        checkers::break_outside_loop(stmt, &self.parents, &self.parent_stack, self)
-                    {
+                    if let Some(check) = pyflakes::checks::break_outside_loop(
+                        stmt,
+                        &self.parents,
+                        &self.parent_stack,
+                        self,
+                    ) {
                         self.checks.push(check);
                     }
                 }
             }
             StmtKind::Continue => {
                 if self.settings.enabled.contains(&CheckCode::F702) {
-                    if let Some(check) = checkers::continue_outside_loop(
+                    if let Some(check) = pyflakes::checks::continue_outside_loop(
                         stmt,
                         &self.parents,
                         &self.parent_stack,
@@ -205,7 +209,7 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::E743) {
-                    if let Some(check) = checkers::ambiguous_function_name(
+                    if let Some(check) = pycodestyle::checks::ambiguous_function_name(
                         name,
                         self.locate_check(Range::from_located(stmt)),
                     ) {
@@ -214,23 +218,25 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N802) {
-                    if let Some(check) = checkers::invalid_function_name(stmt, name) {
+                    if let Some(check) = pep8_naming::checks::invalid_function_name(stmt, name) {
                         self.checks.push(check);
                     }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N804) {
-                    if let Some(check) = checkers::invalid_first_argument_name_for_class_method(
-                        self.current_scope(),
-                        decorator_list,
-                        args,
-                    ) {
+                    if let Some(check) =
+                        pep8_naming::checks::invalid_first_argument_name_for_class_method(
+                            self.current_scope(),
+                            decorator_list,
+                            args,
+                        )
+                    {
                         self.checks.push(check);
                     }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N805) {
-                    if let Some(check) = checkers::invalid_first_argument_name_for_method(
+                    if let Some(check) = pep8_naming::checks::invalid_first_argument_name_for_method(
                         self.current_scope(),
                         decorator_list,
                         args,
@@ -317,7 +323,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E742) {
-                    if let Some(check) = checkers::ambiguous_class_name(
+                    if let Some(check) = pycodestyle::checks::ambiguous_class_name(
                         name,
                         self.locate_check(Range::from_located(stmt)),
                     ) {
@@ -326,7 +332,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N801) {
-                    if let Some(check) = checkers::invalid_class_name(stmt, name) {
+                    if let Some(check) = pep8_naming::checks::invalid_class_name(stmt, name) {
                         self.checks.push(check);
                     }
                 }
@@ -524,7 +530,7 @@ where
             StmtKind::Raise { exc, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F901) {
                     if let Some(expr) = exc {
-                        if let Some(check) = checkers::raise_not_implemented(expr) {
+                        if let Some(check) = pyflakes::checks::raise_not_implemented(expr) {
                             self.checks.push(check);
                         }
                     }
@@ -535,32 +541,32 @@ where
             }
             StmtKind::If { test, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F634) {
-                    plugins::if_tuple(self, stmt, test);
+                    pyflakes::plugins::if_tuple(self, stmt, test);
                 }
             }
             StmtKind::Assert { test, msg } => {
                 if self.settings.enabled.contains(&CheckCode::F631) {
-                    plugins::assert_tuple(self, stmt, test);
+                    pyflakes::plugins::assert_tuple(self, stmt, test);
                 }
                 if self.settings.enabled.contains(&CheckCode::B011) {
-                    plugins::assert_false(self, stmt, test, msg);
+                    flake8_bugbear::plugins::assert_false(self, stmt, test, msg);
                 }
             }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
-                    if let Some(check) = checkers::default_except_not_last(handlers) {
+                    if let Some(check) = pyflakes::checks::default_except_not_last(handlers) {
                         self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::B014)
                     || self.settings.enabled.contains(&CheckCode::B025)
                 {
-                    plugins::duplicate_exceptions(self, stmt, handlers);
+                    flake8_bugbear::plugins::duplicate_exceptions(self, stmt, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
-                    if let Some(check) = checkers::do_not_assign_lambda(
+                    if let Some(check) = pycodestyle::checks::do_not_assign_lambda(
                         value,
                         self.locate_check(Range::from_located(stmt)),
                     ) {
@@ -574,7 +580,7 @@ where
             StmtKind::AnnAssign { value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
                     if let Some(value) = value {
-                        if let Some(check) = checkers::do_not_assign_lambda(
+                        if let Some(check) = pycodestyle::checks::do_not_assign_lambda(
                             value,
                             self.locate_check(Range::from_located(stmt)),
                         ) {
@@ -591,7 +597,7 @@ where
         let prev_visible_scope = self.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
-                let definition = pydocstyle::extraction::extract(
+                let definition = docstrings::extraction::extract(
                     &self.visible_scope,
                     stmt,
                     body,
@@ -609,7 +615,7 @@ where
                 ));
             }
             StmtKind::ClassDef { body, .. } => {
-                let definition = pydocstyle::extraction::extract(
+                let definition = docstrings::extraction::extract(
                     &self.visible_scope,
                     stmt,
                     body,
@@ -714,7 +720,7 @@ where
                         self.settings.enabled.contains(&CheckCode::F621);
                     let check_two_starred_expressions =
                         self.settings.enabled.contains(&CheckCode::F622);
-                    if let Some(check) = checkers::starred_expressions(
+                    if let Some(check) = pyflakes::checks::starred_expressions(
                         elts,
                         check_too_many_expressions,
                         check_two_starred_expressions,
@@ -737,7 +743,7 @@ where
                 }
                 ExprContext::Store => {
                     if self.settings.enabled.contains(&CheckCode::E741) {
-                        if let Some(check) = checkers::ambiguous_variable_name(
+                        if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                             id,
                             self.locate_check(Range::from_located(expr)),
                         ) {
@@ -782,31 +788,39 @@ where
                 if self.settings.enabled.contains(&CheckCode::T201)
                     || self.settings.enabled.contains(&CheckCode::T203)
                 {
-                    plugins::print_call(self, expr, func);
+                    flake8_print::plugins::print_call(self, expr, func);
                 }
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {
-                    if let Some(check) = checkers::unnecessary_generator_list(expr, func, args) {
+                    if let Some(check) =
+                        flake8_comprehensions::checks::unnecessary_generator_list(expr, func, args)
+                    {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C401) {
-                    if let Some(check) = checkers::unnecessary_generator_set(expr, func, args) {
+                    if let Some(check) =
+                        flake8_comprehensions::checks::unnecessary_generator_set(expr, func, args)
+                    {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C402) {
-                    if let Some(check) = checkers::unnecessary_generator_dict(expr, func, args) {
+                    if let Some(check) =
+                        flake8_comprehensions::checks::unnecessary_generator_dict(expr, func, args)
+                    {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C403) {
                     if let Some(check) =
-                        checkers::unnecessary_list_comprehension_set(expr, func, args)
+                        flake8_comprehensions::checks::unnecessary_list_comprehension_set(
+                            expr, func, args,
+                        )
                     {
                         self.checks.push(check);
                     };
@@ -814,35 +828,43 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C404) {
                     if let Some(check) =
-                        checkers::unnecessary_list_comprehension_dict(expr, func, args)
+                        flake8_comprehensions::checks::unnecessary_list_comprehension_dict(
+                            expr, func, args,
+                        )
                     {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C405) {
-                    if let Some(check) = checkers::unnecessary_literal_set(expr, func, args) {
+                    if let Some(check) =
+                        flake8_comprehensions::checks::unnecessary_literal_set(expr, func, args)
+                    {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C406) {
-                    if let Some(check) = checkers::unnecessary_literal_dict(expr, func, args) {
+                    if let Some(check) =
+                        flake8_comprehensions::checks::unnecessary_literal_dict(expr, func, args)
+                    {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C408) {
-                    if let Some(check) =
-                        checkers::unnecessary_collection_call(expr, func, args, keywords)
-                    {
+                    if let Some(check) = flake8_comprehensions::checks::unnecessary_collection_call(
+                        expr, func, args, keywords,
+                    ) {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C409) {
                     if let Some(check) =
-                        checkers::unnecessary_literal_within_tuple_call(expr, func, args)
+                        flake8_comprehensions::checks::unnecessary_literal_within_tuple_call(
+                            expr, func, args,
+                        )
                     {
                         self.checks.push(check);
                     };
@@ -850,20 +872,27 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C410) {
                     if let Some(check) =
-                        checkers::unnecessary_literal_within_list_call(expr, func, args)
+                        flake8_comprehensions::checks::unnecessary_literal_within_list_call(
+                            expr, func, args,
+                        )
                     {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C411) {
-                    if let Some(check) = checkers::unnecessary_list_call(expr, func, args) {
+                    if let Some(check) =
+                        flake8_comprehensions::checks::unnecessary_list_call(expr, func, args)
+                    {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C413) {
-                    if let Some(check) = checkers::unnecessary_call_around_sorted(expr, func, args)
+                    if let Some(check) =
+                        flake8_comprehensions::checks::unnecessary_call_around_sorted(
+                            expr, func, args,
+                        )
                     {
                         self.checks.push(check);
                     };
@@ -871,21 +900,28 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C414) {
                     if let Some(check) =
-                        checkers::unnecessary_double_cast_or_process(expr, func, args)
+                        flake8_comprehensions::checks::unnecessary_double_cast_or_process(
+                            expr, func, args,
+                        )
                     {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C415) {
-                    if let Some(check) = checkers::unnecessary_subscript_reversal(expr, func, args)
+                    if let Some(check) =
+                        flake8_comprehensions::checks::unnecessary_subscript_reversal(
+                            expr, func, args,
+                        )
                     {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C417) {
-                    if let Some(check) = checkers::unnecessary_map(expr, func, args) {
+                    if let Some(check) =
+                        flake8_comprehensions::checks::unnecessary_map(expr, func, args)
+                    {
                         self.checks.push(check);
                     };
                 }
@@ -920,7 +956,7 @@ where
                 let check_repeated_literals = self.settings.enabled.contains(&CheckCode::F601);
                 let check_repeated_variables = self.settings.enabled.contains(&CheckCode::F602);
                 if check_repeated_literals || check_repeated_variables {
-                    self.checks.extend(checkers::repeated_keys(
+                    self.checks.extend(pyflakes::checks::repeated_keys(
                         keys,
                         check_repeated_literals,
                         check_repeated_variables,
@@ -960,14 +996,14 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::F633) {
-                    plugins::invalid_print_syntax(self, left);
+                    pyflakes::plugins::invalid_print_syntax(self, left);
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
                 let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
                 let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
                 if check_not_in || check_not_is {
-                    self.checks.extend(checkers::not_tests(
+                    self.checks.extend(pycodestyle::checks::not_tests(
                         op,
                         operand,
                         check_not_in,
@@ -984,7 +1020,7 @@ where
                 let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
                 let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
                 if check_none_comparisons || check_true_false_comparisons {
-                    self.checks.extend(checkers::literal_comparisons(
+                    self.checks.extend(pycodestyle::checks::literal_comparisons(
                         left,
                         ops,
                         comparators,
@@ -995,7 +1031,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::F632) {
-                    self.checks.extend(checkers::is_literal(
+                    self.checks.extend(pyflakes::checks::is_literal(
                         left,
                         ops,
                         comparators,
@@ -1004,7 +1040,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E721) {
-                    self.checks.extend(checkers::type_comparison(
+                    self.checks.extend(pycodestyle::checks::type_comparison(
                         ops,
                         comparators,
                         self.locate_check(Range::from_located(expr)),
@@ -1057,8 +1093,9 @@ where
 
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&CheckCode::C416) {
-                    if let Some(check) = checkers::unnecessary_comprehension(expr, elt, generators)
-                    {
+                    if let Some(check) = flake8_comprehensions::checks::unnecessary_comprehension(
+                        expr, elt, generators,
+                    ) {
                         self.checks.push(check);
                     };
                 }
@@ -1241,7 +1278,7 @@ where
                 match name {
                     Some(name) => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) = checkers::ambiguous_variable_name(
+                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                                 name,
                                 self.locate_check(Range::from_located(excepthandler)),
                             ) {
@@ -1309,7 +1346,8 @@ where
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
         if self.settings.enabled.contains(&CheckCode::F831) {
-            self.checks.extend(checkers::duplicate_arguments(arguments));
+            self.checks
+                .extend(pyflakes::checks::duplicate_arguments(arguments));
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them upstream.
@@ -1342,7 +1380,7 @@ where
         );
 
         if self.settings.enabled.contains(&CheckCode::E741) {
-            if let Some(check) = checkers::ambiguous_variable_name(
+            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                 &arg.node.arg,
                 self.locate_check(Range::from_located(arg)),
             ) {
@@ -1352,7 +1390,7 @@ where
 
         if self.settings.enabled.contains(&CheckCode::N803) {
             if let Some(check) =
-                checkers::invalid_argument_name(Range::from_located(arg), &arg.node.arg)
+                pep8_naming::checks::invalid_argument_name(Range::from_located(arg), &arg.node.arg)
             {
                 self.checks.push(check);
             }
@@ -1707,7 +1745,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let docstring = pydocstyle::extraction::docstring_from(python_ast);
+        let docstring = docstrings::extraction::docstring_from(python_ast);
         self.docstrings.push((
             Definition {
                 kind: if self.path.ends_with("__init__.py") {
@@ -1798,7 +1836,7 @@ impl<'a> Checker<'a> {
     fn check_deferred_assignments(&mut self) {
         if self.settings.enabled.contains(&CheckCode::F841) {
             while let Some(index) = self.deferred_assignments.pop() {
-                self.checks.extend(checkers::unused_variables(
+                self.checks.extend(pyflakes::checks::unused_variables(
                     &self.scopes[index],
                     self,
                     &self.settings.dummy_variable_rgx,
@@ -2031,23 +2069,22 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_shadowing(&mut self, name: &str, location: Range, is_attribute: bool) {
-        // flake8-builtins
         if is_attribute && matches!(self.current_scope().kind, ScopeKind::Class) {
             if self.settings.enabled.contains(&CheckCode::A003) {
-                if let Some(check) = checkers::builtin_shadowing(
+                if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
                     self.locate_check(location),
-                    checkers::ShadowingType::Attribute,
+                    flake8_builtins::types::ShadowingType::Attribute,
                 ) {
                     self.checks.push(check);
                 }
             }
         } else {
             if self.settings.enabled.contains(&CheckCode::A001) {
-                if let Some(check) = checkers::builtin_shadowing(
+                if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
                     self.locate_check(location),
-                    checkers::ShadowingType::Variable,
+                    flake8_builtins::types::ShadowingType::Variable,
                 ) {
                     self.checks.push(check);
                 }
@@ -2056,12 +2093,11 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_arg_shadowing(&mut self, name: &str, location: Range) {
-        // flake8-builtins
         if self.settings.enabled.contains(&CheckCode::A002) {
-            if let Some(check) = checkers::builtin_shadowing(
+            if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                 name,
                 self.locate_check(location),
-                checkers::ShadowingType::Argument,
+                flake8_builtins::types::ShadowingType::Argument,
             ) {
                 self.checks.push(check);
             }

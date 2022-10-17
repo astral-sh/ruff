@@ -2,7 +2,7 @@
 
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::pydocstyle::definition::{Definition, DefinitionKind, Documentable};
+use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 use crate::visibility::{Modifier, VisibleScope};
 
 /// Extract a docstring from a function or class body.

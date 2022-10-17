@@ -5,8 +5,8 @@ use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter, EnumString};
 
-use crate::ast::checkers::Primitive;
 use crate::ast::types::Range;
+use crate::pyupgrade::types::Primitive;
 
 #[derive(
     AsRefStr,
@@ -211,18 +211,29 @@ pub enum CheckKind {
     AmbiguousClassName(String),
     AmbiguousFunctionName(String),
     AmbiguousVariableName(String),
+    DoNotAssignLambda,
+    DoNotUseBareExcept,
+    IOError(String),
+    LineTooLong(usize, usize),
+    ModuleImportNotAtTopOfFile,
+    NoneComparison(RejectedCmpop),
+    NotInTest,
+    NotIsTest,
+    SyntaxError(String),
+    TrueFalseComparison(bool, RejectedCmpop),
+    TypeComparison,
+    // pycodestyle warnings
+    NoNewLineAtEndOfFile,
+    // pyflakes
     AssertTuple,
     BreakOutsideLoop,
     ContinueOutsideLoop,
     DefaultExceptNotLast,
-    DoNotAssignLambda,
-    DoNotUseBareExcept,
     DuplicateArgumentName,
     ExpressionsInStarAssignment,
     FStringMissingPlaceholders,
     ForwardAnnotationSyntaxError(String),
     FutureFeatureNotDefined(String),
-    IOError(String),
     IfTuple,
     ImportShadowedByLoopVar(String, usize),
     ImportStarNotPermitted(String),
@@ -231,28 +242,18 @@ pub enum CheckKind {
     InvalidPrintSyntax,
     IsLiteral,
     LateFutureImport,
-    LineTooLong(usize, usize),
-    ModuleImportNotAtTopOfFile,
     MultiValueRepeatedKeyLiteral,
     MultiValueRepeatedKeyVariable(String),
-    NoneComparison(RejectedCmpop),
-    NotInTest,
-    NotIsTest,
     RaiseNotImplemented,
     ReturnOutsideFunction,
-    SyntaxError(String),
-    TrueFalseComparison(bool, RejectedCmpop),
     TwoStarredExpressions,
-    TypeComparison,
     UndefinedExport(String),
     UndefinedLocal(String),
     UndefinedName(String),
     UnusedImport(Vec<String>),
     UnusedVariable(String),
     YieldOutsideFunction,
-    // pycodestyle warnings
-    NoNewLineAtEndOfFile,
-    // flake8-builtin
+    // flake8-builtins
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
     BuiltinAttributeShadowing(String),
