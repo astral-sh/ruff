@@ -5,11 +5,10 @@
 //! parse a whole program, a single statement, or a single
 //! expression.
 
-use std::iter;
-
 use crate::lexer::LexResult;
 pub use crate::mode::Mode;
 use crate::{ast, error::ParseError, lexer, python};
+use std::iter;
 
 /*
  * Parse python code.
@@ -20,17 +19,6 @@ use crate::{ast, error::ParseError, lexer, python};
 /// Parse a full python program, containing usually multiple lines.
 pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, ParseError> {
     parse(source, Mode::Module, source_path).map(|top| match top {
-        ast::Mod::Module { body, .. } => body,
-        _ => unreachable!(),
-    })
-}
-
-/// Parse the token stream for a full python program.
-pub fn parse_program_tokens(
-    lxr: impl IntoIterator<Item=LexResult>,
-    source_path: &str,
-) -> Result<ast::Suite, ParseError> {
-    parse_tokens(lxr, Mode::Module, source_path).map(|top| match top {
         ast::Mod::Module { body, .. } => body,
         _ => unreachable!(),
     })
@@ -95,7 +83,7 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
 
 // Parse a given token iterator.
 pub fn parse_tokens(
-    lxr: impl IntoIterator<Item=LexResult>,
+    lxr: impl IntoIterator<Item = LexResult>,
     mode: Mode,
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
