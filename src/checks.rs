@@ -1202,7 +1202,8 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            |CheckKind::BlankLineAfterLastSection(_)| CheckKind::BlankLineAfterSection(_)
+            CheckKind::BlankLineAfterLastSection(_)
+                | CheckKind::BlankLineAfterSection(_)
                 | CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DuplicateHandlerException(_)
