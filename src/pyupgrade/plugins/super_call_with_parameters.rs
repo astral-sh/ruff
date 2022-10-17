@@ -1,8 +1,9 @@
 use rustpython_ast::{Expr, Stmt};
 
-use crate::ast::{checkers, helpers};
+use crate::ast::helpers;
 use crate::autofix::{fixer, fixes};
 use crate::check_ast::Checker;
+use crate::pyupgrade::checks;
 
 pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     // Only bother going through the super check at all if we're in a `super` call.
@@ -14,7 +15,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
             .iter()
             .map(|index| checker.parents[*index])
             .collect();
-        if let Some(mut check) = checkers::super_args(scope, &parents, expr, func, args) {
+        if let Some(mut check) = checks::super_args(scope, &parents, expr, func, args) {
             if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                 if let Some(fix) = fixes::remove_super_arguments(&mut checker.locator, expr) {
                     check.amend(fix);

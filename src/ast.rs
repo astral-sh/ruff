@@ -1,4 +1,3 @@
-pub mod checkers;
 pub mod helpers;
 pub mod operations;
 pub mod relocate;

@@ -1,22 +1,20 @@
-//! Abstractions for tracking and validating docstrings in Python code.
+use std::collections::BTreeSet;
 
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Constant, ExprKind, Location, StmtKind};
+use rustpython_ast::{Arg, Constant, ExprKind, Location, StmtKind};
+use titlecase::titlecase;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind, Fix};
 use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::docstrings::google::check_google_section;
-use crate::docstrings::helpers::{
-    indentation, leading_space, SINGLE_QUOTE_PREFIXES, TRIPLE_QUOTE_PREFIXES,
-};
-use crate::docstrings::numpy::check_numpy_section;
-use crate::docstrings::sections::section_contexts;
+use crate::docstrings::helpers;
+use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
-use crate::visibility::{is_init, is_magic, is_overload, Visibility};
+use crate::visibility::{is_init, is_magic, is_overload, is_static, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub fn not_missing(
@@ -385,7 +383,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
             let mut has_seen_over_indent = false;
             let mut has_seen_under_indent = false;
 
-            let docstring_indent = indentation(checker, docstring).to_string();
+            let docstring_indent = helpers::indentation(checker, docstring).to_string();
             if !has_seen_tab {
                 if docstring_indent.contains('\t') {
                     if checker.settings.enabled.contains(&CheckCode::D206) {
@@ -410,7 +408,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                     continue;
                 }
 
-                let line_indent = leading_space(lines[i]);
+                let line_indent = helpers::leading_space(lines[i]);
                 if !has_seen_tab {
                     if line_indent.contains('\t') {
                         if checker.settings.enabled.contains(&CheckCode::D206) {
@@ -478,7 +476,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                             {
                                 // Insert a newline just before the end-quote(s).
                                 let mut content = "\n".to_string();
-                                content.push_str(indentation(checker, docstring));
+                                content.push_str(helpers::indentation(checker, docstring));
                                 check.amend(Fix::insertion(
                                     content,
                                     Location::new(
@@ -524,7 +522,9 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
                             .next()
                             .map(|line| line.to_lowercase())
                         {
-                            for pattern in TRIPLE_QUOTE_PREFIXES.iter().chain(SINGLE_QUOTE_PREFIXES)
+                            for pattern in helpers::TRIPLE_QUOTE_PREFIXES
+                                .iter()
+                                .chain(helpers::SINGLE_QUOTE_PREFIXES)
                             {
                                 if first_line.starts_with(pattern) {
                                     check.amend(Fix::replacement(
@@ -568,7 +568,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
                     .next()
                     .map(|line| line.to_lowercase())
                 {
-                    if TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
+                    if helpers::TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
                         if checker.settings.enabled.contains(&CheckCode::D212) {
                             checker.add_check(Check::new(
                                 CheckKind::MultiLineSummaryFirstLine,
@@ -812,15 +812,426 @@ pub fn sections(checker: &mut Checker, definition: &Definition) {
             let mut found_numpy_section = false;
             for context in &section_contexts(&lines, &SectionStyle::NumPy) {
                 found_numpy_section = true;
-                check_numpy_section(checker, definition, context);
+                numpy_section(checker, definition, context);
             }
 
             // If no such sections were identified, interpret as Google-style sections.
             if !found_numpy_section {
                 for context in &section_contexts(&lines, &SectionStyle::Google) {
-                    check_google_section(checker, definition, context);
+                    google_section(checker, definition, context);
                 }
             }
+        }
+    }
+}
+
+fn blanks_and_section_underline(
+    checker: &mut Checker,
+    definition: &Definition,
+    context: &SectionContext,
+) {
+    let docstring = definition
+        .docstring
+        .expect("Sections are only available for docstrings.");
+
+    let mut blank_lines_after_header = 0;
+    for line in context.following_lines {
+        if !line.trim().is_empty() {
+            break;
+        }
+        blank_lines_after_header += 1;
+    }
+
+    // Nothing but blank lines after the section header.
+    if blank_lines_after_header == context.following_lines.len() {
+        if checker.settings.enabled.contains(&CheckCode::D407) {
+            checker.add_check(Check::new(
+                CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
+                Range::from_located(docstring),
+            ));
+        }
+        if checker.settings.enabled.contains(&CheckCode::D414) {
+            checker.add_check(Check::new(
+                CheckKind::NonEmptySection(context.section_name.to_string()),
+                Range::from_located(docstring),
+            ));
+        }
+        return;
+    }
+
+    let non_empty_line = context.following_lines[blank_lines_after_header];
+    let dash_line_found = non_empty_line
+        .chars()
+        .all(|char| char.is_whitespace() || char == '-');
+
+    if !dash_line_found {
+        if checker.settings.enabled.contains(&CheckCode::D407) {
+            checker.add_check(Check::new(
+                CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
+                Range::from_located(docstring),
+            ));
+        }
+        if blank_lines_after_header > 0 {
+            if checker.settings.enabled.contains(&CheckCode::D212) {
+                checker.add_check(Check::new(
+                    CheckKind::NoBlankLinesBetweenHeaderAndContent(
+                        context.section_name.to_string(),
+                    ),
+                    Range::from_located(docstring),
+                ));
+            }
+        }
+    } else {
+        if blank_lines_after_header > 0 {
+            if checker.settings.enabled.contains(&CheckCode::D408) {
+                checker.add_check(Check::new(
+                    CheckKind::SectionUnderlineAfterName(context.section_name.to_string()),
+                    Range::from_located(docstring),
+                ));
+            }
+        }
+
+        if non_empty_line
+            .trim()
+            .chars()
+            .filter(|char| *char == '-')
+            .count()
+            != context.section_name.len()
+        {
+            if checker.settings.enabled.contains(&CheckCode::D409) {
+                checker.add_check(Check::new(
+                    CheckKind::SectionUnderlineMatchesSectionLength(
+                        context.section_name.to_string(),
+                    ),
+                    Range::from_located(docstring),
+                ));
+            }
+        }
+
+        if checker.settings.enabled.contains(&CheckCode::D215) {
+            if helpers::leading_space(non_empty_line).len()
+                > helpers::indentation(checker, docstring).len()
+            {
+                checker.add_check(Check::new(
+                    CheckKind::SectionUnderlineNotOverIndented(context.section_name.to_string()),
+                    Range::from_located(docstring),
+                ));
+            }
+        }
+
+        let line_after_dashes_index = blank_lines_after_header + 1;
+
+        if line_after_dashes_index < context.following_lines.len() {
+            let line_after_dashes = context.following_lines[line_after_dashes_index];
+            if line_after_dashes.trim().is_empty() {
+                let rest_of_lines = &context.following_lines[line_after_dashes_index..];
+                if rest_of_lines.iter().all(|line| line.trim().is_empty()) {
+                    if checker.settings.enabled.contains(&CheckCode::D414) {
+                        checker.add_check(Check::new(
+                            CheckKind::NonEmptySection(context.section_name.to_string()),
+                            Range::from_located(docstring),
+                        ));
+                    }
+                } else {
+                    if checker.settings.enabled.contains(&CheckCode::D412) {
+                        checker.add_check(Check::new(
+                            CheckKind::NoBlankLinesBetweenHeaderAndContent(
+                                context.section_name.to_string(),
+                            ),
+                            Range::from_located(docstring),
+                        ));
+                    }
+                }
+            }
+        } else {
+            if checker.settings.enabled.contains(&CheckCode::D414) {
+                checker.add_check(Check::new(
+                    CheckKind::NonEmptySection(context.section_name.to_string()),
+                    Range::from_located(docstring),
+                ));
+            }
+        }
+    }
+}
+
+fn common_section(
+    checker: &mut Checker,
+    definition: &Definition,
+    context: &SectionContext,
+    style: &SectionStyle,
+) {
+    let docstring = definition
+        .docstring
+        .expect("Sections are only available for docstrings.");
+
+    if checker.settings.enabled.contains(&CheckCode::D405) {
+        if !style
+            .section_names()
+            .contains(&context.section_name.as_str())
+            && style
+                .section_names()
+                .contains(titlecase(&context.section_name).as_str())
+        {
+            checker.add_check(Check::new(
+                CheckKind::CapitalizeSectionName(context.section_name.to_string()),
+                Range::from_located(docstring),
+            ))
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D214) {
+        if helpers::leading_space(context.line).len()
+            > helpers::indentation(checker, docstring).len()
+        {
+            checker.add_check(Check::new(
+                CheckKind::SectionNotOverIndented(context.section_name.to_string()),
+                Range::from_located(docstring),
+            ))
+        }
+    }
+
+    if context
+        .following_lines
+        .last()
+        .map(|line| !line.trim().is_empty())
+        .unwrap_or(true)
+    {
+        if context.is_last_section {
+            if checker.settings.enabled.contains(&CheckCode::D413) {
+                let mut check = Check::new(
+                    CheckKind::BlankLineAfterLastSection(context.section_name.to_string()),
+                    Range::from_located(docstring),
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    check.amend(Fix::insertion(
+                        "\n".to_string(),
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + context.following_lines.len(),
+                            1,
+                        ),
+                    ))
+                }
+                checker.add_check(check);
+            }
+        } else {
+            if checker.settings.enabled.contains(&CheckCode::D410) {
+                let mut check = Check::new(
+                    CheckKind::BlankLineAfterSection(context.section_name.to_string()),
+                    Range::from_located(docstring),
+                );
+                if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    check.amend(Fix::insertion(
+                        "\n".to_string(),
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + context.following_lines.len(),
+                            1,
+                        ),
+                    ))
+                }
+                checker.add_check(check);
+            }
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D411) {
+        if !context.previous_line.is_empty() {
+            checker.add_check(Check::new(
+                CheckKind::BlankLineBeforeSection(context.section_name.to_string()),
+                Range::from_located(docstring),
+            ))
+        }
+    }
+
+    blanks_and_section_underline(checker, definition, context);
+}
+
+fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args: &BTreeSet<&str>) {
+    if let DefinitionKind::Function(parent)
+    | DefinitionKind::NestedFunction(parent)
+    | DefinitionKind::Method(parent) = definition.kind
+    {
+        if let StmtKind::FunctionDef {
+            args: arguments, ..
+        }
+        | StmtKind::AsyncFunctionDef {
+            args: arguments, ..
+        } = &parent.node
+        {
+            // Collect all the arguments into a single vector.
+            let mut all_arguments: Vec<&Arg> = arguments
+                .args
+                .iter()
+                .chain(arguments.posonlyargs.iter())
+                .chain(arguments.kwonlyargs.iter())
+                .skip(
+                    // If this is a non-static method, skip `cls` or `self`.
+                    if matches!(definition.kind, DefinitionKind::Method(_)) && !is_static(parent) {
+                        1
+                    } else {
+                        0
+                    },
+                )
+                .collect();
+            if let Some(arg) = &arguments.vararg {
+                all_arguments.push(arg);
+            }
+            if let Some(arg) = &arguments.kwarg {
+                all_arguments.push(arg);
+            }
+
+            // Look for arguments that weren't included in the docstring.
+            let mut missing_args: BTreeSet<&str> = Default::default();
+            for arg in all_arguments {
+                let arg_name = arg.node.arg.as_str();
+                if arg_name.starts_with('_') {
+                    continue;
+                }
+                if docstrings_args.contains(&arg_name) {
+                    continue;
+                }
+                missing_args.insert(arg_name);
+            }
+
+            if !missing_args.is_empty() {
+                let names = missing_args
+                    .into_iter()
+                    .map(String::from)
+                    .sorted()
+                    .collect();
+                checker.add_check(Check::new(
+                    CheckKind::DocumentAllArguments(names),
+                    Range::from_located(parent),
+                ));
+            }
+        }
+    }
+}
+
+// See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
+static GOOGLE_ARGS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\s*(\w+)\s*(\(.*?\))?\s*:\n?\s*.+").expect("Invalid regex"));
+
+fn args_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
+    let mut args_sections: Vec<String> = vec![];
+    for line in textwrap::dedent(&context.following_lines.join("\n")).lines() {
+        if line
+            .chars()
+            .next()
+            .map(|char| char.is_whitespace())
+            .unwrap_or(true)
+        {
+            // This is a continuation of documentation for the last
+            // parameter because it does start with whitespace.
+            if let Some(current) = args_sections.last_mut() {
+                current.push_str(line);
+            }
+        } else {
+            // This line is the start of documentation for the next
+            // parameter because it doesn't start with any whitespace.
+            args_sections.push(line.to_string());
+        }
+    }
+
+    missing_args(
+        checker,
+        definition,
+        // Collect the list of arguments documented in the docstring.
+        &BTreeSet::from_iter(args_sections.iter().filter_map(|section| {
+            match GOOGLE_ARGS_REGEX.captures(section.as_str()) {
+                Some(caps) => caps.get(1).map(|arg_name| arg_name.as_str()),
+                None => None,
+            }
+        })),
+    )
+}
+
+fn parameters_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
+    // Collect the list of arguments documented in the docstring.
+    let mut docstring_args: BTreeSet<&str> = Default::default();
+    let section_level_indent = helpers::leading_space(context.line);
+    for i in 1..context.following_lines.len() {
+        let current_line = context.following_lines[i - 1];
+        let current_leading_space = helpers::leading_space(current_line);
+        let next_line = context.following_lines[i];
+        if current_leading_space == section_level_indent
+            && (helpers::leading_space(next_line).len() > current_leading_space.len())
+            && !next_line.trim().is_empty()
+        {
+            let parameters = if let Some(semi_index) = current_line.find(':') {
+                // If the parameter has a type annotation, exclude it.
+                &current_line[..semi_index]
+            } else {
+                // Otherwise, it's just a list of parameters on the current line.
+                current_line.trim()
+            };
+            // Notably, NumPy lets you put multiple parameters of the same type on the same line.
+            for parameter in parameters.split(',') {
+                docstring_args.insert(parameter.trim());
+            }
+        }
+    }
+    // Validate that all arguments were documented.
+    missing_args(checker, definition, &docstring_args);
+}
+
+fn numpy_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
+    common_section(checker, definition, context, &SectionStyle::NumPy);
+
+    if checker.settings.enabled.contains(&CheckCode::D406) {
+        let suffix = context
+            .line
+            .trim()
+            .strip_prefix(&context.section_name)
+            .unwrap();
+        if !suffix.is_empty() {
+            let docstring = definition
+                .docstring
+                .expect("Sections are only available for docstrings.");
+            checker.add_check(Check::new(
+                CheckKind::NewLineAfterSectionName(context.section_name.to_string()),
+                Range::from_located(docstring),
+            ))
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D417) {
+        let capitalized_section_name = titlecase::titlecase(&context.section_name);
+        if capitalized_section_name == "Parameters" {
+            parameters_section(checker, definition, context);
+        }
+    }
+}
+
+fn google_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
+    common_section(checker, definition, context, &SectionStyle::Google);
+
+    if checker.settings.enabled.contains(&CheckCode::D416) {
+        let suffix = context
+            .line
+            .trim()
+            .strip_prefix(&context.section_name)
+            .unwrap();
+        if suffix != ":" {
+            let docstring = definition
+                .docstring
+                .expect("Sections are only available for docstrings.");
+            checker.add_check(Check::new(
+                CheckKind::SectionNameEndsInColon(context.section_name.to_string()),
+                Range::from_located(docstring),
+            ))
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D417) {
+        let capitalized_section_name = titlecase::titlecase(&context.section_name);
+        if capitalized_section_name == "Args" || capitalized_section_name == "Arguments" {
+            args_section(checker, definition, context);
         }
     }
 }
