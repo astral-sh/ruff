@@ -1007,7 +1007,7 @@ impl CheckKind {
                 format!("Unnecessary {func} call around sorted()")
             }
             CheckKind::UnnecessaryDoubleCastOrProcess(inner, outer) => {
-                format!("Unnecessary {inner} call within {outer}().")
+                format!("Unnecessary {inner} call within {outer}()")
             }
             CheckKind::UnnecessarySubscriptReversal(func) => {
                 format!("Unnecessary subscript reversal of iterable within {func}()")
