@@ -586,7 +586,7 @@ where
         }
 
         // Recurse.
-        let prev_visibile_scope = self.visible_scope.clone();
+        let prev_visible_scope = self.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
                 let definition = docstrings::extraction::extract(
@@ -644,7 +644,7 @@ where
             }
             _ => visitor::walk_stmt(self, stmt),
         };
-        self.visible_scope = prev_visibile_scope;
+        self.visible_scope = prev_visible_scope;
 
         // Post-visit.
         if let StmtKind::ClassDef { name, .. } = &stmt.node {
