@@ -996,20 +996,8 @@ impl Instruction {
             | SetupFinally { .. }
             | EnterFinally
             | EndFinally => 0,
-            SetupExcept { .. } => {
-                if jump {
-                    1
-                } else {
-                    0
-                }
-            }
-            SetupWith { .. } => {
-                if jump {
-                    0
-                } else {
-                    1
-                }
-            }
+            SetupExcept { .. } => jump as i32,
+            SetupWith { .. } => (!jump) as i32,
             WithCleanupStart => 0,
             WithCleanupFinish => -1,
             PopBlock => 0,
