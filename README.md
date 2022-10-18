@@ -307,13 +307,13 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("Returns") | 🛠 |
 | D300 | UsesTripleQuotes | Use """triple double quotes""" |  |
 | D400 | EndsInPeriod | First line should end with a period |  |
-| D402 | NoSignature | First line should not be the function's 'signature' |  |
+| D402 | NoSignature | First line should not be the function's signature |  |
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |
 | D404 | NoThisPrefix | First word of the docstring should not be `This` |  |
 | D405 | CapitalizeSectionName | Section name should be properly capitalized ("returns") | 🛠 |
 | D406 | NewLineAfterSectionName | Section name should end with a newline ("Returns") | 🛠 |
 | D407 | DashedUnderlineAfterSection | Missing dashed underline after section ("Returns") | 🛠 |
-| D408 | SectionUnderlineAfterName | Section underline should be in the line following the section's name ("Returns") |  |
+| D408 | SectionUnderlineAfterName | Section underline should be in the line following the section's name ("Returns") | 🛠 |
 | D409 | SectionUnderlineMatchesSectionLength | Section underline should match the length of its name ("Returns") | 🛠 |
 | D410 | BlankLineAfterSection | Missing blank line after section ("Returns") | 🛠 |
 | D411 | BlankLineBeforeSection | Missing blank line before section ("Returns") | 🛠 |

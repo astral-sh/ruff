@@ -1080,7 +1080,7 @@ impl CheckKind {
                 "Multi-line docstring summary should start at the second line".to_string()
             }
             CheckKind::NoSignature => {
-                "First line should not be the function's 'signature'".to_string()
+                "First line should not be the function's signature".to_string()
             }
             CheckKind::NoBlankLineBeforeFunction(num_lines) => {
                 format!("No blank lines allowed before function docstring (found {num_lines})")
@@ -1228,6 +1228,7 @@ impl CheckKind {
                 | CheckKind::PrintFound
                 | CheckKind::SectionNameEndsInColon(_)
                 | CheckKind::SectionNotOverIndented(_)
+                | CheckKind::SectionUnderlineAfterName(_)
                 | CheckKind::SectionUnderlineMatchesSectionLength(_)
                 | CheckKind::SectionUnderlineNotOverIndented(_)
                 | CheckKind::SuperCallWithParameters
