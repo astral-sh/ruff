@@ -385,23 +385,10 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 return;
             }
 
-            let mut has_seen_tab = false;
-            let mut has_seen_over_indent = false;
-            let mut has_seen_under_indent = false;
-
             let docstring_indent = helpers::indentation(checker, docstring).to_string();
-            if !has_seen_tab {
-                if docstring_indent.contains('\t') {
-                    if checker.settings.enabled.contains(&CheckCode::D206) {
-                        checker.add_check(Check::new(
-                            CheckKind::IndentWithSpaces,
-                            Range::from_located(docstring),
-                        ));
-                    }
-                    has_seen_tab = true;
-                }
-            }
-
+            let mut has_seen_tab = docstring_indent.contains('\t');
+            let mut is_over_indented = true;
+            let mut over_indented_lines = vec![];
             for i in 0..lines.len() {
                 // First lines and continuations doesn't need any indentation.
                 if i == 0 || lines[i - 1].ends_with('\\') {
@@ -415,39 +402,106 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 }
 
                 let line_indent = helpers::leading_space(lines[i]);
-                if !has_seen_tab {
-                    if line_indent.contains('\t') {
-                        if checker.settings.enabled.contains(&CheckCode::D206) {
-                            checker.add_check(Check::new(
-                                CheckKind::IndentWithSpaces,
-                                Range::from_located(docstring),
-                            ));
-                        }
-                        has_seen_tab = true;
-                    }
-                }
 
-                if !has_seen_over_indent {
-                    if line_indent.len() > docstring_indent.len() {
-                        if checker.settings.enabled.contains(&CheckCode::D208) {
-                            checker.add_check(Check::new(
-                                CheckKind::NoOverIndentation,
-                                Range::from_located(docstring),
-                            ));
-                        }
-                        has_seen_over_indent = true;
-                    }
-                }
+                // We only report tab indentation once, so only check if we haven't seen a tab yet.
+                has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-                if !has_seen_under_indent {
+                if checker.settings.enabled.contains(&CheckCode::D207) {
+                    // We report under-indentation on every line. This isn't great, but enables
+                    // autofix.
                     if line_indent.len() < docstring_indent.len() {
-                        if checker.settings.enabled.contains(&CheckCode::D207) {
-                            checker.add_check(Check::new(
-                                CheckKind::NoUnderIndentation,
-                                Range::from_located(docstring),
+                        let mut check = Check::new(
+                            CheckKind::NoUnderIndentation,
+                            Range {
+                                location: Location::new(docstring.location.row() + i, 1),
+                                end_location: Location::new(docstring.location.row() + i, 1),
+                            },
+                        );
+                        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            check.amend(Fix::replacement(
+                                helpers::clean(&docstring_indent),
+                                Location::new(docstring.location.row() + i, 1),
+                                Location::new(docstring.location.row() + i, 1 + line_indent.len()),
                             ));
                         }
-                        has_seen_under_indent = true;
+                        checker.add_check(check);
+                    }
+                }
+
+                // Like pydocstyle, we only report over-indentation if either: (1) every line
+                // (except, optionally, the last line) is over-indented, or (2) the last line (which
+                // contains the closing quotation marks) is over-indented. We can't know if we've
+                // achieved that condition until we've viewed all the lines, so for now, just track
+                // the over-indentation status of every line.
+                if i < lines.len() - 1 {
+                    if line_indent.len() > docstring_indent.len() {
+                        over_indented_lines.push(i);
+                    } else {
+                        is_over_indented = false;
+                    }
+                }
+            }
+
+            if checker.settings.enabled.contains(&CheckCode::D206) {
+                if has_seen_tab {
+                    checker.add_check(Check::new(
+                        CheckKind::IndentWithSpaces,
+                        Range::from_located(docstring),
+                    ));
+                }
+            }
+
+            if checker.settings.enabled.contains(&CheckCode::D208) {
+                // If every line (except the last) is over-indented...
+                if is_over_indented {
+                    for i in over_indented_lines {
+                        let line_indent = helpers::leading_space(lines[i]);
+                        if line_indent.len() > docstring_indent.len() {
+                            // We report over-indentation on every line. This isn't great, but
+                            // enables autofix.
+                            let mut check = Check::new(
+                                CheckKind::NoOverIndentation,
+                                Range {
+                                    location: Location::new(docstring.location.row() + i, 1),
+                                    end_location: Location::new(docstring.location.row() + i, 1),
+                                },
+                            );
+                            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
+                            {
+                                check.amend(Fix::replacement(
+                                    helpers::clean(&docstring_indent),
+                                    Location::new(docstring.location.row() + i, 1),
+                                    Location::new(
+                                        docstring.location.row() + i,
+                                        1 + line_indent.len(),
+                                    ),
+                                ));
+                            }
+                            checker.add_check(check);
+                        }
+                    }
+                }
+
+                // If the last line is over-indented...
+                if !lines.is_empty() {
+                    let i = lines.len() - 1;
+                    let line_indent = helpers::leading_space(lines[i]);
+                    if line_indent.len() > docstring_indent.len() {
+                        let mut check = Check::new(
+                            CheckKind::NoOverIndentation,
+                            Range {
+                                location: Location::new(docstring.location.row() + i, 1),
+                                end_location: Location::new(docstring.location.row() + i, 1),
+                            },
+                        );
+                        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                            check.amend(Fix::replacement(
+                                helpers::clean(&docstring_indent),
+                                Location::new(docstring.location.row() + i, 1),
+                                Location::new(docstring.location.row() + i, 1 + line_indent.len()),
+                            ));
+                        }
+                        checker.add_check(check);
                     }
                 }
             }
@@ -481,8 +535,10 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                             if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
                             {
                                 // Insert a newline just before the end-quote(s).
-                                let mut content = "\n".to_string();
-                                content.push_str(helpers::indentation(checker, docstring));
+                                let content = format!(
+                                    "\n{}",
+                                    helpers::clean(helpers::indentation(checker, docstring))
+                                );
                                 check.amend(Fix::insertion(
                                     content,
                                     Location::new(
@@ -857,10 +913,11 @@ fn blanks_and_section_underline(
             );
             if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                 // Add a dashed line (of the appropriate length) under the section header.
-                let mut content = "".to_string();
-                content.push_str(helpers::indentation(checker, docstring));
-                content.push_str(&"-".repeat(context.section_name.len()));
-                content.push('\n');
+                let content = format!(
+                    "{}{}\n",
+                    helpers::clean(helpers::indentation(checker, docstring)),
+                    "-".repeat(context.section_name.len())
+                );
                 check.amend(Fix::insertion(
                     content,
                     Location::new(docstring.location.row() + context.original_index + 1, 1),
@@ -890,10 +947,11 @@ fn blanks_and_section_underline(
             );
             if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                 // Add a dashed line (of the appropriate length) under the section header.
-                let mut content = "".to_string();
-                content.push_str(helpers::indentation(checker, docstring));
-                content.push_str(&"-".repeat(context.section_name.len()));
-                content.push('\n');
+                let content = format!(
+                    "{}{}\n",
+                    helpers::clean(helpers::indentation(checker, docstring)),
+                    "-".repeat(context.section_name.len())
+                );
                 check.amend(Fix::insertion(
                     content,
                     Location::new(docstring.location.row() + context.original_index + 1, 1),
@@ -965,10 +1023,11 @@ fn blanks_and_section_underline(
                 );
                 if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                     // Replace the existing underline with a line of the appropriate length.
-                    let mut content = "".to_string();
-                    content.push_str(helpers::indentation(checker, docstring));
-                    content.push_str(&"-".repeat(context.section_name.len()));
-                    content.push('\n');
+                    let content = format!(
+                        "{}{}\n",
+                        helpers::clean(helpers::indentation(checker, docstring)),
+                        "-".repeat(context.section_name.len())
+                    );
                     check.amend(Fix::replacement(
                         content,
                         Location::new(
@@ -1003,7 +1062,7 @@ fn blanks_and_section_underline(
                 if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                     // Replace the existing indentation with whitespace of the appropriate length.
                     check.amend(Fix::replacement(
-                        indentation,
+                        helpers::clean(&indentation),
                         Location::new(
                             docstring.location.row()
                                 + context.original_index
@@ -1144,7 +1203,7 @@ fn common_section(
             if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
                 // Replace the existing indentation with whitespace of the appropriate length.
                 check.amend(Fix::replacement(
-                    indentation,
+                    helpers::clean(&indentation),
                     Location::new(docstring.location.row() + context.original_index, 1),
                     Location::new(
                         docstring.location.row() + context.original_index,

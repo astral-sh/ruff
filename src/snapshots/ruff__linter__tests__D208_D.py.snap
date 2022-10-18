@@ -4,26 +4,53 @@ expression: checks
 ---
 - kind: NoOverIndentation
   location:
-    row: 245
-    column: 5
+    row: 247
+    column: 1
   end_location:
-    row: 249
-    column: 8
-  fix: ~
+    row: 247
+    column: 1
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 247
+        column: 1
+      end_location:
+        row: 247
+        column: 8
+    applied: false
 - kind: NoOverIndentation
   location:
-    row: 255
-    column: 5
+    row: 259
+    column: 1
   end_location:
     row: 259
-    column: 12
-  fix: ~
+    column: 1
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 259
+        column: 1
+      end_location:
+        row: 259
+        column: 9
+    applied: false
 - kind: NoOverIndentation
   location:
-    row: 265
-    column: 5
+    row: 267
+    column: 1
   end_location:
-    row: 269
-    column: 8
-  fix: ~
+    row: 267
+    column: 1
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 267
+        column: 1
+      end_location:
+        row: 267
+        column: 9
+    applied: false
 

@@ -1219,7 +1219,9 @@ impl CheckKind {
                 | CheckKind::NoBlankLineBeforeClass(_)
                 | CheckKind::NoBlankLineBeforeFunction(_)
                 | CheckKind::NoBlankLinesBetweenHeaderAndContent(_)
+                | CheckKind::NoOverIndentation
                 | CheckKind::NoSurroundingWhitespace
+                | CheckKind::NoUnderIndentation
                 | CheckKind::OneBlankLineAfterClass(_)
                 | CheckKind::OneBlankLineBeforeClass(_)
                 | CheckKind::PPrintFound

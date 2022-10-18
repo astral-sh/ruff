@@ -4,26 +4,70 @@ expression: checks
 ---
 - kind: NoUnderIndentation
   location:
-    row: 225
-    column: 5
+    row: 227
+    column: 1
   end_location:
-    row: 229
-    column: 8
-  fix: ~
+    row: 227
+    column: 1
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 227
+        column: 1
+      end_location:
+        row: 227
+        column: 1
+    applied: false
 - kind: NoUnderIndentation
   location:
-    row: 235
-    column: 5
+    row: 238
+    column: 1
   end_location:
-    row: 239
-    column: 4
-  fix: ~
+    row: 238
+    column: 1
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 238
+        column: 1
+      end_location:
+        row: 238
+        column: 1
+    applied: false
 - kind: NoUnderIndentation
   location:
-    row: 433
-    column: 37
+    row: 435
+    column: 1
+  end_location:
+    row: 435
+    column: 1
+  fix:
+    patch:
+      content: "                                    "
+      location:
+        row: 435
+        column: 1
+      end_location:
+        row: 435
+        column: 5
+    applied: false
+- kind: NoUnderIndentation
+  location:
+    row: 436
+    column: 1
   end_location:
     row: 436
-    column: 8
-  fix: ~
+    column: 1
+  fix:
+    patch:
+      content: "                                    "
+      location:
+        row: 436
+        column: 1
+      end_location:
+        row: 436
+        column: 5
+    applied: false
 
