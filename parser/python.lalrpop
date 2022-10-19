@@ -871,7 +871,7 @@ ShiftOp: ast::Operator = {
 };
 
 ArithmeticExpression: ast::Expr = {
-    <a:ArithmeticExpression> <location:@L> <op:AddOp> <b:Term> <end_location:@R> => ast::Expr {
+    <location:@L> <a:ArithmeticExpression> <op:AddOp> <b:Term> <end_location:@R> => ast::Expr {
         location,
         end_location: Some(end_location),
         custom: (),

@@ -56,7 +56,7 @@ impl Location {
 
     pub fn newline(&mut self) {
         self.row += 1;
-        self.column = 1;
+        self.column = 0;
     }
 }
 

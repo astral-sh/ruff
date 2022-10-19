@@ -35,7 +35,7 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 /// assert_eq!(
 ///     expr,
 ///     ast::Expr {
-///         location: ast::Location::new(1, 2),
+///         location: ast::Location::new(1, 0),
 ///         end_location: Some(ast::Location::new(1, 5)),
 ///         custom: (),
 ///         node: ast::ExprKind::BinOp {
