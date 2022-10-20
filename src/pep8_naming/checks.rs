@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -110,5 +111,83 @@ pub fn dunder_function_name(func_def: &Stmt, scope: &Scope, name: &str) -> Optio
         ));
     }
 
+    None
+}
+
+pub fn constant_imported_as_non_constant(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if name.chars().all(|c| c.is_uppercase()) && !asname.chars().all(|c| c.is_uppercase()) {
+        return Some(Check::new(
+            CheckKind::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
+        ));
+    }
+    None
+}
+
+pub fn lowercase_imported_as_non_lowercase(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if name.chars().all(|c| c.is_lowercase()) && asname.to_lowercase() != asname {
+        return Some(Check::new(
+            CheckKind::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
+        ));
+    }
+    None
+}
+
+fn is_camelcase(name: &str) -> bool {
+    !name.chars().all(|c| c.is_uppercase()) && !name.chars().all(|c| c.is_lowercase())
+}
+
+fn is_acronym(name: &str, asname: &str) -> bool {
+    name.chars().filter(|c| c.is_uppercase()).join("") == asname
+}
+
+pub fn camelcase_imported_as_lowercase(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if is_camelcase(name) && asname.chars().all(|c| c.is_lowercase()) {
+        return Some(Check::new(
+            CheckKind::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
+        ));
+    }
+    None
+}
+
+pub fn camelcase_imported_as_constant(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if is_camelcase(name) && asname.chars().all(|c| c.is_uppercase()) && !is_acronym(name, asname) {
+        return Some(Check::new(
+            CheckKind::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
+        ));
+    }
+    None
+}
+
+pub fn camelcase_imported_as_acronym(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if is_camelcase(name) && asname.chars().all(|c| c.is_uppercase()) && is_acronym(name, asname) {
+        return Some(Check::new(
+            CheckKind::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
+        ));
+    }
     None
 }

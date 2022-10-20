@@ -533,6 +533,64 @@ where
                             },
                         )
                     }
+
+                    if let Some(asname) = &alias.node.asname {
+                        if self.settings.enabled.contains(&CheckCode::N811) {
+                            if let Some(check) =
+                                pep8_naming::checks::constant_imported_as_non_constant(
+                                    stmt,
+                                    &alias.node.name,
+                                    asname,
+                                )
+                            {
+                                self.checks.push(check);
+                            }
+                        }
+
+                        if self.settings.enabled.contains(&CheckCode::N812) {
+                            if let Some(check) =
+                                pep8_naming::checks::lowercase_imported_as_non_lowercase(
+                                    stmt,
+                                    &alias.node.name,
+                                    asname,
+                                )
+                            {
+                                self.checks.push(check);
+                            }
+                        }
+
+                        if self.settings.enabled.contains(&CheckCode::N813) {
+                            if let Some(check) =
+                                pep8_naming::checks::camelcase_imported_as_lowercase(
+                                    stmt,
+                                    &alias.node.name,
+                                    asname,
+                                )
+                            {
+                                self.checks.push(check);
+                            }
+                        }
+
+                        if self.settings.enabled.contains(&CheckCode::N814) {
+                            if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
+                                stmt,
+                                &alias.node.name,
+                                asname,
+                            ) {
+                                self.checks.push(check);
+                            }
+                        }
+
+                        if self.settings.enabled.contains(&CheckCode::N817) {
+                            if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
+                                stmt,
+                                &alias.node.name,
+                                asname,
+                            ) {
+                                self.checks.push(check);
+                            }
+                        }
+                    }
                 }
             }
             StmtKind::Raise { exc, .. } => {

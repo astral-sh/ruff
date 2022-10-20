@@ -159,6 +159,11 @@ pub enum CheckCode {
     N804,
     N805,
     N807,
+    N811,
+    N812,
+    N813,
+    N814,
+    N817,
     // Meta
     M001,
 }
@@ -344,6 +349,11 @@ pub enum CheckKind {
     InvalidFirstArgumentNameForClassMethod,
     InvalidFirstArgumentNameForMethod,
     DunderFunctionName,
+    ConstantImportedAsNonConstant(String, String),
+    LowercaseImportedAsNonLowercase(String, String),
+    CamelcaseImportedAsLowercase(String, String),
+    CamelcaseImportedAsConstant(String, String),
+    CamelcaseImportedAsAcronym(String, String),
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -520,6 +530,21 @@ impl CheckCode {
             CheckCode::N804 => CheckKind::InvalidFirstArgumentNameForClassMethod,
             CheckCode::N805 => CheckKind::InvalidFirstArgumentNameForMethod,
             CheckCode::N807 => CheckKind::DunderFunctionName,
+            CheckCode::N811 => {
+                CheckKind::ConstantImportedAsNonConstant("...".to_string(), "...".to_string())
+            }
+            CheckCode::N812 => {
+                CheckKind::LowercaseImportedAsNonLowercase("...".to_string(), "...".to_string())
+            }
+            CheckCode::N813 => {
+                CheckKind::CamelcaseImportedAsLowercase("...".to_string(), "...".to_string())
+            }
+            CheckCode::N814 => {
+                CheckKind::CamelcaseImportedAsConstant("...".to_string(), "...".to_string())
+            }
+            CheckCode::N817 => {
+                CheckKind::CamelcaseImportedAsAcronym("...".to_string(), "...".to_string())
+            }
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -652,6 +677,11 @@ impl CheckCode {
             CheckCode::N804 => CheckCategory::PEP8Naming,
             CheckCode::N805 => CheckCategory::PEP8Naming,
             CheckCode::N807 => CheckCategory::PEP8Naming,
+            CheckCode::N811 => CheckCategory::PEP8Naming,
+            CheckCode::N812 => CheckCategory::PEP8Naming,
+            CheckCode::N813 => CheckCategory::PEP8Naming,
+            CheckCode::N814 => CheckCategory::PEP8Naming,
+            CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -795,6 +825,11 @@ impl CheckKind {
             CheckKind::InvalidFirstArgumentNameForClassMethod => &CheckCode::N804,
             CheckKind::InvalidFirstArgumentNameForMethod => &CheckCode::N805,
             CheckKind::DunderFunctionName => &CheckCode::N807,
+            CheckKind::ConstantImportedAsNonConstant(..) => &CheckCode::N811,
+            CheckKind::LowercaseImportedAsNonLowercase(..) => &CheckCode::N812,
+            CheckKind::CamelcaseImportedAsLowercase(..) => &CheckCode::N813,
+            CheckKind::CamelcaseImportedAsConstant(..) => &CheckCode::N814,
+            CheckKind::CamelcaseImportedAsAcronym(..) => &CheckCode::N817,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -1187,6 +1222,21 @@ impl CheckKind {
             }
             CheckKind::DunderFunctionName => {
                 "function name should not start and end with '__'".to_string()
+            }
+            CheckKind::ConstantImportedAsNonConstant(name, asname) => {
+                format!("constant '{name}' imported as non constant '{asname}'")
+            }
+            CheckKind::LowercaseImportedAsNonLowercase(name, asname) => {
+                format!("lowercase '{name}' imported as non lowercase '{asname}'")
+            }
+            CheckKind::CamelcaseImportedAsLowercase(name, asname) => {
+                format!("camelcase '{name}' imported as lowercase '{asname}'")
+            }
+            CheckKind::CamelcaseImportedAsConstant(name, asname) => {
+                format!("camelcase '{name}' imported as constant '{asname}'")
+            }
+            CheckKind::CamelcaseImportedAsAcronym(name, asname) => {
+                format!("camelcase '{name}' imported as acronym '{asname}'")
             }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
