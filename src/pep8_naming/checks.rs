@@ -97,3 +97,18 @@ pub fn invalid_first_argument_name_for_method(
     }
     None
 }
+
+pub fn dunder_function_name(func_def: &Stmt, scope: &Scope, name: &str) -> Option<Check> {
+    if matches!(scope.kind, ScopeKind::Class) {
+        return None;
+    }
+
+    if name.starts_with("__") && name.ends_with("__") {
+        return Some(Check::new(
+            CheckKind::DunderFunctionName,
+            Range::from_located(func_def),
+        ));
+    }
+
+    None
+}

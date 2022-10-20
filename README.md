@@ -348,6 +348,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | N803 | InvalidArgumentName | Argument name `...` should be lowercase |  |
 | N804 | InvalidFirstArgumentNameForClassMethod | First argument of a class method should be named `cls` |  |
 | N805 | InvalidFirstArgumentNameForMethod | First argument of a method should be named `self` |  |
+| N807 | DunderFunctionName | function name should not start and end with '__' |  |
 
 ### flake8-comprehensions
 

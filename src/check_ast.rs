@@ -245,6 +245,14 @@ where
                     }
                 }
 
+                if self.settings.enabled.contains(&CheckCode::N807) {
+                    if let Some(check) =
+                        pep8_naming::checks::dunder_function_name(stmt, self.current_scope(), name)
+                    {
+                        self.checks.push(check);
+                    }
+                }
+
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be deferred.

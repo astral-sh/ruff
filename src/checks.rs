@@ -158,6 +158,7 @@ pub enum CheckCode {
     N803,
     N804,
     N805,
+    N807,
     // Meta
     M001,
 }
@@ -342,6 +343,7 @@ pub enum CheckKind {
     InvalidArgumentName(String),
     InvalidFirstArgumentNameForClassMethod,
     InvalidFirstArgumentNameForMethod,
+    DunderFunctionName,
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -517,6 +519,7 @@ impl CheckCode {
             CheckCode::N803 => CheckKind::InvalidArgumentName("...".to_string()),
             CheckCode::N804 => CheckKind::InvalidFirstArgumentNameForClassMethod,
             CheckCode::N805 => CheckKind::InvalidFirstArgumentNameForMethod,
+            CheckCode::N807 => CheckKind::DunderFunctionName,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -648,6 +651,7 @@ impl CheckCode {
             CheckCode::N803 => CheckCategory::PEP8Naming,
             CheckCode::N804 => CheckCategory::PEP8Naming,
             CheckCode::N805 => CheckCategory::PEP8Naming,
+            CheckCode::N807 => CheckCategory::PEP8Naming,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -790,6 +794,7 @@ impl CheckKind {
             CheckKind::InvalidArgumentName(_) => &CheckCode::N803,
             CheckKind::InvalidFirstArgumentNameForClassMethod => &CheckCode::N804,
             CheckKind::InvalidFirstArgumentNameForMethod => &CheckCode::N805,
+            CheckKind::DunderFunctionName => &CheckCode::N807,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -1179,6 +1184,9 @@ impl CheckKind {
             }
             CheckKind::InvalidFirstArgumentNameForMethod => {
                 "First argument of a method should be named `self`".to_string()
+            }
+            CheckKind::DunderFunctionName => {
+                "function name should not start and end with '__'".to_string()
             }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
