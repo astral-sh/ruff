@@ -1221,22 +1221,22 @@ impl CheckKind {
                 "First argument of a method should be named `self`".to_string()
             }
             CheckKind::DunderFunctionName => {
-                "function name should not start and end with '__'".to_string()
+                "Function name should not start and end with `__`".to_string()
             }
             CheckKind::ConstantImportedAsNonConstant(name, asname) => {
-                format!("constant '{name}' imported as non constant '{asname}'")
+                format!("Constant `{name}` imported as non-constant `{asname}`")
             }
             CheckKind::LowercaseImportedAsNonLowercase(name, asname) => {
-                format!("lowercase '{name}' imported as non lowercase '{asname}'")
+                format!("Lowercase `{name}` imported as non-lowercase `{asname}`")
             }
             CheckKind::CamelcaseImportedAsLowercase(name, asname) => {
-                format!("camelcase '{name}' imported as lowercase '{asname}'")
+                format!("Camelcase `{name}` imported as lowercase `{asname}`")
             }
             CheckKind::CamelcaseImportedAsConstant(name, asname) => {
-                format!("camelcase '{name}' imported as constant '{asname}'")
+                format!("Camelcase `{name}` imported as constant `{asname}`")
             }
             CheckKind::CamelcaseImportedAsAcronym(name, asname) => {
-                format!("camelcase '{name}' imported as acronym '{asname}'")
+                format!("Camelcase `{name}` imported as acronym `{asname}`")
             }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {

@@ -348,12 +348,12 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | N803 | InvalidArgumentName | Argument name `...` should be lowercase |  |
 | N804 | InvalidFirstArgumentNameForClassMethod | First argument of a class method should be named `cls` |  |
 | N805 | InvalidFirstArgumentNameForMethod | First argument of a method should be named `self` |  |
-| N807 | DunderFunctionName | function name should not start and end with '__' |  |
-| N811 | ConstantImportedAsNonConstant | constant '...' imported as non constant '...' |  |
-| N812 | LowercaseImportedAsNonLowercase | lowercase '...' imported as non lowercase '...' |  |
-| N813 | CamelcaseImportedAsLowercase | camelcase '...' imported as lowercase '...' |  |
-| N814 | CamelcaseImportedAsConstant | camelcase '...' imported as constant '...' |  |
-| N817 | CamelcaseImportedAsAcronym | camelcase '...' imported as acronym '...' |  |
+| N807 | DunderFunctionName | Function name should not start and end with `__` |  |
+| N811 | ConstantImportedAsNonConstant | Constant `...` imported as non-constant `...` |  |
+| N812 | LowercaseImportedAsNonLowercase | Lowercase `...` imported as non-lowercase `...` |  |
+| N813 | CamelcaseImportedAsLowercase | Camelcase `...` imported as lowercase `...` |  |
+| N814 | CamelcaseImportedAsConstant | Camelcase `...` imported as constant `...` |  |
+| N817 | CamelcaseImportedAsAcronym | Camelcase `...` imported as acronym `...` |  |
 
 ### flake8-comprehensions
 
