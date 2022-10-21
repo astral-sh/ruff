@@ -77,7 +77,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.81
+    rev: v0.0.82
     hooks:
       - id: lint
 ```
