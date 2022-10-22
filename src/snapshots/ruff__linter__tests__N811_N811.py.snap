@@ -4,24 +4,42 @@ expression: checks
 ---
 - kind:
     ConstantImportedAsNonConstant:
+<<<<<<< HEAD
       - SUBMOD
       - submod
+=======
+      - CONSTANT
+      - constant
+>>>>>>> Fix string casing check
   location:
     row: 1
     column: 1
   end_location:
     row: 1
+<<<<<<< HEAD
     column: 28
   fix: ~
 - kind:
     ConstantImportedAsNonConstant:
       - BAD
       - bad
+=======
+    column: 37
+  fix: ~
+- kind:
+    ConstantImportedAsNonConstant:
+      - ANOTHER_CONSTANT
+      - another_constant
+>>>>>>> Fix string casing check
   location:
     row: 2
     column: 1
   end_location:
     row: 2
+<<<<<<< HEAD
     column: 27
+=======
+    column: 53
+>>>>>>> Fix string casing check
   fix: ~
 
