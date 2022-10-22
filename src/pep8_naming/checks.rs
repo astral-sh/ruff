@@ -167,7 +167,7 @@ pub fn lowercase_imported_as_non_lowercase(
 }
 
 fn is_camelcase(name: &str) -> bool {
-    !is_lower(name) && !is_upper(name) && !name.contains("_")
+    !is_lower(name) && !is_upper(name) && !name.contains('_')
 }
 fn is_acronym(name: &str, asname: &str) -> bool {
     name.chars().filter(|c| c.is_uppercase()).join("") == asname
