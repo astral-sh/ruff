@@ -4,14 +4,14 @@ expression: checks
 ---
 - kind:
     CamelcaseImportedAsLowercase:
-      - SubMod
-      - submod
+      - Camel
+      - camel
   location:
     row: 1
     column: 1
   end_location:
     row: 1
-    column: 28
+    column: 26
   fix: ~
 - kind:
     CamelcaseImportedAsLowercase:
@@ -23,5 +23,16 @@ expression: checks
   end_location:
     row: 2
     column: 39
+  fix: ~
+- kind:
+    CamelcaseImportedAsLowercase:
+      - AnotherCamelCase
+      - another_camelcase
+  location:
+    row: 3
+    column: 1
+  end_location:
+    row: 3
+    column: 54
   fix: ~
 

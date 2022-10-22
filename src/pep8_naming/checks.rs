@@ -114,12 +114,36 @@ pub fn dunder_function_name(func_def: &Stmt, scope: &Scope, name: &str) -> Optio
     None
 }
 
+fn is_lower(s: &str) -> bool {
+    let mut cased = false;
+    for c in s.chars() {
+        if c.is_uppercase() {
+            return false;
+        } else if !cased && c.is_lowercase() {
+            cased = true;
+        }
+    }
+    cased
+}
+
+fn is_upper(s: &str) -> bool {
+    let mut cased = false;
+    for c in s.chars() {
+        if c.is_lowercase() {
+            return false;
+        } else if (!cased) && c.is_uppercase() {
+            cased = true;
+        }
+    }
+    cased
+}
+
 pub fn constant_imported_as_non_constant(
     import_from: &Stmt,
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if name.chars().all(|c| c.is_uppercase()) && !asname.chars().all(|c| c.is_uppercase()) {
+    if is_upper(name) && !is_upper(asname) {
         return Some(Check::new(
             CheckKind::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -133,7 +157,7 @@ pub fn lowercase_imported_as_non_lowercase(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if name.chars().all(|c| c.is_lowercase()) && asname.to_lowercase() != asname {
+    if is_lower(name) && asname.to_lowercase() != asname {
         return Some(Check::new(
             CheckKind::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -143,9 +167,8 @@ pub fn lowercase_imported_as_non_lowercase(
 }
 
 fn is_camelcase(name: &str) -> bool {
-    !name.chars().all(|c| c.is_uppercase()) && !name.chars().all(|c| c.is_lowercase())
+    !is_lower(name) && !is_upper(name) && !name.contains('_')
 }
-
 fn is_acronym(name: &str, asname: &str) -> bool {
     name.chars().filter(|c| c.is_uppercase()).join("") == asname
 }
@@ -155,7 +178,7 @@ pub fn camelcase_imported_as_lowercase(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if is_camelcase(name) && asname.chars().all(|c| c.is_lowercase()) {
+    if is_camelcase(name) && is_lower(asname) {
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -169,7 +192,7 @@ pub fn camelcase_imported_as_constant(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if is_camelcase(name) && asname.chars().all(|c| c.is_uppercase()) && !is_acronym(name, asname) {
+    if is_camelcase(name) && is_upper(asname) && !is_acronym(name, asname) {
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -183,11 +206,56 @@ pub fn camelcase_imported_as_acronym(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if is_camelcase(name) && asname.chars().all(|c| c.is_uppercase()) && is_acronym(name, asname) {
+    if is_camelcase(name) && is_upper(asname) && is_acronym(name, asname) {
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
         ));
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_acronym, is_camelcase, is_lower, is_upper};
+
+    #[test]
+    fn test_is_lower() -> () {
+        assert!(is_lower("abc"));
+        assert!(is_lower("a_b_c"));
+        assert!(is_lower("a2c"));
+        assert!(!is_lower("aBc"));
+        assert!(!is_lower("ABC"));
+        assert!(!is_lower(""));
+        assert!(!is_lower("_"));
+    }
+
+    #[test]
+    fn test_is_upper() -> () {
+        assert!(is_upper("ABC"));
+        assert!(is_upper("A_B_C"));
+        assert!(is_upper("A2C"));
+        assert!(!is_upper("aBc"));
+        assert!(!is_upper("abc"));
+        assert!(!is_upper(""));
+        assert!(!is_upper("_"));
+    }
+
+    #[test]
+    fn test_is_camelcase() -> () {
+        assert!(is_camelcase("Camel"));
+        assert!(is_camelcase("CamelCase"));
+        assert!(!is_camelcase("camel"));
+        assert!(!is_camelcase("camel_case"));
+        assert!(!is_camelcase("CAMEL"));
+        assert!(!is_camelcase("CAMEL_CASE"));
+    }
+
+    #[test]
+    fn test_is_acronym() -> () {
+        assert!(is_acronym("AB", "AB"));
+        assert!(is_acronym("AbcDef", "AD"));
+        assert!(!is_acronym("AbcDef", "Ad"));
+        assert!(!is_acronym("AbcDef", "AB"));
+    }
 }

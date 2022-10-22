@@ -1,2 +1,3 @@
-import mod.submod as SubMod
-from mod import bad as Bad
+import modl.lowercase as Lower
+from mod import lowercase as Lowercase
+from mod import another_lowercase as AnotherLowercase

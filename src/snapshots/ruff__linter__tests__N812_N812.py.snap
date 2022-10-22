@@ -4,24 +4,35 @@ expression: checks
 ---
 - kind:
     LowercaseImportedAsNonLowercase:
-      - submod
-      - SubMod
+      - lowercase
+      - Lower
   location:
     row: 1
     column: 1
   end_location:
     row: 1
-    column: 28
+    column: 31
   fix: ~
 - kind:
     LowercaseImportedAsNonLowercase:
-      - bad
-      - Bad
+      - lowercase
+      - Lowercase
   location:
     row: 2
     column: 1
   end_location:
     row: 2
-    column: 27
+    column: 39
+  fix: ~
+- kind:
+    LowercaseImportedAsNonLowercase:
+      - another_lowercase
+      - AnotherLowercase
+  location:
+    row: 3
+    column: 1
+  end_location:
+    row: 3
+    column: 54
   fix: ~
 
