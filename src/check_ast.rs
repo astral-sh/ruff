@@ -415,11 +415,11 @@ where
                     }
 
                     if let Some(asname) = &alias.node.asname {
-                        let name = &alias.node.name.split(".").last().unwrap();
+                        let name = alias.node.name.split('.').last().unwrap();
                         if self.settings.enabled.contains(&CheckCode::N811) {
                             if let Some(check) =
                                 pep8_naming::checks::constant_imported_as_non_constant(
-                                    stmt, &name, asname,
+                                    stmt, name, asname,
                                 )
                             {
                                 self.checks.push(check);
@@ -429,7 +429,7 @@ where
                         if self.settings.enabled.contains(&CheckCode::N812) {
                             if let Some(check) =
                                 pep8_naming::checks::lowercase_imported_as_non_lowercase(
-                                    stmt, &name, asname,
+                                    stmt, name, asname,
                                 )
                             {
                                 self.checks.push(check);
@@ -439,7 +439,7 @@ where
                         if self.settings.enabled.contains(&CheckCode::N813) {
                             if let Some(check) =
                                 pep8_naming::checks::camelcase_imported_as_lowercase(
-                                    stmt, &name, asname,
+                                    stmt, name, asname,
                                 )
                             {
                                 self.checks.push(check);
@@ -448,7 +448,7 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::N814) {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
-                                stmt, &name, asname,
+                                stmt, name, asname,
                             ) {
                                 self.checks.push(check);
                             }
@@ -456,7 +456,7 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::N817) {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
-                                stmt, &name, asname,
+                                stmt, name, asname,
                             ) {
                                 self.checks.push(check);
                             }
