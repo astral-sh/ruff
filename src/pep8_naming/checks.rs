@@ -214,3 +214,48 @@ pub fn camelcase_imported_as_acronym(
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{is_acronym, is_camelcase, is_lower, is_upper};
+
+    #[test]
+    fn test_is_lower() -> () {
+        assert!(is_lower("abc"));
+        assert!(is_lower("a_b_c"));
+        assert!(is_lower("a2c"));
+        assert!(!is_lower("aBc"));
+        assert!(!is_lower("ABC"));
+        assert!(!is_lower(""));
+        assert!(!is_lower("_"));
+    }
+
+    #[test]
+    fn test_is_upper() -> () {
+        assert!(is_upper("ABC"));
+        assert!(is_upper("A_B_C"));
+        assert!(is_upper("A2C"));
+        assert!(!is_upper("aBc"));
+        assert!(!is_upper("abc"));
+        assert!(!is_upper(""));
+        assert!(!is_upper("_"));
+    }
+
+    #[test]
+    fn test_is_camelcase() -> () {
+        assert!(is_camelcase("Camel"));
+        assert!(is_camelcase("CamelCase"));
+        assert!(!is_camelcase("camel"));
+        assert!(!is_camelcase("camel_case"));
+        assert!(!is_camelcase("CAMEL"));
+        assert!(!is_camelcase("CAMEL_CASE"));
+    }
+
+    #[test]
+    fn test_is_acronym() -> () {
+        assert!(is_acronym("AB", "AB"));
+        assert!(is_acronym("AbcDef", "AD"));
+        assert!(!is_acronym("AbcDef", "Ad"));
+        assert!(!is_acronym("AbcDef", "AB"));
+    }
+}
