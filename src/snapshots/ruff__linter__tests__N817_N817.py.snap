@@ -4,13 +4,24 @@ expression: checks
 ---
 - kind:
     CamelcaseImportedAsAcronym:
-      - CamelCase
-      - CC
+      - SubMod
+      - SM
   location:
     row: 1
     column: 1
   end_location:
     row: 1
+    column: 24
+  fix: ~
+- kind:
+    CamelcaseImportedAsAcronym:
+      - CamelCase
+      - CC
+  location:
+    row: 2
+    column: 1
+  end_location:
+    row: 2
     column: 32
   fix: ~
 

@@ -4,13 +4,24 @@ expression: checks
 ---
 - kind:
     ConstantImportedAsNonConstant:
-      - BAD
-      - bad
+      - SUBMOD
+      - submod
   location:
     row: 1
     column: 1
   end_location:
     row: 1
+    column: 28
+  fix: ~
+- kind:
+    ConstantImportedAsNonConstant:
+      - BAD
+      - bad
+  location:
+    row: 2
+    column: 1
+  end_location:
+    row: 2
     column: 27
   fix: ~
 
