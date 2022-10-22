@@ -4,42 +4,35 @@ expression: checks
 ---
 - kind:
     ConstantImportedAsNonConstant:
-<<<<<<< HEAD
-      - SUBMOD
-      - submod
-=======
-      - CONSTANT
-      - constant
->>>>>>> Fix string casing check
+      - CONST
+      - const
   location:
     row: 1
     column: 1
   end_location:
     row: 1
-<<<<<<< HEAD
-    column: 28
+    column: 26
   fix: ~
 - kind:
     ConstantImportedAsNonConstant:
-      - BAD
-      - bad
-=======
+      - CONSTANT
+      - constant
+  location:
+    row: 2
+    column: 1
+  end_location:
+    row: 2
     column: 37
   fix: ~
 - kind:
     ConstantImportedAsNonConstant:
       - ANOTHER_CONSTANT
       - another_constant
->>>>>>> Fix string casing check
   location:
-    row: 2
+    row: 3
     column: 1
   end_location:
-    row: 2
-<<<<<<< HEAD
-    column: 27
-=======
+    row: 3
     column: 53
->>>>>>> Fix string casing check
   fix: ~
 
