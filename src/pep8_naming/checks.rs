@@ -115,27 +115,27 @@ pub fn dunder_function_name(func_def: &Stmt, scope: &Scope, name: &str) -> Optio
 }
 
 fn is_lower(s: &str) -> bool {
-    let mut cased = 0;
+    let mut cased = false;
     for c in s.chars() {
         if c.is_uppercase() {
             return false;
-        } else if (cased == 0) && c.is_lowercase() {
-            cased = 1;
+        } else if !cased && c.is_lowercase() {
+            cased = true;
         }
     }
-    cased == 1
+    cased
 }
 
 fn is_upper(s: &str) -> bool {
-    let mut cased = 0;
+    let mut cased = false;
     for c in s.chars() {
         if c.is_lowercase() {
             return false;
-        } else if (cased == 0) && c.is_uppercase() {
-            cased = 1;
+        } else if (!cased) && c.is_uppercase() {
+            cased = true;
         }
     }
-    cased == 1
+    cased
 }
 
 pub fn constant_imported_as_non_constant(
