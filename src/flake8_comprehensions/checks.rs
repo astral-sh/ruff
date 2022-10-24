@@ -4,57 +4,75 @@ use rustpython_ast::{Comprehension, Constant, Expr, ExprKind, KeywordData, Locat
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
 
+fn function_name(func: &Expr) -> Option<&str> {
+    if let ExprKind::Name { id, .. } = &func.node {
+        Some(id)
+    } else {
+        None
+    }
+}
+
+fn exactly_one_argument_with_matching_function<'a>(
+    name: &str,
+    func: &Expr,
+    args: &'a [Expr],
+) -> Option<&'a ExprKind> {
+    if args.len() != 1 {
+        return None;
+    }
+    if function_name(func)? != name {
+        return None;
+    }
+    Some(&args[0].node)
+}
+
+fn first_argument_with_matching_function<'a>(
+    name: &str,
+    func: &Expr,
+    args: &'a [Expr],
+) -> Option<&'a ExprKind> {
+    if function_name(func)? != name {
+        return None;
+    }
+    Some(&args.first()?.node)
+}
+
 /// Check `list(generator)` compliance.
 pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    if args.len() == 1 {
-        if let ExprKind::Name { id, .. } = &func.node {
-            if id == "list" {
-                if let ExprKind::GeneratorExp { .. } = &args[0].node {
-                    return Some(Check::new(
-                        CheckKind::UnnecessaryGeneratorList,
-                        Range::from_located(expr),
-                    ));
-                }
-            }
-        }
+    let argument = exactly_one_argument_with_matching_function("list", func, args)?;
+    if let ExprKind::GeneratorExp { .. } = argument {
+        return Some(Check::new(
+            CheckKind::UnnecessaryGeneratorList,
+            Range::from_located(expr),
+        ));
     }
     None
 }
 
 /// Check `set(generator)` compliance.
 pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    if args.len() == 1 {
-        if let ExprKind::Name { id, .. } = &func.node {
-            if id == "set" {
-                if let ExprKind::GeneratorExp { .. } = &args[0].node {
-                    return Some(Check::new(
-                        CheckKind::UnnecessaryGeneratorSet,
-                        Range::from_located(expr),
-                    ));
-                }
-            }
-        }
+    let argument = exactly_one_argument_with_matching_function("set", func, args)?;
+    if let ExprKind::GeneratorExp { .. } = argument {
+        return Some(Check::new(
+            CheckKind::UnnecessaryGeneratorSet,
+            Range::from_located(expr),
+        ));
     }
     None
 }
 
 /// Check `dict((x, y) for x, y in iterable)` compliance.
 pub fn unnecessary_generator_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    if args.len() == 1 {
-        if let ExprKind::Name { id, .. } = &func.node {
-            if id == "dict" {
-                if let ExprKind::GeneratorExp { elt, .. } = &args[0].node {
-                    match &elt.node {
-                        ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                            return Some(Check::new(
-                                CheckKind::UnnecessaryGeneratorDict,
-                                Range::from_located(expr),
-                            ));
-                        }
-                        _ => {}
-                    }
-                }
+    let argument = exactly_one_argument_with_matching_function("dict", func, args)?;
+    if let ExprKind::GeneratorExp { elt, .. } = argument {
+        match &elt.node {
+            ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+                return Some(Check::new(
+                    CheckKind::UnnecessaryGeneratorDict,
+                    Range::from_located(expr),
+                ));
             }
+            _ => {}
         }
     }
     None
@@ -66,17 +84,12 @@ pub fn unnecessary_list_comprehension_set(
     func: &Expr,
     args: &[Expr],
 ) -> Option<Check> {
-    if args.len() == 1 {
-        if let ExprKind::Name { id, .. } = &func.node {
-            if id == "set" {
-                if let ExprKind::ListComp { .. } = &args[0].node {
-                    return Some(Check::new(
-                        CheckKind::UnnecessaryListComprehensionSet,
-                        Range::from_located(expr),
-                    ));
-                }
-            }
-        }
+    let argument = exactly_one_argument_with_matching_function("set", func, args)?;
+    if let ExprKind::ListComp { .. } = &argument {
+        return Some(Check::new(
+            CheckKind::UnnecessaryListComprehensionSet,
+            Range::from_located(expr),
+        ));
     }
     None
 }
@@ -87,21 +100,16 @@ pub fn unnecessary_list_comprehension_dict(
     func: &Expr,
     args: &[Expr],
 ) -> Option<Check> {
-    if args.len() == 1 {
-        if let ExprKind::Name { id, .. } = &func.node {
-            if id == "dict" {
-                if let ExprKind::ListComp { elt, .. } = &args[0].node {
-                    match &elt.node {
-                        ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                            return Some(Check::new(
-                                CheckKind::UnnecessaryListComprehensionDict,
-                                Range::from_located(expr),
-                            ));
-                        }
-                        _ => {}
-                    }
-                }
+    let argument = exactly_one_argument_with_matching_function("dict", func, args)?;
+    if let ExprKind::ListComp { elt, .. } = &argument {
+        match &elt.node {
+            ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+                return Some(Check::new(
+                    CheckKind::UnnecessaryListComprehensionDict,
+                    Range::from_located(expr),
+                ));
             }
+            _ => {}
         }
     }
     None
@@ -109,80 +117,70 @@ pub fn unnecessary_list_comprehension_dict(
 
 /// Check `set([1, 2])` compliance.
 pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    if args.len() == 1 {
-        if let ExprKind::Name { id, .. } = &func.node {
-            if id == "set" {
-                match &args[0].node {
-                    ExprKind::List { .. } => {
-                        return Some(Check::new(
-                            CheckKind::UnnecessaryLiteralSet("list".to_string()),
-                            Range::from_located(expr),
-                        ));
-                    }
-                    ExprKind::Tuple { .. } => {
-                        return Some(Check::new(
-                            CheckKind::UnnecessaryLiteralSet("tuple".to_string()),
-                            Range::from_located(expr),
-                        ));
-                    }
-                    _ => {}
-                }
-            }
+    let argument = exactly_one_argument_with_matching_function("set", func, args)?;
+    match argument {
+        ExprKind::List { .. } => {
+            return Some(Check::new(
+                CheckKind::UnnecessaryLiteralSet("list".to_string()),
+                Range::from_located(expr),
+            ));
         }
+        ExprKind::Tuple { .. } => {
+            return Some(Check::new(
+                CheckKind::UnnecessaryLiteralSet("tuple".to_string()),
+                Range::from_located(expr),
+            ));
+        }
+        _ => {}
     }
     None
 }
 
 /// Check `dict([(1, 2)])` compliance.
 pub fn unnecessary_literal_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    if args.len() == 1 {
-        if let ExprKind::Name { id, .. } = &func.node {
-            if id == "dict" {
-                match &args[0].node {
-                    ExprKind::Tuple { elts, .. } => {
-                        if let Some(elt) = elts.first() {
-                            match &elt.node {
-                                // dict((1, 2), ...))
-                                ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                                    return Some(Check::new(
-                                        CheckKind::UnnecessaryLiteralDict("tuple".to_string()),
-                                        Range::from_located(expr),
-                                    ));
-                                }
-                                _ => {}
-                            }
-                        } else {
-                            // dict(())
-                            return Some(Check::new(
-                                CheckKind::UnnecessaryLiteralDict("tuple".to_string()),
-                                Range::from_located(expr),
-                            ));
-                        }
-                    }
-                    ExprKind::List { elts, .. } => {
-                        if let Some(elt) = elts.first() {
-                            match &elt.node {
-                                // dict([(1, 2), ...])
-                                ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                                    return Some(Check::new(
-                                        CheckKind::UnnecessaryLiteralDict("list".to_string()),
-                                        Range::from_located(expr),
-                                    ));
-                                }
-                                _ => {}
-                            }
-                        } else {
-                            // dict([])
-                            return Some(Check::new(
-                                CheckKind::UnnecessaryLiteralDict("list".to_string()),
-                                Range::from_located(expr),
-                            ));
-                        }
+    let argument = exactly_one_argument_with_matching_function("dict", func, args)?;
+    match argument {
+        ExprKind::Tuple { elts, .. } => {
+            if let Some(elt) = elts.first() {
+                match &elt.node {
+                    // dict((1, 2), ...))
+                    ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+                        return Some(Check::new(
+                            CheckKind::UnnecessaryLiteralDict("tuple".to_string()),
+                            Range::from_located(expr),
+                        ));
                     }
                     _ => {}
                 }
+            } else {
+                // dict(())
+                return Some(Check::new(
+                    CheckKind::UnnecessaryLiteralDict("tuple".to_string()),
+                    Range::from_located(expr),
+                ));
             }
         }
+        ExprKind::List { elts, .. } => {
+            if let Some(elt) = elts.first() {
+                match &elt.node {
+                    // dict([(1, 2), ...])
+                    ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+                        return Some(Check::new(
+                            CheckKind::UnnecessaryLiteralDict("list".to_string()),
+                            Range::from_located(expr),
+                        ));
+                    }
+                    _ => {}
+                }
+            } else {
+                // dict([])
+                return Some(Check::new(
+                    CheckKind::UnnecessaryLiteralDict("list".to_string()),
+                    Range::from_located(expr),
+                ));
+            }
+        }
+        _ => {}
     }
     None
 }
@@ -220,26 +218,21 @@ pub fn unnecessary_literal_within_tuple_call(
     func: &Expr,
     args: &[Expr],
 ) -> Option<Check> {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if id == "tuple" {
-            if let Some(arg) = args.first() {
-                match &arg.node {
-                    ExprKind::Tuple { .. } => {
-                        return Some(Check::new(
-                            CheckKind::UnnecessaryLiteralWithinTupleCall("tuple".to_string()),
-                            Range::from_located(expr),
-                        ));
-                    }
-                    ExprKind::List { .. } => {
-                        return Some(Check::new(
-                            CheckKind::UnnecessaryLiteralWithinTupleCall("list".to_string()),
-                            Range::from_located(expr),
-                        ));
-                    }
-                    _ => {}
-                }
-            }
+    let argument = first_argument_with_matching_function("tuple", func, args)?;
+    match argument {
+        ExprKind::Tuple { .. } => {
+            return Some(Check::new(
+                CheckKind::UnnecessaryLiteralWithinTupleCall("tuple".to_string()),
+                Range::from_located(expr),
+            ));
         }
+        ExprKind::List { .. } => {
+            return Some(Check::new(
+                CheckKind::UnnecessaryLiteralWithinTupleCall("list".to_string()),
+                Range::from_located(expr),
+            ));
+        }
+        _ => {}
     }
 
     None
@@ -250,43 +243,33 @@ pub fn unnecessary_literal_within_list_call(
     func: &Expr,
     args: &[Expr],
 ) -> Option<Check> {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if id == "list" {
-            if let Some(arg) = args.first() {
-                match &arg.node {
-                    ExprKind::Tuple { .. } => {
-                        return Some(Check::new(
-                            CheckKind::UnnecessaryLiteralWithinListCall("tuple".to_string()),
-                            Range::from_located(expr),
-                        ));
-                    }
-                    ExprKind::List { .. } => {
-                        return Some(Check::new(
-                            CheckKind::UnnecessaryLiteralWithinListCall("list".to_string()),
-                            Range::from_located(expr),
-                        ));
-                    }
-                    _ => {}
-                }
-            }
+    let argument = first_argument_with_matching_function("list", func, args)?;
+    match argument {
+        ExprKind::Tuple { .. } => {
+            return Some(Check::new(
+                CheckKind::UnnecessaryLiteralWithinListCall("tuple".to_string()),
+                Range::from_located(expr),
+            ));
         }
+        ExprKind::List { .. } => {
+            return Some(Check::new(
+                CheckKind::UnnecessaryLiteralWithinListCall("list".to_string()),
+                Range::from_located(expr),
+            ));
+        }
+        _ => {}
     }
 
     None
 }
 
 pub fn unnecessary_list_call(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if id == "list" {
-            if let Some(arg) = args.first() {
-                if let ExprKind::ListComp { .. } = &arg.node {
-                    return Some(Check::new(
-                        CheckKind::UnnecessaryListCall,
-                        Range::from_located(expr),
-                    ));
-                }
-            }
-        }
+    let argument = first_argument_with_matching_function("list", func, args)?;
+    if let ExprKind::ListComp { .. } = argument {
+        return Some(Check::new(
+            CheckKind::UnnecessaryListCall,
+            Range::from_located(expr),
+        ));
     }
     None
 }
