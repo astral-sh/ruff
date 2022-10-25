@@ -512,7 +512,7 @@ on Rust at all.
 ### Can I write my own plugins for Ruff?
 
 Ruff does not yet support third-party plugins, though a plugin system is within-scope for the
-project. See [#283](https://github.com/charliermarsh/ruff/issues/2830) for more.
+project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
 
 ### Does Ruff support NumPy- or Google-style docstrings?
 
