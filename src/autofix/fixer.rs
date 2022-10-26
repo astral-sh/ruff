@@ -16,7 +16,7 @@ pub enum Mode {
 
 impl Mode {
     /// Return `true` if a patch should be generated under the given `Mode`.
-    pub fn enabled(&self) -> bool {
+    pub fn patch(&self) -> bool {
         match &self {
             Mode::Generate => true,
             Mode::Apply => true,

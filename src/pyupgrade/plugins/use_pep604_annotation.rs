@@ -45,7 +45,7 @@ fn union(elts: &[Expr]) -> Expr {
 pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
     if match_name_or_attr(value, "Optional") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
-        if checker.autofix.enabled() {
+        if checker.patch() {
             let mut generator = SourceGenerator::new();
             if let Ok(()) = generator.unparse_expr(&optional(slice), 0) {
                 if let Ok(content) = generator.generate() {
@@ -60,7 +60,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         checker.add_check(check);
     } else if match_name_or_attr(value, "Union") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
-        if checker.autofix.enabled() {
+        if checker.patch() {
             match &slice.node {
                 ExprKind::Slice { .. } => {
                     // Invalid type annotation.

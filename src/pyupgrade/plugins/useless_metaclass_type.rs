@@ -12,7 +12,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         value,
         checker.locate_check(Range::from_located(stmt)),
     ) {
-        if checker.autofix.enabled() {
+        if checker.patch() {
             let context = checker.binding_context();
             let deleted: Vec<&Stmt> = checker
                 .deletions

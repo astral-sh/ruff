@@ -16,9 +16,9 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
             .map(|index| checker.parents[*index])
             .collect();
         if let Some(mut check) = checks::super_args(scope, &parents, expr, func, args) {
-            if checker.autofix.enabled() {
+            if checker.patch() {
                 if let Some(fix) =
-                    pyupgrade::fixes::remove_super_arguments(&mut checker.locator, expr)
+                    pyupgrade::fixes::remove_super_arguments(checker.get_locator(), expr)
                 {
                     check.amend(fix);
                 }

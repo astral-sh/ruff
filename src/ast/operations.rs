@@ -122,56 +122,50 @@ pub fn is_unpacking_assignment(stmt: &Stmt) -> bool {
 pub struct SourceCodeLocator<'a> {
     content: &'a str,
     offsets: Vec<Vec<usize>>,
-    initialized: bool,
 }
 
 impl<'a> SourceCodeLocator<'a> {
     pub fn new(content: &'a str) -> Self {
         SourceCodeLocator {
             content,
-            offsets: vec![],
-            initialized: false,
+            offsets: Self::compute_offsets(content),
         }
     }
 
-    fn init(&mut self) {
-        if !self.initialized {
-            let mut offset = 0;
-            for line in self.content.lines() {
-                let mut newline = 0;
-                let mut line_offsets: Vec<usize> = vec![];
-                for (i, char) in line.char_indices() {
-                    line_offsets.push(offset + i);
-                    newline = i + char.len_utf8();
-                }
-                line_offsets.push(offset + newline);
-                self.offsets.push(line_offsets);
-                offset += newline + 1;
+    fn compute_offsets(content: &str) -> Vec<Vec<usize>> {
+        let mut offsets = vec![];
+        let mut offset = 0;
+        for line in content.lines() {
+            let mut newline = 0;
+            let mut line_offsets: Vec<usize> = vec![];
+            for (i, char) in line.char_indices() {
+                line_offsets.push(offset + i);
+                newline = i + char.len_utf8();
             }
-            self.offsets.push(vec![offset]);
-            self.initialized = true;
+            line_offsets.push(offset + newline);
+            offsets.push(line_offsets);
+            offset += newline + 1;
         }
+        offsets.push(vec![offset]);
+        offsets
     }
 
-    pub fn slice_source_code_at(&mut self, location: &Location) -> &'a str {
-        self.init();
+    pub fn slice_source_code_at(&self, location: &Location) -> &'a str {
         let offset = self.offsets[location.row() - 1][location.column() - 1];
         &self.content[offset..]
     }
 
-    pub fn slice_source_code_range(&mut self, range: &Range) -> &'a str {
-        self.init();
+    pub fn slice_source_code_range(&self, range: &Range) -> &'a str {
         let start = self.offsets[range.location.row() - 1][range.location.column() - 1];
         let end = self.offsets[range.end_location.row() - 1][range.end_location.column() - 1];
         &self.content[start..end]
     }
 
     pub fn partition_source_code_at(
-        &mut self,
+        &self,
         outer: &Range,
         inner: &Range,
     ) -> (&'a str, &'a str, &'a str) {
-        self.init();
         let outer_start = self.offsets[outer.location.row() - 1][outer.location.column() - 1];
         let outer_end = self.offsets[outer.end_location.row() - 1][outer.end_location.column() - 1];
         let inner_start = self.offsets[inner.location.row() - 1][inner.location.column() - 1];
@@ -191,8 +185,7 @@ mod tests {
     #[test]
     fn source_code_locator_init() {
         let content = "# \u{4e9c}\nclass Foo:\n    \"\"\".\"\"\"";
-        let mut locator = SourceCodeLocator::new(content);
-        locator.init();
+        let locator = SourceCodeLocator::new(content);
         assert_eq!(locator.offsets.len(), 4);
         assert_eq!(locator.offsets[0], [0, 1, 2, 5]);
         assert_eq!(locator.offsets[1], [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);

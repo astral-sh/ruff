@@ -10,7 +10,7 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
     if let Some(mut check) =
         checks::type_of_primitive(func, args, checker.locate_check(Range::from_located(expr)))
     {
-        if checker.autofix.enabled() {
+        if checker.patch() {
             if let CheckKind::TypeOfPrimitive(primitive) = &check.kind {
                 check.amend(Fix::replacement(
                     primitive.builtin(),

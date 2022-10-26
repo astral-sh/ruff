@@ -13,9 +13,9 @@ pub fn useless_object_inheritance(
 ) {
     let scope = checker.current_scope();
     if let Some(mut check) = checks::useless_object_inheritance(name, bases, scope) {
-        if checker.autofix.enabled() {
+        if checker.patch() {
             if let Some(fix) = pyupgrade::fixes::remove_class_def_base(
-                &mut checker.locator,
+                checker.get_locator(),
                 &stmt.location,
                 check.location,
                 bases,

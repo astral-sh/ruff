@@ -10,7 +10,7 @@ use crate::autofix::Fix;
 
 /// Generate a fix to remove a base from a ClassDef statement.
 pub fn remove_class_def_base(
-    locator: &mut SourceCodeLocator,
+    locator: &SourceCodeLocator,
     stmt_at: &Location,
     expr_at: Location,
     bases: &[Expr],
@@ -101,7 +101,7 @@ pub fn remove_class_def_base(
     }
 }
 
-pub fn remove_super_arguments(locator: &mut SourceCodeLocator, expr: &Expr) -> Option<Fix> {
+pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Option<Fix> {
     let range = Range::from_located(expr);
     let contents = locator.slice_source_code_range(&range);
 
