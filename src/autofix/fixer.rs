@@ -1,9 +1,10 @@
-use crate::autofix::Fix;
-use crate::autofix::Patch;
-use itertools::Itertools;
-use rustpython_parser::ast::Location;
 use std::collections::BTreeSet;
 
+use itertools::Itertools;
+use rustpython_parser::ast::Location;
+
+use crate::autofix::Fix;
+use crate::autofix::Patch;
 use crate::checks::Check;
 
 #[derive(Hash)]
