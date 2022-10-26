@@ -135,4 +135,23 @@ expression: checks
         row: 53
         column: 22
     applied: false
+- kind:
+    UnusedImport:
+      - foo.bar.baz
+  location:
+    row: 90
+    column: 1
+  end_location:
+    row: 90
+    column: 24
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 90
+        column: 1
+      end_location:
+        row: 91
+        column: 1
+    applied: false
 
