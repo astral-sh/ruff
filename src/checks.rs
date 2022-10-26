@@ -75,6 +75,7 @@ pub enum CheckCode {
     A002,
     A003,
     // flake8-bugbear
+    B002,
     B011,
     B014,
     B017,
@@ -266,6 +267,7 @@ pub enum CheckKind {
     BuiltinArgumentShadowing(String),
     BuiltinAttributeShadowing(String),
     // flake8-bugbear
+    UnaryPrefixIncrement,
     DoNotAssertFalse,
     DuplicateHandlerException(Vec<String>),
     NoAssertRaisesException,
@@ -426,6 +428,7 @@ impl CheckCode {
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-bugbear
+            CheckCode::B002 => CheckKind::UnaryPrefixIncrement,
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
             CheckCode::B014 => CheckKind::DuplicateHandlerException(vec!["ValueError".to_string()]),
             CheckCode::B017 => CheckKind::NoAssertRaisesException,
@@ -601,6 +604,7 @@ impl CheckCode {
             CheckCode::A001 => CheckCategory::Flake8Builtins,
             CheckCode::A002 => CheckCategory::Flake8Builtins,
             CheckCode::A003 => CheckCategory::Flake8Builtins,
+            CheckCode::B002 => CheckCategory::Flake8Bugbear,
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
             CheckCode::B014 => CheckCategory::Flake8Bugbear,
             CheckCode::B017 => CheckCategory::Flake8Bugbear,
@@ -745,6 +749,7 @@ impl CheckKind {
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-bugbear
+            CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
@@ -984,6 +989,7 @@ impl CheckKind {
                 format!("Class attribute `{name}` is shadowing a python builtin")
             }
             // flake8-bugbear
+            CheckKind::UnaryPrefixIncrement => "Python does not support the unary prefix increment. Writing `++n` is equivalent to `+(+(n))`, which equals `n`. You meant `n += 1`.".to_string(),
             CheckKind::DoNotAssertFalse => {
                 "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
                     .to_string()
@@ -1266,9 +1272,12 @@ impl CheckKind {
         }
     }
 
-    /// The summary text for the check.
+    /// The summary text for the check. Typically a truncated form of the body text.
     pub fn summary(&self) -> String {
         match self {
+            CheckKind::UnaryPrefixIncrement => {
+                "Python does not support the unary prefix increment.".to_string()
+            }
             CheckKind::NoAssertRaisesException => {
                 "`assertRaises(Exception):` should be considered evil.".to_string()
             }
