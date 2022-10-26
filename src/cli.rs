@@ -21,11 +21,14 @@ pub struct Cli {
     #[arg(long)]
     pub config: Option<PathBuf>,
     /// Enable verbose logging.
-    #[arg(short, long)]
+    #[arg(short, long, group = "verbosity")]
     pub verbose: bool,
-    /// Disable all logging (but still exit with status code "1" upon detecting errors).
-    #[arg(short, long)]
+    /// Only log errors.
+    #[arg(short, long, group = "verbosity")]
     pub quiet: bool,
+    /// Disable all logging (but still exit with status code "1" upon detecting errors).
+    #[arg(short, long, group = "verbosity")]
+    pub silent: bool,
     /// Exit with status code "0", even upon detecting errors.
     #[arg(short, long)]
     pub exit_zero: bool,
