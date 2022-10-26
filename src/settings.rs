@@ -130,8 +130,9 @@ impl RawSettings {
     pub fn from_pyproject(
         pyproject: &Option<PathBuf>,
         project_root: &Option<PathBuf>,
+        quiet: bool,
     ) -> Result<Self> {
-        let config = load_config(pyproject)?;
+        let config = load_config(pyproject, quiet)?;
         Ok(RawSettings {
             dummy_variable_rgx: match config.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)

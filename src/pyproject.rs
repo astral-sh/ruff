@@ -11,15 +11,17 @@ use crate::checks::CheckCode;
 use crate::fs;
 use crate::settings::PythonVersion;
 
-pub fn load_config(pyproject: &Option<PathBuf>) -> Result<Config> {
+pub fn load_config(pyproject: &Option<PathBuf>, quiet: bool) -> Result<Config> {
     match pyproject {
         Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
             .tool
             .and_then(|tool| tool.ruff)
             .unwrap_or_default()),
         None => {
-            eprintln!("No pyproject.toml found.");
-            eprintln!("Falling back to default configuration...");
+            if !quiet {
+                eprintln!("No pyproject.toml found.");
+                eprintln!("Falling back to default configuration...");
+            }
             Ok(Default::default())
         }
     }
