@@ -51,13 +51,13 @@ expression: checks
     column: 24
   fix:
     patch:
-      content: import logging.handlers
+      content: ""
       location:
         row: 12
         column: 1
       end_location:
-        row: 12
-        column: 24
+        row: 13
+        column: 1
     applied: false
 - kind:
     UnusedImport:
@@ -134,24 +134,5 @@ expression: checks
       end_location:
         row: 53
         column: 22
-    applied: false
-- kind:
-    UnusedImport:
-      - foo.bar.baz
-  location:
-    row: 90
-    column: 1
-  end_location:
-    row: 90
-    column: 24
-  fix:
-    patch:
-      content: ""
-      location:
-        row: 90
-        column: 1
-      end_location:
-        row: 91
-        column: 1
     applied: false
 
