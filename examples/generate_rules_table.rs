@@ -19,7 +19,7 @@ fn main() {
                     "| {} | {} | {} | {} |",
                     check_kind.code().as_ref(),
                     check_kind.as_ref(),
-                    check_kind.body().replace("|", r"\|"),
+                    check_kind.summary().replace("|", r"\|"),
                     fix_token
                 );
             }

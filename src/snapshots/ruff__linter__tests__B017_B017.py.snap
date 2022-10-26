@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: NoAssertRaisesException
+  location:
+    row: 22
+    column: 9
+  end_location:
+    row: 25
+    column: 5
+  fix: ~
+
