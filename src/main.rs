@@ -255,7 +255,7 @@ fn inner_main() -> Result<ExitCode> {
         .map(|pair| PerFileIgnore::new(pair, &project_root))
         .collect();
 
-    let mut settings = RawSettings::from_pyproject(&pyproject, &project_root)?;
+    let mut settings = RawSettings::from_pyproject(&pyproject, &project_root, cli.quiet)?;
     if !exclude.is_empty() {
         settings.exclude = exclude;
     }
