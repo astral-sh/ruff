@@ -4,7 +4,6 @@ use once_cell::sync::Lazy;
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::autofix::fixer;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
@@ -38,7 +37,7 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
                         CheckKind::DeprecatedUnittestAlias(attr.to_string(), target.to_string()),
                         Range::from_located(expr),
                     );
-                    if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                    if checker.autofix.enabled() {
                         check.amend(Fix::replacement(
                             format!("self.{}", target),
                             expr.location,

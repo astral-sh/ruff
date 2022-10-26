@@ -2070,8 +2070,7 @@ impl<'a> Checker<'a> {
                     let child = self.parents[defined_by];
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
-                    let fix = if matches!(self.autofix, fixer::Mode::Generate | fixer::Mode::Apply)
-                    {
+                    let fix = if self.autofix.enabled() {
                         let deleted: Vec<&Stmt> = self
                             .deletions
                             .iter()

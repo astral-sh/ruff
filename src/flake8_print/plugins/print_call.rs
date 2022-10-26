@@ -1,7 +1,7 @@
 use log::error;
 use rustpython_ast::{Expr, Stmt, StmtKind};
 
-use crate::autofix::{fixer, helpers};
+use crate::autofix::helpers;
 use crate::check_ast::Checker;
 use crate::checks::CheckCode;
 use crate::flake8_print::checks;
@@ -13,7 +13,7 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
         checker.settings.enabled.contains(&CheckCode::T201),
         checker.settings.enabled.contains(&CheckCode::T203),
     ) {
-        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+        if checker.autofix.enabled() {
             let context = checker.binding_context();
             if matches!(
                 checker.parents[context.defined_by].node,
