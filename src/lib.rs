@@ -19,6 +19,7 @@ mod check_lines;
 pub mod checks;
 pub mod cli;
 pub mod code_gen;
+mod cst;
 mod docstrings;
 mod flake8_bugbear;
 mod flake8_builtins;

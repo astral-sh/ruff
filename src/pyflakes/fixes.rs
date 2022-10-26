@@ -1,11 +1,11 @@
-use libcst_native::ImportNames::Aliases;
-use libcst_native::NameOrAttribute::N;
-use libcst_native::{Codegen, SmallStatement, Statement};
+use anyhow::Result;
+use libcst_native::{Codegen, ImportNames, NameOrAttribute, SmallStatement, Statement};
 use rustpython_ast::Stmt;
 
 use crate::ast::operations::SourceCodeLocator;
 use crate::ast::types::Range;
 use crate::autofix::{helpers, Fix};
+use crate::cst::helpers::compose_module_path;
 
 /// Generate a Fix to remove any unused imports from an `import` statement.
 pub fn remove_unused_imports(
@@ -14,7 +14,7 @@ pub fn remove_unused_imports(
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
-) -> anyhow::Result<Fix> {
+) -> Result<Fix> {
     let mut tree = match libcst_native::parse_module(
         locator.slice_source_code_range(&Range::from_located(stmt)),
         None,
@@ -43,7 +43,7 @@ pub fn remove_unused_imports(
     // Identify unused imports from within the `import from`.
     let mut removable = vec![];
     for (index, alias) in aliases.iter().enumerate() {
-        if let N(import_name) = &alias.name {
+        if let NameOrAttribute::N(import_name) = &alias.name {
             if full_names.contains(&import_name.value) {
                 removable.push(index);
             }
@@ -79,7 +79,7 @@ pub fn remove_unused_import_froms(
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
-) -> anyhow::Result<Fix> {
+) -> Result<Fix> {
     let mut tree = match libcst_native::parse_module(
         locator.slice_source_code_range(&Range::from_located(stmt)),
         None,
@@ -100,7 +100,8 @@ pub fn remove_unused_import_froms(
             "Expected node to be: SmallStatement::ImportFrom."
         ));
     };
-    let aliases = if let Aliases(aliases) = &mut body.names {
+
+    let aliases = if let ImportNames::Aliases(aliases) = &mut body.names {
         aliases
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Aliases."));
@@ -112,13 +113,16 @@ pub fn remove_unused_import_froms(
     // Identify unused imports from within the `import from`.
     let mut removable = vec![];
     for (index, alias) in aliases.iter().enumerate() {
-        if let N(name) = &alias.name {
-            let import_name = if let Some(N(module_name)) = &body.module {
-                format!("{}.{}", module_name.value, name.value)
-            } else {
-                name.value.to_string()
-            };
-            if full_names.contains(&import_name.as_str()) {
+        if let NameOrAttribute::N(name) = &alias.name {
+            let import_name = name.value.to_string();
+            let full_name = body
+                .module
+                .as_ref()
+                .map(compose_module_path)
+                .map(|module_name| format!("{module_name}.{import_name}"))
+                .unwrap_or(import_name);
+
+            if full_names.contains(&full_name.as_str()) {
                 removable.push(index);
             }
         }
