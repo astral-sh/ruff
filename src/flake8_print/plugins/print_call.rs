@@ -13,7 +13,7 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
         checker.settings.enabled.contains(&CheckCode::T201),
         checker.settings.enabled.contains(&CheckCode::T203),
     ) {
-        if checker.autofix.enabled() {
+        if checker.patch() {
             let context = checker.binding_context();
             if matches!(
                 checker.parents[context.defined_by].node,

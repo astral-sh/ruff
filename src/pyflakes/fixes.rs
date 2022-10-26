@@ -9,7 +9,7 @@ use crate::autofix::{helpers, Fix};
 
 /// Generate a Fix to remove any unused imports from an `import` statement.
 pub fn remove_unused_imports(
-    locator: &mut SourceCodeLocator,
+    locator: &SourceCodeLocator,
     full_names: &[&str],
     stmt: &Stmt,
     parent: Option<&Stmt>,
@@ -74,7 +74,7 @@ pub fn remove_unused_imports(
 
 /// Generate a Fix to remove any unused imports from an `import from` statement.
 pub fn remove_unused_import_froms(
-    locator: &mut SourceCodeLocator,
+    locator: &SourceCodeLocator,
     full_names: &[&str],
     stmt: &Stmt,
     parent: Option<&Stmt>,

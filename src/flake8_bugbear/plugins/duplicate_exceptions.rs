@@ -49,7 +49,7 @@ pub fn duplicate_handler_exceptions(
                 ),
                 checker.locate_check(Range::from_located(expr)),
             );
-            if checker.autofix.enabled() {
+            if checker.patch() {
                 // TODO(charlie): If we have a single element, remove the tuple.
                 let mut generator = SourceGenerator::new();
                 if let Ok(()) = generator.unparse_expr(&type_pattern(unique_elts), 0) {

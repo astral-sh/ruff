@@ -9,7 +9,7 @@ pub fn unnecessary_abspath(checker: &mut Checker, expr: &Expr, func: &Expr, args
     if let Some(mut check) =
         checks::unnecessary_abspath(func, args, checker.locate_check(Range::from_located(expr)))
     {
-        if checker.autofix.enabled() {
+        if checker.patch() {
             check.amend(Fix::replacement(
                 "__file__".to_string(),
                 expr.location,

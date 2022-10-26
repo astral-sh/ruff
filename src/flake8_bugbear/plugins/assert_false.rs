@@ -43,7 +43,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: &Optio
     } = &test.node
     {
         let mut check = Check::new(CheckKind::DoNotAssertFalse, Range::from_located(test));
-        if checker.autofix.enabled() {
+        if checker.patch() {
             let mut generator = SourceGenerator::new();
             if let Ok(()) = generator.unparse_stmt(&assertion_error(msg)) {
                 if let Ok(content) = generator.generate() {
