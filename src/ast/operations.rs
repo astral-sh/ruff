@@ -140,9 +140,9 @@ impl<'a> SourceCodeLocator<'a> {
             for line in self.content.lines() {
                 let mut newline = 0;
                 let mut line_offsets: Vec<usize> = vec![];
-                for (i, _char) in line.char_indices() {
+                for (i, char) in line.char_indices() {
                     line_offsets.push(offset + i);
-                    newline = i + 1;
+                    newline = i + char.len_utf8();
                 }
                 line_offsets.push(offset + newline);
                 self.offsets.push(line_offsets);
@@ -181,5 +181,25 @@ impl<'a> SourceCodeLocator<'a> {
             &self.content[inner_start..inner_end],
             &self.content[inner_end..outer_end],
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SourceCodeLocator;
+
+    #[test]
+    fn source_code_locator_init() {
+        let content = "# \u{4e9c}\nclass Foo:\n    \"\"\".\"\"\"";
+        let mut locator = SourceCodeLocator::new(content);
+        locator.init();
+        assert_eq!(locator.offsets.len(), 4);
+        assert_eq!(locator.offsets[0], [0, 1, 2, 5]);
+        assert_eq!(locator.offsets[1], [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+        assert_eq!(
+            locator.offsets[2],
+            [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
+        );
+        assert_eq!(locator.offsets[3], [29]);
     }
 }
