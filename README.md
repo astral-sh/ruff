@@ -380,6 +380,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
@@ -472,7 +473,7 @@ including:
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (4/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (5/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
@@ -492,7 +493,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (4/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (5/32)
 
 Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34).

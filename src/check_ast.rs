@@ -1131,6 +1131,10 @@ where
                         self,
                     ));
                 }
+
+                if self.settings.enabled.contains(&CheckCode::B002) {
+                    flake8_bugbear::plugins::unary_prefix_increment(self, expr, op, operand);
+                }
             }
             ExprKind::Compare {
                 left,

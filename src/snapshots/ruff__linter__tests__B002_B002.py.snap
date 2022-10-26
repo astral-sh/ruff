@@ -1,0 +1,21 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: UnaryPrefixIncrement
+  location:
+    row: 15
+    column: 9
+  end_location:
+    row: 15
+    column: 12
+  fix: ~
+- kind: UnaryPrefixIncrement
+  location:
+    row: 20
+    column: 12
+  end_location:
+    row: 20
+    column: 15
+  fix: ~
+
