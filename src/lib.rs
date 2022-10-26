@@ -16,6 +16,7 @@ mod autofix;
 pub mod cache;
 pub mod check_ast;
 mod check_lines;
+mod check_tokens;
 pub mod checks;
 pub mod cli;
 pub mod code_gen;

@@ -1,3 +1,5 @@
+//! Lint rules based on checking raw physical lines.
+
 use std::collections::BTreeMap;
 
 use rustpython_parser::ast::Location;

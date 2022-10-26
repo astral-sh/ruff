@@ -1,3 +1,5 @@
+//! Lint rules based on AST traversal.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Deref;
 use std::path::Path;
