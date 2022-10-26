@@ -76,6 +76,7 @@ pub enum CheckCode {
     A003,
     // flake8-bugbear
     B002,
+    B007,
     B011,
     B014,
     B017,
@@ -268,6 +269,7 @@ pub enum CheckKind {
     BuiltinAttributeShadowing(String),
     // flake8-bugbear
     UnaryPrefixIncrement,
+    UnusedLoopControlVariable(String),
     DoNotAssertFalse,
     DuplicateHandlerException(Vec<String>),
     NoAssertRaisesException,
@@ -429,6 +431,7 @@ impl CheckCode {
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-bugbear
             CheckCode::B002 => CheckKind::UnaryPrefixIncrement,
+            CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
             CheckCode::B014 => CheckKind::DuplicateHandlerException(vec!["ValueError".to_string()]),
             CheckCode::B017 => CheckKind::NoAssertRaisesException,
@@ -605,6 +608,7 @@ impl CheckCode {
             CheckCode::A002 => CheckCategory::Flake8Builtins,
             CheckCode::A003 => CheckCategory::Flake8Builtins,
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
+            CheckCode::B007 => CheckCategory::Flake8Bugbear,
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
             CheckCode::B014 => CheckCategory::Flake8Bugbear,
             CheckCode::B017 => CheckCategory::Flake8Bugbear,
@@ -750,6 +754,7 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-bugbear
             CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
+            CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
@@ -990,6 +995,7 @@ impl CheckKind {
             }
             // flake8-bugbear
             CheckKind::UnaryPrefixIncrement => "Python does not support the unary prefix increment. Writing `++n` is equivalent to `+(+(n))`, which equals `n`. You meant `n += 1`.".to_string(),
+            CheckKind::UnusedLoopControlVariable(name) => format!("Loop control variable `{name}` not used within the loop body. If this is intended, start the name with an underscore."),
             CheckKind::DoNotAssertFalse => {
                 "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
                     .to_string()
@@ -1278,6 +1284,9 @@ impl CheckKind {
             CheckKind::UnaryPrefixIncrement => {
                 "Python does not support the unary prefix increment.".to_string()
             }
+            CheckKind::UnusedLoopControlVariable(name) => {
+                format!("Loop control variable `{name}` not used within the loop body.")
+            }
             CheckKind::NoAssertRaisesException => {
                 "`assertRaises(Exception):` should be considered evil.".to_string()
             }
@@ -1320,6 +1329,7 @@ impl CheckKind {
                 | CheckKind::TypeOfPrimitive(_)
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnusedImport(_)
+                | CheckKind::UnusedLoopControlVariable(_)
                 | CheckKind::UnusedNOQA(_)
                 | CheckKind::UsePEP585Annotation(_)
                 | CheckKind::UsePEP604Annotation
