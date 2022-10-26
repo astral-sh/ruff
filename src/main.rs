@@ -220,7 +220,8 @@ fn autoformat(files: &[PathBuf], settings: &Settings) -> Result<usize> {
 }
 
 fn inner_main() -> Result<ExitCode> {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    cli.quiet |= cli.silent;
 
     set_up_logging(cli.verbose)?;
 
@@ -342,7 +343,7 @@ fn inner_main() -> Result<ExitCode> {
         tell_user!("Starting linter in watch mode...\n");
 
         let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
-        if !cli.quiet {
+        if !cli.silent {
             printer.write_continuously(&messages)?;
         }
 
@@ -362,7 +363,7 @@ fn inner_main() -> Result<ExitCode> {
                             tell_user!("File change detected...\n");
 
                             let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
-                            if !cli.quiet {
+                            if !cli.silent {
                                 printer.write_continuously(&messages)?;
                             }
                         }
@@ -388,13 +389,13 @@ fn inner_main() -> Result<ExitCode> {
                 let path = Path::new(&filename);
                 (
                     run_once_stdin(&settings, path, cli.fix)?,
-                    !cli.quiet && !cli.fix,
+                    !cli.silent && !cli.fix,
                     false,
                 )
             } else {
                 (
                     run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?,
-                    !cli.quiet,
+                    !cli.silent,
                     !cli.quiet,
                 )
             };
