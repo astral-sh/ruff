@@ -257,7 +257,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` |  |
 
-### pycodestyle
+### pycodestyle (error)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -275,7 +275,13 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
 | E902 | IOError | IOError: `...` |  |
 | E999 | SyntaxError | SyntaxError: `...` |  |
+
+### pycodestyle (warning)
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
 | W292 | NoNewLineAtEndOfFile | No newline at end of file |  |
+| W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' |  |
 
 ### pydocstyle
 

@@ -41,6 +41,7 @@ pub enum CheckCode {
     E999,
     // pycodestyle warnings
     W292,
+    W605,
     // pyflakes
     F401,
     F402,
@@ -174,7 +175,8 @@ pub enum CheckCode {
 #[derive(EnumIter, Debug, PartialEq, Eq)]
 pub enum CheckCategory {
     Pyflakes,
-    Pycodestyle,
+    PycodestyleError,
+    PycodestyleWarning,
     Pydocstyle,
     Pyupgrade,
     PEP8Naming,
@@ -188,7 +190,8 @@ pub enum CheckCategory {
 impl CheckCategory {
     pub fn title(&self) -> &'static str {
         match self {
-            CheckCategory::Pycodestyle => "pycodestyle",
+            CheckCategory::PycodestyleError => "pycodestyle (error)",
+            CheckCategory::PycodestyleWarning => "pycodestyle (warning)",
             CheckCategory::Pyflakes => "Pyflakes",
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
@@ -205,8 +208,9 @@ impl CheckCategory {
 #[allow(clippy::upper_case_acronyms)]
 pub enum LintSource {
     AST,
-    Lines,
     FileSystem,
+    Lines,
+    Tokens,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -234,6 +238,7 @@ pub enum CheckKind {
     TypeComparison,
     // pycodestyle warnings
     NoNewLineAtEndOfFile,
+    InvalidEscapeSequence(char),
     // pyflakes
     AssertTuple,
     BreakOutsideLoop,
@@ -369,6 +374,7 @@ impl CheckCode {
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             CheckCode::E501 | CheckCode::W292 | CheckCode::M001 => &LintSource::Lines,
+            CheckCode::W605 => &LintSource::Tokens,
             CheckCode::E902 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
@@ -394,6 +400,7 @@ impl CheckCode {
             CheckCode::E999 => CheckKind::SyntaxError("`...`".to_string()),
             // pycodestyle warnings
             CheckCode::W292 => CheckKind::NoNewLineAtEndOfFile,
+            CheckCode::W605 => CheckKind::InvalidEscapeSequence('c'),
             // pyflakes
             CheckCode::F401 => CheckKind::UnusedImport(vec!["...".to_string()]),
             CheckCode::F402 => CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
@@ -561,21 +568,22 @@ impl CheckCode {
 
     pub fn category(&self) -> CheckCategory {
         match self {
-            CheckCode::E402 => CheckCategory::Pycodestyle,
-            CheckCode::E501 => CheckCategory::Pycodestyle,
-            CheckCode::E711 => CheckCategory::Pycodestyle,
-            CheckCode::E712 => CheckCategory::Pycodestyle,
-            CheckCode::E713 => CheckCategory::Pycodestyle,
-            CheckCode::E714 => CheckCategory::Pycodestyle,
-            CheckCode::E721 => CheckCategory::Pycodestyle,
-            CheckCode::E722 => CheckCategory::Pycodestyle,
-            CheckCode::E731 => CheckCategory::Pycodestyle,
-            CheckCode::E741 => CheckCategory::Pycodestyle,
-            CheckCode::E742 => CheckCategory::Pycodestyle,
-            CheckCode::E743 => CheckCategory::Pycodestyle,
-            CheckCode::E902 => CheckCategory::Pycodestyle,
-            CheckCode::E999 => CheckCategory::Pycodestyle,
-            CheckCode::W292 => CheckCategory::Pycodestyle,
+            CheckCode::E402 => CheckCategory::PycodestyleError,
+            CheckCode::E501 => CheckCategory::PycodestyleError,
+            CheckCode::E711 => CheckCategory::PycodestyleError,
+            CheckCode::E712 => CheckCategory::PycodestyleError,
+            CheckCode::E713 => CheckCategory::PycodestyleError,
+            CheckCode::E714 => CheckCategory::PycodestyleError,
+            CheckCode::E721 => CheckCategory::PycodestyleError,
+            CheckCode::E722 => CheckCategory::PycodestyleError,
+            CheckCode::E731 => CheckCategory::PycodestyleError,
+            CheckCode::E741 => CheckCategory::PycodestyleError,
+            CheckCode::E742 => CheckCategory::PycodestyleError,
+            CheckCode::E743 => CheckCategory::PycodestyleError,
+            CheckCode::E902 => CheckCategory::PycodestyleError,
+            CheckCode::E999 => CheckCategory::PycodestyleError,
+            CheckCode::W292 => CheckCategory::PycodestyleWarning,
+            CheckCode::W605 => CheckCategory::PycodestyleWarning,
             CheckCode::F401 => CheckCategory::Pyflakes,
             CheckCode::F402 => CheckCategory::Pyflakes,
             CheckCode::F403 => CheckCategory::Pyflakes,
@@ -748,6 +756,7 @@ impl CheckKind {
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
+            CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
@@ -983,6 +992,7 @@ impl CheckKind {
             }
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
+            CheckKind::InvalidEscapeSequence(char) => format!("Invalid escape sequence: '\\{char}'"),
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
                 format!("Variable `{name}` is shadowing a python builtin")

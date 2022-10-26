@@ -14,6 +14,7 @@ use crate::autofix::fixer;
 use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
 use crate::check_lines::check_lines;
+use crate::check_tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::code_gen::SourceGenerator;
 use crate::message::Message;
@@ -44,6 +45,15 @@ pub(crate) fn check_path(
 ) -> Result<Vec<Check>> {
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
+
+    // Run the token-based checks.
+    if settings
+        .enabled
+        .iter()
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens))
+    {
+        check_tokens(&mut checks, contents, &tokens, settings);
+    }
 
     // Run the AST-based checks.
     if settings
@@ -381,6 +391,7 @@ mod tests {
     #[test_case(CheckCode::W292, Path::new("W292_0.py"); "W292_0")]
     #[test_case(CheckCode::W292, Path::new("W292_1.py"); "W292_1")]
     #[test_case(CheckCode::W292, Path::new("W292_2.py"); "W292_2")]
+    #[test_case(CheckCode::W605, Path::new("W605.py"); "W605")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let mut checks = check_path(

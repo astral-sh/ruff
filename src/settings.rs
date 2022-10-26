@@ -160,7 +160,7 @@ impl RawSettings {
                     .filter(|code| {
                         matches!(
                             code.category(),
-                            CheckCategory::Pycodestyle | CheckCategory::Pyflakes
+                            CheckCategory::PycodestyleError | CheckCategory::Pyflakes
                         )
                     })
                     .collect()
