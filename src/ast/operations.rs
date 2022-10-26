@@ -140,9 +140,9 @@ impl<'a> SourceCodeLocator<'a> {
             for line in self.content.lines() {
                 let mut newline = 0;
                 let mut line_offsets: Vec<usize> = vec![];
-                for (i, _char) in line.char_indices() {
+                for (i, char) in line.char_indices() {
                     line_offsets.push(offset + i);
-                    newline = i + _char.len_utf8();
+                    newline = i + char.len_utf8();
                 }
                 line_offsets.push(offset + newline);
                 self.offsets.push(line_offsets);
