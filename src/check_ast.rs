@@ -667,6 +667,11 @@ where
                     flake8_bugbear::plugins::assert_false(self, stmt, test, msg);
                 }
             }
+            StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
+                if self.settings.enabled.contains(&CheckCode::B017) {
+                    flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
+                }
+            }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
                     if let Some(check) = pyflakes::checks::default_except_not_last(handlers) {

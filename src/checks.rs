@@ -77,6 +77,7 @@ pub enum CheckCode {
     // flake8-bugbear
     B011,
     B014,
+    B017,
     B025,
     // flake8-comprehensions
     C400,
@@ -267,6 +268,7 @@ pub enum CheckKind {
     // flake8-bugbear
     DoNotAssertFalse,
     DuplicateHandlerException(Vec<String>),
+    NoAssertRaisesException,
     DuplicateTryBlockException(String),
     // flake8-comprehensions
     UnnecessaryGeneratorList,
@@ -426,6 +428,7 @@ impl CheckCode {
             // flake8-bugbear
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
             CheckCode::B014 => CheckKind::DuplicateHandlerException(vec!["ValueError".to_string()]),
+            CheckCode::B017 => CheckKind::NoAssertRaisesException,
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
@@ -600,6 +603,7 @@ impl CheckCode {
             CheckCode::A003 => CheckCategory::Flake8Builtins,
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
             CheckCode::B014 => CheckCategory::Flake8Bugbear,
+            CheckCode::B017 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
@@ -743,6 +747,7 @@ impl CheckKind {
             // flake8-bugbear
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
+            CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
@@ -992,6 +997,9 @@ impl CheckKind {
                     format!("Exception handler with duplicate exceptions: {names}")
                 }
             }
+            CheckKind::NoAssertRaisesException => {
+                "`assertRaises(Exception):` should be considered evil. It can lead to your test passing even if the code being tested is never executed due to a typo. Either assert for a more specific exception (builtin or custom), use `assertRaisesRegex`, or use the context manager form of `assertRaises`.".to_string()
+           }
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
             }
@@ -1255,6 +1263,16 @@ impl CheckKind {
                     format!("Unused `noqa` directive for: {codes}")
                 }
             },
+        }
+    }
+
+    /// The summary text for the check.
+    pub fn summary(&self) -> String {
+        match self {
+            CheckKind::NoAssertRaisesException => {
+                "`assertRaises(Exception):` should be considered evil.".to_string()
+            }
+            _ => self.body(),
         }
     }
 
