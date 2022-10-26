@@ -86,5 +86,3 @@ else:
 
 
 CustomInt: TypeAlias = "np.int8 | np.int16"
-
-from foo.bar import baz

@@ -40,13 +40,11 @@ pub fn remove_unused_imports(
     // Preserve the trailing comma (or not) from the last entry.
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
 
-    // Identify unused imports from within the `import from`.
+    // Identify unused imports from within the `import`.
     let mut removable = vec![];
     for (index, alias) in aliases.iter().enumerate() {
-        if let NameOrAttribute::N(import_name) = &alias.name {
-            if full_names.contains(&import_name.value) {
-                removable.push(index);
-            }
+        if full_names.contains(&compose_module_path(&alias.name).as_str()) {
+            removable.push(index);
         }
     }
     // TODO(charlie): This is quadratic.
