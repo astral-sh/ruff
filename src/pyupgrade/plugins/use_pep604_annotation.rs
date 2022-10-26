@@ -2,7 +2,6 @@ use rustpython_ast::{Constant, Expr, ExprKind, Operator};
 
 use crate::ast::helpers::match_name_or_attr;
 use crate::ast::types::Range;
-use crate::autofix::fixer;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
@@ -46,7 +45,7 @@ fn union(elts: &[Expr]) -> Expr {
 pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
     if match_name_or_attr(value, "Optional") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
-        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+        if checker.autofix.enabled() {
             let mut generator = SourceGenerator::new();
             if let Ok(()) = generator.unparse_expr(&optional(slice), 0) {
                 if let Ok(content) = generator.generate() {
@@ -61,7 +60,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         checker.add_check(check);
     } else if match_name_or_attr(value, "Union") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
-        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+        if checker.autofix.enabled() {
             match &slice.node {
                 ExprKind::Slice { .. } => {
                     // Invalid type annotation.

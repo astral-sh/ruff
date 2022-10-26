@@ -166,7 +166,7 @@ pub fn check_lines(
                                 end_location: Location::new(row + 1, end + 1),
                             },
                         );
-                        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                        if autofix.enabled() {
                             check.amend(Fix::deletion(
                                 Location::new(row + 1, start + 1),
                                 Location::new(row + 1, lines[row].chars().count() + 1),
@@ -194,7 +194,7 @@ pub fn check_lines(
                                 end_location: Location::new(row + 1, end + 1),
                             },
                         );
-                        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+                        if autofix.enabled() {
                             if valid_codes.is_empty() {
                                 check.amend(Fix::deletion(
                                     Location::new(row + 1, start + 1),

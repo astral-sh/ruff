@@ -13,6 +13,17 @@ pub enum Mode {
     None,
 }
 
+impl Mode {
+    /// Return `true` if a patch should be generated under the given `Mode`.
+    pub fn enabled(&self) -> bool {
+        match &self {
+            Mode::Generate => true,
+            Mode::Apply => true,
+            Mode::None => false,
+        }
+    }
+}
+
 impl From<bool> for Mode {
     fn from(value: bool) -> Self {
         match value {

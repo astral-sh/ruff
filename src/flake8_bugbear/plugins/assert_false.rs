@@ -1,7 +1,6 @@
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
-use crate::autofix::fixer;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
@@ -44,7 +43,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: &Optio
     } = &test.node
     {
         let mut check = Check::new(CheckKind::DoNotAssertFalse, Range::from_located(test));
-        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+        if checker.autofix.enabled() {
             let mut generator = SourceGenerator::new();
             if let Ok(()) = generator.unparse_stmt(&assertion_error(msg)) {
                 if let Ok(content) = generator.generate() {

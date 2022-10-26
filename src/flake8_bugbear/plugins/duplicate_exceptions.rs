@@ -5,7 +5,6 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKi
 
 use crate::ast::helpers;
 use crate::ast::types::{CheckLocator, Range};
-use crate::autofix::fixer;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
@@ -50,7 +49,7 @@ pub fn duplicate_handler_exceptions(
                 ),
                 checker.locate_check(Range::from_located(expr)),
             );
-            if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+            if checker.autofix.enabled() {
                 // TODO(charlie): If we have a single element, remove the tuple.
                 let mut generator = SourceGenerator::new();
                 if let Ok(()) = generator.unparse_expr(&type_pattern(unique_elts), 0) {

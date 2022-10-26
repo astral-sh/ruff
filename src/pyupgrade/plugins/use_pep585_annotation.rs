@@ -1,7 +1,6 @@
 use rustpython_ast::Expr;
 
 use crate::ast::types::Range;
-use crate::autofix::fixer;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
@@ -14,7 +13,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr, id: &str) {
             CheckKind::UsePEP585Annotation(id.to_string()),
             Range::from_located(expr),
         );
-        if matches!(checker.autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+        if checker.autofix.enabled() {
             check.amend(Fix::replacement(
                 id.to_lowercase(),
                 expr.location,
