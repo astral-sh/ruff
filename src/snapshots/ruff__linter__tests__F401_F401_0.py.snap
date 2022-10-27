@@ -4,7 +4,8 @@ expression: checks
 ---
 - kind:
     UnusedImport:
-      - functools
+      - - functools
+      - false
   location:
     row: 2
     column: 1
@@ -23,7 +24,8 @@ expression: checks
     applied: false
 - kind:
     UnusedImport:
-      - collections.OrderedDict
+      - - collections.OrderedDict
+      - false
   location:
     row: 4
     column: 1
@@ -42,7 +44,8 @@ expression: checks
     applied: false
 - kind:
     UnusedImport:
-      - logging.handlers
+      - - logging.handlers
+      - false
   location:
     row: 12
     column: 1
@@ -61,7 +64,8 @@ expression: checks
     applied: false
 - kind:
     UnusedImport:
-      - shelve
+      - - shelve
+      - false
   location:
     row: 33
     column: 5
@@ -80,7 +84,8 @@ expression: checks
     applied: false
 - kind:
     UnusedImport:
-      - importlib
+      - - importlib
+      - false
   location:
     row: 34
     column: 5
@@ -99,7 +104,8 @@ expression: checks
     applied: false
 - kind:
     UnusedImport:
-      - pathlib
+      - - pathlib
+      - false
   location:
     row: 38
     column: 5
@@ -118,7 +124,8 @@ expression: checks
     applied: false
 - kind:
     UnusedImport:
-      - pickle
+      - - pickle
+      - false
   location:
     row: 53
     column: 9

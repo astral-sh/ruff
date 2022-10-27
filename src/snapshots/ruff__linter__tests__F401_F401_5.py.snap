@@ -4,7 +4,8 @@ expression: checks
 ---
 - kind:
     UnusedImport:
-      - a.b.c
+      - - a.b.c
+      - false
   location:
     row: 2
     column: 1
@@ -23,7 +24,8 @@ expression: checks
     applied: false
 - kind:
     UnusedImport:
-      - d.e.f
+      - - d.e.f
+      - false
   location:
     row: 3
     column: 1
@@ -42,7 +44,8 @@ expression: checks
     applied: false
 - kind:
     UnusedImport:
-      - h.i
+      - - h.i
+      - false
   location:
     row: 4
     column: 1
@@ -61,7 +64,8 @@ expression: checks
     applied: false
 - kind:
     UnusedImport:
-      - j.k
+      - - j.k
+      - false
   location:
     row: 5
     column: 1

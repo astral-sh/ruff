@@ -2115,15 +2115,27 @@ impl<'a> Checker<'a> {
                         None
                     };
 
-                    let mut check = Check::new(
-                        CheckKind::UnusedImport(full_names.into_iter().map(String::from).collect()),
-                        self.locate_check(Range::from_located(child)),
-                    );
-                    if let Some(fix) = fix {
-                        check.amend(fix);
+                    if self.path.ends_with("__init__.py") {
+                        self.checks.push(Check::new(
+                            CheckKind::UnusedImport(
+                                full_names.into_iter().map(String::from).collect(),
+                                true,
+                            ),
+                            self.locate_check(Range::from_located(child)),
+                        ));
+                    } else {
+                        let mut check = Check::new(
+                            CheckKind::UnusedImport(
+                                full_names.into_iter().map(String::from).collect(),
+                                false,
+                            ),
+                            self.locate_check(Range::from_located(child)),
+                        );
+                        if let Some(fix) = fix {
+                            check.amend(fix);
+                        }
+                        self.checks.push(check);
                     }
-
-                    self.checks.push(check);
                 }
             }
         }
