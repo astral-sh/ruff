@@ -82,6 +82,9 @@ repos:
       - id: ruff
 ```
 
+<!-- TODO(charlie): Remove this message a few versions after v0.0.86. -->
+_Note: prior to `v0.0.86`, `ruff-pre-commit` used `lint` (rather than `ruff`) as the hook ID._
+
 ## Configuration
 
 Ruff is configurable both via `pyproject.toml` and the command line.
