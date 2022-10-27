@@ -5,3 +5,6 @@ extend-exclude = [
     "migrations",
     "directory/also_excluded.py",
 ]
+per-file-ignores = [
+    "__init__.py:F401",
+]
