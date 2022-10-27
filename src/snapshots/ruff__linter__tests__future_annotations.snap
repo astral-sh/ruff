@@ -4,7 +4,8 @@ expression: checks
 ---
 - kind:
     UnusedImport:
-      - models.Nut
+      - - models.Nut
+      - false
   location:
     row: 5
     column: 1
