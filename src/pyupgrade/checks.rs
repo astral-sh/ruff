@@ -5,7 +5,7 @@ use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::types::Primitive;
 
-/// Check that `super()` has no args
+/// U008
 pub fn super_args(
     scope: &Scope,
     parents: &[&Stmt],
@@ -70,7 +70,7 @@ pub fn super_args(
     None
 }
 
-/// Check UselessMetaclassType compliance.
+/// U001
 pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -> Option<Check> {
     if targets.len() == 1 {
         if let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() {
@@ -86,7 +86,7 @@ pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -
     None
 }
 
-/// Check UnnecessaryAbspath compliance.
+/// U002
 pub fn unnecessary_abspath(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
     // Validate the arguments.
     if args.len() == 1 {
@@ -106,7 +106,7 @@ pub fn unnecessary_abspath(func: &Expr, args: &[Expr], location: Range) -> Optio
     None
 }
 
-/// Check UselessObjectInheritance compliance.
+/// U004
 pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> Option<Check> {
     for expr in bases {
         if let ExprKind::Name { id, .. } = &expr.node {
@@ -131,7 +131,7 @@ pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> 
     None
 }
 
-/// Check TypeOfPrimitive compliance.
+/// U003
 pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
     // Validate the arguments.
     if args.len() == 1 {

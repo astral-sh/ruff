@@ -8,7 +8,7 @@ fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }
 
-/// Check AmbiguousVariableName compliance.
+/// E741
 pub fn ambiguous_variable_name(name: &str, location: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
@@ -20,7 +20,7 @@ pub fn ambiguous_variable_name(name: &str, location: Range) -> Option<Check> {
     }
 }
 
-/// Check AmbiguousClassName compliance.
+/// E742
 pub fn ambiguous_class_name(name: &str, location: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
@@ -32,7 +32,7 @@ pub fn ambiguous_class_name(name: &str, location: Range) -> Option<Check> {
     }
 }
 
-/// Check AmbiguousFunctionName compliance.
+/// E743
 pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
@@ -44,7 +44,7 @@ pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
     }
 }
 
-/// Check DoNotAssignLambda compliance.
+/// E731
 pub fn do_not_assign_lambda(value: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Lambda { .. } = &value.node {
         Some(Check::new(CheckKind::DoNotAssignLambda, location))
@@ -53,7 +53,7 @@ pub fn do_not_assign_lambda(value: &Expr, location: Range) -> Option<Check> {
     }
 }
 
-/// Check NotInTest and NotIsTest compliance.
+/// E713, E714
 pub fn not_tests(
     op: &Unaryop,
     operand: &Expr,
@@ -92,7 +92,7 @@ pub fn not_tests(
     checks
 }
 
-/// Check TrueFalseComparison and NoneComparison compliance.
+/// E711, E712
 pub fn literal_comparisons(
     left: &Expr,
     ops: &[Cmpop],
@@ -201,7 +201,7 @@ pub fn literal_comparisons(
     checks
 }
 
-/// Check TypeComparison compliance.
+/// E721
 pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 

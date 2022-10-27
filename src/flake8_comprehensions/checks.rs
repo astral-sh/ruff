@@ -37,7 +37,7 @@ fn first_argument_with_matching_function<'a>(
     Some(&args.first()?.node)
 }
 
-/// Check `list(generator)` compliance.
+/// C400 (`list(generator)`)
 pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("list", func, args)?;
     if let ExprKind::GeneratorExp { .. } = argument {
@@ -49,7 +49,7 @@ pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &[Expr]) -> Op
     None
 }
 
-/// Check `set(generator)` compliance.
+/// C401 (`set(generator)`)
 pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args)?;
     if let ExprKind::GeneratorExp { .. } = argument {
@@ -61,7 +61,7 @@ pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Opt
     None
 }
 
-/// Check `dict((x, y) for x, y in iterable)` compliance.
+/// C402 (`dict((x, y) for x, y in iterable)`)
 pub fn unnecessary_generator_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args)?;
     if let ExprKind::GeneratorExp { elt, .. } = argument {
@@ -78,7 +78,7 @@ pub fn unnecessary_generator_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Op
     None
 }
 
-/// Check `set([...])` compliance.
+/// C403 (`set([...])`)
 pub fn unnecessary_list_comprehension_set(
     expr: &Expr,
     func: &Expr,
@@ -94,7 +94,7 @@ pub fn unnecessary_list_comprehension_set(
     None
 }
 
-/// Check `dict([...])` compliance.
+/// C404 (`dict([...])`)
 pub fn unnecessary_list_comprehension_dict(
     expr: &Expr,
     func: &Expr,
@@ -115,7 +115,7 @@ pub fn unnecessary_list_comprehension_dict(
     None
 }
 
-/// Check `set([1, 2])` compliance.
+/// C405 (`set([1, 2])`)
 pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args)?;
     let kind = match argument {
@@ -129,7 +129,7 @@ pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Optio
     ))
 }
 
-/// Check `dict([(1, 2)])` compliance.
+/// C406 (`dict([(1, 2)])`)
 pub fn unnecessary_literal_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args)?;
     let (kind, elts) = match argument {
@@ -151,6 +151,7 @@ pub fn unnecessary_literal_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Opti
     ))
 }
 
+/// C408
 pub fn unnecessary_collection_call(
     expr: &Expr,
     func: &Expr,
@@ -162,10 +163,10 @@ pub fn unnecessary_collection_call(
     }
     let id = function_name(func)?;
     match id {
+        "dict" if keywords.is_empty() || keywords.iter().all(|kw| kw.node.arg.is_some()) => (),
         "list" | "tuple" => {
             // list() or tuple()
         }
-        "dict" if keywords.is_empty() || keywords.iter().all(|kw| kw.node.arg.is_some()) => (),
         _ => return None,
     };
     Some(Check::new(
@@ -174,6 +175,7 @@ pub fn unnecessary_collection_call(
     ))
 }
 
+/// C409
 pub fn unnecessary_literal_within_tuple_call(
     expr: &Expr,
     func: &Expr,
@@ -191,6 +193,7 @@ pub fn unnecessary_literal_within_tuple_call(
     ))
 }
 
+/// C410
 pub fn unnecessary_literal_within_list_call(
     expr: &Expr,
     func: &Expr,
@@ -208,6 +211,7 @@ pub fn unnecessary_literal_within_list_call(
     ))
 }
 
+/// C411
 pub fn unnecessary_list_call(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     let argument = first_argument_with_matching_function("list", func, args)?;
     if let ExprKind::ListComp { .. } = argument {
@@ -219,6 +223,7 @@ pub fn unnecessary_list_call(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<
     None
 }
 
+/// C413
 pub fn unnecessary_call_around_sorted(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     let outer = function_name(func)?;
     if !(outer == "list" || outer == "reversed") {
@@ -235,6 +240,7 @@ pub fn unnecessary_call_around_sorted(expr: &Expr, func: &Expr, args: &[Expr]) -
     None
 }
 
+/// C414
 pub fn unnecessary_double_cast_or_process(
     expr: &Expr,
     func: &Expr,
@@ -274,6 +280,7 @@ pub fn unnecessary_double_cast_or_process(
     None
 }
 
+/// C415
 pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     let first_arg = args.first()?;
     let id = function_name(func)?;
@@ -309,6 +316,7 @@ pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -
     None
 }
 
+/// C416
 pub fn unnecessary_comprehension(
     expr: &Expr,
     elt: &Expr,
@@ -337,6 +345,7 @@ pub fn unnecessary_comprehension(
     ))
 }
 
+/// C417
 pub fn unnecessary_map(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
     fn new_check(kind: &str, expr: &Expr) -> Check {
         Check::new(
