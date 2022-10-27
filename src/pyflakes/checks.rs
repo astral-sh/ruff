@@ -10,7 +10,7 @@ use rustpython_parser::ast::{
 use crate::ast::types::{BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 
-/// Check IfTuple compliance.
+/// F634
 pub fn if_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
         if !elts.is_empty() {
@@ -20,7 +20,7 @@ pub fn if_tuple(test: &Expr, location: Range) -> Option<Check> {
     None
 }
 
-/// Check AssertTuple compliance.
+/// F631
 pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
         if !elts.is_empty() {
@@ -30,7 +30,7 @@ pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
     None
 }
 
-/// Check UnusedVariable compliance.
+/// F841
 pub fn unused_variables(
     scope: &Scope,
     locator: &dyn CheckLocator,
@@ -63,7 +63,7 @@ pub fn unused_variables(
     checks
 }
 
-/// Check DefaultExceptNotLast compliance.
+/// F707
 pub fn default_except_not_last(handlers: &[Excepthandler]) -> Option<Check> {
     for (idx, handler) in handlers.iter().enumerate() {
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
@@ -78,7 +78,7 @@ pub fn default_except_not_last(handlers: &[Excepthandler]) -> Option<Check> {
     None
 }
 
-/// Check RaiseNotImplemented compliance.
+/// F901
 pub fn raise_not_implemented(expr: &Expr) -> Option<Check> {
     match &expr.node {
         ExprKind::Call { func, .. } => {
@@ -105,7 +105,7 @@ pub fn raise_not_implemented(expr: &Expr) -> Option<Check> {
     None
 }
 
-/// Check DuplicateArgumentName compliance.
+/// F831
 pub fn duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -153,7 +153,7 @@ fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {
     }
 }
 
-/// Check MultiValueRepeatedKeyLiteral and MultiValueRepeatedKeyVariable compliance.
+/// F601, F602
 pub fn repeated_keys(
     keys: &[Expr],
     check_repeated_literals: bool,
@@ -215,7 +215,7 @@ fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
-/// Check IsLiteral compliance.
+/// F632
 pub fn is_literal(left: &Expr, ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -232,7 +232,7 @@ pub fn is_literal(left: &Expr, ops: &[Cmpop], comparators: &[Expr], location: Ra
     checks
 }
 
-/// Check TwoStarredExpressions and TooManyExpressionsInStarredAssignment compliance.
+/// F621, F622
 pub fn starred_expressions(
     elts: &[Expr],
     check_too_many_expressions: bool,
@@ -262,7 +262,7 @@ pub fn starred_expressions(
     None
 }
 
-/// Check BreakOutsideLoop compliance.
+/// F701
 pub fn break_outside_loop(
     stmt: &Stmt,
     parents: &[&Stmt],
@@ -303,7 +303,7 @@ pub fn break_outside_loop(
     }
 }
 
-/// Check ContinueOutsideLoop compliance.
+/// F702
 pub fn continue_outside_loop(
     stmt: &Stmt,
     parents: &[&Stmt],
