@@ -95,6 +95,10 @@ select = [
     "F401",
     "F403",
 ]
+per-file-ignores = [
+    "__init__.py:F401",
+    "path/to/file.py:F401"
+]
 ```
 
 Alternatively, on the command-line:

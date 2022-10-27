@@ -362,7 +362,10 @@ other-attribute = 1
                 extend_select: vec![],
                 ignore: vec![],
                 extend_ignore: vec![],
-                per_file_ignores: vec![],
+                per_file_ignores: vec![StrCheckCodePair {
+                    pattern: "__init__.py".to_string(),
+                    code: CheckCode::F401
+                }],
                 dummy_variable_rgx: None,
                 target_version: None,
             }
