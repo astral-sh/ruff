@@ -82,9 +82,8 @@ repos:
       - id: ruff
 ```
 
-<!-- remove this message a few versions after 0.0.86 -->
-_note: for version <= 0.0.85, the hook id was `lint`. Please be sure to update configuration
-where necessary._
+<!-- TODO(charlie): Remove this message a few versions after v0.0.86. -->
+_Note: prior to `v0.0.86`, `ruff-pre-commit` used `lint` (rather than `ruff`) as the hook ID._
 
 ## Configuration
 
