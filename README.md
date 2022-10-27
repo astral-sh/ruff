@@ -79,7 +79,7 @@ repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: v0.0.86
     hooks:
-      - id: lint
+      - id: ruff
 ```
 
 ## Configuration
