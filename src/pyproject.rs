@@ -81,7 +81,7 @@ impl FromStr for StrCheckCodePair {
             if tokens.len() != 2 {
                 return Err(anyhow!("Expected {}", Self::EXPECTED_PATTERN));
             }
-            (tokens[0], tokens[1])
+            (tokens[0].trim(), tokens[1].trim())
         };
         let code = CheckCode::from_str(code_string)?;
         let pattern = pattern_str.into();
@@ -374,6 +374,8 @@ other-attribute = 1
     #[test]
     fn str_check_code_pair_strings() {
         let result = StrCheckCodePair::from_str("foo:E501");
+        assert!(result.is_ok());
+        let result = StrCheckCodePair::from_str("foo: E501");
         assert!(result.is_ok());
         let result = StrCheckCodePair::from_str("E501:foo");
         assert!(result.is_err());
