@@ -94,10 +94,8 @@ For example, you could configure Ruff to only enforce a subset of rules with:
 ```toml
 [tool.ruff]
 line-length = 88
-select = [
-    "F401",
-    "F403",
-]
+select = ["E", "F"]
+ignore = ["E501"]
 per-file-ignores = [
     "__init__.py:F401",
     "path/to/file.py:F401"
@@ -557,35 +555,55 @@ Yes! To enable a specific docstring convention, start by enabling all `pydocstyl
 then selectively disabling based on your [preferred convention](https://www.pydocstyle.org/en/latest/error_codes.html#default-conventions).
 
 For example, if you're coming from `flake8-docstrings`, the following configuration is equivalent to
-`--docstring-convention numpy`:
+`--docstring-convention=numpy`:
 
 ```toml
 [tool.ruff]
-extend-select = [
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D104",
-    "D105",
-    "D106",
-    "D200",
-    "D201",
-    "D202",
+extend-select = ["D"]
+extend-ignore = [
+    "D107",
+    "D203",
+    "D212",
+    "D213",
+    "D402",
+    "D413",
+    "D415",
+    "D416",
+    "D417",
+]
+```
+
+Similarly, the following is equivalent to `--docstring-convention=google`:
+
+```toml
+[tool.ruff]
+extend-select = ["D"]
+extend-ignore = [
+    "D203",
     "D204",
-    "D205",
-    "D206",
-    "D207",
-    "D208",
-    "D209",
-    "D210",
-    "D211",
+    "D213",
+    "D215",
+    "D400",
+    "D404",
+    "D406",
+    "D407",
+    "D408",
+    "D409",
+    "D413",
+]
+```
+
+Similarly, the following is equivalent to `--docstring-convention=pep8`:
+
+```toml
+[tool.ruff]
+extend-select = ["D"]
+extend-ignore = [
+    "D203",
+    "D212",
+    "D213",
     "D214",
     "D215",
-    "D300",
-    "D400",
-    "D402",
-    "D403",
     "D404",
     "D405",
     "D406",
@@ -594,51 +612,10 @@ extend-select = [
     "D409",
     "D410",
     "D411",
-    "D412",
     "D413",
-    "D418",
-    "D419",
-]
-```
-
-Similarly, the following is equivalent to `--docstring-convention google`:
-
-```toml
-[tool.ruff]
-extend-select = [
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D104",
-    "D105",
-    "D106",
-    "D107",
-    "D200",
-    "D201",
-    "D202",
-    "D205",
-    "D206",
-    "D207",
-    "D208",
-    "D209",
-    "D210",
-    "D211",
-    "D212",
-    "D214",
-    "D300",
-    "D402",
-    "D403",
-    "D405",
-    "D410",
-    "D411",
-    "D412",
-    "D414",
     "D415",
     "D416",
     "D417",
-    "D418",
-    "D419",
 ]
 ```
 
