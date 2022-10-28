@@ -1,3 +1,6 @@
+//! User-provided program settings, taking into account pyproject.toml and command-line options.
+//! Structure mirrors the user-facing representation of the various parameters.
+
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};

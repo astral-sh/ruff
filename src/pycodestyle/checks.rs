@@ -1,8 +1,8 @@
-use crate::ast::operations::SourceCodeLocator;
 use itertools::izip;
 use rustpython_ast::Location;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Unaryop};
 
+use crate::ast::operations::SourceCodeLocator;
 use crate::ast::types::{CheckLocator, Range};
 use crate::checks::{Check, CheckKind, RejectedCmpop};
 
