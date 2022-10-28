@@ -18,6 +18,7 @@ pub mod check_ast;
 mod check_lines;
 mod check_tokens;
 pub mod checks;
+mod checks_gen;
 pub mod cli;
 pub mod code_gen;
 mod cst;

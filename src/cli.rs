@@ -5,7 +5,7 @@ use clap::{command, Parser};
 use log::warn;
 use regex::Regex;
 
-use crate::checks::CheckCode;
+use crate::checks_gen::CheckCodePrefix;
 use crate::printer::SerializationFormat;
 use crate::pyproject::StrCheckCodePair;
 use crate::settings::PythonVersion;
@@ -43,16 +43,16 @@ pub struct Cli {
     pub no_cache: bool,
     /// List of error codes to enable.
     #[arg(long, value_delimiter = ',')]
-    pub select: Vec<CheckCode>,
+    pub select: Vec<CheckCodePrefix>,
     /// Like --select, but adds additional error codes on top of the selected ones.
     #[arg(long, value_delimiter = ',')]
-    pub extend_select: Vec<CheckCode>,
+    pub extend_select: Vec<CheckCodePrefix>,
     /// List of error codes to ignore.
     #[arg(long, value_delimiter = ',')]
-    pub ignore: Vec<CheckCode>,
+    pub ignore: Vec<CheckCodePrefix>,
     /// Like --ignore, but adds additional error codes on top of the ignored ones.
     #[arg(long, value_delimiter = ',')]
-    pub extend_ignore: Vec<CheckCode>,
+    pub extend_ignore: Vec<CheckCodePrefix>,
     /// List of paths, used to exclude files and/or directories from checks.
     #[arg(long, value_delimiter = ',')]
     pub exclude: Vec<String>,
@@ -106,9 +106,9 @@ impl fmt::Display for Warnable {
 /// Warn the user if they attempt to enable a code that won't be respected.
 pub fn warn_on(
     flag: Warnable,
-    codes: &[CheckCode],
-    cli_ignore: &[CheckCode],
-    cli_extend_ignore: &[CheckCode],
+    codes: &[CheckCodePrefix],
+    cli_ignore: &[CheckCodePrefix],
+    cli_extend_ignore: &[CheckCodePrefix],
     pyproject_settings: &RawSettings,
     pyproject_path: &Option<PathBuf>,
 ) {

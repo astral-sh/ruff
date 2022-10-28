@@ -7,7 +7,7 @@ use path_absolutize::Absolutize;
 use serde::de;
 use serde::{Deserialize, Deserializer};
 
-use crate::checks::CheckCode;
+use crate::checks_gen::CheckCodePrefix;
 use crate::settings::PythonVersion;
 use crate::{flake8_quotes, fs};
 
@@ -34,13 +34,13 @@ pub struct Config {
     pub exclude: Option<Vec<String>>,
     #[serde(default)]
     pub extend_exclude: Vec<String>,
-    pub select: Option<Vec<CheckCode>>,
+    pub select: Option<Vec<CheckCodePrefix>>,
     #[serde(default)]
-    pub extend_select: Vec<CheckCode>,
+    pub extend_select: Vec<CheckCodePrefix>,
     #[serde(default)]
-    pub ignore: Vec<CheckCode>,
+    pub ignore: Vec<CheckCodePrefix>,
     #[serde(default)]
-    pub extend_ignore: Vec<CheckCode>,
+    pub extend_ignore: Vec<CheckCodePrefix>,
     #[serde(default)]
     pub per_file_ignores: Vec<StrCheckCodePair>,
     pub dummy_variable_rgx: Option<String>,
@@ -51,7 +51,7 @@ pub struct Config {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StrCheckCodePair {
     pub pattern: String,
-    pub code: CheckCode,
+    pub code: CheckCodePrefix,
 }
 
 impl StrCheckCodePair {
@@ -84,7 +84,7 @@ impl FromStr for StrCheckCodePair {
             }
             (tokens[0].trim(), tokens[1].trim())
         };
-        let code = CheckCode::from_str(code_string)?;
+        let code = CheckCodePrefix::from_str(code_string)?;
         let pattern = pattern_str.into();
         Ok(Self { pattern, code })
     }
@@ -157,7 +157,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use crate::checks::CheckCode;
+    use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes;
     use crate::flake8_quotes::settings::Quote;
     use crate::pyproject::{
@@ -269,7 +269,7 @@ select = ["E501"]
                     line_length: None,
                     exclude: None,
                     extend_exclude: vec![],
-                    select: Some(vec![CheckCode::E501]),
+                    select: Some(vec![CheckCodePrefix::E501]),
                     extend_select: vec![],
                     ignore: vec![],
                     extend_ignore: vec![],
@@ -297,8 +297,8 @@ ignore = ["E501"]
                     exclude: None,
                     extend_exclude: vec![],
                     select: None,
-                    extend_select: vec![CheckCode::M001],
-                    ignore: vec![CheckCode::E501],
+                    extend_select: vec![CheckCodePrefix::M001],
+                    ignore: vec![CheckCodePrefix::E501],
                     extend_ignore: vec![],
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
@@ -372,7 +372,7 @@ other-attribute = 1
                 extend_ignore: vec![],
                 per_file_ignores: vec![StrCheckCodePair {
                     pattern: "__init__.py".to_string(),
-                    code: CheckCode::F401
+                    code: CheckCodePrefix::F401
                 }],
                 dummy_variable_rgx: None,
                 target_version: None,
