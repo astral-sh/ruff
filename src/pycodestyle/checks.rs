@@ -248,17 +248,9 @@ const VALID_ESCAPE_SEQUENCES: &[char; 23] = &[
 
 /// Return the quotation markers used for a String token.
 fn extract_quote(text: &str) -> &str {
-    if text.len() >= 3 {
-        let triple = &text[text.len() - 3..];
-        if triple == "'''" || triple == "\"\"\"" {
-            return triple;
-        }
-    }
-
-    if !text.is_empty() {
-        let single = &text[text.len() - 1..];
-        if single == "'" || single == "\"" {
-            return single;
+    for quote in ["'''", "\"\"\"", "'", "\""] {
+        if text.ends_with(quote) {
+            return quote;
         }
     }
 
