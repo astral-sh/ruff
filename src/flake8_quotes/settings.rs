@@ -11,7 +11,7 @@ pub enum Quote {
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Config {
+pub struct Options {
     pub inline_quotes: Option<Quote>,
     pub multiline_quotes: Option<Quote>,
     pub docstring_quotes: Option<Quote>,
@@ -27,7 +27,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_config(config: Config) -> Self {
+    pub fn from_config(config: Options) -> Self {
         Self {
             inline_quotes: config.inline_quotes.unwrap_or(Quote::Single),
             multiline_quotes: config.multiline_quotes.unwrap_or(Quote::Double),

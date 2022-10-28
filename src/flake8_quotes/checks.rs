@@ -148,15 +148,10 @@ mod tests {
     use crate::checks::{Check, CheckCode};
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::tokenize;
-    use crate::settings;
-    use crate::{flake8_quotes, linter};
+    use crate::{flake8_quotes, linter, Settings};
     use crate::{fs, noqa};
 
-    fn check_path(
-        path: &Path,
-        settings: &settings::Settings,
-        autofix: &fixer::Mode,
-    ) -> Result<Vec<Check>> {
+    fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;
         let tokens: Vec<LexResult> = tokenize(&contents);
         let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
@@ -174,14 +169,14 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
-            &settings::Settings {
+            &Settings {
                 flake8_quotes: flake8_quotes::settings::Settings {
                     inline_quotes: Quote::Single,
                     multiline_quotes: Quote::Single,
                     docstring_quotes: Quote::Single,
                     avoid_escape: true,
                 },
-                ..settings::Settings::for_rules(vec![
+                ..Settings::for_rules(vec![
                     CheckCode::Q000,
                     CheckCode::Q001,
                     CheckCode::Q002,
@@ -206,14 +201,14 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
-            &settings::Settings {
+            &Settings {
                 flake8_quotes: flake8_quotes::settings::Settings {
                     inline_quotes: Quote::Double,
                     multiline_quotes: Quote::Double,
                     docstring_quotes: Quote::Double,
                     avoid_escape: true,
                 },
-                ..settings::Settings::for_rules(vec![
+                ..Settings::for_rules(vec![
                     CheckCode::Q000,
                     CheckCode::Q001,
                     CheckCode::Q002,
@@ -243,14 +238,14 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
-            &settings::Settings {
+            &Settings {
                 flake8_quotes: flake8_quotes::settings::Settings {
                     inline_quotes: Quote::Single,
                     multiline_quotes: Quote::Single,
                     docstring_quotes: Quote::Double,
                     avoid_escape: true,
                 },
-                ..settings::Settings::for_rules(vec![
+                ..Settings::for_rules(vec![
                     CheckCode::Q000,
                     CheckCode::Q001,
                     CheckCode::Q002,
@@ -280,14 +275,14 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
-            &settings::Settings {
+            &Settings {
                 flake8_quotes: flake8_quotes::settings::Settings {
                     inline_quotes: Quote::Single,
                     multiline_quotes: Quote::Double,
                     docstring_quotes: Quote::Single,
                     avoid_escape: true,
                 },
-                ..settings::Settings::for_rules(vec![
+                ..Settings::for_rules(vec![
                     CheckCode::Q000,
                     CheckCode::Q001,
                     CheckCode::Q002,

@@ -7,9 +7,9 @@ use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::printer::SerializationFormat;
-use crate::pyproject::StrCheckCodePair;
-use crate::settings::PythonVersion;
-use crate::RawSettings;
+use crate::settings::configuration::Configuration;
+use crate::settings::types::PythonVersion;
+use crate::settings::types::StrCheckCodePair;
 
 #[derive(Debug, Parser)]
 #[command(author, about = "ruff: An extremely fast Python linter.")]
@@ -109,7 +109,7 @@ pub fn warn_on(
     codes: &[CheckCodePrefix],
     cli_ignore: &[CheckCodePrefix],
     cli_extend_ignore: &[CheckCodePrefix],
-    pyproject_settings: &RawSettings,
+    pyproject_configuration: &Configuration,
     pyproject_path: &Option<PathBuf>,
 ) {
     for code in codes {
@@ -117,7 +117,7 @@ pub fn warn_on(
             if cli_ignore.contains(code) {
                 warn!("{code:?} was passed to {flag}, but ignored via --ignore")
             }
-        } else if pyproject_settings.ignore.contains(code) {
+        } else if pyproject_configuration.ignore.contains(code) {
             if let Some(path) = pyproject_path {
                 warn!(
                     "{code:?} was passed to {flag}, but ignored by the `ignore` field in {}",
@@ -131,7 +131,7 @@ pub fn warn_on(
             if cli_extend_ignore.contains(code) {
                 warn!("{code:?} was passed to {flag}, but ignored via --extend-ignore")
             }
-        } else if pyproject_settings.extend_ignore.contains(code) {
+        } else if pyproject_configuration.extend_ignore.contains(code) {
             if let Some(path) = pyproject_path {
                 warn!(
                     "{code:?} was passed to {flag}, but ignored by the `extend_ignore` field in {}",

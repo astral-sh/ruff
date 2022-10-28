@@ -229,7 +229,7 @@ pub fn check_lines(
 mod tests {
     use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
-    use crate::settings;
+    use crate::settings::Settings;
 
     use super::check_lines;
 
@@ -243,9 +243,9 @@ mod tests {
                 &mut checks,
                 line,
                 &noqa_line_for,
-                &settings::Settings {
+                &Settings {
                     line_length,
-                    ..settings::Settings::for_rule(CheckCode::E501)
+                    ..Settings::for_rule(CheckCode::E501)
                 },
                 &fixer::Mode::Generate,
             );

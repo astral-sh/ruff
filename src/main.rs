@@ -25,10 +25,11 @@ use ruff::linter::{lint_path, lint_stdin};
 use ruff::logging::set_up_logging;
 use ruff::message::Message;
 use ruff::printer::{Printer, SerializationFormat};
-use ruff::pyproject::{self};
-use ruff::settings::CurrentSettings;
-use ruff::settings::RawSettings;
-use ruff::settings::{FilePattern, PerFileIgnore, Settings};
+use ruff::settings::configuration::Configuration;
+use ruff::settings::pyproject;
+use ruff::settings::types::{FilePattern, PerFileIgnore};
+use ruff::settings::user::UserConfiguration;
+use ruff::settings::Settings;
 use ruff::tell_user;
 
 #[cfg(feature = "update-informer")]
@@ -73,10 +74,14 @@ fn check_for_updates() {
     }
 }
 
-fn show_settings(settings: RawSettings, project_root: Option<PathBuf>, pyproject: Option<PathBuf>) {
+fn show_settings(
+    configuration: Configuration,
+    project_root: Option<PathBuf>,
+    pyproject: Option<PathBuf>,
+) {
     println!(
         "{:#?}",
-        CurrentSettings::from_settings(settings, project_root, pyproject)
+        UserConfiguration::from_configuration(configuration, project_root, pyproject)
     );
 }
 
@@ -256,15 +261,15 @@ fn inner_main() -> Result<ExitCode> {
         .map(|pair| PerFileIgnore::new(pair, &project_root))
         .collect();
 
-    let mut settings = RawSettings::from_pyproject(&pyproject, &project_root, cli.quiet)?;
+    let mut configuration = Configuration::from_pyproject(&pyproject, &project_root, cli.quiet)?;
     if !exclude.is_empty() {
-        settings.exclude = exclude;
+        configuration.exclude = exclude;
     }
     if !extend_exclude.is_empty() {
-        settings.extend_exclude = extend_exclude;
+        configuration.extend_exclude = extend_exclude;
     }
     if !per_file_ignores.is_empty() {
-        settings.per_file_ignores = per_file_ignores;
+        configuration.per_file_ignores = per_file_ignores;
     }
     if !cli.select.is_empty() {
         warn_on(
@@ -272,10 +277,10 @@ fn inner_main() -> Result<ExitCode> {
             &cli.select,
             &cli.ignore,
             &cli.extend_ignore,
-            &settings,
+            &configuration,
             &pyproject,
         );
-        settings.select = cli.select;
+        configuration.select = cli.select;
     }
     if !cli.extend_select.is_empty() {
         warn_on(
@@ -283,22 +288,22 @@ fn inner_main() -> Result<ExitCode> {
             &cli.extend_select,
             &cli.ignore,
             &cli.extend_ignore,
-            &settings,
+            &configuration,
             &pyproject,
         );
-        settings.extend_select = cli.extend_select;
+        configuration.extend_select = cli.extend_select;
     }
     if !cli.ignore.is_empty() {
-        settings.ignore = cli.ignore;
+        configuration.ignore = cli.ignore;
     }
     if !cli.extend_ignore.is_empty() {
-        settings.extend_ignore = cli.extend_ignore;
+        configuration.extend_ignore = cli.extend_ignore;
     }
     if let Some(target_version) = cli.target_version {
-        settings.target_version = target_version;
+        configuration.target_version = target_version;
     }
     if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
-        settings.dummy_variable_rgx = dummy_variable_rgx;
+        configuration.dummy_variable_rgx = dummy_variable_rgx;
     }
 
     if cli.show_settings && cli.show_files {
@@ -306,11 +311,11 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::FAILURE);
     }
     if cli.show_settings {
-        show_settings(settings, project_root, pyproject);
+        show_settings(configuration, project_root, pyproject);
         return Ok(ExitCode::SUCCESS);
     }
 
-    let settings = Settings::from_raw(settings);
+    let settings = Settings::from_configuration(configuration);
 
     if cli.show_files {
         show_files(&cli.files, &settings);
