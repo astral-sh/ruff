@@ -5,11 +5,13 @@ use std::path::Path;
 use anyhow::Result;
 use log::debug;
 use rustpython_parser::lexer::LexResult;
+use settings::pyproject;
 
 use crate::autofix::fixer::Mode;
 use crate::linter::{check_path, tokenize};
 use crate::message::Message;
-use crate::settings::{RawSettings, Settings};
+use crate::settings::configuration::Configuration;
+use settings::Settings;
 
 mod ast;
 mod autofix;
@@ -38,7 +40,6 @@ pub mod printer;
 mod pycodestyle;
 mod pydocstyle;
 mod pyflakes;
-pub mod pyproject;
 mod python;
 mod pyupgrade;
 pub mod settings;
@@ -58,7 +59,7 @@ pub fn check(path: &Path, contents: &str, quiet: bool) -> Result<Vec<Message>> {
         None => debug!("Unable to find pyproject.toml; using default settings..."),
     };
 
-    let settings = Settings::from_raw(RawSettings::from_pyproject(
+    let settings = Settings::from_configuration(Configuration::from_pyproject(
         &pyproject,
         &project_root,
         quiet,

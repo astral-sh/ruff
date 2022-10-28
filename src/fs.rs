@@ -12,7 +12,7 @@ use path_absolutize::Absolutize;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::checks::CheckCode;
-use crate::settings::{FilePattern, PerFileIgnore};
+use crate::settings::types::{FilePattern, PerFileIgnore};
 
 /// Extract the absolute path and basename (as strings) from a Path.
 fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -178,7 +178,7 @@ mod tests {
     use path_absolutize::Absolutize;
 
     use crate::fs::{extract_path_names, is_excluded, is_included};
-    use crate::settings::FilePattern;
+    use crate::settings::types::FilePattern;
 
     #[test]
     fn inclusions() {

@@ -1,106 +1,26 @@
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+//! Utilities for locating (and extracting configuration from) a pyproject.toml.
 
-use anyhow::{anyhow, Result};
+use std::path::{Path, PathBuf};
+
+use anyhow::Result;
 use common_path::common_path_all;
 use path_absolutize::Absolutize;
-use serde::de;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 
-use crate::checks_gen::CheckCodePrefix;
-use crate::settings::PythonVersion;
-use crate::{flake8_quotes, fs};
-
-pub fn load_config(pyproject: &Option<PathBuf>, quiet: bool) -> Result<Config> {
-    match pyproject {
-        Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
-            .tool
-            .and_then(|tool| tool.ruff)
-            .unwrap_or_default()),
-        None => {
-            if !quiet {
-                eprintln!("No pyproject.toml found.");
-                eprintln!("Falling back to default configuration...");
-            }
-            Ok(Default::default())
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Config {
-    pub line_length: Option<usize>,
-    pub exclude: Option<Vec<String>>,
-    #[serde(default)]
-    pub extend_exclude: Vec<String>,
-    pub select: Option<Vec<CheckCodePrefix>>,
-    #[serde(default)]
-    pub extend_select: Vec<CheckCodePrefix>,
-    #[serde(default)]
-    pub ignore: Vec<CheckCodePrefix>,
-    #[serde(default)]
-    pub extend_ignore: Vec<CheckCodePrefix>,
-    #[serde(default)]
-    pub per_file_ignores: Vec<StrCheckCodePair>,
-    pub dummy_variable_rgx: Option<String>,
-    pub target_version: Option<PythonVersion>,
-    pub flake8_quotes: Option<flake8_quotes::settings::Config>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StrCheckCodePair {
-    pub pattern: String,
-    pub code: CheckCodePrefix,
-}
-
-impl StrCheckCodePair {
-    const EXPECTED_PATTERN: &'static str = "<FilePattern>:<CheckCode> pattern";
-}
-
-impl<'de> Deserialize<'de> for StrCheckCodePair {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let str_result = String::deserialize(deserializer)?;
-        Self::from_str(str_result.as_str()).map_err(|_| {
-            de::Error::invalid_value(
-                de::Unexpected::Str(str_result.as_str()),
-                &Self::EXPECTED_PATTERN,
-            )
-        })
-    }
-}
-
-impl FromStr for StrCheckCodePair {
-    type Err = anyhow::Error;
-
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        let (pattern_str, code_string) = {
-            let tokens = string.split(':').collect::<Vec<_>>();
-            if tokens.len() != 2 {
-                return Err(anyhow!("Expected {}", Self::EXPECTED_PATTERN));
-            }
-            (tokens[0].trim(), tokens[1].trim())
-        };
-        let code = CheckCodePrefix::from_str(code_string)?;
-        let pattern = pattern_str.into();
-        Ok(Self { pattern, code })
-    }
-}
+use crate::fs;
+use crate::settings::options::Options;
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 struct Tools {
-    ruff: Option<Config>,
+    ruff: Option<Options>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
-struct PyProject {
+struct Pyproject {
     tool: Option<Tools>,
 }
 
-fn parse_pyproject_toml(path: &Path) -> Result<PyProject> {
+fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
     toml::from_str(&contents).map_err(|e| e.into())
 }
@@ -149,6 +69,22 @@ pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
     None
 }
 
+pub fn load_options(pyproject: &Option<PathBuf>, quiet: bool) -> Result<Options> {
+    match pyproject {
+        Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
+            .tool
+            .and_then(|tool| tool.ruff)
+            .unwrap_or_default()),
+        None => {
+            if !quiet {
+                eprintln!("No pyproject.toml found.");
+                eprintln!("Falling back to default configuration...");
+            }
+            Ok(Default::default())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::env::current_dir;
@@ -160,25 +96,24 @@ mod tests {
     use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes;
     use crate::flake8_quotes::settings::Quote;
-    use crate::pyproject::{
-        find_project_root, find_pyproject_toml, parse_pyproject_toml, Config, PyProject, Tools,
+    use crate::settings::pyproject::{
+        find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
-
-    use super::StrCheckCodePair;
+    use crate::settings::types::StrCheckCodePair;
 
     #[test]
     fn deserialize() -> Result<()> {
-        let pyproject: PyProject = toml::from_str(r#""#)?;
+        let pyproject: Pyproject = toml::from_str(r#""#)?;
         assert_eq!(pyproject.tool, None);
 
-        let pyproject: PyProject = toml::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 "#,
         )?;
         assert_eq!(pyproject.tool, Some(Tools { ruff: None }));
 
-        let pyproject: PyProject = toml::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -187,7 +122,7 @@ mod tests {
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                ruff: Some(Config {
+                ruff: Some(Options {
                     line_length: None,
                     exclude: None,
                     extend_exclude: vec![],
@@ -203,7 +138,7 @@ mod tests {
             })
         );
 
-        let pyproject: PyProject = toml::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -213,7 +148,7 @@ line-length = 79
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                ruff: Some(Config {
+                ruff: Some(Options {
                     line_length: Some(79),
                     exclude: None,
                     extend_exclude: vec![],
@@ -229,7 +164,7 @@ line-length = 79
             })
         );
 
-        let pyproject: PyProject = toml::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -239,7 +174,7 @@ exclude = ["foo.py"]
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                ruff: Some(Config {
+                ruff: Some(Options {
                     line_length: None,
                     exclude: Some(vec!["foo.py".to_string()]),
                     extend_exclude: vec![],
@@ -255,7 +190,7 @@ exclude = ["foo.py"]
             })
         );
 
-        let pyproject: PyProject = toml::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -265,7 +200,7 @@ select = ["E501"]
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                ruff: Some(Config {
+                ruff: Some(Options {
                     line_length: None,
                     exclude: None,
                     extend_exclude: vec![],
@@ -281,7 +216,7 @@ select = ["E501"]
             })
         );
 
-        let pyproject: PyProject = toml::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -292,7 +227,7 @@ ignore = ["E501"]
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                ruff: Some(Config {
+                ruff: Some(Options {
                     line_length: None,
                     exclude: None,
                     extend_exclude: vec![],
@@ -308,7 +243,7 @@ ignore = ["E501"]
             })
         );
 
-        assert!(toml::from_str::<PyProject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -317,7 +252,7 @@ line_length = 79
         )
         .is_err());
 
-        assert!(toml::from_str::<PyProject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -326,7 +261,7 @@ select = ["E123"]
         )
         .is_err());
 
-        assert!(toml::from_str::<PyProject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -358,7 +293,7 @@ other-attribute = 1
             .expect("Unable to find tool.ruff.");
         assert_eq!(
             config,
-            Config {
+            Options {
                 line_length: Some(88),
                 exclude: None,
                 extend_exclude: vec![
@@ -376,7 +311,7 @@ other-attribute = 1
                 }],
                 dummy_variable_rgx: None,
                 target_version: None,
-                flake8_quotes: Some(flake8_quotes::settings::Config {
+                flake8_quotes: Some(flake8_quotes::settings::Options {
                     inline_quotes: Some(Quote::Single),
                     multiline_quotes: Some(Quote::Double),
                     docstring_quotes: Some(Quote::Double),

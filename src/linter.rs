@@ -236,16 +236,12 @@ mod tests {
 
     use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
-    use crate::linter;
     use crate::linter::tokenize;
     use crate::settings;
     use crate::{fs, noqa};
+    use crate::{linter, Settings};
 
-    fn check_path(
-        path: &Path,
-        settings: &settings::Settings,
-        autofix: &fixer::Mode,
-    ) -> Result<Vec<Check>> {
+    fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;
         let tokens: Vec<LexResult> = tokenize(&contents);
         let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
