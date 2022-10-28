@@ -26,6 +26,7 @@ mod flake8_bugbear;
 mod flake8_builtins;
 mod flake8_comprehensions;
 mod flake8_print;
+mod flake8_quotes;
 pub mod fs;
 pub mod linter;
 pub mod logging;

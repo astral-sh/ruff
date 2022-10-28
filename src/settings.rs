@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::checks::{CheckCategory, CheckCode};
-use crate::fs;
 use crate::pyproject::{load_config, StrCheckCodePair};
+use crate::{flake8_quotes, fs};
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PythonVersion {
@@ -97,6 +97,8 @@ pub struct RawSettings {
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub select: Vec<CheckCode>,
     pub target_version: PythonVersion,
+    // Plugins
+    pub flake8_quotes: flake8_quotes::settings::Settings,
 }
 
 static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
@@ -133,6 +135,7 @@ impl RawSettings {
         quiet: bool,
     ) -> Result<Self> {
         let config = load_config(pyproject, quiet)?;
+        println!("{:?}", config.flake8_quotes);
         Ok(RawSettings {
             dummy_variable_rgx: match config.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
@@ -173,6 +176,11 @@ impl RawSettings {
                 .into_iter()
                 .map(|pair| PerFileIgnore::new(pair, project_root))
                 .collect(),
+            // Plugins
+            flake8_quotes: config
+                .flake8_quotes
+                .map(flake8_quotes::settings::Settings::from_config)
+                .unwrap_or_default(),
         })
     }
 }
@@ -186,6 +194,8 @@ pub struct Settings {
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub target_version: PythonVersion,
+    // Plugins
+    pub flake8_quotes: flake8_quotes::settings::Settings,
 }
 
 impl Settings {
@@ -205,9 +215,10 @@ impl Settings {
             enabled,
             exclude: settings.exclude,
             extend_exclude: settings.extend_exclude,
+            flake8_quotes: settings.flake8_quotes,
             line_length: settings.line_length,
             per_file_ignores: settings.per_file_ignores,
-            target_version: PythonVersion::Py310,
+            target_version: settings.target_version,
         }
     }
 
@@ -220,6 +231,7 @@ impl Settings {
             line_length: 88,
             per_file_ignores: vec![],
             target_version: PythonVersion::Py310,
+            flake8_quotes: Default::default(),
         }
     }
 
@@ -232,6 +244,7 @@ impl Settings {
             line_length: 88,
             per_file_ignores: vec![],
             target_version: PythonVersion::Py310,
+            flake8_quotes: Default::default(),
         }
     }
 }
@@ -285,6 +298,9 @@ pub struct CurrentSettings {
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub select: Vec<CheckCode>,
     pub target_version: PythonVersion,
+    // Plugins
+    pub flake8_quotes: flake8_quotes::settings::Settings,
+    // Non-settings exposed to the user
     pub project_root: Option<PathBuf>,
     pub pyproject: Option<PathBuf>,
 }
@@ -314,6 +330,7 @@ impl CurrentSettings {
             per_file_ignores: settings.per_file_ignores,
             select: settings.select,
             target_version: settings.target_version,
+            flake8_quotes: settings.flake8_quotes,
             project_root,
             pyproject,
         }

@@ -1,0 +1,13 @@
+---
+source: src/flake8_quotes/checks.rs
+expression: checks
+---
+- kind: AvoidQuoteEscape
+  location:
+    row: 1
+    column: 26
+  end_location:
+    row: 1
+    column: 48
+  fix: ~
+

@@ -104,7 +104,17 @@ per-file-ignores = [
 ]
 ```
 
-Alternatively, on the command-line:
+Plugin configurations should be expressed as subsections, e.g.:
+
+```toml
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.flake8-quotes]
+docstring-quotes = "double"
+```
+
+Alternatively, common configuration settings can be provided via the command-line:
 
 ```shell
 ruff path/to/code/ --select F401 --select F403
@@ -415,6 +425,15 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | T201 | PrintFound | `print` found | 🛠 |
 | T203 | PPrintFound | `pprint` found | 🛠 |
 
+### flake8-quotes
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| Q000 | BadQuotesInlineString | Single quotes found but double quotes preferred |  |
+| Q001 | BadQuotesMultilineString | Single quote multiline found but double quotes preferred |  |
+| Q002 | BadQuotesDocstring | Single quote docstring found but double quotes preferred |  |
+| Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes |  |
+
 ### Meta rules
 
 | Code | Name | Message | Fix |
@@ -486,6 +505,7 @@ including:
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (9/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
@@ -506,6 +526,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (9/32)
 

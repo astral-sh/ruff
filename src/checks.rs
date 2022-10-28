@@ -7,6 +7,7 @@ use strum_macros::{AsRefStr, EnumIter, EnumString};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::flake8_quotes::settings::Quote;
 use crate::pyupgrade::types::Primitive;
 
 #[derive(
@@ -102,6 +103,11 @@ pub enum CheckCode {
     // flake8-print
     T201,
     T203,
+    // flake8-quotes
+    Q000,
+    Q001,
+    Q002,
+    Q003,
     // pyupgrade
     U001,
     U002,
@@ -184,6 +190,7 @@ pub enum CheckCategory {
     Flake8Bugbear,
     Flake8Builtins,
     Flake8Print,
+    Flake8Quotes,
     Meta,
 }
 
@@ -197,6 +204,7 @@ impl CheckCategory {
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
             CheckCategory::Flake8Print => "flake8-print",
+            CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Pydocstyle => "pydocstyle",
             CheckCategory::PEP8Naming => "pep8-naming",
@@ -299,6 +307,11 @@ pub enum CheckKind {
     // flake8-print
     PrintFound,
     PPrintFound,
+    // flake8-quotes
+    BadQuotesInlineString(Quote),
+    BadQuotesMultilineString(Quote),
+    BadQuotesDocstring(Quote),
+    AvoidQuoteEscape,
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UnnecessaryAbspath,
@@ -374,7 +387,11 @@ impl CheckCode {
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             CheckCode::E501 | CheckCode::W292 | CheckCode::M001 => &LintSource::Lines,
-            CheckCode::W605 => &LintSource::Tokens,
+            CheckCode::W605
+            | CheckCode::Q000
+            | CheckCode::Q001
+            | CheckCode::Q002
+            | CheckCode::Q003 => &LintSource::Tokens,
             CheckCode::E902 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
@@ -476,6 +493,11 @@ impl CheckCode {
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
+            // flake8-quotes
+            CheckCode::Q000 => CheckKind::BadQuotesInlineString(Quote::Double),
+            CheckCode::Q001 => CheckKind::BadQuotesMultilineString(Quote::Double),
+            CheckCode::Q002 => CheckKind::BadQuotesDocstring(Quote::Double),
+            CheckCode::Q003 => CheckKind::AvoidQuoteEscape,
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
@@ -639,6 +661,10 @@ impl CheckCode {
             CheckCode::C417 => CheckCategory::Flake8Comprehensions,
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
+            CheckCode::Q000 => CheckCategory::Flake8Quotes,
+            CheckCode::Q001 => CheckCategory::Flake8Quotes,
+            CheckCode::Q002 => CheckCategory::Flake8Quotes,
+            CheckCode::Q003 => CheckCategory::Flake8Quotes,
             CheckCode::U001 => CheckCategory::Pyupgrade,
             CheckCode::U002 => CheckCategory::Pyupgrade,
             CheckCode::U003 => CheckCategory::Pyupgrade,
@@ -788,6 +814,11 @@ impl CheckKind {
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
+            // flake8-quotes
+            CheckKind::BadQuotesInlineString(_) => &CheckCode::Q000,
+            CheckKind::BadQuotesMultilineString(_) => &CheckCode::Q001,
+            CheckKind::BadQuotesDocstring(_) => &CheckCode::Q002,
+            CheckKind::AvoidQuoteEscape => &CheckCode::Q003,
             // pyupgrade
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
@@ -1101,6 +1132,26 @@ impl CheckKind {
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),
+            // flake8-quotes
+            CheckKind::BadQuotesInlineString(quote) => {
+                match quote {
+                    Quote::Single => "Double quotes found but single quotes preferred".to_string(),
+                    Quote::Double => "Single quotes found but double quotes preferred".to_string(),
+                }
+            },
+            CheckKind::BadQuotesMultilineString(quote) => {
+                match quote {
+                    Quote::Single => "Double quote multiline found but single quotes preferred".to_string(),
+                    Quote::Double => "Single quote multiline found but double quotes preferred".to_string(),
+                }
+            },
+            CheckKind::BadQuotesDocstring(quote) => {
+                match quote {
+                    Quote::Single => "Double quote docstring found but single quotes preferred".to_string(),
+                    Quote::Double => "Single quote docstring found but double quotes preferred".to_string(),
+                }
+            },
+            CheckKind::AvoidQuoteEscape => "Change outer quotes to avoid escaping inner quotes".to_string(),
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
