@@ -8,9 +8,9 @@ use glob::Pattern;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use strum::IntoEnumIterator;
 
-use crate::checks::{CheckCategory, CheckCode};
+use crate::checks::CheckCode;
+use crate::checks_gen::{CheckCodePrefix, PrefixSpecificity};
 use crate::pyproject::{load_config, StrCheckCodePair};
 use crate::{flake8_quotes, fs};
 
@@ -74,14 +74,14 @@ impl FilePattern {
 #[derive(Debug, Clone, Hash)]
 pub struct PerFileIgnore {
     pub pattern: FilePattern,
-    pub code: CheckCode,
+    pub codes: BTreeSet<CheckCode>,
 }
 
 impl PerFileIgnore {
     pub fn new(user_in: StrCheckCodePair, project_root: &Option<PathBuf>) -> Self {
         let pattern = FilePattern::from_user(user_in.pattern.as_str(), project_root);
-        let code = user_in.code;
-        Self { pattern, code }
+        let codes = BTreeSet::from_iter(user_in.code.codes());
+        Self { pattern, codes }
     }
 }
 
@@ -90,12 +90,12 @@ pub struct RawSettings {
     pub dummy_variable_rgx: Regex,
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
-    pub extend_ignore: Vec<CheckCode>,
-    pub extend_select: Vec<CheckCode>,
-    pub ignore: Vec<CheckCode>,
+    pub extend_ignore: Vec<CheckCodePrefix>,
+    pub extend_select: Vec<CheckCodePrefix>,
+    pub ignore: Vec<CheckCodePrefix>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
-    pub select: Vec<CheckCode>,
+    pub select: Vec<CheckCodePrefix>,
     pub target_version: PythonVersion,
     // Plugins
     pub flake8_quotes: flake8_quotes::settings::Settings,
@@ -157,16 +157,9 @@ impl RawSettings {
                 .map(|path| FilePattern::from_user(path, project_root))
                 .collect(),
             extend_ignore: config.extend_ignore,
-            select: config.select.unwrap_or_else(|| {
-                CheckCode::iter()
-                    .filter(|code| {
-                        matches!(
-                            code.category(),
-                            CheckCategory::PycodestyleError | CheckCategory::Pyflakes
-                        )
-                    })
-                    .collect()
-            }),
+            select: config
+                .select
+                .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F]),
             extend_select: config.extend_select,
             ignore: config.ignore,
             line_length: config.line_length.unwrap_or(88),
@@ -197,21 +190,58 @@ pub struct Settings {
     pub flake8_quotes: flake8_quotes::settings::Settings,
 }
 
+/// Given a set of selected and ignored prefixes, resolve the set of enabled error codes.
+fn resolve_codes(
+    select: &[CheckCodePrefix],
+    extend_select: &[CheckCodePrefix],
+    ignore: &[CheckCodePrefix],
+    extend_ignore: &[CheckCodePrefix],
+) -> BTreeSet<CheckCode> {
+    let mut codes: BTreeSet<CheckCode> = BTreeSet::new();
+    for specificity in [
+        PrefixSpecificity::Category,
+        PrefixSpecificity::Hundreds,
+        PrefixSpecificity::Tens,
+        PrefixSpecificity::Explicit,
+    ] {
+        for prefix in select {
+            if prefix.specificity() == specificity {
+                codes.extend(prefix.codes());
+            }
+        }
+        for prefix in extend_select {
+            if prefix.specificity() == specificity {
+                codes.extend(prefix.codes());
+            }
+        }
+        for prefix in ignore {
+            if prefix.specificity() == specificity {
+                for code in prefix.codes() {
+                    codes.remove(&code);
+                }
+            }
+        }
+        for prefix in extend_ignore {
+            if prefix.specificity() == specificity {
+                for code in prefix.codes() {
+                    codes.remove(&code);
+                }
+            }
+        }
+    }
+    codes
+}
+
 impl Settings {
     pub fn from_raw(settings: RawSettings) -> Self {
-        // Materialize the set of enabled CheckCodes.
-        let mut enabled: BTreeSet<CheckCode> = BTreeSet::new();
-        enabled.extend(settings.select);
-        enabled.extend(settings.extend_select);
-        for code in &settings.ignore {
-            enabled.remove(code);
-        }
-        for code in &settings.extend_ignore {
-            enabled.remove(code);
-        }
         Self {
             dummy_variable_rgx: settings.dummy_variable_rgx,
-            enabled,
+            enabled: resolve_codes(
+                &settings.select,
+                &settings.extend_select,
+                &settings.ignore,
+                &settings.extend_ignore,
+            ),
             exclude: settings.exclude,
             extend_exclude: settings.extend_exclude,
             flake8_quotes: settings.flake8_quotes,
@@ -290,12 +320,12 @@ pub struct CurrentSettings {
     pub dummy_variable_rgx: Regex,
     pub exclude: Vec<Exclusion>,
     pub extend_exclude: Vec<Exclusion>,
-    pub extend_ignore: Vec<CheckCode>,
-    pub extend_select: Vec<CheckCode>,
-    pub ignore: Vec<CheckCode>,
+    pub extend_ignore: Vec<CheckCodePrefix>,
+    pub extend_select: Vec<CheckCodePrefix>,
+    pub ignore: Vec<CheckCodePrefix>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
-    pub select: Vec<CheckCode>,
+    pub select: Vec<CheckCodePrefix>,
     pub target_version: PythonVersion,
     // Plugins
     pub flake8_quotes: flake8_quotes::settings::Settings,

@@ -133,7 +133,7 @@ pub fn ignores_from_path<'a>(
                 [&pattern_code_pair.pattern].into_iter(),
             )
         })
-        .map(|pattern_code_pair| &pattern_code_pair.code)
+        .flat_map(|pattern_code_pair| &pattern_code_pair.codes)
         .collect())
 }
 
