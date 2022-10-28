@@ -5,13 +5,14 @@ use std::path::Path;
 use anyhow::Result;
 use log::debug;
 use rustpython_parser::lexer::LexResult;
+
 use settings::pyproject;
+use settings::Settings;
 
 use crate::autofix::fixer::Mode;
 use crate::linter::{check_path, tokenize};
 use crate::message::Message;
 use crate::settings::configuration::Configuration;
-use settings::Settings;
 
 mod ast;
 mod autofix;

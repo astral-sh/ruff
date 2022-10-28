@@ -131,3 +131,31 @@ fn resolve_codes(
     }
     codes
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use crate::checks::CheckCode;
+    use crate::checks_gen::CheckCodePrefix;
+    use crate::settings::resolve_codes;
+
+    #[test]
+    fn resolver() {
+        let actual = resolve_codes(&[CheckCodePrefix::W], &[], &[], &[]);
+        let expected = BTreeSet::from_iter([CheckCode::W292, CheckCode::W605]);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_codes(&[CheckCodePrefix::W6], &[], &[], &[]);
+        let expected = BTreeSet::from_iter([CheckCode::W605]);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_codes(&[CheckCodePrefix::W], &[], &[CheckCodePrefix::W292], &[]);
+        let expected = BTreeSet::from_iter([CheckCode::W605]);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_codes(&[CheckCodePrefix::W605], &[], &[CheckCodePrefix::W605], &[]);
+        let expected = BTreeSet::from_iter([]);
+        assert_eq!(actual, expected);
+    }
+}
