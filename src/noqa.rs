@@ -169,7 +169,6 @@ y = 2
 z = x + 1",
         )
         .collect();
-        println!("{:?}", extract_noqa_line_for(&lxr));
         assert_eq!(extract_noqa_line_for(&lxr), empty);
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
@@ -179,7 +178,6 @@ y = 2
 z = x + 1",
         )
         .collect();
-        println!("{:?}", extract_noqa_line_for(&lxr));
         assert_eq!(extract_noqa_line_for(&lxr), empty);
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
@@ -189,7 +187,6 @@ z = x + 1
         ",
         )
         .collect();
-        println!("{:?}", extract_noqa_line_for(&lxr));
         assert_eq!(extract_noqa_line_for(&lxr), empty);
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
@@ -200,7 +197,6 @@ z = x + 1
         ",
         )
         .collect();
-        println!("{:?}", extract_noqa_line_for(&lxr));
         assert_eq!(extract_noqa_line_for(&lxr), empty);
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(

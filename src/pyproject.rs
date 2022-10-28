@@ -158,6 +158,8 @@ mod tests {
     use anyhow::Result;
 
     use crate::checks::CheckCode;
+    use crate::flake8_quotes;
+    use crate::flake8_quotes::settings::Quote;
     use crate::pyproject::{
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Config, PyProject, Tools,
     };
@@ -374,7 +376,12 @@ other-attribute = 1
                 }],
                 dummy_variable_rgx: None,
                 target_version: None,
-                flake8_quotes: None
+                flake8_quotes: Some(flake8_quotes::settings::Config {
+                    inline_quotes: Some(Quote::Single),
+                    multiline_quotes: Some(Quote::Double),
+                    docstring_quotes: Some(Quote::Double),
+                    avoid_escape: Some(true),
+                })
             }
         );
 

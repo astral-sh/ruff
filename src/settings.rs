@@ -135,7 +135,6 @@ impl RawSettings {
         quiet: bool,
     ) -> Result<Self> {
         let config = load_config(pyproject, quiet)?;
-        println!("{:?}", config.flake8_quotes);
         Ok(RawSettings {
             dummy_variable_rgx: match config.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
