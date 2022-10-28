@@ -1,0 +1,14 @@
+---
+source: src/flake8_quotes/checks.rs
+expression: checks
+---
+- kind:
+    BadQuotesDocstring: double
+  location:
+    row: 1
+    column: 1
+  end_location:
+    row: 3
+    column: 4
+  fix: ~
+

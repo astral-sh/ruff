@@ -8,3 +8,9 @@ extend-exclude = [
 per-file-ignores = [
     "__init__.py:F401",
 ]
+
+[tool.ruff.flake8-quotes]
+inline-quotes = "single"
+multiline-quotes = "double"
+docstring-quotes = "double"
+avoid-escape = true

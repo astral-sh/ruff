@@ -8,8 +8,8 @@ use serde::de;
 use serde::{Deserialize, Deserializer};
 
 use crate::checks::CheckCode;
-use crate::fs;
 use crate::settings::PythonVersion;
+use crate::{flake8_quotes, fs};
 
 pub fn load_config(pyproject: &Option<PathBuf>, quiet: bool) -> Result<Config> {
     match pyproject {
@@ -45,6 +45,7 @@ pub struct Config {
     pub per_file_ignores: Vec<StrCheckCodePair>,
     pub dummy_variable_rgx: Option<String>,
     pub target_version: Option<PythonVersion>,
+    pub flake8_quotes: Option<flake8_quotes::settings::Config>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -195,6 +196,7 @@ mod tests {
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_quotes: None
                 })
             })
         );
@@ -220,6 +222,7 @@ line-length = 79
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_quotes: None
                 })
             })
         );
@@ -245,6 +248,7 @@ exclude = ["foo.py"]
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_quotes: None
                 })
             })
         );
@@ -270,6 +274,7 @@ select = ["E501"]
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_quotes: None
                 })
             })
         );
@@ -296,6 +301,7 @@ ignore = ["E501"]
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_quotes: None
                 })
             })
         );
@@ -368,6 +374,7 @@ other-attribute = 1
                 }],
                 dummy_variable_rgx: None,
                 target_version: None,
+                flake8_quotes: None
             }
         );
 

@@ -1,0 +1,23 @@
+---
+source: src/flake8_quotes/checks.rs
+expression: checks
+---
+- kind:
+    BadQuotesMultilineString: single
+  location:
+    row: 3
+    column: 5
+  end_location:
+    row: 3
+    column: 28
+  fix: ~
+- kind:
+    BadQuotesMultilineString: single
+  location:
+    row: 5
+    column: 23
+  end_location:
+    row: 5
+    column: 44
+  fix: ~
+
