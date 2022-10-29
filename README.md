@@ -234,8 +234,7 @@ add `noqa` directives to all failing lines, with the appropriate error codes.**
 
 ## Supported Rules
 
-By default, Ruff enables all `E`, `W`, and `F` error codes, which correspond to those built-in to
-Flake8.
+By default, Ruff enables all `E` and `F` error codes, which correspond to those built-in to Flake8.
 
 The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` command-line option.
 
