@@ -37,7 +37,7 @@ const IGNORE_NAMES: &[&str] = &[
 ];
 
 pub fn invalid_function_name(func_def: &Stmt, name: &str) -> Option<Check> {
-    if name.chars().any(|c| c.is_uppercase()) && !IGNORE_NAMES.contains(&name) {
+    if !is_lower(name) && !IGNORE_NAMES.contains(&name) {
         return Some(Check::new(
             CheckKind::InvalidFunctionName(name.to_string()),
             Range::from_located(func_def),
@@ -47,7 +47,7 @@ pub fn invalid_function_name(func_def: &Stmt, name: &str) -> Option<Check> {
 }
 
 pub fn invalid_argument_name(location: Range, name: &str) -> Option<Check> {
-    if name.chars().any(|c| c.is_uppercase()) {
+    if !is_lower(name) {
         return Some(Check::new(
             CheckKind::InvalidArgumentName(name.to_string()),
             location,
