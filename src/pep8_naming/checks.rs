@@ -215,19 +215,12 @@ fn is_camelcase(name: &str) -> bool {
 
 fn is_mixed_case(name: &str) -> bool {
     !is_lower(name)
-        && name.strip_prefix('_').map_or_else(
-            || {
-                name.chars()
-                    .next()
-                    .map_or_else(|| false, |c| c.is_lowercase())
-            },
-            |stripped| {
-                stripped
-                    .chars()
-                    .next()
-                    .map_or_else(|| false, |c| c.is_lowercase())
-            },
-        )
+        && name
+            .strip_prefix('_')
+            .unwrap_or(name)
+            .chars()
+            .next()
+            .map_or_else(|| false, |c| c.is_lowercase())
 }
 
 fn is_acronym(name: &str, asname: &str) -> bool {
