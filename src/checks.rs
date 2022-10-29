@@ -177,6 +177,7 @@ pub enum CheckCode {
     N815,
     N816,
     N817,
+    N818,
     // Meta
     M001,
 }
@@ -384,6 +385,7 @@ pub enum CheckKind {
     MixedCaseVariableInClassScope(String),
     MixedCaseVariableInGlobalScope(String),
     CamelcaseImportedAsAcronym(String, String),
+    ErrorSuffixOnExceptionName(String),
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -592,6 +594,7 @@ impl CheckCode {
             CheckCode::N817 => {
                 CheckKind::CamelcaseImportedAsAcronym("...".to_string(), "...".to_string())
             }
+            CheckCode::N818 => CheckKind::ErrorSuffixOnExceptionName("...".to_string()),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -740,6 +743,7 @@ impl CheckCode {
             CheckCode::N815 => CheckCategory::PEP8Naming,
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
+            CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -900,6 +904,7 @@ impl CheckKind {
             CheckKind::MixedCaseVariableInClassScope(..) => &CheckCode::N815,
             CheckKind::MixedCaseVariableInGlobalScope(..) => &CheckCode::N816,
             CheckKind::CamelcaseImportedAsAcronym(..) => &CheckCode::N817,
+            CheckKind::ErrorSuffixOnExceptionName(..) => &CheckCode::N818,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -1346,6 +1351,9 @@ impl CheckKind {
             }
             CheckKind::CamelcaseImportedAsAcronym(name, asname) => {
                 format!("Camelcase `{name}` imported as acronym `{asname}`")
+            }
+            CheckKind::ErrorSuffixOnExceptionName(name) => {
+                format!("Exception name `{name}` should be named with an Error suffix")
             }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {

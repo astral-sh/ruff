@@ -363,6 +363,14 @@ where
                     }
                 }
 
+                if self.settings.enabled.contains(&CheckCode::N818) {
+                    if let Some(check) =
+                        pep8_naming::checks::error_suffix_on_exception_name(stmt, bases, name)
+                    {
+                        self.checks.push(check);
+                    }
+                }
+
                 self.check_builtin_shadowing(
                     name,
                     self.locate_check(Range::from_located(stmt)),

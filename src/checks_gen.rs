@@ -194,6 +194,7 @@ pub enum CheckCodePrefix {
     N815,
     N816,
     N817,
+    N818,
     Q,
     Q0,
     Q00,
@@ -735,6 +736,7 @@ impl CheckCodePrefix {
                 CheckCode::N815,
                 CheckCode::N816,
                 CheckCode::N817,
+                CheckCode::N818,
             ],
             CheckCodePrefix::N8 => vec![
                 CheckCode::N801,
@@ -751,6 +753,7 @@ impl CheckCodePrefix {
                 CheckCode::N815,
                 CheckCode::N816,
                 CheckCode::N817,
+                CheckCode::N818,
             ],
             CheckCodePrefix::N80 => vec![
                 CheckCode::N801,
@@ -776,6 +779,7 @@ impl CheckCodePrefix {
                 CheckCode::N815,
                 CheckCode::N816,
                 CheckCode::N817,
+                CheckCode::N818,
             ],
             CheckCodePrefix::N811 => vec![CheckCode::N811],
             CheckCodePrefix::N812 => vec![CheckCode::N812],
@@ -784,6 +788,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::N815 => vec![CheckCode::N815],
             CheckCodePrefix::N816 => vec![CheckCode::N816],
             CheckCodePrefix::N817 => vec![CheckCode::N817],
+            CheckCodePrefix::N818 => vec![CheckCode::N817],
             CheckCodePrefix::Q => vec![
                 CheckCode::Q000,
                 CheckCode::Q001,
@@ -1050,6 +1055,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::N815 => PrefixSpecificity::Explicit,
             CheckCodePrefix::N816 => PrefixSpecificity::Explicit,
             CheckCodePrefix::N817 => PrefixSpecificity::Explicit,
+            CheckCodePrefix::N818 => PrefixSpecificity::Explicit,
             CheckCodePrefix::Q => PrefixSpecificity::Category,
             CheckCodePrefix::Q0 => PrefixSpecificity::Hundreds,
             CheckCodePrefix::Q00 => PrefixSpecificity::Tens,

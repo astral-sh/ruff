@@ -276,6 +276,29 @@ pub fn camelcase_imported_as_acronym(
     None
 }
 
+pub fn error_suffix_on_exception_name(
+    class_def: &Stmt,
+    bases: &[Expr],
+    name: &str,
+) -> Option<Check> {
+    // If bases contains , then this is an exception class.
+    if bases.iter().any(|base| {
+        if let ExprKind::Name { id, .. } = &base.node {
+            id == "Exception"
+        } else {
+            false
+        }
+    }) {
+        if !name.ends_with("Error") {
+            return Some(Check::new(
+                CheckKind::ErrorSuffixOnExceptionName(name.to_string()),
+                Range::from_located(class_def),
+            ));
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::{is_acronym, is_camelcase, is_lower, is_mixed_case, is_upper};
