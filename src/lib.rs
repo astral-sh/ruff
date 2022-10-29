@@ -47,7 +47,7 @@ pub mod settings;
 pub mod visibility;
 
 /// Run ruff over Python source code directly.
-pub fn check(path: &Path, contents: &str, quiet: bool) -> Result<Vec<Message>> {
+pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
     // Find the project root and pyproject.toml.
     let project_root = pyproject::find_project_root(&[path.to_path_buf()]);
     match &project_root {
@@ -60,11 +60,8 @@ pub fn check(path: &Path, contents: &str, quiet: bool) -> Result<Vec<Message>> {
         None => debug!("Unable to find pyproject.toml; using default settings..."),
     };
 
-    let settings = Settings::from_configuration(Configuration::from_pyproject(
-        &pyproject,
-        &project_root,
-        quiet,
-    )?);
+    let settings =
+        Settings::from_configuration(Configuration::from_pyproject(&pyproject, &project_root)?);
 
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);

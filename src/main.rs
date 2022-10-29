@@ -261,7 +261,7 @@ fn inner_main() -> Result<ExitCode> {
         .map(|pair| PerFileIgnore::new(pair, &project_root))
         .collect();
 
-    let mut configuration = Configuration::from_pyproject(&pyproject, &project_root, cli.quiet)?;
+    let mut configuration = Configuration::from_pyproject(&pyproject, &project_root)?;
     if !exclude.is_empty() {
         configuration.exclude = exclude;
     }

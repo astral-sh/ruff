@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use common_path::common_path_all;
+use log::debug;
 use path_absolutize::Absolutize;
 use serde::Deserialize;
 
@@ -69,17 +70,15 @@ pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
     None
 }
 
-pub fn load_options(pyproject: &Option<PathBuf>, quiet: bool) -> Result<Options> {
+pub fn load_options(pyproject: &Option<PathBuf>) -> Result<Options> {
     match pyproject {
         Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
             .tool
             .and_then(|tool| tool.ruff)
             .unwrap_or_default()),
         None => {
-            if !quiet {
-                eprintln!("No pyproject.toml found.");
-                eprintln!("Falling back to default configuration...");
-            }
+            debug!("No pyproject.toml found.");
+            debug!("Falling back to default configuration...");
             Ok(Default::default())
         }
     }
