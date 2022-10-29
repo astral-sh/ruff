@@ -1150,7 +1150,7 @@ impl CheckKind {
                 format!("Unnecessary subscript reversal of iterable within `{func}()`")
             }
             CheckKind::UnnecessaryComprehension(obj_type) => {
-                format!(" Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`)")
+                format!("Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`)")
             }
             CheckKind::UnnecessaryMap(obj_type) => {
                 if obj_type == "generator" {
