@@ -281,7 +281,6 @@ pub fn error_suffix_on_exception_name(
     bases: &[Expr],
     name: &str,
 ) -> Option<Check> {
-    // If bases contains , then this is an exception class.
     if bases.iter().any(|base| {
         if let ExprKind::Name { id, .. } = &base.node {
             id == "Exception"
