@@ -133,20 +133,15 @@ impl<'a> SourceCodeLocator<'a> {
     }
 
     fn compute_offsets(content: &str) -> Vec<Vec<usize>> {
-        let mut offsets = vec![];
-        let mut offset = 0;
-        for line in content.lines() {
-            let mut newline = 0;
-            let mut line_offsets: Vec<usize> = vec![];
-            for (i, char) in line.char_indices() {
-                line_offsets.push(offset + i);
-                newline = i + char.len_utf8();
+        let mut offsets = vec![vec![]];
+        let mut line_index = 0;
+        for (i, char) in content.char_indices() {
+            offsets[line_index].push(i);
+            if char == '\n' {
+                line_index += 1;
+                offsets.push(vec![]);
             }
-            line_offsets.push(offset + newline);
-            offsets.push(line_offsets);
-            offset += newline + 1;
         }
-        offsets.push(vec![offset]);
         offsets
     }
 
@@ -184,15 +179,22 @@ mod tests {
 
     #[test]
     fn source_code_locator_init() {
-        let content = "# \u{4e9c}\nclass Foo:\n    \"\"\".\"\"\"";
+        let content = "x = 1\ny = 2\nz = x + y\n";
         let locator = SourceCodeLocator::new(content);
         assert_eq!(locator.offsets.len(), 4);
+        assert_eq!(locator.offsets[0], [0, 1, 2, 3, 4, 5]);
+        assert_eq!(locator.offsets[1], [6, 7, 8, 9, 10, 11]);
+        assert_eq!(locator.offsets[2], [12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+        assert!(locator.offsets[3].is_empty());
+
+        let content = "# \u{4e9c}\nclass Foo:\n    \"\"\".\"\"\"";
+        let locator = SourceCodeLocator::new(content);
+        assert_eq!(locator.offsets.len(), 3);
         assert_eq!(locator.offsets[0], [0, 1, 2, 5]);
         assert_eq!(locator.offsets[1], [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
         assert_eq!(
             locator.offsets[2],
-            [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
+            [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
         );
-        assert_eq!(locator.offsets[3], [29]);
     }
 }
