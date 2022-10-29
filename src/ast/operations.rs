@@ -1,3 +1,4 @@
+use once_cell::unsync::OnceCell;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::types::{BindingKind, Range, Scope};
@@ -120,15 +121,15 @@ pub fn is_unpacking_assignment(stmt: &Stmt) -> bool {
 
 /// Struct used to efficiently slice source code at (row, column) Locations.
 pub struct SourceCodeLocator<'a> {
-    content: &'a str,
-    offsets: Vec<Vec<usize>>,
+    contents: &'a str,
+    offsets: OnceCell<Vec<Vec<usize>>>,
 }
 
 impl<'a> SourceCodeLocator<'a> {
-    pub fn new(content: &'a str) -> Self {
+    pub fn new(contents: &'a str) -> Self {
         SourceCodeLocator {
-            content,
-            offsets: Self::compute_offsets(content),
+            contents,
+            offsets: OnceCell::new(),
         }
     }
 
@@ -145,15 +146,22 @@ impl<'a> SourceCodeLocator<'a> {
         offsets
     }
 
+    fn get_or_init_offsets(&self) -> &Vec<Vec<usize>> {
+        self.offsets
+            .get_or_init(|| Self::compute_offsets(self.contents))
+    }
+
     pub fn slice_source_code_at(&self, location: &Location) -> &'a str {
-        let offset = self.offsets[location.row() - 1][location.column() - 1];
-        &self.content[offset..]
+        let offsets = self.get_or_init_offsets();
+        let offset = offsets[location.row() - 1][location.column() - 1];
+        &self.contents[offset..]
     }
 
     pub fn slice_source_code_range(&self, range: &Range) -> &'a str {
-        let start = self.offsets[range.location.row() - 1][range.location.column() - 1];
-        let end = self.offsets[range.end_location.row() - 1][range.end_location.column() - 1];
-        &self.content[start..end]
+        let offsets = self.get_or_init_offsets();
+        let start = offsets[range.location.row() - 1][range.location.column() - 1];
+        let end = offsets[range.end_location.row() - 1][range.end_location.column() - 1];
+        &self.contents[start..end]
     }
 
     pub fn partition_source_code_at(
@@ -161,14 +169,15 @@ impl<'a> SourceCodeLocator<'a> {
         outer: &Range,
         inner: &Range,
     ) -> (&'a str, &'a str, &'a str) {
-        let outer_start = self.offsets[outer.location.row() - 1][outer.location.column() - 1];
-        let outer_end = self.offsets[outer.end_location.row() - 1][outer.end_location.column() - 1];
-        let inner_start = self.offsets[inner.location.row() - 1][inner.location.column() - 1];
-        let inner_end = self.offsets[inner.end_location.row() - 1][inner.end_location.column() - 1];
+        let offsets = self.get_or_init_offsets();
+        let outer_start = offsets[outer.location.row() - 1][outer.location.column() - 1];
+        let outer_end = offsets[outer.end_location.row() - 1][outer.end_location.column() - 1];
+        let inner_start = offsets[inner.location.row() - 1][inner.location.column() - 1];
+        let inner_end = offsets[inner.end_location.row() - 1][inner.end_location.column() - 1];
         (
-            &self.content[outer_start..inner_start],
-            &self.content[inner_start..inner_end],
-            &self.content[inner_end..outer_end],
+            &self.contents[outer_start..inner_start],
+            &self.contents[inner_start..inner_end],
+            &self.contents[inner_end..outer_end],
         )
     }
 }
@@ -181,20 +190,19 @@ mod tests {
     fn source_code_locator_init() {
         let content = "x = 1\ny = 2\nz = x + y\n";
         let locator = SourceCodeLocator::new(content);
-        assert_eq!(locator.offsets.len(), 4);
-        assert_eq!(locator.offsets[0], [0, 1, 2, 3, 4, 5]);
-        assert_eq!(locator.offsets[1], [6, 7, 8, 9, 10, 11]);
-        assert_eq!(locator.offsets[2], [12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
-        assert!(locator.offsets[3].is_empty());
+        let offsets = locator.get_or_init_offsets();
+        assert_eq!(offsets.len(), 4);
+        assert_eq!(offsets[0], [0, 1, 2, 3, 4, 5]);
+        assert_eq!(offsets[1], [6, 7, 8, 9, 10, 11]);
+        assert_eq!(offsets[2], [12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+        assert!(offsets[3].is_empty());
 
         let content = "# \u{4e9c}\nclass Foo:\n    \"\"\".\"\"\"";
         let locator = SourceCodeLocator::new(content);
-        assert_eq!(locator.offsets.len(), 3);
-        assert_eq!(locator.offsets[0], [0, 1, 2, 5]);
-        assert_eq!(locator.offsets[1], [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-        assert_eq!(
-            locator.offsets[2],
-            [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
-        );
+        let offsets = locator.get_or_init_offsets();
+        assert_eq!(offsets.len(), 3);
+        assert_eq!(offsets[0], [0, 1, 2, 5]);
+        assert_eq!(offsets[1], [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+        assert_eq!(offsets[2], [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
     }
 }

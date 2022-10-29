@@ -9,7 +9,7 @@ use crate::{flake8_quotes, pycodestyle, Settings};
 
 pub fn check_tokens(
     checks: &mut Vec<Check>,
-    contents: &str,
+    locator: &SourceCodeLocator,
     tokens: &[LexResult],
     settings: &Settings,
 ) {
@@ -19,16 +19,13 @@ pub fn check_tokens(
         | settings.enabled.contains(&CheckCode::Q002)
         | settings.enabled.contains(&CheckCode::Q003);
 
-    // TODO(charlie): Use a shared SourceCodeLocator between this site and the AST traversal.
-    let locator = SourceCodeLocator::new(contents);
-
     let mut state_machine = StateMachine::new();
     for (start, tok, end) in tokens.iter().flatten() {
         // W605
         if enforce_invalid_escape_sequence {
             if matches!(tok, Tok::String { .. }) {
                 checks.extend(pycodestyle::checks::invalid_escape_sequence(
-                    &locator, start, end,
+                    locator, start, end,
                 ));
             }
         }
@@ -38,7 +35,7 @@ pub fn check_tokens(
             let is_docstring = state_machine.consume(tok);
             if matches!(tok, Tok::String { .. }) {
                 if let Some(check) = flake8_quotes::checks::quotes(
-                    &locator,
+                    locator,
                     start,
                     end,
                     is_docstring,

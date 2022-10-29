@@ -162,7 +162,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
             } = &docstring.node
             {
                 if checker.settings.enabled.contains(&CheckCode::D201) {
-                    let (before, _, _) = checker.get_locator().partition_source_code_at(
+                    let (before, _, _) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
                         &Range::from_located(docstring),
                     );
@@ -190,7 +190,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                 }
 
                 if checker.settings.enabled.contains(&CheckCode::D202) {
-                    let (_, _, after) = checker.get_locator().partition_source_code_at(
+                    let (_, _, after) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
                         &Range::from_located(docstring),
                     );
@@ -253,7 +253,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                 if checker.settings.enabled.contains(&CheckCode::D203)
                     || checker.settings.enabled.contains(&CheckCode::D211)
                 {
-                    let (before, _, _) = checker.get_locator().partition_source_code_at(
+                    let (before, _, _) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
                         &Range::from_located(docstring),
                     );
@@ -300,7 +300,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                 }
 
                 if checker.settings.enabled.contains(&CheckCode::D204) {
-                    let (_, _, after) = checker.get_locator().partition_source_code_at(
+                    let (_, _, after) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
                         &Range::from_located(docstring),
                     );
@@ -530,7 +530,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                 }
                 if line_count > 1 {
                     let content = checker
-                        .get_locator()
+                        .locator
                         .slice_source_code_range(&Range::from_located(docstring));
                     if let Some(last_line) = content.lines().last().map(|line| line.trim()) {
                         if last_line != "\"\"\"" && last_line != "'''" {
@@ -583,7 +583,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
                     );
                     if checker.patch() {
                         if let Some(first_line) = checker
-                            .get_locator()
+                            .locator
                             .slice_source_code_range(&Range::from_located(docstring))
                             .lines()
                             .next()
@@ -629,7 +629,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
         {
             if string.lines().nth(1).is_some() {
                 if let Some(first_line) = checker
-                    .get_locator()
+                    .locator
                     .slice_source_code_range(&Range::from_located(docstring))
                     .lines()
                     .next()
@@ -665,7 +665,7 @@ pub fn triple_quotes(checker: &mut Checker, definition: &Definition) {
         } = &docstring.node
         {
             if let Some(first_line) = checker
-                .get_locator()
+                .locator
                 .slice_source_code_range(&Range::from_located(docstring))
                 .lines()
                 .next()
