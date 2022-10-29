@@ -9,6 +9,7 @@ use log::debug;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::{lexer, parser};
 
+use crate::ast::operations::SourceCodeLocator;
 use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::autofix::fixer::fix_file;
@@ -46,13 +47,16 @@ pub(crate) fn check_path(
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
+    // Initialize the SourceCodeLocator (which computes offsets lazily).
+    let locator = SourceCodeLocator::new(contents);
+
     // Run the token-based checks.
     if settings
         .enabled
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens))
     {
-        check_tokens(&mut checks, contents, &tokens, settings);
+        check_tokens(&mut checks, &locator, &tokens, settings);
     }
 
     // Run the AST-based checks.
@@ -63,7 +67,7 @@ pub(crate) fn check_path(
     {
         match parser::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
-                checks.extend(check_ast(&python_ast, contents, settings, autofix, path))
+                checks.extend(check_ast(&python_ast, &locator, settings, autofix, path))
             }
             Err(parse_error) => {
                 if settings.enabled.contains(&CheckCode::E999) {

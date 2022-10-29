@@ -5,7 +5,6 @@ use std::ops::Deref;
 use std::path::Path;
 
 use log::error;
-use once_cell::unsync::OnceCell;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -39,13 +38,11 @@ pub const GLOBAL_SCOPE_INDEX: usize = 0;
 pub struct Checker<'a> {
     // Input data.
     path: &'a Path,
-    content: &'a str,
     autofix: &'a fixer::Mode,
     pub(crate) settings: &'a Settings,
+    pub(crate) locator: &'a SourceCodeLocator<'a>,
     // Computed checks.
     checks: Vec<Check>,
-    // Efficient source-code slicing.
-    locator: OnceCell<SourceCodeLocator<'a>>,
     // Docstring tracking.
     docstrings: Vec<(Definition<'a>, Visibility)>,
     // Edit tracking.
@@ -79,14 +76,13 @@ impl<'a> Checker<'a> {
         settings: &'a Settings,
         autofix: &'a fixer::Mode,
         path: &'a Path,
-        content: &'a str,
+        locator: &'a SourceCodeLocator,
     ) -> Checker<'a> {
         Checker {
             settings,
             autofix,
             path,
-            content,
-            locator: OnceCell::new(),
+            locator,
             checks: Default::default(),
             docstrings: Default::default(),
             deletions: Default::default(),
@@ -112,12 +108,6 @@ impl<'a> Checker<'a> {
             annotations_future_enabled: Default::default(),
             except_handlers: Default::default(),
         }
-    }
-
-    /// Get access to a lazily-initialized `SourceCodeLocator` for the file contents.
-    pub fn get_locator(&self) -> &SourceCodeLocator {
-        self.locator
-            .get_or_init(|| SourceCodeLocator::new(self.content))
     }
 
     /// Return `true` if a patch should be generated under the given autofix `Mode`.
@@ -2146,7 +2136,7 @@ impl<'a> Checker<'a> {
                             ImportKind::ImportFrom => pyflakes::fixes::remove_unused_import_froms,
                         };
 
-                        match removal_fn(self.get_locator(), &full_names, child, parent, &deleted) {
+                        match removal_fn(self.locator, &full_names, child, parent, &deleted) {
                             Ok(fix) => Some(fix),
                             Err(e) => {
                                 error!("Failed to fix unused imports: {}", e);
@@ -2306,12 +2296,12 @@ impl<'a> Checker<'a> {
 
 pub fn check_ast(
     python_ast: &Suite,
-    contents: &str,
+    locator: &SourceCodeLocator,
     settings: &Settings,
     autofix: &fixer::Mode,
     path: &Path,
 ) -> Vec<Check> {
-    let mut checker = Checker::new(settings, autofix, path, contents);
+    let mut checker = Checker::new(settings, autofix, path, locator);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 
