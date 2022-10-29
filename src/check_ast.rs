@@ -1799,6 +1799,30 @@ impl<'a> Checker<'a> {
                 }
             }
 
+            if self.settings.enabled.contains(&CheckCode::N806) {
+                if let Some(check) =
+                    pep8_naming::checks::non_lowercase_variable_in_function(current, expr, id)
+                {
+                    self.checks.push(check);
+                }
+            }
+
+            if self.settings.enabled.contains(&CheckCode::N815) {
+                if let Some(check) =
+                    pep8_naming::checks::mixed_case_variable_in_class_scope(current, expr, id)
+                {
+                    self.checks.push(check);
+                }
+            }
+
+            if self.settings.enabled.contains(&CheckCode::N816) {
+                if let Some(check) =
+                    pep8_naming::checks::mixed_case_variable_in_global_scope(current, expr, id)
+                {
+                    self.checks.push(check);
+                }
+            }
+
             if matches!(parent.node, StmtKind::AnnAssign { value: None, .. }) {
                 self.add_binding(
                     id.to_string(),
