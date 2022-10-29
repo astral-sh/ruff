@@ -94,12 +94,12 @@ mod tests {
     use anyhow::Result;
 
     use crate::checks_gen::CheckCodePrefix;
-    use crate::flake8_quotes;
     use crate::flake8_quotes::settings::Quote;
     use crate::settings::pyproject::{
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::StrCheckCodePair;
+    use crate::{flake8_quotes, pep8_naming};
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -133,7 +133,8 @@ mod tests {
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
-                    flake8_quotes: None
+                    flake8_quotes: None,
+                    pep8_naming: None,
                 })
             })
         );
@@ -159,7 +160,8 @@ line-length = 79
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
-                    flake8_quotes: None
+                    flake8_quotes: None,
+                    pep8_naming: None,
                 })
             })
         );
@@ -185,7 +187,8 @@ exclude = ["foo.py"]
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
-                    flake8_quotes: None
+                    flake8_quotes: None,
+                    pep8_naming: None,
                 })
             })
         );
@@ -211,7 +214,8 @@ select = ["E501"]
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
-                    flake8_quotes: None
+                    flake8_quotes: None,
+                    pep8_naming: None,
                 })
             })
         );
@@ -238,7 +242,8 @@ ignore = ["E501"]
                     per_file_ignores: vec![],
                     dummy_variable_rgx: None,
                     target_version: None,
-                    flake8_quotes: None
+                    flake8_quotes: None,
+                    pep8_naming: None,
                 })
             })
         );
@@ -316,7 +321,25 @@ other-attribute = 1
                     multiline_quotes: Some(Quote::Double),
                     docstring_quotes: Some(Quote::Double),
                     avoid_escape: Some(true),
-                })
+                }),
+                pep8_naming: Some(pep8_naming::settings::Options {
+                    ignore_names: Some(vec![
+                        "setUp".to_string(),
+                        "tearDown".to_string(),
+                        "setUpClass".to_string(),
+                        "tearDownClass".to_string(),
+                        "setUpModule".to_string(),
+                        "tearDownModule".to_string(),
+                        "asyncSetUp".to_string(),
+                        "asyncTearDown".to_string(),
+                        "setUpTestData".to_string(),
+                        "failureException".to_string(),
+                        "longMessage".to_string(),
+                        "maxDiff".to_string(),
+                    ]),
+                    classmethod_decorators: Some(vec!["classmethod".to_string()]),
+                    staticmethod_decorators: Some(vec!["staticmethod".to_string()]),
+                }),
             }
         );
 

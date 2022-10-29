@@ -236,7 +236,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N802) {
-                    if let Some(check) = pep8_naming::checks::invalid_function_name(stmt, name) {
+                    if let Some(check) = pep8_naming::checks::invalid_function_name(
+                        stmt,
+                        name,
+                        &self.settings.pep8_naming,
+                    ) {
                         self.checks.push(check);
                     }
                 }
@@ -247,6 +251,7 @@ where
                             self.current_scope(),
                             decorator_list,
                             args,
+                            &self.settings.pep8_naming,
                         )
                     {
                         self.checks.push(check);
@@ -258,6 +263,7 @@ where
                         self.current_scope(),
                         decorator_list,
                         args,
+                        &self.settings.pep8_naming,
                     ) {
                         self.checks.push(check);
                     }

@@ -6,7 +6,7 @@ use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
-use crate::{flake8_quotes, Configuration};
+use crate::{flake8_quotes, pep8_naming, Configuration};
 
 /// Struct to render user-facing exclusion patterns.
 #[derive(Debug)]
@@ -46,6 +46,7 @@ pub struct UserConfiguration {
     pub target_version: PythonVersion,
     // Plugins
     pub flake8_quotes: flake8_quotes::settings::Settings,
+    pub pep8_naming: pep8_naming::settings::Settings,
     // Non-settings exposed to the user
     pub project_root: Option<PathBuf>,
     pub pyproject: Option<PathBuf>,
@@ -53,30 +54,31 @@ pub struct UserConfiguration {
 
 impl UserConfiguration {
     pub fn from_configuration(
-        settings: Configuration,
+        configuration: Configuration,
         project_root: Option<PathBuf>,
         pyproject: Option<PathBuf>,
     ) -> Self {
         Self {
-            dummy_variable_rgx: settings.dummy_variable_rgx,
-            exclude: settings
+            dummy_variable_rgx: configuration.dummy_variable_rgx,
+            exclude: configuration
                 .exclude
                 .into_iter()
                 .map(Exclusion::from_file_pattern)
                 .collect(),
-            extend_exclude: settings
+            extend_exclude: configuration
                 .extend_exclude
                 .into_iter()
                 .map(Exclusion::from_file_pattern)
                 .collect(),
-            extend_ignore: settings.extend_ignore,
-            extend_select: settings.extend_select,
-            ignore: settings.ignore,
-            line_length: settings.line_length,
-            per_file_ignores: settings.per_file_ignores,
-            select: settings.select,
-            target_version: settings.target_version,
-            flake8_quotes: settings.flake8_quotes,
+            extend_ignore: configuration.extend_ignore,
+            extend_select: configuration.extend_select,
+            ignore: configuration.ignore,
+            line_length: configuration.line_length,
+            per_file_ignores: configuration.per_file_ignores,
+            select: configuration.select,
+            target_version: configuration.target_version,
+            flake8_quotes: configuration.flake8_quotes,
+            pep8_naming: configuration.pep8_naming,
             project_root,
             pyproject,
         }

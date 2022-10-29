@@ -3,7 +3,9 @@ use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::types::{FunctionScope, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
+use crate::pep8_naming::settings::Settings;
 
+/// N801
 pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
     let stripped = name.strip_prefix('_').unwrap_or(name);
     if !stripped
@@ -21,23 +23,14 @@ pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
     None
 }
 
-const IGNORE_NAMES: &[&str] = &[
-    "setUp",
-    "tearDown",
-    "setUpClass",
-    "tearDownClass",
-    "setUpModule",
-    "tearDownModule",
-    "asyncSetUp",
-    "asyncTearDown",
-    "setUpTestData",
-    "failureException",
-    "longMessage",
-    "maxDiff",
-];
-
-pub fn invalid_function_name(func_def: &Stmt, name: &str) -> Option<Check> {
-    if !is_lower(name) && !IGNORE_NAMES.contains(&name) {
+/// N802
+pub fn invalid_function_name(func_def: &Stmt, name: &str, settings: &Settings) -> Option<Check> {
+    if !is_lower(name)
+        && !settings
+            .ignore_names
+            .iter()
+            .any(|ignore_name| ignore_name == name)
+    {
         return Some(Check::new(
             CheckKind::InvalidFunctionName(name.to_string()),
             Range::from_located(func_def),
@@ -46,6 +39,7 @@ pub fn invalid_function_name(func_def: &Stmt, name: &str) -> Option<Check> {
     None
 }
 
+/// N803
 pub fn invalid_argument_name(location: Range, name: &str) -> Option<Check> {
     if !is_lower(name) {
         return Some(Check::new(
@@ -56,10 +50,12 @@ pub fn invalid_argument_name(location: Range, name: &str) -> Option<Check> {
     None
 }
 
+/// N804
 pub fn invalid_first_argument_name_for_class_method(
     scope: &Scope,
     decorator_list: &[Expr],
     args: &Arguments,
+    settings: &Settings,
 ) -> Option<Check> {
     if !matches!(scope.kind, ScopeKind::Class) {
         return None;
@@ -67,7 +63,7 @@ pub fn invalid_first_argument_name_for_class_method(
 
     if decorator_list.iter().any(|decorator| {
         if let ExprKind::Name { id, .. } = &decorator.node {
-            id == "classmethod"
+            settings.classmethod_decorators.contains(id)
         } else {
             false
         }
@@ -84,10 +80,12 @@ pub fn invalid_first_argument_name_for_class_method(
     None
 }
 
+/// N805
 pub fn invalid_first_argument_name_for_method(
     scope: &Scope,
     decorator_list: &[Expr],
     args: &Arguments,
+    settings: &Settings,
 ) -> Option<Check> {
     if !matches!(scope.kind, ScopeKind::Class) {
         return None;
@@ -95,7 +93,8 @@ pub fn invalid_first_argument_name_for_method(
 
     if decorator_list.iter().any(|decorator| {
         if let ExprKind::Name { id, .. } = &decorator.node {
-            id == "classmethod" || id == "staticmethod"
+            settings.classmethod_decorators.contains(id)
+                || settings.staticmethod_decorators.contains(id)
         } else {
             false
         }
@@ -114,6 +113,7 @@ pub fn invalid_first_argument_name_for_method(
     None
 }
 
+/// N806
 pub fn non_lowercase_variable_in_function(scope: &Scope, expr: &Expr, name: &str) -> Option<Check> {
     if !matches!(scope.kind, ScopeKind::Function(FunctionScope { .. })) {
         return None;
@@ -127,6 +127,83 @@ pub fn non_lowercase_variable_in_function(scope: &Scope, expr: &Expr, name: &str
     None
 }
 
+/// N807
+pub fn dunder_function_name(func_def: &Stmt, scope: &Scope, name: &str) -> Option<Check> {
+    if matches!(scope.kind, ScopeKind::Class) {
+        return None;
+    }
+
+    if name.starts_with("__") && name.ends_with("__") {
+        return Some(Check::new(
+            CheckKind::DunderFunctionName,
+            Range::from_located(func_def),
+        ));
+    }
+
+    None
+}
+
+/// N811
+pub fn constant_imported_as_non_constant(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if is_upper(name) && !is_upper(asname) {
+        return Some(Check::new(
+            CheckKind::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
+        ));
+    }
+    None
+}
+
+/// N812
+pub fn lowercase_imported_as_non_lowercase(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if is_lower(name) && asname.to_lowercase() != asname {
+        return Some(Check::new(
+            CheckKind::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
+        ));
+    }
+    None
+}
+
+/// N813
+pub fn camelcase_imported_as_lowercase(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if is_camelcase(name) && is_lower(asname) {
+        return Some(Check::new(
+            CheckKind::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
+        ));
+    }
+    None
+}
+
+/// N814
+pub fn camelcase_imported_as_constant(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if is_camelcase(name) && is_upper(asname) && !is_acronym(name, asname) {
+        return Some(Check::new(
+            CheckKind::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
+        ));
+    }
+    None
+}
+
+/// N815
 pub fn mixed_case_variable_in_class_scope(scope: &Scope, expr: &Expr, name: &str) -> Option<Check> {
     if !matches!(scope.kind, ScopeKind::Class) {
         return None;
@@ -140,6 +217,7 @@ pub fn mixed_case_variable_in_class_scope(scope: &Scope, expr: &Expr, name: &str
     None
 }
 
+/// N816
 pub fn mixed_case_variable_in_global_scope(
     scope: &Scope,
     expr: &Expr,
@@ -157,18 +235,41 @@ pub fn mixed_case_variable_in_global_scope(
     None
 }
 
-pub fn dunder_function_name(func_def: &Stmt, scope: &Scope, name: &str) -> Option<Check> {
-    if matches!(scope.kind, ScopeKind::Class) {
-        return None;
-    }
-
-    if name.starts_with("__") && name.ends_with("__") {
+/// N817
+pub fn camelcase_imported_as_acronym(
+    import_from: &Stmt,
+    name: &str,
+    asname: &str,
+) -> Option<Check> {
+    if is_camelcase(name) && is_upper(asname) && is_acronym(name, asname) {
         return Some(Check::new(
-            CheckKind::DunderFunctionName,
-            Range::from_located(func_def),
+            CheckKind::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
+            Range::from_located(import_from),
         ));
     }
+    None
+}
 
+/// N818
+pub fn error_suffix_on_exception_name(
+    class_def: &Stmt,
+    bases: &[Expr],
+    name: &str,
+) -> Option<Check> {
+    if bases.iter().any(|base| {
+        if let ExprKind::Name { id, .. } = &base.node {
+            id == "Exception"
+        } else {
+            false
+        }
+    }) {
+        if !name.ends_with("Error") {
+            return Some(Check::new(
+                CheckKind::ErrorSuffixOnExceptionName(name.to_string()),
+                Range::from_located(class_def),
+            ));
+        }
+    }
     None
 }
 
@@ -196,34 +297,6 @@ fn is_upper(s: &str) -> bool {
     cased
 }
 
-pub fn constant_imported_as_non_constant(
-    import_from: &Stmt,
-    name: &str,
-    asname: &str,
-) -> Option<Check> {
-    if is_upper(name) && !is_upper(asname) {
-        return Some(Check::new(
-            CheckKind::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
-        ));
-    }
-    None
-}
-
-pub fn lowercase_imported_as_non_lowercase(
-    import_from: &Stmt,
-    name: &str,
-    asname: &str,
-) -> Option<Check> {
-    if is_lower(name) && asname.to_lowercase() != asname {
-        return Some(Check::new(
-            CheckKind::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
-        ));
-    }
-    None
-}
-
 fn is_camelcase(name: &str) -> bool {
     !is_lower(name) && !is_upper(name) && !name.contains('_')
 }
@@ -240,70 +313,6 @@ fn is_mixed_case(name: &str) -> bool {
 
 fn is_acronym(name: &str, asname: &str) -> bool {
     name.chars().filter(|c| c.is_uppercase()).join("") == asname
-}
-
-pub fn camelcase_imported_as_lowercase(
-    import_from: &Stmt,
-    name: &str,
-    asname: &str,
-) -> Option<Check> {
-    if is_camelcase(name) && is_lower(asname) {
-        return Some(Check::new(
-            CheckKind::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
-        ));
-    }
-    None
-}
-
-pub fn camelcase_imported_as_constant(
-    import_from: &Stmt,
-    name: &str,
-    asname: &str,
-) -> Option<Check> {
-    if is_camelcase(name) && is_upper(asname) && !is_acronym(name, asname) {
-        return Some(Check::new(
-            CheckKind::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
-        ));
-    }
-    None
-}
-
-pub fn camelcase_imported_as_acronym(
-    import_from: &Stmt,
-    name: &str,
-    asname: &str,
-) -> Option<Check> {
-    if is_camelcase(name) && is_upper(asname) && is_acronym(name, asname) {
-        return Some(Check::new(
-            CheckKind::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
-        ));
-    }
-    None
-}
-
-pub fn error_suffix_on_exception_name(
-    class_def: &Stmt,
-    bases: &[Expr],
-    name: &str,
-) -> Option<Check> {
-    if bases.iter().any(|base| {
-        if let ExprKind::Name { id, .. } = &base.node {
-            id == "Exception"
-        } else {
-            false
-        }
-    }) {
-        if !name.ends_with("Error") {
-            return Some(Check::new(
-                CheckKind::ErrorSuffixOnExceptionName(name.to_string()),
-                Range::from_located(class_def),
-            ));
-        }
-    }
-    None
 }
 
 #[cfg(test)]
