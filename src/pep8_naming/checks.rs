@@ -342,6 +342,8 @@ mod tests {
         assert!(is_mixed_case("_mixed_Case"));
         assert!(!is_mixed_case("mixed_case"));
         assert!(!is_mixed_case("MIXED_CASE"));
+        assert!(!is_mixed_case(""));
+        assert!(!is_mixed_case("_"));
     }
 
     #[test]
