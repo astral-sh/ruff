@@ -408,6 +408,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body. | 🛠 |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
+| B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError:` instead of `except (ValueError,):`. |  |
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
@@ -510,7 +511,7 @@ including:
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (9/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (10/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 

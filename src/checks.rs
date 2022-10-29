@@ -80,6 +80,7 @@ pub enum CheckCode {
     B002,
     B007,
     B011,
+    B013,
     B014,
     B017,
     B025,
@@ -288,6 +289,7 @@ pub enum CheckKind {
     UnaryPrefixIncrement,
     UnusedLoopControlVariable(String),
     DoNotAssertFalse,
+    RedundantTupleInExceptionHandler(String),
     DuplicateHandlerException(Vec<String>),
     NoAssertRaisesException,
     DuplicateTryBlockException(String),
@@ -465,6 +467,9 @@ impl CheckCode {
             CheckCode::B002 => CheckKind::UnaryPrefixIncrement,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
+            CheckCode::B013 => {
+                CheckKind::RedundantTupleInExceptionHandler("ValueError".to_string())
+            }
             CheckCode::B014 => CheckKind::DuplicateHandlerException(vec!["ValueError".to_string()]),
             CheckCode::B017 => CheckKind::NoAssertRaisesException,
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
@@ -652,6 +657,7 @@ impl CheckCode {
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
             CheckCode::B007 => CheckCategory::Flake8Bugbear,
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
+            CheckCode::B013 => CheckCategory::Flake8Bugbear,
             CheckCode::B014 => CheckCategory::Flake8Bugbear,
             CheckCode::B017 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
@@ -807,6 +813,7 @@ impl CheckKind {
             CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
+            CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
@@ -1064,6 +1071,9 @@ impl CheckKind {
             CheckKind::DoNotAssertFalse => {
                 "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
                     .to_string()
+            }
+            CheckKind::RedundantTupleInExceptionHandler(name) => {
+                format!("A length-one tuple literal is redundant. Write `except {name}:` instead of `except ({name},):`.")
             }
             CheckKind::DuplicateHandlerException(names) => {
                 if names.len() == 1 {
