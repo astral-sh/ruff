@@ -363,6 +363,14 @@ where
                     }
                 }
 
+                if self.settings.enabled.contains(&CheckCode::N818) {
+                    if let Some(check) =
+                        pep8_naming::checks::error_suffix_on_exception_name(stmt, bases, name)
+                    {
+                        self.checks.push(check);
+                    }
+                }
+
                 self.check_builtin_shadowing(
                     name,
                     self.locate_check(Range::from_located(stmt)),
@@ -1796,6 +1804,30 @@ impl<'a> Checker<'a> {
                             }
                         }
                     }
+                }
+            }
+
+            if self.settings.enabled.contains(&CheckCode::N806) {
+                if let Some(check) =
+                    pep8_naming::checks::non_lowercase_variable_in_function(current, expr, id)
+                {
+                    self.checks.push(check);
+                }
+            }
+
+            if self.settings.enabled.contains(&CheckCode::N815) {
+                if let Some(check) =
+                    pep8_naming::checks::mixed_case_variable_in_class_scope(current, expr, id)
+                {
+                    self.checks.push(check);
+                }
+            }
+
+            if self.settings.enabled.contains(&CheckCode::N816) {
+                if let Some(check) =
+                    pep8_naming::checks::mixed_case_variable_in_global_scope(current, expr, id)
+                {
+                    self.checks.push(check);
                 }
             }
 

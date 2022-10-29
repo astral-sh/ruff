@@ -369,12 +369,16 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | N803 | InvalidArgumentName | Argument name `...` should be lowercase |  |
 | N804 | InvalidFirstArgumentNameForClassMethod | First argument of a class method should be named `cls` |  |
 | N805 | InvalidFirstArgumentNameForMethod | First argument of a method should be named `self` |  |
+| N806 | NonLowercaseVariableInFunction | Variable `...` in function should be lowercase |  |
 | N807 | DunderFunctionName | Function name should not start and end with `__` |  |
 | N811 | ConstantImportedAsNonConstant | Constant `...` imported as non-constant `...` |  |
 | N812 | LowercaseImportedAsNonLowercase | Lowercase `...` imported as non-lowercase `...` |  |
 | N813 | CamelcaseImportedAsLowercase | Camelcase `...` imported as lowercase `...` |  |
 | N814 | CamelcaseImportedAsConstant | Camelcase `...` imported as constant `...` |  |
+| N815 | MixedCaseVariableInClassScope | Variable `mixedCase` in class scope should not be mixedCase |  |
+| N816 | MixedCaseVariableInGlobalScope | Variable `mixedCase` in global scope should not be mixedCase |  |
 | N817 | CamelcaseImportedAsAcronym | Camelcase `...` imported as acronym `...` |  |
+| N818 | ErrorSuffixOnExceptionName | Exception name `...` should be named with an Error suffix |  |
 
 ### flake8-comprehensions
 
@@ -498,6 +502,7 @@ Ruff re-implements some of the most popular Flake8 plugins and related code qual
 including:
 
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
+- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`yesqa`](https://github.com/asottile/yesqa)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
@@ -520,6 +525,7 @@ Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis F
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
 
+- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)

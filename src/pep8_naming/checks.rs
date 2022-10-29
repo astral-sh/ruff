@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
-use crate::ast::types::{Range, Scope, ScopeKind};
+use crate::ast::types::{FunctionScope, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 
 pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
@@ -99,6 +99,49 @@ pub fn invalid_first_argument_name_for_method(
     None
 }
 
+pub fn non_lowercase_variable_in_function(scope: &Scope, expr: &Expr, name: &str) -> Option<Check> {
+    if !matches!(scope.kind, ScopeKind::Function(FunctionScope { .. })) {
+        return None;
+    }
+    if !is_lower(name) {
+        return Some(Check::new(
+            CheckKind::NonLowercaseVariableInFunction(name.to_string()),
+            Range::from_located(expr),
+        ));
+    }
+    None
+}
+
+pub fn mixed_case_variable_in_class_scope(scope: &Scope, expr: &Expr, name: &str) -> Option<Check> {
+    if !matches!(scope.kind, ScopeKind::Class) {
+        return None;
+    }
+    if is_mixed_case(name) {
+        return Some(Check::new(
+            CheckKind::MixedCaseVariableInClassScope(name.to_string()),
+            Range::from_located(expr),
+        ));
+    }
+    None
+}
+
+pub fn mixed_case_variable_in_global_scope(
+    scope: &Scope,
+    expr: &Expr,
+    name: &str,
+) -> Option<Check> {
+    if !matches!(scope.kind, ScopeKind::Module) {
+        return None;
+    }
+    if is_mixed_case(name) {
+        return Some(Check::new(
+            CheckKind::MixedCaseVariableInGlobalScope(name.to_string()),
+            Range::from_located(expr),
+        ));
+    }
+    None
+}
+
 pub fn dunder_function_name(func_def: &Stmt, scope: &Scope, name: &str) -> Option<Check> {
     if matches!(scope.kind, ScopeKind::Class) {
         return None;
@@ -169,6 +212,17 @@ pub fn lowercase_imported_as_non_lowercase(
 fn is_camelcase(name: &str) -> bool {
     !is_lower(name) && !is_upper(name) && !name.contains('_')
 }
+
+fn is_mixed_case(name: &str) -> bool {
+    !is_lower(name)
+        && name
+            .strip_prefix('_')
+            .unwrap_or(name)
+            .chars()
+            .next()
+            .map_or_else(|| false, |c| c.is_lowercase())
+}
+
 fn is_acronym(name: &str, asname: &str) -> bool {
     name.chars().filter(|c| c.is_uppercase()).join("") == asname
 }
@@ -215,9 +269,31 @@ pub fn camelcase_imported_as_acronym(
     None
 }
 
+pub fn error_suffix_on_exception_name(
+    class_def: &Stmt,
+    bases: &[Expr],
+    name: &str,
+) -> Option<Check> {
+    if bases.iter().any(|base| {
+        if let ExprKind::Name { id, .. } = &base.node {
+            id == "Exception"
+        } else {
+            false
+        }
+    }) {
+        if !name.ends_with("Error") {
+            return Some(Check::new(
+                CheckKind::ErrorSuffixOnExceptionName(name.to_string()),
+                Range::from_located(class_def),
+            ));
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{is_acronym, is_camelcase, is_lower, is_upper};
+    use super::{is_acronym, is_camelcase, is_lower, is_mixed_case, is_upper};
 
     #[test]
     fn test_is_lower() -> () {
@@ -249,6 +325,17 @@ mod tests {
         assert!(!is_camelcase("camel_case"));
         assert!(!is_camelcase("CAMEL"));
         assert!(!is_camelcase("CAMEL_CASE"));
+    }
+
+    #[test]
+    fn test_is_mixed_case() -> () {
+        assert!(is_mixed_case("mixedCase"));
+        assert!(is_mixed_case("mixed_Case"));
+        assert!(is_mixed_case("_mixed_Case"));
+        assert!(!is_mixed_case("mixed_case"));
+        assert!(!is_mixed_case("MIXED_CASE"));
+        assert!(!is_mixed_case(""));
+        assert!(!is_mixed_case("_"));
     }
 
     #[test]

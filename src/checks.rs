@@ -168,12 +168,16 @@ pub enum CheckCode {
     N803,
     N804,
     N805,
+    N806,
     N807,
     N811,
     N812,
     N813,
     N814,
+    N815,
+    N816,
     N817,
+    N818,
     // Meta
     M001,
 }
@@ -372,12 +376,16 @@ pub enum CheckKind {
     InvalidArgumentName(String),
     InvalidFirstArgumentNameForClassMethod,
     InvalidFirstArgumentNameForMethod,
+    NonLowercaseVariableInFunction(String),
     DunderFunctionName,
     ConstantImportedAsNonConstant(String, String),
     LowercaseImportedAsNonLowercase(String, String),
     CamelcaseImportedAsLowercase(String, String),
     CamelcaseImportedAsConstant(String, String),
+    MixedCaseVariableInClassScope(String),
+    MixedCaseVariableInGlobalScope(String),
     CamelcaseImportedAsAcronym(String, String),
+    ErrorSuffixOnExceptionName(String),
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -567,6 +575,7 @@ impl CheckCode {
             CheckCode::N803 => CheckKind::InvalidArgumentName("...".to_string()),
             CheckCode::N804 => CheckKind::InvalidFirstArgumentNameForClassMethod,
             CheckCode::N805 => CheckKind::InvalidFirstArgumentNameForMethod,
+            CheckCode::N806 => CheckKind::NonLowercaseVariableInFunction("...".to_string()),
             CheckCode::N807 => CheckKind::DunderFunctionName,
             CheckCode::N811 => {
                 CheckKind::ConstantImportedAsNonConstant("...".to_string(), "...".to_string())
@@ -580,9 +589,12 @@ impl CheckCode {
             CheckCode::N814 => {
                 CheckKind::CamelcaseImportedAsConstant("...".to_string(), "...".to_string())
             }
+            CheckCode::N815 => CheckKind::MixedCaseVariableInClassScope("mixedCase".to_string()),
+            CheckCode::N816 => CheckKind::MixedCaseVariableInGlobalScope("mixedCase".to_string()),
             CheckCode::N817 => {
                 CheckKind::CamelcaseImportedAsAcronym("...".to_string(), "...".to_string())
             }
+            CheckCode::N818 => CheckKind::ErrorSuffixOnExceptionName("...".to_string()),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -722,12 +734,16 @@ impl CheckCode {
             CheckCode::N803 => CheckCategory::PEP8Naming,
             CheckCode::N804 => CheckCategory::PEP8Naming,
             CheckCode::N805 => CheckCategory::PEP8Naming,
+            CheckCode::N806 => CheckCategory::PEP8Naming,
             CheckCode::N807 => CheckCategory::PEP8Naming,
             CheckCode::N811 => CheckCategory::PEP8Naming,
             CheckCode::N812 => CheckCategory::PEP8Naming,
             CheckCode::N813 => CheckCategory::PEP8Naming,
             CheckCode::N814 => CheckCategory::PEP8Naming,
+            CheckCode::N815 => CheckCategory::PEP8Naming,
+            CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
+            CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -879,12 +895,16 @@ impl CheckKind {
             CheckKind::InvalidArgumentName(_) => &CheckCode::N803,
             CheckKind::InvalidFirstArgumentNameForClassMethod => &CheckCode::N804,
             CheckKind::InvalidFirstArgumentNameForMethod => &CheckCode::N805,
+            CheckKind::NonLowercaseVariableInFunction(..) => &CheckCode::N806,
             CheckKind::DunderFunctionName => &CheckCode::N807,
             CheckKind::ConstantImportedAsNonConstant(..) => &CheckCode::N811,
             CheckKind::LowercaseImportedAsNonLowercase(..) => &CheckCode::N812,
             CheckKind::CamelcaseImportedAsLowercase(..) => &CheckCode::N813,
             CheckKind::CamelcaseImportedAsConstant(..) => &CheckCode::N814,
+            CheckKind::MixedCaseVariableInClassScope(..) => &CheckCode::N815,
+            CheckKind::MixedCaseVariableInGlobalScope(..) => &CheckCode::N816,
             CheckKind::CamelcaseImportedAsAcronym(..) => &CheckCode::N817,
+            CheckKind::ErrorSuffixOnExceptionName(..) => &CheckCode::N818,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -1305,6 +1325,9 @@ impl CheckKind {
             CheckKind::InvalidFirstArgumentNameForMethod => {
                 "First argument of a method should be named `self`".to_string()
             }
+            CheckKind::NonLowercaseVariableInFunction(name) => {
+                format!("Variable `{name}` in function should be lowercase")
+            }
             CheckKind::DunderFunctionName => {
                 "Function name should not start and end with `__`".to_string()
             }
@@ -1320,8 +1343,17 @@ impl CheckKind {
             CheckKind::CamelcaseImportedAsConstant(name, asname) => {
                 format!("Camelcase `{name}` imported as constant `{asname}`")
             }
+            CheckKind::MixedCaseVariableInClassScope(name) => {
+                format!("Variable `{name}` in class scope should not be mixedCase")
+            }
+            CheckKind::MixedCaseVariableInGlobalScope(name) => {
+                format!("Variable `{name}` in global scope should not be mixedCase")
+            }
             CheckKind::CamelcaseImportedAsAcronym(name, asname) => {
                 format!("Camelcase `{name}` imported as acronym `{asname}`")
+            }
+            CheckKind::ErrorSuffixOnExceptionName(name) => {
+                format!("Exception name `{name}` should be named with an Error suffix")
             }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {

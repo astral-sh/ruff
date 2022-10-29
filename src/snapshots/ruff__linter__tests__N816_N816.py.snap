@@ -1,0 +1,32 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    MixedCaseVariableInGlobalScope: mixedCase
+  location:
+    row: 3
+    column: 1
+  end_location:
+    row: 3
+    column: 10
+  fix: ~
+- kind:
+    MixedCaseVariableInGlobalScope: _mixedCase
+  location:
+    row: 4
+    column: 1
+  end_location:
+    row: 4
+    column: 11
+  fix: ~
+- kind:
+    MixedCaseVariableInGlobalScope: mixed_Case
+  location:
+    row: 5
+    column: 1
+  end_location:
+    row: 5
+    column: 11
+  fix: ~
+
