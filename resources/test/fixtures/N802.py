@@ -1,3 +1,6 @@
+import unittest
+
+
 def Bad():
     pass
 
@@ -24,3 +27,15 @@ def _good():
 
 def good_func():
     pass
+
+
+def tearDownModule():
+    pass
+
+
+class Test(unittest.TestCase):
+    def tearDown(self):
+        return super().tearDown()
+
+    def testTest(self):
+        assert True

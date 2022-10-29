@@ -21,8 +21,23 @@ pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
     None
 }
 
+const IGNORE_NAMES: &[&str] = &[
+    "setUp",
+    "tearDown",
+    "setUpClass",
+    "tearDownClass",
+    "setUpModule",
+    "tearDownModule",
+    "asyncSetUp",
+    "asyncTearDown",
+    "setUpTestData",
+    "failureException",
+    "longMessage",
+    "maxDiff",
+];
+
 pub fn invalid_function_name(func_def: &Stmt, name: &str) -> Option<Check> {
-    if name.chars().any(|c| c.is_uppercase()) {
+    if name.chars().any(|c| c.is_uppercase()) && !IGNORE_NAMES.contains(&name) {
         return Some(Check::new(
             CheckKind::InvalidFunctionName(name.to_string()),
             Range::from_located(func_def),
