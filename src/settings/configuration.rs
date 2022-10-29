@@ -60,9 +60,8 @@ impl Configuration {
     pub fn from_pyproject(
         pyproject: &Option<PathBuf>,
         project_root: &Option<PathBuf>,
-        quiet: bool,
     ) -> Result<Self> {
-        let options = load_options(pyproject, quiet)?;
+        let options = load_options(pyproject)?;
         Ok(Configuration {
             dummy_variable_rgx: match options.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
