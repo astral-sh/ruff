@@ -5,25 +5,25 @@ expression: checks
 - kind: DuplicateArgumentName
   location:
     row: 1
-    column: 25
+    column: 24
   end_location:
     row: 1
-    column: 31
+    column: 30
   fix: ~
 - kind: DuplicateArgumentName
   location:
     row: 5
-    column: 28
-  end_location:
-    row: 5
-    column: 34
-  fix: ~
-- kind: DuplicateArgumentName
-  location:
-    row: 9
     column: 27
   end_location:
-    row: 9
+    row: 5
     column: 33
+  fix: ~
+- kind: DuplicateArgumentName
+  location:
+    row: 9
+    column: 26
+  end_location:
+    row: 9
+    column: 32
   fix: ~
 

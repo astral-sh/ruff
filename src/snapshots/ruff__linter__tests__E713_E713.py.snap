@@ -5,41 +5,41 @@ expression: checks
 - kind: NotInTest
   location:
     row: 2
-    column: 10
+    column: 9
   end_location:
     row: 2
-    column: 14
+    column: 13
   fix: ~
 - kind: NotInTest
   location:
     row: 5
-    column: 12
-  end_location:
-    row: 5
-    column: 16
-  fix: ~
-- kind: NotInTest
-  location:
-    row: 8
-    column: 10
-  end_location:
-    row: 8
-    column: 14
-  fix: ~
-- kind: NotInTest
-  location:
-    row: 11
-    column: 25
-  end_location:
-    row: 11
-    column: 29
-  fix: ~
-- kind: NotInTest
-  location:
-    row: 14
     column: 11
   end_location:
-    row: 14
+    row: 5
     column: 15
+  fix: ~
+- kind: NotInTest
+  location:
+    row: 8
+    column: 9
+  end_location:
+    row: 8
+    column: 13
+  fix: ~
+- kind: NotInTest
+  location:
+    row: 11
+    column: 24
+  end_location:
+    row: 11
+    column: 28
+  fix: ~
+- kind: NotInTest
+  location:
+    row: 14
+    column: 10
+  end_location:
+    row: 14
+    column: 14
   fix: ~
 

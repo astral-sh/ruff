@@ -5,25 +5,25 @@ expression: checks
 - kind: NonEmpty
   location:
     row: 19
-    column: 9
+    column: 8
   end_location:
     row: 19
-    column: 15
+    column: 14
   fix: ~
 - kind: NonEmpty
   location:
     row: 69
-    column: 5
+    column: 4
   end_location:
     row: 69
-    column: 12
-  fix: ~
-- kind: NonEmpty
-  location:
-    row: 75
-    column: 9
-  end_location:
-    row: 75
     column: 11
+  fix: ~
+- kind: NonEmpty
+  location:
+    row: 75
+    column: 8
+  end_location:
+    row: 75
+    column: 10
   fix: ~
 

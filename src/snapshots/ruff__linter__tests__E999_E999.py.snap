@@ -6,9 +6,9 @@ expression: checks
     SyntaxError: Got unexpected EOF
   location:
     row: 2
-    column: 1
+    column: 0
   end_location:
     row: 2
-    column: 1
+    column: 0
   fix: ~
 

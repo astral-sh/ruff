@@ -5,25 +5,25 @@ expression: checks
 - kind: NotIsTest
   location:
     row: 2
-    column: 10
+    column: 9
   end_location:
     row: 2
-    column: 14
+    column: 13
   fix: ~
 - kind: NotIsTest
   location:
     row: 5
-    column: 12
+    column: 11
   end_location:
     row: 5
-    column: 16
+    column: 15
   fix: ~
 - kind: NotIsTest
   location:
     row: 8
-    column: 10
+    column: 9
   end_location:
     row: 8
-    column: 23
+    column: 22
   fix: ~
 

@@ -6,27 +6,27 @@ expression: checks
     UnnecessaryCallAroundSorted: list
   location:
     row: 2
-    column: 1
+    column: 0
   end_location:
     row: 2
-    column: 16
+    column: 15
   fix: ~
 - kind:
     UnnecessaryCallAroundSorted: reversed
   location:
     row: 3
-    column: 1
+    column: 0
   end_location:
     row: 3
-    column: 20
+    column: 19
   fix: ~
 - kind:
     UnnecessaryCallAroundSorted: reversed
   location:
     row: 4
-    column: 1
+    column: 0
   end_location:
     row: 4
-    column: 34
+    column: 33
   fix: ~
 

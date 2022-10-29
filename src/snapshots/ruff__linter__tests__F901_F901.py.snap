@@ -5,17 +5,17 @@ expression: checks
 - kind: RaiseNotImplemented
   location:
     row: 2
-    column: 11
+    column: 10
   end_location:
     row: 2
-    column: 27
+    column: 26
   fix: ~
 - kind: RaiseNotImplemented
   location:
     row: 6
-    column: 11
+    column: 10
   end_location:
     row: 6
-    column: 25
+    column: 24
   fix: ~
 

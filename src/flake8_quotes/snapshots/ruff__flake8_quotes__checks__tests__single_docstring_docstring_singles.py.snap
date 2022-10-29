@@ -6,54 +6,54 @@ expression: checks
     BadQuotesMultilineString: double
   location:
     row: 5
-    column: 1
+    column: 0
   end_location:
     row: 7
-    column: 4
+    column: 3
   fix: ~
 - kind:
     BadQuotesMultilineString: double
   location:
     row: 11
-    column: 21
+    column: 20
   end_location:
     row: 13
-    column: 4
+    column: 3
   fix: ~
 - kind:
     BadQuotesMultilineString: double
   location:
     row: 18
-    column: 5
+    column: 4
   end_location:
     row: 20
-    column: 8
+    column: 7
   fix: ~
 - kind:
     BadQuotesMultilineString: double
   location:
     row: 23
-    column: 21
+    column: 20
   end_location:
     row: 24
-    column: 38
+    column: 37
   fix: ~
 - kind:
     BadQuotesMultilineString: double
   location:
     row: 32
-    column: 9
+    column: 8
   end_location:
     row: 34
-    column: 12
+    column: 11
   fix: ~
 - kind:
     BadQuotesMultilineString: double
   location:
     row: 37
-    column: 13
+    column: 12
   end_location:
     row: 39
-    column: 16
+    column: 15
   fix: ~
 

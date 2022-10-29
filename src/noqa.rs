@@ -246,8 +246,8 @@ ghi
         let checks = vec![Check::new(
             CheckKind::UnusedVariable("x".to_string()),
             Range {
-                location: Location::new(1, 1),
-                end_location: Location::new(1, 1),
+                location: Location::new(1, 0),
+                end_location: Location::new(1, 0),
             },
         )];
         let contents = "x = 1";
@@ -260,15 +260,15 @@ ghi
             Check::new(
                 CheckKind::AmbiguousVariableName("x".to_string()),
                 Range {
-                    location: Location::new(1, 1),
-                    end_location: Location::new(1, 1),
+                    location: Location::new(1, 0),
+                    end_location: Location::new(1, 0),
                 },
             ),
             Check::new(
                 CheckKind::UnusedVariable("x".to_string()),
                 Range {
-                    location: Location::new(1, 1),
-                    end_location: Location::new(1, 1),
+                    location: Location::new(1, 0),
+                    end_location: Location::new(1, 0),
                 },
             ),
         ];
@@ -282,15 +282,15 @@ ghi
             Check::new(
                 CheckKind::AmbiguousVariableName("x".to_string()),
                 Range {
-                    location: Location::new(1, 1),
-                    end_location: Location::new(1, 1),
+                    location: Location::new(1, 0),
+                    end_location: Location::new(1, 0),
                 },
             ),
             Check::new(
                 CheckKind::UnusedVariable("x".to_string()),
                 Range {
-                    location: Location::new(1, 1),
-                    end_location: Location::new(1, 1),
+                    location: Location::new(1, 0),
+                    end_location: Location::new(1, 0),
                 },
             ),
         ];

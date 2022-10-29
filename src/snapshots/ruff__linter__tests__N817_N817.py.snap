@@ -8,10 +8,10 @@ expression: checks
       - CM
   location:
     row: 1
-    column: 1
+    column: 0
   end_location:
     row: 1
-    column: 23
+    column: 22
   fix: ~
 - kind:
     CamelcaseImportedAsAcronym:
@@ -19,9 +19,9 @@ expression: checks
       - CC
   location:
     row: 2
-    column: 1
+    column: 0
   end_location:
     row: 2
-    column: 32
+    column: 31
   fix: ~
 

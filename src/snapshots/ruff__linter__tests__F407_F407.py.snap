@@ -6,9 +6,9 @@ expression: checks
     FutureFeatureNotDefined: non_existent_feature
   location:
     row: 2
-    column: 1
+    column: 0
   end_location:
     row: 2
-    column: 44
+    column: 43
   fix: ~
 

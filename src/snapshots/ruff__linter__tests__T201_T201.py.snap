@@ -5,18 +5,18 @@ expression: checks
 - kind: PrintFound
   location:
     row: 1
-    column: 1
+    column: 0
   end_location:
     row: 1
-    column: 23
+    column: 22
   fix:
     patch:
       content: ""
       location:
         row: 1
-        column: 1
+        column: 0
       end_location:
         row: 2
-        column: 1
+        column: 0
     applied: false
 

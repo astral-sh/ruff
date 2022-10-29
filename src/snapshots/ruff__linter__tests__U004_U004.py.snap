@@ -6,360 +6,360 @@ expression: checks
     UselessObjectInheritance: A
   location:
     row: 5
-    column: 9
+    column: 8
   end_location:
     row: 5
-    column: 15
+    column: 14
   fix:
     patch:
       content: ""
       location:
         row: 5
-        column: 8
+        column: 7
       end_location:
         row: 5
-        column: 16
+        column: 15
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 10
-    column: 5
+    column: 4
   end_location:
     row: 10
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 9
-        column: 8
+        column: 7
       end_location:
         row: 11
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 16
-    column: 5
+    column: 4
   end_location:
     row: 16
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 15
-        column: 8
+        column: 7
       end_location:
         row: 18
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 24
-    column: 5
+    column: 4
   end_location:
     row: 24
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 22
-        column: 8
+        column: 7
       end_location:
         row: 25
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 31
-    column: 5
+    column: 4
   end_location:
     row: 31
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 29
-        column: 8
+        column: 7
       end_location:
         row: 32
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 37
-    column: 5
+    column: 4
   end_location:
     row: 37
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 36
-        column: 8
+        column: 7
       end_location:
         row: 39
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 45
-    column: 5
+    column: 4
   end_location:
     row: 45
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 43
-        column: 8
+        column: 7
       end_location:
         row: 47
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 53
-    column: 5
+    column: 4
   end_location:
     row: 53
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 51
-        column: 8
+        column: 7
       end_location:
         row: 55
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 61
-    column: 5
+    column: 4
   end_location:
     row: 61
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 59
-        column: 8
+        column: 7
       end_location:
         row: 63
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 69
-    column: 5
+    column: 4
   end_location:
     row: 69
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 67
-        column: 8
+        column: 7
       end_location:
         row: 71
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: B
   location:
     row: 75
-    column: 12
+    column: 11
   end_location:
     row: 75
-    column: 18
+    column: 17
   fix:
     patch:
       content: ""
       location:
         row: 75
-        column: 10
-      end_location:
-        row: 75
-        column: 18
-    applied: false
-- kind:
-    UselessObjectInheritance: B
-  location:
-    row: 79
-    column: 9
-  end_location:
-    row: 79
-    column: 15
-  fix:
-    patch:
-      content: ""
-      location:
-        row: 79
         column: 9
       end_location:
-        row: 79
+        row: 75
         column: 17
     applied: false
 - kind:
     UselessObjectInheritance: B
   location:
+    row: 79
+    column: 8
+  end_location:
+    row: 79
+    column: 14
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 79
+        column: 8
+      end_location:
+        row: 79
+        column: 16
+    applied: false
+- kind:
+    UselessObjectInheritance: B
+  location:
     row: 84
-    column: 5
+    column: 4
   end_location:
     row: 84
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 84
-        column: 5
+        column: 4
       end_location:
         row: 85
-        column: 5
+        column: 4
     applied: false
 - kind:
     UselessObjectInheritance: B
   location:
     row: 92
-    column: 5
+    column: 4
   end_location:
     row: 92
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 91
-        column: 6
+        column: 5
       end_location:
         row: 92
-        column: 11
+        column: 10
     applied: false
 - kind:
     UselessObjectInheritance: B
   location:
     row: 98
-    column: 5
+    column: 4
   end_location:
     row: 98
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 98
-        column: 5
+        column: 4
       end_location:
         row: 100
-        column: 5
+        column: 4
     applied: false
 - kind:
     UselessObjectInheritance: B
   location:
     row: 108
-    column: 5
+    column: 4
   end_location:
     row: 108
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 107
-        column: 6
+        column: 5
       end_location:
         row: 108
-        column: 11
+        column: 10
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 114
-    column: 13
+    column: 12
   end_location:
     row: 114
-    column: 19
+    column: 18
   fix:
     patch:
       content: ""
       location:
         row: 114
-        column: 12
+        column: 11
       end_location:
         row: 114
-        column: 20
+        column: 19
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 119
-    column: 5
+    column: 4
   end_location:
     row: 119
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 118
-        column: 8
+        column: 7
       end_location:
         row: 120
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 125
-    column: 5
+    column: 4
   end_location:
     row: 125
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 124
-        column: 8
+        column: 7
       end_location:
         row: 126
-        column: 2
+        column: 1
     applied: false
 - kind:
     UselessObjectInheritance: A
   location:
     row: 131
-    column: 5
+    column: 4
   end_location:
     row: 131
-    column: 11
+    column: 10
   fix:
     patch:
       content: ""
       location:
         row: 130
-        column: 8
+        column: 7
       end_location:
         row: 133
-        column: 2
+        column: 1
     applied: false
 

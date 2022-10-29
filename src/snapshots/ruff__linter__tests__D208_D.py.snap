@@ -5,52 +5,52 @@ expression: checks
 - kind: NoOverIndentation
   location:
     row: 247
-    column: 1
+    column: 0
   end_location:
     row: 247
-    column: 1
+    column: 0
   fix:
     patch:
       content: "    "
       location:
         row: 247
-        column: 1
+        column: 0
       end_location:
         row: 247
+        column: 7
+    applied: false
+- kind: NoOverIndentation
+  location:
+    row: 259
+    column: 0
+  end_location:
+    row: 259
+    column: 0
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 259
+        column: 0
+      end_location:
+        row: 259
         column: 8
     applied: false
 - kind: NoOverIndentation
   location:
-    row: 259
-    column: 1
-  end_location:
-    row: 259
-    column: 1
-  fix:
-    patch:
-      content: "    "
-      location:
-        row: 259
-        column: 1
-      end_location:
-        row: 259
-        column: 9
-    applied: false
-- kind: NoOverIndentation
-  location:
     row: 267
-    column: 1
+    column: 0
   end_location:
     row: 267
-    column: 1
+    column: 0
   fix:
     patch:
       content: "    "
       location:
         row: 267
-        column: 1
+        column: 0
       end_location:
         row: 267
-        column: 9
+        column: 8
     applied: false
 

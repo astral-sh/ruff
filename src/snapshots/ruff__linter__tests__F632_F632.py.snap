@@ -5,17 +5,17 @@ expression: checks
 - kind: IsLiteral
   location:
     row: 1
-    column: 6
+    column: 5
   end_location:
     row: 1
-    column: 14
+    column: 13
   fix: ~
 - kind: IsLiteral
   location:
     row: 4
-    column: 8
+    column: 7
   end_location:
     row: 4
-    column: 16
+    column: 15
   fix: ~
 

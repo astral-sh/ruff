@@ -6,72 +6,72 @@ expression: checks
     NewLineAfterSectionName: Returns
   location:
     row: 30
-    column: 5
+    column: 4
   end_location:
     row: 36
-    column: 8
+    column: 7
   fix:
     patch:
       content: ""
       location:
         row: 32
-        column: 12
+        column: 11
       end_location:
         row: 32
-        column: 13
+        column: 12
     applied: false
 - kind:
     NewLineAfterSectionName: Raises
   location:
     row: 207
-    column: 5
+    column: 4
   end_location:
     row: 221
-    column: 8
+    column: 7
   fix:
     patch:
       content: ""
       location:
         row: 218
-        column: 11
+        column: 10
       end_location:
         row: 218
-        column: 12
+        column: 11
     applied: false
 - kind:
     NewLineAfterSectionName: Returns
   location:
     row: 252
-    column: 5
+    column: 4
   end_location:
     row: 262
-    column: 8
+    column: 7
   fix:
     patch:
       content: ""
       location:
         row: 257
-        column: 12
+        column: 11
       end_location:
         row: 257
-        column: 13
+        column: 12
     applied: false
 - kind:
     NewLineAfterSectionName: Raises
   location:
     row: 252
-    column: 5
+    column: 4
   end_location:
     row: 262
-    column: 8
+    column: 7
   fix:
     patch:
       content: ""
       location:
         row: 259
-        column: 11
+        column: 10
       end_location:
         row: 259
-        column: 12
+        column: 11
     applied: false
 

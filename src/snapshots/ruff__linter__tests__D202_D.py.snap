@@ -6,36 +6,36 @@ expression: checks
     NoBlankLineAfterFunction: 1
   location:
     row: 137
-    column: 5
+    column: 4
   end_location:
     row: 137
-    column: 25
+    column: 24
   fix:
     patch:
       content: ""
       location:
         row: 138
-        column: 1
+        column: 0
       end_location:
         row: 139
-        column: 1
+        column: 0
     applied: false
 - kind:
     NoBlankLineAfterFunction: 1
   location:
     row: 146
-    column: 5
+    column: 4
   end_location:
     row: 146
-    column: 38
+    column: 37
   fix:
     patch:
       content: ""
       location:
         row: 147
-        column: 1
+        column: 0
       end_location:
         row: 148
-        column: 1
+        column: 0
     applied: false
 

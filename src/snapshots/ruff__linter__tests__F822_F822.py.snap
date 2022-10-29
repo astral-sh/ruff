@@ -6,9 +6,9 @@ expression: checks
     UndefinedExport: b
   location:
     row: 3
-    column: 1
+    column: 0
   end_location:
     row: 3
-    column: 8
+    column: 7
   fix: ~
 

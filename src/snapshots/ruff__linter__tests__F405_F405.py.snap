@@ -8,10 +8,10 @@ expression: checks
       - - mymodule
   location:
     row: 5
-    column: 11
+    column: 10
   end_location:
     row: 5
-    column: 15
+    column: 14
   fix: ~
 - kind:
     ImportStarUsage:
@@ -19,9 +19,9 @@ expression: checks
       - - mymodule
   location:
     row: 11
-    column: 1
+    column: 0
   end_location:
     row: 11
-    column: 8
+    column: 7
   fix: ~
 

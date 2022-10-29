@@ -5,9 +5,9 @@ expression: checks
 - kind: DunderFunctionName
   location:
     row: 1
-    column: 1
+    column: 0
   end_location:
     row: 5
-    column: 1
+    column: 0
   fix: ~
 

@@ -6,36 +6,36 @@ expression: checks
     UnnecessarySubscriptReversal: set
   location:
     row: 2
-    column: 5
+    column: 4
   end_location:
     row: 2
-    column: 19
+    column: 18
   fix: ~
 - kind:
     UnnecessarySubscriptReversal: reversed
   location:
     row: 3
-    column: 5
+    column: 4
   end_location:
     row: 3
-    column: 24
+    column: 23
   fix: ~
 - kind:
     UnnecessarySubscriptReversal: sorted
   location:
     row: 4
-    column: 5
+    column: 4
   end_location:
     row: 4
-    column: 22
+    column: 21
   fix: ~
 - kind:
     UnnecessarySubscriptReversal: sorted
   location:
     row: 5
-    column: 5
+    column: 4
   end_location:
     row: 5
-    column: 36
+    column: 35
   fix: ~
 

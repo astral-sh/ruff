@@ -82,8 +82,8 @@ pub fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Res
         // Otherwise, nuke the entire line.
         // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
         Ok(Fix::deletion(
-            Location::new(stmt.location.row(), 1),
-            Location::new(stmt.end_location.unwrap().row() + 1, 1),
+            Location::new(stmt.location.row(), 0),
+            Location::new(stmt.end_location.unwrap().row() + 1, 0),
         ))
     }
 }

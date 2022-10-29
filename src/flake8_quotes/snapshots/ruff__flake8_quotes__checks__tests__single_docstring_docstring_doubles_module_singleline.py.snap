@@ -6,9 +6,9 @@ expression: checks
     BadQuotesDocstring: single
   location:
     row: 1
-    column: 1
+    column: 0
   end_location:
     row: 1
-    column: 50
+    column: 49
   fix: ~
 

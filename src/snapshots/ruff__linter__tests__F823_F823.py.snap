@@ -6,9 +6,9 @@ expression: checks
     UndefinedLocal: my_var
   location:
     row: 6
-    column: 5
+    column: 4
   end_location:
     row: 6
-    column: 11
+    column: 10
   fix: ~
 

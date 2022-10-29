@@ -5,35 +5,35 @@ expression: checks
 - kind: NoUnderIndentation
   location:
     row: 227
-    column: 1
+    column: 0
   end_location:
     row: 227
-    column: 1
+    column: 0
   fix:
     patch:
       content: "    "
       location:
         row: 227
-        column: 1
+        column: 0
       end_location:
         row: 227
-        column: 1
+        column: 0
     applied: false
 - kind: NoUnderIndentation
   location:
     row: 435
-    column: 1
+    column: 0
   end_location:
     row: 435
-    column: 1
+    column: 0
   fix:
     patch:
       content: "                                    "
       location:
         row: 435
-        column: 1
+        column: 0
       end_location:
         row: 435
-        column: 5
+        column: 4
     applied: false
 

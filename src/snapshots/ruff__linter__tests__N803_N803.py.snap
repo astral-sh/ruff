@@ -6,18 +6,18 @@ expression: checks
     InvalidArgumentName: A
   location:
     row: 1
-    column: 13
+    column: 12
   end_location:
     row: 1
-    column: 14
+    column: 13
   fix: ~
 - kind:
     InvalidArgumentName: A
   location:
     row: 6
-    column: 25
+    column: 24
   end_location:
     row: 6
-    column: 26
+    column: 25
   fix: ~
 

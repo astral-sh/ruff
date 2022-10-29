@@ -6,38 +6,38 @@ expression: checks
     UnusedNOQA: ~
   location:
     row: 9
-    column: 10
+    column: 9
   end_location:
     row: 9
-    column: 18
+    column: 17
   fix:
     patch:
       content: ""
       location:
         row: 9
-        column: 10
+        column: 9
       end_location:
         row: 9
-        column: 18
+        column: 17
     applied: false
 - kind:
     UnusedNOQA:
       - E501
   location:
     row: 13
-    column: 10
+    column: 9
   end_location:
     row: 13
-    column: 24
+    column: 23
   fix:
     patch:
       content: ""
       location:
         row: 13
-        column: 10
+        column: 9
       end_location:
         row: 13
-        column: 24
+        column: 23
     applied: false
 - kind:
     UnusedNOQA:
@@ -45,93 +45,93 @@ expression: checks
       - E501
   location:
     row: 16
-    column: 10
+    column: 9
   end_location:
     row: 16
-    column: 30
+    column: 29
   fix:
     patch:
       content: ""
       location:
         row: 16
-        column: 10
+        column: 9
       end_location:
         row: 16
-        column: 30
+        column: 29
     applied: false
 - kind:
     UnusedNOQA:
       - W191
   location:
     row: 19
-    column: 10
+    column: 9
   end_location:
     row: 19
-    column: 30
+    column: 29
   fix:
     patch:
       content: "  # noqa: F841"
       location:
         row: 19
-        column: 10
+        column: 9
       end_location:
         row: 19
-        column: 30
+        column: 29
     applied: false
 - kind:
     UnusedNOQA:
       - F841
   location:
     row: 44
-    column: 4
+    column: 3
   end_location:
     row: 44
-    column: 24
+    column: 23
   fix:
     patch:
       content: "  # noqa: E501"
       location:
         row: 44
-        column: 4
+        column: 3
       end_location:
         row: 44
-        column: 24
+        column: 23
     applied: false
 - kind:
     UnusedNOQA:
       - E501
   location:
     row: 52
-    column: 4
+    column: 3
   end_location:
     row: 52
-    column: 18
+    column: 17
   fix:
     patch:
       content: ""
       location:
         row: 52
-        column: 4
+        column: 3
       end_location:
         row: 52
-        column: 18
+        column: 17
     applied: false
 - kind:
     UnusedNOQA: ~
   location:
     row: 60
-    column: 4
+    column: 3
   end_location:
     row: 60
-    column: 12
+    column: 11
   fix:
     patch:
       content: ""
       location:
         row: 60
-        column: 4
+        column: 3
       end_location:
         row: 60
-        column: 12
+        column: 11
     applied: false
 

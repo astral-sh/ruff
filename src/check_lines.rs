@@ -94,8 +94,8 @@ pub fn check_lines(
                 let check = Check::new(
                     CheckKind::LineTooLong(line_length, settings.line_length),
                     Range {
-                        location: Location::new(lineno + 1, 1),
-                        end_location: Location::new(lineno + 1, line_length + 1),
+                        location: Location::new(lineno + 1, 0),
+                        end_location: Location::new(lineno + 1, line_length),
                     },
                 );
 
@@ -164,14 +164,14 @@ pub fn check_lines(
                         let mut check = Check::new(
                             CheckKind::UnusedNOQA(None),
                             Range {
-                                location: Location::new(row + 1, start + 1),
-                                end_location: Location::new(row + 1, end + 1),
+                                location: Location::new(row + 1, start),
+                                end_location: Location::new(row + 1, end),
                             },
                         );
                         if autofix.patch() {
                             check.amend(Fix::deletion(
-                                Location::new(row + 1, start + 1),
-                                Location::new(row + 1, lines[row].chars().count() + 1),
+                                Location::new(row + 1, start),
+                                Location::new(row + 1, lines[row].chars().count()),
                             ));
                         }
                         line_checks.push(check);
@@ -192,21 +192,21 @@ pub fn check_lines(
                         let mut check = Check::new(
                             CheckKind::UnusedNOQA(Some(invalid_codes)),
                             Range {
-                                location: Location::new(row + 1, start + 1),
-                                end_location: Location::new(row + 1, end + 1),
+                                location: Location::new(row + 1, start),
+                                end_location: Location::new(row + 1, end),
                             },
                         );
                         if autofix.patch() {
                             if valid_codes.is_empty() {
                                 check.amend(Fix::deletion(
-                                    Location::new(row + 1, start + 1),
-                                    Location::new(row + 1, lines[row].chars().count() + 1),
+                                    Location::new(row + 1, start),
+                                    Location::new(row + 1, lines[row].chars().count()),
                                 ));
                             } else {
                                 check.amend(Fix::replacement(
                                     format!("  # noqa: {}", valid_codes.join(", ")),
-                                    Location::new(row + 1, start + 1),
-                                    Location::new(row + 1, lines[row].chars().count() + 1),
+                                    Location::new(row + 1, start),
+                                    Location::new(row + 1, lines[row].chars().count()),
                                 ));
                             }
                         }

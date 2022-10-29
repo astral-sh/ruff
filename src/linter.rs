@@ -6,7 +6,10 @@ use std::path::Path;
 use anyhow::Result;
 #[cfg(not(target_family = "wasm"))]
 use log::debug;
+use rustpython_ast::{Mod, Suite};
+use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
+use rustpython_parser::parser::Mode;
 use rustpython_parser::{lexer, parser};
 
 use crate::ast::types::Range;
@@ -34,6 +37,17 @@ pub(crate) fn tokenize(contents: &str) -> Vec<LexResult> {
         }
     }
     tokens
+}
+
+/// Parse a full Python program from its tokens.
+pub(crate) fn parse_program_tokens(
+    lxr: Vec<LexResult>,
+    source_path: &str,
+) -> Result<Suite, ParseError> {
+    parser::parse_tokens(lxr, Mode::Module, source_path).map(|top| match top {
+        Mod::Module { body, .. } => body,
+        _ => unreachable!(),
+    })
 }
 
 pub(crate) fn check_path(
@@ -65,7 +79,7 @@ pub(crate) fn check_path(
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
     {
-        match parser::parse_program_tokens(tokens, "<filename>") {
+        match parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
                 checks.extend(check_ast(&python_ast, &locator, settings, autofix, path))
             }
@@ -220,7 +234,7 @@ pub fn autoformat_path(path: &Path) -> Result<()> {
     let tokens: Vec<LexResult> = tokenize(&contents);
 
     // Generate the AST.
-    let python_ast = parser::parse_program_tokens(tokens, "<filename>")?;
+    let python_ast = parse_program_tokens(tokens, "<filename>")?;
     let mut generator: SourceGenerator = Default::default();
     generator.unparse_suite(&python_ast)?;
     write(path, generator.generate()?)?;

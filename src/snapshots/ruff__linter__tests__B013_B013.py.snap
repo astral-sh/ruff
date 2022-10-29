@@ -6,9 +6,9 @@ expression: checks
     RedundantTupleInExceptionHandler: ValueError
   location:
     row: 3
-    column: 9
+    column: 8
   end_location:
     row: 3
-    column: 20
+    column: 19
   fix: ~
 

@@ -6,9 +6,9 @@ expression: checks
     ErrorSuffixOnExceptionName: C
   location:
     row: 9
-    column: 1
+    column: 0
   end_location:
     row: 11
-    column: 1
+    column: 0
   fix: ~
 

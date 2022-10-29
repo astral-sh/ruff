@@ -5,129 +5,129 @@ expression: checks
 - kind: EndsInPeriod
   location:
     row: 124
-    column: 5
+    column: 4
   end_location:
     row: 126
-    column: 8
+    column: 7
   fix: ~
 - kind: EndsInPeriod
   location:
     row: 283
-    column: 5
+    column: 4
   end_location:
     row: 283
-    column: 34
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 288
-    column: 5
-  end_location:
-    row: 288
-    column: 38
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 350
-    column: 5
-  end_location:
-    row: 350
-    column: 18
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 401
-    column: 25
-  end_location:
-    row: 401
-    column: 40
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 405
-    column: 5
-  end_location:
-    row: 405
-    column: 25
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 411
-    column: 5
-  end_location:
-    row: 411
-    column: 25
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 417
-    column: 35
-  end_location:
-    row: 417
-    column: 50
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 424
-    column: 49
-  end_location:
-    row: 424
-    column: 64
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 465
-    column: 5
-  end_location:
-    row: 465
-    column: 25
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 470
-    column: 5
-  end_location:
-    row: 470
-    column: 25
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 475
-    column: 5
-  end_location:
-    row: 475
-    column: 25
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 482
-    column: 5
-  end_location:
-    row: 482
-    column: 25
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 504
-    column: 5
-  end_location:
-    row: 504
-    column: 35
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 509
-    column: 5
-  end_location:
-    row: 509
-    column: 34
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 515
-    column: 5
-  end_location:
-    row: 515
     column: 33
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 288
+    column: 4
+  end_location:
+    row: 288
+    column: 37
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 350
+    column: 4
+  end_location:
+    row: 350
+    column: 17
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 401
+    column: 24
+  end_location:
+    row: 401
+    column: 39
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 405
+    column: 4
+  end_location:
+    row: 405
+    column: 24
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 411
+    column: 4
+  end_location:
+    row: 411
+    column: 24
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 417
+    column: 34
+  end_location:
+    row: 417
+    column: 49
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 424
+    column: 48
+  end_location:
+    row: 424
+    column: 63
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 465
+    column: 4
+  end_location:
+    row: 465
+    column: 24
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 470
+    column: 4
+  end_location:
+    row: 470
+    column: 24
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 475
+    column: 4
+  end_location:
+    row: 475
+    column: 24
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 482
+    column: 4
+  end_location:
+    row: 482
+    column: 24
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 504
+    column: 4
+  end_location:
+    row: 504
+    column: 34
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 509
+    column: 4
+  end_location:
+    row: 509
+    column: 33
+  fix: ~
+- kind: EndsInPeriod
+  location:
+    row: 515
+    column: 4
+  end_location:
+    row: 515
+    column: 32
   fix: ~
 

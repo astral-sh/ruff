@@ -6,18 +6,18 @@ expression: checks
     BadQuotesInlineString: double
   location:
     row: 1
-    column: 25
+    column: 24
   end_location:
     row: 1
-    column: 46
+    column: 45
   fix: ~
 - kind:
     BadQuotesInlineString: double
   location:
     row: 2
-    column: 25
+    column: 24
   end_location:
     row: 2
-    column: 47
+    column: 46
   fix: ~
 

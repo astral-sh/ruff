@@ -6,9 +6,9 @@ expression: checks
     ForwardAnnotationSyntaxError: ///
   location:
     row: 9
-    column: 12
+    column: 11
   end_location:
     row: 9
-    column: 17
+    column: 16
   fix: ~
 

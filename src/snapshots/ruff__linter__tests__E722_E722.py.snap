@@ -5,25 +5,25 @@ expression: checks
 - kind: DoNotUseBareExcept
   location:
     row: 4
-    column: 1
+    column: 0
   end_location:
     row: 7
-    column: 1
+    column: 0
   fix: ~
 - kind: DoNotUseBareExcept
   location:
     row: 11
-    column: 1
+    column: 0
   end_location:
     row: 14
-    column: 1
+    column: 0
   fix: ~
 - kind: DoNotUseBareExcept
   location:
     row: 16
-    column: 1
+    column: 0
   end_location:
     row: 19
-    column: 1
+    column: 0
   fix: ~
 
