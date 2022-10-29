@@ -502,6 +502,7 @@ Ruff re-implements some of the most popular Flake8 plugins and related code qual
 including:
 
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
+- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`yesqa`](https://github.com/asottile/yesqa)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
@@ -524,6 +525,7 @@ Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis F
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
 
+- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
