@@ -14,3 +14,25 @@ inline-quotes = "single"
 multiline-quotes = "double"
 docstring-quotes = "double"
 avoid-escape = true
+
+[tool.ruff.pep8-naming]
+ignore-names = [
+    "setUp",
+    "tearDown",
+    "setUpClass",
+    "tearDownClass",
+    "setUpModule",
+    "tearDownModule",
+    "asyncSetUp",
+    "asyncTearDown",
+    "setUpTestData",
+    "failureException",
+    "longMessage",
+    "maxDiff",
+]
+classmethod-decorators = [
+    "classmethod",
+]
+staticmethod-decorators = [
+    "staticmethod",
+]

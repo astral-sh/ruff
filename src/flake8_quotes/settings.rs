@@ -1,4 +1,4 @@
-//! Settings for the `flake_quotes` plugin.
+//! Settings for the `flake-quotes` plugin.
 
 use serde::{Deserialize, Serialize};
 
@@ -27,12 +27,12 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_config(config: Options) -> Self {
+    pub fn from_options(options: Options) -> Self {
         Self {
-            inline_quotes: config.inline_quotes.unwrap_or(Quote::Single),
-            multiline_quotes: config.multiline_quotes.unwrap_or(Quote::Double),
-            docstring_quotes: config.docstring_quotes.unwrap_or(Quote::Double),
-            avoid_escape: config.avoid_escape.unwrap_or(true),
+            inline_quotes: options.inline_quotes.unwrap_or(Quote::Single),
+            multiline_quotes: options.multiline_quotes.unwrap_or(Quote::Double),
+            docstring_quotes: options.docstring_quotes.unwrap_or(Quote::Double),
+            avoid_escape: options.avoid_escape.unwrap_or(true),
         }
     }
 }
