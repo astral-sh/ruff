@@ -923,7 +923,6 @@ where
                 func,
                 args,
                 keywords,
-                ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::U005) {
                     pyupgrade::plugins::deprecated_unittest_alias(self, func);
@@ -943,25 +942,25 @@ where
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {
-                    if let Some(check) =
-                        flake8_comprehensions::checks::unnecessary_generator_list(expr, func, args)
-                    {
+                    if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_list(
+                        expr, func, args, keywords,
+                    ) {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C401) {
-                    if let Some(check) =
-                        flake8_comprehensions::checks::unnecessary_generator_set(expr, func, args)
-                    {
+                    if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_set(
+                        expr, func, args, keywords,
+                    ) {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C402) {
-                    if let Some(check) =
-                        flake8_comprehensions::checks::unnecessary_generator_dict(expr, func, args)
-                    {
+                    if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_dict(
+                        expr, func, args, keywords,
+                    ) {
                         self.checks.push(check);
                     };
                 }
@@ -969,7 +968,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::C403) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_set(
-                            expr, func, args,
+                            expr, func, args, keywords,
                         )
                     {
                         self.checks.push(check);
@@ -979,7 +978,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::C404) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_dict(
-                            expr, func, args,
+                            expr, func, args, keywords,
                         )
                     {
                         self.checks.push(check);
@@ -987,17 +986,17 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C405) {
-                    if let Some(check) =
-                        flake8_comprehensions::checks::unnecessary_literal_set(expr, func, args)
-                    {
+                    if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_set(
+                        expr, func, args, keywords,
+                    ) {
                         self.checks.push(check);
                     };
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C406) {
-                    if let Some(check) =
-                        flake8_comprehensions::checks::unnecessary_literal_dict(expr, func, args)
-                    {
+                    if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_dict(
+                        expr, func, args, keywords,
+                    ) {
                         self.checks.push(check);
                     };
                 }
