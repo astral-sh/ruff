@@ -1,5 +1,7 @@
 use num_bigint::BigInt;
-use rustpython_ast::{Comprehension, Constant, Expr, ExprKind, KeywordData, Located, Unaryop};
+use rustpython_ast::{
+    Comprehension, Constant, Expr, ExprKind, Keyword, KeywordData, Located, Unaryop,
+};
 
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
@@ -16,7 +18,11 @@ fn exactly_one_argument_with_matching_function<'a>(
     name: &str,
     func: &Expr,
     args: &'a [Expr],
+    keywords: &[Keyword],
 ) -> Option<&'a ExprKind> {
+    if !keywords.is_empty() {
+        return None;
+    }
     if args.len() != 1 {
         return None;
     }
@@ -38,8 +44,13 @@ fn first_argument_with_matching_function<'a>(
 }
 
 /// C400 (`list(generator)`)
-pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    let argument = exactly_one_argument_with_matching_function("list", func, args)?;
+pub fn unnecessary_generator_list(
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Check> {
+    let argument = exactly_one_argument_with_matching_function("list", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
         return Some(Check::new(
             CheckKind::UnnecessaryGeneratorList,
@@ -50,8 +61,13 @@ pub fn unnecessary_generator_list(expr: &Expr, func: &Expr, args: &[Expr]) -> Op
 }
 
 /// C401 (`set(generator)`)
-pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    let argument = exactly_one_argument_with_matching_function("set", func, args)?;
+pub fn unnecessary_generator_set(
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Check> {
+    let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
         return Some(Check::new(
             CheckKind::UnnecessaryGeneratorSet,
@@ -62,8 +78,13 @@ pub fn unnecessary_generator_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Opt
 }
 
 /// C402 (`dict((x, y) for x, y in iterable)`)
-pub fn unnecessary_generator_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    let argument = exactly_one_argument_with_matching_function("dict", func, args)?;
+pub fn unnecessary_generator_dict(
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Check> {
+    let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     if let ExprKind::GeneratorExp { elt, .. } = argument {
         match &elt.node {
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
@@ -83,8 +104,9 @@ pub fn unnecessary_list_comprehension_set(
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
+    keywords: &[Keyword],
 ) -> Option<Check> {
-    let argument = exactly_one_argument_with_matching_function("set", func, args)?;
+    let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::ListComp { .. } = &argument {
         return Some(Check::new(
             CheckKind::UnnecessaryListComprehensionSet,
@@ -99,8 +121,9 @@ pub fn unnecessary_list_comprehension_dict(
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
+    keywords: &[Keyword],
 ) -> Option<Check> {
-    let argument = exactly_one_argument_with_matching_function("dict", func, args)?;
+    let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     if let ExprKind::ListComp { elt, .. } = &argument {
         match &elt.node {
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
@@ -116,8 +139,13 @@ pub fn unnecessary_list_comprehension_dict(
 }
 
 /// C405 (`set([1, 2])`)
-pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    let argument = exactly_one_argument_with_matching_function("set", func, args)?;
+pub fn unnecessary_literal_set(
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Check> {
+    let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     let kind = match argument {
         ExprKind::List { .. } => "list",
         ExprKind::Tuple { .. } => "tuple",
@@ -130,8 +158,13 @@ pub fn unnecessary_literal_set(expr: &Expr, func: &Expr, args: &[Expr]) -> Optio
 }
 
 /// C406 (`dict([(1, 2)])`)
-pub fn unnecessary_literal_dict(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    let argument = exactly_one_argument_with_matching_function("dict", func, args)?;
+pub fn unnecessary_literal_dict(
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Check> {
+    let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     let (kind, elts) = match argument {
         ExprKind::Tuple { elts, .. } => ("tuple", elts),
         ExprKind::List { elts, .. } => ("list", elts),

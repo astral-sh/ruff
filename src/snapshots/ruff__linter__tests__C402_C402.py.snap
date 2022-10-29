@@ -5,9 +5,9 @@ expression: checks
 - kind: UnnecessaryGeneratorDict
   location:
     row: 1
-    column: 5
+    column: 1
   end_location:
     row: 1
-    column: 35
+    column: 31
   fix: ~
 
