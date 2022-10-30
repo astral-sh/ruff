@@ -9,7 +9,7 @@ def f_dict_literal(x={}):
     pass
 
 
-def f_set_literal(x={}):
+def f_set_literal(x={0}):
     pass
 
 

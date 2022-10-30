@@ -24,7 +24,7 @@ expression: checks
     column: 21
   end_location:
     row: 12
-    column: 23
+    column: 24
   fix: ~
 - kind: MutableArgumentDefault
   location:
