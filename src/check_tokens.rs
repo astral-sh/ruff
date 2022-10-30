@@ -2,9 +2,9 @@
 
 use rustpython_parser::lexer::{LexResult, Tok};
 
-use crate::ast::operations::SourceCodeLocator;
 use crate::checks::{Check, CheckCode};
 use crate::flake8_quotes::docstring_detection::StateMachine;
+use crate::source_code_locator::SourceCodeLocator;
 use crate::{flake8_quotes, pycodestyle, Settings};
 
 pub fn check_tokens(

@@ -4,9 +4,9 @@ use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::helpers;
-use crate::ast::operations::SourceCodeLocator;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::source_code_locator::SourceCodeLocator;
 
 /// Generate a fix to remove a base from a ClassDef statement.
 pub fn remove_class_def_base(

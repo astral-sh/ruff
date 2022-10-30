@@ -12,7 +12,7 @@ use rustpython_parser::ast::{
 use rustpython_parser::parser;
 
 use crate::ast::helpers::{extract_handler_names, match_name_or_attr, SubscriptKind};
-use crate::ast::operations::{extract_all_names, SourceCodeLocator};
+use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
     Binding, BindingContext, BindingKind, CheckLocator, FunctionScope, ImportKind, Range, Scope,
@@ -27,6 +27,7 @@ use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::settings::types::PythonVersion;
 use crate::settings::Settings;
+use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print, pep8_naming,

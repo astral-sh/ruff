@@ -9,7 +9,6 @@ use log::debug;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::{lexer, parser};
 
-use crate::ast::operations::SourceCodeLocator;
 use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::autofix::fixer::fix_file;
@@ -21,6 +20,7 @@ use crate::code_gen::SourceGenerator;
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::settings::Settings;
+use crate::source_code_locator::SourceCodeLocator;
 use crate::{cache, fs, noqa};
 
 /// Collect tokens up to and including the first error.
