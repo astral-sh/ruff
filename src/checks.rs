@@ -78,6 +78,7 @@ pub enum CheckCode {
     A003,
     // flake8-bugbear
     B002,
+    B006,
     B007,
     B011,
     B013,
@@ -287,6 +288,7 @@ pub enum CheckKind {
     BuiltinAttributeShadowing(String),
     // flake8-bugbear
     UnaryPrefixIncrement,
+    MutableArgumentDefault,
     UnusedLoopControlVariable(String),
     DoNotAssertFalse,
     RedundantTupleInExceptionHandler(String),
@@ -465,6 +467,7 @@ impl CheckCode {
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-bugbear
             CheckCode::B002 => CheckKind::UnaryPrefixIncrement,
+            CheckCode::B006 => CheckKind::MutableArgumentDefault,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
             CheckCode::B013 => {
@@ -655,6 +658,7 @@ impl CheckCode {
             CheckCode::A002 => CheckCategory::Flake8Builtins,
             CheckCode::A003 => CheckCategory::Flake8Builtins,
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
+            CheckCode::B006 => CheckCategory::Flake8Bugbear,
             CheckCode::B007 => CheckCategory::Flake8Bugbear,
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
             CheckCode::B013 => CheckCategory::Flake8Bugbear,
@@ -811,6 +815,7 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-bugbear
             CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
+            CheckKind::MutableArgumentDefault => &CheckCode::B006,
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
             CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
@@ -1067,6 +1072,7 @@ impl CheckKind {
             }
             // flake8-bugbear
             CheckKind::UnaryPrefixIncrement => "Python does not support the unary prefix increment. Writing `++n` is equivalent to `+(+(n))`, which equals `n`. You meant `n += 1`.".to_string(),
+            CheckKind::MutableArgumentDefault => "Do not use mutable data structures for argument defaults.".to_string(),
             CheckKind::UnusedLoopControlVariable(name) => format!("Loop control variable `{name}` not used within the loop body. If this is intended, start the name with an underscore."),
             CheckKind::DoNotAssertFalse => {
                 "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"

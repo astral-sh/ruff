@@ -1502,6 +1502,9 @@ where
             self.checks
                 .extend(pyflakes::checks::duplicate_arguments(arguments));
         }
+        if self.settings.enabled.contains(&CheckCode::B006) {
+            flake8_bugbear::plugins::mutable_argument_default(self, arguments)
+        }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them upstream.
         for arg in &arguments.posonlyargs {
