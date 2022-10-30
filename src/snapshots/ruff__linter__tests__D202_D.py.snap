@@ -3,24 +3,6 @@ source: src/linter.rs
 expression: checks
 ---
 - kind:
-    NoBlankLineAfterFunction: 0
-  location:
-    row: 79
-    column: 5
-  end_location:
-    row: 79
-    column: 33
-  fix:
-    patch:
-      content: ""
-      location:
-        row: 81
-        column: 1
-      end_location:
-        row: 80
-        column: 1
-    applied: false
-- kind:
     NoBlankLineAfterFunction: 1
   location:
     row: 137
@@ -54,24 +36,6 @@ expression: checks
         column: 1
       end_location:
         row: 148
-        column: 1
-    applied: false
-- kind:
-    NoBlankLineAfterFunction: 0
-  location:
-    row: 453
-    column: 5
-  end_location:
-    row: 453
-    column: 24
-  fix:
-    patch:
-      content: ""
-      location:
-        row: 455
-        column: 1
-      end_location:
-        row: 454
         column: 1
     applied: false
 

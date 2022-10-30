@@ -208,15 +208,13 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                         .skip(1)
                         .take_while(|line| line.trim().is_empty())
                         .count();
-                    // Report a D202 violation if the docstring is followed by a blank line and the
-                    // blank line is not itself followed by an inner function or class.
-                    let expected_blank_lines_after =
-                        if INNER_FUNCTION_OR_CLASS_REGEX.is_match(after) {
-                            1
-                        } else {
-                            0
-                        };
-                    if blank_lines_after != expected_blank_lines_after {
+
+                    // Avoid D202 violations for blank lines followed by inner functions or classes.
+                    if blank_lines_after == 1 && INNER_FUNCTION_OR_CLASS_REGEX.is_match(after) {
+                        return;
+                    }
+
+                    if blank_lines_after != 0 {
                         let mut check = Check::new(
                             CheckKind::NoBlankLineAfterFunction(blank_lines_after),
                             Range::from_located(docstring),
@@ -224,10 +222,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                         if checker.patch() {
                             // Delete the blank line after the docstring.
                             check.amend(Fix::deletion(
-                                Location::new(
-                                    docstring.location.row() + 1 + expected_blank_lines_after,
-                                    1,
-                                ),
+                                Location::new(docstring.location.row() + 1, 1),
                                 Location::new(docstring.location.row() + 1 + blank_lines_after, 1),
                             ));
                         }
