@@ -125,6 +125,28 @@ pub struct SourceCodeLocator<'a> {
     offsets: OnceCell<Vec<Vec<usize>>>,
 }
 
+pub fn compute_offsets(contents: &str) -> Vec<Vec<usize>> {
+    let mut offsets = vec![vec![]];
+    let mut line_index = 0;
+    let mut char_index = 0;
+    let mut newline = false;
+    for (i, char) in contents.char_indices() {
+        offsets[line_index].push(i);
+
+        newline = char == '\n';
+        if newline {
+            line_index += 1;
+            offsets.push(vec![]);
+            char_index = i + char.len_utf8();
+        }
+    }
+    // If we end in a newline, add an extra character to indicate the start of that line.
+    if newline {
+        offsets[line_index].push(char_index);
+    }
+    offsets
+}
+
 impl<'a> SourceCodeLocator<'a> {
     pub fn new(contents: &'a str) -> Self {
         SourceCodeLocator {
@@ -133,31 +155,8 @@ impl<'a> SourceCodeLocator<'a> {
         }
     }
 
-    fn compute_offsets(content: &str) -> Vec<Vec<usize>> {
-        let mut offsets = vec![vec![]];
-        let mut line_index = 0;
-        let mut char_index = 0;
-        let mut newline = false;
-        for (i, char) in content.char_indices() {
-            offsets[line_index].push(i);
-            char_index = i + char.len_utf8();
-
-            newline = char == '\n';
-            if newline {
-                line_index += 1;
-                offsets.push(vec![]);
-            }
-        }
-        // If we end in a newline, add an extra character to indicate the start of that line.
-        if newline {
-            offsets[line_index].push(char_index);
-        }
-        offsets
-    }
-
     fn get_or_init_offsets(&self) -> &Vec<Vec<usize>> {
-        self.offsets
-            .get_or_init(|| Self::compute_offsets(self.contents))
+        self.offsets.get_or_init(|| compute_offsets(self.contents))
     }
 
     pub fn slice_source_code_at(&self, location: &Location) -> &'a str {
