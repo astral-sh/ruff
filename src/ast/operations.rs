@@ -137,15 +137,21 @@ impl<'a> SourceCodeLocator<'a> {
         let mut offsets = vec![vec![]];
         let mut line_index = 0;
         let mut char_index = 0;
+        let mut newline = false;
         for (i, char) in content.char_indices() {
             offsets[line_index].push(i);
-            if char == '\n' {
+            char_index = i + char.len_utf8();
+
+            newline = char == '\n';
+            if newline {
                 line_index += 1;
                 offsets.push(vec![]);
             }
-            char_index = i + char.len_utf8();
         }
-        offsets[line_index].push(char_index);
+        // If we end in a newline, add an extra character to indicate the start of that line.
+        if newline {
+            offsets[line_index].push(char_index);
+        }
         offsets
     }
 
@@ -191,6 +197,19 @@ mod tests {
 
     #[test]
     fn source_code_locator_init() {
+        let content = "x = 1";
+        let locator = SourceCodeLocator::new(content);
+        let offsets = locator.get_or_init_offsets();
+        assert_eq!(offsets.len(), 1);
+        assert_eq!(offsets[0], [0, 1, 2, 3, 4]);
+
+        let content = "x = 1\n";
+        let locator = SourceCodeLocator::new(content);
+        let offsets = locator.get_or_init_offsets();
+        assert_eq!(offsets.len(), 2);
+        assert_eq!(offsets[0], [0, 1, 2, 3, 4, 5]);
+        assert_eq!(offsets[1], [6]);
+
         let content = "x = 1\ny = 2\nz = x + y\n";
         let locator = SourceCodeLocator::new(content);
         let offsets = locator.get_or_init_offsets();
@@ -206,6 +225,6 @@ mod tests {
         assert_eq!(offsets.len(), 3);
         assert_eq!(offsets[0], [0, 1, 2, 5]);
         assert_eq!(offsets[1], [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-        assert_eq!(offsets[2], [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]);
+        assert_eq!(offsets[2], [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
     }
 }
