@@ -5,52 +5,52 @@ expression: checks
 - kind: UnnecessaryAbspath
   location:
     row: 3
-    column: 5
+    column: 4
   end_location:
     row: 3
-    column: 22
+    column: 21
   fix:
     patch:
       content: __file__
       location:
         row: 3
-        column: 5
+        column: 4
       end_location:
         row: 3
-        column: 22
+        column: 21
     applied: false
 - kind: UnnecessaryAbspath
   location:
     row: 9
-    column: 5
+    column: 4
   end_location:
     row: 9
-    column: 30
+    column: 29
   fix:
     patch:
       content: __file__
       location:
         row: 9
-        column: 5
+        column: 4
       end_location:
         row: 9
-        column: 30
+        column: 29
     applied: false
 - kind: UnnecessaryAbspath
   location:
     row: 15
-    column: 5
+    column: 4
   end_location:
     row: 15
-    column: 27
+    column: 26
   fix:
     patch:
       content: __file__
       location:
         row: 15
-        column: 5
+        column: 4
       end_location:
         row: 15
-        column: 27
+        column: 26
     applied: false
 

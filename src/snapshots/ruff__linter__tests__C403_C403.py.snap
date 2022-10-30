@@ -5,9 +5,9 @@ expression: checks
 - kind: UnnecessaryListComprehensionSet
   location:
     row: 1
-    column: 5
+    column: 4
   end_location:
     row: 1
-    column: 31
+    column: 30
   fix: ~
 

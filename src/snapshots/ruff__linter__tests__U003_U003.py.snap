@@ -6,90 +6,90 @@ expression: checks
     TypeOfPrimitive: Str
   location:
     row: 1
-    column: 1
+    column: 0
   end_location:
     row: 1
-    column: 9
+    column: 8
   fix:
     patch:
       content: str
       location:
         row: 1
-        column: 1
+        column: 0
       end_location:
         row: 1
-        column: 9
+        column: 8
     applied: false
 - kind:
     TypeOfPrimitive: Bytes
   location:
     row: 2
-    column: 1
+    column: 0
   end_location:
     row: 2
-    column: 10
+    column: 9
   fix:
     patch:
       content: bytes
       location:
         row: 2
-        column: 1
+        column: 0
       end_location:
         row: 2
-        column: 10
+        column: 9
     applied: false
 - kind:
     TypeOfPrimitive: Int
   location:
     row: 3
-    column: 1
+    column: 0
   end_location:
     row: 3
-    column: 8
+    column: 7
   fix:
     patch:
       content: int
       location:
         row: 3
-        column: 1
+        column: 0
       end_location:
         row: 3
-        column: 8
+        column: 7
     applied: false
 - kind:
     TypeOfPrimitive: Float
   location:
     row: 4
-    column: 1
+    column: 0
   end_location:
     row: 4
-    column: 9
+    column: 8
   fix:
     patch:
       content: float
       location:
         row: 4
-        column: 1
+        column: 0
       end_location:
         row: 4
-        column: 9
+        column: 8
     applied: false
 - kind:
     TypeOfPrimitive: Complex
   location:
     row: 5
-    column: 1
+    column: 0
   end_location:
     row: 5
-    column: 9
+    column: 8
   fix:
     patch:
       content: complex
       location:
         row: 5
-        column: 1
+        column: 0
       end_location:
         row: 5
-        column: 9
+        column: 8
     applied: false
 

@@ -6,18 +6,18 @@ expression: checks
     SectionUnderlineAfterName: Returns
   location:
     row: 85
-    column: 5
+    column: 4
   end_location:
     row: 92
-    column: 8
+    column: 7
   fix:
     patch:
       content: ""
       location:
         row: 88
-        column: 1
+        column: 0
       end_location:
         row: 89
-        column: 1
+        column: 0
     applied: false
 

@@ -137,7 +137,7 @@ pub fn to_absolute(relative: &Location, base: &Location) -> Location {
     if relative.row() == 1 {
         Location::new(
             relative.row() + base.row() - 1,
-            relative.column() + base.column() - 1,
+            relative.column() + base.column(),
         )
     } else {
         Location::new(relative.row() + base.row() - 1, relative.column())

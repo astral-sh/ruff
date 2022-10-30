@@ -28,7 +28,7 @@ pub fn leading_space(line: &str) -> String {
 pub fn indentation<'a>(checker: &'a Checker, docstring: &Expr) -> &'a str {
     let range = Range::from_located(docstring);
     checker.locator.slice_source_code_range(&Range {
-        location: Location::new(range.location.row(), 1),
+        location: Location::new(range.location.row(), 0),
         end_location: Location::new(range.location.row(), range.location.column()),
     })
 }

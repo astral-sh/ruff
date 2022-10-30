@@ -6,54 +6,54 @@ expression: checks
     OneBlankLineBeforeClass: 0
   location:
     row: 156
-    column: 5
+    column: 4
   end_location:
     row: 156
-    column: 33
+    column: 32
   fix:
     patch:
       content: "\n"
       location:
         row: 156
-        column: 1
+        column: 0
       end_location:
         row: 156
-        column: 1
+        column: 0
     applied: false
 - kind:
     OneBlankLineBeforeClass: 0
   location:
     row: 187
-    column: 5
+    column: 4
   end_location:
     row: 187
-    column: 46
+    column: 45
   fix:
     patch:
       content: "\n"
       location:
         row: 187
-        column: 1
+        column: 0
       end_location:
         row: 187
-        column: 1
+        column: 0
     applied: false
 - kind:
     OneBlankLineBeforeClass: 0
   location:
     row: 521
-    column: 5
+    column: 4
   end_location:
     row: 527
-    column: 8
+    column: 7
   fix:
     patch:
       content: "\n"
       location:
         row: 521
-        column: 1
+        column: 0
       end_location:
         row: 521
-        column: 1
+        column: 0
     applied: false
 

@@ -5,52 +5,52 @@ expression: checks
 - kind: NoSurroundingWhitespace
   location:
     row: 283
-    column: 5
+    column: 4
   end_location:
     row: 283
-    column: 34
+    column: 33
   fix:
     patch:
       content: Whitespace at the end.
       location:
         row: 283
-        column: 8
+        column: 7
       end_location:
         row: 283
-        column: 31
+        column: 30
     applied: false
 - kind: NoSurroundingWhitespace
   location:
     row: 288
-    column: 5
+    column: 4
   end_location:
     row: 288
-    column: 38
+    column: 37
   fix:
     patch:
       content: Whitespace at everywhere.
       location:
         row: 288
-        column: 8
+        column: 7
       end_location:
         row: 288
-        column: 35
+        column: 34
     applied: false
 - kind: NoSurroundingWhitespace
   location:
     row: 294
-    column: 5
+    column: 4
   end_location:
     row: 297
-    column: 8
+    column: 7
   fix:
     patch:
       content: Whitespace at the beginning.
       location:
         row: 294
-        column: 8
+        column: 7
       end_location:
         row: 294
-        column: 37
+        column: 36
     applied: false
 

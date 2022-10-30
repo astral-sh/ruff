@@ -5,9 +5,9 @@ expression: checks
 - kind: UnnecessaryListComprehensionDict
   location:
     row: 1
-    column: 1
+    column: 0
   end_location:
     row: 1
-    column: 33
+    column: 32
   fix: ~
 

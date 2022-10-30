@@ -69,19 +69,18 @@ fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> 
 
         if fix.patch.location.row() > last_pos.row() {
             if last_pos.row() > 0 || last_pos.column() > 0 {
-                output.push_str(&lines[last_pos.row() - 1][last_pos.column() - 1..]);
+                output.push_str(&lines[last_pos.row() - 1][last_pos.column()..]);
                 output.push('\n');
             }
             for line in &lines[last_pos.row()..fix.patch.location.row() - 1] {
                 output.push_str(line);
                 output.push('\n');
             }
-            output
-                .push_str(&lines[fix.patch.location.row() - 1][..fix.patch.location.column() - 1]);
+            output.push_str(&lines[fix.patch.location.row() - 1][..fix.patch.location.column()]);
             output.push_str(&fix.patch.content);
         } else {
             output.push_str(
-                &lines[last_pos.row() - 1][last_pos.column() - 1..fix.patch.location.column() - 1],
+                &lines[last_pos.row() - 1][last_pos.column()..fix.patch.location.column()],
             );
             output.push_str(&fix.patch.content);
         }
@@ -95,7 +94,7 @@ fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> 
         && (last_pos.row() - 1) < lines.len()
         && (last_pos.row() > 0 || last_pos.column() > 0)
     {
-        output.push_str(&lines[last_pos.row() - 1][last_pos.column() - 1..]);
+        output.push_str(&lines[last_pos.row() - 1][last_pos.column()..]);
         output.push('\n');
     }
     if last_pos.row() < lines.len() {
@@ -133,8 +132,8 @@ mod tests {
         let mut fixes = vec![Fix {
             patch: Patch {
                 content: "Bar".to_string(),
-                location: Location::new(1, 9),
-                end_location: Location::new(1, 15),
+                location: Location::new(1, 8),
+                end_location: Location::new(1, 14),
             },
             applied: false,
         }];
@@ -159,8 +158,8 @@ mod tests {
         let mut fixes = vec![Fix {
             patch: Patch {
                 content: "".to_string(),
-                location: Location::new(1, 8),
-                end_location: Location::new(1, 16),
+                location: Location::new(1, 7),
+                end_location: Location::new(1, 15),
             },
             applied: false,
         }];
@@ -186,16 +185,16 @@ mod tests {
             Fix {
                 patch: Patch {
                     content: "".to_string(),
-                    location: Location::new(1, 8),
-                    end_location: Location::new(1, 17),
+                    location: Location::new(1, 7),
+                    end_location: Location::new(1, 16),
                 },
                 applied: false,
             },
             Fix {
                 patch: Patch {
                     content: "".to_string(),
-                    location: Location::new(1, 17),
-                    end_location: Location::new(1, 24),
+                    location: Location::new(1, 16),
+                    end_location: Location::new(1, 23),
                 },
                 applied: false,
             },
@@ -222,16 +221,16 @@ mod tests {
             Fix {
                 patch: Patch {
                     content: "".to_string(),
-                    location: Location::new(1, 8),
-                    end_location: Location::new(1, 16),
+                    location: Location::new(1, 7),
+                    end_location: Location::new(1, 15),
                 },
                 applied: false,
             },
             Fix {
                 patch: Patch {
                     content: "ignored".to_string(),
-                    location: Location::new(1, 10),
-                    end_location: Location::new(1, 12),
+                    location: Location::new(1, 9),
+                    end_location: Location::new(1, 11),
                 },
                 applied: false,
             },

@@ -35,8 +35,8 @@ pub fn not_missing(
                 checker.add_check(Check::new(
                     CheckKind::PublicModule,
                     Range {
-                        location: Location::new(1, 1),
-                        end_location: Location::new(1, 1),
+                        location: Location::new(1, 0),
+                        end_location: Location::new(1, 0),
                     },
                 ));
             }
@@ -47,8 +47,8 @@ pub fn not_missing(
                 checker.add_check(Check::new(
                     CheckKind::PublicPackage,
                     Range {
-                        location: Location::new(1, 1),
-                        end_location: Location::new(1, 1),
+                        location: Location::new(1, 0),
+                        end_location: Location::new(1, 0),
                     },
                 ));
             }
@@ -181,8 +181,8 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                         if checker.patch() {
                             // Delete the blank line before the docstring.
                             check.amend(Fix::deletion(
-                                Location::new(docstring.location.row() - blank_lines_before, 1),
-                                Location::new(docstring.location.row(), 1),
+                                Location::new(docstring.location.row() - blank_lines_before, 0),
+                                Location::new(docstring.location.row(), 0),
                             ));
                         }
                         checker.add_check(check);
@@ -222,8 +222,8 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                         if checker.patch() {
                             // Delete the blank line after the docstring.
                             check.amend(Fix::deletion(
-                                Location::new(docstring.location.row() + 1, 1),
-                                Location::new(docstring.location.row() + 1 + blank_lines_after, 1),
+                                Location::new(docstring.location.row() + 1, 0),
+                                Location::new(docstring.location.row() + 1 + blank_lines_after, 0),
                             ));
                         }
                         checker.add_check(check);
@@ -268,8 +268,8 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                             if checker.patch() {
                                 // Delete the blank line before the class.
                                 check.amend(Fix::deletion(
-                                    Location::new(docstring.location.row() - blank_lines_before, 1),
-                                    Location::new(docstring.location.row(), 1),
+                                    Location::new(docstring.location.row() - blank_lines_before, 0),
+                                    Location::new(docstring.location.row(), 0),
                                 ));
                             }
                             checker.add_check(check);
@@ -285,8 +285,8 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                                 // Insert one blank line before the class.
                                 check.amend(Fix::replacement(
                                     "\n".to_string(),
-                                    Location::new(docstring.location.row() - blank_lines_before, 1),
-                                    Location::new(docstring.location.row(), 1),
+                                    Location::new(docstring.location.row() - blank_lines_before, 0),
+                                    Location::new(docstring.location.row(), 0),
                                 ));
                             }
                             checker.add_check(check);
@@ -322,10 +322,10 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                             // Insert a blank line before the class (replacing any existing lines).
                             check.amend(Fix::replacement(
                                 "\n".to_string(),
-                                Location::new(docstring.end_location.unwrap().row() + 1, 1),
+                                Location::new(docstring.end_location.unwrap().row() + 1, 0),
                                 Location::new(
                                     docstring.end_location.unwrap().row() + 1 + blank_lines_after,
-                                    1,
+                                    0,
                                 ),
                             ));
                         }
@@ -364,8 +364,8 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
                     // Insert one blank line after the summary (replacing any existing lines).
                     check.amend(Fix::replacement(
                         "\n".to_string(),
-                        Location::new(docstring.location.row() + 1, 1),
-                        Location::new(docstring.location.row() + 1 + blanks_count, 1),
+                        Location::new(docstring.location.row() + 1, 0),
+                        Location::new(docstring.location.row() + 1 + blanks_count, 0),
                     ));
                 }
                 checker.add_check(check);
@@ -416,15 +416,15 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                         let mut check = Check::new(
                             CheckKind::NoUnderIndentation,
                             Range {
-                                location: Location::new(docstring.location.row() + i, 1),
-                                end_location: Location::new(docstring.location.row() + i, 1),
+                                location: Location::new(docstring.location.row() + i, 0),
+                                end_location: Location::new(docstring.location.row() + i, 0),
                             },
                         );
                         if checker.patch() {
                             check.amend(Fix::replacement(
                                 helpers::clean(&docstring_indent),
-                                Location::new(docstring.location.row() + i, 1),
-                                Location::new(docstring.location.row() + i, 1 + line_indent.len()),
+                                Location::new(docstring.location.row() + i, 0),
+                                Location::new(docstring.location.row() + i, line_indent.len()),
                             ));
                         }
                         checker.add_check(check);
@@ -465,18 +465,15 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                             let mut check = Check::new(
                                 CheckKind::NoOverIndentation,
                                 Range {
-                                    location: Location::new(docstring.location.row() + i, 1),
-                                    end_location: Location::new(docstring.location.row() + i, 1),
+                                    location: Location::new(docstring.location.row() + i, 0),
+                                    end_location: Location::new(docstring.location.row() + i, 0),
                                 },
                             );
                             if checker.patch() {
                                 check.amend(Fix::replacement(
                                     helpers::clean(&docstring_indent),
-                                    Location::new(docstring.location.row() + i, 1),
-                                    Location::new(
-                                        docstring.location.row() + i,
-                                        1 + line_indent.len(),
-                                    ),
+                                    Location::new(docstring.location.row() + i, 0),
+                                    Location::new(docstring.location.row() + i, line_indent.len()),
                                 ));
                             }
                             checker.add_check(check);
@@ -492,15 +489,15 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                         let mut check = Check::new(
                             CheckKind::NoOverIndentation,
                             Range {
-                                location: Location::new(docstring.location.row() + i, 1),
-                                end_location: Location::new(docstring.location.row() + i, 1),
+                                location: Location::new(docstring.location.row() + i, 0),
+                                end_location: Location::new(docstring.location.row() + i, 0),
                             },
                         );
                         if checker.patch() {
                             check.amend(Fix::replacement(
                                 helpers::clean(&docstring_indent),
-                                Location::new(docstring.location.row() + i, 1),
-                                Location::new(docstring.location.row() + i, 1 + line_indent.len()),
+                                Location::new(docstring.location.row() + i, 0),
+                                Location::new(docstring.location.row() + i, line_indent.len()),
                             ));
                         }
                         checker.add_check(check);
@@ -921,7 +918,7 @@ fn blanks_and_section_underline(
                 );
                 check.amend(Fix::insertion(
                     content,
-                    Location::new(docstring.location.row() + context.original_index + 1, 1),
+                    Location::new(docstring.location.row() + context.original_index + 1, 0),
                 ));
             }
             checker.add_check(check);
@@ -955,7 +952,7 @@ fn blanks_and_section_underline(
                 );
                 check.amend(Fix::insertion(
                     content,
-                    Location::new(docstring.location.row() + context.original_index + 1, 1),
+                    Location::new(docstring.location.row() + context.original_index + 1, 0),
                 ));
             }
             checker.add_check(check);
@@ -971,13 +968,13 @@ fn blanks_and_section_underline(
                 if checker.patch() {
                     // Delete any blank lines between the header and content.
                     check.amend(Fix::deletion(
-                        Location::new(docstring.location.row() + context.original_index + 1, 1),
+                        Location::new(docstring.location.row() + context.original_index + 1, 0),
                         Location::new(
                             docstring.location.row()
                                 + context.original_index
                                 + 1
                                 + blank_lines_after_header,
-                            1,
+                            0,
                         ),
                     ));
                 }
@@ -994,13 +991,13 @@ fn blanks_and_section_underline(
                 if checker.patch() {
                     // Delete any blank lines between the header and the underline.
                     check.amend(Fix::deletion(
-                        Location::new(docstring.location.row() + context.original_index + 1, 1),
+                        Location::new(docstring.location.row() + context.original_index + 1, 0),
                         Location::new(
                             docstring.location.row()
                                 + context.original_index
                                 + 1
                                 + blank_lines_after_header,
-                            1,
+                            0,
                         ),
                     ));
                 }
@@ -1036,7 +1033,7 @@ fn blanks_and_section_underline(
                                 + context.original_index
                                 + 1
                                 + blank_lines_after_header,
-                            1,
+                            0,
                         ),
                         Location::new(
                             docstring.location.row()
@@ -1044,7 +1041,7 @@ fn blanks_and_section_underline(
                                 + 1
                                 + blank_lines_after_header
                                 + 1,
-                            1,
+                            0,
                         ),
                     ));
                 };
@@ -1069,7 +1066,7 @@ fn blanks_and_section_underline(
                                 + context.original_index
                                 + 1
                                 + blank_lines_after_header,
-                            1,
+                            0,
                         ),
                         Location::new(
                             docstring.location.row()
@@ -1117,7 +1114,7 @@ fn blanks_and_section_underline(
                                         + context.original_index
                                         + 1
                                         + line_after_dashes_index,
-                                    1,
+                                    0,
                                 ),
                                 Location::new(
                                     docstring.location.row()
@@ -1125,7 +1122,7 @@ fn blanks_and_section_underline(
                                         + 1
                                         + line_after_dashes_index
                                         + blank_lines_after_dashes,
-                                    1,
+                                    0,
                                 ),
                             ));
                         }
@@ -1179,11 +1176,11 @@ fn common_section(
                             capitalized_section_name,
                             Location::new(
                                 docstring.location.row() + context.original_index,
-                                1 + section_name_start,
+                                *section_name_start,
                             ),
                             Location::new(
                                 docstring.location.row() + context.original_index,
-                                1 + section_name_start + section_name_length,
+                                section_name_start + section_name_length,
                             ),
                         ))
                     }
@@ -1205,10 +1202,10 @@ fn common_section(
                 // Replace the existing indentation with whitespace of the appropriate length.
                 check.amend(Fix::replacement(
                     helpers::clean(&indentation),
-                    Location::new(docstring.location.row() + context.original_index, 1),
+                    Location::new(docstring.location.row() + context.original_index, 0),
                     Location::new(
                         docstring.location.row() + context.original_index,
-                        1 + leading_space.len(),
+                        leading_space.len(),
                     ),
                 ));
             };
@@ -1237,7 +1234,7 @@ fn common_section(
                                 + context.original_index
                                 + 1
                                 + context.following_lines.len(),
-                            1,
+                            0,
                         ),
                     ));
                 }
@@ -1258,7 +1255,7 @@ fn common_section(
                                 + context.original_index
                                 + 1
                                 + context.following_lines.len(),
-                            1,
+                            0,
                         ),
                     ));
                 }
@@ -1277,7 +1274,7 @@ fn common_section(
                 // Add a blank line before the section.
                 check.amend(Fix::insertion(
                     "\n".to_string(),
-                    Location::new(docstring.location.row() + context.original_index, 1),
+                    Location::new(docstring.location.row() + context.original_index, 0),
                 ));
             }
             checker.add_check(check)
@@ -1444,11 +1441,11 @@ fn numpy_section(checker: &mut Checker, definition: &Definition, context: &Secti
                     check.amend(Fix::deletion(
                         Location::new(
                             docstring.location.row() + context.original_index,
-                            1 + suffix_start,
+                            *suffix_start,
                         ),
                         Location::new(
                             docstring.location.row() + context.original_index,
-                            1 + suffix_start + suffix_length,
+                            suffix_start + suffix_length,
                         ),
                     ));
                 }
@@ -1494,11 +1491,11 @@ fn google_section(checker: &mut Checker, definition: &Definition, context: &Sect
                         ":".to_string(),
                         Location::new(
                             docstring.location.row() + context.original_index,
-                            1 + suffix_start,
+                            *suffix_start,
                         ),
                         Location::new(
                             docstring.location.row() + context.original_index,
-                            1 + suffix_start + suffix_length,
+                            suffix_start + suffix_length,
                         ),
                     ));
                 }

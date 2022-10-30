@@ -5,17 +5,17 @@ expression: checks
 - kind: InvalidFirstArgumentNameForMethod
   location:
     row: 5
-    column: 20
+    column: 19
   end_location:
     row: 5
-    column: 24
+    column: 23
   fix: ~
 - kind: InvalidFirstArgumentNameForMethod
   location:
     row: 10
-    column: 30
+    column: 29
   end_location:
     row: 10
-    column: 34
+    column: 33
   fix: ~
 

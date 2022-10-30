@@ -5,9 +5,9 @@ expression: checks
 - kind: AvoidQuoteEscape
   location:
     row: 1
-    column: 26
+    column: 25
   end_location:
     row: 1
-    column: 48
+    column: 47
   fix: ~
 

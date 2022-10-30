@@ -6,72 +6,72 @@ expression: checks
     NoneComparison: Eq
   location:
     row: 2
-    column: 11
+    column: 10
   end_location:
     row: 2
-    column: 15
+    column: 14
   fix: ~
 - kind:
     NoneComparison: NotEq
   location:
     row: 5
-    column: 11
+    column: 10
   end_location:
     row: 5
-    column: 15
+    column: 14
   fix: ~
 - kind:
     NoneComparison: Eq
   location:
     row: 8
-    column: 4
+    column: 3
   end_location:
     row: 8
-    column: 8
+    column: 7
   fix: ~
 - kind:
     NoneComparison: NotEq
   location:
     row: 11
-    column: 4
+    column: 3
   end_location:
     row: 11
-    column: 8
+    column: 7
   fix: ~
 - kind:
     NoneComparison: Eq
   location:
     row: 14
-    column: 14
+    column: 13
   end_location:
     row: 14
-    column: 18
+    column: 17
   fix: ~
 - kind:
     NoneComparison: NotEq
   location:
     row: 17
-    column: 14
+    column: 13
   end_location:
     row: 17
-    column: 18
+    column: 17
   fix: ~
 - kind:
     NoneComparison: NotEq
   location:
     row: 20
-    column: 4
+    column: 3
   end_location:
     row: 20
-    column: 8
+    column: 7
   fix: ~
 - kind:
     NoneComparison: Eq
   location:
     row: 23
-    column: 4
+    column: 3
   end_location:
     row: 23
-    column: 8
+    column: 7
   fix: ~
 

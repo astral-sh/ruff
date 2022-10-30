@@ -8,19 +8,19 @@ expression: checks
       - assertEqual
   location:
     row: 6
-    column: 9
+    column: 8
   end_location:
     row: 6
-    column: 26
+    column: 25
   fix:
     patch:
       content: self.assertEqual
       location:
         row: 6
-        column: 9
+        column: 8
       end_location:
         row: 6
-        column: 26
+        column: 25
     applied: false
 - kind:
     DeprecatedUnittestAlias:
@@ -28,19 +28,19 @@ expression: checks
       - assertEqual
   location:
     row: 7
-    column: 9
+    column: 8
   end_location:
     row: 7
-    column: 26
+    column: 25
   fix:
     patch:
       content: self.assertEqual
       location:
         row: 7
-        column: 9
+        column: 8
       end_location:
         row: 7
-        column: 26
+        column: 25
     applied: false
 - kind:
     DeprecatedUnittestAlias:
@@ -48,19 +48,19 @@ expression: checks
       - assertAlmostEqual
   location:
     row: 9
-    column: 9
+    column: 8
   end_location:
     row: 9
-    column: 35
+    column: 34
   fix:
     patch:
       content: self.assertAlmostEqual
       location:
         row: 9
-        column: 9
+        column: 8
       end_location:
         row: 9
-        column: 35
+        column: 34
     applied: false
 - kind:
     DeprecatedUnittestAlias:
@@ -68,18 +68,18 @@ expression: checks
       - assertNotRegex
   location:
     row: 10
-    column: 9
+    column: 8
   end_location:
     row: 10
-    column: 36
+    column: 35
   fix:
     patch:
       content: self.assertNotRegex
       location:
         row: 10
-        column: 9
+        column: 8
       end_location:
         row: 10
-        column: 36
+        column: 35
     applied: false
 

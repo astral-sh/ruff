@@ -5,9 +5,9 @@ expression: checks
 - kind: NoSignature
   location:
     row: 373
-    column: 5
+    column: 4
   end_location:
     row: 373
-    column: 31
+    column: 30
   fix: ~
 

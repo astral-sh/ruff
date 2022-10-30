@@ -8,27 +8,27 @@ expression: checks
       - false
   location:
     row: 5
-    column: 1
+    column: 0
   end_location:
     row: 8
-    column: 2
+    column: 1
   fix:
     patch:
       content: "from models import (\n    Fruit,\n)"
       location:
         row: 5
-        column: 1
+        column: 0
       end_location:
         row: 8
-        column: 2
+        column: 1
     applied: false
 - kind:
     UndefinedName: Bar
   location:
     row: 25
-    column: 19
+    column: 18
   end_location:
     row: 25
-    column: 22
+    column: 21
   fix: ~
 

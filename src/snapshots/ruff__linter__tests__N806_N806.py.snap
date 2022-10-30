@@ -6,18 +6,18 @@ expression: checks
     NonLowercaseVariableInFunction: Camel
   location:
     row: 3
-    column: 5
+    column: 4
   end_location:
     row: 3
-    column: 10
+    column: 9
   fix: ~
 - kind:
     NonLowercaseVariableInFunction: CONSTANT
   location:
     row: 4
-    column: 5
+    column: 4
   end_location:
     row: 4
-    column: 13
+    column: 12
   fix: ~
 

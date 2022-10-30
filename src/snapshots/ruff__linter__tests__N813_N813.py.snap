@@ -8,10 +8,10 @@ expression: checks
       - camel
   location:
     row: 1
-    column: 1
+    column: 0
   end_location:
     row: 1
-    column: 26
+    column: 25
   fix: ~
 - kind:
     CamelcaseImportedAsLowercase:
@@ -19,10 +19,10 @@ expression: checks
       - camelcase
   location:
     row: 2
-    column: 1
+    column: 0
   end_location:
     row: 2
-    column: 39
+    column: 38
   fix: ~
 - kind:
     CamelcaseImportedAsLowercase:
@@ -30,9 +30,9 @@ expression: checks
       - another_camelcase
   location:
     row: 3
-    column: 1
+    column: 0
   end_location:
     row: 3
-    column: 54
+    column: 53
   fix: ~
 

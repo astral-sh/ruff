@@ -8,19 +8,19 @@ expression: checks
       - false
   location:
     row: 2
-    column: 1
+    column: 0
   end_location:
     row: 2
-    column: 21
+    column: 20
   fix:
     patch:
       content: import os
       location:
         row: 2
-        column: 1
+        column: 0
       end_location:
         row: 2
-        column: 21
+        column: 20
     applied: false
 - kind:
     UnusedImport:
@@ -28,19 +28,19 @@ expression: checks
       - false
   location:
     row: 4
-    column: 1
+    column: 0
   end_location:
     row: 8
-    column: 2
+    column: 1
   fix:
     patch:
       content: "from collections import (\n    Counter,\n    namedtuple,\n)"
       location:
         row: 4
-        column: 1
+        column: 0
       end_location:
         row: 8
-        column: 2
+        column: 1
     applied: false
 - kind:
     UnusedImport:
@@ -48,19 +48,19 @@ expression: checks
       - false
   location:
     row: 12
-    column: 1
+    column: 0
   end_location:
     row: 12
-    column: 24
+    column: 23
   fix:
     patch:
       content: ""
       location:
         row: 12
-        column: 1
+        column: 0
       end_location:
         row: 13
-        column: 1
+        column: 0
     applied: false
 - kind:
     UnusedImport:
@@ -68,19 +68,19 @@ expression: checks
       - false
   location:
     row: 33
-    column: 5
+    column: 4
   end_location:
     row: 33
-    column: 18
+    column: 17
   fix:
     patch:
       content: ""
       location:
         row: 33
-        column: 1
+        column: 0
       end_location:
         row: 34
-        column: 1
+        column: 0
     applied: false
 - kind:
     UnusedImport:
@@ -88,19 +88,19 @@ expression: checks
       - false
   location:
     row: 34
-    column: 5
+    column: 4
   end_location:
     row: 34
-    column: 21
+    column: 20
   fix:
     patch:
       content: ""
       location:
         row: 34
-        column: 1
+        column: 0
       end_location:
         row: 35
-        column: 1
+        column: 0
     applied: false
 - kind:
     UnusedImport:
@@ -108,19 +108,19 @@ expression: checks
       - false
   location:
     row: 38
-    column: 5
+    column: 4
   end_location:
     row: 38
-    column: 19
+    column: 18
   fix:
     patch:
       content: ""
       location:
         row: 38
-        column: 1
+        column: 0
       end_location:
         row: 39
-        column: 1
+        column: 0
     applied: false
 - kind:
     UnusedImport:
@@ -128,18 +128,18 @@ expression: checks
       - false
   location:
     row: 53
-    column: 9
+    column: 8
   end_location:
     row: 53
-    column: 22
+    column: 21
   fix:
     patch:
       content: pass
       location:
         row: 53
-        column: 9
+        column: 8
       end_location:
         row: 53
-        column: 22
+        column: 21
     applied: false
 

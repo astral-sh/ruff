@@ -6,63 +6,63 @@ expression: checks
     BuiltinArgumentShadowing: str
   location:
     row: 1
-    column: 11
+    column: 10
   end_location:
     row: 1
-    column: 14
+    column: 13
   fix: ~
 - kind:
     BuiltinArgumentShadowing: type
   location:
     row: 1
-    column: 19
+    column: 18
   end_location:
     row: 1
-    column: 23
+    column: 22
   fix: ~
 - kind:
     BuiltinArgumentShadowing: complex
   location:
     row: 1
-    column: 26
+    column: 25
   end_location:
     row: 1
-    column: 33
+    column: 32
   fix: ~
 - kind:
     BuiltinArgumentShadowing: Exception
   location:
     row: 1
-    column: 35
+    column: 34
   end_location:
     row: 1
-    column: 44
+    column: 43
   fix: ~
 - kind:
     BuiltinArgumentShadowing: getattr
   location:
     row: 1
-    column: 48
+    column: 47
   end_location:
     row: 1
-    column: 55
+    column: 54
   fix: ~
 - kind:
     BuiltinArgumentShadowing: bytes
   location:
     row: 5
-    column: 17
+    column: 16
   end_location:
     row: 5
-    column: 22
+    column: 21
   fix: ~
 - kind:
     BuiltinArgumentShadowing: float
   location:
     row: 9
-    column: 16
+    column: 15
   end_location:
     row: 9
-    column: 21
+    column: 20
   fix: ~
 

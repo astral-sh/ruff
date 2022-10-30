@@ -6,99 +6,99 @@ expression: checks
     UndefinedName: self
   location:
     row: 2
-    column: 12
+    column: 11
   end_location:
     row: 2
+    column: 15
+  fix: ~
+- kind:
+    UndefinedName: self
+  location:
+    row: 6
+    column: 12
+  end_location:
+    row: 6
     column: 16
   fix: ~
 - kind:
     UndefinedName: self
   location:
-    row: 6
-    column: 13
-  end_location:
-    row: 6
-    column: 17
-  fix: ~
-- kind:
-    UndefinedName: self
-  location:
     row: 10
-    column: 9
+    column: 8
   end_location:
     row: 10
-    column: 13
+    column: 12
   fix: ~
 - kind:
     UndefinedName: numeric_string
   location:
     row: 21
-    column: 12
+    column: 11
   end_location:
     row: 21
-    column: 26
+    column: 25
   fix: ~
 - kind:
     UndefinedName: Bar
   location:
     row: 58
-    column: 4
+    column: 3
   end_location:
     row: 58
-    column: 9
+    column: 8
   fix: ~
 - kind:
     UndefinedName: TOMATO
   location:
     row: 83
-    column: 11
+    column: 10
   end_location:
     row: 83
-    column: 17
+    column: 16
   fix: ~
 - kind:
     UndefinedName: B
   location:
     row: 87
-    column: 5
+    column: 4
   end_location:
     row: 87
-    column: 11
+    column: 10
   fix: ~
 - kind:
     UndefinedName: B
   location:
     row: 89
-    column: 5
+    column: 4
   end_location:
     row: 89
-    column: 9
+    column: 8
   fix: ~
 - kind:
     UndefinedName: PEP593Test123
   location:
     row: 114
-    column: 9
+    column: 8
   end_location:
     row: 114
-    column: 24
+    column: 23
   fix: ~
 - kind:
     UndefinedName: foo
   location:
     row: 122
-    column: 14
+    column: 13
   end_location:
     row: 122
-    column: 19
+    column: 18
   fix: ~
 - kind:
     UndefinedName: bar
   location:
     row: 122
-    column: 21
+    column: 20
   end_location:
     row: 122
-    column: 26
+    column: 25
   fix: ~
 

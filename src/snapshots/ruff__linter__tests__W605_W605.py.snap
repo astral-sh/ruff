@@ -6,10 +6,10 @@ expression: checks
     InvalidEscapeSequence: "."
   location:
     row: 2
-    column: 10
+    column: 9
   end_location:
     row: 2
-    column: 11
+    column: 10
   fix: ~
 - kind:
     InvalidEscapeSequence: "."
@@ -24,10 +24,10 @@ expression: checks
     InvalidEscapeSequence: _
   location:
     row: 11
-    column: 6
+    column: 5
   end_location:
     row: 11
-    column: 7
+    column: 6
   fix: ~
 - kind:
     InvalidEscapeSequence: _

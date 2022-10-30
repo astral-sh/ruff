@@ -8,10 +8,10 @@ expression: checks
       - 1
   location:
     row: 5
-    column: 5
+    column: 4
   end_location:
     row: 5
-    column: 7
+    column: 6
   fix: ~
 - kind:
     ImportShadowedByLoopVar:
@@ -19,9 +19,9 @@ expression: checks
       - 2
   location:
     row: 8
-    column: 5
+    column: 4
   end_location:
     row: 8
-    column: 9
+    column: 8
   fix: ~
 

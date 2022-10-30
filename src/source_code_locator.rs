@@ -46,14 +46,14 @@ impl<'a> SourceCodeLocator<'a> {
 
     pub fn slice_source_code_at(&self, location: &Location) -> &'a str {
         let offsets = self.get_or_init_offsets();
-        let offset = offsets[location.row() - 1][location.column() - 1];
+        let offset = offsets[location.row() - 1][location.column()];
         &self.contents[offset..]
     }
 
     pub fn slice_source_code_range(&self, range: &Range) -> &'a str {
         let offsets = self.get_or_init_offsets();
-        let start = offsets[range.location.row() - 1][range.location.column() - 1];
-        let end = offsets[range.end_location.row() - 1][range.end_location.column() - 1];
+        let start = offsets[range.location.row() - 1][range.location.column()];
+        let end = offsets[range.end_location.row() - 1][range.end_location.column()];
         &self.contents[start..end]
     }
 
@@ -63,10 +63,10 @@ impl<'a> SourceCodeLocator<'a> {
         inner: &Range,
     ) -> (&'a str, &'a str, &'a str) {
         let offsets = self.get_or_init_offsets();
-        let outer_start = offsets[outer.location.row() - 1][outer.location.column() - 1];
-        let outer_end = offsets[outer.end_location.row() - 1][outer.end_location.column() - 1];
-        let inner_start = offsets[inner.location.row() - 1][inner.location.column() - 1];
-        let inner_end = offsets[inner.end_location.row() - 1][inner.end_location.column() - 1];
+        let outer_start = offsets[outer.location.row() - 1][outer.location.column()];
+        let outer_end = offsets[outer.end_location.row() - 1][outer.end_location.column()];
+        let inner_start = offsets[inner.location.row() - 1][inner.location.column()];
+        let inner_end = offsets[inner.end_location.row() - 1][inner.end_location.column()];
         (
             &self.contents[outer_start..inner_start],
             &self.contents[inner_start..inner_end],

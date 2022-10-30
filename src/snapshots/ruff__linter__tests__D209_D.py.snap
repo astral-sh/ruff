@@ -5,18 +5,18 @@ expression: checks
 - kind: NewLineAfterLastParagraph
   location:
     row: 276
-    column: 5
+    column: 4
   end_location:
     row: 278
-    column: 20
+    column: 19
   fix:
     patch:
       content: "\n    "
       location:
         row: 278
-        column: 17
+        column: 16
       end_location:
         row: 278
-        column: 17
+        column: 16
     applied: false
 

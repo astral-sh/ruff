@@ -5,9 +5,9 @@ expression: checks
 - kind: UnnecessaryGeneratorSet
   location:
     row: 1
-    column: 5
+    column: 4
   end_location:
     row: 1
-    column: 29
+    column: 28
   fix: ~
 

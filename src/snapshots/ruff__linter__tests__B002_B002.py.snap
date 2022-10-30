@@ -5,17 +5,17 @@ expression: checks
 - kind: UnaryPrefixIncrement
   location:
     row: 15
-    column: 9
+    column: 8
   end_location:
     row: 15
-    column: 12
+    column: 11
   fix: ~
 - kind: UnaryPrefixIncrement
   location:
     row: 20
-    column: 12
+    column: 11
   end_location:
     row: 20
-    column: 15
+    column: 14
   fix: ~
 

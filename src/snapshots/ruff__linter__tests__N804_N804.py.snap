@@ -5,9 +5,9 @@ expression: checks
 - kind: InvalidFirstArgumentNameForClassMethod
   location:
     row: 3
-    column: 26
+    column: 25
   end_location:
     row: 3
-    column: 30
+    column: 29
   fix: ~
 

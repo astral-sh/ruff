@@ -5,9 +5,9 @@ expression: checks
 - kind: ModuleImportNotAtTopOfFile
   location:
     row: 24
-    column: 1
+    column: 0
   end_location:
     row: 24
-    column: 9
+    column: 8
   fix: ~
 

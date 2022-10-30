@@ -26,9 +26,9 @@ once_cell = { version = "1.13.1" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/charliermarsh/RustPython.git", rev = "1b253a12705f84972cd76e8dc1cdaaccb233e5a5" }
-rustpython-common = { git = "https://github.com/charliermarsh/RustPython.git", rev = "1b253a12705f84972cd76e8dc1cdaaccb233e5a5" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/charliermarsh/RustPython.git", rev = "1b253a12705f84972cd76e8dc1cdaaccb233e5a5" }
+rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "77b821a1941019fe34f73ce17cea013ae1b98fd0" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "77b821a1941019fe34f73ce17cea013ae1b98fd0" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "77b821a1941019fe34f73ce17cea013ae1b98fd0" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 strum = { version = "0.24.1", features = ["strum_macros"] }

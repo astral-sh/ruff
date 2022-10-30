@@ -6,18 +6,18 @@ expression: checks
     BadQuotesMultilineString: single
   location:
     row: 3
-    column: 5
+    column: 4
   end_location:
     row: 3
-    column: 28
+    column: 27
   fix: ~
 - kind:
     BadQuotesMultilineString: single
   location:
     row: 5
-    column: 23
+    column: 22
   end_location:
     row: 5
-    column: 44
+    column: 43
   fix: ~
 

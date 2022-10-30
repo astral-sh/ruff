@@ -6,36 +6,36 @@ expression: checks
     UsePEP585Annotation: List
   location:
     row: 4
-    column: 10
+    column: 9
   end_location:
     row: 4
-    column: 14
+    column: 13
   fix:
     patch:
       content: list
       location:
         row: 4
-        column: 10
+        column: 9
       end_location:
         row: 4
-        column: 14
+        column: 13
     applied: false
 - kind:
     UsePEP585Annotation: List
   location:
     row: 11
-    column: 10
+    column: 9
   end_location:
     row: 11
-    column: 21
+    column: 20
   fix:
     patch:
       content: list
       location:
         row: 11
-        column: 10
+        column: 9
       end_location:
         row: 11
-        column: 21
+        column: 20
     applied: false
 

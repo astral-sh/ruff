@@ -8,54 +8,54 @@ expression: checks
       - Eq
   location:
     row: 2
-    column: 11
+    column: 10
   end_location:
     row: 2
+    column: 14
+  fix: ~
+- kind:
+    TrueFalseComparison:
+      - false
+      - NotEq
+  location:
+    row: 5
+    column: 10
+  end_location:
+    row: 5
     column: 15
   fix: ~
 - kind:
     TrueFalseComparison:
-      - false
-      - NotEq
-  location:
-    row: 5
-    column: 11
-  end_location:
-    row: 5
-    column: 16
-  fix: ~
-- kind:
-    TrueFalseComparison:
       - true
       - NotEq
   location:
     row: 8
-    column: 4
+    column: 3
   end_location:
     row: 8
+    column: 7
+  fix: ~
+- kind:
+    TrueFalseComparison:
+      - false
+      - Eq
+  location:
+    row: 11
+    column: 3
+  end_location:
+    row: 11
     column: 8
   fix: ~
 - kind:
     TrueFalseComparison:
-      - false
-      - Eq
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 9
-  fix: ~
-- kind:
-    TrueFalseComparison:
       - true
       - Eq
   location:
     row: 14
-    column: 14
+    column: 13
   end_location:
     row: 14
-    column: 18
+    column: 17
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -63,10 +63,10 @@ expression: checks
       - NotEq
   location:
     row: 17
-    column: 14
+    column: 13
   end_location:
     row: 17
-    column: 19
+    column: 18
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -74,10 +74,10 @@ expression: checks
       - Eq
   location:
     row: 20
-    column: 20
+    column: 19
   end_location:
     row: 20
-    column: 24
+    column: 23
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -85,10 +85,10 @@ expression: checks
       - Eq
   location:
     row: 20
-    column: 44
+    column: 43
   end_location:
     row: 20
-    column: 49
+    column: 48
   fix: ~
 - kind:
     TrueFalseComparison:
@@ -96,9 +96,9 @@ expression: checks
       - Eq
   location:
     row: 22
-    column: 5
+    column: 4
   end_location:
     row: 22
-    column: 9
+    column: 8
   fix: ~
 

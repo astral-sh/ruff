@@ -6,18 +6,18 @@ expression: checks
     ImportStarNotPermitted: F634
   location:
     row: 5
-    column: 5
+    column: 4
   end_location:
     row: 5
-    column: 23
+    column: 22
   fix: ~
 - kind:
     ImportStarNotPermitted: F634
   location:
     row: 9
-    column: 5
+    column: 4
   end_location:
     row: 9
-    column: 23
+    column: 22
   fix: ~
 

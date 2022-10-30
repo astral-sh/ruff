@@ -6,27 +6,27 @@ expression: checks
     AmbiguousClassName: l
   location:
     row: 1
-    column: 1
+    column: 0
   end_location:
     row: 5
-    column: 1
+    column: 0
   fix: ~
 - kind:
     AmbiguousClassName: I
   location:
     row: 5
-    column: 1
+    column: 0
   end_location:
     row: 9
-    column: 1
+    column: 0
   fix: ~
 - kind:
     AmbiguousClassName: O
   location:
     row: 9
-    column: 1
+    column: 0
   end_location:
     row: 13
-    column: 1
+    column: 0
   fix: ~
 

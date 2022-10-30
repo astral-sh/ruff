@@ -6,72 +6,72 @@ expression: checks
     UnusedLoopControlVariable: i
   location:
     row: 6
-    column: 5
+    column: 4
   end_location:
     row: 6
-    column: 6
+    column: 5
   fix:
     patch:
       content: _i
       location:
         row: 6
-        column: 5
+        column: 4
       end_location:
         row: 6
-        column: 6
+        column: 5
     applied: false
 - kind:
     UnusedLoopControlVariable: k
   location:
     row: 18
-    column: 13
+    column: 12
   end_location:
     row: 18
-    column: 14
+    column: 13
   fix:
     patch:
       content: _k
       location:
         row: 18
-        column: 13
+        column: 12
       end_location:
         row: 18
-        column: 14
+        column: 13
     applied: false
 - kind:
     UnusedLoopControlVariable: i
   location:
     row: 30
-    column: 5
+    column: 4
   end_location:
     row: 30
-    column: 6
+    column: 5
   fix:
     patch:
       content: _i
       location:
         row: 30
-        column: 5
+        column: 4
       end_location:
         row: 30
-        column: 6
+        column: 5
     applied: false
 - kind:
     UnusedLoopControlVariable: k
   location:
     row: 30
-    column: 13
+    column: 12
   end_location:
     row: 30
-    column: 14
+    column: 13
   fix:
     patch:
       content: _k
       location:
         row: 30
-        column: 13
+        column: 12
       end_location:
         row: 30
-        column: 14
+        column: 13
     applied: false
 

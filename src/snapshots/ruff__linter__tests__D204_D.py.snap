@@ -6,36 +6,36 @@ expression: checks
     OneBlankLineAfterClass: 0
   location:
     row: 176
-    column: 5
+    column: 4
   end_location:
     row: 176
-    column: 25
+    column: 24
   fix:
     patch:
       content: "\n"
       location:
         row: 177
-        column: 1
+        column: 0
       end_location:
         row: 177
-        column: 1
+        column: 0
     applied: false
 - kind:
     OneBlankLineAfterClass: 0
   location:
     row: 187
-    column: 5
+    column: 4
   end_location:
     row: 187
-    column: 46
+    column: 45
   fix:
     patch:
       content: "\n"
       location:
         row: 188
-        column: 1
+        column: 0
       end_location:
         row: 188
-        column: 1
+        column: 0
     applied: false
 
