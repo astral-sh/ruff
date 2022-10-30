@@ -417,6 +417,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
+| B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults. |  |
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body. | 🛠 |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError:` instead of `except (ValueError,):`. |  |
