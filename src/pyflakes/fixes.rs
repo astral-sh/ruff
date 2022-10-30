@@ -2,10 +2,10 @@ use anyhow::Result;
 use libcst_native::{Codegen, ImportNames, NameOrAttribute, SmallStatement, Statement};
 use rustpython_ast::Stmt;
 
-use crate::ast::operations::SourceCodeLocator;
 use crate::ast::types::Range;
 use crate::autofix::{helpers, Fix};
 use crate::cst::helpers::compose_module_path;
+use crate::source_code_locator::SourceCodeLocator;
 
 /// Generate a Fix to remove any unused imports from an `import` statement.
 pub fn remove_unused_imports(

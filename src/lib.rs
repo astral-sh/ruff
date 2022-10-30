@@ -14,7 +14,7 @@ use crate::linter::{check_path, tokenize};
 use crate::message::Message;
 use crate::settings::configuration::Configuration;
 
-pub mod ast;
+mod ast;
 mod autofix;
 pub mod cache;
 pub mod check_ast;
@@ -44,6 +44,7 @@ mod pyflakes;
 mod python;
 mod pyupgrade;
 pub mod settings;
+pub mod source_code_locator;
 pub mod visibility;
 
 /// Run ruff over Python source code directly.
