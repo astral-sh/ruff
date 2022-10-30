@@ -1055,7 +1055,7 @@ impl CheckKind {
                 format!("Local variable `{name}` is assigned to but never used")
             }
             CheckKind::YieldOutsideFunction => {
-                "`yield` or `yield from` statement outside of a function/method".to_string()
+                "`yield` or `yield from` statement outside of a function".to_string()
             }
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
@@ -1197,7 +1197,7 @@ impl CheckKind {
             }
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
             CheckKind::DeprecatedUnittestAlias(alias, target) => {
-                format!("`{}` is deprecated, use `{}` instead", alias, target)
+                format!("`{alias}` is deprecated, use `{target}` instead")
             }
             CheckKind::UselessObjectInheritance(name) => {
                 format!("Class `{name}` inherits from object")
@@ -1267,10 +1267,10 @@ impl CheckKind {
             CheckKind::PublicNestedClass => "Missing docstring in public nested class".to_string(),
             CheckKind::PublicInit => "Missing docstring in `__init__`".to_string(),
             CheckKind::NoThisPrefix => {
-                "First word of the docstring should not be `This`".to_string()
+                "First word of the docstring should not be 'This'".to_string()
             }
             CheckKind::SkipDocstring => {
-                "Function decorated with @overload shouldn't contain a docstring".to_string()
+                "Function decorated with `@overload` shouldn't contain a docstring".to_string()
             }
             CheckKind::CapitalizeSectionName(name) => {
                 format!("Section name should be properly capitalized (\"{name}\")")

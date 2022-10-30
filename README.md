@@ -272,7 +272,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | F634 | IfTuple | If test is a tuple, which is always `True` |  |
 | F701 | BreakOutsideLoop | `break` outside loop |  |
 | F702 | ContinueOutsideLoop | `continue` not properly in loop |  |
-| F704 | YieldOutsideFunction | `yield` or `yield from` statement outside of a function/method |  |
+| F704 | YieldOutsideFunction | `yield` or `yield from` statement outside of a function |  |
 | F706 | ReturnOutsideFunction | `return` statement outside of a function/method |  |
 | F707 | DefaultExceptNotLast | An `except:` block as not the last exception handler |  |
 | F722 | ForwardAnnotationSyntaxError | Syntax error in forward annotation: `...` |  |
@@ -341,7 +341,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D400 | EndsInPeriod | First line should end with a period |  |
 | D402 | NoSignature | First line should not be the function's signature |  |
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |
-| D404 | NoThisPrefix | First word of the docstring should not be `This` |  |
+| D404 | NoThisPrefix | First word of the docstring should not be 'This' |  |
 | D405 | CapitalizeSectionName | Section name should be properly capitalized ("returns") | 🛠 |
 | D406 | NewLineAfterSectionName | Section name should end with a newline ("Returns") | 🛠 |
 | D407 | DashedUnderlineAfterSection | Missing dashed underline after section ("Returns") | 🛠 |
@@ -355,7 +355,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |
 | D416 | SectionNameEndsInColon | Section name should end with a colon ("Returns") | 🛠 |
 | D417 | DocumentAllArguments | Missing argument descriptions in the docstring: `x`, `y` |  |
-| D418 | SkipDocstring | Function decorated with @overload shouldn't contain a docstring |  |
+| D418 | SkipDocstring | Function decorated with `@overload` shouldn't contain a docstring |  |
 | D419 | NonEmpty | Docstring is empty |  |
 
 ### pyupgrade
