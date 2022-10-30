@@ -404,7 +404,8 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
 
                 // Omit empty lines, except for the last line, which is non-empty by way of
                 // containing the closing quotation marks.
-                if i < lines.len() - 1 && lines[i].trim().is_empty() {
+                let is_blank = lines[i].trim().is_empty();
+                if i < lines.len() - 1 && is_blank {
                     continue;
                 }
 
@@ -416,7 +417,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 if checker.settings.enabled.contains(&CheckCode::D207) {
                     // We report under-indentation on every line. This isn't great, but enables
                     // autofix.
-                    if line_indent.len() < docstring_indent.len() {
+                    if !is_blank && line_indent.len() < docstring_indent.len() {
                         let mut check = Check::new(
                             CheckKind::NoUnderIndentation,
                             Range {
