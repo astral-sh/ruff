@@ -14,7 +14,7 @@ use crate::linter::{check_path, tokenize};
 use crate::message::Message;
 use crate::settings::configuration::Configuration;
 
-mod ast;
+pub mod ast;
 mod autofix;
 pub mod cache;
 pub mod check_ast;
