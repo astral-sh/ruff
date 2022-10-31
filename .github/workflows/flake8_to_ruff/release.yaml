@@ -1,4 +1,4 @@
-name: [ruff] Release
+name: [flake8-to-ruff] Release
 
 on:
   create:
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PACKAGE_NAME: ruff
+  PACKAGE_NAME: flake8-to-ruff
   PYTHON_VERSION: "3.7" # to build abi3 wheels
 
 jobs:
@@ -146,7 +146,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --no-default-features --release --out dist
+          args: --release --out dist
           maturin-version: "v0.13.0"
       - uses: uraimo/run-on-arch-action@v2.0.5
         if: matrix.target != 'ppc64'

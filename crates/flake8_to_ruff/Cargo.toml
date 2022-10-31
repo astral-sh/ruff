@@ -1,6 +1,6 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.1"
+version = "0.0.93-dev.0"
 edition = "2021"
 
 [lib]
@@ -12,7 +12,7 @@ clap = { version = "4.0.1", features = ["derive"] }
 configparser = { version = "3.0.2" }
 once_cell = { version = "1.13.1" }
 regex = { version = "1.6.0" }
-ruff = {path = "../.."}
+ruff = { path = "../..", features = [] }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_json = { version = "1.0.83" }
 toml = { version = "0.5.9" }
