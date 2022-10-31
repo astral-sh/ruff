@@ -29,7 +29,7 @@ fn main() -> Result<()> {
 
     // Create the pyproject.toml.
     let pyproject = converter::convert(config)?;
-    println!("{}", toml::to_string(&pyproject)?);
+    println!("{}", toml::to_string_pretty(&pyproject)?);
 
     Ok(())
 }
