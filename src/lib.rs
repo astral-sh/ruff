@@ -10,12 +10,12 @@ use settings::pyproject;
 use settings::Settings;
 
 use crate::autofix::fixer::Mode;
+use crate::checks::Check;
 use crate::linter::{check_path, tokenize};
-use crate::message::Message;
 use crate::settings::configuration::Configuration;
 
 mod ast;
-mod autofix;
+pub mod autofix;
 pub mod cache;
 pub mod check_ast;
 mod check_lines;
@@ -48,7 +48,7 @@ pub mod source_code_locator;
 pub mod visibility;
 
 /// Run ruff over Python source code directly.
-pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
+pub fn check(path: &Path, contents: &str) -> Result<Vec<Check>> {
     // Find the project root and pyproject.toml.
     let project_root = pyproject::find_project_root(&[path.to_path_buf()]);
     match &project_root {
@@ -80,17 +80,5 @@ pub fn check(path: &Path, contents: &str) -> Result<Vec<Message>> {
         &Mode::None,
     )?;
 
-    // Convert to messages.
-    let messages: Vec<Message> = checks
-        .into_iter()
-        .map(|check| Message {
-            kind: check.kind,
-            fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
-            location: check.location,
-            end_location: check.end_location,
-            filename: path.to_string_lossy().to_string(),
-        })
-        .collect();
-
-    Ok(messages)
+    Ok(checks)
 }
