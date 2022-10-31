@@ -30,5 +30,4 @@ build-backend = "maturin"
 
 [tool.maturin]
 bindings = "bin"
-sdist-include = ["Cargo.lock"]
 strip = true
