@@ -1,9 +1,6 @@
 name: "[flake8-to-ruff] Release"
 
-on:
-  create:
-    tags:
-      - v*
+on: workflow_dispatch
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
