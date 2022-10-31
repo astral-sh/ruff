@@ -11,17 +11,12 @@ use crate::{flake8_quotes, pep8_naming};
 pub struct Options {
     pub line_length: Option<usize>,
     pub exclude: Option<Vec<String>>,
-    #[serde(default)]
-    pub extend_exclude: Vec<String>,
+    pub extend_exclude: Option<Vec<String>>,
     pub select: Option<Vec<CheckCodePrefix>>,
-    #[serde(default)]
-    pub extend_select: Vec<CheckCodePrefix>,
-    #[serde(default)]
-    pub ignore: Vec<CheckCodePrefix>,
-    #[serde(default)]
-    pub extend_ignore: Vec<CheckCodePrefix>,
-    #[serde(default)]
-    pub per_file_ignores: Vec<StrCheckCodePair>,
+    pub extend_select: Option<Vec<CheckCodePrefix>>,
+    pub ignore: Option<Vec<CheckCodePrefix>>,
+    pub extend_ignore: Option<Vec<CheckCodePrefix>>,
+    pub per_file_ignores: Option<Vec<StrCheckCodePair>>,
     pub dummy_variable_rgx: Option<String>,
     pub target_version: Option<PythonVersion>,
     // Plugins

@@ -80,18 +80,20 @@ impl Configuration {
                 .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
             extend_exclude: options
                 .extend_exclude
+                .unwrap_or_default()
                 .iter()
                 .map(|path| FilePattern::from_user(path, project_root))
                 .collect(),
-            extend_ignore: options.extend_ignore,
+            extend_ignore: options.extend_ignore.unwrap_or_default(),
             select: options
                 .select
                 .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F]),
-            extend_select: options.extend_select,
-            ignore: options.ignore,
+            extend_select: options.extend_select.unwrap_or_default(),
+            ignore: options.ignore.unwrap_or_default(),
             line_length: options.line_length.unwrap_or(88),
             per_file_ignores: options
                 .per_file_ignores
+                .unwrap_or_default()
                 .into_iter()
                 .map(|pair| PerFileIgnore::new(pair, project_root))
                 .collect(),
