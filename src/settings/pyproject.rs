@@ -6,19 +6,29 @@ use anyhow::Result;
 use common_path::common_path_all;
 use log::debug;
 use path_absolutize::Absolutize;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::fs;
 use crate::settings::options::Options;
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Tools {
     ruff: Option<Options>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
-struct Pyproject {
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Pyproject {
     tool: Option<Tools>,
+}
+
+impl Pyproject {
+    pub fn new(options: Options) -> Self {
+        Self {
+            tool: Some(Tools {
+                ruff: Some(options),
+            }),
+        }
+    }
 }
 
 fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {

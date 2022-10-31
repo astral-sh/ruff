@@ -1,6 +1,6 @@
 //! Settings for the `pep8-naming` plugin.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 const IGNORE_NAMES: [&str; 12] = [
     "setUp",
@@ -21,7 +21,7 @@ const CLASSMETHOD_DECORATORS: [&str; 1] = ["classmethod"];
 
 const STATICMETHOD_DECORATORS: [&str; 1] = ["staticmethod"];
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
     pub ignore_names: Option<Vec<String>>,

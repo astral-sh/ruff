@@ -13,6 +13,7 @@ chrono = { version = "0.4.21" }
 clap = { version = "4.0.1", features = ["derive"] }
 colored = { version = "2.0.0" }
 common-path = { version = "1.0.0" }
+configparser = { version = "3.0.2" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 filetime = { version = "0.2.17" }
