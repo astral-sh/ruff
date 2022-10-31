@@ -61,7 +61,7 @@ jobs:
           maturin-version: "v0.13.0"
       - name: Install built wheel - universal2
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*universal2.whl --force-reinstall
+          pip install dist/${{ env.CRATE_NAME }}-*universal2.whl --force-reinstall
       - name: Upload wheels
         uses: actions/upload-artifact@v2
         with:
