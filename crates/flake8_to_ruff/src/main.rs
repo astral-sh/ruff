@@ -6,11 +6,11 @@ use anyhow::Result;
 use clap::Parser;
 use configparser::ini::Ini;
 
-use ruff::flake8_to_ruff;
+use flake8_to_ruff::converter;
 
 #[derive(Parser)]
 #[command(
-    about = "Convert an existing Flake8 configuration to Ruff.",
+    about = "Convert existing Flake8 configuration to Ruff.",
     long_about = None
 )]
 struct Cli {
@@ -28,7 +28,7 @@ fn main() -> Result<()> {
     let config = ini.load(cli.file).map_err(|msg| anyhow::anyhow!(msg))?;
 
     // Create the pyproject.toml.
-    let pyproject = flake8_to_ruff::convert(config)?;
+    let pyproject = converter::convert(config)?;
     println!("{}", toml::to_string(&pyproject)?);
 
     Ok(())
