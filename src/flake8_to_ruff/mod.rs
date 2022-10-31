@@ -24,25 +24,25 @@ pub fn convert(config: HashMap<String, HashMap<String, Option<String>>>) -> Resu
                 Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
             },
             "select" => {
-                options.select = Some(parser::parse_prefix_codes(value.clone().unwrap()));
+                options.select = Some(parser::parse_prefix_codes(value.as_ref().unwrap()));
             }
             "extend-select" | "extend_select" => {
-                options.extend_select = parser::parse_prefix_codes(value.clone().unwrap());
+                options.extend_select = parser::parse_prefix_codes(value.as_ref().unwrap());
             }
             "ignore" => {
-                options.ignore = parser::parse_prefix_codes(value.clone().unwrap());
+                options.ignore = parser::parse_prefix_codes(value.as_ref().unwrap());
             }
             "extend-ignore" | "extend_ignore" => {
-                options.extend_ignore = parser::parse_prefix_codes(value.clone().unwrap());
+                options.extend_ignore = parser::parse_prefix_codes(value.as_ref().unwrap());
             }
             "exclude" => {
-                options.exclude = Some(parser::parse_strings(value.clone().unwrap()));
+                options.exclude = Some(parser::parse_strings(value.as_ref().unwrap()));
             }
             "extend-exclude" | "extend_exclude" => {
-                options.extend_exclude = parser::parse_strings(value.clone().unwrap());
+                options.extend_exclude = parser::parse_strings(value.as_ref().unwrap());
             }
             "per-file-ignores" | "per_file_ignores" => {
-                match parser::parse_files_to_codes_mapping(value.clone().unwrap()) {
+                match parser::parse_files_to_codes_mapping(value.as_ref().unwrap()) {
                     Ok(per_file_ignores) => options.per_file_ignores = per_file_ignores,
                     Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                 }

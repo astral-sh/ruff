@@ -10,10 +10,13 @@ use crate::settings::types::StrCheckCodePair;
 static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
 /// Parse a comma-separated list of `CheckCodePrefix` values (e.g., "F401,E501").
-pub fn parse_prefix_codes(value: String) -> Vec<CheckCodePrefix> {
+pub fn parse_prefix_codes(value: &str) -> Vec<CheckCodePrefix> {
     let mut codes: Vec<CheckCodePrefix> = vec![];
-    for code in COMMA_SEPARATED_LIST_RE.split(&value) {
+    for code in COMMA_SEPARATED_LIST_RE.split(value) {
         let code = code.trim();
+        if code.is_empty() {
+            continue;
+        }
         if let Ok(code) = CheckCodePrefix::from_str(code) {
             codes.push(code);
         } else {
@@ -24,10 +27,11 @@ pub fn parse_prefix_codes(value: String) -> Vec<CheckCodePrefix> {
 }
 
 /// Parse a comma-separated list of strings (e.g., "__init__.py,__main__.py").
-pub fn parse_strings(value: String) -> Vec<String> {
+pub fn parse_strings(value: &str) -> Vec<String> {
     COMMA_SEPARATED_LIST_RE
-        .split(&value)
+        .split(value)
         .map(|part| part.trim())
+        .filter(|part| !part.is_empty())
         .map(String::from)
         .collect()
 }
@@ -123,13 +127,13 @@ fn tokenize_files_to_codes_mapping(value: &str) -> Vec<Token> {
 /// Parse a 'files-to-codes' mapping, mimicking Flake8's internal logic.
 ///
 /// See: https://github.com/PyCQA/flake8/blob/7dfe99616fc2f07c0017df2ba5fa884158f3ea8a/src/flake8/utils.py#L45
-pub fn parse_files_to_codes_mapping(value: String) -> Result<Vec<StrCheckCodePair>> {
+pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<StrCheckCodePair>> {
     if value.trim().is_empty() {
         return Ok(vec![]);
     }
     let mut codes: Vec<StrCheckCodePair> = vec![];
     let mut state = State::new();
-    for token in tokenize_files_to_codes_mapping(&value) {
+    for token in tokenize_files_to_codes_mapping(value) {
         if matches!(token.token_name, TokenType::Comma | TokenType::Ws) {
             state.seen_sep = true;
         } else if !state.seen_colon {
@@ -160,4 +164,197 @@ pub fn parse_files_to_codes_mapping(value: String) -> Result<Vec<StrCheckCodePai
         }
     }
     Ok(codes)
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+
+    use crate::checks_gen::CheckCodePrefix;
+    use crate::flake8_to_ruff::parser::{
+        parse_files_to_codes_mapping, parse_prefix_codes, parse_strings,
+    };
+    use crate::settings::types::StrCheckCodePair;
+
+    #[test]
+    fn it_parses_prefix_codes() {
+        let actual = parse_prefix_codes("");
+        let expected: Vec<CheckCodePrefix> = vec![];
+        assert_eq!(actual, expected);
+
+        let actual = parse_prefix_codes(" ");
+        let expected: Vec<CheckCodePrefix> = vec![];
+        assert_eq!(actual, expected);
+
+        let actual = parse_prefix_codes("F401");
+        let expected = vec![CheckCodePrefix::F401];
+        assert_eq!(actual, expected);
+
+        let actual = parse_prefix_codes("F401,");
+        let expected = vec![CheckCodePrefix::F401];
+        assert_eq!(actual, expected);
+
+        let actual = parse_prefix_codes("F401,E501");
+        let expected = vec![CheckCodePrefix::F401, CheckCodePrefix::E501];
+        assert_eq!(actual, expected);
+
+        let actual = parse_prefix_codes("F401, E501");
+        let expected = vec![CheckCodePrefix::F401, CheckCodePrefix::E501];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn it_parses_strings() {
+        let actual = parse_strings("");
+        let expected: Vec<String> = vec![];
+        assert_eq!(actual, expected);
+
+        let actual = parse_strings(" ");
+        let expected: Vec<String> = vec![];
+        assert_eq!(actual, expected);
+
+        let actual = parse_strings("__init__.py");
+        let expected = vec!["__init__.py".to_string()];
+        assert_eq!(actual, expected);
+
+        let actual = parse_strings("__init__.py,");
+        let expected = vec!["__init__.py".to_string()];
+        assert_eq!(actual, expected);
+
+        let actual = parse_strings("__init__.py,__main__.py");
+        let expected = vec!["__init__.py".to_string(), "__main__.py".to_string()];
+        assert_eq!(actual, expected);
+
+        let actual = parse_strings("__init__.py, __main__.py");
+        let expected = vec!["__init__.py".to_string(), "__main__.py".to_string()];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn it_parse_files_to_codes_mapping() -> Result<()> {
+        let actual = parse_files_to_codes_mapping("")?;
+        let expected: Vec<StrCheckCodePair> = vec![];
+        assert_eq!(actual, expected);
+
+        let actual = parse_files_to_codes_mapping(" ")?;
+        let expected: Vec<StrCheckCodePair> = vec![];
+        assert_eq!(actual, expected);
+
+        // Ex) locust
+        let actual = parse_files_to_codes_mapping(
+            "per-file-ignores =
+    locust/test/*: F841
+    examples/*: F841
+    *.pyi: E302,E704"
+                .strip_prefix("per-file-ignores =")
+                .unwrap(),
+        )?;
+        let expected: Vec<StrCheckCodePair> = vec![
+            StrCheckCodePair {
+                pattern: "locust/test/*".to_string(),
+                code: CheckCodePrefix::F841,
+            },
+            StrCheckCodePair {
+                pattern: "examples/*".to_string(),
+                code: CheckCodePrefix::F841,
+            },
+        ];
+        assert_eq!(actual, expected);
+
+        // Ex) celery
+        let actual = parse_files_to_codes_mapping(
+            "per-file-ignores =
+   t/*,setup.py,examples/*,docs/*,extra/*:
+       D,"
+            .strip_prefix("per-file-ignores =")
+            .unwrap(),
+        )?;
+        let expected: Vec<StrCheckCodePair> = vec![
+            StrCheckCodePair {
+                pattern: "t/*".to_string(),
+                code: CheckCodePrefix::D,
+            },
+            StrCheckCodePair {
+                pattern: "setup.py".to_string(),
+                code: CheckCodePrefix::D,
+            },
+            StrCheckCodePair {
+                pattern: "examples/*".to_string(),
+                code: CheckCodePrefix::D,
+            },
+            StrCheckCodePair {
+                pattern: "docs/*".to_string(),
+                code: CheckCodePrefix::D,
+            },
+            StrCheckCodePair {
+                pattern: "extra/*".to_string(),
+                code: CheckCodePrefix::D,
+            },
+        ];
+        assert_eq!(actual, expected);
+
+        // Ex) scrapy
+        let actual = parse_files_to_codes_mapping(
+            "per-file-ignores =
+    scrapy/__init__.py:E402
+    scrapy/core/downloader/handlers/http.py:F401
+    scrapy/http/__init__.py:F401
+    scrapy/linkextractors/__init__.py:E402,F401
+    scrapy/selector/__init__.py:F401
+    scrapy/spiders/__init__.py:E402,F401
+    scrapy/utils/url.py:F403,F405
+    tests/test_loader.py:E741"
+                .strip_prefix("per-file-ignores =")
+                .unwrap(),
+        )?;
+        let expected: Vec<StrCheckCodePair> = vec![
+            StrCheckCodePair {
+                pattern: "scrapy/__init__.py".to_string(),
+                code: CheckCodePrefix::E402,
+            },
+            StrCheckCodePair {
+                pattern: "scrapy/core/downloader/handlers/http.py".to_string(),
+                code: CheckCodePrefix::F401,
+            },
+            StrCheckCodePair {
+                pattern: "scrapy/http/__init__.py".to_string(),
+                code: CheckCodePrefix::F401,
+            },
+            StrCheckCodePair {
+                pattern: "scrapy/linkextractors/__init__.py".to_string(),
+                code: CheckCodePrefix::E402,
+            },
+            StrCheckCodePair {
+                pattern: "scrapy/linkextractors/__init__.py".to_string(),
+                code: CheckCodePrefix::F401,
+            },
+            StrCheckCodePair {
+                pattern: "scrapy/selector/__init__.py".to_string(),
+                code: CheckCodePrefix::F401,
+            },
+            StrCheckCodePair {
+                pattern: "scrapy/spiders/__init__.py".to_string(),
+                code: CheckCodePrefix::E402,
+            },
+            StrCheckCodePair {
+                pattern: "scrapy/spiders/__init__.py".to_string(),
+                code: CheckCodePrefix::F401,
+            },
+            StrCheckCodePair {
+                pattern: "scrapy/utils/url.py".to_string(),
+                code: CheckCodePrefix::F403,
+            },
+            StrCheckCodePair {
+                pattern: "scrapy/utils/url.py".to_string(),
+                code: CheckCodePrefix::F405,
+            },
+            StrCheckCodePair {
+                pattern: "tests/test_loader.py".to_string(),
+                code: CheckCodePrefix::E741,
+            },
+        ];
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
 }
