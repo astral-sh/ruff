@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -8,8 +9,8 @@ use regex::Regex;
 use crate::checks_gen::CheckCodePrefix;
 use crate::printer::SerializationFormat;
 use crate::settings::configuration::Configuration;
+use crate::settings::types::PatternPrefixPair;
 use crate::settings::types::PythonVersion;
-use crate::settings::types::StrCheckCodePair;
 
 #[derive(Debug, Parser)]
 #[command(author, about = "ruff: An extremely fast Python linter.")]
@@ -61,7 +62,7 @@ pub struct Cli {
     pub extend_exclude: Vec<String>,
     /// List of mappings from file pattern to code to exclude
     #[arg(long, value_delimiter = ',')]
-    pub per_file_ignores: Vec<StrCheckCodePair>,
+    pub per_file_ignores: Vec<PatternPrefixPair>,
     /// Output serialization format for error messages.
     #[arg(long, value_enum, default_value_t=SerializationFormat::Text)]
     pub format: SerializationFormat,
@@ -142,4 +143,18 @@ pub fn warn_on(
             }
         }
     }
+}
+
+/// Collect a list of `PatternPrefixPair` structs as a `BTreeMap`.
+pub fn collect_per_file_ignores(
+    pairs: Vec<PatternPrefixPair>,
+) -> BTreeMap<String, Vec<CheckCodePrefix>> {
+    let mut per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>> = BTreeMap::new();
+    for pair in pairs {
+        per_file_ignores
+            .entry(pair.pattern)
+            .or_insert_with(Vec::new)
+            .push(pair.prefix);
+    }
+    per_file_ignores
 }

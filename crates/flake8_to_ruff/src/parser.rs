@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use anyhow::Result;
@@ -5,7 +6,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use ruff::checks_gen::CheckCodePrefix;
-use ruff::settings::types::StrCheckCodePair;
+use ruff::settings::types::PatternPrefixPair;
 
 static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
@@ -70,15 +71,15 @@ impl State {
     }
 
     /// Generate the list of `StrCheckCodePair` pairs for the current state.
-    fn parse(&self) -> Vec<StrCheckCodePair> {
-        let mut codes: Vec<StrCheckCodePair> = vec![];
+    fn parse(&self) -> Vec<PatternPrefixPair> {
+        let mut codes: Vec<PatternPrefixPair> = vec![];
         for code in &self.codes {
             match CheckCodePrefix::from_str(code) {
                 Ok(code) => {
                     for filename in &self.filenames {
-                        codes.push(StrCheckCodePair {
+                        codes.push(PatternPrefixPair {
                             pattern: filename.clone(),
-                            code: code.clone(),
+                            prefix: code.clone(),
                         });
                     }
                 }
@@ -127,11 +128,11 @@ fn tokenize_files_to_codes_mapping(value: &str) -> Vec<Token> {
 /// Parse a 'files-to-codes' mapping, mimicking Flake8's internal logic.
 ///
 /// See: https://github.com/PyCQA/flake8/blob/7dfe99616fc2f07c0017df2ba5fa884158f3ea8a/src/flake8/utils.py#L45
-pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<StrCheckCodePair>> {
+pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair>> {
     if value.trim().is_empty() {
         return Ok(vec![]);
     }
-    let mut codes: Vec<StrCheckCodePair> = vec![];
+    let mut codes: Vec<PatternPrefixPair> = vec![];
     let mut state = State::new();
     for token in tokenize_files_to_codes_mapping(value) {
         if matches!(token.token_name, TokenType::Comma | TokenType::Ws) {
@@ -166,12 +167,26 @@ pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<StrCheckCodePair>
     Ok(codes)
 }
 
+/// Collect a list of `PatternPrefixPair` structs as a `BTreeMap`.
+pub fn collect_per_file_ignores(
+    pairs: Vec<PatternPrefixPair>,
+) -> BTreeMap<String, Vec<CheckCodePrefix>> {
+    let mut per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>> = BTreeMap::new();
+    for pair in pairs {
+        per_file_ignores
+            .entry(pair.pattern)
+            .or_insert_with(Vec::new)
+            .push(pair.prefix);
+    }
+    per_file_ignores
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
 
     use ruff::checks_gen::CheckCodePrefix;
-    use ruff::settings::types::StrCheckCodePair;
+    use ruff::settings::types::PatternPrefixPair;
 
     use crate::parser::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
 
@@ -232,11 +247,11 @@ mod tests {
     #[test]
     fn it_parse_files_to_codes_mapping() -> Result<()> {
         let actual = parse_files_to_codes_mapping("")?;
-        let expected: Vec<StrCheckCodePair> = vec![];
+        let expected: Vec<PatternPrefixPair> = vec![];
         assert_eq!(actual, expected);
 
         let actual = parse_files_to_codes_mapping(" ")?;
-        let expected: Vec<StrCheckCodePair> = vec![];
+        let expected: Vec<PatternPrefixPair> = vec![];
         assert_eq!(actual, expected);
 
         // Ex) locust
@@ -248,14 +263,14 @@ mod tests {
                 .strip_prefix("per-file-ignores =")
                 .unwrap(),
         )?;
-        let expected: Vec<StrCheckCodePair> = vec![
-            StrCheckCodePair {
+        let expected: Vec<PatternPrefixPair> = vec![
+            PatternPrefixPair {
                 pattern: "locust/test/*".to_string(),
-                code: CheckCodePrefix::F841,
+                prefix: CheckCodePrefix::F841,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "examples/*".to_string(),
-                code: CheckCodePrefix::F841,
+                prefix: CheckCodePrefix::F841,
             },
         ];
         assert_eq!(actual, expected);
@@ -268,26 +283,26 @@ mod tests {
             .strip_prefix("per-file-ignores =")
             .unwrap(),
         )?;
-        let expected: Vec<StrCheckCodePair> = vec![
-            StrCheckCodePair {
+        let expected: Vec<PatternPrefixPair> = vec![
+            PatternPrefixPair {
                 pattern: "t/*".to_string(),
-                code: CheckCodePrefix::D,
+                prefix: CheckCodePrefix::D,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "setup.py".to_string(),
-                code: CheckCodePrefix::D,
+                prefix: CheckCodePrefix::D,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "examples/*".to_string(),
-                code: CheckCodePrefix::D,
+                prefix: CheckCodePrefix::D,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "docs/*".to_string(),
-                code: CheckCodePrefix::D,
+                prefix: CheckCodePrefix::D,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "extra/*".to_string(),
-                code: CheckCodePrefix::D,
+                prefix: CheckCodePrefix::D,
             },
         ];
         assert_eq!(actual, expected);
@@ -306,50 +321,50 @@ mod tests {
                 .strip_prefix("per-file-ignores =")
                 .unwrap(),
         )?;
-        let expected: Vec<StrCheckCodePair> = vec![
-            StrCheckCodePair {
+        let expected: Vec<PatternPrefixPair> = vec![
+            PatternPrefixPair {
                 pattern: "scrapy/__init__.py".to_string(),
-                code: CheckCodePrefix::E402,
+                prefix: CheckCodePrefix::E402,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "scrapy/core/downloader/handlers/http.py".to_string(),
-                code: CheckCodePrefix::F401,
+                prefix: CheckCodePrefix::F401,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "scrapy/http/__init__.py".to_string(),
-                code: CheckCodePrefix::F401,
+                prefix: CheckCodePrefix::F401,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "scrapy/linkextractors/__init__.py".to_string(),
-                code: CheckCodePrefix::E402,
+                prefix: CheckCodePrefix::E402,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "scrapy/linkextractors/__init__.py".to_string(),
-                code: CheckCodePrefix::F401,
+                prefix: CheckCodePrefix::F401,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "scrapy/selector/__init__.py".to_string(),
-                code: CheckCodePrefix::F401,
+                prefix: CheckCodePrefix::F401,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "scrapy/spiders/__init__.py".to_string(),
-                code: CheckCodePrefix::E402,
+                prefix: CheckCodePrefix::E402,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "scrapy/spiders/__init__.py".to_string(),
-                code: CheckCodePrefix::F401,
+                prefix: CheckCodePrefix::F401,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "scrapy/utils/url.py".to_string(),
-                code: CheckCodePrefix::F403,
+                prefix: CheckCodePrefix::F403,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "scrapy/utils/url.py".to_string(),
-                code: CheckCodePrefix::F405,
+                prefix: CheckCodePrefix::F405,
             },
-            StrCheckCodePair {
+            PatternPrefixPair {
                 pattern: "tests/test_loader.py".to_string(),
-                code: CheckCodePrefix::E741,
+                prefix: CheckCodePrefix::E741,
             },
         ];
         assert_eq!(actual, expected);

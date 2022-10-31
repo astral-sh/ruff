@@ -42,7 +42,10 @@ pub fn convert(config: HashMap<String, HashMap<String, Option<String>>>) -> Resu
                 }
                 "per-file-ignores" | "per_file_ignores" => {
                     match parser::parse_files_to_codes_mapping(value.as_ref()) {
-                        Ok(per_file_ignores) => options.per_file_ignores = Some(per_file_ignores),
+                        Ok(per_file_ignores) => {
+                            options.per_file_ignores =
+                                Some(parser::collect_per_file_ignores(per_file_ignores))
+                        }
                         Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                     }
                 }

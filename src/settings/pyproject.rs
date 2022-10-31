@@ -96,6 +96,7 @@ pub fn load_options(pyproject: &Option<PathBuf>) -> Result<Options> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::env::current_dir;
     use std::path::PathBuf;
     use std::str::FromStr;
@@ -107,7 +108,7 @@ mod tests {
     use crate::settings::pyproject::{
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
-    use crate::settings::types::StrCheckCodePair;
+    use crate::settings::types::PatternPrefixPair;
     use crate::{flake8_quotes, pep8_naming};
 
     #[test]
@@ -319,10 +320,10 @@ other-attribute = 1
                 extend_select: None,
                 ignore: None,
                 extend_ignore: None,
-                per_file_ignores: Some(vec![StrCheckCodePair {
-                    pattern: "__init__.py".to_string(),
-                    code: CheckCodePrefix::F401
-                }]),
+                per_file_ignores: Some(BTreeMap::from([(
+                    "__init__.py".to_string(),
+                    vec![CheckCodePrefix::F401]
+                ),])),
                 dummy_variable_rgx: None,
                 target_version: None,
                 flake8_quotes: Some(flake8_quotes::settings::Options {
@@ -357,21 +358,21 @@ other-attribute = 1
 
     #[test]
     fn str_check_code_pair_strings() {
-        let result = StrCheckCodePair::from_str("foo:E501");
+        let result = PatternPrefixPair::from_str("foo:E501");
         assert!(result.is_ok());
-        let result = StrCheckCodePair::from_str("foo: E501");
+        let result = PatternPrefixPair::from_str("foo: E501");
         assert!(result.is_ok());
-        let result = StrCheckCodePair::from_str("E501:foo");
+        let result = PatternPrefixPair::from_str("E501:foo");
         assert!(result.is_err());
-        let result = StrCheckCodePair::from_str("E501");
+        let result = PatternPrefixPair::from_str("E501");
         assert!(result.is_err());
-        let result = StrCheckCodePair::from_str("foo");
+        let result = PatternPrefixPair::from_str("foo");
         assert!(result.is_err());
-        let result = StrCheckCodePair::from_str("foo:E501:E402");
+        let result = PatternPrefixPair::from_str("foo:E501:E402");
         assert!(result.is_err());
-        let result = StrCheckCodePair::from_str("**/bar:E501");
+        let result = PatternPrefixPair::from_str("**/bar:E501");
         assert!(result.is_ok());
-        let result = StrCheckCodePair::from_str("bar:E502");
+        let result = PatternPrefixPair::from_str("bar:E502");
         assert!(result.is_err());
     }
 }
