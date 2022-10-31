@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use glob::Pattern;
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
@@ -104,6 +104,16 @@ impl<'de> Deserialize<'de> for StrCheckCodePair {
                 &Self::EXPECTED_PATTERN,
             )
         })
+    }
+}
+
+impl Serialize for StrCheckCodePair {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let as_str = format!("{}:{}", self.pattern, self.code.as_ref());
+        serializer.serialize_str(&as_str)
     }
 }
 

@@ -1,12 +1,12 @@
 //! Options that the user can provide via pyproject.toml.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::types::{PythonVersion, StrCheckCodePair};
 use crate::{flake8_quotes, pep8_naming};
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
     pub line_length: Option<usize>,
