@@ -1,4 +1,4 @@
-name: [ruff] Release
+name: "[ruff] Release"
 
 on:
   create:

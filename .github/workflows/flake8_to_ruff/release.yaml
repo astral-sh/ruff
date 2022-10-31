@@ -1,4 +1,4 @@
-name: [flake8-to-ruff] Release
+name: "[flake8-to-ruff] Release"
 
 on:
   create:
