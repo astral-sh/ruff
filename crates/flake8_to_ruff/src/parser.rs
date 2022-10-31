@@ -4,8 +4,8 @@ use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::checks_gen::CheckCodePrefix;
-use crate::settings::types::StrCheckCodePair;
+use ruff::checks_gen::CheckCodePrefix;
+use ruff::settings::types::StrCheckCodePair;
 
 static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
@@ -170,11 +170,10 @@ pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<StrCheckCodePair>
 mod tests {
     use anyhow::Result;
 
-    use crate::checks_gen::CheckCodePrefix;
-    use crate::flake8_to_ruff::parser::{
-        parse_files_to_codes_mapping, parse_prefix_codes, parse_strings,
-    };
-    use crate::settings::types::StrCheckCodePair;
+    use ruff::checks_gen::CheckCodePrefix;
+    use ruff::settings::types::StrCheckCodePair;
+
+    use crate::parser::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
 
     #[test]
     fn it_parses_prefix_codes() {

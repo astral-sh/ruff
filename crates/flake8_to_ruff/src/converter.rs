@@ -1,13 +1,11 @@
-//! Utility to generate Ruff's pyproject.toml section from a Flake8 INI file.
-
 use std::collections::HashMap;
 
 use anyhow::Result;
 
-use crate::settings::options::Options;
-use crate::settings::pyproject::Pyproject;
+use ruff::settings::options::Options;
+use ruff::settings::pyproject::Pyproject;
 
-mod parser;
+use crate::parser;
 
 pub fn convert(config: HashMap<String, HashMap<String, Option<String>>>) -> Result<Pyproject> {
     // Extract the Flake8 section.
