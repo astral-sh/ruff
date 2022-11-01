@@ -141,13 +141,7 @@ pub fn lint_stdin(
     // Convert to messages.
     Ok(checks
         .into_iter()
-        .map(|check| Message {
-            kind: check.kind,
-            fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
-            location: check.location,
-            end_location: check.end_location,
-            filename: path.to_string_lossy().to_string(),
-        })
+        .map(|check| Message::from_check(path.to_string_lossy().to_string(), check))
         .collect())
 }
 
@@ -189,13 +183,7 @@ pub fn lint_path(
     // Convert to messages.
     let messages: Vec<Message> = checks
         .into_iter()
-        .map(|check| Message {
-            kind: check.kind,
-            fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
-            location: check.location,
-            end_location: check.end_location,
-            filename: path.to_string_lossy().to_string(),
-        })
+        .map(|check| Message::from_check(path.to_string_lossy().to_string(), check))
         .collect();
     #[cfg(not(target_family = "wasm"))]
     cache::set(path, &metadata, settings, autofix, &messages, mode);

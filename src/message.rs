@@ -6,7 +6,7 @@ use colored::Colorize;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-use crate::checks::CheckKind;
+use crate::checks::{Check, CheckKind};
 use crate::fs::relativize_path;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -16,6 +16,18 @@ pub struct Message {
     pub location: Location,
     pub end_location: Location,
     pub filename: String,
+}
+
+impl Message {
+    pub fn from_check(filename: String, check: Check) -> Self {
+        Self {
+            kind: check.kind,
+            fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
+            location: Location::new(check.location.row(), check.location.column() + 1),
+            end_location: Location::new(check.end_location.row(), check.end_location.column() + 1),
+            filename,
+        }
+    }
 }
 
 impl Ord for Message {
