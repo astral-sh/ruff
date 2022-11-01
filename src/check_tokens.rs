@@ -19,7 +19,7 @@ pub fn check_tokens(
         | settings.enabled.contains(&CheckCode::Q002)
         | settings.enabled.contains(&CheckCode::Q003);
 
-    let mut state_machine = StateMachine::new();
+    let mut state_machine: StateMachine = Default::default();
     for (start, tok, end) in tokens.iter().flatten() {
         // W605
         if enforce_invalid_escape_sequence {

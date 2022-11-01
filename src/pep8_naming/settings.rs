@@ -21,7 +21,7 @@ const CLASSMETHOD_DECORATORS: [&str; 1] = ["classmethod"];
 
 const STATICMETHOD_DECORATORS: [&str; 1] = ["staticmethod"];
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
     pub ignore_names: Option<Vec<String>>,

@@ -17,3 +17,5 @@ exclude =
     test_fstring.py,
     bad_coding2.py,
     badsyntax_*.py
+ignore_names = foo, bar
+quotes = double
