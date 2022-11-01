@@ -1,6 +1,7 @@
 //! User-provided program settings, taking into account pyproject.toml and command-line options.
 //! Structure mirrors the user-facing representation of the various parameters.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
@@ -9,7 +10,7 @@ use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::pyproject::load_options;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePattern, PythonVersion};
 use crate::{flake8_quotes, pep8_naming};
 
 #[derive(Debug)]
@@ -21,7 +22,7 @@ pub struct Configuration {
     pub extend_select: Vec<CheckCodePrefix>,
     pub ignore: Vec<CheckCodePrefix>,
     pub line_length: usize,
-    pub per_file_ignores: Vec<PerFileIgnore>,
+    pub per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>>,
     pub select: Vec<CheckCodePrefix>,
     pub target_version: PythonVersion,
     // Plugins
@@ -91,12 +92,7 @@ impl Configuration {
             extend_select: options.extend_select.unwrap_or_default(),
             ignore: options.ignore.unwrap_or_default(),
             line_length: options.line_length.unwrap_or(88),
-            per_file_ignores: options
-                .per_file_ignores
-                .unwrap_or_default()
-                .into_iter()
-                .map(|pair| PerFileIgnore::new(pair, project_root))
-                .collect(),
+            per_file_ignores: options.per_file_ignores.unwrap_or_default(),
             // Plugins
             flake8_quotes: options
                 .flake8_quotes

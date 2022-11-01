@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -17,7 +18,8 @@ use walkdir::DirEntry;
 use ruff::cache;
 use ruff::checks::CheckCode;
 use ruff::checks::CheckKind;
-use ruff::cli::{warn_on, Cli, Warnable};
+use ruff::checks_gen::CheckCodePrefix;
+use ruff::cli::{collect_per_file_ignores, warn_on, Cli, Warnable};
 use ruff::fs::iter_python_files;
 use ruff::linter::add_noqa_to_path;
 use ruff::linter::autoformat_path;
@@ -27,7 +29,7 @@ use ruff::message::Message;
 use ruff::printer::{Printer, SerializationFormat};
 use ruff::settings::configuration::Configuration;
 use ruff::settings::pyproject;
-use ruff::settings::types::{FilePattern, PerFileIgnore};
+use ruff::settings::types::FilePattern;
 use ruff::settings::user::UserConfiguration;
 use ruff::settings::Settings;
 use ruff::tell_user;
@@ -255,11 +257,8 @@ fn inner_main() -> Result<ExitCode> {
         .iter()
         .map(|path| FilePattern::from_user(path, &project_root))
         .collect();
-    let per_file_ignores: Vec<PerFileIgnore> = cli
-        .per_file_ignores
-        .into_iter()
-        .map(|pair| PerFileIgnore::new(pair, &project_root))
-        .collect();
+    let per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>> =
+        collect_per_file_ignores(cli.per_file_ignores);
 
     let mut configuration = Configuration::from_pyproject(&pyproject, &project_root)?;
     if !exclude.is_empty() {

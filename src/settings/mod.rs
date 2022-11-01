@@ -1,7 +1,7 @@
 //! Effective program settings, taking into account pyproject.toml and command-line options.
 //! Structure is optimized for internal usage, as opposed to external visibility or parsing.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
 
 use regex::Regex;
@@ -47,7 +47,7 @@ impl Settings {
             flake8_quotes: config.flake8_quotes,
             line_length: config.line_length,
             pep8_naming: config.pep8_naming,
-            per_file_ignores: config.per_file_ignores,
+            per_file_ignores: resolve_per_file_ignores(&config.per_file_ignores),
             target_version: config.target_version,
         }
     }
@@ -56,10 +56,10 @@ impl Settings {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: BTreeSet::from([check_code]),
-            exclude: vec![],
-            extend_exclude: vec![],
+            exclude: Default::default(),
+            extend_exclude: Default::default(),
             line_length: 88,
-            per_file_ignores: vec![],
+            per_file_ignores: Default::default(),
             target_version: PythonVersion::Py310,
             flake8_quotes: Default::default(),
             pep8_naming: Default::default(),
@@ -70,10 +70,10 @@ impl Settings {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: BTreeSet::from_iter(check_codes),
-            exclude: vec![],
-            extend_exclude: vec![],
+            exclude: Default::default(),
+            extend_exclude: Default::default(),
             line_length: 88,
-            per_file_ignores: vec![],
+            per_file_ignores: Default::default(),
             target_version: PythonVersion::Py310,
             flake8_quotes: Default::default(),
             pep8_naming: Default::default(),
@@ -134,6 +134,15 @@ fn resolve_codes(
         }
     }
     codes
+}
+
+fn resolve_per_file_ignores(
+    per_file_ignores: &BTreeMap<String, Vec<CheckCodePrefix>>,
+) -> Vec<PerFileIgnore> {
+    per_file_ignores
+        .iter()
+        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, prefixes, &None))
+        .collect()
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use glob::Pattern;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
@@ -75,24 +75,28 @@ pub struct PerFileIgnore {
 }
 
 impl PerFileIgnore {
-    pub fn new(user_in: StrCheckCodePair, project_root: &Option<PathBuf>) -> Self {
-        let pattern = FilePattern::from_user(user_in.pattern.as_str(), project_root);
-        let codes = BTreeSet::from_iter(user_in.code.codes());
+    pub fn new(
+        pattern: &str,
+        prefixes: &[CheckCodePrefix],
+        project_root: &Option<PathBuf>,
+    ) -> Self {
+        let pattern = FilePattern::from_user(pattern, project_root);
+        let codes = BTreeSet::from_iter(prefixes.iter().flat_map(|prefix| prefix.codes()));
         Self { pattern, codes }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StrCheckCodePair {
+pub struct PatternPrefixPair {
     pub pattern: String,
-    pub code: CheckCodePrefix,
+    pub prefix: CheckCodePrefix,
 }
 
-impl StrCheckCodePair {
+impl PatternPrefixPair {
     const EXPECTED_PATTERN: &'static str = "<FilePattern>:<CheckCode> pattern";
 }
 
-impl<'de> Deserialize<'de> for StrCheckCodePair {
+impl<'de> Deserialize<'de> for PatternPrefixPair {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -107,17 +111,7 @@ impl<'de> Deserialize<'de> for StrCheckCodePair {
     }
 }
 
-impl Serialize for StrCheckCodePair {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let as_str = format!("{}:{}", self.pattern, self.code.as_ref());
-        serializer.serialize_str(&as_str)
-    }
-}
-
-impl FromStr for StrCheckCodePair {
+impl FromStr for PatternPrefixPair {
     type Err = anyhow::Error;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
@@ -128,8 +122,8 @@ impl FromStr for StrCheckCodePair {
             }
             (tokens[0].trim(), tokens[1].trim())
         };
-        let code = CheckCodePrefix::from_str(code_string)?;
         let pattern = pattern_str.into();
-        Ok(Self { pattern, code })
+        let prefix = CheckCodePrefix::from_str(code_string)?;
+        Ok(Self { pattern, prefix })
     }
 }

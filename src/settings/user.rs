@@ -1,11 +1,12 @@
 //! Structs to render user-facing settings.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePattern, PythonVersion};
 use crate::{flake8_quotes, pep8_naming, Configuration};
 
 /// Struct to render user-facing exclusion patterns.
@@ -41,7 +42,7 @@ pub struct UserConfiguration {
     pub extend_select: Vec<CheckCodePrefix>,
     pub ignore: Vec<CheckCodePrefix>,
     pub line_length: usize,
-    pub per_file_ignores: Vec<PerFileIgnore>,
+    pub per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>>,
     pub select: Vec<CheckCodePrefix>,
     pub target_version: PythonVersion,
     // Plugins
