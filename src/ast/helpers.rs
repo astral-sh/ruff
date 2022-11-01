@@ -1,8 +1,8 @@
+use std::collections::BTreeSet;
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, StmtKind};
-
-use crate::python::typing;
 
 fn compose_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
     match &expr.node {
@@ -30,6 +30,7 @@ pub fn compose_call_path(expr: &Expr) -> Option<String> {
     }
 }
 
+/// Return `true` if the `Expr` is a name or attribute reference to `${target}`.
 pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
     match &expr.node {
         ExprKind::Attribute { attr, .. } => target == attr,
@@ -38,32 +39,27 @@ pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
     }
 }
 
-pub enum SubscriptKind {
-    AnnotatedSubscript,
-    PEP593AnnotatedSubscript,
-}
-
-pub fn match_annotated_subscript(expr: &Expr) -> Option<SubscriptKind> {
+/// Return `true` if the `Expr` is a reference to `${module}.${target}`.
+///
+/// Useful for, e.g., ensuring that a `Union` reference represents `typing.Union`.
+pub fn match_name_or_attr_from_module(
+    expr: &Expr,
+    target: &str,
+    module: &str,
+    imports: Option<&BTreeSet<&str>>,
+) -> bool {
     match &expr.node {
-        ExprKind::Attribute { attr, .. } => {
-            if typing::is_annotated_subscript(attr) {
-                Some(SubscriptKind::AnnotatedSubscript)
-            } else if typing::is_pep593_annotated_subscript(attr) {
-                Some(SubscriptKind::PEP593AnnotatedSubscript)
-            } else {
-                None
-            }
-        }
+        ExprKind::Attribute { value, attr, .. } => match &value.node {
+            ExprKind::Name { id, .. } => id == module && target == attr,
+            _ => false,
+        },
         ExprKind::Name { id, .. } => {
-            if typing::is_annotated_subscript(id) {
-                Some(SubscriptKind::AnnotatedSubscript)
-            } else if typing::is_pep593_annotated_subscript(id) {
-                Some(SubscriptKind::PEP593AnnotatedSubscript)
-            } else {
-                None
-            }
+            target == id
+                && imports
+                    .map(|imports| imports.contains(&id.as_str()))
+                    .unwrap_or_default()
         }
-        _ => None,
+        _ => false,
     }
 }
 
