@@ -647,9 +647,14 @@ Assuming you have `cargo` installed, you can run:
 
 ```shell
 cargo run resources/test/fixtures
-cargo fmt
-cargo clippy
-cargo test
+```
+
+For development, we use [nightly Rust](https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust):
+
+```shell
+cargo +nightly fmt
+cargo +nightly clippy
+cargo +nightly test
 ```
 
 ## Releases

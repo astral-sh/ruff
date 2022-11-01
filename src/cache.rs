@@ -1,4 +1,5 @@
-// cacache uses asyncd-std which has no wasm support, so currently no caching support on wasm
+// cacache uses asyncd-std which has no wasm support, so currently no caching
+// support on wasm
 #![cfg_attr(
     target_family = "wasm",
     allow(unused_imports, unused_variables, dead_code)
@@ -127,7 +128,7 @@ pub fn get(
             }
             Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
         },
-        Err(EntryNotFound(_, _)) => {}
+        Err(EntryNotFound(..)) => {}
         Err(e) => error!("Failed to read from cache: {e:?}"),
     }
     None

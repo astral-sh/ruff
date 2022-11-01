@@ -123,7 +123,8 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Return `true` if a patch should be generated under the given autofix `Mode`.
+    /// Return `true` if a patch should be generated under the given autofix
+    /// `Mode`.
     pub fn patch(&self) -> bool {
         self.autofix.patch()
     }
@@ -287,7 +288,8 @@ where
 
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
 
-                // Visit the decorators and arguments, but avoid the body, which will be deferred.
+                // Visit the decorators and arguments, but avoid the body, which will be
+                // deferred.
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
@@ -1540,7 +1542,8 @@ where
             flake8_bugbear::plugins::mutable_argument_default(self, arguments)
         }
 
-        // Bind, but intentionally avoid walking default expressions, as we handle them upstream.
+        // Bind, but intentionally avoid walking default expressions, as we handle them
+        // upstream.
         for arg in &arguments.posonlyargs {
             self.visit_arg(arg);
         }
@@ -1559,7 +1562,8 @@ where
     }
 
     fn visit_arg(&mut self, arg: &'b Arg) {
-        // Bind, but intentionally avoid walking the annotation, as we handle it upstream.
+        // Bind, but intentionally avoid walking the annotation, as we handle it
+        // upstream.
         self.add_binding(
             arg.node.arg.to_string(),
             Binding {
@@ -1601,8 +1605,9 @@ fn try_mark_used(scope: &mut Scope, scope_id: usize, id: &str, expr: &Expr) -> b
         // Mark the binding as used.
         binding.used = Some((scope_id, Range::from_located(expr)));
 
-        // If the name of the sub-importation is the same as an alias of another importation and the
-        // alias is used, that sub-importation should be marked as used too.
+        // If the name of the sub-importation is the same as an alias of another
+        // importation and the alias is used, that sub-importation should be
+        // marked as used too.
         //
         // This handles code like:
         //   import pyarrow as pa
@@ -1712,7 +1717,8 @@ impl<'a> Checker<'a> {
     fn add_binding(&mut self, name: String, binding: Binding) {
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
 
-        // TODO(charlie): Don't treat annotations as assignments if there is an existing value.
+        // TODO(charlie): Don't treat annotations as assignments if there is an existing
+        // value.
         let binding = match scope.values.get(&name) {
             None => binding,
             Some(existing) => {

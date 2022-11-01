@@ -60,7 +60,8 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
             min_line = min(min_line, start.row());
             max_line = max(max_line, start.row());
 
-            // For now, we only care about preserving noqa directives across multi-line strings.
+            // For now, we only care about preserving noqa directives across multi-line
+            // strings.
             if in_string {
                 for i in (noqa_line_for.len())..(min_line - 1) {
                     noqa_line_for.push(i + 1);
@@ -123,7 +124,7 @@ fn add_noqa_inner(
                         output.push_str(line);
                     }
                     Directive::All(start, _) => output.push_str(&line[..start]),
-                    Directive::Codes(start, _, _) => output.push_str(&line[..start]),
+                    Directive::Codes(start, ..) => output.push_str(&line[..start]),
                 };
                 let codes: Vec<&str> = codes.iter().map(|code| code.as_ref()).collect();
                 output.push_str("  # noqa: ");

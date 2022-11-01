@@ -1,5 +1,6 @@
-//! Effective program settings, taking into account pyproject.toml and command-line options.
-//! Structure is optimized for internal usage, as opposed to external visibility or parsing.
+//! Effective program settings, taking into account pyproject.toml and
+//! command-line options. Structure is optimized for internal usage, as opposed
+//! to external visibility or parsing.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
@@ -94,7 +95,8 @@ impl Hash for Settings {
     }
 }
 
-/// Given a set of selected and ignored prefixes, resolve the set of enabled error codes.
+/// Given a set of selected and ignored prefixes, resolve the set of enabled
+/// error codes.
 fn resolve_codes(
     select: &[CheckCodePrefix],
     extend_select: &[CheckCodePrefix],

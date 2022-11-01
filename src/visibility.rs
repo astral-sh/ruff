@@ -1,4 +1,5 @@
-//! Abstractions for tracking public and private visibility across modules, classes, and functions.
+//! Abstractions for tracking public and private visibility across modules,
+//! classes, and functions.
 
 use std::path::Path;
 
@@ -133,8 +134,8 @@ fn class_visibility(stmt: &Stmt) -> Visibility {
 
 /// Transition a `VisibleScope` based on a new `Documentable` definition.
 ///
-/// `scope` is the current `VisibleScope`, while `Documentable` and `Stmt` describe the current
-/// node used to modify visibility.
+/// `scope` is the current `VisibleScope`, while `Documentable` and `Stmt`
+/// describe the current node used to modify visibility.
 pub fn transition_scope(scope: &VisibleScope, stmt: &Stmt, kind: &Documentable) -> VisibleScope {
     match kind {
         Documentable::Function => VisibleScope {

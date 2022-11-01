@@ -7,8 +7,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use log::debug;
-use path_absolutize::path_dedot;
-use path_absolutize::Absolutize;
+use path_absolutize::{path_dedot, Absolutize};
 use walkdir::{DirEntry, WalkDir};
 
 use crate::checks::CheckCode;
@@ -137,7 +136,8 @@ pub fn ignores_from_path<'a>(
         .collect())
 }
 
-/// Convert any path to an absolute path (based on the current working directory).
+/// Convert any path to an absolute path (based on the current working
+/// directory).
 pub fn normalize_path(path: &Path) -> PathBuf {
     if let Ok(path) = path.absolutize() {
         return path.to_path_buf();

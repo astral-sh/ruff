@@ -12,36 +12,32 @@ use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use walkdir::DirEntry;
-
 #[cfg(not(target_family = "wasm"))]
 use ruff::cache;
-use ruff::checks::CheckCode;
-use ruff::checks::CheckKind;
+use ruff::checks::{CheckCode, CheckKind};
 use ruff::checks_gen::CheckCodePrefix;
 use ruff::cli::{collect_per_file_ignores, warn_on, Cli, Warnable};
 use ruff::fs::iter_python_files;
-use ruff::linter::add_noqa_to_path;
-use ruff::linter::autoformat_path;
-use ruff::linter::{lint_path, lint_stdin};
+use ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin};
 use ruff::logging::set_up_logging;
 use ruff::message::Message;
 use ruff::printer::{Printer, SerializationFormat};
 use ruff::settings::configuration::Configuration;
-use ruff::settings::pyproject;
 use ruff::settings::types::FilePattern;
 use ruff::settings::user::UserConfiguration;
-use ruff::settings::Settings;
+use ruff::settings::{pyproject, Settings};
 use ruff::tell_user;
+use walkdir::DirEntry;
 
 #[cfg(feature = "update-informer")]
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 #[cfg(feature = "update-informer")]
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Shim that calls par_iter except for wasm because there's no wasm support in rayon yet
-/// (there is a shim to be used for the web, but it requires js cooperation)
-/// Unfortunately, ParallelIterator does not implement Iterator so the signatures diverge
+/// Shim that calls par_iter except for wasm because there's no wasm support in
+/// rayon yet (there is a shim to be used for the web, but it requires js
+/// cooperation) Unfortunately, ParallelIterator does not implement Iterator so
+/// the signatures diverge
 #[cfg(not(target_family = "wasm"))]
 fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl ParallelIterator<Item = &T> {
     iterable.par_iter()

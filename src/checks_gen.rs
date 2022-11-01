@@ -270,12 +270,14 @@ impl CheckCodePrefix {
             CheckCodePrefix::B002 => vec![CheckCode::B002],
             CheckCodePrefix::B006 => vec![CheckCode::B006],
             CheckCodePrefix::B007 => vec![CheckCode::B007],
-            CheckCodePrefix::B01 => vec![
-                CheckCode::B011,
-                CheckCode::B013,
-                CheckCode::B014,
-                CheckCode::B017,
-            ],
+            CheckCodePrefix::B01 => {
+                vec![
+                    CheckCode::B011,
+                    CheckCode::B013,
+                    CheckCode::B014,
+                    CheckCode::B017,
+                ]
+            }
             CheckCodePrefix::B011 => vec![CheckCode::B011],
             CheckCodePrefix::B013 => vec![CheckCode::B013],
             CheckCodePrefix::B014 => vec![CheckCode::B014],
@@ -582,12 +584,14 @@ impl CheckCodePrefix {
                 CheckCode::E742,
                 CheckCode::E743,
             ],
-            CheckCodePrefix::E71 => vec![
-                CheckCode::E711,
-                CheckCode::E712,
-                CheckCode::E713,
-                CheckCode::E714,
-            ],
+            CheckCodePrefix::E71 => {
+                vec![
+                    CheckCode::E711,
+                    CheckCode::E712,
+                    CheckCode::E713,
+                    CheckCode::E714,
+                ]
+            }
             CheckCodePrefix::E711 => vec![CheckCode::E711],
             CheckCodePrefix::E712 => vec![CheckCode::E712],
             CheckCodePrefix::E713 => vec![CheckCode::E713],
@@ -680,12 +684,14 @@ impl CheckCodePrefix {
             CheckCodePrefix::F62 => vec![CheckCode::F621, CheckCode::F622],
             CheckCodePrefix::F621 => vec![CheckCode::F621],
             CheckCodePrefix::F622 => vec![CheckCode::F622],
-            CheckCodePrefix::F63 => vec![
-                CheckCode::F631,
-                CheckCode::F632,
-                CheckCode::F633,
-                CheckCode::F634,
-            ],
+            CheckCodePrefix::F63 => {
+                vec![
+                    CheckCode::F631,
+                    CheckCode::F632,
+                    CheckCode::F633,
+                    CheckCode::F634,
+                ]
+            }
             CheckCodePrefix::F631 => vec![CheckCode::F631],
             CheckCodePrefix::F632 => vec![CheckCode::F632],
             CheckCodePrefix::F633 => vec![CheckCode::F633],
@@ -802,24 +808,30 @@ impl CheckCodePrefix {
             CheckCodePrefix::N816 => vec![CheckCode::N816],
             CheckCodePrefix::N817 => vec![CheckCode::N817],
             CheckCodePrefix::N818 => vec![CheckCode::N818],
-            CheckCodePrefix::Q => vec![
-                CheckCode::Q000,
-                CheckCode::Q001,
-                CheckCode::Q002,
-                CheckCode::Q003,
-            ],
-            CheckCodePrefix::Q0 => vec![
-                CheckCode::Q000,
-                CheckCode::Q001,
-                CheckCode::Q002,
-                CheckCode::Q003,
-            ],
-            CheckCodePrefix::Q00 => vec![
-                CheckCode::Q000,
-                CheckCode::Q001,
-                CheckCode::Q002,
-                CheckCode::Q003,
-            ],
+            CheckCodePrefix::Q => {
+                vec![
+                    CheckCode::Q000,
+                    CheckCode::Q001,
+                    CheckCode::Q002,
+                    CheckCode::Q003,
+                ]
+            }
+            CheckCodePrefix::Q0 => {
+                vec![
+                    CheckCode::Q000,
+                    CheckCode::Q001,
+                    CheckCode::Q002,
+                    CheckCode::Q003,
+                ]
+            }
+            CheckCodePrefix::Q00 => {
+                vec![
+                    CheckCode::Q000,
+                    CheckCode::Q001,
+                    CheckCode::Q002,
+                    CheckCode::Q003,
+                ]
+            }
             CheckCodePrefix::Q000 => vec![CheckCode::Q000],
             CheckCodePrefix::Q001 => vec![CheckCode::Q001],
             CheckCodePrefix::Q002 => vec![CheckCode::Q002],

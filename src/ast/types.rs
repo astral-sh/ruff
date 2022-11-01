@@ -85,8 +85,8 @@ pub enum BindingKind {
 pub struct Binding {
     pub kind: BindingKind,
     pub range: Range,
-    /// Tuple of (scope index, range) indicating the scope and range at which the binding was
-    /// last used.
+    /// Tuple of (scope index, range) indicating the scope and range at which
+    /// the binding was last used.
     pub used: Option<(usize, Range)>,
 }
 

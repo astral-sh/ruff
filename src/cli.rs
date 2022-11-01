@@ -9,8 +9,7 @@ use regex::Regex;
 use crate::checks_gen::CheckCodePrefix;
 use crate::printer::SerializationFormat;
 use crate::settings::configuration::Configuration;
-use crate::settings::types::PatternPrefixPair;
-use crate::settings::types::PythonVersion;
+use crate::settings::types::{PatternPrefixPair, PythonVersion};
 
 #[derive(Debug, Parser)]
 #[command(author, about = "ruff: An extremely fast Python linter.")]
@@ -27,7 +26,8 @@ pub struct Cli {
     /// Only log errors.
     #[arg(short, long, group = "verbosity")]
     pub quiet: bool,
-    /// Disable all logging (but still exit with status code "1" upon detecting errors).
+    /// Disable all logging (but still exit with status code "1" upon detecting
+    /// errors).
     #[arg(short, long, group = "verbosity")]
     pub silent: bool,
     /// Exit with status code "0", even upon detecting errors.
@@ -45,19 +45,22 @@ pub struct Cli {
     /// List of error codes to enable.
     #[arg(long, value_delimiter = ',')]
     pub select: Vec<CheckCodePrefix>,
-    /// Like --select, but adds additional error codes on top of the selected ones.
+    /// Like --select, but adds additional error codes on top of the selected
+    /// ones.
     #[arg(long, value_delimiter = ',')]
     pub extend_select: Vec<CheckCodePrefix>,
     /// List of error codes to ignore.
     #[arg(long, value_delimiter = ',')]
     pub ignore: Vec<CheckCodePrefix>,
-    /// Like --ignore, but adds additional error codes on top of the ignored ones.
+    /// Like --ignore, but adds additional error codes on top of the ignored
+    /// ones.
     #[arg(long, value_delimiter = ',')]
     pub extend_ignore: Vec<CheckCodePrefix>,
     /// List of paths, used to exclude files and/or directories from checks.
     #[arg(long, value_delimiter = ',')]
     pub exclude: Vec<String>,
-    /// Like --exclude, but adds additional files and directories on top of the excluded ones.
+    /// Like --exclude, but adds additional files and directories on top of the
+    /// excluded ones.
     #[arg(long, value_delimiter = ',')]
     pub extend_exclude: Vec<String>,
     /// List of mappings from file pattern to code to exclude
@@ -139,7 +142,10 @@ pub fn warn_on(
                     path.to_string_lossy()
                 )
             } else {
-                warn!("{code:?} was passed to {flag}, but ignored by the default `extend_ignore` field")
+                warn!(
+                    "{code:?} was passed to {flag}, but ignored by the default `extend_ignore` \
+                     field"
+                )
             }
         }
     }

@@ -10,7 +10,8 @@ use rustpython_parser::lexer::Tok;
 enum State {
     // Start of the module: first string gets marked as a docstring.
     ExpectModuleDocstring,
-    // After seeing a class definition, we're waiting for the block colon (and do bracket counting).
+    // After seeing a class definition, we're waiting for the block colon (and do bracket
+    // counting).
     ExpectClassColon,
     // After seeing the block colon in a class definition, we expect a docstring.
     ExpectClassDocstring,

@@ -25,7 +25,8 @@ pub fn compute_offsets(contents: &str) -> Vec<Vec<usize>> {
             char_index = i + char.len_utf8();
         }
     }
-    // If we end in a newline, add an extra character to indicate the start of that line.
+    // If we end in a newline, add an extra character to indicate the start of that
+    // line.
     if newline {
         offsets[line_index].push(char_index);
     }

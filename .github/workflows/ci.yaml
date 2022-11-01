@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          profile: minimal
+          toolchain: 1.63.0
       - uses: actions/cache@v3
         env:
           cache-name: cache-cargo
@@ -36,7 +37,9 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          profile: minimal
+          toolchain: nightly-2022-11-01
+          components: rustfmt
       - uses: actions/cache@v3
         env:
           cache-name: cache-cargo
@@ -58,7 +61,9 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          profile: minimal
+          toolchain: nightly-2022-11-01
+          components: clippy
       - uses: actions/cache@v3
         env:
           cache-name: cache-cargo
@@ -80,7 +85,8 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          profile: minimal
+          toolchain: nightly-2022-11-01
       - uses: actions/cache@v3
         env:
           cache-name: cache-cargo
@@ -102,7 +108,8 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          profile: minimal
+          toolchain: nightly-2022-11-01
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"

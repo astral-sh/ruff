@@ -153,8 +153,8 @@ pub const BUILTINS: &[&str] = &[
     "zip",
 ];
 
-// Globally defined names which are not attributes of the builtins module, or are only present on
-// some platforms.
+// Globally defined names which are not attributes of the builtins module, or
+// are only present on some platforms.
 pub const MAGIC_GLOBALS: &[&str] = &[
     "WindowsError",
     "__annotations__",

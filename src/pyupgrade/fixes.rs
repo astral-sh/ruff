@@ -79,7 +79,8 @@ pub fn remove_class_def_base(
             _ => None,
         }
     } else {
-        // Case 3: `object` is the last node, so we have to find the last token that isn't a comma.
+        // Case 3: `object` is the last node, so we have to find the last token that
+        // isn't a comma.
         let mut fix_start: Option<Location> = None;
         let mut fix_end: Option<Location> = None;
         for (start, tok, end) in lexer::make_tokenizer(content).flatten() {

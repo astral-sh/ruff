@@ -4,13 +4,13 @@ use std::str::FromStr;
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
-
 use ruff::checks_gen::CheckCodePrefix;
 use ruff::settings::types::PatternPrefixPair;
 
 static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
-/// Parse a comma-separated list of `CheckCodePrefix` values (e.g., "F401,E501").
+/// Parse a comma-separated list of `CheckCodePrefix` values (e.g.,
+/// "F401,E501").
 pub fn parse_prefix_codes(value: &str) -> Vec<CheckCodePrefix> {
     let mut codes: Vec<CheckCodePrefix> = vec![];
     for code in COMMA_SEPARATED_LIST_RE.split(value) {
@@ -184,7 +184,6 @@ pub fn collect_per_file_ignores(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-
     use ruff::checks_gen::CheckCodePrefix;
     use ruff::settings::types::PatternPrefixPair;
 
