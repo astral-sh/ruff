@@ -293,7 +293,7 @@ jobs:
       - name: Publish to PyPi
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          TWINE_PASSWORD: ${{ secrets.FLAKE8_TO_RUFF_TOKEN }}
         run: |
           pip install --upgrade twine
           twine upload --skip-existing *
