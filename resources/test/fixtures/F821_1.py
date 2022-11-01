@@ -16,3 +16,15 @@ import typing
 
 # F821 Undefined name `Model`
 x = typing.cast("Model", x)
+
+
+from typing import Pattern
+
+# F821 Undefined name `Model`
+x = Pattern["Model"]
+
+
+from typing.re import Match
+
+# F821 Undefined name `Model`
+x = Match["Model"]

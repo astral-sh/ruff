@@ -37,7 +37,14 @@ use crate::{
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
-const TRACK_FROM_IMPORTS: [&str; 1] = ["typing"];
+const TRACK_FROM_IMPORTS: [&str; 6] = [
+    "collections",
+    "collections.abc",
+    "contextlib",
+    "re",
+    "typing",
+    "typing.re",
+];
 
 pub struct Checker<'a> {
     // Input data.
@@ -1396,7 +1403,7 @@ where
                 }
             }
             ExprKind::Subscript { value, slice, ctx } => {
-                match typing::match_annotated_subscript(value, self.from_imports.get("typing")) {
+                match typing::match_annotated_subscript(value, &self.from_imports) {
                     Some(subscript) => match subscript {
                         // Ex) Optional[int]
                         SubscriptKind::AnnotatedSubscript => {
