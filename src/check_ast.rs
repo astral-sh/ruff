@@ -11,7 +11,7 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast::helpers::{extract_handler_names, match_name_or_attr, SubscriptKind};
+use crate::ast::helpers::{extract_handler_names, match_name_or_attr_from_module};
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -25,6 +25,8 @@ use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
+use crate::python::typing;
+use crate::python::typing::SubscriptKind;
 use crate::settings::types::PythonVersion;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
@@ -34,7 +36,8 @@ use crate::{
     pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
-pub const GLOBAL_SCOPE_INDEX: usize = 0;
+const GLOBAL_SCOPE_INDEX: usize = 0;
+const TRACK_FROM_IMPORTS: [&str; 1] = ["typing"];
 
 pub struct Checker<'a> {
     // Input data.
@@ -70,6 +73,7 @@ pub struct Checker<'a> {
     futures_allowed: bool,
     annotations_future_enabled: bool,
     except_handlers: Vec<Vec<String>>,
+    from_imports: BTreeMap<&'a str, BTreeSet<&'a str>>,
 }
 
 impl<'a> Checker<'a> {
@@ -101,19 +105,25 @@ impl<'a> Checker<'a> {
                 modifier: Modifier::Module,
                 visibility: module_visibility(path),
             },
-            in_f_string: None,
+            in_f_string: Default::default(),
             in_annotation: Default::default(),
             in_literal: Default::default(),
             seen_import_boundary: Default::default(),
             futures_allowed: true,
             annotations_future_enabled: Default::default(),
             except_handlers: Default::default(),
+            from_imports: Default::default(),
         }
     }
 
     /// Return `true` if a patch should be generated under the given autofix `Mode`.
     pub fn patch(&self) -> bool {
         self.autofix.patch()
+    }
+
+    /// Return `true` if the `Expr` is a reference to `typing.${target}`.
+    pub fn match_typing_module(&self, expr: &Expr, target: &str) -> bool {
+        match_name_or_attr_from_module(expr, target, "typing", self.from_imports.get("typing"))
     }
 }
 
@@ -492,6 +502,24 @@ where
                 module,
                 level,
             } => {
+                // Track `import from` statements, to ensure that we can correctly attribute
+                // references like `from typing import Union`.
+                if level.map(|level| level == 0).unwrap_or(true) {
+                    if let Some(module) = module {
+                        if TRACK_FROM_IMPORTS.contains(&module.as_str()) {
+                            self.from_imports
+                                .entry(module)
+                                .or_insert_with(BTreeSet::new)
+                                .extend(
+                                    names
+                                        .iter()
+                                        .filter(|alias| alias.node.asname.is_none())
+                                        .map(|alias| alias.node.name.as_str()),
+                                )
+                        }
+                    }
+                }
+
                 if self.settings.enabled.contains(&CheckCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
                         self.checks.push(Check::new(
@@ -861,7 +889,7 @@ where
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
 
-                if match_name_or_attr(value, "Literal") {
+                if self.match_typing_module(value, "Literal") {
                     self.in_literal = true;
                 }
             }
@@ -886,6 +914,7 @@ where
                     // Ex) List[...]
                     if self.settings.enabled.contains(&CheckCode::U006)
                         && self.settings.target_version >= PythonVersion::Py39
+                        && typing::is_pep585_builtin(expr, self.from_imports.get("typing"))
                     {
                         pyupgrade::plugins::use_pep585_annotation(self, expr, id);
                     }
@@ -908,16 +937,13 @@ where
                 }
                 ExprContext::Del => self.handle_node_delete(expr),
             },
-            ExprKind::Attribute { value, attr, .. } => {
+            ExprKind::Attribute { attr, .. } => {
                 // Ex) typing.List[...]
                 if self.settings.enabled.contains(&CheckCode::U006)
                     && self.settings.target_version >= PythonVersion::Py39
+                    && typing::is_pep585_builtin(expr, self.from_imports.get("typing"))
                 {
-                    if let ExprKind::Name { id, .. } = &value.node {
-                        if id == "typing" {
-                            pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
-                        }
-                    }
+                    pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
             }
             ExprKind::Call {
@@ -1276,12 +1302,12 @@ where
                 args,
                 keywords,
             } => {
-                if match_name_or_attr(func, "ForwardRef") {
+                if self.match_typing_module(func, "ForwardRef") {
                     self.visit_expr(func);
                     for expr in args {
                         self.visit_annotation(expr);
                     }
-                } else if match_name_or_attr(func, "cast") {
+                } else if self.match_typing_module(func, "cast") {
                     self.visit_expr(func);
                     if !args.is_empty() {
                         self.visit_annotation(&args[0]);
@@ -1289,12 +1315,12 @@ where
                     for expr in args.iter().skip(1) {
                         self.visit_expr(expr);
                     }
-                } else if match_name_or_attr(func, "NewType") {
+                } else if self.match_typing_module(func, "NewType") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.visit_annotation(expr);
                     }
-                } else if match_name_or_attr(func, "TypeVar") {
+                } else if self.match_typing_module(func, "TypeVar") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.visit_annotation(expr);
@@ -1311,7 +1337,7 @@ where
                             }
                         }
                     }
-                } else if match_name_or_attr(func, "NamedTuple") {
+                } else if self.match_typing_module(func, "NamedTuple") {
                     self.visit_expr(func);
 
                     // Ex) NamedTuple("a", [("a", int)])
@@ -1343,7 +1369,7 @@ where
                         let KeywordData { value, .. } = &keyword.node;
                         self.visit_annotation(value);
                     }
-                } else if match_name_or_attr(func, "TypedDict") {
+                } else if self.match_typing_module(func, "TypedDict") {
                     self.visit_expr(func);
 
                     // Ex) TypedDict("a", {"a": int})
@@ -1370,7 +1396,7 @@ where
                 }
             }
             ExprKind::Subscript { value, slice, ctx } => {
-                match helpers::match_annotated_subscript(value) {
+                match typing::match_annotated_subscript(value, self.from_imports.get("typing")) {
                     Some(subscript) => match subscript {
                         // Ex) Optional[int]
                         SubscriptKind::AnnotatedSubscript => {
