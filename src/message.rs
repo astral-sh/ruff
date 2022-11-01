@@ -43,7 +43,7 @@ impl fmt::Display for Message {
             ":".cyan(),
             self.location.row(),
             ":".cyan(),
-            self.location.column(),
+            self.location.column() + 1,
             ":".cyan(),
             self.kind.code().as_ref().red().bold(),
             self.kind.body()
