@@ -640,7 +640,7 @@ extend-ignore = [
 
 ## Development
 
-Ruff is written in Rust (1.63.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
+Ruff is written in Rust (1.64.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
 for development.
 
 Assuming you have `cargo` installed, you can run:

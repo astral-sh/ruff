@@ -15,7 +15,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.63.0
       - uses: actions/cache@v3
         env:
           cache-name: cache-cargo
