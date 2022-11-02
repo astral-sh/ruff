@@ -108,10 +108,7 @@ For example, you could configure Ruff to only enforce a subset of rules with:
 line-length = 88
 select = ["E", "F"]
 ignore = ["E501"]
-per-file-ignores = [
-    "__init__.py:F401",
-    "path/to/file.py:F401"
-]
+per-file-ignores = {"__init__.py" = ["F401"], "path/to/file.py" = ["F401"]}
 ```
 
 Plugin configurations should be expressed as subsections, e.g.:
