@@ -22,7 +22,7 @@ pub fn convert(config: HashMap<String, HashMap<String, Option<String>>>) -> Resu
         if let Some(value) = value {
             match key.as_str() {
                 // flake8
-                "line-length" | "line_length" => match value.clone().parse::<usize>() {
+                "max-line-length" | "max_line_length" => match value.clone().parse::<usize>() {
                     Ok(line_length) => options.line_length = Some(line_length),
                     Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                 },
