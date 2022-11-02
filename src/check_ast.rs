@@ -37,13 +37,16 @@ use crate::{
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
-const TRACK_FROM_IMPORTS: [&str; 6] = [
+const TRACK_FROM_IMPORTS: [&str; 9] = [
     "collections",
     "collections.abc",
     "contextlib",
     "re",
     "typing",
+    "typing.io",
     "typing.re",
+    "typing_extensions",
+    "weakref",
 ];
 
 pub struct Checker<'a> {
@@ -132,6 +135,13 @@ impl<'a> Checker<'a> {
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_module(&self, expr: &Expr, target: &str) -> bool {
         match_name_or_attr_from_module(expr, target, "typing", self.from_imports.get("typing"))
+            || (typing::in_extensions(target)
+                && match_name_or_attr_from_module(
+                    expr,
+                    target,
+                    "typing_extensions",
+                    self.from_imports.get("typing_extensions"),
+                ))
     }
 }
 
