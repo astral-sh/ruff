@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UndefinedName: Model
+  location:
+    row: 5
+    column: 11
+  end_location:
+    row: 5
+    column: 18
+  fix: ~
+

@@ -3,6 +3,66 @@ use std::collections::{BTreeMap, BTreeSet};
 use once_cell::sync::Lazy;
 use rustpython_ast::{Expr, ExprKind};
 
+// See: https://pypi.org/project/typing-extensions/
+static TYPING_EXTENSIONS: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
+    BTreeSet::from([
+        "Annotated",
+        "Any",
+        "AsyncContextManager",
+        "AsyncGenerator",
+        "AsyncIterable",
+        "AsyncIterator",
+        "Awaitable",
+        "ChainMap",
+        "ClassVar",
+        "Concatenate",
+        "ContextManager",
+        "Coroutine",
+        "Counter",
+        "DefaultDict",
+        "Deque",
+        "Final",
+        "Literal",
+        "LiteralString",
+        "NamedTuple",
+        "Never",
+        "NewType",
+        "NotRequired",
+        "OrderedDict",
+        "ParamSpec",
+        "ParamSpecArgs",
+        "ParamSpecKwargs",
+        "Protocol",
+        "Required",
+        "Self",
+        "TYPE_CHECKING",
+        "Text",
+        "Type",
+        "TypeAlias",
+        "TypeGuard",
+        "TypeVar",
+        "TypeVarTuple",
+        "TypedDict",
+        "Unpack",
+        "assert_never",
+        "assert_type",
+        "clear_overloads",
+        "final",
+        "get_Type_hints",
+        "get_args",
+        "get_origin",
+        "get_overloads",
+        "is_typeddict",
+        "overload",
+        "reveal_type",
+        "runtime_checkable",
+    ])
+});
+
+pub fn in_extensions(name: &str) -> bool {
+    TYPING_EXTENSIONS.contains(name)
+}
+
 // See: https://docs.python.org/3/library/typing.html
 static IMPORTED_SUBSCRIPTS: Lazy<BTreeMap<&'static str, BTreeSet<&'static str>>> =
     Lazy::new(|| {
@@ -48,9 +108,7 @@ static IMPORTED_SUBSCRIPTS: Lazy<BTreeMap<&'static str, BTreeSet<&'static str>>>
             ("AbstractSet", "typing"),
             ("Annotated", "typing"),
             ("AsyncContextManager", "typing"),
-            ("AsyncContextManager", "typing"),
             ("AsyncGenerator", "typing"),
-            ("AsyncIterable", "typing"),
             ("AsyncIterator", "typing"),
             ("Awaitable", "typing"),
             ("BinaryIO", "typing"),
@@ -61,7 +119,6 @@ static IMPORTED_SUBSCRIPTS: Lazy<BTreeMap<&'static str, BTreeSet<&'static str>>>
             ("Collection", "typing"),
             ("Concatenate", "typing"),
             ("Container", "typing"),
-            ("ContextManager", "typing"),
             ("ContextManager", "typing"),
             ("Coroutine", "typing"),
             ("Counter", "typing"),
@@ -92,7 +149,6 @@ static IMPORTED_SUBSCRIPTS: Lazy<BTreeMap<&'static str, BTreeSet<&'static str>>>
             ("TextIO", "typing"),
             ("Tuple", "typing"),
             ("Type", "typing"),
-            ("Type", "typing"),
             ("TypeGuard", "typing"),
             ("Union", "typing"),
             ("Unpack", "typing"),
@@ -104,6 +160,23 @@ static IMPORTED_SUBSCRIPTS: Lazy<BTreeMap<&'static str, BTreeSet<&'static str>>>
             // `typing.re`
             ("Match", "typing.re"),
             ("Pattern", "typing.re"),
+            // `typing_extensions`
+            ("Annotated", "typing_extensions"),
+            ("AsyncContextManager", "typing_extensions"),
+            ("AsyncGenerator", "typing_extensions"),
+            ("AsyncIterable", "typing_extensions"),
+            ("AsyncIterator", "typing_extensions"),
+            ("Awaitable", "typing_extensions"),
+            ("ChainMap", "typing_extensions"),
+            ("ClassVar", "typing_extensions"),
+            ("Concatenate", "typing_extensions"),
+            ("ContextManager", "typing_extensions"),
+            ("Coroutine", "typing_extensions"),
+            ("Counter", "typing_extensions"),
+            ("DefaultDict", "typing_extensions"),
+            ("Deque", "typing_extensions"),
+            ("Literal", "typing_extensions"),
+            ("Type", "typing_extensions"),
             // `weakref`
             ("WeakKeyDictionary", "weakref"),
             ("WeakSet", "weakref"),
@@ -187,7 +260,8 @@ pub fn match_annotated_subscript(
 }
 
 /// Returns `true` if `Expr` represents a reference to a typing object with a
-/// PEP 585 built-in.
+/// PEP 585 built-in. Note that none of the PEP 585 built-ins are in
+/// `typing_extensions`.
 pub fn is_pep585_builtin(expr: &Expr, typing_imports: Option<&BTreeSet<&str>>) -> bool {
     match &expr.node {
         ExprKind::Attribute { attr, value, .. } => {
