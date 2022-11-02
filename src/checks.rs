@@ -1469,6 +1469,12 @@ impl CheckKind {
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::TypeOfPrimitive(_)
                 | CheckKind::UnnecessaryAbspath
+                | CheckKind::UnnecessaryCollectionCall(_)
+                | CheckKind::UnnecessaryGeneratorList
+                | CheckKind::UnnecessaryGeneratorSet
+                | CheckKind::UnnecessaryListCall
+                | CheckKind::UnnecessaryListComprehensionSet
+                | CheckKind::UnnecessaryLiteralSet(_)
                 | CheckKind::UnusedImport(_, false)
                 | CheckKind::UnusedLoopControlVariable(_)
                 | CheckKind::UnusedNOQA(_)

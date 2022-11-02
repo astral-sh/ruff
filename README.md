@@ -392,17 +392,17 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C400 | UnnecessaryGeneratorList | Unnecessary generator (rewrite as a `list` comprehension) |  |
-| C401 | UnnecessaryGeneratorSet | Unnecessary generator (rewrite as a `set` comprehension) |  |
+| C400 | UnnecessaryGeneratorList | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
+| C401 | UnnecessaryGeneratorSet | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
 | C402 | UnnecessaryGeneratorDict | Unnecessary generator (rewrite as a `dict` comprehension) |  |
-| C403 | UnnecessaryListComprehensionSet | Unnecessary `list` comprehension (rewrite as a `set` comprehension) |  |
+| C403 | UnnecessaryListComprehensionSet | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
 | C404 | UnnecessaryListComprehensionDict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) |  |
-| C405 | UnnecessaryLiteralSet | Unnecessary `(list\|tuple)` literal (rewrite as a `set` literal) |  |
+| C405 | UnnecessaryLiteralSet | Unnecessary `(list\|tuple)` literal (rewrite as a `set` literal) | 🛠 |
 | C406 | UnnecessaryLiteralDict | Unnecessary `(list\|tuple)` literal (rewrite as a `dict` literal) |  |
-| C408 | UnnecessaryCollectionCall | Unnecessary `(dict\|list\|tuple)` call (rewrite as a literal) |  |
+| C408 | UnnecessaryCollectionCall | Unnecessary `(dict\|list\|tuple)` call (rewrite as a literal) | 🛠 |
 | C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary `(list\|tuple)` literal passed to `tuple()` (remove the outer call to `tuple()`) |  |
 | C410 | UnnecessaryLiteralWithinListCall | Unnecessary `(list\|tuple)` literal passed to `list()` (rewrite as a `list` literal) |  |
-| C411 | UnnecessaryListCall | Unnecessary `list` call (remove the outer call to `list()`) |  |
+| C411 | UnnecessaryListCall | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
 | C413 | UnnecessaryCallAroundSorted | Unnecessary `(list\|reversed)` call around `sorted()` |  |
 | C414 | UnnecessaryDoubleCastOrProcess | Unnecessary `(list\|reversed\|set\|sorted\|tuple)` call within `(list\|set\|sorted\|tuple)()` |  |
 | C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within `(reversed\|set\|sorted)()` |  |
@@ -521,7 +521,7 @@ including:
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (10/32)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (9/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
 Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
@@ -545,7 +545,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (10/32)
 
 Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
-and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (8/34).
+and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (9/34).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 
