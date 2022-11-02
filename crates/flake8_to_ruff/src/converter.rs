@@ -102,3 +102,142 @@ pub fn convert(config: HashMap<String, HashMap<String, Option<String>>>) -> Resu
     // Create the pyproject.toml.
     Ok(Pyproject::new(options))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use anyhow::Result;
+    use ruff::flake8_quotes;
+    use ruff::settings::options::Options;
+    use ruff::settings::pyproject::Pyproject;
+
+    use crate::converter::convert;
+
+    #[test]
+    fn it_converts_empty() -> Result<()> {
+        let actual = convert(HashMap::from([("flake8".to_string(), HashMap::from([]))]))?;
+        let expected = Pyproject::new(Options {
+            line_length: None,
+            exclude: None,
+            extend_exclude: None,
+            select: None,
+            extend_select: None,
+            ignore: None,
+            extend_ignore: None,
+            per_file_ignores: None,
+            dummy_variable_rgx: None,
+            target_version: None,
+            flake8_quotes: None,
+            pep8_naming: None,
+        });
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_converts_dashes() -> Result<()> {
+        let actual = convert(HashMap::from([(
+            "flake8".to_string(),
+            HashMap::from([("max-line-length".to_string(), Some("100".to_string()))]),
+        )]))?;
+        let expected = Pyproject::new(Options {
+            line_length: Some(100),
+            exclude: None,
+            extend_exclude: None,
+            select: None,
+            extend_select: None,
+            ignore: None,
+            extend_ignore: None,
+            per_file_ignores: None,
+            dummy_variable_rgx: None,
+            target_version: None,
+            flake8_quotes: None,
+            pep8_naming: None,
+        });
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_converts_underscores() -> Result<()> {
+        let actual = convert(HashMap::from([(
+            "flake8".to_string(),
+            HashMap::from([("max_line_length".to_string(), Some("100".to_string()))]),
+        )]))?;
+        let expected = Pyproject::new(Options {
+            line_length: Some(100),
+            exclude: None,
+            extend_exclude: None,
+            select: None,
+            extend_select: None,
+            ignore: None,
+            extend_ignore: None,
+            per_file_ignores: None,
+            dummy_variable_rgx: None,
+            target_version: None,
+            flake8_quotes: None,
+            pep8_naming: None,
+        });
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_ignores_parse_errors() -> Result<()> {
+        let actual = convert(HashMap::from([(
+            "flake8".to_string(),
+            HashMap::from([("max_line_length".to_string(), Some("abc".to_string()))]),
+        )]))?;
+        let expected = Pyproject::new(Options {
+            line_length: None,
+            exclude: None,
+            extend_exclude: None,
+            select: None,
+            extend_select: None,
+            ignore: None,
+            extend_ignore: None,
+            per_file_ignores: None,
+            dummy_variable_rgx: None,
+            target_version: None,
+            flake8_quotes: None,
+            pep8_naming: None,
+        });
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_converts_extensions() -> Result<()> {
+        let actual = convert(HashMap::from([(
+            "flake8".to_string(),
+            HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
+        )]))?;
+        let expected = Pyproject::new(Options {
+            line_length: None,
+            exclude: None,
+            extend_exclude: None,
+            select: None,
+            extend_select: None,
+            ignore: None,
+            extend_ignore: None,
+            per_file_ignores: None,
+            dummy_variable_rgx: None,
+            target_version: None,
+            flake8_quotes: Some(flake8_quotes::settings::Options {
+                inline_quotes: Some(flake8_quotes::settings::Quote::Single),
+                multiline_quotes: None,
+                docstring_quotes: None,
+                avoid_escape: None,
+            }),
+            pep8_naming: None,
+        });
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+}
