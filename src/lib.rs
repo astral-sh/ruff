@@ -45,8 +45,8 @@ pub mod settings;
 pub mod source_code_locator;
 pub mod visibility;
 
-/// Run ruff over Python source code directly.
-pub fn check(path: &Path, contents: &str) -> Result<Vec<Check>> {
+/// Run Ruff over Python source code directly.
+pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     // Find the project root and pyproject.toml.
     let project_root = pyproject::find_project_root(&[path.to_path_buf()]);
     match &project_root {
@@ -75,7 +75,7 @@ pub fn check(path: &Path, contents: &str) -> Result<Vec<Check>> {
         tokens,
         &noqa_line_for,
         &settings,
-        &Mode::None,
+        &if autofix { Mode::Generate } else { Mode::None },
     )?;
 
     Ok(checks)
