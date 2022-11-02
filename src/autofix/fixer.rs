@@ -6,6 +6,8 @@ use rustpython_parser::ast::Location;
 use crate::autofix::{Fix, Patch};
 use crate::checks::Check;
 
+// TODO(charlie): The model here is awkward because `Apply` is only relevant at
+// higher levels in the execution flow.
 #[derive(Hash)]
 pub enum Mode {
     Generate,
