@@ -4,9 +4,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
-use rustpython_parser::lexer;
-
 use ruff::fs;
+use rustpython_parser::lexer;
 
 #[derive(Debug, Parser)]
 struct Cli {

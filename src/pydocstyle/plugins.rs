@@ -162,7 +162,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
             } = &docstring.node
             {
                 if checker.settings.enabled.contains(&CheckCode::D201) {
-                    let (before, _, _) = checker.locator.partition_source_code_at(
+                    let (before, ..) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
                         &Range::from_located(docstring),
                     );
@@ -248,7 +248,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                 if checker.settings.enabled.contains(&CheckCode::D203)
                     || checker.settings.enabled.contains(&CheckCode::D211)
                 {
-                    let (before, _, _) = checker.locator.partition_source_code_at(
+                    let (before, ..) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
                         &Range::from_located(docstring),
                     );
@@ -406,7 +406,8 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
 
                 let line_indent = helpers::leading_space(lines[i]);
 
-                // We only report tab indentation once, so only check if we haven't seen a tab yet.
+                // We only report tab indentation once, so only check if we haven't seen a tab
+                // yet.
                 has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
                 if checker.settings.enabled.contains(&CheckCode::D207) {
@@ -432,9 +433,10 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 }
 
                 // Like pydocstyle, we only report over-indentation if either: (1) every line
-                // (except, optionally, the last line) is over-indented, or (2) the last line (which
-                // contains the closing quotation marks) is over-indented. We can't know if we've
-                // achieved that condition until we've viewed all the lines, so for now, just track
+                // (except, optionally, the last line) is over-indented, or (2) the last line
+                // (which contains the closing quotation marks) is
+                // over-indented. We can't know if we've achieved that condition
+                // until we've viewed all the lines, so for now, just track
                 // the over-indentation status of every line.
                 if i < lines.len() - 1 {
                     if line_indent.len() > docstring_indent.len() {
@@ -855,7 +857,8 @@ pub fn not_empty(checker: &mut Checker, definition: &Definition) -> bool {
     true
 }
 
-/// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413, D414, D416, D417
+/// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
+/// D414, D416, D417
 pub fn sections(checker: &mut Checker, definition: &Definition) {
     if let Some(docstring) = definition.docstring {
         if let ExprKind::Constant {
@@ -1304,11 +1307,9 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
                 .chain(arguments.kwonlyargs.iter())
                 .skip(
                     // If this is a non-static method, skip `cls` or `self`.
-                    if matches!(definition.kind, DefinitionKind::Method(_)) && !is_static(parent) {
-                        1
-                    } else {
-                        0
-                    },
+                    usize::from(
+                        matches!(definition.kind, DefinitionKind::Method(_)) && !is_static(parent),
+                    ),
                 )
                 .collect();
             if let Some(arg) = &arguments.vararg {
@@ -1403,7 +1404,8 @@ fn parameters_section(checker: &mut Checker, definition: &Definition, context: &
                 // Otherwise, it's just a list of parameters on the current line.
                 current_line.trim()
             };
-            // Notably, NumPy lets you put multiple parameters of the same type on the same line.
+            // Notably, NumPy lets you put multiple parameters of the same type on the same
+            // line.
             for parameter in parameters.split(',') {
                 docstring_args.insert(parameter.trim());
             }

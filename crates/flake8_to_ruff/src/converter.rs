@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-
-use ruff::flake8_quotes;
 use ruff::flake8_quotes::settings::Quote;
-use ruff::pep8_naming;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
+use ruff::{flake8_quotes, pep8_naming};
 
 use crate::parser;
 

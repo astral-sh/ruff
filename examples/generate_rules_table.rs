@@ -1,8 +1,7 @@
 //! Generate a Markdown-compatible table of supported lint rules.
 
-use strum::IntoEnumIterator;
-
 use ruff::checks::{CheckCategory, CheckCode};
+use strum::IntoEnumIterator;
 
 fn main() {
     for check_category in CheckCategory::iter() {

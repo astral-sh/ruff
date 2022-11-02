@@ -148,8 +148,7 @@ mod tests {
     use crate::checks::{Check, CheckCode};
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::tokenize;
-    use crate::{flake8_quotes, linter, Settings};
-    use crate::{fs, noqa};
+    use crate::{flake8_quotes, fs, linter, noqa, Settings};
 
     fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;

@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Parser;
 use configparser::ini::Ini;
-
 use flake8_to_ruff::converter;
 
 #[derive(Parser)]
@@ -14,7 +13,8 @@ use flake8_to_ruff::converter;
     long_about = None
 )]
 struct Cli {
-    /// Path to the Flake8 configuration file (e.g., 'setup.cfg', 'tox.ini', or '.flake8').
+    /// Path to the Flake8 configuration file (e.g., 'setup.cfg', 'tox.ini', or
+    /// '.flake8').
     #[arg(required = true)]
     file: PathBuf,
 }

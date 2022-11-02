@@ -41,7 +41,8 @@ pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
 
 /// Return `true` if the `Expr` is a reference to `${module}.${target}`.
 ///
-/// Useful for, e.g., ensuring that a `Union` reference represents `typing.Union`.
+/// Useful for, e.g., ensuring that a `Union` reference represents
+/// `typing.Union`.
 pub fn match_name_or_attr_from_module(
     expr: &Expr,
     target: &str,
@@ -66,8 +67,8 @@ pub fn match_name_or_attr_from_module(
 static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
 pub fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
-    // Check whether it's an assignment to a dunder, with or without a type annotation.
-    // This is what pycodestyle (as of 2.9.1) does.
+    // Check whether it's an assignment to a dunder, with or without a type
+    // annotation. This is what pycodestyle (as of 2.9.1) does.
     match node {
         StmtKind::Assign {
             targets,
@@ -128,7 +129,8 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
     }
 }
 
-/// Convert a location within a file (relative to `base`) to an absolute position.
+/// Convert a location within a file (relative to `base`) to an absolute
+/// position.
 pub fn to_absolute(relative: &Location, base: &Location) -> Location {
     if relative.row() == 1 {
         Location::new(

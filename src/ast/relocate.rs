@@ -8,7 +8,8 @@ fn relocate_keyword(keyword: &mut Keyword, location: Range) {
     relocate_expr(&mut keyword.node.value, location);
 }
 
-/// Change an expression's location (recursively) to match a desired, fixed location.
+/// Change an expression's location (recursively) to match a desired, fixed
+/// location.
 pub fn relocate_expr(expr: &mut Expr, location: Range) {
     expr.location = location.location;
     expr.end_location = Some(location.end_location);

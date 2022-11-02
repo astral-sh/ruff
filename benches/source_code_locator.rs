@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-
 use ruff::fs;
 use ruff::source_code_locator::compute_offsets;
 

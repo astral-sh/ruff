@@ -5,9 +5,7 @@ use std::path::Path;
 use anyhow::Result;
 use log::debug;
 use rustpython_parser::lexer::LexResult;
-
-use settings::pyproject;
-use settings::Settings;
+use settings::{pyproject, Settings};
 
 use crate::autofix::fixer::Mode;
 use crate::checks::Check;

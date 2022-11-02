@@ -243,9 +243,7 @@ mod tests {
     use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
     use crate::linter::tokenize;
-    use crate::settings;
-    use crate::{fs, noqa};
-    use crate::{linter, Settings};
+    use crate::{fs, linter, noqa, settings, Settings};
 
     fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;

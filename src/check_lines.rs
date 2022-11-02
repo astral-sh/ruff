@@ -5,8 +5,7 @@ use std::collections::BTreeMap;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
-use crate::autofix::fixer;
-use crate::autofix::Fix;
+use crate::autofix::{fixer, Fix};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::noqa;
 use crate::noqa::Directive;
@@ -68,7 +67,7 @@ pub fn check_lines(
                     .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
 
                 match noqa {
-                    (Directive::All(_, _), matches) => {
+                    (Directive::All(..), matches) => {
                         matches.push(check.kind.code().as_ref());
                         ignored.push(index)
                     }
@@ -100,7 +99,7 @@ pub fn check_lines(
                 );
 
                 match noqa {
-                    (Directive::All(_, _), matches) => {
+                    (Directive::All(..), matches) => {
                         matches.push(check.kind.code().as_ref());
                     }
                     (Directive::Codes(_, _, codes), matches) => {
@@ -118,8 +117,8 @@ pub fn check_lines(
 
     // Enforce newlines at end of files.
     if settings.enabled.contains(&CheckCode::W292) && !contents.ends_with('\n') {
-        // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't want to
-        // raise W292 anyway).
+        // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
+        // want to raise W292 anyway).
         if let Some(line) = lines.last() {
             let lineno = lines.len() - 1;
             let noqa_lineno = noqa_line_for
@@ -140,7 +139,7 @@ pub fn check_lines(
             );
 
             match noqa {
-                (Directive::All(_, _), matches) => {
+                (Directive::All(..), matches) => {
                     matches.push(check.kind.code().as_ref());
                 }
                 (Directive::Codes(_, _, codes), matches) => {
@@ -227,11 +226,10 @@ pub fn check_lines(
 
 #[cfg(test)]
 mod tests {
+    use super::check_lines;
     use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
     use crate::settings::Settings;
-
-    use super::check_lines;
 
     #[test]
     fn e501_non_ascii_char() {

@@ -186,7 +186,8 @@ pub fn match_annotated_subscript(
     None
 }
 
-/// Returns `true` if `Expr` represents a reference to a typing object with a PEP 585 built-in.
+/// Returns `true` if `Expr` represents a reference to a typing object with a
+/// PEP 585 built-in.
 pub fn is_pep585_builtin(expr: &Expr, typing_imports: Option<&BTreeSet<&str>>) -> bool {
     match &expr.node {
         ExprKind::Attribute { attr, value, .. } => {

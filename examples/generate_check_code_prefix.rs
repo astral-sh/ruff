@@ -4,9 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use codegen::{Scope, Type, Variant};
 use itertools::Itertools;
-use strum::IntoEnumIterator;
-
 use ruff::checks::CheckCode;
+use strum::IntoEnumIterator;
 
 fn main() {
     // Build up a map from prefix to matching CheckCodes.

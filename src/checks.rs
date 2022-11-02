@@ -395,7 +395,8 @@ pub enum CheckKind {
 }
 
 impl CheckCode {
-    /// The source for the check (either the AST, the filesystem, or the physical lines).
+    /// The source for the check (either the AST, the filesystem, or the
+    /// physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             CheckCode::E501 | CheckCode::W292 | CheckCode::M001 => &LintSource::Lines,
@@ -779,14 +780,14 @@ impl CheckKind {
             CheckKind::FutureFeatureNotDefined(_) => &CheckCode::F407,
             CheckKind::IOError(_) => &CheckCode::E902,
             CheckKind::IfTuple => &CheckCode::F634,
-            CheckKind::ImportShadowedByLoopVar(_, _) => &CheckCode::F402,
+            CheckKind::ImportShadowedByLoopVar(..) => &CheckCode::F402,
             CheckKind::ImportStarNotPermitted(_) => &CheckCode::F406,
-            CheckKind::ImportStarUsage(_, _) => &CheckCode::F405,
+            CheckKind::ImportStarUsage(..) => &CheckCode::F405,
             CheckKind::ImportStarUsed(_) => &CheckCode::F403,
             CheckKind::InvalidPrintSyntax => &CheckCode::F633,
             CheckKind::IsLiteral => &CheckCode::F632,
             CheckKind::LateFutureImport => &CheckCode::F404,
-            CheckKind::LineTooLong(_, _) => &CheckCode::E501,
+            CheckKind::LineTooLong(..) => &CheckCode::E501,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
             CheckKind::MultiValueRepeatedKeyLiteral => &CheckCode::F601,
             CheckKind::MultiValueRepeatedKeyVariable(_) => &CheckCode::F602,
@@ -797,13 +798,13 @@ impl CheckKind {
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
             CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::ExpressionsInStarAssignment => &CheckCode::F621,
-            CheckKind::TrueFalseComparison(_, _) => &CheckCode::E712,
+            CheckKind::TrueFalseComparison(..) => &CheckCode::E712,
             CheckKind::TwoStarredExpressions => &CheckCode::F622,
             CheckKind::TypeComparison => &CheckCode::E721,
             CheckKind::UndefinedExport(_) => &CheckCode::F822,
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
-            CheckKind::UnusedImport(_, _) => &CheckCode::F401,
+            CheckKind::UnusedImport(..) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
             CheckKind::YieldOutsideFunction => &CheckCode::F704,
             // pycodestyle warnings
@@ -851,7 +852,7 @@ impl CheckKind {
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
-            CheckKind::DeprecatedUnittestAlias(_, _) => &CheckCode::U005,
+            CheckKind::DeprecatedUnittestAlias(..) => &CheckCode::U005,
             CheckKind::UsePEP585Annotation(_) => &CheckCode::U006,
             CheckKind::UsePEP604Annotation => &CheckCode::U007,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
@@ -1059,7 +1060,9 @@ impl CheckKind {
             }
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
-            CheckKind::InvalidEscapeSequence(char) => format!("Invalid escape sequence: '\\{char}'"),
+            CheckKind::InvalidEscapeSequence(char) => {
+                format!("Invalid escape sequence: '\\{char}'")
+            }
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
                 format!("Variable `{name}` is shadowing a python builtin")
@@ -1071,15 +1074,25 @@ impl CheckKind {
                 format!("Class attribute `{name}` is shadowing a python builtin")
             }
             // flake8-bugbear
-            CheckKind::UnaryPrefixIncrement => "Python does not support the unary prefix increment. Writing `++n` is equivalent to `+(+(n))`, which equals `n`. You meant `n += 1`.".to_string(),
-            CheckKind::MutableArgumentDefault => "Do not use mutable data structures for argument defaults.".to_string(),
-            CheckKind::UnusedLoopControlVariable(name) => format!("Loop control variable `{name}` not used within the loop body. If this is intended, start the name with an underscore."),
-            CheckKind::DoNotAssertFalse => {
-                "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
-                    .to_string()
+            CheckKind::UnaryPrefixIncrement => "Python does not support the unary prefix \
+                                                increment. Writing `++n` is equivalent to \
+                                                `+(+(n))`, which equals `n`. You meant `n += 1`."
+                .to_string(),
+            CheckKind::MutableArgumentDefault => {
+                "Do not use mutable data structures for argument defaults.".to_string()
             }
+            CheckKind::UnusedLoopControlVariable(name) => format!(
+                "Loop control variable `{name}` not used within the loop body. If this is \
+                 intended, start the name with an underscore."
+            ),
+            CheckKind::DoNotAssertFalse => "Do not `assert False` (`python -O` removes these \
+                                            calls), raise `AssertionError()`"
+                .to_string(),
             CheckKind::RedundantTupleInExceptionHandler(name) => {
-                format!("A length-one tuple literal is redundant. Write `except {name}:` instead of `except ({name},):`.")
+                format!(
+                    "A length-one tuple literal is redundant. Write `except {name}:` instead of \
+                     `except ({name},):`."
+                )
             }
             CheckKind::DuplicateHandlerException(names) => {
                 if names.len() == 1 {
@@ -1091,8 +1104,12 @@ impl CheckKind {
                 }
             }
             CheckKind::NoAssertRaisesException => {
-                "`assertRaises(Exception):` should be considered evil. It can lead to your test passing even if the code being tested is never executed due to a typo. Either assert for a more specific exception (builtin or custom), use `assertRaisesRegex`, or use the context manager form of `assertRaises`.".to_string()
-           }
+                "`assertRaises(Exception):` should be considered evil. It can lead to your test \
+                 passing even if the code being tested is never executed due to a typo. Either \
+                 assert for a more specific exception (builtin or custom), use \
+                 `assertRaisesRegex`, or use the context manager form of `assertRaises`."
+                    .to_string()
+            }
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
             }
@@ -1124,22 +1141,26 @@ impl CheckKind {
             CheckKind::UnnecessaryLiteralWithinTupleCall(literal) => {
                 if literal == "list" {
                     format!(
-                        "Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` literal)"
+                        "Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a \
+                         `tuple` literal)"
                     )
                 } else {
                     format!(
-                        "Unnecessary `{literal}` literal passed to `tuple()` (remove the outer call to `tuple()`)"
+                        "Unnecessary `{literal}` literal passed to `tuple()` (remove the outer \
+                         call to `tuple()`)"
                     )
                 }
             }
             CheckKind::UnnecessaryLiteralWithinListCall(literal) => {
                 if literal == "list" {
                     format!(
-                        "Unnecessary `{literal}` literal passed to `list()` (remove the outer call to `list()`)"
+                        "Unnecessary `{literal}` literal passed to `list()` (remove the outer \
+                         call to `list()`)"
                     )
                 } else {
                     format!(
-                        "Unnecessary `{literal}` literal passed to `list()` (rewrite as a `list` literal)"
+                        "Unnecessary `{literal}` literal passed to `list()` (rewrite as a `list` \
+                         literal)"
                     )
                 }
             }
@@ -1169,25 +1190,29 @@ impl CheckKind {
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),
             // flake8-quotes
-            CheckKind::BadQuotesInlineString(quote) => {
-                match quote {
-                    Quote::Single => "Double quotes found but single quotes preferred".to_string(),
-                    Quote::Double => "Single quotes found but double quotes preferred".to_string(),
+            CheckKind::BadQuotesInlineString(quote) => match quote {
+                Quote::Single => "Double quotes found but single quotes preferred".to_string(),
+                Quote::Double => "Single quotes found but double quotes preferred".to_string(),
+            },
+            CheckKind::BadQuotesMultilineString(quote) => match quote {
+                Quote::Single => {
+                    "Double quote multiline found but single quotes preferred".to_string()
+                }
+                Quote::Double => {
+                    "Single quote multiline found but double quotes preferred".to_string()
                 }
             },
-            CheckKind::BadQuotesMultilineString(quote) => {
-                match quote {
-                    Quote::Single => "Double quote multiline found but single quotes preferred".to_string(),
-                    Quote::Double => "Single quote multiline found but double quotes preferred".to_string(),
+            CheckKind::BadQuotesDocstring(quote) => match quote {
+                Quote::Single => {
+                    "Double quote docstring found but single quotes preferred".to_string()
+                }
+                Quote::Double => {
+                    "Single quote docstring found but double quotes preferred".to_string()
                 }
             },
-            CheckKind::BadQuotesDocstring(quote) => {
-                match quote {
-                    Quote::Single => "Double quote docstring found but single quotes preferred".to_string(),
-                    Quote::Double => "Single quote docstring found but double quotes preferred".to_string(),
-                }
-            },
-            CheckKind::AvoidQuoteEscape => "Change outer quotes to avoid escaping inner quotes".to_string(),
+            CheckKind::AvoidQuoteEscape => {
+                "Change outer quotes to avoid escaping inner quotes".to_string()
+            }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
@@ -1226,10 +1251,9 @@ impl CheckKind {
             }
             CheckKind::EndsInPeriod => "First line should end with a period".to_string(),
             CheckKind::NonEmpty => "Docstring is empty".to_string(),
-            CheckKind::EndsInPunctuation => {
-                "First line should end with a period, question mark, or exclamation point"
-                    .to_string()
-            }
+            CheckKind::EndsInPunctuation => "First line should end with a period, question mark, \
+                                             or exclamation point"
+                .to_string(),
             CheckKind::FirstLineCapitalized => {
                 "First word of the first line should be properly capitalized".to_string()
             }
@@ -1291,7 +1315,10 @@ impl CheckKind {
                 format!("Missing dashed underline after section (\"{name}\")")
             }
             CheckKind::SectionUnderlineAfterName(name) => {
-                format!("Section underline should be in the line following the section's name (\"{name}\")")
+                format!(
+                    "Section underline should be in the line following the section's name \
+                     (\"{name}\")"
+                )
             }
             CheckKind::SectionUnderlineMatchesSectionLength(name) => {
                 format!("Section underline should match the length of its name (\"{name}\")")
@@ -1391,7 +1418,8 @@ impl CheckKind {
         }
     }
 
-    /// The summary text for the check. Typically a truncated form of the body text.
+    /// The summary text for the check. Typically a truncated form of the body
+    /// text.
     pub fn summary(&self) -> String {
         match self {
             CheckKind::UnaryPrefixIncrement => {

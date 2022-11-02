@@ -24,8 +24,9 @@ pub fn super_args(
 
     let mut parents = parents.iter().rev();
 
-    // For a `super` invocation to be unnecessary, the first argument needs to match the enclosing
-    // class, and the second argument needs to match the first argument to the enclosing function.
+    // For a `super` invocation to be unnecessary, the first argument needs to match
+    // the enclosing class, and the second argument needs to match the first
+    // argument to the enclosing function.
     if let [first_arg, second_arg] = args {
         // Find the enclosing function definition (if any).
         if let Some(StmtKind::FunctionDef {

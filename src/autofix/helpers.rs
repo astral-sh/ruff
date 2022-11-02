@@ -4,7 +4,8 @@ use rustpython_parser::ast::{ExcepthandlerKind, Location, Stmt, StmtKind};
 
 use crate::autofix::Fix;
 
-/// Determine if a body contains only a single statement, taking into account deleted.
+/// Determine if a body contains only a single statement, taking into account
+/// deleted.
 fn has_single_child(body: &[Stmt], deleted: &[&Stmt]) -> bool {
     body.iter().filter(|child| !deleted.contains(child)).count() == 1
 }
@@ -80,7 +81,8 @@ pub fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Res
         ))
     } else {
         // Otherwise, nuke the entire line.
-        // TODO(charlie): This logic assumes that there are no multi-statement physical lines.
+        // TODO(charlie): This logic assumes that there are no multi-statement physical
+        // lines.
         Ok(Fix::deletion(
             Location::new(stmt.location.row(), 0),
             Location::new(stmt.end_location.unwrap().row() + 1, 0),

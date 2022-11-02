@@ -1,0 +1,15 @@
+condense_wildcard_suffixes = true
+edition = "2021"
+format_strings = true
+group_imports = "StdExternalCrate"
+hex_literal_case = "Lower"
+imports_granularity = "Module"
+max_width = 100
+normalize_comments = true
+normalize_doc_attributes = true
+reorder_impl_items = true
+reorder_imports = true
+reorder_modules = true
+unstable_features = true
+use_field_init_shorthand = true
+wrap_comments = true

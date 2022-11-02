@@ -1,5 +1,6 @@
-//! User-provided program settings, taking into account pyproject.toml and command-line options.
-//! Structure mirrors the user-facing representation of the various parameters.
+//! User-provided program settings, taking into account pyproject.toml and
+//! command-line options. Structure mirrors the user-facing representation of
+//! the various parameters.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;

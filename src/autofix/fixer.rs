@@ -3,8 +3,7 @@ use std::collections::BTreeSet;
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 
-use crate::autofix::Fix;
-use crate::autofix::Patch;
+use crate::autofix::{Fix, Patch};
 use crate::checks::Check;
 
 #[derive(Hash)]
@@ -55,14 +54,15 @@ fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> 
     let mut applied: BTreeSet<&Patch> = Default::default();
 
     for fix in fixes.sorted_by_key(|fix| fix.patch.location) {
-        // If we already applied an identical fix as part of another correction, skip any
-        // re-application.
+        // If we already applied an identical fix as part of another correction, skip
+        // any re-application.
         if applied.contains(&fix.patch) {
             fix.applied = true;
             continue;
         }
 
-        // Best-effort approach: if this fix overlaps with a fix we've already applied, skip it.
+        // Best-effort approach: if this fix overlaps with a fix we've already applied,
+        // skip it.
         if last_pos > fix.patch.location {
             continue;
         }
@@ -113,8 +113,7 @@ mod tests {
     use rustpython_parser::ast::Location;
 
     use crate::autofix::fixer::apply_fixes;
-    use crate::autofix::Fix;
-    use crate::autofix::Patch;
+    use crate::autofix::{Fix, Patch};
 
     #[test]
     fn empty_file() -> Result<()> {
