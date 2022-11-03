@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use rustpython_ast::{Expr, ExprKind, Stmt};
 
-use crate::ast::types::Range;
+use crate::ast::types::{CheckLocator, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
@@ -64,7 +64,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
 
         let mut check = Check::new(
             CheckKind::UnusedLoopControlVariable(name.to_string()),
-            Range::from_located(expr),
+            checker.locate_check(Range::from_located(expr)),
         );
         if checker.patch() {
             // Prefix the variable name with an underscore.

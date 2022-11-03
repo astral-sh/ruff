@@ -129,7 +129,9 @@ impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self) -> bool {
-        self.autofix.patch()
+        // TODO(charlie): We can't fix errors in f-strings until RustPython adds
+        // location data.
+        self.autofix.patch() && self.in_f_string.is_none()
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -995,6 +997,7 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
+                        self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);
                     };
@@ -1008,6 +1011,7 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
+                        self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);
                     };
@@ -1021,6 +1025,7 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
+                        self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);
                     };
@@ -1035,6 +1040,7 @@ where
                             keywords,
                             self.locator,
                             self.patch(),
+                            self.locate_check(Range::from_located(expr)),
                         )
                     {
                         self.checks.push(check);
@@ -1044,7 +1050,10 @@ where
                 if self.settings.enabled.contains(&CheckCode::C404) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_dict(
-                            expr, func, args, keywords,
+                            func,
+                            args,
+                            keywords,
+                            self.locate_check(Range::from_located(expr)),
                         )
                     {
                         self.checks.push(check);
@@ -1059,6 +1068,7 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
+                        self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);
                     };
@@ -1066,7 +1076,10 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C406) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_dict(
-                        expr, func, args, keywords,
+                        func,
+                        args,
+                        keywords,
+                        self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);
                     };
@@ -1080,6 +1093,7 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
+                        self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);
                     };
@@ -1093,6 +1107,7 @@ where
                             args,
                             self.locator,
                             self.patch(),
+                            self.locate_check(Range::from_located(expr)),
                         )
                     {
                         self.checks.push(check);
@@ -1107,6 +1122,7 @@ where
                             args,
                             self.locator,
                             self.patch(),
+                            self.locate_check(Range::from_located(expr)),
                         )
                     {
                         self.checks.push(check);
@@ -1120,6 +1136,7 @@ where
                         args,
                         self.locator,
                         self.patch(),
+                        self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);
                     };
@@ -1128,7 +1145,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::C413) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_call_around_sorted(
-                            expr, func, args,
+                            func,
+                            args,
+                            self.locate_check(Range::from_located(expr)),
                         )
                     {
                         self.checks.push(check);
@@ -1138,7 +1157,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::C414) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_double_cast_or_process(
-                            expr, func, args,
+                            func,
+                            args,
+                            self.locate_check(Range::from_located(expr)),
                         )
                     {
                         self.checks.push(check);
@@ -1148,7 +1169,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::C415) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_subscript_reversal(
-                            expr, func, args,
+                            func,
+                            args,
+                            self.locate_check(Range::from_located(expr)),
                         )
                     {
                         self.checks.push(check);
@@ -1156,9 +1179,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C417) {
-                    if let Some(check) =
-                        flake8_comprehensions::checks::unnecessary_map(expr, func, args)
-                    {
+                    if let Some(check) = flake8_comprehensions::checks::unnecessary_map(
+                        func,
+                        args,
+                        self.locate_check(Range::from_located(expr)),
+                    ) {
                         self.checks.push(check);
                     };
                 }
@@ -1335,7 +1360,10 @@ where
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&CheckCode::C416) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_comprehension(
-                        expr, elt, generators,
+                        expr,
+                        elt,
+                        generators,
+                        self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);
                     };
