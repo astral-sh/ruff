@@ -1,54 +1,57 @@
 use anyhow::Result;
 use libcst_native::{
-    Arg, Codegen, Dict, DictComp, Element, Expression, LeftCurlyBrace, LeftParen,
-    LeftSquareBracket, List, ListComp, ParenthesizableWhitespace, RightCurlyBrace, RightParen,
-    RightSquareBracket, Set, SetComp, SimpleWhitespace, SmallStatement, Statement, Tuple,
+    Arg, Call, Codegen, Dict, DictComp, Element, Expr, Expression, LeftCurlyBrace, LeftParen,
+    LeftSquareBracket, List, ListComp, Module, ParenthesizableWhitespace, RightCurlyBrace,
+    RightParen, RightSquareBracket, Set, SetComp, SimpleWhitespace, SmallStatement, Statement,
+    Tuple,
 };
-use rustpython_ast::Expr;
 
-use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::cst::matchers::match_tree;
 use crate::source_code_locator::SourceCodeLocator;
 
+fn match_expr<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Expr<'b>> {
+    if let Some(Statement::Simple(expr)) = module.body.first_mut() {
+        if let Some(SmallStatement::Expr(expr)) = expr.body.first_mut() {
+            Ok(expr)
+        } else {
+            Err(anyhow::anyhow!(
+                "Expected node to be: SmallStatement::Expr."
+            ))
+        }
+    } else {
+        Err(anyhow::anyhow!("Expected node to be: Statement::Simple."))
+    }
+}
+
+fn match_call<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Call<'b>> {
+    if let Expression::Call(call) = &mut expr.value {
+        Ok(call)
+    } else {
+        Err(anyhow::anyhow!("Expected node to be: Expression::Call."))
+    }
+}
+
+fn match_arg<'a, 'b>(call: &'a Call<'b>) -> Result<&'a Arg<'b>> {
+    if let Some(arg) = call.args.first() {
+        Ok(arg)
+    } else {
+        Err(anyhow::anyhow!("Expected node to be: Arg."))
+    }
+}
+
 /// (C400) Convert `list(x for x in y)` to `[x for x in y]`.
-pub fn fix_unnecessary_generator_list(locator: &SourceCodeLocator, expr: &Expr) -> Result<Fix> {
-    // Module(SimpleStatementLine(Expr(Call(GeneratorExp)))) ->
-    // Module(SimpleStatementLine(Expr(ListComp)))
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(expr)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
-    };
-    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::Expr."
-        ));
-    };
-    let call = if let Expression::Call(call) = &body.value {
-        call
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
-    };
-    let (arg, whitespace_after_arg) = if let Some(Arg {
-        value,
-        whitespace_after_arg,
-        ..
-    }) = call.args.first()
-    {
-        (value, whitespace_after_arg)
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Arg."));
-    };
-    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg {
+pub fn fix_unnecessary_generator_list(
+    locator: &SourceCodeLocator,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
+    // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
+
+    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg.value {
         generator_exp
     } else {
         return Err(anyhow::anyhow!(
@@ -63,7 +66,7 @@ pub fn fix_unnecessary_generator_list(locator: &SourceCodeLocator, expr: &Expr) 
             whitespace_after: call.whitespace_before_args.clone(),
         },
         rbracket: RightSquareBracket {
-            whitespace_before: whitespace_after_arg.clone(),
+            whitespace_before: arg.whitespace_after_arg.clone(),
         },
         lpar: generator_exp.lpar.clone(),
         rpar: generator_exp.rpar.clone(),
@@ -80,44 +83,17 @@ pub fn fix_unnecessary_generator_list(locator: &SourceCodeLocator, expr: &Expr) 
 }
 
 /// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
-pub fn fix_unnecessary_generator_set(locator: &SourceCodeLocator, expr: &Expr) -> Result<Fix> {
-    // Module(SimpleStatementLine(Expr(Call(GeneratorExp)))) ->
-    // Module(SimpleStatementLine(Expr(SetComp)))
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(expr)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
-    };
-    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::Expr."
-        ));
-    };
-    let call = if let Expression::Call(call) = &body.value {
-        call
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
-    };
-    let (arg, whitespace_after_arg) = if let Some(Arg {
-        value,
-        whitespace_after_arg,
-        ..
-    }) = call.args.first()
-    {
-        (value, whitespace_after_arg)
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Arg."));
-    };
-    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg {
+pub fn fix_unnecessary_generator_set(
+    locator: &SourceCodeLocator,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
+    // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
+
+    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg.value {
         generator_exp
     } else {
         return Err(anyhow::anyhow!(
@@ -132,7 +108,7 @@ pub fn fix_unnecessary_generator_set(locator: &SourceCodeLocator, expr: &Expr) -
             whitespace_after: call.whitespace_before_args.clone(),
         },
         rbrace: RightCurlyBrace {
-            whitespace_before: whitespace_after_arg.clone(),
+            whitespace_before: arg.whitespace_after_arg.clone(),
         },
         lpar: generator_exp.lpar.clone(),
         rpar: generator_exp.rpar.clone(),
@@ -150,42 +126,17 @@ pub fn fix_unnecessary_generator_set(locator: &SourceCodeLocator, expr: &Expr) -
 
 /// (C402) Convert `dict((x, x) for x in range(3))` to `{x: x for x in
 /// range(3)}`.
-pub fn fix_unnecessary_generator_dict(locator: &SourceCodeLocator, expr: &Expr) -> Result<Fix> {
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(expr)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
-    };
-    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::Expr."
-        ));
-    };
-    let call = if let Expression::Call(call) = &body.value {
-        call
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
-    };
-    let (arg, whitespace_after_arg) = if let Some(Arg {
-        value,
-        whitespace_after_arg,
-        ..
-    }) = call.args.first()
-    {
-        (value, whitespace_after_arg)
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Arg."));
-    };
-    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg {
+pub fn fix_unnecessary_generator_dict(
+    locator: &SourceCodeLocator,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
+
+    // Extract the (k, v) from `(k, v) for ...`.
+    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg.value {
         generator_exp
     } else {
         return Err(anyhow::anyhow!(
@@ -220,7 +171,7 @@ pub fn fix_unnecessary_generator_dict(locator: &SourceCodeLocator, expr: &Expr) 
             whitespace_after: call.whitespace_before_args.clone(),
         },
         rbrace: RightCurlyBrace {
-            whitespace_before: whitespace_after_arg.clone(),
+            whitespace_before: arg.whitespace_after_arg.clone(),
         },
         lpar: Default::default(),
         rpar: Default::default(),
@@ -241,45 +192,16 @@ pub fn fix_unnecessary_generator_dict(locator: &SourceCodeLocator, expr: &Expr) 
 /// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
 pub fn fix_unnecessary_list_comprehension_set(
     locator: &SourceCodeLocator,
-    expr: &Expr,
+    expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
-    // Module(SimpleStatementLine(Expr(Call(ListComp)))) ->
-    // Module(SimpleStatementLine(Expr(SetComp)))
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(expr)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
-    };
-    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::Expr."
-        ));
-    };
-    let call = if let Expression::Call(call) = &body.value {
-        call
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
-    };
-    let (arg, whitespace_after_arg) = if let Some(Arg {
-        value,
-        whitespace_after_arg,
-        ..
-    }) = call.args.first()
-    {
-        (value, whitespace_after_arg)
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Arg."));
-    };
-    let list_comp = if let Expression::ListComp(list_comp) = arg {
+    // Expr(Call(ListComp)))) ->
+    // Expr(SetComp)))
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
+
+    let list_comp = if let Expression::ListComp(list_comp) = &arg.value {
         list_comp
     } else {
         return Err(anyhow::anyhow!(
@@ -294,7 +216,7 @@ pub fn fix_unnecessary_list_comprehension_set(
             whitespace_after: call.whitespace_before_args.clone(),
         },
         rbrace: RightCurlyBrace {
-            whitespace_before: whitespace_after_arg.clone(),
+            whitespace_before: arg.whitespace_after_arg.clone(),
         },
         lpar: list_comp.lpar.clone(),
         rpar: list_comp.rpar.clone(),
@@ -311,46 +233,19 @@ pub fn fix_unnecessary_list_comprehension_set(
 }
 
 /// (C405) Convert `set((1, 2))` to `{1, 2}`.
-pub fn fix_unnecessary_literal_set(locator: &SourceCodeLocator, expr: &Expr) -> Result<Fix> {
-    // Module(SimpleStatementLine(Expr(Call(List|Tuple)))) ->
-    // Module(SimpleStatementLine(Expr(Set)))
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(expr)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
-    };
-    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::Expr."
-        ));
-    };
-    let call = if let Expression::Call(call) = &mut body.value {
-        call
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
-    };
-    let (arg, whitespace_after_arg) = if let Some(Arg {
-        value,
-        whitespace_after_arg,
-        ..
-    }) = call.args.first_mut()
-    {
-        (value, whitespace_after_arg)
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Arg."));
-    };
-    let elements = match arg {
-        Expression::Tuple(inner) => inner.elements.clone(),
-        Expression::List(inner) => inner.elements.clone(),
+pub fn fix_unnecessary_literal_set(
+    locator: &SourceCodeLocator,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
+    // Expr(Call(List|Tuple)))) -> Expr(Set)))
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+    let mut call = match_call(body)?;
+    let arg = match_arg(call)?;
+
+    let elements = match &arg.value {
+        Expression::Tuple(inner) => &inner.elements,
+        Expression::List(inner) => &inner.elements,
         _ => {
             return Err(anyhow::anyhow!(
                 "Expected node to be: Expression::Tuple | Expression::List."
@@ -362,12 +257,12 @@ pub fn fix_unnecessary_literal_set(locator: &SourceCodeLocator, expr: &Expr) -> 
         call.args = vec![];
     } else {
         body.value = Expression::Set(Box::new(Set {
-            elements,
+            elements: elements.clone(),
             lbrace: LeftCurlyBrace {
                 whitespace_after: call.whitespace_before_args.clone(),
             },
             rbrace: RightCurlyBrace {
-                whitespace_before: whitespace_after_arg.clone(),
+                whitespace_before: arg.whitespace_after_arg.clone(),
             },
             lpar: Default::default(),
             rpar: Default::default(),
@@ -385,33 +280,14 @@ pub fn fix_unnecessary_literal_set(locator: &SourceCodeLocator, expr: &Expr) -> 
 }
 
 /// (C408)
-pub fn fix_unnecessary_collection_call(locator: &SourceCodeLocator, expr: &Expr) -> Result<Fix> {
-    // Module(SimpleStatementLine(Expr(Call("list" | "tuple" | "dict")))) ->
-    // Module(SimpleStatementLine(Expr(List|Tuple|Dict)))
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(expr)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
-    };
-    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::Expr."
-        ));
-    };
-    let call = if let Expression::Call(call) = &body.value {
-        call
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
-    };
+pub fn fix_unnecessary_collection_call(
+    locator: &SourceCodeLocator,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
+    // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)))
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
     let name = if let Expression::Name(name) = &call.func.as_ref() {
         name
     } else {
@@ -421,27 +297,27 @@ pub fn fix_unnecessary_collection_call(locator: &SourceCodeLocator, expr: &Expr)
     match name.value {
         "tuple" => {
             body.value = Expression::Tuple(Box::new(Tuple {
-                elements: vec![],
+                elements: Default::default(),
                 lpar: vec![Default::default()],
                 rpar: vec![Default::default()],
             }));
         }
         "list" => {
             body.value = Expression::List(Box::new(List {
-                elements: vec![],
+                elements: Default::default(),
                 lbracket: Default::default(),
                 rbracket: Default::default(),
-                lpar: vec![],
-                rpar: vec![],
+                lpar: Default::default(),
+                rpar: Default::default(),
             }));
         }
         "dict" => {
             body.value = Expression::Dict(Box::new(Dict {
-                elements: vec![],
+                elements: Default::default(),
                 lbrace: Default::default(),
                 rbrace: Default::default(),
-                lpar: vec![],
-                rpar: vec![],
+                lpar: Default::default(),
+                rpar: Default::default(),
             }));
         }
         _ => {
@@ -464,38 +340,13 @@ pub fn fix_unnecessary_collection_call(locator: &SourceCodeLocator, expr: &Expr)
 /// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`
 pub fn fix_unnecessary_literal_within_tuple_call(
     locator: &SourceCodeLocator,
-    expr: &Expr,
+    expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(expr)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
-    };
-    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::Expr."
-        ));
-    };
-    let call = if let Expression::Call(call) = &body.value {
-        call
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
-    };
-    let arg = if let Some(Arg { value, .. }) = call.args.first() {
-        value
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Arg."));
-    };
-    let (elements, whitespace_after, whitespace_before) = match arg {
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
+    let (elements, whitespace_after, whitespace_before) = match &arg.value {
         Expression::Tuple(inner) => (
             &inner.elements,
             &inner
@@ -544,38 +395,13 @@ pub fn fix_unnecessary_literal_within_tuple_call(
 /// (C410) Convert `list([1, 2])` to `[1, 2]`
 pub fn fix_unnecessary_literal_within_list_call(
     locator: &SourceCodeLocator,
-    expr: &Expr,
+    expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(expr)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
-    };
-    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::Expr."
-        ));
-    };
-    let call = if let Expression::Call(call) = &body.value {
-        call
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
-    };
-    let arg = if let Some(Arg { value, .. }) = call.args.first() {
-        value
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Arg."));
-    };
-    let (elements, whitespace_after, whitespace_before) = match arg {
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
+    let (elements, whitespace_after, whitespace_before) = match &arg.value {
         Expression::Tuple(inner) => (
             &inner.elements,
             &inner
@@ -624,40 +450,17 @@ pub fn fix_unnecessary_literal_within_list_call(
 }
 
 /// (C411) Convert `list([i for i in x])` to `[i for i in x]`.
-pub fn fix_unnecessary_list_call(locator: &SourceCodeLocator, expr: &Expr) -> Result<Fix> {
-    // Module(SimpleStatementLine(Expr(Call(List|Tuple)))) ->
-    // Module(SimpleStatementLine(Expr(List|Tuple)))
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(expr)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
-    };
-    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-        body
-    } else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::Expr."
-        ));
-    };
-    let call = if let Expression::Call(call) = &body.value {
-        call
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
-    };
-    let arg = if let Some(Arg { value, .. }) = call.args.first() {
-        value
-    } else {
-        return Err(anyhow::anyhow!("Expected node to be: Arg."));
-    };
+pub fn fix_unnecessary_list_call(
+    locator: &SourceCodeLocator,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
+    // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
 
-    body.value = arg.clone();
+    body.value = arg.value.clone();
 
     let mut state = Default::default();
     tree.codegen(&mut state);

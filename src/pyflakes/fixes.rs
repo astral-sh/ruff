@@ -2,9 +2,9 @@ use anyhow::Result;
 use libcst_native::{Codegen, ImportNames, NameOrAttribute, SmallStatement, Statement};
 use rustpython_ast::Stmt;
 
-use crate::ast::types::Range;
 use crate::autofix::{helpers, Fix};
 use crate::cst::helpers::compose_module_path;
+use crate::cst::matchers::match_tree;
 use crate::source_code_locator::SourceCodeLocator;
 
 /// Generate a Fix to remove any unused imports from an `import` statement.
@@ -15,13 +15,7 @@ pub fn remove_unused_imports(
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
 ) -> Result<Fix> {
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(stmt)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
+    let mut tree = match_tree(locator, stmt)?;
 
     let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         body
@@ -78,13 +72,7 @@ pub fn remove_unused_import_froms(
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
 ) -> Result<Fix> {
-    let mut tree = match libcst_native::parse_module(
-        locator.slice_source_code_range(&Range::from_located(stmt)),
-        None,
-    ) {
-        Ok(m) => m,
-        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
-    };
+    let mut tree = match_tree(locator, stmt)?;
 
     let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         body
