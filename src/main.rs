@@ -16,17 +16,16 @@ use rayon::prelude::*;
 use ruff::cache;
 use ruff::checks::{CheckCode, CheckKind};
 use ruff::checks_gen::CheckCodePrefix;
-use ruff::cli::{collect_per_file_ignores, warn_on, Cli, Warnable};
+use ruff::cli::{collect_per_file_ignores, extract_log_level, warn_on, Cli, Warnable};
 use ruff::fs::iter_python_files;
 use ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin};
-use ruff::logging::set_up_logging;
+use ruff::logging::{set_up_logging, LogLevel};
 use ruff::message::Message;
 use ruff::printer::{Printer, SerializationFormat};
 use ruff::settings::configuration::Configuration;
 use ruff::settings::types::FilePattern;
 use ruff::settings::user::UserConfiguration;
 use ruff::settings::{pyproject, Settings};
-use ruff::tell_user;
 use walkdir::DirEntry;
 
 #[cfg(feature = "update-informer")]
@@ -223,10 +222,10 @@ fn autoformat(files: &[PathBuf], settings: &Settings) -> Result<usize> {
 }
 
 fn inner_main() -> Result<ExitCode> {
-    let mut cli = Cli::parse();
-    cli.quiet |= cli.silent;
+    let cli = Cli::parse();
 
-    set_up_logging(cli.verbose)?;
+    let log_level = extract_log_level(&cli);
+    set_up_logging(&log_level)?;
 
     // Find the project root and pyproject.toml.
     let project_root = pyproject::find_project_root(&cli.files);
@@ -320,7 +319,7 @@ fn inner_main() -> Result<ExitCode> {
     #[cfg(not(target_family = "wasm"))]
     cache::init()?;
 
-    let mut printer = Printer::new(cli.format, cli.verbose);
+    let printer = Printer::new(&cli.format, &log_level);
     if cli.watch {
         if cli.fix {
             eprintln!("Warning: --fix is not enabled in watch mode.");
@@ -340,12 +339,10 @@ fn inner_main() -> Result<ExitCode> {
 
         // Perform an initial run instantly.
         printer.clear_screen()?;
-        tell_user!("Starting linter in watch mode...\n");
+        printer.write_to_user("Starting linter in watch mode...\n");
 
         let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
-        if !cli.silent {
-            printer.write_continuously(&messages)?;
-        }
+        printer.write_continuously(&messages)?;
 
         // Configure the file watcher.
         let (tx, rx) = channel();
@@ -360,12 +357,10 @@ fn inner_main() -> Result<ExitCode> {
                     if let Some(path) = e.path {
                         if path.to_string_lossy().ends_with(".py") {
                             printer.clear_screen()?;
-                            tell_user!("File change detected...\n");
+                            printer.write_to_user("File change detected...\n");
 
                             let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
-                            if !cli.silent {
-                                printer.write_continuously(&messages)?;
-                            }
+                            printer.write_continuously(&messages)?;
                         }
                     }
                 }
@@ -374,37 +369,36 @@ fn inner_main() -> Result<ExitCode> {
         }
     } else if cli.add_noqa {
         let modifications = add_noqa(&cli.files, &settings)?;
-        if modifications > 0 {
+        if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
     } else if cli.autoformat {
         let modifications = autoformat(&cli.files, &settings)?;
-        if modifications > 0 {
+        if modifications > 0 && log_level >= LogLevel::Default {
             println!("Formatted {modifications} files.");
         }
     } else {
-        let (messages, should_print_messages, should_check_updates) =
-            if cli.files == vec![PathBuf::from("-")] {
-                let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
-                let path = Path::new(&filename);
-                (
-                    run_once_stdin(&settings, path, cli.fix)?,
-                    !cli.silent && !cli.fix,
-                    false,
-                )
-            } else {
-                (
-                    run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?,
-                    !cli.silent,
-                    !cli.quiet,
-                )
-            };
-        if should_print_messages {
+        let is_stdin = cli.files == vec![PathBuf::from("-")];
+
+        // Generate lint violations.
+        let messages = if is_stdin {
+            let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
+            let path = Path::new(&filename);
+            run_once_stdin(&settings, path, cli.fix)?
+        } else {
+            run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?
+        };
+
+        // Always try to print violations (the printer itself may suppress output),
+        // unless we're writing fixes via stdin (in which case, the transformed
+        // source code goes to stdout).
+        if !(is_stdin && cli.fix) {
             printer.write_once(&messages)?;
         }
 
+        // Check for updates if we're in a non-silent log level.
         #[cfg(feature = "update-informer")]
-        if should_check_updates {
+        if !is_stdin && log_level >= LogLevel::Default {
             check_for_updates();
         }
 

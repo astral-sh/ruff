@@ -5,6 +5,7 @@ use rustpython_parser::ast::Location;
 use serde::Serialize;
 
 use crate::checks::{CheckCode, CheckKind};
+use crate::logging::LogLevel;
 use crate::message::Message;
 use crate::tell_user;
 
@@ -25,17 +26,27 @@ struct ExpandedMessage<'a> {
     filename: &'a String,
 }
 
-pub struct Printer {
-    format: SerializationFormat,
-    verbose: bool,
+pub struct Printer<'a> {
+    format: &'a SerializationFormat,
+    log_level: &'a LogLevel,
 }
 
-impl Printer {
-    pub fn new(format: SerializationFormat, verbose: bool) -> Self {
-        Self { format, verbose }
+impl<'a> Printer<'a> {
+    pub fn new(format: &'a SerializationFormat, log_level: &'a LogLevel) -> Self {
+        Self { format, log_level }
     }
 
-    pub fn write_once(&mut self, messages: &[Message]) -> Result<()> {
+    pub fn write_to_user(&self, message: &str) {
+        if self.log_level >= &LogLevel::Default {
+            tell_user!("{}", message);
+        }
+    }
+
+    pub fn write_once(&self, messages: &[Message]) -> Result<()> {
+        if matches!(self.log_level, LogLevel::Silent) {
+            return Ok(());
+        }
+
         let (fixed, outstanding): (Vec<&Message>, Vec<&Message>) =
             messages.iter().partition(|message| message.fixed);
         let num_fixable = outstanding
@@ -64,22 +75,26 @@ impl Printer {
                 )
             }
             SerializationFormat::Text => {
-                if !fixed.is_empty() {
-                    println!(
-                        "Found {} error(s) ({} fixed).",
-                        outstanding.len(),
-                        fixed.len()
-                    )
-                } else if !outstanding.is_empty() || self.verbose {
-                    println!("Found {} error(s).", outstanding.len())
+                if self.log_level >= &LogLevel::Default {
+                    if !fixed.is_empty() {
+                        println!(
+                            "Found {} error(s) ({} fixed).",
+                            outstanding.len(),
+                            fixed.len()
+                        )
+                    } else if !outstanding.is_empty() {
+                        println!("Found {} error(s).", outstanding.len())
+                    }
                 }
 
                 for message in outstanding {
                     println!("{}", message)
                 }
 
-                if num_fixable > 0 {
-                    println!("{num_fixable} potentially fixable with the --fix option.")
+                if self.log_level >= &LogLevel::Default {
+                    if num_fixable > 0 {
+                        println!("{num_fixable} potentially fixable with the --fix option.")
+                    }
                 }
             }
         }
@@ -87,14 +102,22 @@ impl Printer {
         Ok(())
     }
 
-    pub fn write_continuously(&mut self, messages: &[Message]) -> Result<()> {
-        tell_user!(
-            "Found {} error(s). Watching for file changes.",
-            messages.len(),
-        );
+    pub fn write_continuously(&self, messages: &[Message]) -> Result<()> {
+        if matches!(self.log_level, LogLevel::Silent) {
+            return Ok(());
+        }
+
+        if self.log_level >= &LogLevel::Default {
+            tell_user!(
+                "Found {} error(s). Watching for file changes.",
+                messages.len(),
+            );
+        }
 
         if !messages.is_empty() {
-            println!();
+            if self.log_level >= &LogLevel::Default {
+                println!();
+            }
             for message in messages {
                 println!("{}", message)
             }
@@ -103,7 +126,7 @@ impl Printer {
         Ok(())
     }
 
-    pub fn clear_screen(&mut self) -> Result<()> {
+    pub fn clear_screen(&self) -> Result<()> {
         #[cfg(not(target_family = "wasm"))]
         clearscreen::clear()?;
         Ok(())
