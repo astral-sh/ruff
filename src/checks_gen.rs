@@ -5,7 +5,9 @@ use strum_macros::{AsRefStr, EnumString};
 
 use crate::checks::CheckCode;
 
-#[derive(AsRefStr, EnumString, Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(
+    AsRefStr, EnumString, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize,
+)]
 pub enum CheckCodePrefix {
     A,
     A0,

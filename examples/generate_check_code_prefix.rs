@@ -31,6 +31,8 @@ fn main() {
         .derive("Debug")
         .derive("PartialEq")
         .derive("Eq")
+        .derive("PartialOrd")
+        .derive("Ord")
         .derive("Clone")
         .derive("Serialize")
         .derive("Deserialize");

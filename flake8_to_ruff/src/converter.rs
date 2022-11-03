@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
 use ruff::flake8_quotes::settings::Quote;
@@ -6,13 +6,38 @@ use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
 use ruff::{flake8_quotes, pep8_naming};
 
-use crate::parser;
+use crate::plugin::Plugin;
+use crate::{parser, plugin};
 
-pub fn convert(config: HashMap<String, HashMap<String, Option<String>>>) -> Result<Pyproject> {
-    // Extract the Flake8 section.
-    let flake8 = config
-        .get("flake8")
-        .expect("Unable to find flake8 section in INI file.");
+pub fn convert(
+    flake8: &HashMap<String, Option<String>>,
+    plugins: Option<Vec<Plugin>>,
+) -> Result<Pyproject> {
+    // Check if the user has specified a `select`. If not, we'll add our own
+    // default `select`, and populate it based on user plugins.
+    let mut select = flake8
+        .get("select")
+        .map(|value| {
+            value
+                .as_ref()
+                .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
+        })
+        .flatten()
+        .unwrap_or_else(|| {
+            plugin::resolve_select(
+                flake8,
+                &plugins.unwrap_or_else(|| plugin::infer_plugins(&flake8)),
+            )
+        });
+    let mut ignore = flake8
+        .get("ignore")
+        .map(|value| {
+            value
+                .as_ref()
+                .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
+        })
+        .flatten()
+        .unwrap_or_default();
 
     // Parse each supported option.
     let mut options: Options = Default::default();
@@ -27,16 +52,18 @@ pub fn convert(config: HashMap<String, HashMap<String, Option<String>>>) -> Resu
                     Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                 },
                 "select" => {
-                    options.select = Some(parser::parse_prefix_codes(value.as_ref()));
-                }
-                "extend-select" | "extend_select" => {
-                    options.extend_select = Some(parser::parse_prefix_codes(value.as_ref()));
+                    // No-op (handled above).
                 }
                 "ignore" => {
-                    options.ignore = Some(parser::parse_prefix_codes(value.as_ref()));
+                    // No-op (handled above).
+                }
+                "extend-select" | "extend_select" => {
+                    // Unlike Flake8, use a single explicit `select`.
+                    select.extend(parser::parse_prefix_codes(value.as_ref()));
                 }
                 "extend-ignore" | "extend_ignore" => {
-                    options.extend_ignore = Some(parser::parse_prefix_codes(value.as_ref()));
+                    // Unlike Flake8, use a single explicit `ignore`.
+                    ignore.extend(parser::parse_prefix_codes(value.as_ref()));
                 }
                 "exclude" => {
                     options.exclude = Some(parser::parse_strings(value.as_ref()));
@@ -92,6 +119,9 @@ pub fn convert(config: HashMap<String, HashMap<String, Option<String>>>) -> Resu
         }
     }
 
+    // Deduplicate and sort.
+    options.select = Some(Vec::from_iter(select));
+    options.ignore = Some(Vec::from_iter(ignore));
     if flake8_quotes != Default::default() {
         options.flake8_quotes = Some(flake8_quotes);
     }
@@ -108,22 +138,24 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
+    use ruff::checks_gen::CheckCodePrefix;
     use ruff::flake8_quotes;
     use ruff::settings::options::Options;
     use ruff::settings::pyproject::Pyproject;
 
     use crate::converter::convert;
+    use crate::plugin::Plugin;
 
     #[test]
     fn it_converts_empty() -> Result<()> {
-        let actual = convert(HashMap::from([("flake8".to_string(), HashMap::from([]))]))?;
+        let actual = convert(&HashMap::from([]), None)?;
         let expected = Pyproject::new(Options {
             line_length: None,
             exclude: None,
             extend_exclude: None,
-            select: None,
+            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
             extend_select: None,
-            ignore: None,
+            ignore: Some(vec![]),
             extend_ignore: None,
             per_file_ignores: None,
             dummy_variable_rgx: None,
@@ -138,17 +170,17 @@ mod tests {
 
     #[test]
     fn it_converts_dashes() -> Result<()> {
-        let actual = convert(HashMap::from([(
-            "flake8".to_string(),
-            HashMap::from([("max-line-length".to_string(), Some("100".to_string()))]),
-        )]))?;
+        let actual = convert(
+            &HashMap::from([("max-line-length".to_string(), Some("100".to_string()))]),
+            Some(vec![]),
+        )?;
         let expected = Pyproject::new(Options {
             line_length: Some(100),
             exclude: None,
             extend_exclude: None,
-            select: None,
+            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
             extend_select: None,
-            ignore: None,
+            ignore: Some(vec![]),
             extend_ignore: None,
             per_file_ignores: None,
             dummy_variable_rgx: None,
@@ -163,17 +195,17 @@ mod tests {
 
     #[test]
     fn it_converts_underscores() -> Result<()> {
-        let actual = convert(HashMap::from([(
-            "flake8".to_string(),
-            HashMap::from([("max_line_length".to_string(), Some("100".to_string()))]),
-        )]))?;
+        let actual = convert(
+            &HashMap::from([("max_line_length".to_string(), Some("100".to_string()))]),
+            Some(vec![]),
+        )?;
         let expected = Pyproject::new(Options {
             line_length: Some(100),
             exclude: None,
             extend_exclude: None,
-            select: None,
+            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
             extend_select: None,
-            ignore: None,
+            ignore: Some(vec![]),
             extend_ignore: None,
             per_file_ignores: None,
             dummy_variable_rgx: None,
@@ -188,17 +220,17 @@ mod tests {
 
     #[test]
     fn it_ignores_parse_errors() -> Result<()> {
-        let actual = convert(HashMap::from([(
-            "flake8".to_string(),
-            HashMap::from([("max_line_length".to_string(), Some("abc".to_string()))]),
-        )]))?;
+        let actual = convert(
+            &HashMap::from([("max_line_length".to_string(), Some("abc".to_string()))]),
+            Some(vec![]),
+        )?;
         let expected = Pyproject::new(Options {
             line_length: None,
             exclude: None,
             extend_exclude: None,
-            select: None,
+            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
             extend_select: None,
-            ignore: None,
+            ignore: Some(vec![]),
             extend_ignore: None,
             per_file_ignores: None,
             dummy_variable_rgx: None,
@@ -212,18 +244,118 @@ mod tests {
     }
 
     #[test]
-    fn it_converts_extensions() -> Result<()> {
-        let actual = convert(HashMap::from([(
-            "flake8".to_string(),
-            HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
-        )]))?;
+    fn it_converts_plugin_options() -> Result<()> {
+        let actual = convert(
+            &HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
+            Some(vec![]),
+        )?;
         let expected = Pyproject::new(Options {
             line_length: None,
             exclude: None,
             extend_exclude: None,
-            select: None,
+            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
             extend_select: None,
-            ignore: None,
+            ignore: Some(vec![]),
+            extend_ignore: None,
+            per_file_ignores: None,
+            dummy_variable_rgx: None,
+            target_version: None,
+            flake8_quotes: Some(flake8_quotes::settings::Options {
+                inline_quotes: Some(flake8_quotes::settings::Quote::Single),
+                multiline_quotes: None,
+                docstring_quotes: None,
+                avoid_escape: None,
+            }),
+            pep8_naming: None,
+        });
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_converts_docstring_conventions() -> Result<()> {
+        let actual = convert(
+            &HashMap::from([(
+                "docstring-convention".to_string(),
+                Some("numpy".to_string()),
+            )]),
+            Some(vec![Plugin::Flake8Docstrings]),
+        )?;
+        let expected = Pyproject::new(Options {
+            line_length: None,
+            exclude: None,
+            extend_exclude: None,
+            select: Some(vec![
+                CheckCodePrefix::D100,
+                CheckCodePrefix::D101,
+                CheckCodePrefix::D102,
+                CheckCodePrefix::D103,
+                CheckCodePrefix::D104,
+                CheckCodePrefix::D105,
+                CheckCodePrefix::D106,
+                CheckCodePrefix::D200,
+                CheckCodePrefix::D201,
+                CheckCodePrefix::D202,
+                CheckCodePrefix::D204,
+                CheckCodePrefix::D205,
+                CheckCodePrefix::D206,
+                CheckCodePrefix::D207,
+                CheckCodePrefix::D208,
+                CheckCodePrefix::D209,
+                CheckCodePrefix::D210,
+                CheckCodePrefix::D211,
+                CheckCodePrefix::D214,
+                CheckCodePrefix::D215,
+                CheckCodePrefix::D300,
+                CheckCodePrefix::D400,
+                CheckCodePrefix::D403,
+                CheckCodePrefix::D404,
+                CheckCodePrefix::D405,
+                CheckCodePrefix::D406,
+                CheckCodePrefix::D407,
+                CheckCodePrefix::D408,
+                CheckCodePrefix::D409,
+                CheckCodePrefix::D410,
+                CheckCodePrefix::D411,
+                CheckCodePrefix::D412,
+                CheckCodePrefix::D414,
+                CheckCodePrefix::D418,
+                CheckCodePrefix::D419,
+                CheckCodePrefix::E,
+                CheckCodePrefix::F,
+            ]),
+            extend_select: None,
+            ignore: Some(vec![]),
+            extend_ignore: None,
+            per_file_ignores: None,
+            dummy_variable_rgx: None,
+            target_version: None,
+            flake8_quotes: None,
+            pep8_naming: None,
+        });
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_infers_plugins_if_omitted() -> Result<()> {
+        let actual = convert(
+            &HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
+            None,
+        )?;
+        let expected = Pyproject::new(Options {
+            line_length: None,
+            exclude: None,
+            extend_exclude: None,
+            select: Some(vec![
+                CheckCodePrefix::E,
+                CheckCodePrefix::F,
+                CheckCodePrefix::Q,
+            ]),
+            extend_select: None,
+            ignore: Some(vec![]),
             extend_ignore: None,
             per_file_ignores: None,
             dummy_variable_rgx: None,
