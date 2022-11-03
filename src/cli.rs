@@ -7,6 +7,7 @@ use log::warn;
 use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
+use crate::logging::LogLevel;
 use crate::printer::SerializationFormat;
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PatternPrefixPair, PythonVersion};
@@ -91,6 +92,19 @@ pub struct Cli {
     /// The name of the file when passing it through stdin.
     #[arg(long)]
     pub stdin_filename: Option<String>,
+}
+
+/// Map the CLI settings to a `LogLevel`.
+pub fn extract_log_level(cli: &Cli) -> LogLevel {
+    if cli.silent {
+        LogLevel::Silent
+    } else if cli.quiet {
+        LogLevel::Quiet
+    } else if cli.verbose {
+        LogLevel::Verbose
+    } else {
+        LogLevel::Default
+    }
 }
 
 pub enum Warnable {
