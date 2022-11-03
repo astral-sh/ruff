@@ -1,6 +1,6 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.97-dev.0"
+version = "0.0.98-dev.0"
 edition = "2021"
 
 [lib]
