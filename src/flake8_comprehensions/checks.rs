@@ -54,13 +54,11 @@ pub fn unnecessary_generator_list(
     keywords: &[Keyword],
     locator: &SourceCodeLocator,
     fix: bool,
+    location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("list", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        let mut check = Check::new(
-            CheckKind::UnnecessaryGeneratorList,
-            Range::from_located(expr),
-        );
+        let mut check = Check::new(CheckKind::UnnecessaryGeneratorList, location);
         if fix {
             match fixes::fix_unnecessary_generator_list(locator, expr) {
                 Ok(fix) => check.amend(fix),
@@ -80,13 +78,11 @@ pub fn unnecessary_generator_set(
     keywords: &[Keyword],
     locator: &SourceCodeLocator,
     fix: bool,
+    location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        let mut check = Check::new(
-            CheckKind::UnnecessaryGeneratorSet,
-            Range::from_located(expr),
-        );
+        let mut check = Check::new(CheckKind::UnnecessaryGeneratorSet, location);
         if fix {
             match fixes::fix_unnecessary_generator_set(locator, expr) {
                 Ok(fix) => check.amend(fix),
@@ -106,15 +102,13 @@ pub fn unnecessary_generator_dict(
     keywords: &[Keyword],
     locator: &SourceCodeLocator,
     fix: bool,
+    location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     if let ExprKind::GeneratorExp { elt, .. } = argument {
         match &elt.node {
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                let mut check = Check::new(
-                    CheckKind::UnnecessaryGeneratorDict,
-                    Range::from_located(expr),
-                );
+                let mut check = Check::new(CheckKind::UnnecessaryGeneratorDict, location);
                 if fix {
                     match fixes::fix_unnecessary_generator_dict(locator, expr) {
                         Ok(fix) => check.amend(fix),
@@ -137,13 +131,11 @@ pub fn unnecessary_list_comprehension_set(
     keywords: &[Keyword],
     locator: &SourceCodeLocator,
     fix: bool,
+    location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::ListComp { .. } = &argument {
-        let mut check = Check::new(
-            CheckKind::UnnecessaryListComprehensionSet,
-            Range::from_located(expr),
-        );
+        let mut check = Check::new(CheckKind::UnnecessaryListComprehensionSet, location);
         if fix {
             match fixes::fix_unnecessary_list_comprehension_set(locator, expr) {
                 Ok(fix) => check.amend(fix),
@@ -157,10 +149,10 @@ pub fn unnecessary_list_comprehension_set(
 
 /// C404 (`dict([...])`)
 pub fn unnecessary_list_comprehension_dict(
-    expr: &Expr,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
+    location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     if let ExprKind::ListComp { elt, .. } = &argument {
@@ -168,7 +160,7 @@ pub fn unnecessary_list_comprehension_dict(
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
                 return Some(Check::new(
                     CheckKind::UnnecessaryListComprehensionDict,
-                    Range::from_located(expr),
+                    location,
                 ));
             }
             _ => {}
@@ -185,6 +177,7 @@ pub fn unnecessary_literal_set(
     keywords: &[Keyword],
     locator: &SourceCodeLocator,
     fix: bool,
+    location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     let kind = match argument {
@@ -192,10 +185,7 @@ pub fn unnecessary_literal_set(
         ExprKind::Tuple { .. } => "tuple",
         _ => return None,
     };
-    let mut check = Check::new(
-        CheckKind::UnnecessaryLiteralSet(kind.to_string()),
-        Range::from_located(expr),
-    );
+    let mut check = Check::new(CheckKind::UnnecessaryLiteralSet(kind.to_string()), location);
     if fix {
         match fixes::fix_unnecessary_literal_set(locator, expr) {
             Ok(fix) => check.amend(fix),
@@ -207,10 +197,10 @@ pub fn unnecessary_literal_set(
 
 /// C406 (`dict([(1, 2)])`)
 pub fn unnecessary_literal_dict(
-    expr: &Expr,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
+    location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     let (kind, elts) = match argument {
@@ -228,7 +218,7 @@ pub fn unnecessary_literal_dict(
 
     Some(Check::new(
         CheckKind::UnnecessaryLiteralDict(kind.to_string()),
-        Range::from_located(expr),
+        location,
     ))
 }
 
@@ -240,6 +230,7 @@ pub fn unnecessary_collection_call(
     keywords: &[Located<KeywordData>],
     locator: &SourceCodeLocator,
     fix: bool,
+    location: Range,
 ) -> Option<Check> {
     if !args.is_empty() {
         return None;
@@ -256,7 +247,7 @@ pub fn unnecessary_collection_call(
     };
     let mut check = Check::new(
         CheckKind::UnnecessaryCollectionCall(id.to_string()),
-        Range::from_located(expr),
+        location,
     );
     if fix {
         // TODO(charlie): Support fixing `dict(a=1)`.
@@ -277,6 +268,7 @@ pub fn unnecessary_literal_within_tuple_call(
     args: &[Expr],
     locator: &SourceCodeLocator,
     fix: bool,
+    location: Range,
 ) -> Option<Check> {
     let argument = first_argument_with_matching_function("tuple", func, args)?;
     let argument_kind = match argument {
@@ -286,7 +278,7 @@ pub fn unnecessary_literal_within_tuple_call(
     };
     let mut check = Check::new(
         CheckKind::UnnecessaryLiteralWithinTupleCall(argument_kind.to_string()),
-        Range::from_located(expr),
+        location,
     );
     if fix {
         match fixes::fix_unnecessary_literal_within_tuple_call(locator, expr) {
@@ -304,6 +296,7 @@ pub fn unnecessary_literal_within_list_call(
     args: &[Expr],
     locator: &SourceCodeLocator,
     fix: bool,
+    location: Range,
 ) -> Option<Check> {
     let argument = first_argument_with_matching_function("list", func, args)?;
     let argument_kind = match argument {
@@ -313,7 +306,7 @@ pub fn unnecessary_literal_within_list_call(
     };
     let mut check = Check::new(
         CheckKind::UnnecessaryLiteralWithinListCall(argument_kind.to_string()),
-        Range::from_located(expr),
+        location,
     );
     if fix {
         match fixes::fix_unnecessary_literal_within_list_call(locator, expr) {
@@ -331,10 +324,11 @@ pub fn unnecessary_list_call(
     args: &[Expr],
     locator: &SourceCodeLocator,
     fix: bool,
+    location: Range,
 ) -> Option<Check> {
     let argument = first_argument_with_matching_function("list", func, args)?;
     if let ExprKind::ListComp { .. } = argument {
-        let mut check = Check::new(CheckKind::UnnecessaryListCall, Range::from_located(expr));
+        let mut check = Check::new(CheckKind::UnnecessaryListCall, location);
         if fix {
             match fixes::fix_unnecessary_list_call(locator, expr) {
                 Ok(fix) => check.amend(fix),
@@ -347,7 +341,11 @@ pub fn unnecessary_list_call(
 }
 
 /// C413
-pub fn unnecessary_call_around_sorted(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
+pub fn unnecessary_call_around_sorted(
+    func: &Expr,
+    args: &[Expr],
+    location: Range,
+) -> Option<Check> {
     let outer = function_name(func)?;
     if !(outer == "list" || outer == "reversed") {
         return None;
@@ -356,7 +354,7 @@ pub fn unnecessary_call_around_sorted(expr: &Expr, func: &Expr, args: &[Expr]) -
         if function_name(func)? == "sorted" {
             return Some(Check::new(
                 CheckKind::UnnecessaryCallAroundSorted(outer.to_string()),
-                Range::from_located(expr),
+                location,
             ));
         }
     }
@@ -365,19 +363,19 @@ pub fn unnecessary_call_around_sorted(expr: &Expr, func: &Expr, args: &[Expr]) -
 
 /// C414
 pub fn unnecessary_double_cast_or_process(
-    expr: &Expr,
     func: &Expr,
     args: &[Expr],
+    location: Range,
 ) -> Option<Check> {
     let outer = function_name(func)?;
     if !["list", "tuple", "set", "reversed", "sorted"].contains(&outer) {
         return None;
     }
 
-    fn new_check(inner: &str, outer: &str, expr: &Expr) -> Check {
+    fn new_check(inner: &str, outer: &str, location: Range) -> Check {
         Check::new(
             CheckKind::UnnecessaryDoubleCastOrProcess(inner.to_string(), outer.to_string()),
-            Range::from_located(expr),
+            location,
         )
     }
 
@@ -387,24 +385,28 @@ pub fn unnecessary_double_cast_or_process(
         if (outer == "set" || outer == "sorted")
             && (inner == "list" || inner == "tuple" || inner == "reversed" || inner == "sorted")
         {
-            return Some(new_check(inner, outer, expr));
+            return Some(new_check(inner, outer, location));
         }
 
         // Ex) list(tuple(...))
         if (outer == "list" || outer == "tuple") && (inner == "list" || inner == "tuple") {
-            return Some(new_check(inner, outer, expr));
+            return Some(new_check(inner, outer, location));
         }
 
         // Ex) set(set(...))
         if outer == "set" && inner == "set" {
-            return Some(new_check(inner, outer, expr));
+            return Some(new_check(inner, outer, location));
         }
     }
     None
 }
 
 /// C415
-pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
+pub fn unnecessary_subscript_reversal(
+    func: &Expr,
+    args: &[Expr],
+    location: Range,
+) -> Option<Check> {
     let first_arg = args.first()?;
     let id = function_name(func)?;
     if !["set", "sorted", "reversed"].contains(&id) {
@@ -427,7 +429,7 @@ pub fn unnecessary_subscript_reversal(expr: &Expr, func: &Expr, args: &[Expr]) -
                             if *val == BigInt::from(1) {
                                 return Some(Check::new(
                                     CheckKind::UnnecessarySubscriptReversal(id.to_string()),
-                                    Range::from_located(expr),
+                                    location,
                                 ));
                             }
                         }
@@ -444,6 +446,7 @@ pub fn unnecessary_comprehension(
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
+    location: Range,
 ) -> Option<Check> {
     if generators.len() != 1 {
         return None;
@@ -464,30 +467,27 @@ pub fn unnecessary_comprehension(
     };
     Some(Check::new(
         CheckKind::UnnecessaryComprehension(expr_kind.to_string()),
-        Range::from_located(expr),
+        location,
     ))
 }
 
 /// C417
-pub fn unnecessary_map(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
-    fn new_check(kind: &str, expr: &Expr) -> Check {
-        Check::new(
-            CheckKind::UnnecessaryMap(kind.to_string()),
-            Range::from_located(expr),
-        )
+pub fn unnecessary_map(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
+    fn new_check(kind: &str, location: Range) -> Check {
+        Check::new(CheckKind::UnnecessaryMap(kind.to_string()), location)
     }
     let id = function_name(func)?;
     match id {
         "map" => {
             if args.len() == 2 && matches!(&args[0].node, ExprKind::Lambda { .. }) {
-                return Some(new_check("generator", expr));
+                return Some(new_check("generator", location));
             }
         }
         "list" | "set" => {
             if let ExprKind::Call { func, args, .. } = &args.first()?.node {
                 let argument = first_argument_with_matching_function("map", func, args)?;
                 if let ExprKind::Lambda { .. } = argument {
-                    return Some(new_check(id, expr));
+                    return Some(new_check(id, location));
                 }
             }
         }
@@ -498,7 +498,7 @@ pub fn unnecessary_map(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check>
                     if let ExprKind::Lambda { body, .. } = &argument {
                         if matches!(&body.node, ExprKind::Tuple { elts, .. } | ExprKind::List { elts, .. } if elts.len() == 2)
                         {
-                            return Some(new_check(id, expr));
+                            return Some(new_check(id, location));
                         }
                     }
                 }
