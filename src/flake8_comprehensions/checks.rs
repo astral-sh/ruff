@@ -250,12 +250,9 @@ pub fn unnecessary_collection_call(
         location,
     );
     if fix {
-        // TODO(charlie): Support fixing `dict(a=1)`.
-        if keywords.is_empty() {
-            match fixes::fix_unnecessary_collection_call(locator, expr) {
-                Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to generate fix: {}", e),
-            }
+        match fixes::fix_unnecessary_collection_call(locator, expr) {
+            Ok(fix) => check.amend(fix),
+            Err(e) => error!("Failed to generate fix: {}", e),
         }
     }
     Some(check)

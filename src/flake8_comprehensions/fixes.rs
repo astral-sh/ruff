@@ -1,9 +1,9 @@
 use anyhow::Result;
 use libcst_native::{
-    Arg, Call, Codegen, Dict, DictComp, Element, Expr, Expression, LeftCurlyBrace, LeftParen,
-    LeftSquareBracket, List, ListComp, Module, ParenthesizableWhitespace, RightCurlyBrace,
-    RightParen, RightSquareBracket, Set, SetComp, SimpleWhitespace, SmallStatement, Statement,
-    Tuple,
+    Arg, Call, Codegen, Dict, DictComp, DictElement, Element, Expr, Expression, LeftCurlyBrace,
+    LeftParen, LeftSquareBracket, List, ListComp, Module, ParenthesizableWhitespace,
+    RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
+    SmallStatement, Statement, Tuple,
 };
 
 use crate::autofix::Fix;
@@ -294,6 +294,10 @@ pub fn fix_unnecessary_collection_call(
         return Err(anyhow::anyhow!("Expected node to be: Expression::Name."));
     };
 
+    // Arena allocator used to create formatted strings of sufficient lifetime,
+    // below.
+    let mut arena: Vec<String> = vec![];
+
     match name.value {
         "tuple" => {
             body.value = Expression::Tuple(Box::new(Tuple {
@@ -312,13 +316,63 @@ pub fn fix_unnecessary_collection_call(
             }));
         }
         "dict" => {
-            body.value = Expression::Dict(Box::new(Dict {
-                elements: Default::default(),
-                lbrace: Default::default(),
-                rbrace: Default::default(),
-                lpar: Default::default(),
-                rpar: Default::default(),
-            }));
+            if call.args.is_empty() {
+                body.value = Expression::Dict(Box::new(Dict {
+                    elements: Default::default(),
+                    lbrace: Default::default(),
+                    rbrace: Default::default(),
+                    lpar: Default::default(),
+                    rpar: Default::default(),
+                }));
+            } else {
+                // Quote each argument.
+                for arg in &call.args {
+                    let quoted = format!(
+                        "\"{}\"",
+                        arg.keyword
+                            .as_ref()
+                            .expect("Expected dictionary argument to be kwarg.")
+                            .value
+                    );
+                    arena.push(quoted);
+                }
+
+                let elements = call
+                    .args
+                    .iter()
+                    .enumerate()
+                    .map(|(i, arg)| DictElement::Simple {
+                        key: Expression::SimpleString(Box::new(SimpleString {
+                            value: &arena[i],
+                            lpar: Default::default(),
+                            rpar: Default::default(),
+                        })),
+                        value: arg.value.clone(),
+                        comma: arg.comma.clone(),
+                        whitespace_before_colon: Default::default(),
+                        whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(
+                            SimpleWhitespace(" "),
+                        ),
+                    })
+                    .collect();
+
+                body.value = Expression::Dict(Box::new(Dict {
+                    elements,
+                    lbrace: LeftCurlyBrace {
+                        whitespace_after: call.whitespace_before_args.clone(),
+                    },
+                    rbrace: RightCurlyBrace {
+                        whitespace_before: call
+                            .args
+                            .last()
+                            .expect("Arguments should be non-empty")
+                            .whitespace_after_arg
+                            .clone(),
+                    },
+                    lpar: Default::default(),
+                    rpar: Default::default(),
+                }));
+            }
         }
         _ => {
             return Err(anyhow::anyhow!("Expected function name to be one of: \

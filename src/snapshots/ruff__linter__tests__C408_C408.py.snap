@@ -64,5 +64,14 @@ expression: checks
   end_location:
     row: 4
     column: 14
-  fix: ~
+  fix:
+    patch:
+      content: "{\"a\": 1}"
+      location:
+        row: 4
+        column: 5
+      end_location:
+        row: 4
+        column: 14
+    applied: false
 
