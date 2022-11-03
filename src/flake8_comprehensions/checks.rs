@@ -443,6 +443,8 @@ pub fn unnecessary_comprehension(
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
+    locator: &SourceCodeLocator,
+    fix: bool,
     location: Range,
 ) -> Option<Check> {
     if generators.len() != 1 {
@@ -462,10 +464,17 @@ pub fn unnecessary_comprehension(
         ExprKind::SetComp { .. } => "set",
         _ => return None,
     };
-    Some(Check::new(
+    let mut check = Check::new(
         CheckKind::UnnecessaryComprehension(expr_kind.to_string()),
         location,
-    ))
+    );
+    if fix {
+        match fixes::fix_unnecessary_comprehension(locator, expr) {
+            Ok(fix) => check.amend(fix),
+            Err(e) => error!("Failed to generate fix: {}", e),
+        }
+    }
+    Some(check)
 }
 
 /// C417

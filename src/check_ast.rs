@@ -1363,6 +1363,8 @@ where
                         expr,
                         elt,
                         generators,
+                        self.locator,
+                        self.patch(),
                         self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);

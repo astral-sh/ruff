@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libcst_native::{
     Arg, Call, Codegen, Dict, DictComp, DictElement, Element, Expr, Expression, LeftCurlyBrace,
-    LeftParen, LeftSquareBracket, List, ListComp, Module, ParenthesizableWhitespace,
+    LeftParen, LeftSquareBracket, List, ListComp, Module, Name, ParenthesizableWhitespace,
     RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     SmallStatement, Statement, Tuple,
 };
@@ -503,7 +503,7 @@ pub fn fix_unnecessary_literal_within_list_call(
     ))
 }
 
-/// (C411) Convert `list([i for i in x])` to `[i for i in x]`.
+/// (C411) Convert `list([i * i for i in x])` to `[i * i for i in x]`.
 pub fn fix_unnecessary_list_call(
     locator: &SourceCodeLocator,
     expr: &rustpython_ast::Expr,
@@ -515,6 +515,76 @@ pub fn fix_unnecessary_list_call(
     let arg = match_arg(call)?;
 
     body.value = arg.value.clone();
+
+    let mut state = Default::default();
+    tree.codegen(&mut state);
+
+    Ok(Fix::replacement(
+        state.to_string(),
+        expr.location,
+        expr.end_location.unwrap(),
+    ))
+}
+
+/// (C416) Convert `[i for i in x]` to `list(x)`.
+pub fn fix_unnecessary_comprehension(
+    locator: &SourceCodeLocator,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
+    let mut tree = match_tree(locator, expr)?;
+    let mut body = match_expr(&mut tree)?;
+
+    match &body.value {
+        Expression::ListComp(inner) => {
+            body.value = Expression::Call(Box::new(Call {
+                func: Box::new(Expression::Name(Box::new(Name {
+                    value: "list",
+                    lpar: Default::default(),
+                    rpar: Default::default(),
+                }))),
+                args: vec![Arg {
+                    value: inner.for_in.iter.clone(),
+                    keyword: Default::default(),
+                    equal: Default::default(),
+                    comma: Default::default(),
+                    star: Default::default(),
+                    whitespace_after_star: Default::default(),
+                    whitespace_after_arg: Default::default(),
+                }],
+                lpar: Default::default(),
+                rpar: Default::default(),
+                whitespace_after_func: Default::default(),
+                whitespace_before_args: Default::default(),
+            }))
+        }
+        Expression::SetComp(inner) => {
+            body.value = Expression::Call(Box::new(Call {
+                func: Box::new(Expression::Name(Box::new(Name {
+                    value: "set",
+                    lpar: Default::default(),
+                    rpar: Default::default(),
+                }))),
+                args: vec![Arg {
+                    value: inner.for_in.iter.clone(),
+                    keyword: Default::default(),
+                    equal: Default::default(),
+                    comma: Default::default(),
+                    star: Default::default(),
+                    whitespace_after_star: Default::default(),
+                    whitespace_after_arg: Default::default(),
+                }],
+                lpar: Default::default(),
+                rpar: Default::default(),
+                whitespace_after_func: Default::default(),
+                whitespace_before_args: Default::default(),
+            }))
+        }
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Expected node to be: Expression::ListComp | Expression:SetComp."
+            ))
+        }
+    }
 
     let mut state = Default::default();
     tree.codegen(&mut state);
