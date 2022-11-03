@@ -84,14 +84,19 @@ impl Settings {
 
 impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.line_length.hash(state);
+        // Add base properties in alphabetical order.
         self.dummy_variable_rgx.as_str().hash(state);
         for value in self.enabled.iter() {
             value.hash(state);
         }
+        self.line_length.hash(state);
         for value in self.per_file_ignores.iter() {
             value.hash(state);
         }
+        self.target_version.hash(state);
+        // Add plugin properties in alphabetical order.
+        self.flake8_quotes.hash(state);
+        self.pep8_naming.hash(state);
     }
 }
 

@@ -11,7 +11,7 @@ use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
 use crate::fs;
 
-#[derive(Clone, Debug, PartialOrd, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialOrd, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum PythonVersion {
     Py33,
     Py34,
