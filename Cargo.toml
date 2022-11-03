@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "crates/flake8_to_ruff",
+    "flake8_to_ruff",
 ]
 
 [package]
