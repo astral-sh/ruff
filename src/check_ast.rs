@@ -1015,7 +1015,12 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C402) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_dict(
-                        expr, func, args, keywords,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(),
                     ) {
                         self.checks.push(check);
                     };
@@ -1083,7 +1088,11 @@ where
                 if self.settings.enabled.contains(&CheckCode::C409) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_literal_within_tuple_call(
-                            expr, func, args,
+                            expr,
+                            func,
+                            args,
+                            self.locator,
+                            self.patch(),
                         )
                     {
                         self.checks.push(check);
@@ -1093,7 +1102,11 @@ where
                 if self.settings.enabled.contains(&CheckCode::C410) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_literal_within_list_call(
-                            expr, func, args,
+                            expr,
+                            func,
+                            args,
+                            self.locator,
+                            self.patch(),
                         )
                     {
                         self.checks.push(check);
