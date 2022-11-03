@@ -5,6 +5,20 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
+#[cfg(not(target_family = "wasm"))]
+use ::ruff::cache;
+use ::ruff::checks::{CheckCode, CheckKind};
+use ::ruff::checks_gen::CheckCodePrefix;
+use ::ruff::cli::{collect_per_file_ignores, extract_log_level, warn_on, Cli, Warnable};
+use ::ruff::fs::iter_python_files;
+use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin};
+use ::ruff::logging::{set_up_logging, LogLevel};
+use ::ruff::message::Message;
+use ::ruff::printer::{Printer, SerializationFormat};
+use ::ruff::settings::configuration::Configuration;
+use ::ruff::settings::types::FilePattern;
+use ::ruff::settings::user::UserConfiguration;
+use ::ruff::settings::{pyproject, Settings};
 use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
@@ -12,20 +26,6 @@ use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-#[cfg(not(target_family = "wasm"))]
-use ruff::cache;
-use ruff::checks::{CheckCode, CheckKind};
-use ruff::checks_gen::CheckCodePrefix;
-use ruff::cli::{collect_per_file_ignores, extract_log_level, warn_on, Cli, Warnable};
-use ruff::fs::iter_python_files;
-use ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin};
-use ruff::logging::{set_up_logging, LogLevel};
-use ruff::message::Message;
-use ruff::printer::{Printer, SerializationFormat};
-use ruff::settings::configuration::Configuration;
-use ruff::settings::types::FilePattern;
-use ruff::settings::user::UserConfiguration;
-use ruff::settings::{pyproject, Settings};
 use walkdir::DirEntry;
 
 #[cfg(feature = "update-informer")]
