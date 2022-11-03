@@ -118,7 +118,7 @@ pub fn non_lowercase_variable_in_function(scope: &Scope, expr: &Expr, name: &str
     if !matches!(scope.kind, ScopeKind::Function(FunctionScope { .. })) {
         return None;
     }
-    if !is_lower(name) {
+    if name.to_lowercase() != name {
         return Some(Check::new(
             CheckKind::NonLowercaseVariableInFunction(name.to_string()),
             Range::from_located(expr),
