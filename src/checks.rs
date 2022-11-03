@@ -1476,6 +1476,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryGeneratorSet
                 | CheckKind::UnnecessaryListCall
                 | CheckKind::UnnecessaryListComprehensionSet
+                | CheckKind::UnnecessaryLiteralDict(_)
                 | CheckKind::UnnecessaryLiteralSet(_)
                 | CheckKind::UnnecessaryLiteralWithinListCall(_)
                 | CheckKind::UnnecessaryLiteralWithinTupleCall(_)
