@@ -99,15 +99,59 @@ _Note: prior to `v0.0.86`, `ruff-pre-commit` used `lint` (rather than `ruff`) as
 
 ## Configuration
 
-Ruff is configurable both via `pyproject.toml` and the command line.
-
-For example, you could configure Ruff to only enforce a subset of rules with:
+Ruff is configurable both via `pyproject.toml` and the command line. If left unspecified, the
+default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
 line-length = 88
+
+# Enable Flake's "E" and "F" codes by default.
 select = ["E", "F"]
+ignore = []
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+per-file-ignores = {}
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Assume Python 3.10.
+target-version = "py310"
+```
+
+As an example, the following would configure Ruff to (1) avoid checking for line-length
+violations (`E501`) and (2) ignore unused import rules in `__init__.py` files:
+
+```toml
+[tool.ruff]
+select = ["E", "F"]
+
+# Never enforce `E501`.
 ignore = ["E501"]
+
+# Ignore `F401` violations in any `__init__.py` file, and in `path/to/file.py`.
 per-file-ignores = {"__init__.py" = ["F401"], "path/to/file.py" = ["F401"]}
 ```
 
@@ -115,7 +159,8 @@ Plugin configurations should be expressed as subsections, e.g.:
 
 ```toml
 [tool.ruff]
-line-length = 88
+# Add "Q" to the list of enabled codes.
+select = ["E", "F", "Q"]
 
 [tool.ruff.flake8-quotes]
 docstring-quotes = "double"
@@ -143,6 +188,8 @@ Options:
   -v, --verbose
           Enable verbose logging
   -q, --quiet
+          Only log errors
+  -s, --silent
           Disable all logging (but still exit with status code "1" upon detecting errors)
   -e, --exit-zero
           Exit with status code "0", even upon detecting errors
