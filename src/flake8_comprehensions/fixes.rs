@@ -37,8 +37,13 @@ pub fn fix_unnecessary_generator_list(locator: &SourceCodeLocator, expr: &Expr) 
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
     };
-    let arg = if let Some(Arg { value, .. }) = call.args.first_mut() {
-        value
+    let (arg, whitespace_after_arg) = if let Some(Arg {
+        value,
+        whitespace_after_arg,
+        ..
+    }) = call.args.first_mut()
+    {
+        (value, whitespace_after_arg)
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Arg."));
     };
@@ -57,7 +62,7 @@ pub fn fix_unnecessary_generator_list(locator: &SourceCodeLocator, expr: &Expr) 
             whitespace_after: call.whitespace_before_args.clone(),
         },
         rbracket: RightSquareBracket {
-            whitespace_before: call.whitespace_after_func.clone(),
+            whitespace_before: whitespace_after_arg.clone(),
         },
         lpar: generator_exp.lpar.clone(),
         rpar: generator_exp.rpar.clone(),
@@ -101,8 +106,13 @@ pub fn fix_unnecessary_generator_set(locator: &SourceCodeLocator, expr: &Expr) -
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
     };
-    let arg = if let Some(Arg { value, .. }) = call.args.first_mut() {
-        value
+    let (arg, whitespace_after_arg) = if let Some(Arg {
+        value,
+        whitespace_after_arg,
+        ..
+    }) = call.args.first_mut()
+    {
+        (value, whitespace_after_arg)
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Arg."));
     };
@@ -121,7 +131,7 @@ pub fn fix_unnecessary_generator_set(locator: &SourceCodeLocator, expr: &Expr) -
             whitespace_after: call.whitespace_before_args.clone(),
         },
         rbrace: RightCurlyBrace {
-            whitespace_before: call.whitespace_after_func.clone(),
+            whitespace_before: whitespace_after_arg.clone(),
         },
         lpar: generator_exp.lpar.clone(),
         rpar: generator_exp.rpar.clone(),
@@ -168,8 +178,13 @@ pub fn fix_unnecessary_list_comprehension_set(
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
     };
-    let arg = if let Some(Arg { value, .. }) = call.args.first_mut() {
-        value
+    let (arg, whitespace_after_arg) = if let Some(Arg {
+        value,
+        whitespace_after_arg,
+        ..
+    }) = call.args.first_mut()
+    {
+        (value, whitespace_after_arg)
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Arg."));
     };
@@ -188,7 +203,7 @@ pub fn fix_unnecessary_list_comprehension_set(
             whitespace_after: call.whitespace_before_args.clone(),
         },
         rbrace: RightCurlyBrace {
-            whitespace_before: call.whitespace_after_func.clone(),
+            whitespace_before: whitespace_after_arg.clone(),
         },
         lpar: list_comp.lpar.clone(),
         rpar: list_comp.rpar.clone(),
@@ -232,8 +247,13 @@ pub fn fix_unnecessary_literal_set(locator: &SourceCodeLocator, expr: &Expr) -> 
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
     };
-    let arg = if let Some(Arg { value, .. }) = call.args.first_mut() {
-        value
+    let (arg, whitespace_after_arg) = if let Some(Arg {
+        value,
+        whitespace_after_arg,
+        ..
+    }) = call.args.first_mut()
+    {
+        (value, whitespace_after_arg)
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Arg."));
     };
@@ -256,7 +276,7 @@ pub fn fix_unnecessary_literal_set(locator: &SourceCodeLocator, expr: &Expr) -> 
                 whitespace_after: call.whitespace_before_args.clone(),
             },
             rbrace: RightCurlyBrace {
-                whitespace_before: call.whitespace_after_func.clone(),
+                whitespace_before: whitespace_after_arg.clone(),
             },
             lpar: Default::default(),
             rpar: Default::default(),
