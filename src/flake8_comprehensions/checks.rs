@@ -104,15 +104,24 @@ pub fn unnecessary_generator_dict(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
+    locator: &SourceCodeLocator,
+    fix: bool,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     if let ExprKind::GeneratorExp { elt, .. } = argument {
         match &elt.node {
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                return Some(Check::new(
+                let mut check = Check::new(
                     CheckKind::UnnecessaryGeneratorDict,
                     Range::from_located(expr),
-                ));
+                );
+                if fix {
+                    match fixes::fix_unnecessary_generator_dict(locator, expr) {
+                        Ok(fix) => check.amend(fix),
+                        Err(e) => error!("Failed to generate fix: {}", e),
+                    }
+                }
+                return Some(check);
             }
             _ => {}
         }
@@ -266,6 +275,8 @@ pub fn unnecessary_literal_within_tuple_call(
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
+    locator: &SourceCodeLocator,
+    fix: bool,
 ) -> Option<Check> {
     let argument = first_argument_with_matching_function("tuple", func, args)?;
     let argument_kind = match argument {
@@ -273,10 +284,17 @@ pub fn unnecessary_literal_within_tuple_call(
         ExprKind::List { .. } => "list",
         _ => return None,
     };
-    Some(Check::new(
+    let mut check = Check::new(
         CheckKind::UnnecessaryLiteralWithinTupleCall(argument_kind.to_string()),
         Range::from_located(expr),
-    ))
+    );
+    if fix {
+        match fixes::fix_unnecessary_literal_within_tuple_call(locator, expr) {
+            Ok(fix) => check.amend(fix),
+            Err(e) => error!("Failed to generate fix: {}", e),
+        }
+    }
+    Some(check)
 }
 
 /// C410
@@ -284,6 +302,8 @@ pub fn unnecessary_literal_within_list_call(
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
+    locator: &SourceCodeLocator,
+    fix: bool,
 ) -> Option<Check> {
     let argument = first_argument_with_matching_function("list", func, args)?;
     let argument_kind = match argument {
@@ -291,10 +311,17 @@ pub fn unnecessary_literal_within_list_call(
         ExprKind::List { .. } => "list",
         _ => return None,
     };
-    Some(Check::new(
+    let mut check = Check::new(
         CheckKind::UnnecessaryLiteralWithinListCall(argument_kind.to_string()),
         Range::from_located(expr),
-    ))
+    );
+    if fix {
+        match fixes::fix_unnecessary_literal_within_list_call(locator, expr) {
+            Ok(fix) => check.amend(fix),
+            Err(e) => error!("Failed to generate fix: {}", e),
+        }
+    }
+    Some(check)
 }
 
 /// C411

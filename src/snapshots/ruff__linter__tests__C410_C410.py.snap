@@ -10,7 +10,16 @@ expression: checks
   end_location:
     row: 1
     column: 17
-  fix: ~
+  fix:
+    patch:
+      content: "[1, 2]"
+      location:
+        row: 1
+        column: 5
+      end_location:
+        row: 1
+        column: 17
+    applied: false
 - kind:
     UnnecessaryLiteralWithinListCall: tuple
   location:
@@ -19,7 +28,16 @@ expression: checks
   end_location:
     row: 2
     column: 17
-  fix: ~
+  fix:
+    patch:
+      content: "[1, 2]"
+      location:
+        row: 2
+        column: 5
+      end_location:
+        row: 2
+        column: 17
+    applied: false
 - kind:
     UnnecessaryLiteralWithinListCall: list
   location:
@@ -28,7 +46,16 @@ expression: checks
   end_location:
     row: 3
     column: 13
-  fix: ~
+  fix:
+    patch:
+      content: "[]"
+      location:
+        row: 3
+        column: 5
+      end_location:
+        row: 3
+        column: 13
+    applied: false
 - kind:
     UnnecessaryLiteralWithinListCall: tuple
   location:
@@ -37,5 +64,14 @@ expression: checks
   end_location:
     row: 4
     column: 13
-  fix: ~
+  fix:
+    patch:
+      content: "[]"
+      location:
+        row: 4
+        column: 5
+      end_location:
+        row: 4
+        column: 13
+    applied: false
 

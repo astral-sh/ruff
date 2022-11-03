@@ -1470,11 +1470,14 @@ impl CheckKind {
                 | CheckKind::TypeOfPrimitive(_)
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnnecessaryCollectionCall(_)
+                | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet
                 | CheckKind::UnnecessaryListCall
                 | CheckKind::UnnecessaryListComprehensionSet
                 | CheckKind::UnnecessaryLiteralSet(_)
+                | CheckKind::UnnecessaryLiteralWithinListCall(_)
+                | CheckKind::UnnecessaryLiteralWithinTupleCall(_)
                 | CheckKind::UnusedImport(_, false)
                 | CheckKind::UnusedLoopControlVariable(_)
                 | CheckKind::UnusedNOQA(_)

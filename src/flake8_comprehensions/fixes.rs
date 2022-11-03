@@ -1,7 +1,8 @@
 use anyhow::Result;
 use libcst_native::{
-    Arg, Codegen, Dict, Expression, LeftCurlyBrace, LeftSquareBracket, List, ListComp,
-    RightCurlyBrace, RightSquareBracket, Set, SetComp, SmallStatement, Statement, Tuple,
+    Arg, Codegen, Dict, DictComp, Element, Expression, LeftCurlyBrace, LeftParen,
+    LeftSquareBracket, List, ListComp, ParenthesizableWhitespace, RightCurlyBrace, RightParen,
+    RightSquareBracket, Set, SetComp, SimpleWhitespace, SmallStatement, Statement, Tuple,
 };
 use rustpython_ast::Expr;
 
@@ -32,7 +33,7 @@ pub fn fix_unnecessary_generator_list(locator: &SourceCodeLocator, expr: &Expr) 
             "Expected node to be: SmallStatement::Expr."
         ));
     };
-    let call = if let Expression::Call(call) = &mut body.value {
+    let call = if let Expression::Call(call) = &body.value {
         call
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
@@ -41,7 +42,7 @@ pub fn fix_unnecessary_generator_list(locator: &SourceCodeLocator, expr: &Expr) 
         value,
         whitespace_after_arg,
         ..
-    }) = call.args.first_mut()
+    }) = call.args.first()
     {
         (value, whitespace_after_arg)
     } else {
@@ -101,7 +102,7 @@ pub fn fix_unnecessary_generator_set(locator: &SourceCodeLocator, expr: &Expr) -
             "Expected node to be: SmallStatement::Expr."
         ));
     };
-    let call = if let Expression::Call(call) = &mut body.value {
+    let call = if let Expression::Call(call) = &body.value {
         call
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
@@ -110,7 +111,7 @@ pub fn fix_unnecessary_generator_set(locator: &SourceCodeLocator, expr: &Expr) -
         value,
         whitespace_after_arg,
         ..
-    }) = call.args.first_mut()
+    }) = call.args.first()
     {
         (value, whitespace_after_arg)
     } else {
@@ -135,6 +136,96 @@ pub fn fix_unnecessary_generator_set(locator: &SourceCodeLocator, expr: &Expr) -
         },
         lpar: generator_exp.lpar.clone(),
         rpar: generator_exp.rpar.clone(),
+    }));
+
+    let mut state = Default::default();
+    tree.codegen(&mut state);
+
+    Ok(Fix::replacement(
+        state.to_string(),
+        expr.location,
+        expr.end_location.unwrap(),
+    ))
+}
+
+/// (C402) Convert `dict((x, x) for x in range(3))` to `{x: x for x in
+/// range(3)}`.
+pub fn fix_unnecessary_generator_dict(locator: &SourceCodeLocator, expr: &Expr) -> Result<Fix> {
+    let mut tree = match libcst_native::parse_module(
+        locator.slice_source_code_range(&Range::from_located(expr)),
+        None,
+    ) {
+        Ok(m) => m,
+        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
+    };
+    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
+    };
+    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!(
+            "Expected node to be: SmallStatement::Expr."
+        ));
+    };
+    let call = if let Expression::Call(call) = &body.value {
+        call
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
+    };
+    let (arg, whitespace_after_arg) = if let Some(Arg {
+        value,
+        whitespace_after_arg,
+        ..
+    }) = call.args.first()
+    {
+        (value, whitespace_after_arg)
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Arg."));
+    };
+    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg {
+        generator_exp
+    } else {
+        return Err(anyhow::anyhow!(
+            "Expected node to be: Expression::GeneratorExp."
+        ));
+    };
+    let tuple = if let Expression::Tuple(tuple) = &generator_exp.elt.as_ref() {
+        tuple
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Expression::Tuple."));
+    };
+    let key = if let Some(Element::Simple { value, .. }) = &tuple.elements.get(0) {
+        value
+    } else {
+        return Err(anyhow::anyhow!(
+            "Expected tuple to contain a key as the first element."
+        ));
+    };
+    let value = if let Some(Element::Simple { value, .. }) = &tuple.elements.get(1) {
+        value
+    } else {
+        return Err(anyhow::anyhow!(
+            "Expected tuple to contain a key as the second element."
+        ));
+    };
+
+    body.value = Expression::DictComp(Box::new(DictComp {
+        key: Box::new(key.clone()),
+        value: Box::new(value.clone()),
+        for_in: generator_exp.for_in.clone(),
+        lbrace: LeftCurlyBrace {
+            whitespace_after: call.whitespace_before_args.clone(),
+        },
+        rbrace: RightCurlyBrace {
+            whitespace_before: whitespace_after_arg.clone(),
+        },
+        lpar: Default::default(),
+        rpar: Default::default(),
+        whitespace_before_colon: Default::default(),
+        whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
     }));
 
     let mut state = Default::default();
@@ -173,7 +264,7 @@ pub fn fix_unnecessary_list_comprehension_set(
             "Expected node to be: SmallStatement::Expr."
         ));
     };
-    let call = if let Expression::Call(call) = &mut body.value {
+    let call = if let Expression::Call(call) = &body.value {
         call
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
@@ -182,7 +273,7 @@ pub fn fix_unnecessary_list_comprehension_set(
         value,
         whitespace_after_arg,
         ..
-    }) = call.args.first_mut()
+    }) = call.args.first()
     {
         (value, whitespace_after_arg)
     } else {
@@ -370,6 +461,168 @@ pub fn fix_unnecessary_collection_call(locator: &SourceCodeLocator, expr: &Expr)
     ))
 }
 
+/// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`
+pub fn fix_unnecessary_literal_within_tuple_call(
+    locator: &SourceCodeLocator,
+    expr: &Expr,
+) -> Result<Fix> {
+    let mut tree = match libcst_native::parse_module(
+        locator.slice_source_code_range(&Range::from_located(expr)),
+        None,
+    ) {
+        Ok(m) => m,
+        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
+    };
+    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
+    };
+    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!(
+            "Expected node to be: SmallStatement::Expr."
+        ));
+    };
+    let call = if let Expression::Call(call) = &body.value {
+        call
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
+    };
+    let arg = if let Some(Arg { value, .. }) = call.args.first() {
+        value
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Arg."));
+    };
+    let (elements, whitespace_after, whitespace_before) = match arg {
+        Expression::Tuple(inner) => (
+            &inner.elements,
+            &inner
+                .lpar
+                .first()
+                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses."))?
+                .whitespace_after,
+            &inner
+                .rpar
+                .first()
+                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses."))?
+                .whitespace_before,
+        ),
+        Expression::List(inner) => (
+            &inner.elements,
+            &inner.lbracket.whitespace_after,
+            &inner.rbracket.whitespace_before,
+        ),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Expected node to be: Expression::Tuple | Expression::List."
+            ))
+        }
+    };
+
+    body.value = Expression::Tuple(Box::new(Tuple {
+        elements: elements.clone(),
+        lpar: vec![LeftParen {
+            whitespace_after: whitespace_after.clone(),
+        }],
+        rpar: vec![RightParen {
+            whitespace_before: whitespace_before.clone(),
+        }],
+    }));
+
+    let mut state = Default::default();
+    tree.codegen(&mut state);
+
+    Ok(Fix::replacement(
+        state.to_string(),
+        expr.location,
+        expr.end_location.unwrap(),
+    ))
+}
+
+/// (C410) Convert `list([1, 2])` to `[1, 2]`
+pub fn fix_unnecessary_literal_within_list_call(
+    locator: &SourceCodeLocator,
+    expr: &Expr,
+) -> Result<Fix> {
+    let mut tree = match libcst_native::parse_module(
+        locator.slice_source_code_range(&Range::from_located(expr)),
+        None,
+    ) {
+        Ok(m) => m,
+        Err(_) => return Err(anyhow::anyhow!("Failed to extract CST from source.")),
+    };
+    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
+    };
+    let body = if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
+        body
+    } else {
+        return Err(anyhow::anyhow!(
+            "Expected node to be: SmallStatement::Expr."
+        ));
+    };
+    let call = if let Expression::Call(call) = &body.value {
+        call
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
+    };
+    let arg = if let Some(Arg { value, .. }) = call.args.first() {
+        value
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Arg."));
+    };
+    let (elements, whitespace_after, whitespace_before) = match arg {
+        Expression::Tuple(inner) => (
+            &inner.elements,
+            &inner
+                .lpar
+                .first()
+                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses."))?
+                .whitespace_after,
+            &inner
+                .rpar
+                .first()
+                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses."))?
+                .whitespace_before,
+        ),
+        Expression::List(inner) => (
+            &inner.elements,
+            &inner.lbracket.whitespace_after,
+            &inner.rbracket.whitespace_before,
+        ),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Expected node to be: Expression::Tuple | Expression::List."
+            ))
+        }
+    };
+
+    body.value = Expression::List(Box::new(List {
+        elements: elements.clone(),
+        lbracket: LeftSquareBracket {
+            whitespace_after: whitespace_after.clone(),
+        },
+        rbracket: RightSquareBracket {
+            whitespace_before: whitespace_before.clone(),
+        },
+        lpar: Default::default(),
+        rpar: Default::default(),
+    }));
+
+    let mut state = Default::default();
+    tree.codegen(&mut state);
+
+    Ok(Fix::replacement(
+        state.to_string(),
+        expr.location,
+        expr.end_location.unwrap(),
+    ))
+}
+
 /// (C411) Convert `list([i for i in x])` to `[i for i in x]`.
 pub fn fix_unnecessary_list_call(locator: &SourceCodeLocator, expr: &Expr) -> Result<Fix> {
     // Module(SimpleStatementLine(Expr(Call(List|Tuple)))) ->
@@ -393,12 +646,12 @@ pub fn fix_unnecessary_list_call(locator: &SourceCodeLocator, expr: &Expr) -> Re
             "Expected node to be: SmallStatement::Expr."
         ));
     };
-    let call = if let Expression::Call(call) = &mut body.value {
+    let call = if let Expression::Call(call) = &body.value {
         call
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Call."));
     };
-    let arg = if let Some(Arg { value, .. }) = call.args.first_mut() {
+    let arg = if let Some(Arg { value, .. }) = call.args.first() {
         value
     } else {
         return Err(anyhow::anyhow!("Expected node to be: Arg."));
