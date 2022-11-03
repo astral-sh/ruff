@@ -9,5 +9,14 @@ expression: checks
   end_location:
     row: 1
     column: 28
-  fix: ~
+  fix:
+    patch:
+      content: "{x for x in range(3)}"
+      location:
+        row: 1
+        column: 4
+      end_location:
+        row: 1
+        column: 28
+    applied: false
 

@@ -1,3 +1,4 @@
+use log::error;
 use num_bigint::BigInt;
 use rustpython_ast::{
     Comprehension, Constant, Expr, ExprKind, Keyword, KeywordData, Located, Unaryop,
@@ -5,6 +6,8 @@ use rustpython_ast::{
 
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
+use crate::flake8_comprehensions::fixes;
+use crate::source_code_locator::SourceCodeLocator;
 
 fn function_name(func: &Expr) -> Option<&str> {
     if let ExprKind::Name { id, .. } = &func.node {
@@ -49,13 +52,22 @@ pub fn unnecessary_generator_list(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
+    locator: &SourceCodeLocator,
+    fix: bool,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("list", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        return Some(Check::new(
+        let mut check = Check::new(
             CheckKind::UnnecessaryGeneratorList,
             Range::from_located(expr),
-        ));
+        );
+        if fix {
+            match fixes::fix_unnecessary_generator_list(locator, expr) {
+                Ok(fix) => check.amend(fix),
+                Err(e) => error!("Failed to generate fix: {}", e),
+            }
+        }
+        return Some(check);
     }
     None
 }
@@ -66,13 +78,22 @@ pub fn unnecessary_generator_set(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
+    locator: &SourceCodeLocator,
+    fix: bool,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        return Some(Check::new(
+        let mut check = Check::new(
             CheckKind::UnnecessaryGeneratorSet,
             Range::from_located(expr),
-        ));
+        );
+        if fix {
+            match fixes::fix_unnecessary_generator_set(locator, expr) {
+                Ok(fix) => check.amend(fix),
+                Err(e) => error!("Failed to generate fix: {}", e),
+            }
+        }
+        return Some(check);
     }
     None
 }
@@ -105,13 +126,22 @@ pub fn unnecessary_list_comprehension_set(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
+    locator: &SourceCodeLocator,
+    fix: bool,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::ListComp { .. } = &argument {
-        return Some(Check::new(
+        let mut check = Check::new(
             CheckKind::UnnecessaryListComprehensionSet,
             Range::from_located(expr),
-        ));
+        );
+        if fix {
+            match fixes::fix_unnecessary_list_comprehension_set(locator, expr) {
+                Ok(fix) => check.amend(fix),
+                Err(e) => error!("Failed to generate fix: {}", e),
+            }
+        }
+        return Some(check);
     }
     None
 }
@@ -144,6 +174,8 @@ pub fn unnecessary_literal_set(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
+    locator: &SourceCodeLocator,
+    fix: bool,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     let kind = match argument {
@@ -151,10 +183,17 @@ pub fn unnecessary_literal_set(
         ExprKind::Tuple { .. } => "tuple",
         _ => return None,
     };
-    Some(Check::new(
+    let mut check = Check::new(
         CheckKind::UnnecessaryLiteralSet(kind.to_string()),
         Range::from_located(expr),
-    ))
+    );
+    if fix {
+        match fixes::fix_unnecessary_literal_set(locator, expr) {
+            Ok(fix) => check.amend(fix),
+            Err(e) => error!("Failed to generate fix: {}", e),
+        }
+    }
+    Some(check)
 }
 
 /// C406 (`dict([(1, 2)])`)
@@ -190,22 +229,36 @@ pub fn unnecessary_collection_call(
     func: &Expr,
     args: &[Expr],
     keywords: &[Located<KeywordData>],
+    locator: &SourceCodeLocator,
+    fix: bool,
 ) -> Option<Check> {
     if !args.is_empty() {
         return None;
     }
     let id = function_name(func)?;
     match id {
-        "dict" if keywords.is_empty() || keywords.iter().all(|kw| kw.node.arg.is_some()) => (),
+        "dict" if keywords.is_empty() || keywords.iter().all(|kw| kw.node.arg.is_some()) => {
+            // `dict()` or `dict(a=1)` (as opposed to `dict(**a)`)
+        }
         "list" | "tuple" => {
-            // list() or tuple()
+            // `list()` or `tuple()`
         }
         _ => return None,
     };
-    Some(Check::new(
+    let mut check = Check::new(
         CheckKind::UnnecessaryCollectionCall(id.to_string()),
         Range::from_located(expr),
-    ))
+    );
+    if fix {
+        // TODO(charlie): Support fixing `dict(a=1)`.
+        if keywords.is_empty() {
+            match fixes::fix_unnecessary_collection_call(locator, expr) {
+                Ok(fix) => check.amend(fix),
+                Err(e) => error!("Failed to generate fix: {}", e),
+            }
+        }
+    }
+    Some(check)
 }
 
 /// C409
@@ -245,13 +298,23 @@ pub fn unnecessary_literal_within_list_call(
 }
 
 /// C411
-pub fn unnecessary_list_call(expr: &Expr, func: &Expr, args: &[Expr]) -> Option<Check> {
+pub fn unnecessary_list_call(
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    locator: &SourceCodeLocator,
+    fix: bool,
+) -> Option<Check> {
     let argument = first_argument_with_matching_function("list", func, args)?;
     if let ExprKind::ListComp { .. } = argument {
-        return Some(Check::new(
-            CheckKind::UnnecessaryListCall,
-            Range::from_located(expr),
-        ));
+        let mut check = Check::new(CheckKind::UnnecessaryListCall, Range::from_located(expr));
+        if fix {
+            match fixes::fix_unnecessary_list_call(locator, expr) {
+                Ok(fix) => check.amend(fix),
+                Err(e) => error!("Failed to generate fix: {}", e),
+            }
+        }
+        return Some(check);
     }
     None
 }

@@ -10,7 +10,16 @@ expression: checks
   end_location:
     row: 1
     column: 11
-  fix: ~
+  fix:
+    patch:
+      content: ()
+      location:
+        row: 1
+        column: 4
+      end_location:
+        row: 1
+        column: 11
+    applied: false
 - kind:
     UnnecessaryCollectionCall: list
   location:
@@ -19,7 +28,16 @@ expression: checks
   end_location:
     row: 2
     column: 10
-  fix: ~
+  fix:
+    patch:
+      content: "[]"
+      location:
+        row: 2
+        column: 4
+      end_location:
+        row: 2
+        column: 10
+    applied: false
 - kind:
     UnnecessaryCollectionCall: dict
   location:
@@ -28,7 +46,16 @@ expression: checks
   end_location:
     row: 3
     column: 11
-  fix: ~
+  fix:
+    patch:
+      content: "{}"
+      location:
+        row: 3
+        column: 5
+      end_location:
+        row: 3
+        column: 11
+    applied: false
 - kind:
     UnnecessaryCollectionCall: dict
   location:

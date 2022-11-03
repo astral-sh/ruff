@@ -989,7 +989,12 @@ where
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_list(
-                        expr, func, args, keywords,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(),
                     ) {
                         self.checks.push(check);
                     };
@@ -997,7 +1002,12 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C401) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_set(
-                        expr, func, args, keywords,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(),
                     ) {
                         self.checks.push(check);
                     };
@@ -1014,7 +1024,12 @@ where
                 if self.settings.enabled.contains(&CheckCode::C403) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_set(
-                            expr, func, args, keywords,
+                            expr,
+                            func,
+                            args,
+                            keywords,
+                            self.locator,
+                            self.patch(),
                         )
                     {
                         self.checks.push(check);
@@ -1033,7 +1048,12 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C405) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_set(
-                        expr, func, args, keywords,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(),
                     ) {
                         self.checks.push(check);
                     };
@@ -1049,7 +1069,12 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C408) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_collection_call(
-                        expr, func, args, keywords,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(),
                     ) {
                         self.checks.push(check);
                     };
@@ -1076,9 +1101,13 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::C411) {
-                    if let Some(check) =
-                        flake8_comprehensions::checks::unnecessary_list_call(expr, func, args)
-                    {
+                    if let Some(check) = flake8_comprehensions::checks::unnecessary_list_call(
+                        expr,
+                        func,
+                        args,
+                        self.locator,
+                        self.patch(),
+                    ) {
                         self.checks.push(check);
                     };
                 }
