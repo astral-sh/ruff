@@ -29,7 +29,7 @@ pub struct Options {
     pub staticmethod_decorators: Option<Vec<String>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Settings {
     pub ignore_names: Vec<String>,
     pub classmethod_decorators: Vec<String>,

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Quote {
     Single,
@@ -18,7 +18,7 @@ pub struct Options {
     pub avoid_escape: Option<bool>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Settings {
     pub inline_quotes: Quote,
     pub multiline_quotes: Quote,
