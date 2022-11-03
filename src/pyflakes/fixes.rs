@@ -20,13 +20,13 @@ pub fn remove_unused_imports(
     let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         body
     } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
+        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple"));
     };
     let body = if let Some(SmallStatement::Import(body)) = body.body.first_mut() {
         body
     } else {
         return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::ImportFrom."
+            "Expected node to be: SmallStatement::ImportFrom"
         ));
     };
     let aliases = &mut body.names;
@@ -77,20 +77,20 @@ pub fn remove_unused_import_froms(
     let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         body
     } else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple."));
+        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple"));
     };
     let body = if let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() {
         body
     } else {
         return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::ImportFrom."
+            "Expected node to be: SmallStatement::ImportFrom"
         ));
     };
 
     let aliases = if let ImportNames::Aliases(aliases) = &mut body.names {
         aliases
     } else {
-        return Err(anyhow::anyhow!("Expected node to be: Aliases."));
+        return Err(anyhow::anyhow!("Expected node to be: Aliases"));
     };
 
     // Preserve the trailing comma (or not) from the last entry.

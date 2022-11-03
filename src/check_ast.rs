@@ -1076,9 +1076,12 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::C406) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_dict(
+                        expr,
                         func,
                         args,
                         keywords,
+                        self.locator,
+                        self.patch(),
                         self.locate_check(Range::from_located(expr)),
                     ) {
                         self.checks.push(check);

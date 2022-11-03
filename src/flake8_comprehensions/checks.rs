@@ -197,9 +197,12 @@ pub fn unnecessary_literal_set(
 
 /// C406 (`dict([(1, 2)])`)
 pub fn unnecessary_literal_dict(
+    expr: &Expr,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
+    locator: &SourceCodeLocator,
+    fix: bool,
     location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
@@ -208,18 +211,24 @@ pub fn unnecessary_literal_dict(
         ExprKind::List { elts, .. } => ("list", elts),
         _ => return None,
     };
-
-    if let Some(elt) = elts.first() {
-        // dict((1, 2), ...)) or dict([(1, 2), ...])
-        if !matches!(&elt.node, ExprKind::Tuple { elts, .. } if elts.len() == 2) {
-            return None;
-        }
+    // Accept `dict((1, 2), ...))` `dict([(1, 2), ...])`.
+    if !elts
+        .iter()
+        .all(|elt| matches!(&elt.node, ExprKind::Tuple { elts, .. } if elts.len() == 2))
+    {
+        return None;
     }
-
-    Some(Check::new(
+    let mut check = Check::new(
         CheckKind::UnnecessaryLiteralDict(kind.to_string()),
         location,
-    ))
+    );
+    if fix {
+        match fixes::fix_unnecessary_literal_dict(locator, expr) {
+            Ok(fix) => check.amend(fix),
+            Err(e) => error!("Failed to generate fix: {}", e),
+        }
+    }
+    Some(check)
 }
 
 /// C408
