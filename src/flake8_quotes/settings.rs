@@ -29,7 +29,7 @@ pub struct Settings {
 impl Settings {
     pub fn from_options(options: Options) -> Self {
         Self {
-            inline_quotes: options.inline_quotes.unwrap_or(Quote::Single),
+            inline_quotes: options.inline_quotes.unwrap_or(Quote::Double),
             multiline_quotes: options.multiline_quotes.unwrap_or(Quote::Double),
             docstring_quotes: options.docstring_quotes.unwrap_or(Quote::Double),
             avoid_escape: options.avoid_escape.unwrap_or(true),
@@ -40,7 +40,7 @@ impl Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            inline_quotes: Quote::Single,
+            inline_quotes: Quote::Double,
             multiline_quotes: Quote::Double,
             docstring_quotes: Quote::Double,
             avoid_escape: true,
