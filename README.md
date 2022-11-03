@@ -325,7 +325,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |  |
 | F831 | DuplicateArgumentName | Duplicate argument name in function definition |  |
 | F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
-| F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` |  |
+| F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
 ### pycodestyle (error)
 

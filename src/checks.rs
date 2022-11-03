@@ -1461,6 +1461,7 @@ impl CheckKind {
                 | CheckKind::OneBlankLineBeforeClass(_)
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
+                | CheckKind::RaiseNotImplemented
                 | CheckKind::SectionNameEndsInColon(_)
                 | CheckKind::SectionNotOverIndented(_)
                 | CheckKind::SectionUnderlineAfterName(_)
