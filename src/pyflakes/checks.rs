@@ -10,21 +10,21 @@ use rustpython_parser::ast::{
 use crate::ast::types::{BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 
-/// F634
-pub fn if_tuple(test: &Expr, location: Range) -> Option<Check> {
-    if let ExprKind::Tuple { elts, .. } = &test.node {
-        if !elts.is_empty() {
-            return Some(Check::new(CheckKind::IfTuple, location));
-        }
-    }
-    None
-}
-
 /// F631
 pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
         if !elts.is_empty() {
             return Some(Check::new(CheckKind::AssertTuple, location));
+        }
+    }
+    None
+}
+
+/// F634
+pub fn if_tuple(test: &Expr, location: Range) -> Option<Check> {
+    if let ExprKind::Tuple { elts, .. } = &test.node {
+        if !elts.is_empty() {
+            return Some(Check::new(CheckKind::IfTuple, location));
         }
     }
     None
@@ -73,33 +73,6 @@ pub fn default_except_not_last(handlers: &[Excepthandler]) -> Option<Check> {
                 Range::from_located(handler),
             ));
         }
-    }
-
-    None
-}
-
-/// F901
-pub fn raise_not_implemented(expr: &Expr) -> Option<Check> {
-    match &expr.node {
-        ExprKind::Call { func, .. } => {
-            if let ExprKind::Name { id, .. } = &func.node {
-                if id == "NotImplemented" {
-                    return Some(Check::new(
-                        CheckKind::RaiseNotImplemented,
-                        Range::from_located(expr),
-                    ));
-                }
-            }
-        }
-        ExprKind::Name { id, .. } => {
-            if id == "NotImplemented" {
-                return Some(Check::new(
-                    CheckKind::RaiseNotImplemented,
-                    Range::from_located(expr),
-                ));
-            }
-        }
-        _ => {}
     }
 
     None

@@ -8,8 +8,17 @@ expression: checks
     column: 10
   end_location:
     row: 2
-    column: 26
-  fix: ~
+    column: 24
+  fix:
+    patch:
+      content: NotImplementedError
+      location:
+        row: 2
+        column: 10
+      end_location:
+        row: 2
+        column: 24
+    applied: false
 - kind: RaiseNotImplemented
   location:
     row: 6
@@ -17,5 +26,14 @@ expression: checks
   end_location:
     row: 6
     column: 24
-  fix: ~
+  fix:
+    patch:
+      content: NotImplementedError
+      location:
+        row: 6
+        column: 10
+      end_location:
+        row: 6
+        column: 24
+    applied: false
 

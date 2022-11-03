@@ -717,9 +717,7 @@ where
             StmtKind::Raise { exc, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F901) {
                     if let Some(expr) = exc {
-                        if let Some(check) = pyflakes::checks::raise_not_implemented(expr) {
-                            self.checks.push(check);
-                        }
+                        pyflakes::plugins::raise_not_implemented(self, expr);
                     }
                 }
             }

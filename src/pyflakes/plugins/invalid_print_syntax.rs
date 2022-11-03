@@ -4,6 +4,7 @@ use crate::ast::types::{Binding, BindingKind, Range};
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+/// F633
 pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     if let ExprKind::Name { id, .. } = &left.node {
         if id == "print" {
