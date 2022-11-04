@@ -79,6 +79,7 @@ pub struct Checker<'a> {
     in_f_string: Option<Range>,
     in_annotation: bool,
     in_literal: bool,
+    in_subscript: bool,
     seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
@@ -118,6 +119,7 @@ impl<'a> Checker<'a> {
             in_f_string: Default::default(),
             in_annotation: Default::default(),
             in_literal: Default::default(),
+            in_subscript: Default::default(),
             seen_import_boundary: Default::default(),
             futures_allowed: true,
             annotations_future_enabled: Default::default(),
@@ -1488,36 +1490,56 @@ where
                 }
             }
             ExprKind::Subscript { value, slice, ctx } => {
-                match typing::match_annotated_subscript(value, &self.from_imports) {
-                    Some(subscript) => match subscript {
-                        // Ex) Optional[int]
-                        SubscriptKind::AnnotatedSubscript => {
-                            self.visit_expr(value);
-                            self.visit_annotation(slice);
-                            self.visit_expr_context(ctx);
-                        }
-                        // Ex) Annotated[int, "Hello, world!"]
-                        SubscriptKind::PEP593AnnotatedSubscript => {
-                            // First argument is a type (including forward references); the rest are
-                            // arbitrary Python objects.
-                            self.visit_expr(value);
-                            if let ExprKind::Tuple { elts, ctx } = &slice.node {
-                                if let Some(expr) = elts.first() {
-                                    self.visit_expr(expr);
-                                    self.in_annotation = false;
-                                    for expr in elts.iter().skip(1) {
-                                        self.visit_expr(expr);
-                                    }
-                                    self.in_annotation = true;
+                // Only allow annotations in `ExprContext::Load`. If we have, e.g.,
+                // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
+                // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
+                // the `ExprContext` at the top-level.
+                let prev_in_subscript = self.in_subscript;
+                if self.in_subscript {
+                    visitor::walk_expr(self, expr);
+                } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
+                    self.in_subscript = true;
+                    visitor::walk_expr(self, expr);
+                } else {
+                    self.in_subscript = true;
+                    match typing::match_annotated_subscript(value, &self.from_imports) {
+                        Some(subscript) => {
+                            match subscript {
+                                // Ex) Optional[int]
+                                SubscriptKind::AnnotatedSubscript => {
+                                    self.visit_expr(value);
+                                    self.visit_annotation(slice);
                                     self.visit_expr_context(ctx);
                                 }
-                            } else {
-                                error!("Found non-ExprKind::Tuple argument to PEP 593 Annotation.")
+                                // Ex) Annotated[int, "Hello, world!"]
+                                SubscriptKind::PEP593AnnotatedSubscript => {
+                                    // First argument is a type (including forward references); the
+                                    // rest are arbitrary Python
+                                    // objects.
+                                    self.visit_expr(value);
+                                    if let ExprKind::Tuple { elts, ctx } = &slice.node {
+                                        if let Some(expr) = elts.first() {
+                                            self.visit_expr(expr);
+                                            self.in_annotation = false;
+                                            for expr in elts.iter().skip(1) {
+                                                self.visit_expr(expr);
+                                            }
+                                            self.in_annotation = true;
+                                            self.visit_expr_context(ctx);
+                                        }
+                                    } else {
+                                        error!(
+                                            "Found non-ExprKind::Tuple argument to PEP 593 \
+                                             Annotation."
+                                        )
+                                    }
+                                }
                             }
                         }
-                    },
-                    None => visitor::walk_expr(self, expr),
+                        None => visitor::walk_expr(self, expr),
+                    }
                 }
+                self.in_subscript = prev_in_subscript;
             }
             _ => visitor::walk_expr(self, expr),
         }

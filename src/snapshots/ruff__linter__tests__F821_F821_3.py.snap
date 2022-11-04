@@ -1,0 +1,23 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UndefinedName: key
+  location:
+    row: 11
+    column: 8
+  end_location:
+    row: 11
+    column: 13
+  fix: ~
+- kind:
+    UndefinedName: value
+  location:
+    row: 11
+    column: 15
+  end_location:
+    row: 11
+    column: 22
+  fix: ~
+
