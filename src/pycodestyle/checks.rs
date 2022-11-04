@@ -277,20 +277,26 @@ pub fn invalid_escape_sequence(
     let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];
 
     if !prefix.contains('r') {
-        let mut col_offset = 0;
-        let mut row_offset = 0;
-        let mut in_escape = false;
-        let mut chars = body.chars();
-        let mut current = chars.next();
-        let mut next = chars.next();
-        while let (Some(current_char), Some(next_char)) = (current, next) {
-            // If we see an escaped backslash, avoid treating the character _after_ the
-            // escaped backslash as itself an escaped character.
-            if in_escape {
-                in_escape = false;
-            } else {
-                in_escape = current_char == '\\' && next_char == '\\';
-                if current_char == '\\' && !VALID_ESCAPE_SEQUENCES.contains(&next_char) {
+        for (row_offset, line) in body.lines().enumerate() {
+            let chars: Vec<char> = line.chars().collect();
+            for col_offset in 0..chars.len() {
+                if chars[col_offset] == '\\' {
+                    // If the previous character was also a backslash, skip.
+                    if col_offset > 0 && chars[col_offset - 1] == '\\' {
+                        continue;
+                    }
+
+                    // If we're at the end of the line, skip.
+                    if col_offset == chars.len() - 1 {
+                        continue;
+                    }
+
+                    // If the next character is a valid escape sequence, skip.
+                    let next_char = chars[col_offset + 1];
+                    if VALID_ESCAPE_SEQUENCES.contains(&next_char) {
+                        continue;
+                    }
+
                     // Compute the location of the escape sequence by offsetting the location of the
                     // string token by the characters we've seen thus far.
                     let location = if row_offset == 0 {
@@ -311,17 +317,6 @@ pub fn invalid_escape_sequence(
                     ))
                 }
             }
-
-            // Track the offset from the start position as we iterate over the body.
-            if current_char == '\n' {
-                col_offset = 0;
-                row_offset += 1;
-            } else {
-                col_offset += 1;
-            }
-
-            current = next;
-            next = chars.next();
         }
     }
 
