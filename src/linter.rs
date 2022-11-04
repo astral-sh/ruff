@@ -438,7 +438,8 @@ mod tests {
     #[test_case(CheckCode::W292, Path::new("W292_0.py"); "W292_0")]
     #[test_case(CheckCode::W292, Path::new("W292_1.py"); "W292_1")]
     #[test_case(CheckCode::W292, Path::new("W292_2.py"); "W292_2")]
-    #[test_case(CheckCode::W605, Path::new("W605.py"); "W605")]
+    #[test_case(CheckCode::W605, Path::new("W605_0.py"); "W605_0")]
+    #[test_case(CheckCode::W605, Path::new("W605_1.py"); "W605_1")]
     #[test_case(CheckCode::X001, Path::new("X001.py"); "X001")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
