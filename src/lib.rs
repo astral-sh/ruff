@@ -11,6 +11,7 @@ use crate::autofix::fixer::Mode;
 use crate::checks::Check;
 use crate::linter::{check_path, tokenize};
 use crate::settings::configuration::Configuration;
+use crate::source_code_locator::SourceCodeLocator;
 
 mod ast;
 pub mod autofix;
@@ -65,6 +66,9 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);
 
+    // Initialize the SourceCodeLocator (which computes offsets lazily).
+    let locator = SourceCodeLocator::new(contents);
+
     // Determine the noqa line for every line in the source.
     let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
@@ -73,6 +77,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         path,
         contents,
         tokens,
+        &locator,
         &noqa_line_for,
         &settings,
         &if autofix { Mode::Generate } else { Mode::None },
