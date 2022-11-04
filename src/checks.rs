@@ -184,6 +184,7 @@ pub enum CheckCode {
     N818,
     // Ruff
     X001,
+    X002,
     // Meta
     M001,
 }
@@ -399,7 +400,8 @@ pub enum CheckKind {
     CamelcaseImportedAsAcronym(String, String),
     ErrorSuffixOnExceptionName(String),
     // Ruff
-    AmbiguousUnicodeCharacter(char, char),
+    AmbiguousUnicodeCharacterString(char, char),
+    AmbiguousUnicodeCharacterDocstring(char, char),
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -415,7 +417,8 @@ impl CheckCode {
             | CheckCode::Q002
             | CheckCode::Q003
             | CheckCode::W605
-            | CheckCode::X001 => &LintSource::Tokens,
+            | CheckCode::X001
+            | CheckCode::X002 => &LintSource::Tokens,
             CheckCode::E902 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
@@ -618,7 +621,8 @@ impl CheckCode {
             }
             CheckCode::N818 => CheckKind::ErrorSuffixOnExceptionName("...".to_string()),
             // Ruff
-            CheckCode::X001 => CheckKind::AmbiguousUnicodeCharacter('𝐁', 'B'),
+            CheckCode::X001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
+            CheckCode::X002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -773,6 +777,7 @@ impl CheckCode {
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::X001 => CheckCategory::Ruff,
+            CheckCode::X002 => CheckCategory::Ruff,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -939,7 +944,8 @@ impl CheckKind {
             CheckKind::CamelcaseImportedAsAcronym(..) => &CheckCode::N817,
             CheckKind::ErrorSuffixOnExceptionName(..) => &CheckCode::N818,
             // Ruff
-            CheckKind::AmbiguousUnicodeCharacter(..) => &CheckCode::X001,
+            CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::X001,
+            CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::X002,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -1428,9 +1434,15 @@ impl CheckKind {
                 format!("Exception name `{name}` should be named with an Error suffix")
             }
             // Ruff
-            CheckKind::AmbiguousUnicodeCharacter(confusable, representant) => {
+            CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(
-                    "Use of ambiguous unicode character '{confusable}' (did you mean \
+                    "String contains ambiguous unicode character '{confusable}' (did you mean \
+                     '{representant}'?)"
+                )
+            }
+            CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant) => {
+                format!(
+                    "Docstring contains ambiguous unicode character '{confusable}' (did you mean \
                      '{representant}'?)"
                 )
             }
@@ -1475,7 +1487,8 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            CheckKind::AmbiguousUnicodeCharacter(_, _)
+            CheckKind::AmbiguousUnicodeCharacterString(_, _)
+                | CheckKind::AmbiguousUnicodeCharacterDocstring(_, _)
                 | CheckKind::BlankLineAfterLastSection(_)
                 | CheckKind::BlankLineAfterSection(_)
                 | CheckKind::BlankLineAfterSummary

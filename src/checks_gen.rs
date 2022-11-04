@@ -233,6 +233,7 @@ pub enum CheckCodePrefix {
     X0,
     X00,
     X001,
+    X002,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -271,6 +272,7 @@ impl CheckCodePrefix {
                 CheckCode::B011,
                 CheckCode::B013,
                 CheckCode::B014,
+                CheckCode::B015,
                 CheckCode::B017,
                 CheckCode::B018,
                 CheckCode::B025,
@@ -279,16 +281,14 @@ impl CheckCodePrefix {
             CheckCodePrefix::B002 => vec![CheckCode::B002],
             CheckCodePrefix::B006 => vec![CheckCode::B006],
             CheckCodePrefix::B007 => vec![CheckCode::B007],
-            CheckCodePrefix::B01 => {
-                vec![
-                    CheckCode::B011,
-                    CheckCode::B013,
-                    CheckCode::B014,
-                    CheckCode::B015,
-                    CheckCode::B017,
-                    CheckCode::B018,
-                ]
-            }
+            CheckCodePrefix::B01 => vec![
+                CheckCode::B011,
+                CheckCode::B013,
+                CheckCode::B014,
+                CheckCode::B015,
+                CheckCode::B017,
+                CheckCode::B018,
+            ],
             CheckCodePrefix::B011 => vec![CheckCode::B011],
             CheckCodePrefix::B013 => vec![CheckCode::B013],
             CheckCodePrefix::B014 => vec![CheckCode::B014],
@@ -889,10 +889,11 @@ impl CheckCodePrefix {
             CheckCodePrefix::W6 => vec![CheckCode::W605],
             CheckCodePrefix::W60 => vec![CheckCode::W605],
             CheckCodePrefix::W605 => vec![CheckCode::W605],
-            CheckCodePrefix::X => vec![CheckCode::X001],
-            CheckCodePrefix::X0 => vec![CheckCode::X001],
-            CheckCodePrefix::X00 => vec![CheckCode::X001],
+            CheckCodePrefix::X => vec![CheckCode::X001, CheckCode::X002],
+            CheckCodePrefix::X0 => vec![CheckCode::X001, CheckCode::X002],
+            CheckCodePrefix::X00 => vec![CheckCode::X001, CheckCode::X002],
             CheckCodePrefix::X001 => vec![CheckCode::X001],
+            CheckCodePrefix::X002 => vec![CheckCode::X002],
         }
     }
 }
@@ -1126,6 +1127,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::X0 => PrefixSpecificity::Hundreds,
             CheckCodePrefix::X00 => PrefixSpecificity::Tens,
             CheckCodePrefix::X001 => PrefixSpecificity::Explicit,
+            CheckCodePrefix::X002 => PrefixSpecificity::Explicit,
         }
     }
 }
