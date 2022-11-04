@@ -83,6 +83,7 @@ pub enum CheckCode {
     B011,
     B013,
     B014,
+    B015,
     B017,
     B018,
     B025,
@@ -298,6 +299,7 @@ pub enum CheckKind {
     DoNotAssertFalse,
     RedundantTupleInExceptionHandler(String),
     DuplicateHandlerException(Vec<String>),
+    UselessComparison,
     NoAssertRaisesException,
     UselessExpression,
     DuplicateTryBlockException(String),
@@ -484,6 +486,7 @@ impl CheckCode {
                 CheckKind::RedundantTupleInExceptionHandler("ValueError".to_string())
             }
             CheckCode::B014 => CheckKind::DuplicateHandlerException(vec!["ValueError".to_string()]),
+            CheckCode::B015 => CheckKind::UselessComparison,
             CheckCode::B017 => CheckKind::NoAssertRaisesException,
             CheckCode::B018 => CheckKind::UselessExpression,
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
@@ -676,6 +679,7 @@ impl CheckCode {
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
             CheckCode::B013 => CheckCategory::Flake8Bugbear,
             CheckCode::B014 => CheckCategory::Flake8Bugbear,
+            CheckCode::B015 => CheckCategory::Flake8Bugbear,
             CheckCode::B017 => CheckCategory::Flake8Bugbear,
             CheckCode::B018 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
@@ -835,6 +839,7 @@ impl CheckKind {
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
             CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
+            CheckKind::UselessComparison => &CheckCode::B015,
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::UselessExpression => &CheckCode::B018,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
@@ -1111,6 +1116,10 @@ impl CheckKind {
                      `except ({name},):`."
                 )
             }
+            CheckKind::UselessComparison => "Pointless comparison. This comparison does nothing \
+                                             but waste CPU instructions. Either prepend `assert` \
+                                             or remove it."
+                .to_string(),
             CheckKind::DuplicateHandlerException(names) => {
                 if names.len() == 1 {
                     let name = &names[0];
