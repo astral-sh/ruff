@@ -238,6 +238,7 @@ where
                 decorator_list,
                 returns,
                 args,
+                body,
                 ..
             }
             | StmtKind::AsyncFunctionDef {
@@ -245,6 +246,7 @@ where
                 decorator_list,
                 returns,
                 args,
+                body,
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::E743) {
@@ -296,6 +298,10 @@ where
                     {
                         self.checks.push(check);
                     }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::B018) {
+                    flake8_bugbear::plugins::useless_expression(self, body);
                 }
 
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
@@ -368,6 +374,7 @@ where
                 bases,
                 keywords,
                 decorator_list,
+                body,
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::U004) {
@@ -397,6 +404,10 @@ where
                     {
                         self.checks.push(check);
                     }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::B018) {
+                    flake8_bugbear::plugins::useless_expression(self, body);
                 }
 
                 self.check_builtin_shadowing(

@@ -1,0 +1,30 @@
+use rustpython_ast::{Constant, ExprKind, Stmt, StmtKind};
+
+use crate::ast::types::{CheckLocator, Range};
+use crate::check_ast::Checker;
+use crate::checks::{Check, CheckKind};
+
+pub fn useless_expression(checker: &mut Checker, body: &[Stmt]) {
+    for stmt in body {
+        if let StmtKind::Expr { value } = &stmt.node {
+            match &value.node {
+                ExprKind::List { .. } | ExprKind::Dict { .. } | ExprKind::Set { .. } => {
+                    checker.add_check(Check::new(
+                        CheckKind::UselessExpression,
+                        checker.locate_check(Range::from_located(value)),
+                    ));
+                }
+                ExprKind::Constant { value: val, .. } => match &val {
+                    Constant::Str { .. } => {}
+                    _ => {
+                        checker.add_check(Check::new(
+                            CheckKind::UselessExpression,
+                            checker.locate_check(Range::from_located(value)),
+                        ));
+                    }
+                },
+                _ => {}
+            }
+        }
+    }
+}
