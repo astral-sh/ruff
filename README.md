@@ -49,7 +49,8 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    9. [flake8-builtins](#flake8-builtins)
    10. [flake8-print](#flake8-print)
    11. [flake8-quotes](#flake8-quotes)
-   12. [Meta rules](#meta-rules)
+   12. [Ruff-specific rules](#ruff-specific-rules)
+   13. [Meta rules](#meta-rules)
 5. [Editor Integrations](#editor-integrations)
 6. [FAQ](#faq)
 7. [Development](#development)
@@ -467,6 +468,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError:` instead of `except (ValueError,):`. |  |
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
+| B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
 
 ### flake8-builtins
@@ -492,6 +494,12 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | Q001 | BadQuotesMultilineString | Single quote multiline found but double quotes preferred |  |
 | Q002 | BadQuotesDocstring | Single quote docstring found but double quotes preferred |  |
 | Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes |  |
+
+### Ruff-specific rules
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| X001 | AmbiguousUnicodeCharacter | Use of ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 
 ### Meta rules
 

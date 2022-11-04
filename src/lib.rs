@@ -42,6 +42,7 @@ mod pydocstyle;
 mod pyflakes;
 mod python;
 mod pyupgrade;
+mod rules;
 pub mod settings;
 pub mod source_code_locator;
 pub mod visibility;
