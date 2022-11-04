@@ -271,7 +271,7 @@ pub fn invalid_escape_sequence(
     });
 
     // Determine whether the string is single- or triple-quoted.
-    let quote = extract_quote(text);
+    let quote = extract_quote(&text);
     let quote_pos = text.find(quote).unwrap();
     let prefix = text[..quote_pos].to_lowercase();
     let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];

@@ -16,14 +16,14 @@ pub fn remove_class_def_base(
     bases: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Fix> {
-    let content = locator.slice_source_code_at(stmt_at);
+    let contents = locator.slice_source_code_at(stmt_at);
 
     // Case 1: `object` is the only base.
     if bases.len() == 1 && keywords.is_empty() {
         let mut fix_start = None;
         let mut fix_end = None;
         let mut count: usize = 0;
-        for (start, tok, end) in lexer::make_tokenizer(content).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
                     fix_start = Some(helpers::to_absolute(&start, stmt_at));
@@ -56,7 +56,7 @@ pub fn remove_class_def_base(
         let mut fix_start: Option<Location> = None;
         let mut fix_end: Option<Location> = None;
         let mut seen_comma = false;
-        for (start, tok, end) in lexer::make_tokenizer(content).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
             let start = helpers::to_absolute(&start, stmt_at);
             if seen_comma {
                 if matches!(tok, Tok::Newline) {
@@ -83,7 +83,7 @@ pub fn remove_class_def_base(
         // isn't a comma.
         let mut fix_start: Option<Location> = None;
         let mut fix_end: Option<Location> = None;
-        for (start, tok, end) in lexer::make_tokenizer(content).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
             let start = helpers::to_absolute(&start, stmt_at);
             let end = helpers::to_absolute(&end, stmt_at);
             if start == expr_at {
@@ -106,7 +106,7 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
     let range = Range::from_located(expr);
     let contents = locator.slice_source_code_range(&range);
 
-    let mut tree = match libcst_native::parse_module(contents, None) {
+    let mut tree = match libcst_native::parse_module(&contents, None) {
         Ok(m) => m,
         Err(_) => return None,
     };

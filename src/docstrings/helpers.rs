@@ -25,12 +25,15 @@ pub fn leading_space(line: &str) -> String {
 }
 
 /// Extract the leading indentation from a docstring.
-pub fn indentation<'a>(checker: &'a Checker, docstring: &Expr) -> &'a str {
+pub fn indentation<'a>(checker: &'a Checker, docstring: &Expr) -> String {
     let range = Range::from_located(docstring);
-    checker.locator.slice_source_code_range(&Range {
-        location: Location::new(range.location.row(), 0),
-        end_location: Location::new(range.location.row(), range.location.column()),
-    })
+    checker
+        .locator
+        .slice_source_code_range(&Range {
+            location: Location::new(range.location.row(), 0),
+            end_location: Location::new(range.location.row(), range.location.column()),
+        })
+        .to_string()
 }
 
 /// Replace any non-whitespace characters from an indentation string.

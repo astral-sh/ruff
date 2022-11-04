@@ -6,8 +6,9 @@ use libcst_native::{
     SmallStatement, Statement, Tuple,
 };
 
+use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::cst::matchers::match_tree;
+use crate::cst::matchers::match_module;
 use crate::source_code_locator::SourceCodeLocator;
 
 fn match_expr<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Expr<'b>> {
@@ -44,7 +45,8 @@ pub fn fix_unnecessary_generator_list(
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let arg = match_arg(call)?;
@@ -86,7 +88,8 @@ pub fn fix_unnecessary_generator_set(
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let arg = match_arg(call)?;
@@ -128,7 +131,8 @@ pub fn fix_unnecessary_generator_dict(
     locator: &SourceCodeLocator,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let arg = match_arg(call)?;
@@ -194,7 +198,8 @@ pub fn fix_unnecessary_list_comprehension_set(
 ) -> Result<Fix> {
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let arg = match_arg(call)?;
@@ -234,7 +239,8 @@ pub fn fix_unnecessary_literal_set(
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let mut call = match_call(body)?;
     let arg = match_arg(call)?;
@@ -281,7 +287,8 @@ pub fn fix_unnecessary_literal_dict(
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let arg = match_arg(call)?;
@@ -351,8 +358,9 @@ pub fn fix_unnecessary_collection_call(
     locator: &SourceCodeLocator,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
-    // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)))
-    let mut tree = match_tree(locator, expr)?;
+    // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let name = if let Expression::Name(name) = &call.func.as_ref() {
@@ -463,7 +471,8 @@ pub fn fix_unnecessary_literal_within_tuple_call(
     locator: &SourceCodeLocator,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let arg = match_arg(call)?;
@@ -518,7 +527,8 @@ pub fn fix_unnecessary_literal_within_list_call(
     locator: &SourceCodeLocator,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let arg = match_arg(call)?;
@@ -576,7 +586,8 @@ pub fn fix_unnecessary_list_call(
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let arg = match_arg(call)?;
@@ -598,7 +609,8 @@ pub fn fix_unnecessary_comprehension(
     locator: &SourceCodeLocator,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
-    let mut tree = match_tree(locator, expr)?;
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
 
     match &body.value {
