@@ -239,7 +239,7 @@ impl DocstringConvention {
 /// Infer the enabled plugins based on user-provided settings.
 pub fn infer_plugins(flake8: &HashMap<String, Option<String>>) -> Vec<Plugin> {
     let mut plugins = BTreeSet::new();
-    for (key, _) in flake8 {
+    for key in flake8.keys() {
         match key.as_str() {
             // flake8-docstrings
             "docstring-convention" | "docstring_convention" => {
@@ -284,7 +284,7 @@ pub fn resolve_select(
     plugins: &[Plugin],
 ) -> BTreeSet<CheckCodePrefix> {
     // Include default Pyflakes and pycodestyle checks.
-    let mut select = BTreeSet::from([CheckCodePrefix::E, CheckCodePrefix::F]);
+    let mut select = BTreeSet::from([CheckCodePrefix::E, CheckCodePrefix::F, CheckCodePrefix::W]);
 
     // Add prefix codes for every plugin.
     for plugin in plugins {

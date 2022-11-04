@@ -17,26 +17,24 @@ pub fn convert(
     // default `select`, and populate it based on user plugins.
     let mut select = flake8
         .get("select")
-        .map(|value| {
+        .and_then(|value| {
             value
                 .as_ref()
                 .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
         })
-        .flatten()
         .unwrap_or_else(|| {
             plugin::resolve_select(
                 flake8,
-                &plugins.unwrap_or_else(|| plugin::infer_plugins(&flake8)),
+                &plugins.unwrap_or_else(|| plugin::infer_plugins(flake8)),
             )
         });
     let mut ignore = flake8
         .get("ignore")
-        .map(|value| {
+        .and_then(|value| {
             value
                 .as_ref()
                 .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
         })
-        .flatten()
         .unwrap_or_default();
 
     // Parse each supported option.
@@ -113,6 +111,10 @@ pub fn convert(
                     pep8_naming.staticmethod_decorators =
                         Some(parser::parse_strings(value.as_ref()));
                 }
+                // flake8-docstrings
+                "docstring-convention" => {
+                    // No-op (handled above).
+                }
                 // Unknown
                 _ => eprintln!("Skipping unsupported property: {key}"),
             }
@@ -153,7 +155,11 @@ mod tests {
             line_length: None,
             exclude: None,
             extend_exclude: None,
-            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
+            select: Some(vec![
+                CheckCodePrefix::E,
+                CheckCodePrefix::F,
+                CheckCodePrefix::W,
+            ]),
             extend_select: None,
             ignore: Some(vec![]),
             extend_ignore: None,
@@ -178,7 +184,11 @@ mod tests {
             line_length: Some(100),
             exclude: None,
             extend_exclude: None,
-            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
+            select: Some(vec![
+                CheckCodePrefix::E,
+                CheckCodePrefix::F,
+                CheckCodePrefix::W,
+            ]),
             extend_select: None,
             ignore: Some(vec![]),
             extend_ignore: None,
@@ -203,7 +213,11 @@ mod tests {
             line_length: Some(100),
             exclude: None,
             extend_exclude: None,
-            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
+            select: Some(vec![
+                CheckCodePrefix::E,
+                CheckCodePrefix::F,
+                CheckCodePrefix::W,
+            ]),
             extend_select: None,
             ignore: Some(vec![]),
             extend_ignore: None,
@@ -228,7 +242,11 @@ mod tests {
             line_length: None,
             exclude: None,
             extend_exclude: None,
-            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
+            select: Some(vec![
+                CheckCodePrefix::E,
+                CheckCodePrefix::F,
+                CheckCodePrefix::W,
+            ]),
             extend_select: None,
             ignore: Some(vec![]),
             extend_ignore: None,
@@ -253,7 +271,11 @@ mod tests {
             line_length: None,
             exclude: None,
             extend_exclude: None,
-            select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
+            select: Some(vec![
+                CheckCodePrefix::E,
+                CheckCodePrefix::F,
+                CheckCodePrefix::W,
+            ]),
             extend_select: None,
             ignore: Some(vec![]),
             extend_ignore: None,
@@ -324,6 +346,7 @@ mod tests {
                 CheckCodePrefix::D419,
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
+                CheckCodePrefix::W,
             ]),
             extend_select: None,
             ignore: Some(vec![]),
@@ -353,6 +376,7 @@ mod tests {
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::Q,
+                CheckCodePrefix::W,
             ]),
             extend_select: None,
             ignore: Some(vec![]),
