@@ -1600,6 +1600,7 @@ pub fn ambiguous_unicode_character(
     locator: &SourceCodeLocator,
     start: &Location,
     end: &Location,
+    is_docstring: bool,
     fix: bool,
 ) -> Vec<Check> {
     let mut checks = vec![];
@@ -1622,7 +1623,11 @@ pub fn ambiguous_unicode_character(
                 };
                 let end_location = Location::new(location.row(), location.column() + 1);
                 let mut check = Check::new(
-                    CheckKind::AmbiguousUnicodeCharacter(current_char, representant),
+                    if is_docstring {
+                        CheckKind::AmbiguousUnicodeCharacterDocstring(current_char, representant)
+                    } else {
+                        CheckKind::AmbiguousUnicodeCharacterString(current_char, representant)
+                    },
                     Range {
                         location,
                         end_location,

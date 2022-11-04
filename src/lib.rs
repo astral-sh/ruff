@@ -31,6 +31,7 @@ mod flake8_comprehensions;
 mod flake8_print;
 pub mod flake8_quotes;
 pub mod fs;
+mod lex;
 pub mod linter;
 pub mod logging;
 pub mod message;
