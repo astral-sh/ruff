@@ -1329,7 +1329,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::B015) {
                     if let Some(parent) = self.parents.last() {
-                        flake8_bugbear::plugins::useless_comparison(self, expr, parent);
+                        flake8_bugbear::plugins::useless_comparison(self, left, parent);
                     }
                 }
             }
