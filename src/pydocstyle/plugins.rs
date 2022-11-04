@@ -210,7 +210,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                         .count();
 
                     // Avoid D202 violations for blank lines followed by inner functions or classes.
-                    if blank_lines_after == 1 && INNER_FUNCTION_OR_CLASS_REGEX.is_match(after) {
+                    if blank_lines_after == 1 && INNER_FUNCTION_OR_CLASS_REGEX.is_match(&after) {
                         return;
                     }
 
@@ -387,7 +387,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 return;
             }
 
-            let docstring_indent = helpers::indentation(checker, docstring).to_string();
+            let docstring_indent = helpers::indentation(checker, docstring);
             let mut has_seen_tab = docstring_indent.contains('\t');
             let mut is_over_indented = true;
             let mut over_indented_lines = vec![];
@@ -537,7 +537,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                                 // Insert a newline just before the end-quote(s).
                                 let content = format!(
                                     "\n{}",
-                                    helpers::clean(helpers::indentation(checker, docstring))
+                                    helpers::clean(&helpers::indentation(checker, docstring))
                                 );
                                 check.amend(Fix::insertion(
                                     content,
@@ -916,7 +916,7 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
-                    helpers::clean(helpers::indentation(checker, docstring)),
+                    helpers::clean(&helpers::indentation(checker, docstring)),
                     "-".repeat(context.section_name.len())
                 );
                 check.amend(Fix::insertion(
@@ -950,7 +950,7 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
-                    helpers::clean(helpers::indentation(checker, docstring)),
+                    helpers::clean(&helpers::indentation(checker, docstring)),
                     "-".repeat(context.section_name.len())
                 );
                 check.amend(Fix::insertion(
@@ -1026,7 +1026,7 @@ fn blanks_and_section_underline(
                     // Replace the existing underline with a line of the appropriate length.
                     let content = format!(
                         "{}{}\n",
-                        helpers::clean(helpers::indentation(checker, docstring)),
+                        helpers::clean(&helpers::indentation(checker, docstring)),
                         "-".repeat(context.section_name.len())
                     );
                     check.amend(Fix::replacement(
@@ -1054,7 +1054,7 @@ fn blanks_and_section_underline(
 
         if checker.settings.enabled.contains(&CheckCode::D215) {
             let leading_space = helpers::leading_space(non_empty_line);
-            let indentation = helpers::indentation(checker, docstring).to_string();
+            let indentation = helpers::indentation(checker, docstring);
             if leading_space.len() > indentation.len() {
                 let mut check = Check::new(
                     CheckKind::SectionUnderlineNotOverIndented(context.section_name.to_string()),
@@ -1195,7 +1195,7 @@ fn common_section(
 
     if checker.settings.enabled.contains(&CheckCode::D214) {
         let leading_space = helpers::leading_space(context.line);
-        let indentation = helpers::indentation(checker, docstring).to_string();
+        let indentation = helpers::indentation(checker, docstring);
         if leading_space.len() > indentation.len() {
             let mut check = Check::new(
                 CheckKind::SectionNotOverIndented(context.section_name.to_string()),

@@ -1,10 +1,14 @@
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
+use ropey::RopeBuilder;
 use rustpython_parser::ast::Location;
 
+use crate::ast::types::Range;
 use crate::autofix::{Fix, Patch};
 use crate::checks::Check;
+use crate::source_code_locator::SourceCodeLocator;
 
 // TODO(charlie): The model here is awkward because `Apply` is only relevant at
 // higher levels in the execution flow.
@@ -36,7 +40,7 @@ impl From<bool> for Mode {
 }
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file(checks: &mut [Check], contents: &str) -> Option<String> {
+pub fn fix_file<'a>(checks: &mut [Check], contents: &'a str) -> Option<Cow<'a, str>> {
     if checks.iter().all(|check| check.fix.is_none()) {
         return None;
     }
@@ -48,12 +52,12 @@ pub fn fix_file(checks: &mut [Check], contents: &str) -> Option<String> {
 }
 
 /// Apply a series of fixes.
-fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> String {
-    let lines: Vec<&str> = contents.lines().collect();
+fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> Cow<'_, str> {
+    let locator = SourceCodeLocator::new(contents);
 
-    let mut output: String = Default::default();
-    let mut last_pos: Location = Default::default();
-    let mut applied: BTreeSet<&Patch> = Default::default();
+    let mut output = RopeBuilder::new();
+    let mut last_pos: Location = Location::new(1, 0);
+    let mut applied: BTreeSet<&Patch> = BTreeSet::new();
 
     for fix in fixes.sorted_by_key(|fix| fix.patch.location) {
         // If we already applied an identical fix as part of another correction, skip
@@ -69,44 +73,27 @@ fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> 
             continue;
         }
 
-        if fix.patch.location.row() > last_pos.row() {
-            if last_pos.row() > 0 || last_pos.column() > 0 {
-                output.push_str(&lines[last_pos.row() - 1][last_pos.column()..]);
-                output.push('\n');
-            }
-            for line in &lines[last_pos.row()..fix.patch.location.row() - 1] {
-                output.push_str(line);
-                output.push('\n');
-            }
-            output.push_str(&lines[fix.patch.location.row() - 1][..fix.patch.location.column()]);
-            output.push_str(&fix.patch.content);
-        } else {
-            output.push_str(
-                &lines[last_pos.row() - 1][last_pos.column()..fix.patch.location.column()],
-            );
-            output.push_str(&fix.patch.content);
-        }
-        last_pos = fix.patch.end_location;
+        // Add all contents from `last_pos` to `fix.patch.location`.
+        let slice = locator.slice_source_code_range(&Range {
+            location: last_pos,
+            end_location: fix.patch.location,
+        });
+        output.append(&slice);
 
+        // Add the patch itself.
+        output.append(&fix.patch.content);
+
+        // Track that the fix was applied.
+        last_pos = fix.patch.end_location;
         applied.insert(&fix.patch);
         fix.applied = true;
     }
 
-    if last_pos.row() > 0
-        && (last_pos.row() - 1) < lines.len()
-        && (last_pos.row() > 0 || last_pos.column() > 0)
-    {
-        output.push_str(&lines[last_pos.row() - 1][last_pos.column()..]);
-        output.push('\n');
-    }
-    if last_pos.row() < lines.len() {
-        for line in &lines[last_pos.row()..] {
-            output.push_str(line);
-            output.push('\n');
-        }
-    }
+    // Add the remaining content.
+    let slice = locator.slice_source_code_at(&last_pos);
+    output.append(&slice);
 
-    output
+    Cow::from(output.finish())
 }
 
 #[cfg(test)]

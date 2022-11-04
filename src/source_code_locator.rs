@@ -1,5 +1,7 @@
 //! Struct used to efficiently slice source code at (row, column) Locations.
 
+use std::borrow::Cow;
+
 use once_cell::unsync::OnceCell;
 use ropey::Rope;
 use rustpython_ast::Location;
@@ -23,24 +25,24 @@ impl<'a> SourceCodeLocator<'a> {
         self.rope.get_or_init(|| Rope::from_str(self.contents))
     }
 
-    pub fn slice_source_code_at(&self, location: &Location) -> &'a str {
+    pub fn slice_source_code_at(&self, location: &Location) -> Cow<'_, str> {
         let rope = self.get_or_init_rope();
         let offset = rope.line_to_char(location.row() - 1) + location.column();
-        &self.contents[offset..]
+        Cow::from(rope.slice(offset..))
     }
 
-    pub fn slice_source_code_range(&self, range: &Range) -> &'a str {
+    pub fn slice_source_code_range(&self, range: &Range) -> Cow<'_, str> {
         let rope = self.get_or_init_rope();
         let start = rope.line_to_char(range.location.row() - 1) + range.location.column();
         let end = rope.line_to_char(range.end_location.row() - 1) + range.end_location.column();
-        &self.contents[start..end]
+        Cow::from(rope.slice(start..end))
     }
 
     pub fn partition_source_code_at(
         &self,
         outer: &Range,
         inner: &Range,
-    ) -> (&'a str, &'a str, &'a str) {
+    ) -> (Cow<'_, str>, Cow<'_, str>, Cow<'_, str>) {
         let rope = self.get_or_init_rope();
         let outer_start = rope.line_to_char(outer.location.row() - 1) + outer.location.column();
         let outer_end =
@@ -49,9 +51,9 @@ impl<'a> SourceCodeLocator<'a> {
         let inner_end =
             rope.line_to_char(inner.end_location.row() - 1) + inner.end_location.column();
         (
-            &self.contents[outer_start..inner_start],
-            &self.contents[inner_start..inner_end],
-            &self.contents[inner_end..outer_end],
+            Cow::from(rope.slice(outer_start..inner_start)),
+            Cow::from(rope.slice(inner_start..inner_end)),
+            Cow::from(rope.slice(inner_end..outer_end)),
         )
     }
 }

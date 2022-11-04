@@ -131,11 +131,10 @@ pub fn lint_stdin(
 
     // Apply autofix, write results to stdout.
     if matches!(autofix, fixer::Mode::Apply) {
-        let output = match fix_file(&mut checks, stdin) {
-            None => stdin.to_string(),
-            Some(content) => content,
-        };
-        io::stdout().write_all(output.as_bytes())?;
+        match fix_file(&mut checks, stdin) {
+            None => io::stdout().write_all(stdin.as_bytes()),
+            Some(contents) => io::stdout().write_all(contents.as_bytes()),
+        }?;
     }
 
     // Convert to messages.
@@ -176,7 +175,7 @@ pub fn lint_path(
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
         if let Some(fixed_contents) = fix_file(&mut checks, &contents) {
-            write(path, fixed_contents)?;
+            write(path, fixed_contents.as_ref())?;
         }
     };
 
