@@ -17,12 +17,66 @@ pip install flake8-to-ruff
 
 ### Usage
 
-To run Ruff, try any of the following:
+To run `flake8-to-ruff`:
 
 ```shell
 flake8-to-ruff path/to/setup.cfg
 flake8-to-ruff path/to/tox.ini
 flake8-to-ruff path/to/.flake8
+```
+
+`flake8-to-ruff` will print the relevant `pyproject.toml` sections to standard output, like so:
+
+```toml
+[tool.ruff]
+exclude = [
+    '.svn',
+    'CVS',
+    '.bzr',
+    '.hg',
+    '.git',
+    '__pycache__',
+    '.tox',
+    '.idea',
+    '.mypy_cache',
+    '.venv',
+    'node_modules',
+    '_state_machine.py',
+    'test_fstring.py',
+    'bad_coding2.py',
+    'badsyntax_*.py',
+]
+select = [
+    'A',
+    'E',
+    'F',
+    'Q',
+]
+ignore = []
+
+[tool.ruff.flake8-quotes]
+inline-quotes = 'single'
+
+[tool.ruff.pep8-naming]
+ignore-names = [
+    'foo',
+    'bar',
+]
+```
+
+### Plugins
+
+`flake8-to-ruff` will attempt to infer any activated plugins based on the settings provided in your
+configuration file.
+
+For example, if your `.flake8` file includes a `docstring-convention` property, `flake8-to-ruff`
+will enable the appropriate [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
+checks.
+
+Alternatively, you can manually specify plugins on the command-line:
+
+```shell
+flake8-to-ruff path/to/.flake8 --plugin flake8-builtins --plugin flake8-quotes
 ```
 
 ## Limitations
@@ -33,9 +87,6 @@ flake8-to-ruff path/to/.flake8
 2. Ruff will omit any error codes that are unimplemented or unsupported by Ruff, including error
    codes from unsupported plugins. (See the [Ruff README](https://github.com/charliermarsh/ruff#user-content-how-does-ruff-compare-to-flake8)
    for the complete list of supported plugins.)
-3. `flake8-to-ruff` does not auto-detect your Flake8 plugins, so any reliance on Flake8 plugins that
-   implicitly enable third-party checks will be ignored. Instead, add those error codes to your
-   `select` or `extend-select` fields, so that `flake8-to-ruff` can pick them up.
 
 ## License
 

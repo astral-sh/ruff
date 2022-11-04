@@ -2,3 +2,4 @@
 
 pub mod converter;
 mod parser;
+pub mod plugin;
