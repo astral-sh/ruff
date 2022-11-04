@@ -1,0 +1,45 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    AmbiguousUnicodeCharacter:
+      - 𝐁
+      - B
+  location:
+    row: 1
+    column: 5
+  end_location:
+    row: 1
+    column: 6
+  fix:
+    patch:
+      content: B
+      location:
+        row: 1
+        column: 5
+      end_location:
+        row: 1
+        column: 6
+    applied: false
+- kind:
+    AmbiguousUnicodeCharacter:
+      - ）
+      - )
+  location:
+    row: 5
+    column: 53
+  end_location:
+    row: 5
+    column: 54
+  fix:
+    patch:
+      content: )
+      location:
+        row: 5
+        column: 53
+      end_location:
+        row: 5
+        column: 54
+    applied: false
+

@@ -181,6 +181,8 @@ pub enum CheckCode {
     N816,
     N817,
     N818,
+    // Ruff
+    X001,
     // Meta
     M001,
 }
@@ -198,6 +200,7 @@ pub enum CheckCategory {
     Flake8Builtins,
     Flake8Print,
     Flake8Quotes,
+    Ruff,
     Meta,
 }
 
@@ -215,6 +218,7 @@ impl CheckCategory {
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Pydocstyle => "pydocstyle",
             CheckCategory::PEP8Naming => "pep8-naming",
+            CheckCategory::Ruff => "Ruff-specific rules",
             CheckCategory::Meta => "Meta rules",
         }
     }
@@ -392,6 +396,8 @@ pub enum CheckKind {
     MixedCaseVariableInGlobalScope(String),
     CamelcaseImportedAsAcronym(String, String),
     ErrorSuffixOnExceptionName(String),
+    // Ruff
+    AmbiguousUnicodeCharacter(char, char),
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -402,11 +408,12 @@ impl CheckCode {
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             CheckCode::E501 | CheckCode::W292 | CheckCode::M001 => &LintSource::Lines,
-            CheckCode::W605
-            | CheckCode::Q000
+            CheckCode::Q000
             | CheckCode::Q001
             | CheckCode::Q002
-            | CheckCode::Q003 => &LintSource::Tokens,
+            | CheckCode::Q003
+            | CheckCode::W605
+            | CheckCode::X001 => &LintSource::Tokens,
             CheckCode::E902 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
@@ -607,6 +614,8 @@ impl CheckCode {
                 CheckKind::CamelcaseImportedAsAcronym("...".to_string(), "...".to_string())
             }
             CheckCode::N818 => CheckKind::ErrorSuffixOnExceptionName("...".to_string()),
+            // Ruff
+            CheckCode::X001 => CheckKind::AmbiguousUnicodeCharacter('𝐁', 'B'),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -759,6 +768,7 @@ impl CheckCode {
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
+            CheckCode::X001 => CheckCategory::Ruff,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -923,6 +933,8 @@ impl CheckKind {
             CheckKind::MixedCaseVariableInGlobalScope(..) => &CheckCode::N816,
             CheckKind::CamelcaseImportedAsAcronym(..) => &CheckCode::N817,
             CheckKind::ErrorSuffixOnExceptionName(..) => &CheckCode::N818,
+            // Ruff
+            CheckKind::AmbiguousUnicodeCharacter(..) => &CheckCode::X001,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -1406,6 +1418,13 @@ impl CheckKind {
             CheckKind::ErrorSuffixOnExceptionName(name) => {
                 format!("Exception name `{name}` should be named with an Error suffix")
             }
+            // Ruff
+            CheckKind::AmbiguousUnicodeCharacter(confusable, representant) => {
+                format!(
+                    "Use of ambiguous unicode character '{confusable}' (did you mean \
+                     '{representant}'?)"
+                )
+            }
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),
@@ -1447,7 +1466,8 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            CheckKind::BlankLineAfterLastSection(_)
+            CheckKind::AmbiguousUnicodeCharacter(_, _)
+                | CheckKind::BlankLineAfterLastSection(_)
                 | CheckKind::BlankLineAfterSection(_)
                 | CheckKind::BlankLineAfterSummary
                 | CheckKind::BlankLineBeforeSection(_)

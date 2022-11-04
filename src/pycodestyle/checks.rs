@@ -299,9 +299,9 @@ pub fn invalid_escape_sequence(
                             start.column() + prefix.len() + quote.len() + col_offset,
                         )
                     } else {
-                        Location::new(start.row() + row_offset, col_offset + 1)
+                        Location::new(start.row() + row_offset, col_offset)
                     };
-                    let end_location = Location::new(location.row(), location.column() + 1);
+                    let end_location = Location::new(location.row(), location.column() + 2);
                     checks.push(Check::new(
                         CheckKind::InvalidEscapeSequence(next_char),
                         Range {
