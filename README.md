@@ -500,8 +500,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| X001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
-| X002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
+| RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
+| RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 
 ### Meta rules
 

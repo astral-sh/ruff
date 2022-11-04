@@ -183,8 +183,8 @@ pub enum CheckCode {
     N817,
     N818,
     // Ruff
-    X001,
-    X002,
+    RUF001,
+    RUF002,
     // Meta
     M001,
 }
@@ -417,8 +417,8 @@ impl CheckCode {
             | CheckCode::Q002
             | CheckCode::Q003
             | CheckCode::W605
-            | CheckCode::X001
-            | CheckCode::X002 => &LintSource::Tokens,
+            | CheckCode::RUF001
+            | CheckCode::RUF002 => &LintSource::Tokens,
             CheckCode::E902 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
@@ -621,8 +621,8 @@ impl CheckCode {
             }
             CheckCode::N818 => CheckKind::ErrorSuffixOnExceptionName("...".to_string()),
             // Ruff
-            CheckCode::X001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
-            CheckCode::X002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
+            CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
+            CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -776,8 +776,8 @@ impl CheckCode {
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
-            CheckCode::X001 => CheckCategory::Ruff,
-            CheckCode::X002 => CheckCategory::Ruff,
+            CheckCode::RUF001 => CheckCategory::Ruff,
+            CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -944,8 +944,8 @@ impl CheckKind {
             CheckKind::CamelcaseImportedAsAcronym(..) => &CheckCode::N817,
             CheckKind::ErrorSuffixOnExceptionName(..) => &CheckCode::N818,
             // Ruff
-            CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::X001,
-            CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::X002,
+            CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
+            CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }

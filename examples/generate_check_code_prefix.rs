@@ -11,8 +11,12 @@ fn main() {
     // Build up a map from prefix to matching CheckCodes.
     let mut prefix_to_codes: BTreeMap<String, BTreeSet<CheckCode>> = Default::default();
     for check_code in CheckCode::iter() {
-        let as_ref = check_code.as_ref().to_string();
-        for i in 1..=as_ref.len() {
+        let as_ref: String = check_code.as_ref().to_string();
+        let prefix_len = as_ref
+            .chars()
+            .take_while(|char| char.is_alphabetic())
+            .count();
+        for i in prefix_len..=as_ref.len() {
             let prefix = as_ref[..i].to_string();
             let entry = prefix_to_codes
                 .entry(prefix)
@@ -81,11 +85,12 @@ fn main() {
         .vis("pub")
         .line("match self {");
     for (prefix, _) in &prefix_to_codes {
-        let specificity = match prefix.len() {
-            4 => "Explicit",
-            3 => "Tens",
-            2 => "Hundreds",
-            1 => "Category",
+        let num_numeric = prefix.chars().filter(|char| char.is_numeric()).count();
+        let specificity = match num_numeric {
+            3 => "Explicit",
+            2 => "Tens",
+            1 => "Hundreds",
+            0 => "Category",
             _ => panic!("Invalid prefix: {}", prefix),
         };
         gen = gen.line(format!(

@@ -206,6 +206,11 @@ pub enum CheckCodePrefix {
     Q001,
     Q002,
     Q003,
+    RUF,
+    RUF0,
+    RUF00,
+    RUF001,
+    RUF002,
     T,
     T2,
     T20,
@@ -229,11 +234,6 @@ pub enum CheckCodePrefix {
     W6,
     W60,
     W605,
-    X,
-    X0,
-    X00,
-    X001,
-    X002,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -839,6 +839,11 @@ impl CheckCodePrefix {
             CheckCodePrefix::Q001 => vec![CheckCode::Q001],
             CheckCodePrefix::Q002 => vec![CheckCode::Q002],
             CheckCodePrefix::Q003 => vec![CheckCode::Q003],
+            CheckCodePrefix::RUF => vec![CheckCode::RUF001, CheckCode::RUF002],
+            CheckCodePrefix::RUF0 => vec![CheckCode::RUF001, CheckCode::RUF002],
+            CheckCodePrefix::RUF00 => vec![CheckCode::RUF001, CheckCode::RUF002],
+            CheckCodePrefix::RUF001 => vec![CheckCode::RUF001],
+            CheckCodePrefix::RUF002 => vec![CheckCode::RUF002],
             CheckCodePrefix::T => vec![CheckCode::T201, CheckCode::T203],
             CheckCodePrefix::T2 => vec![CheckCode::T201, CheckCode::T203],
             CheckCodePrefix::T20 => vec![CheckCode::T201, CheckCode::T203],
@@ -889,11 +894,6 @@ impl CheckCodePrefix {
             CheckCodePrefix::W6 => vec![CheckCode::W605],
             CheckCodePrefix::W60 => vec![CheckCode::W605],
             CheckCodePrefix::W605 => vec![CheckCode::W605],
-            CheckCodePrefix::X => vec![CheckCode::X001, CheckCode::X002],
-            CheckCodePrefix::X0 => vec![CheckCode::X001, CheckCode::X002],
-            CheckCodePrefix::X00 => vec![CheckCode::X001, CheckCode::X002],
-            CheckCodePrefix::X001 => vec![CheckCode::X001],
-            CheckCodePrefix::X002 => vec![CheckCode::X002],
         }
     }
 }
@@ -1100,6 +1100,11 @@ impl CheckCodePrefix {
             CheckCodePrefix::Q001 => PrefixSpecificity::Explicit,
             CheckCodePrefix::Q002 => PrefixSpecificity::Explicit,
             CheckCodePrefix::Q003 => PrefixSpecificity::Explicit,
+            CheckCodePrefix::RUF => PrefixSpecificity::Category,
+            CheckCodePrefix::RUF0 => PrefixSpecificity::Hundreds,
+            CheckCodePrefix::RUF00 => PrefixSpecificity::Tens,
+            CheckCodePrefix::RUF001 => PrefixSpecificity::Explicit,
+            CheckCodePrefix::RUF002 => PrefixSpecificity::Explicit,
             CheckCodePrefix::T => PrefixSpecificity::Category,
             CheckCodePrefix::T2 => PrefixSpecificity::Hundreds,
             CheckCodePrefix::T20 => PrefixSpecificity::Tens,
@@ -1123,11 +1128,6 @@ impl CheckCodePrefix {
             CheckCodePrefix::W6 => PrefixSpecificity::Hundreds,
             CheckCodePrefix::W60 => PrefixSpecificity::Tens,
             CheckCodePrefix::W605 => PrefixSpecificity::Explicit,
-            CheckCodePrefix::X => PrefixSpecificity::Category,
-            CheckCodePrefix::X0 => PrefixSpecificity::Hundreds,
-            CheckCodePrefix::X00 => PrefixSpecificity::Tens,
-            CheckCodePrefix::X001 => PrefixSpecificity::Explicit,
-            CheckCodePrefix::X002 => PrefixSpecificity::Explicit,
         }
     }
 }

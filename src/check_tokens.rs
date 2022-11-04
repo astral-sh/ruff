@@ -15,8 +15,8 @@ pub fn check_tokens(
     settings: &Settings,
     autofix: &fixer::Mode,
 ) {
-    let enforce_ambiguous_unicode_character =
-        settings.enabled.contains(&CheckCode::X001) || settings.enabled.contains(&CheckCode::X002);
+    let enforce_ambiguous_unicode_character = settings.enabled.contains(&CheckCode::RUF001)
+        || settings.enabled.contains(&CheckCode::RUF002);
     let enforce_quotes = settings.enabled.contains(&CheckCode::Q000)
         || settings.enabled.contains(&CheckCode::Q001)
         || settings.enabled.contains(&CheckCode::Q002)
@@ -31,7 +31,7 @@ pub fn check_tokens(
             false
         };
 
-        // X001, X002
+        // RUF001, RUF002
         if enforce_ambiguous_unicode_character {
             if matches!(tok, Tok::String { .. }) {
                 for check in rules::checks::ambiguous_unicode_character(
