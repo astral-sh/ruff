@@ -1116,9 +1116,10 @@ impl CheckKind {
                      `except ({name},):`."
                 )
             }
-            CheckKind::UselessComparison => {
-                "Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.".to_string()
-            }
+            CheckKind::UselessComparison => "Pointless comparison. This comparison does nothing \
+                                             but waste CPU instructions. Either prepend `assert` \
+                                             or remove it."
+                .to_string(),
             CheckKind::DuplicateHandlerException(names) => {
                 if names.len() == 1 {
                     let name = &names[0];
