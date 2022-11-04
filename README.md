@@ -467,6 +467,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError:` instead of `except (ValueError,):`. |  |
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
+| B015 | UselessComparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
