@@ -145,7 +145,7 @@ Located {
                     Located {
                         location: Location {
                             row: 1,
-                            column: 34,
+                            column: 32,
                         },
                         end_location: Some(
                             Location {
@@ -201,7 +201,7 @@ Located {
                     Located {
                         location: Location {
                             row: 1,
-                            column: 43,
+                            column: 41,
                         },
                         end_location: Some(
                             Location {

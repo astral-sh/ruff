@@ -800,7 +800,7 @@ NotTest: ast::Expr = {
 };
 
 Comparison: ast::Expr = {
-    <left:Expression> <location:@L> <comparisons:(CompOp Expression)+> <end_location:@R> => {
+    <location:@L> <left:Expression> <comparisons:(CompOp Expression)+> <end_location:@R> => {
         let (ops, comparators) = comparisons.into_iter().unzip();
         ast::Expr {
             location,
