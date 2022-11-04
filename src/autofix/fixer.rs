@@ -40,21 +40,25 @@ impl From<bool> for Mode {
 }
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file<'a>(checks: &mut [Check], contents: &'a str) -> Option<Cow<'a, str>> {
+pub fn fix_file<'a>(
+    checks: &'a mut [Check],
+    locator: &'a SourceCodeLocator<'a>,
+) -> Option<Cow<'a, str>> {
     if checks.iter().all(|check| check.fix.is_none()) {
         return None;
     }
 
     Some(apply_fixes(
         checks.iter_mut().filter_map(|check| check.fix.as_mut()),
-        contents,
+        locator,
     ))
 }
 
 /// Apply a series of fixes.
-fn apply_fixes<'a>(fixes: impl Iterator<Item = &'a mut Fix>, contents: &str) -> Cow<'_, str> {
-    let locator = SourceCodeLocator::new(contents);
-
+fn apply_fixes<'a>(
+    fixes: impl Iterator<Item = &'a mut Fix>,
+    locator: &'a SourceCodeLocator<'a>,
+) -> Cow<'a, str> {
     let mut output = RopeBuilder::new();
     let mut last_pos: Location = Location::new(1, 0);
     let mut applied: BTreeSet<&Patch> = BTreeSet::new();
@@ -103,11 +107,13 @@ mod tests {
 
     use crate::autofix::fixer::apply_fixes;
     use crate::autofix::{Fix, Patch};
+    use crate::SourceCodeLocator;
 
     #[test]
     fn empty_file() -> Result<()> {
         let mut fixes = vec![];
-        let actual = apply_fixes(fixes.iter_mut(), "");
+        let locator = SourceCodeLocator::new("");
+        let actual = apply_fixes(fixes.iter_mut(), &locator);
         let expected = "";
 
         assert_eq!(actual, expected);
@@ -125,12 +131,12 @@ mod tests {
             },
             applied: false,
         }];
-        let actual = apply_fixes(
-            fixes.iter_mut(),
+        let locator = SourceCodeLocator::new(
             "class A(object):
         ...
 ",
         );
+        let actual = apply_fixes(fixes.iter_mut(), &locator);
 
         let expected = "class A(Bar):
         ...
@@ -151,12 +157,12 @@ mod tests {
             },
             applied: false,
         }];
-        let actual = apply_fixes(
-            fixes.iter_mut(),
+        let locator = SourceCodeLocator::new(
             "class A(object):
         ...
 ",
         );
+        let actual = apply_fixes(fixes.iter_mut(), &locator);
 
         let expected = "class A:
         ...
@@ -187,12 +193,12 @@ mod tests {
                 applied: false,
             },
         ];
-        let actual = apply_fixes(
-            fixes.iter_mut(),
+        let locator = SourceCodeLocator::new(
             "class A(object, object):
         ...
 ",
         );
+        let actual = apply_fixes(fixes.iter_mut(), &locator);
 
         let expected = "class A:
         ...
@@ -223,12 +229,12 @@ mod tests {
                 applied: false,
             },
         ];
-        let actual = apply_fixes(
-            fixes.iter_mut(),
+        let locator = SourceCodeLocator::new(
             "class A(object):
     ...
 ",
         );
+        let actual = apply_fixes(fixes.iter_mut(), &locator);
 
         let expected = "class A:
     ...

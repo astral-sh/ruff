@@ -148,13 +148,22 @@ mod tests {
     use crate::checks::{Check, CheckCode};
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::tokenize;
-    use crate::{flake8_quotes, fs, linter, noqa, Settings};
+    use crate::{flake8_quotes, fs, linter, noqa, Settings, SourceCodeLocator};
 
     fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;
         let tokens: Vec<LexResult> = tokenize(&contents);
+        let locator = SourceCodeLocator::new(&contents);
         let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-        linter::check_path(path, &contents, tokens, &noqa_line_for, settings, autofix)
+        linter::check_path(
+            path,
+            &contents,
+            tokens,
+            &locator,
+            &noqa_line_for,
+            settings,
+            autofix,
+        )
     }
 
     #[test_case(Path::new("doubles.py"))]

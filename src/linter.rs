@@ -54,6 +54,7 @@ pub(crate) fn check_path(
     path: &Path,
     contents: &str,
     tokens: Vec<LexResult>,
+    locator: &SourceCodeLocator,
     noqa_line_for: &[usize],
     settings: &Settings,
     autofix: &fixer::Mode,
@@ -61,16 +62,13 @@ pub(crate) fn check_path(
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
-    // Initialize the SourceCodeLocator (which computes offsets lazily).
-    let locator = SourceCodeLocator::new(contents);
-
     // Run the token-based checks.
     if settings
         .enabled
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens))
     {
-        check_tokens(&mut checks, &locator, &tokens, settings);
+        check_tokens(&mut checks, locator, &tokens, settings);
     }
 
     // Run the AST-based checks.
@@ -81,7 +79,7 @@ pub(crate) fn check_path(
     {
         match parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
-                checks.extend(check_ast(&python_ast, &locator, settings, autofix, path))
+                checks.extend(check_ast(&python_ast, locator, settings, autofix, path))
             }
             Err(parse_error) => {
                 if settings.enabled.contains(&CheckCode::E999) {
@@ -123,15 +121,26 @@ pub fn lint_stdin(
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(stdin);
 
+    // Initialize the SourceCodeLocator (which computes offsets lazily).
+    let locator = SourceCodeLocator::new(stdin);
+
     // Determine the noqa line for every line in the source.
     let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
     // Generate checks.
-    let mut checks = check_path(path, stdin, tokens, &noqa_line_for, settings, autofix)?;
+    let mut checks = check_path(
+        path,
+        stdin,
+        tokens,
+        &locator,
+        &noqa_line_for,
+        settings,
+        autofix,
+    )?;
 
     // Apply autofix, write results to stdout.
     if matches!(autofix, fixer::Mode::Apply) {
-        match fix_file(&mut checks, stdin) {
+        match fix_file(&mut checks, &locator) {
             None => io::stdout().write_all(stdin.as_bytes()),
             Some(contents) => io::stdout().write_all(contents.as_bytes()),
         }?;
@@ -166,15 +175,26 @@ pub fn lint_path(
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(&contents);
 
+    // Initialize the SourceCodeLocator (which computes offsets lazily).
+    let locator = SourceCodeLocator::new(&contents);
+
     // Determine the noqa line for every line in the source.
     let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
     // Generate checks.
-    let mut checks = check_path(path, &contents, tokens, &noqa_line_for, settings, autofix)?;
+    let mut checks = check_path(
+        path,
+        &contents,
+        tokens,
+        &locator,
+        &noqa_line_for,
+        settings,
+        autofix,
+    )?;
 
     // Apply autofix.
     if matches!(autofix, fixer::Mode::Apply) {
-        if let Some(fixed_contents) = fix_file(&mut checks, &contents) {
+        if let Some(fixed_contents) = fix_file(&mut checks, &locator) {
             write(path, fixed_contents.as_ref())?;
         }
     };
@@ -197,6 +217,9 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(&contents);
 
+    // Initialize the SourceCodeLocator (which computes offsets lazily).
+    let locator = SourceCodeLocator::new(&contents);
+
     // Determine the noqa line for every line in the source.
     let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
 
@@ -205,6 +228,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         path,
         &contents,
         tokens,
+        &locator,
         &noqa_line_for,
         settings,
         &fixer::Mode::None,
@@ -242,13 +266,27 @@ mod tests {
     use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
     use crate::linter::tokenize;
-    use crate::{fs, linter, noqa, settings, Settings};
+    use crate::source_code_locator::SourceCodeLocator;
+    use crate::{fs, linter, noqa, settings};
 
-    fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
+    fn check_path(
+        path: &Path,
+        settings: &settings::Settings,
+        autofix: &fixer::Mode,
+    ) -> Result<Vec<Check>> {
         let contents = fs::read_file(path)?;
         let tokens: Vec<LexResult> = tokenize(&contents);
+        let locator = SourceCodeLocator::new(&contents);
         let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-        linter::check_path(path, &contents, tokens, &noqa_line_for, settings, autofix)
+        linter::check_path(
+            path,
+            &contents,
+            tokens,
+            &locator,
+            &noqa_line_for,
+            settings,
+            autofix,
+        )
     }
 
     #[test_case(CheckCode::A001, Path::new("A001.py"); "A001")]
