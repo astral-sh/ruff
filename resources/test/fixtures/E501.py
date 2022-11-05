@@ -14,3 +14,21 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 
 _ = "---------------------------------------------------------------------------AAAAAAA"
 _ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜"
+
+
+def caller(string: str) -> None:
+    assert string is not None
+
+
+caller(
+    """
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    """,
+)
+
+
+caller(
+    """
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    """,  # noqa: E501
+)
