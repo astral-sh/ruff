@@ -38,7 +38,7 @@ pub fn main(cli: &Cli) -> Result<()> {
             output.push('\n');
         }
 
-        output.push_str("| Coade | Name | Message | Fix |");
+        output.push_str("| Code | Name | Message | Fix |");
         output.push('\n');
         output.push_str("| ---- | ---- | ------- | --- |");
         output.push('\n');

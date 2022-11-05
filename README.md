@@ -307,7 +307,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | F401 | UnusedImport | `...` imported but unused | 🛠 |
 | F402 | ImportShadowedByLoopVar | Import `...` from line 1 shadowed by loop variable |  |
@@ -342,7 +342,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 
 For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |  |
 | E501 | LineTooLong | Line too long (89 > 88 characters) |  |
@@ -365,7 +365,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 
 For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | D100 | PublicModule | Missing docstring in public module |  |
 | D101 | PublicClass | Missing docstring in public class |  |
@@ -416,7 +416,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 
 For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | U001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
 | U002 | UnnecessaryAbspath | `abspath(__file__)` is unnecessary in Python 3.9 and later | 🛠 |
@@ -431,7 +431,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 
 For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | N801 | InvalidClassName | Class name `...` should use CapWords convention  |  |
 | N802 | InvalidFunctionName | Function name `...` should be lowercase |  |
@@ -453,7 +453,7 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyP
 
 For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/3.10.1/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | C400 | UnnecessaryGeneratorList | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
 | C401 | UnnecessaryGeneratorSet | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
@@ -476,7 +476,7 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 
 For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
 | B003 | AssignmentToOsEnviron | Assigning to `os.environ` doesn't clear the environment. |  |
@@ -496,7 +496,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 
 For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |  |
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |
@@ -506,7 +506,7 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/)
 
 For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | T201 | PrintFound | `print` found | 🛠 |
 | T203 | PPrintFound | `pprint` found | 🛠 |
@@ -515,7 +515,7 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on Py
 
 For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on PyPI.
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | Q000 | BadQuotesInlineString | Single quotes found but double quotes preferred |  |
 | Q001 | BadQuotesMultilineString | Single quote multiline found but double quotes preferred |  |
@@ -524,14 +524,14 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on 
 
 ### Ruff-specific rules
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 
 ### Meta rules
 
-| Coade | Name | Message | Fix |
+| Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | M001 | UnusedNOQA | Unused `noqa` directive | 🛠 |
 
