@@ -426,6 +426,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
+| U009 | PEP3120UnnecessaryCodingComment | utf-8 encoding declaration is unnecessary | 🛠 |
 
 ### pep8-naming
 
