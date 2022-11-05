@@ -18,4 +18,12 @@ expression: checks
     row: 4
     column: 15
   fix: ~
+- kind: IsLiteral
+  location:
+    row: 7
+    column: 9
+  end_location:
+    row: 7
+    column: 17
+  fix: ~
 
