@@ -1583,6 +1583,7 @@ impl CheckKind {
                 | CheckKind::UsePEP604Annotation
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(_)
+                | CheckKind::IsLiteral
         )
     }
 }
