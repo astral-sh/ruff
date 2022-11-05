@@ -4,6 +4,7 @@ use crate::ast::types::{CheckLocator, Range};
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+/// B003
 pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
     if targets.len() == 1 {
         let target = &targets[0];
