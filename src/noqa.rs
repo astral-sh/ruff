@@ -49,7 +49,11 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
         if matches!(tok, Tok::EndOfFile) {
             break;
         }
-        if matches!(tok, Tok::String { .. }) {
+        // For multi-line strings, we expect `noqa` directives on the last line of the
+        // string. By definition, we can't have multiple multi-line strings on
+        // the same line, so we don't need to verify that we haven't already
+        // traversed past the current line.
+        if matches!(tok, Tok::String { .. }) && end.row() > start.row() {
             for i in (noqa_line_for.len())..(start.row() - 1) {
                 noqa_line_for.push(i + 1);
             }
