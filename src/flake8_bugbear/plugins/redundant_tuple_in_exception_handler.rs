@@ -1,6 +1,6 @@
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
-use crate::ast::types::{CheckLocator, Range};
+use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
@@ -13,7 +13,7 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
                 if elts.len() == 1 {
                     checker.add_check(Check::new(
                         CheckKind::RedundantTupleInExceptionHandler(elts[0].to_string()),
-                        checker.locate_check(Range::from_located(type_)),
+                        Range::from_located(type_),
                     ));
                 }
             }

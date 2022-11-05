@@ -1,7 +1,7 @@
 use rustpython_ast::{ExprKind, Stmt, Withitem};
 
 use crate::ast::helpers::match_name_or_attr;
-use crate::ast::types::{CheckLocator, Range};
+use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
@@ -17,7 +17,7 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
             {
                 checker.add_check(Check::new(
                     CheckKind::NoAssertRaisesException,
-                    checker.locate_check(Range::from_located(stmt)),
+                    Range::from_located(stmt),
                 ));
             }
         }

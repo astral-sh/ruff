@@ -1,7 +1,7 @@
 use log::error;
 use rustpython_ast::{Expr, Stmt, StmtKind};
 
-use crate::ast::types::{CheckLocator, Range};
+use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::check_ast::Checker;
 use crate::checks::CheckCode;
@@ -13,7 +13,7 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
         func,
         checker.settings.enabled.contains(&CheckCode::T201),
         checker.settings.enabled.contains(&CheckCode::T203),
-        checker.locate_check(Range::from_located(expr)),
+        Range::from_located(expr),
     ) {
         if checker.patch() {
             let context = checker.binding_context();

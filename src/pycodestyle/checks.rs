@@ -2,7 +2,7 @@ use itertools::izip;
 use rustpython_ast::Location;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Unaryop};
 
-use crate::ast::types::{CheckLocator, Range};
+use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind, RejectedCmpop};
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -61,7 +61,6 @@ pub fn not_tests(
     operand: &Expr,
     check_not_in: bool,
     check_not_is: bool,
-    locator: &dyn CheckLocator,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -73,7 +72,7 @@ pub fn not_tests(
                         if check_not_in {
                             checks.push(Check::new(
                                 CheckKind::NotInTest,
-                                locator.locate_check(Range::from_located(operand)),
+                                Range::from_located(operand),
                             ));
                         }
                     }
@@ -81,7 +80,7 @@ pub fn not_tests(
                         if check_not_is {
                             checks.push(Check::new(
                                 CheckKind::NotIsTest,
-                                locator.locate_check(Range::from_located(operand)),
+                                Range::from_located(operand),
                             ));
                         }
                     }
@@ -101,7 +100,6 @@ pub fn literal_comparisons(
     comparators: &[Expr],
     check_none_comparisons: bool,
     check_true_false_comparisons: bool,
-    locator: &dyn CheckLocator,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -121,13 +119,13 @@ pub fn literal_comparisons(
         if matches!(op, Cmpop::Eq) {
             checks.push(Check::new(
                 CheckKind::NoneComparison(RejectedCmpop::Eq),
-                locator.locate_check(Range::from_located(comparator)),
+                Range::from_located(comparator),
             ));
         }
         if matches!(op, Cmpop::NotEq) {
             checks.push(Check::new(
                 CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                locator.locate_check(Range::from_located(comparator)),
+                Range::from_located(comparator),
             ));
         }
     }
@@ -141,13 +139,13 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 checks.push(Check::new(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                    locator.locate_check(Range::from_located(comparator)),
+                    Range::from_located(comparator),
                 ));
             }
             if matches!(op, Cmpop::NotEq) {
                 checks.push(Check::new(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                    locator.locate_check(Range::from_located(comparator)),
+                    Range::from_located(comparator),
                 ));
             }
         }
@@ -167,13 +165,13 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 checks.push(Check::new(
                     CheckKind::NoneComparison(RejectedCmpop::Eq),
-                    locator.locate_check(Range::from_located(comparator)),
+                    Range::from_located(comparator),
                 ));
             }
             if matches!(op, Cmpop::NotEq) {
                 checks.push(Check::new(
                     CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                    locator.locate_check(Range::from_located(comparator)),
+                    Range::from_located(comparator),
                 ));
             }
         }
@@ -187,13 +185,13 @@ pub fn literal_comparisons(
                 if matches!(op, Cmpop::Eq) {
                     checks.push(Check::new(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                        locator.locate_check(Range::from_located(comparator)),
+                        Range::from_located(comparator),
                     ));
                 }
                 if matches!(op, Cmpop::NotEq) {
                     checks.push(Check::new(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                        locator.locate_check(Range::from_located(comparator)),
+                        Range::from_located(comparator),
                     ));
                 }
             }

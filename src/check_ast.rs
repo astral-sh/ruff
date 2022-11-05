@@ -15,8 +15,8 @@ use crate::ast::helpers::{extract_handler_names, match_name_or_attr_from_module}
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, CheckLocator, ClassScope, FunctionScope, ImportKind,
-    Range, Scope, ScopeKind,
+    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, ImportKind, Range, Scope,
+    ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
@@ -128,6 +128,31 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Add a `Check` to the `Checker`.
+    #[inline(always)]
+    pub(crate) fn add_check(&mut self, check: Check) {
+        // If we're in an f-string, override the location. RustPython doesn't produce
+        // reliable locations for expressions within f-strings, so we use the
+        // span of the f-string itself as a best-effort default.
+        if let Some(range) = self.in_f_string {
+            self.checks.push(Check {
+                location: range.location,
+                end_location: range.end_location,
+                ..check
+            });
+        } else {
+            self.checks.push(check);
+        }
+    }
+
+    /// Add multiple `Check` items to the `Checker`.
+    #[inline(always)]
+    pub(crate) fn add_checks(&mut self, checks: impl Iterator<Item = Check>) {
+        for check in checks {
+            self.add_check(check);
+        }
+    }
+
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self) -> bool {
@@ -205,10 +230,15 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    let location = self.locate_check(Range::from_located(stmt));
-                    self.checks.extend(names.iter().filter_map(|name| {
-                        pycodestyle::checks::ambiguous_variable_name(name, location)
-                    }));
+                    let location = Range::from_located(stmt);
+                    self.add_checks(
+                        names
+                            .iter()
+                            .filter_map(|name| {
+                                pycodestyle::checks::ambiguous_variable_name(name, location)
+                            })
+                            .into_iter(),
+                    );
                 }
             }
             StmtKind::Break => {
@@ -217,9 +247,8 @@ where
                         stmt,
                         &self.parents,
                         &self.parent_stack,
-                        self,
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
             }
@@ -229,9 +258,8 @@ where
                         stmt,
                         &self.parents,
                         &self.parent_stack,
-                        self,
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
             }
@@ -254,9 +282,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::E743) {
                     if let Some(check) = pycodestyle::checks::ambiguous_function_name(
                         name,
-                        self.locate_check(Range::from_located(stmt)),
+                        Range::from_located(stmt),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
 
@@ -266,7 +294,7 @@ where
                         name,
                         &self.settings.pep8_naming,
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
 
@@ -280,7 +308,7 @@ where
                             &self.settings.pep8_naming,
                         )
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
 
@@ -292,7 +320,7 @@ where
                         args,
                         &self.settings.pep8_naming,
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
 
@@ -300,7 +328,7 @@ where
                     if let Some(check) =
                         pep8_naming::checks::dunder_function_name(self.current_scope(), stmt, name)
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
 
@@ -360,12 +388,12 @@ where
             }
             StmtKind::Return { .. } => {
                 if self.settings.enabled.contains(&CheckCode::F706) {
-                    if let Some(scope_index) = self.scope_stack.last().cloned() {
-                        match self.scopes[scope_index].kind {
+                    if let Some(index) = self.scope_stack.last().cloned() {
+                        match self.scopes[index].kind {
                             ScopeKind::Class(_) | ScopeKind::Module => {
-                                self.checks.push(Check::new(
+                                self.add_check(Check::new(
                                     CheckKind::ReturnOutsideFunction,
-                                    self.locate_check(Range::from_located(stmt)),
+                                    Range::from_located(stmt),
                                 ));
                             }
                             _ => {}
@@ -387,17 +415,16 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E742) {
-                    if let Some(check) = pycodestyle::checks::ambiguous_class_name(
-                        name,
-                        self.locate_check(Range::from_located(stmt)),
-                    ) {
-                        self.checks.push(check);
+                    if let Some(check) =
+                        pycodestyle::checks::ambiguous_class_name(name, Range::from_located(stmt))
+                    {
+                        self.add_check(check);
                     }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N801) {
                     if let Some(check) = pep8_naming::checks::invalid_class_name(stmt, name) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
 
@@ -405,7 +432,7 @@ where
                     if let Some(check) =
                         pep8_naming::checks::error_suffix_on_exception_name(stmt, bases, name)
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
 
@@ -413,11 +440,7 @@ where
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
 
-                self.check_builtin_shadowing(
-                    name,
-                    self.locate_check(Range::from_located(stmt)),
-                    false,
-                );
+                self.check_builtin_shadowing(name, Range::from_located(stmt), false);
 
                 for expr in bases {
                     self.visit_expr(expr)
@@ -438,9 +461,9 @@ where
             StmtKind::Import { names } => {
                 if self.settings.enabled.contains(&CheckCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
-                        self.checks.push(Check::new(
+                        self.add_check(Check::new(
                             CheckKind::ModuleImportNotAtTopOfFile,
-                            self.locate_check(Range::from_located(stmt)),
+                            Range::from_located(stmt),
                         ));
                     }
                 }
@@ -495,7 +518,7 @@ where
                                     stmt, name, asname,
                                 )
                             {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
 
@@ -505,7 +528,7 @@ where
                                     stmt, name, asname,
                                 )
                             {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
 
@@ -515,7 +538,7 @@ where
                                     stmt, name, asname,
                                 )
                             {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
 
@@ -523,7 +546,7 @@ where
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
                                 stmt, name, asname,
                             ) {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
 
@@ -531,7 +554,7 @@ where
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
                                 stmt, name, asname,
                             ) {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
                     }
@@ -562,9 +585,9 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
-                        self.checks.push(Check::new(
+                        self.add_check(Check::new(
                             CheckKind::ModuleImportNotAtTopOfFile,
-                            self.locate_check(Range::from_located(stmt)),
+                            Range::from_located(stmt),
                         ));
                     }
                 }
@@ -594,18 +617,18 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::F407) {
                             if !ALL_FEATURE_NAMES.contains(&alias.node.name.deref()) {
-                                self.checks.push(Check::new(
+                                self.add_check(Check::new(
                                     CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
-                                    self.locate_check(Range::from_located(stmt)),
+                                    Range::from_located(stmt),
                                 ));
                             }
                         }
 
                         if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
                         {
-                            self.checks.push(Check::new(
+                            self.add_check(Check::new(
                                 CheckKind::LateFutureImport,
-                                self.locate_check(Range::from_located(stmt)),
+                                Range::from_located(stmt),
                             ));
                         }
                     } else if alias.node.name == "*" {
@@ -628,17 +651,17 @@ where
                             let scope = &self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found."))];
                             if !matches!(scope.kind, ScopeKind::Module) {
-                                self.checks.push(Check::new(
+                                self.add_check(Check::new(
                                     CheckKind::ImportStarNotPermitted(module_name.to_string()),
-                                    self.locate_check(Range::from_located(stmt)),
+                                    Range::from_located(stmt),
                                 ));
                             }
                         }
 
                         if self.settings.enabled.contains(&CheckCode::F403) {
-                            self.checks.push(Check::new(
+                            self.add_check(Check::new(
                                 CheckKind::ImportStarUsed(module_name.to_string()),
-                                self.locate_check(Range::from_located(stmt)),
+                                Range::from_located(stmt),
                             ));
                         }
 
@@ -683,7 +706,7 @@ where
                                     asname,
                                 )
                             {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
 
@@ -695,7 +718,7 @@ where
                                     asname,
                                 )
                             {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
 
@@ -707,7 +730,7 @@ where
                                     asname,
                                 )
                             {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
 
@@ -717,7 +740,7 @@ where
                                 &alias.node.name,
                                 asname,
                             ) {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
 
@@ -727,7 +750,7 @@ where
                                 &alias.node.name,
                                 asname,
                             ) {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
                     }
@@ -774,7 +797,7 @@ where
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
                     if let Some(check) = pyflakes::checks::default_except_not_last(handlers) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::B014)
@@ -788,11 +811,10 @@ where
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
-                    if let Some(check) = pycodestyle::checks::do_not_assign_lambda(
-                        value,
-                        self.locate_check(Range::from_located(stmt)),
-                    ) {
-                        self.checks.push(check);
+                    if let Some(check) =
+                        pycodestyle::checks::do_not_assign_lambda(value, Range::from_located(stmt))
+                    {
+                        self.add_check(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::U001) {
@@ -807,9 +829,9 @@ where
                     if let Some(value) = value {
                         if let Some(check) = pycodestyle::checks::do_not_assign_lambda(
                             value,
-                            self.locate_check(Range::from_located(stmt)),
+                            Range::from_located(stmt),
                         ) {
-                            self.checks.push(check);
+                            self.add_check(check);
                         }
                     }
                 }
@@ -954,9 +976,9 @@ where
                         elts,
                         check_too_many_expressions,
                         check_two_starred_expressions,
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     }
                 }
             }
@@ -976,9 +998,9 @@ where
                     if self.settings.enabled.contains(&CheckCode::E741) {
                         if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                             id,
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         ) {
-                            self.checks.push(check);
+                            self.add_check(check);
                         }
                     }
 
@@ -1027,9 +1049,9 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1041,9 +1063,9 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1055,9 +1077,9 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1070,10 +1092,10 @@ where
                             keywords,
                             self.locator,
                             self.patch(),
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         )
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1083,10 +1105,10 @@ where
                             func,
                             args,
                             keywords,
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         )
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1098,9 +1120,9 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1112,9 +1134,9 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1126,9 +1148,9 @@ where
                         keywords,
                         self.locator,
                         self.patch(),
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1140,10 +1162,10 @@ where
                             args,
                             self.locator,
                             self.patch(),
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         )
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1155,10 +1177,10 @@ where
                             args,
                             self.locator,
                             self.patch(),
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         )
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1169,9 +1191,9 @@ where
                         args,
                         self.locator,
                         self.patch(),
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1180,10 +1202,10 @@ where
                         flake8_comprehensions::checks::unnecessary_call_around_sorted(
                             func,
                             args,
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         )
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1192,10 +1214,10 @@ where
                         flake8_comprehensions::checks::unnecessary_double_cast_or_process(
                             func,
                             args,
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         )
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1204,10 +1226,10 @@ where
                         flake8_comprehensions::checks::unnecessary_subscript_reversal(
                             func,
                             args,
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         )
                     {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1215,9 +1237,9 @@ where
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_map(
                         func,
                         args,
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
 
@@ -1251,21 +1273,23 @@ where
                 let check_repeated_literals = self.settings.enabled.contains(&CheckCode::F601);
                 let check_repeated_variables = self.settings.enabled.contains(&CheckCode::F602);
                 if check_repeated_literals || check_repeated_variables {
-                    self.checks.extend(pyflakes::checks::repeated_keys(
-                        keys,
-                        check_repeated_literals,
-                        check_repeated_variables,
-                        self,
-                    ));
+                    self.add_checks(
+                        pyflakes::checks::repeated_keys(
+                            keys,
+                            check_repeated_literals,
+                            check_repeated_variables,
+                        )
+                        .into_iter(),
+                    );
                 }
             }
             ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. } => {
                 let scope = self.current_scope();
                 if self.settings.enabled.contains(&CheckCode::F704) {
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.checks.push(Check::new(
+                        self.add_check(Check::new(
                             CheckKind::YieldOutsideFunction,
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         ));
                     }
                 }
@@ -1277,9 +1301,9 @@ where
                             .iter()
                             .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
                     {
-                        self.checks.push(Check::new(
+                        self.add_check(Check::new(
                             CheckKind::FStringMissingPlaceholders,
-                            self.locate_check(Range::from_located(expr)),
+                            Range::from_located(expr),
                         ));
                     }
                 }
@@ -1298,13 +1322,10 @@ where
                 let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
                 let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
                 if check_not_in || check_not_is {
-                    self.checks.extend(pycodestyle::checks::not_tests(
-                        op,
-                        operand,
-                        check_not_in,
-                        check_not_is,
-                        self,
-                    ));
+                    self.add_checks(
+                        pycodestyle::checks::not_tests(op, operand, check_not_in, check_not_is)
+                            .into_iter(),
+                    );
                 }
 
                 if self.settings.enabled.contains(&CheckCode::B002) {
@@ -1319,14 +1340,16 @@ where
                 let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
                 let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
                 if check_none_comparisons || check_true_false_comparisons {
-                    self.checks.extend(pycodestyle::checks::literal_comparisons(
-                        left,
-                        ops,
-                        comparators,
-                        check_none_comparisons,
-                        check_true_false_comparisons,
-                        self,
-                    ));
+                    self.add_checks(
+                        pycodestyle::checks::literal_comparisons(
+                            left,
+                            ops,
+                            comparators,
+                            check_none_comparisons,
+                            check_true_false_comparisons,
+                        )
+                        .into_iter(),
+                    );
                 }
 
                 if self.settings.enabled.contains(&CheckCode::F632) {
@@ -1335,16 +1358,19 @@ where
                         left,
                         ops,
                         comparators,
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     );
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E721) {
-                    self.checks.extend(pycodestyle::checks::type_comparison(
-                        ops,
-                        comparators,
-                        self.locate_check(Range::from_located(expr)),
-                    ));
+                    self.add_checks(
+                        pycodestyle::checks::type_comparison(
+                            ops,
+                            comparators,
+                            Range::from_located(expr),
+                        )
+                        .into_iter(),
+                    );
                 }
             }
             ExprKind::Constant {
@@ -1399,9 +1425,9 @@ where
                         generators,
                         self.locator,
                         self.patch(),
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ) {
-                        self.checks.push(check);
+                        self.add_check(check);
                     };
                 }
                 self.push_scope(Scope::new(ScopeKind::Generator))
@@ -1595,7 +1621,7 @@ where
         match &excepthandler.node {
             ExcepthandlerKind::ExceptHandler { type_, name, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E722) && type_.is_none() {
-                    self.checks.push(Check::new(
+                    self.add_check(Check::new(
                         CheckKind::DoNotUseBareExcept,
                         Range::from_located(excepthandler),
                     ));
@@ -1605,9 +1631,9 @@ where
                         if self.settings.enabled.contains(&CheckCode::E741) {
                             if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                                 name,
-                                self.locate_check(Range::from_located(excepthandler)),
+                                Range::from_located(excepthandler),
                             ) {
-                                self.checks.push(check);
+                                self.add_check(check);
                             }
                         }
 
@@ -1646,12 +1672,14 @@ where
 
                         walk_excepthandler(self, excepthandler);
 
-                        let scope = &mut self.scopes
-                            [*(self.scope_stack.last().expect("No current scope found."))];
-                        if let Some(binding) = &scope.values.remove(name) {
+                        if let Some(binding) = {
+                            let scope = &mut self.scopes
+                                [*(self.scope_stack.last().expect("No current scope found."))];
+                            &scope.values.remove(name)
+                        } {
                             if binding.used.is_none() {
                                 if self.settings.enabled.contains(&CheckCode::F841) {
-                                    self.checks.push(Check::new(
+                                    self.add_check(Check::new(
                                         CheckKind::UnusedVariable(name.to_string()),
                                         Range::from_located(excepthandler),
                                     ));
@@ -1660,6 +1688,8 @@ where
                         }
 
                         if let Some(binding) = definition {
+                            let scope = &mut self.scopes
+                                [*(self.scope_stack.last().expect("No current scope found."))];
                             scope.values.insert(name.to_string(), binding);
                         }
                     }
@@ -1715,9 +1745,9 @@ where
         if self.settings.enabled.contains(&CheckCode::E741) {
             if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                 &arg.node.arg,
-                self.locate_check(Range::from_located(arg)),
+                Range::from_located(arg),
             ) {
-                self.checks.push(check);
+                self.add_check(check);
             }
         }
 
@@ -1725,17 +1755,11 @@ where
             if let Some(check) =
                 pep8_naming::checks::invalid_argument_name(&arg.node.arg, Range::from_located(arg))
             {
-                self.checks.push(check);
+                self.add_check(check);
             }
         }
 
         self.check_builtin_arg_shadowing(&arg.node.arg, Range::from_located(arg));
-    }
-}
-
-impl CheckLocator for Checker<'_> {
-    fn locate_check(&self, default: Range) -> Range {
-        self.in_f_string.unwrap_or(default)
     }
 }
 
@@ -1782,10 +1806,6 @@ fn try_mark_used(scope: &mut Scope, scope_id: usize, id: &str, expr: &Expr) -> b
 }
 
 impl<'a> Checker<'a> {
-    pub fn add_check(&mut self, check: Check) {
-        self.checks.push(check);
-    }
-
     fn push_parent(&mut self, parent: &'a Stmt) {
         self.parent_stack.push(self.parents.len());
         self.parents.push(parent);
@@ -1854,41 +1874,43 @@ impl<'a> Checker<'a> {
     }
 
     fn add_binding(&mut self, name: String, binding: Binding) {
-        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        if self.settings.enabled.contains(&CheckCode::F402) {
+            let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+            if let Some(existing) = scope.values.get(&name) {
+                if matches!(binding.kind, BindingKind::LoopVar)
+                    && matches!(
+                        existing.kind,
+                        BindingKind::Importation(_, _, _)
+                            | BindingKind::FromImportation(_, _, _)
+                            | BindingKind::SubmoduleImportation(_, _, _)
+                            | BindingKind::StarImportation
+                            | BindingKind::FutureImportation
+                    )
+                {
+                    self.add_check(Check::new(
+                        CheckKind::ImportShadowedByLoopVar(
+                            name.clone(),
+                            existing.range.location.row(),
+                        ),
+                        binding.range,
+                    ));
+                }
+            }
+        }
 
         // TODO(charlie): Don't treat annotations as assignments if there is an existing
         // value.
+        let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
         let binding = match scope.values.get(&name) {
             None => binding,
-            Some(existing) => {
-                if self.settings.enabled.contains(&CheckCode::F402) {
-                    if matches!(binding.kind, BindingKind::LoopVar)
-                        && matches!(
-                            existing.kind,
-                            BindingKind::Importation(_, _, _)
-                                | BindingKind::FromImportation(_, _, _)
-                                | BindingKind::SubmoduleImportation(_, _, _)
-                                | BindingKind::StarImportation
-                                | BindingKind::FutureImportation
-                        )
-                    {
-                        self.checks.push(Check::new(
-                            CheckKind::ImportShadowedByLoopVar(
-                                name.clone(),
-                                existing.range.location.row(),
-                            ),
-                            binding.range,
-                        ));
-                    }
-                }
-                Binding {
-                    kind: binding.kind,
-                    range: binding.range,
-                    used: existing.used,
-                }
-            }
+            Some(existing) => Binding {
+                kind: binding.kind,
+                range: binding.range,
+                used: existing.used,
+            },
         };
 
+        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
         scope.values.insert(name, binding);
     }
 
@@ -1932,9 +1954,9 @@ impl<'a> Checker<'a> {
                     }
                     from_list.sort();
 
-                    self.checks.push(Check::new(
+                    self.add_check(Check::new(
                         CheckKind::ImportStarUsage(id.clone(), from_list),
-                        self.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ));
                 }
                 return;
@@ -1953,9 +1975,9 @@ impl<'a> Checker<'a> {
                     }
                 }
 
-                self.checks.push(Check::new(
+                self.add_check(Check::new(
                     CheckKind::UndefinedName(id.clone()),
-                    self.locate_check(Range::from_located(expr)),
+                    Range::from_located(expr),
                 ))
             }
         }
@@ -1963,51 +1985,44 @@ impl<'a> Checker<'a> {
 
     fn handle_node_store(&mut self, expr: &Expr, parent: &Stmt) {
         if let ExprKind::Name { id, .. } = &expr.node {
-            let current =
-                &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-
             if self.settings.enabled.contains(&CheckCode::F823) {
-                if matches!(current.kind, ScopeKind::Function(_))
-                    && !current.values.contains_key(id)
-                {
-                    for scope in self.scopes.iter().rev().skip(1) {
-                        if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
-                            if let Some(binding) = scope.values.get(id) {
-                                if let Some((scope_id, location)) = binding.used {
-                                    if scope_id == current.id {
-                                        self.checks.push(Check::new(
-                                            CheckKind::UndefinedLocal(id.clone()),
-                                            self.locate_check(location),
-                                        ));
-                                    }
-                                }
-                            }
-                        }
-                    }
+                let scopes: Vec<&Scope> = self
+                    .scope_stack
+                    .iter()
+                    .map(|index| &self.scopes[*index])
+                    .collect();
+                if let Some(check) = pyflakes::checks::undefined_local(&scopes, id) {
+                    self.add_check(check);
                 }
             }
 
             if self.settings.enabled.contains(&CheckCode::N806) {
+                let current =
+                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                 if let Some(check) =
                     pep8_naming::checks::non_lowercase_variable_in_function(current, expr, id)
                 {
-                    self.checks.push(check);
+                    self.add_check(check);
                 }
             }
 
             if self.settings.enabled.contains(&CheckCode::N815) {
+                let current =
+                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                 if let Some(check) =
                     pep8_naming::checks::mixed_case_variable_in_class_scope(current, expr, id)
                 {
-                    self.checks.push(check);
+                    self.add_check(check);
                 }
             }
 
             if self.settings.enabled.contains(&CheckCode::N816) {
+                let current =
+                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
                 if let Some(check) =
                     pep8_naming::checks::mixed_case_variable_in_global_scope(current, expr, id)
                 {
-                    self.checks.push(check);
+                    self.add_check(check);
                 }
             }
 
@@ -2051,6 +2066,8 @@ impl<'a> Checker<'a> {
                 return;
             }
 
+            let current =
+                &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if id == "__all__"
                 && matches!(current.kind, ScopeKind::Module)
                 && matches!(
@@ -2092,9 +2109,9 @@ impl<'a> Checker<'a> {
                 &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if scope.values.remove(id).is_none() && self.settings.enabled.contains(&CheckCode::F821)
             {
-                self.checks.push(Check::new(
+                self.add_check(Check::new(
                     CheckKind::UndefinedName(id.clone()),
-                    self.locate_check(Range::from_located(expr)),
+                    Range::from_located(expr),
                 ))
             }
         }
@@ -2137,9 +2154,9 @@ impl<'a> Checker<'a> {
                 allocator.push(expr);
             } else {
                 if self.settings.enabled.contains(&CheckCode::F722) {
-                    self.checks.push(Check::new(
+                    self.add_check(Check::new(
                         CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
-                        self.locate_check(range),
+                        range,
                     ));
                 }
             }
@@ -2195,11 +2212,13 @@ impl<'a> Checker<'a> {
     fn check_deferred_assignments(&mut self) {
         if self.settings.enabled.contains(&CheckCode::F841) {
             while let Some(index) = self.deferred_assignments.pop() {
-                self.checks.extend(pyflakes::checks::unused_variables(
-                    &self.scopes[index],
-                    self,
-                    &self.settings.dummy_variable_rgx,
-                ));
+                self.add_checks(
+                    pyflakes::checks::unused_variables(
+                        &self.scopes[index],
+                        &self.settings.dummy_variable_rgx,
+                    )
+                    .into_iter(),
+                );
             }
         }
     }
@@ -2212,9 +2231,8 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        for index in self.dead_scopes.iter().copied() {
-            let scope = &self.scopes[index];
-
+        let mut checks: Vec<Check> = vec![];
+        for scope in self.dead_scopes.iter().map(|index| &self.scopes[*index]) {
             let all_binding = scope.values.get("__all__");
             let all_names = all_binding.and_then(|binding| match &binding.kind {
                 BindingKind::Export(names) => Some(names),
@@ -2227,9 +2245,9 @@ impl<'a> Checker<'a> {
                         if let Some(names) = all_names {
                             for name in names {
                                 if !scope.values.contains_key(name) {
-                                    self.checks.push(Check::new(
+                                    checks.push(Check::new(
                                         CheckKind::UndefinedExport(name.to_string()),
-                                        self.locate_check(all_binding.range),
+                                        all_binding.range,
                                     ));
                                 }
                             }
@@ -2238,23 +2256,25 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.enabled.contains(&CheckCode::F405) && scope.import_starred {
-                if let Some(all_binding) = all_binding {
-                    if let Some(names) = all_names {
-                        let mut from_list = vec![];
-                        for (name, binding) in scope.values.iter() {
-                            if matches!(binding.kind, BindingKind::StarImportation) {
-                                from_list.push(name.to_string());
+            if self.settings.enabled.contains(&CheckCode::F405) {
+                if scope.import_starred {
+                    if let Some(all_binding) = all_binding {
+                        if let Some(names) = all_names {
+                            let mut from_list = vec![];
+                            for (name, binding) in scope.values.iter() {
+                                if matches!(binding.kind, BindingKind::StarImportation) {
+                                    from_list.push(name.to_string());
+                                }
                             }
-                        }
-                        from_list.sort();
+                            from_list.sort();
 
-                        for name in names {
-                            if !scope.values.contains_key(name) {
-                                self.checks.push(Check::new(
-                                    CheckKind::ImportStarUsage(name.clone(), from_list.clone()),
-                                    self.locate_check(all_binding.range),
-                                ));
+                            for name in names {
+                                if !scope.values.contains_key(name) {
+                                    checks.push(Check::new(
+                                        CheckKind::ImportStarUsage(name.clone(), from_list.clone()),
+                                        all_binding.range,
+                                    ));
+                                }
                             }
                         }
                     }
@@ -2329,12 +2349,12 @@ impl<'a> Checker<'a> {
                     };
 
                     if self.path.ends_with("__init__.py") {
-                        self.checks.push(Check::new(
+                        checks.push(Check::new(
                             CheckKind::UnusedImport(
                                 full_names.into_iter().map(String::from).collect(),
                                 true,
                             ),
-                            self.locate_check(Range::from_located(child)),
+                            Range::from_located(child),
                         ));
                     } else {
                         let mut check = Check::new(
@@ -2342,16 +2362,17 @@ impl<'a> Checker<'a> {
                                 full_names.into_iter().map(String::from).collect(),
                                 false,
                             ),
-                            self.locate_check(Range::from_located(child)),
+                            Range::from_located(child),
                         );
                         if let Some(fix) = fix {
                             check.amend(fix);
                         }
-                        self.checks.push(check);
+                        checks.push(check);
                     }
                 }
             }
         }
+        self.add_checks(checks.into_iter());
     }
 
     fn check_docstrings(&mut self) {
@@ -2443,20 +2464,20 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::A003) {
                 if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
-                    self.locate_check(location),
+                    location,
                     flake8_builtins::types::ShadowingType::Attribute,
                 ) {
-                    self.checks.push(check);
+                    self.add_check(check);
                 }
             }
         } else {
             if self.settings.enabled.contains(&CheckCode::A001) {
                 if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
-                    self.locate_check(location),
+                    location,
                     flake8_builtins::types::ShadowingType::Variable,
                 ) {
-                    self.checks.push(check);
+                    self.add_check(check);
                 }
             }
         }
@@ -2466,10 +2487,10 @@ impl<'a> Checker<'a> {
         if self.settings.enabled.contains(&CheckCode::A002) {
             if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                 name,
-                self.locate_check(location),
+                location,
                 flake8_builtins::types::ShadowingType::Argument,
             ) {
-                self.checks.push(check);
+                self.add_check(check);
             }
         }
     }

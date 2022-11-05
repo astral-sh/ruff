@@ -1,7 +1,7 @@
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
 use crate::ast::helpers::compose_call_path;
-use crate::ast::types::{CheckLocator, Range};
+use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::check_ast::Checker;
@@ -91,6 +91,6 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
         visitor.visit_expr(expr);
     }
     for (check, range) in visitor.checks {
-        checker.add_check(Check::new(check, checker.locate_check(range)));
+        checker.add_check(Check::new(check, range));
     }
 }

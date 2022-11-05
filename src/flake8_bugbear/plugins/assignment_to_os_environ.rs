@@ -1,6 +1,6 @@
 use rustpython_ast::{Expr, ExprKind};
 
-use crate::ast::types::{CheckLocator, Range};
+use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
@@ -14,7 +14,7 @@ pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
                     if id == "os" {
                         checker.add_check(Check::new(
                             CheckKind::AssignmentToOsEnviron,
-                            checker.locate_check(Range::from_located(target)),
+                            Range::from_located(target),
                         ));
                     }
                 }
