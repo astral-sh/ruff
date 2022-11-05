@@ -1,6 +1,6 @@
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
-use crate::ast::types::Range;
+use crate::ast::types::{CheckLocator, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::check_ast::Checker;
@@ -36,7 +36,7 @@ fn is_immutable_func(expr: &Expr) -> bool {
 }
 
 struct ArgumentDefaultVisitor {
-    checks: Vec<Check>,
+    checks: Vec<(CheckKind, Range)>,
 }
 
 impl<'a, 'b> Visitor<'b> for ArgumentDefaultVisitor
@@ -50,7 +50,7 @@ where
                     && !is_immutable_func(func)
                     && !is_nan_or_infinity(func, args)
                 {
-                    self.checks.push(Check::new(
+                    self.checks.push((
                         CheckKind::FunctionCallArgumentDefault,
                         Range::from_located(expr),
                     ))
@@ -99,7 +99,7 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
     {
         visitor.visit_expr(expr);
     }
-    for check in visitor.checks {
-        checker.add_check(check);
+    for (check, range) in visitor.checks {
+        checker.add_check(Check::new(check, checker.locate_check(range)));
     }
 }
