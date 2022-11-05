@@ -2266,7 +2266,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.101"
+version = "0.0.102"
 dependencies = [
  "anyhow",
  "clap 4.0.15",
