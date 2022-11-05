@@ -31,6 +31,10 @@ of plugins), [`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](htt
 and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/) and [`autoflake`](https://pypi.org/project/autoflake/)
 all while executing tens or hundreds of times faster than any individual tool.
 
+Ruff is actively developed and used in major open-source projects
+like [Zulip](https://github.com/zulip/zulip), [pydantic](https://github.com/pydantic/pydantic),
+and [Saleor](https://github.com/saleor/saleor).
+
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Table of Contents
