@@ -32,3 +32,20 @@ caller(
     Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
     """,  # noqa: E501
 )
+
+multiple_strings_per_line = {
+    # OK
+    "Lorem ipsum dolor": "sit amet",
+    # E501 Line too long
+    "Lorem ipsum dolor": "sit amet consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    # E501 Line too long
+    "Lorem ipsum dolor": """
+sit amet  consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+""",
+    # OK
+    "Lorem ipsum dolor": "sit amet consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",  # noqa: E501
+    # OK
+    "Lorem ipsum dolor": """
+sit amet  consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+""",  # noqa: E501
+}
