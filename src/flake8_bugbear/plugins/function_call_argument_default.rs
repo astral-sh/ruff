@@ -17,23 +17,22 @@ pub fn call_path(expr: &Expr) -> Option<String> {
     }
 }
 
+const IMMUTABLE_FUNCS: [&str; 11] = [
+    "tuple",
+    "frozenset",
+    "operator.attrgetter",
+    "operator.itemgetter",
+    "operator.methodcaller",
+    "attrgetter",
+    "itemgetter",
+    "methodcaller",
+    "types.MappingProxyType",
+    "MappingProxyType",
+    "re.compile",
+];
+
 fn is_immutable_func(expr: &Expr) -> bool {
-    call_path(expr).map_or_else(
-        || false,
-        |p| {
-            p == "tuple"
-                || p == "frozenset"
-                || p == "operator.attrgetter"
-                || p == "operator.itemgetter"
-                || p == "operator.methodcaller"
-                || p == "attrgetter"
-                || p == "itemgetter"
-                || p == "methodcaller"
-                || p == "types.MappingProxyType"
-                || p == "MappingProxyType"
-                || p == "re.compile"
-        },
-    )
+    call_path(expr).map_or_else(|| false, |p| IMMUTABLE_FUNCS.contains(&p.as_str()))
 }
 
 struct ArgumentDefaultVisitor {
@@ -68,19 +67,21 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
     if let ExprKind::Name { id, .. } = &expr.node {
         if id == "float" {
             if let Some(arg) = args.first() {
-                if let ExprKind::Constant { value, .. } = &arg.node {
-                    if let Constant::Str(value) = &value {
-                        let lowercased = value.to_lowercase();
-                        return lowercased == "nan"
-                            || lowercased == "+nan"
-                            || lowercased == "-nan"
-                            || lowercased == "inf"
-                            || lowercased == "+inf"
-                            || lowercased == "-inf"
-                            || lowercased == "infinity"
-                            || lowercased == "+infinity"
-                            || lowercased == "-infinity";
-                    }
+                if let ExprKind::Constant {
+                    value: Constant::Str(value),
+                    ..
+                } = &arg.node
+                {
+                    let lowercased = value.to_lowercase();
+                    return lowercased == "nan"
+                        || lowercased == "+nan"
+                        || lowercased == "-nan"
+                        || lowercased == "inf"
+                        || lowercased == "+inf"
+                        || lowercased == "-inf"
+                        || lowercased == "infinity"
+                        || lowercased == "+infinity"
+                        || lowercased == "-infinity";
                 }
             }
         }

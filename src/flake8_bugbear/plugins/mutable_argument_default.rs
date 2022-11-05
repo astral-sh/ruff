@@ -23,10 +23,7 @@ pub fn is_mutable_func(expr: &Expr) -> bool {
                 || attr == "defaultdict"
                 || attr == "deque") =>
         {
-            match &value.node {
-                ExprKind::Name { id, .. } if id == "collections" => true,
-                _ => false,
-            }
+            matches!(&value.node, ExprKind::Name { id, .. } if id == "collections")
         }
         _ => false,
     }
