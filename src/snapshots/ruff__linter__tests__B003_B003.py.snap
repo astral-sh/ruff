@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: AssignmentToOsEnviron
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 10
+  fix: ~
+

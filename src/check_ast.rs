@@ -792,6 +792,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::U001) {
                     pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
                 }
+                if self.settings.enabled.contains(&CheckCode::B003) {
+                    flake8_bugbear::plugins::assignment_to_os_environ(self, targets);
+                }
             }
             StmtKind::AnnAssign { value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {

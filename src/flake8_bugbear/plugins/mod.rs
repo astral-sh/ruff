@@ -1,5 +1,6 @@
 pub use assert_false::assert_false;
 pub use assert_raises_exception::assert_raises_exception;
+pub use assignment_to_os_environ::assignment_to_os_environ;
 pub use cannot_raise_literal::cannot_raise_literal;
 pub use duplicate_exceptions::{duplicate_exceptions, duplicate_handler_exceptions};
 pub use function_call_argument_default::function_call_argument_default;
@@ -12,6 +13,7 @@ pub use useless_expression::useless_expression;
 
 mod assert_false;
 mod assert_raises_exception;
+mod assignment_to_os_environ;
 mod cannot_raise_literal;
 mod duplicate_exceptions;
 mod function_call_argument_default;

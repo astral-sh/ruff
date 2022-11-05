@@ -462,6 +462,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
+| B003 | AssignmentToOsEnviron | Assigning to `os.environ` doesn't clear the environment. |  |
 | B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults. |  |
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body. | 🛠 |
 | B008 | FunctionCallArgumentDefault | Do not perform function calls in argument defaults. |  |
