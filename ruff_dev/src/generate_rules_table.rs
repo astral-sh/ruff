@@ -1,28 +1,26 @@
+//! Generate a Markdown-compatible table of supported lint rules.
+
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::Args;
 use ruff::checks::{CheckCategory, CheckCode};
 use strum::IntoEnumIterator;
 
-const FILE: &str = "README.md";
+const FILE: &str = "../README.md";
 const BEGIN_PRAGMA: &str = "<!-- Begin auto-generated sections. -->";
 const END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-/// Generate a Markdown-compatible table of supported lint rules.
-struct Cli {
+#[derive(Args)]
+pub struct Cli {
     /// Write the generated table to stdout (rather than to `README.md`).
     #[arg(long)]
     dry_run: bool,
 }
 
-fn main() -> Result<()> {
-    let cli = Cli::parse();
-
+pub fn main(cli: &Cli) -> Result<()> {
     // Generate the table string.
     let mut output = String::new();
     for check_category in CheckCategory::iter() {
@@ -43,7 +41,7 @@ fn main() -> Result<()> {
                     "| {} | {} | {} | {} |",
                     check_kind.code().as_ref(),
                     check_kind.as_ref(),
-                    check_kind.summary().replace("|", r"\|"),
+                    check_kind.summary().replace('|', r"\|"),
                     fix_token
                 ));
                 output.push('\n');

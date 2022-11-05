@@ -3,23 +3,21 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::Args;
 use ruff::fs;
 use rustpython_parser::lexer;
 
-#[derive(Debug, Parser)]
-struct Cli {
+#[derive(Args)]
+pub struct Cli {
+    /// Python file for which to generate the AST.
     #[arg(required = true)]
     file: PathBuf,
 }
 
-fn main() -> Result<()> {
-    let cli = Cli::parse();
-
+pub fn main(cli: &Cli) -> Result<()> {
     let contents = fs::read_file(&cli.file)?;
     for (_, tok, _) in lexer::make_tokenizer(&contents).flatten() {
         println!("{:#?}", tok);
     }
-
     Ok(())
 }

@@ -2230,7 +2230,6 @@ dependencies = [
  "chrono",
  "clap 4.0.15",
  "clearscreen",
- "codegen",
  "colored",
  "common-path",
  "criterion",
@@ -2263,6 +2262,22 @@ dependencies = [
  "toml",
  "update-informer",
  "walkdir",
+]
+
+[[package]]
+name = "ruff_dev"
+version = "0.0.101"
+dependencies = [
+ "anyhow",
+ "clap 4.0.15",
+ "codegen",
+ "itertools",
+ "ruff",
+ "rustpython-ast",
+ "rustpython-common",
+ "rustpython-parser",
+ "strum",
+ "strum_macros",
 ]
 
 [[package]]

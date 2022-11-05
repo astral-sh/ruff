@@ -1,25 +1,22 @@
+//! Print the AST for a given Python file.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Parser;
-use ruff::code_gen::SourceGenerator;
+use clap::Args;
 use ruff::fs;
 use rustpython_parser::parser;
 
-#[derive(Debug, Parser)]
-struct Cli {
+#[derive(Args)]
+pub struct Cli {
+    /// Python file for which to generate the AST.
     #[arg(required = true)]
     file: PathBuf,
 }
 
-fn main() -> Result<()> {
-    let cli = Cli::parse();
-
+pub fn main(cli: &Cli) -> Result<()> {
     let contents = fs::read_file(&cli.file)?;
     let python_ast = parser::parse_program(&contents, &cli.file.to_string_lossy())?;
-    let mut generator = SourceGenerator::new();
-    generator.unparse_suite(&python_ast)?;
-    println!("{}", generator.generate()?);
-
+    println!("{:#?}", python_ast);
     Ok(())
 }
