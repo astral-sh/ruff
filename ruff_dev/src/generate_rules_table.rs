@@ -28,6 +28,16 @@ pub fn main(cli: &Cli) -> Result<()> {
         output.push('\n');
         output.push('\n');
 
+        if let Some(url) = check_category.url() {
+            output.push_str(&format!(
+                "For more, see [{}]({}) on PyPI.",
+                check_category.title(),
+                url
+            ));
+            output.push('\n');
+            output.push('\n');
+        }
+
         output.push_str("| Coade | Name | Message | Fix |");
         output.push('\n');
         output.push_str("| ---- | ---- | ------- | --- |");

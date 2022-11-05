@@ -195,8 +195,7 @@ pub enum CheckCode {
 #[derive(EnumIter, Debug, PartialEq, Eq)]
 pub enum CheckCategory {
     Pyflakes,
-    PycodestyleError,
-    PycodestyleWarning,
+    Pycodestyle,
     Pydocstyle,
     Pyupgrade,
     PEP8Naming,
@@ -212,8 +211,7 @@ pub enum CheckCategory {
 impl CheckCategory {
     pub fn title(&self) -> &'static str {
         match self {
-            CheckCategory::PycodestyleError => "pycodestyle (error)",
-            CheckCategory::PycodestyleWarning => "pycodestyle (warning)",
+            CheckCategory::Pycodestyle => "pycodestyle",
             CheckCategory::Pyflakes => "Pyflakes",
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
@@ -225,6 +223,29 @@ impl CheckCategory {
             CheckCategory::PEP8Naming => "pep8-naming",
             CheckCategory::Ruff => "Ruff-specific rules",
             CheckCategory::Meta => "Meta rules",
+        }
+    }
+
+    pub fn url(&self) -> Option<&'static str> {
+        match self {
+            CheckCategory::Pycodestyle => Some("https://pypi.org/project/pycodestyle/2.9.1/"),
+            CheckCategory::Pyflakes => Some("https://pypi.org/project/pyflakes/2.5.0/"),
+            CheckCategory::Flake8Builtins => {
+                Some("https://pypi.org/project/flake8-builtins/2.0.1/")
+            }
+            CheckCategory::Flake8Bugbear => {
+                Some("https://pypi.org/project/flake8-bugbear/22.10.27/")
+            }
+            CheckCategory::Flake8Comprehensions => {
+                Some("https://pypi.org/project/flake8-comprehensions/3.10.1/")
+            }
+            CheckCategory::Flake8Print => Some("https://pypi.org/project/flake8-print/5.0.0/"),
+            CheckCategory::Flake8Quotes => Some("https://pypi.org/project/flake8-quotes/3.3.1/"),
+            CheckCategory::Pyupgrade => Some("https://pypi.org/project/pyupgrade/3.2.0/"),
+            CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
+            CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
+            CheckCategory::Ruff => None,
+            CheckCategory::Meta => None,
         }
     }
 }
@@ -639,22 +660,22 @@ impl CheckCode {
 
     pub fn category(&self) -> CheckCategory {
         match self {
-            CheckCode::E402 => CheckCategory::PycodestyleError,
-            CheckCode::E501 => CheckCategory::PycodestyleError,
-            CheckCode::E711 => CheckCategory::PycodestyleError,
-            CheckCode::E712 => CheckCategory::PycodestyleError,
-            CheckCode::E713 => CheckCategory::PycodestyleError,
-            CheckCode::E714 => CheckCategory::PycodestyleError,
-            CheckCode::E721 => CheckCategory::PycodestyleError,
-            CheckCode::E722 => CheckCategory::PycodestyleError,
-            CheckCode::E731 => CheckCategory::PycodestyleError,
-            CheckCode::E741 => CheckCategory::PycodestyleError,
-            CheckCode::E742 => CheckCategory::PycodestyleError,
-            CheckCode::E743 => CheckCategory::PycodestyleError,
-            CheckCode::E902 => CheckCategory::PycodestyleError,
-            CheckCode::E999 => CheckCategory::PycodestyleError,
-            CheckCode::W292 => CheckCategory::PycodestyleWarning,
-            CheckCode::W605 => CheckCategory::PycodestyleWarning,
+            CheckCode::E402 => CheckCategory::Pycodestyle,
+            CheckCode::E501 => CheckCategory::Pycodestyle,
+            CheckCode::E711 => CheckCategory::Pycodestyle,
+            CheckCode::E712 => CheckCategory::Pycodestyle,
+            CheckCode::E713 => CheckCategory::Pycodestyle,
+            CheckCode::E714 => CheckCategory::Pycodestyle,
+            CheckCode::E721 => CheckCategory::Pycodestyle,
+            CheckCode::E722 => CheckCategory::Pycodestyle,
+            CheckCode::E731 => CheckCategory::Pycodestyle,
+            CheckCode::E741 => CheckCategory::Pycodestyle,
+            CheckCode::E742 => CheckCategory::Pycodestyle,
+            CheckCode::E743 => CheckCategory::Pycodestyle,
+            CheckCode::E902 => CheckCategory::Pycodestyle,
+            CheckCode::E999 => CheckCategory::Pycodestyle,
+            CheckCode::W292 => CheckCategory::Pycodestyle,
+            CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::F401 => CheckCategory::Pyflakes,
             CheckCode::F402 => CheckCategory::Pyflakes,
             CheckCode::F403 => CheckCategory::Pyflakes,

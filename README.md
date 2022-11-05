@@ -43,18 +43,17 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
 2. [Configuration](#configuration)
 3. [Supported Rules](#supported-rules)
    1. [Pyflakes](#pyflakes)
-   2. [pycodestyle (error)](#pycodestyle-error)
-   3. [pycodestyle (warning)](#pycodestyle-warning)
-   4. [pydocstyle](#pydocstyle)
-   5. [pyupgrade](#pyupgrade)
-   6. [pep8-naming](#pep8-naming)
-   7. [flake8-comprehensions](#flake8-comprehensions)
-   8. [flake8-bugbear](#flake8-bugbear)
-   9. [flake8-builtins](#flake8-builtins)
-   10. [flake8-print](#flake8-print)
-   11. [flake8-quotes](#flake8-quotes)
-   12. [Ruff-specific rules](#ruff-specific-rules)
-   13. [Meta rules](#meta-rules)
+   2. [pycodestyle](#pycodestyle)
+   3. [pydocstyle](#pydocstyle)
+   4. [pyupgrade](#pyupgrade)
+   5. [pep8-naming](#pep8-naming)
+   6. [flake8-comprehensions](#flake8-comprehensions)
+   7. [flake8-bugbear](#flake8-bugbear)
+   8. [flake8-builtins](#flake8-builtins)
+   9. [flake8-print](#flake8-print)
+   10. [flake8-quotes](#flake8-quotes)
+   11. [Ruff-specific rules](#ruff-specific-rules)
+   12. [Meta rules](#meta-rules)
 5. [Editor Integrations](#editor-integrations)
 6. [FAQ](#faq)
 7. [Development](#development)
@@ -295,6 +294,8 @@ add `noqa` directives to all failing lines, with the appropriate error codes.**
 
 ## Supported Rules
 
+Regardless of the rule's origin, Ruff re-implements every rule in Rust as a first-party feature.
+
 By default, Ruff enables all `E` and `F` error codes, which correspond to those built-in to Flake8.
 
 The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` command-line option.
@@ -303,6 +304,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 <!-- Begin auto-generated sections. -->
 
 ### Pyflakes
+
+For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -335,7 +338,9 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
-### pycodestyle (error)
+### pycodestyle
+
+For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI.
 
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -353,15 +358,12 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
 | E902 | IOError | IOError: `...` |  |
 | E999 | SyntaxError | SyntaxError: `...` |  |
-
-### pycodestyle (warning)
-
-| Coade | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
 | W292 | NoNewLineAtEndOfFile | No newline at end of file |  |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' |  |
 
 ### pydocstyle
+
+For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -412,6 +414,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 ### pyupgrade
 
+For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
+
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | U001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
@@ -424,6 +428,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
 
 ### pep8-naming
+
+For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyPI.
 
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -444,6 +450,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | N818 | ErrorSuffixOnExceptionName | Exception name `...` should be named with an Error suffix |  |
 
 ### flake8-comprehensions
+
+For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/3.10.1/) on PyPI.
 
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -466,6 +474,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 ### flake8-bugbear
 
+For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/) on PyPI.
+
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
@@ -484,6 +494,8 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 ### flake8-builtins
 
+For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/) on PyPI.
+
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |  |
@@ -492,12 +504,16 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 ### flake8-print
 
+For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on PyPI.
+
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | T201 | PrintFound | `print` found | 🛠 |
 | T203 | PPrintFound | `pprint` found | 🛠 |
 
 ### flake8-quotes
+
+For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on PyPI.
 
 | Coade | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
