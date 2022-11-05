@@ -1,21 +1,12 @@
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
+use crate::ast::helpers::compose_call_path;
 use crate::ast::types::{CheckLocator, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::flake8_bugbear::plugins::mutable_argument_default::is_mutable_func;
-
-pub fn call_path(expr: &Expr) -> Option<String> {
-    match &expr.node {
-        ExprKind::Name { id, .. } => Some(id.to_string()),
-        ExprKind::Attribute { value, attr, .. } => {
-            call_path(value).map(|path| format!("{}.{}", path, attr))
-        }
-        _ => None,
-    }
-}
 
 const IMMUTABLE_FUNCS: [&str; 11] = [
     "tuple",
@@ -32,7 +23,7 @@ const IMMUTABLE_FUNCS: [&str; 11] = [
 ];
 
 fn is_immutable_func(expr: &Expr) -> bool {
-    call_path(expr).map_or_else(|| false, |p| IMMUTABLE_FUNCS.contains(&p.as_str()))
+    compose_call_path(expr).map_or_else(|| false, |func| IMMUTABLE_FUNCS.contains(&func.as_str()))
 }
 
 struct ArgumentDefaultVisitor {
