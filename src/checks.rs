@@ -78,6 +78,7 @@ pub enum CheckCode {
     A003,
     // flake8-bugbear
     B002,
+    B003,
     B006,
     B007,
     B008,
@@ -297,6 +298,7 @@ pub enum CheckKind {
     BuiltinAttributeShadowing(String),
     // flake8-bugbear
     UnaryPrefixIncrement,
+    AssignmentToOsEnviron,
     MutableArgumentDefault,
     UnusedLoopControlVariable(String),
     FunctionCallArgumentDefault,
@@ -486,6 +488,7 @@ impl CheckCode {
             CheckCode::A003 => CheckKind::BuiltinAttributeShadowing("...".to_string()),
             // flake8-bugbear
             CheckCode::B002 => CheckKind::UnaryPrefixIncrement,
+            CheckCode::B003 => CheckKind::AssignmentToOsEnviron,
             CheckCode::B006 => CheckKind::MutableArgumentDefault,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B008 => CheckKind::FunctionCallArgumentDefault,
@@ -684,6 +687,7 @@ impl CheckCode {
             CheckCode::A002 => CheckCategory::Flake8Builtins,
             CheckCode::A003 => CheckCategory::Flake8Builtins,
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
+            CheckCode::B003 => CheckCategory::Flake8Bugbear,
             CheckCode::B006 => CheckCategory::Flake8Bugbear,
             CheckCode::B007 => CheckCategory::Flake8Bugbear,
             CheckCode::B008 => CheckCategory::Flake8Bugbear,
@@ -847,6 +851,7 @@ impl CheckKind {
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-bugbear
             CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
+            CheckKind::AssignmentToOsEnviron => &CheckCode::B003,
             CheckKind::MutableArgumentDefault => &CheckCode::B006,
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
             CheckKind::FunctionCallArgumentDefault => &CheckCode::B008,
@@ -1116,6 +1121,9 @@ impl CheckKind {
                                                 increment. Writing `++n` is equivalent to \
                                                 `+(+(n))`, which equals `n`. You meant `n += 1`."
                 .to_string(),
+            CheckKind::AssignmentToOsEnviron => {
+                "Assigning to `os.environ` doesn't clear the environment.".to_string()
+            }
             CheckKind::MutableArgumentDefault => {
                 "Do not use mutable data structures for argument defaults.".to_string()
             }
