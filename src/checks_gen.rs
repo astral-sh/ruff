@@ -274,7 +274,7 @@ impl CheckCodePrefix {
                 CheckCode::B011,
                 CheckCode::B013,
                 CheckCode::B014,
-                CheckCode::B014,
+                CheckCode::B015,
                 CheckCode::B016,
                 CheckCode::B017,
                 CheckCode::B018,
