@@ -1,4 +1,3 @@
-use std::cmp::{max, min};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -46,38 +45,17 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 
 pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
     let mut noqa_line_for: Vec<usize> = vec![];
-
-    let mut min_line = usize::MAX;
-    let mut max_line = usize::MIN;
-    let mut in_string = false;
-
     for (start, tok, end) in lxr.iter().flatten() {
         if matches!(tok, Tok::EndOfFile) {
             break;
         }
-
-        if matches!(tok, Tok::Newline) {
-            min_line = min(min_line, start.row());
-            max_line = max(max_line, start.row());
-
-            // For now, we only care about preserving noqa directives across multi-line
-            // strings.
-            if in_string {
-                for i in (noqa_line_for.len())..(min_line - 1) {
-                    noqa_line_for.push(i + 1);
-                }
-                noqa_line_for.extend(vec![max_line; (max_line + 1) - min_line]);
+        if matches!(tok, Tok::String { .. }) {
+            for i in (noqa_line_for.len())..(start.row() - 1) {
+                noqa_line_for.push(i + 1);
             }
-
-            min_line = usize::MAX;
-            max_line = usize::MIN;
-        } else {
-            min_line = min(min_line, start.row());
-            max_line = max(max_line, end.row());
+            noqa_line_for.extend(vec![end.row(); (end.row() + 1) - start.row()]);
         }
-        in_string = matches!(tok, Tok::String { .. });
     }
-
     noqa_line_for
 }
 

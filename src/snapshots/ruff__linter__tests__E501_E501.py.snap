@@ -13,4 +13,15 @@ expression: checks
     row: 5
     column: 123
   fix: ~
+- kind:
+    LineTooLong:
+      - 127
+      - 88
+  location:
+    row: 25
+    column: 0
+  end_location:
+    row: 25
+    column: 127
+  fix: ~
 
