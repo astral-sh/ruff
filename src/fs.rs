@@ -118,7 +118,7 @@ pub fn iter_python_files<'a>(
 }
 
 /// Create tree set with codes matching the pattern/code pairs.
-pub fn ignores_from_path<'a>(
+pub(crate) fn ignores_from_path<'a>(
     path: &Path,
     pattern_code_pairs: &'a [PerFileIgnore],
 ) -> Result<BTreeSet<&'a CheckCode>> {
@@ -138,7 +138,7 @@ pub fn ignores_from_path<'a>(
 
 /// Convert any path to an absolute path (based on the current working
 /// directory).
-pub fn normalize_path(path: &Path) -> PathBuf {
+pub(crate) fn normalize_path(path: &Path) -> PathBuf {
     if let Ok(path) = path.absolutize() {
         return path.to_path_buf();
     }
@@ -146,7 +146,7 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 }
 
 /// Convert any path to an absolute path (based on the specified project root).
-pub fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
+pub(crate) fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
     if let Ok(path) = path.absolutize_from(project_root) {
         return path.to_path_buf();
     }
@@ -154,7 +154,7 @@ pub fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
 }
 
 /// Convert an absolute path to be relative to the current working directory.
-pub fn relativize_path(path: &Path) -> Cow<str> {
+pub(crate) fn relativize_path(path: &Path) -> Cow<str> {
     if let Ok(path) = path.strip_prefix(path_dedot::CWD.deref()) {
         return path.to_string_lossy();
     }
@@ -162,7 +162,7 @@ pub fn relativize_path(path: &Path) -> Cow<str> {
 }
 
 /// Read a file's contents from disk.
-pub fn read_file(path: &Path) -> Result<String> {
+pub(crate) fn read_file(path: &Path) -> Result<String> {
     let file = File::open(path)?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = String::new();

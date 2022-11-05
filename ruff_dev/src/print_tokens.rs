@@ -1,10 +1,10 @@
 //! Print the token stream for a given Python file.
 
+use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Args;
-use ruff::fs;
 use rustpython_parser::lexer;
 
 #[derive(Args)]
@@ -15,7 +15,7 @@ pub struct Cli {
 }
 
 pub fn main(cli: &Cli) -> Result<()> {
-    let contents = fs::read_file(&cli.file)?;
+    let contents = fs::read_to_string(&cli.file)?;
     for (_, tok, _) in lexer::make_tokenizer(&contents).flatten() {
         println!("{:#?}", tok);
     }
