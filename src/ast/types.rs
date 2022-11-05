@@ -36,6 +36,7 @@ pub enum ScopeKind {
     Function(FunctionScope),
     Generator,
     Module,
+    Arg,
 }
 
 #[derive(Clone, Debug)]

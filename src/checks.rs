@@ -80,6 +80,7 @@ pub enum CheckCode {
     B002,
     B006,
     B007,
+    B008,
     B011,
     B013,
     B014,
@@ -297,6 +298,7 @@ pub enum CheckKind {
     UnaryPrefixIncrement,
     MutableArgumentDefault,
     UnusedLoopControlVariable(String),
+    FunctionCallArgumentDefault,
     DoNotAssertFalse,
     RedundantTupleInExceptionHandler(String),
     DuplicateHandlerException(Vec<String>),
@@ -484,6 +486,7 @@ impl CheckCode {
             CheckCode::B002 => CheckKind::UnaryPrefixIncrement,
             CheckCode::B006 => CheckKind::MutableArgumentDefault,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
+            CheckCode::B008 => CheckKind::FunctionCallArgumentDefault,
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
             CheckCode::B013 => {
                 CheckKind::RedundantTupleInExceptionHandler("ValueError".to_string())
@@ -680,6 +683,7 @@ impl CheckCode {
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
             CheckCode::B006 => CheckCategory::Flake8Bugbear,
             CheckCode::B007 => CheckCategory::Flake8Bugbear,
+            CheckCode::B008 => CheckCategory::Flake8Bugbear,
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
             CheckCode::B013 => CheckCategory::Flake8Bugbear,
             CheckCode::B014 => CheckCategory::Flake8Bugbear,
@@ -841,6 +845,7 @@ impl CheckKind {
             CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
             CheckKind::MutableArgumentDefault => &CheckCode::B006,
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
+            CheckKind::FunctionCallArgumentDefault => &CheckCode::B008,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
             CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
@@ -1113,6 +1118,9 @@ impl CheckKind {
                 "Loop control variable `{name}` not used within the loop body. If this is \
                  intended, start the name with an underscore."
             ),
+            CheckKind::FunctionCallArgumentDefault => {
+                "Do not perform function calls in argument defaults.".to_string()
+            }
             CheckKind::DoNotAssertFalse => "Do not `assert False` (`python -O` removes these \
                                             calls), raise `AssertionError()`"
                 .to_string(),
