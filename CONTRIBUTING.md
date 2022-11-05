@@ -11,7 +11,7 @@ your proposed change.
 
 ### Prerequisites
 
-ruff is written in Rust (1.63.0). You'll need to install the
+ruff is written in Rust. You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
 You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
