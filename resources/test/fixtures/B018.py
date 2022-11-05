@@ -53,3 +53,7 @@ def foo3():
     a = 2
     "str"
     3
+
+
+def foo4():
+    ...
