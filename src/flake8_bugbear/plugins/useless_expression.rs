@@ -4,6 +4,7 @@ use crate::ast::types::{CheckLocator, Range};
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+// B018
 pub fn useless_expression(checker: &mut Checker, body: &[Stmt]) {
     for stmt in body {
         if let StmtKind::Expr { value } = &stmt.node {
@@ -15,7 +16,7 @@ pub fn useless_expression(checker: &mut Checker, body: &[Stmt]) {
                     ));
                 }
                 ExprKind::Constant { value: val, .. } => match &val {
-                    Constant::Str { .. } => {}
+                    Constant::Str { .. } | Constant::Ellipsis => {}
                     _ => {
                         checker.add_check(Check::new(
                             CheckKind::UselessExpression,
