@@ -469,6 +469,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError:` instead of `except (ValueError,):`. |  |
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
 | B015 | UselessComparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
+| B016 | CannotRaiseLiteral | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |

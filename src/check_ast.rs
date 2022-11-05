@@ -733,6 +733,11 @@ where
                         pyflakes::plugins::raise_not_implemented(self, expr);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::B016) {
+                    if let Some(exc) = exc {
+                        flake8_bugbear::plugins::cannot_raise_literal(self, exc);
+                    }
+                }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
