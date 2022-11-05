@@ -1,6 +1,7 @@
 pub use assert_false::assert_false;
 pub use assert_raises_exception::assert_raises_exception;
 pub use duplicate_exceptions::{duplicate_exceptions, duplicate_handler_exceptions};
+pub use function_call_argument_default::function_call_argument_default;
 pub use mutable_argument_default::mutable_argument_default;
 pub use redundant_tuple_in_exception_handler::redundant_tuple_in_exception_handler;
 pub use unary_prefix_increment::unary_prefix_increment;
@@ -11,6 +12,7 @@ pub use useless_expression::useless_expression;
 mod assert_false;
 mod assert_raises_exception;
 mod duplicate_exceptions;
+mod function_call_argument_default;
 mod mutable_argument_default;
 mod redundant_tuple_in_exception_handler;
 mod unary_prefix_increment;

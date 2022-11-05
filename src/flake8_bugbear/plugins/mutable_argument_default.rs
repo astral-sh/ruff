@@ -1,8 +1,36 @@
-use rustpython_ast::{Arguments, ExprKind};
+use rustpython_ast::{Arguments, Expr, ExprKind};
 
 use crate::ast::types::{CheckLocator, Range};
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
+
+pub fn is_mutable_func(expr: &Expr) -> bool {
+    match &expr.node {
+        ExprKind::Name { id, .. }
+            if id == "dict"
+                || id == "list"
+                || id == "set"
+                || id == "Counter"
+                || id == "OrderedDict"
+                || id == "defaultdict"
+                || id == "deque" =>
+        {
+            true
+        }
+        ExprKind::Attribute { value, attr, .. }
+            if (attr == "Counter"
+                || attr == "OrderedDict"
+                || attr == "defaultdict"
+                || attr == "deque") =>
+        {
+            match &value.node {
+                ExprKind::Name { id, .. } if id == "collections" => true,
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
 
 /// B006
 pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
@@ -23,39 +51,14 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
                     checker.locate_check(Range::from_located(expr)),
                 ));
             }
-            ExprKind::Call { func, .. } => match &func.node {
-                ExprKind::Name { id, .. }
-                    if id == "dict"
-                        || id == "list"
-                        || id == "set"
-                        || id == "Counter"
-                        || id == "OrderedDict"
-                        || id == "defaultdict"
-                        || id == "deque" =>
-                {
+            ExprKind::Call { func, .. } => {
+                if is_mutable_func(func) {
                     checker.add_check(Check::new(
                         CheckKind::MutableArgumentDefault,
                         checker.locate_check(Range::from_located(expr)),
                     ));
                 }
-                ExprKind::Attribute { value, attr, .. }
-                    if (attr == "Counter"
-                        || attr == "OrderedDict"
-                        || attr == "defaultdict"
-                        || attr == "deque") =>
-                {
-                    match &value.node {
-                        ExprKind::Name { id, .. } if id == "collections" => {
-                            checker.add_check(Check::new(
-                                CheckKind::MutableArgumentDefault,
-                                checker.locate_check(Range::from_located(expr)),
-                            ));
-                        }
-                        _ => {}
-                    }
-                }
-                _ => {}
-            },
+            }
             _ => {}
         }
     }
