@@ -809,6 +809,11 @@ where
                 }
             }
             StmtKind::Delete { .. } => {}
+            StmtKind::Expr { value, .. } => {
+                if self.settings.enabled.contains(&CheckCode::B015) {
+                    flake8_bugbear::plugins::useless_comparison(self, value)
+                }
+            }
             _ => {}
         }
 
@@ -1333,12 +1338,6 @@ where
                         comparators,
                         self.locate_check(Range::from_located(expr)),
                     ));
-                }
-
-                if self.settings.enabled.contains(&CheckCode::B015) {
-                    if let Some(parent) = self.parents.last() {
-                        flake8_bugbear::plugins::useless_comparison(self, left, parent);
-                    }
                 }
             }
             ExprKind::Constant {
