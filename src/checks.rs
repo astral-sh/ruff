@@ -1131,10 +1131,9 @@ impl CheckKind {
                                              but waste CPU instructions. Either prepend `assert` \
                                              or remove it."
                 .to_string(),
-            CheckKind::CannotRaiseLiteral => {
-                "Cannot raise a literal. Did you intend to return it or raise an Exception?"
-                    .to_string()
-            }
+            CheckKind::CannotRaiseLiteral => "Cannot raise a literal. Did you intend to return it \
+                                              or raise an Exception?"
+                .to_string(),
             CheckKind::DuplicateHandlerException(names) => {
                 if names.len() == 1 {
                     let name = &names[0];
