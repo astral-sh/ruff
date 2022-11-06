@@ -11,7 +11,7 @@ use itertools::Itertools;
 use ruff::checks::CheckCode;
 use strum::IntoEnumIterator;
 
-const FILE: &str = "../src/checks_gen.rs";
+const FILE: &str = "src/checks_gen.rs";
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
