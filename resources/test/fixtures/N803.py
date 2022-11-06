@@ -1,7 +1,7 @@
-def func(a, A):
-    return a, A
+def func(_, a, A):
+    return _, a, A
 
 
 class Class:
-    def method(self, a, A):
-        return a, A
+    def method(self, _, a, A):
+        return _, a, A

@@ -1717,7 +1717,7 @@ where
 
         if self.settings.enabled.contains(&CheckCode::N803) {
             if let Some(check) =
-                pep8_naming::checks::invalid_argument_name(Range::from_located(arg), &arg.node.arg)
+                pep8_naming::checks::invalid_argument_name(&arg.node.arg, Range::from_located(arg))
             {
                 self.checks.push(check);
             }

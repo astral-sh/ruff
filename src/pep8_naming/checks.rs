@@ -25,7 +25,7 @@ pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
 
 /// N802
 pub fn invalid_function_name(func_def: &Stmt, name: &str, settings: &Settings) -> Option<Check> {
-    if !is_lower(name)
+    if name.to_lowercase() != name
         && !settings
             .ignore_names
             .iter()
@@ -40,8 +40,8 @@ pub fn invalid_function_name(func_def: &Stmt, name: &str, settings: &Settings) -
 }
 
 /// N803
-pub fn invalid_argument_name(location: Range, name: &str) -> Option<Check> {
-    if !is_lower(name) {
+pub fn invalid_argument_name(name: &str, location: Range) -> Option<Check> {
+    if name.to_lowercase() != name {
         return Some(Check::new(
             CheckKind::InvalidArgumentName(name.to_string()),
             location,
@@ -164,7 +164,7 @@ pub fn lowercase_imported_as_non_lowercase(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if is_lower(name) && asname.to_lowercase() != asname {
+    if !is_upper(name) && is_lower(name) && asname.to_lowercase() != asname {
         return Some(Check::new(
             CheckKind::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -194,7 +194,7 @@ pub fn camelcase_imported_as_constant(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if is_camelcase(name) && is_upper(asname) && !is_acronym(name, asname) {
+    if is_camelcase(name) && !is_lower(asname) && is_upper(asname) && !is_acronym(name, asname) {
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -241,7 +241,7 @@ pub fn camelcase_imported_as_acronym(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if is_camelcase(name) && is_upper(asname) && is_acronym(name, asname) {
+    if is_camelcase(name) && !is_lower(asname) && is_upper(asname) && is_acronym(name, asname) {
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -290,7 +290,7 @@ fn is_upper(s: &str) -> bool {
     for c in s.chars() {
         if c.is_lowercase() {
             return false;
-        } else if (!cased) && c.is_uppercase() {
+        } else if !cased && c.is_uppercase() {
             cased = true;
         }
     }
