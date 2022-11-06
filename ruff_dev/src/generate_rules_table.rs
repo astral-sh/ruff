@@ -3,13 +3,13 @@
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Args;
 use ruff::checks::{CheckCategory, CheckCode};
 use strum::IntoEnumIterator;
 
-const FILE: &str = "../README.md";
 const BEGIN_PRAGMA: &str = "<!-- Begin auto-generated sections. -->";
 const END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 
@@ -64,7 +64,11 @@ pub fn main(cli: &Cli) -> Result<()> {
         print!("{}", output);
     } else {
         // Read the existing file.
-        let existing = fs::read_to_string(FILE)?;
+        let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("Failed to find root directory")
+            .join("README.md");
+        let existing = fs::read_to_string(&file)?;
 
         // Extract the prefix.
         let index = existing
@@ -79,7 +83,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         let suffix = &existing[index..];
 
         // Write the prefix, new contents, and suffix.
-        let mut f = OpenOptions::new().write(true).truncate(true).open(FILE)?;
+        let mut f = OpenOptions::new().write(true).truncate(true).open(&file)?;
         write!(f, "{}\n\n", prefix)?;
         write!(f, "{}", output)?;
         write!(f, "{}", suffix)?;
