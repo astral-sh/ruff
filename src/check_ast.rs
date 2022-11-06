@@ -15,8 +15,8 @@ use crate::ast::helpers::{extract_handler_names, match_name_or_attr_from_module}
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, CheckLocator, FunctionScope, ImportKind, Range, Scope,
-    ScopeKind,
+    Binding, BindingContext, BindingKind, CheckLocator, ClassScope, FunctionScope, ImportKind,
+    Range, Scope, ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
@@ -66,7 +66,7 @@ pub struct Checker<'a> {
     // at various points in time.
     pub(crate) parents: Vec<&'a Stmt>,
     pub(crate) parent_stack: Vec<usize>,
-    scopes: Vec<Scope>,
+    scopes: Vec<Scope<'a>>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
     deferred_string_annotations: Vec<(Range, &'a str)>,
@@ -274,6 +274,7 @@ where
                     if let Some(check) =
                         pep8_naming::checks::invalid_first_argument_name_for_class_method(
                             self.current_scope(),
+                            name,
                             decorator_list,
                             args,
                             &self.settings.pep8_naming,
@@ -286,6 +287,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::N805) {
                     if let Some(check) = pep8_naming::checks::invalid_first_argument_name_for_method(
                         self.current_scope(),
+                        name,
                         decorator_list,
                         args,
                         &self.settings.pep8_naming,
@@ -296,7 +298,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::N807) {
                     if let Some(check) =
-                        pep8_naming::checks::dunder_function_name(stmt, self.current_scope(), name)
+                        pep8_naming::checks::dunder_function_name(self.current_scope(), stmt, name)
                     {
                         self.checks.push(check);
                     }
@@ -360,7 +362,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::F706) {
                     if let Some(scope_index) = self.scope_stack.last().cloned() {
                         match self.scopes[scope_index].kind {
-                            ScopeKind::Class | ScopeKind::Module => {
+                            ScopeKind::Class(_) | ScopeKind::Module => {
                                 self.checks.push(Check::new(
                                     CheckKind::ReturnOutsideFunction,
                                     self.locate_check(Range::from_located(stmt)),
@@ -377,7 +379,6 @@ where
                 keywords,
                 decorator_list,
                 body,
-                ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::U004) {
                     pyupgrade::plugins::useless_object_inheritance(
@@ -427,7 +428,12 @@ where
                 for expr in decorator_list {
                     self.visit_expr(expr)
                 }
-                self.push_scope(Scope::new(ScopeKind::Class))
+                self.push_scope(Scope::new(ScopeKind::Class(ClassScope {
+                    name,
+                    bases,
+                    keywords,
+                    decorator_list,
+                })))
             }
             StmtKind::Import { names } => {
                 if self.settings.enabled.contains(&CheckCode::E402) {
@@ -1256,7 +1262,7 @@ where
             ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. } => {
                 let scope = self.current_scope();
                 if self.settings.enabled.contains(&CheckCode::F704) {
-                    if matches!(scope.kind, ScopeKind::Class | ScopeKind::Module) {
+                    if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.checks.push(Check::new(
                             CheckKind::YieldOutsideFunction,
                             self.locate_check(Range::from_located(expr)),
@@ -1791,7 +1797,7 @@ impl<'a> Checker<'a> {
             .expect("Attempted to pop without scope.");
     }
 
-    fn push_scope(&mut self, scope: Scope) {
+    fn push_scope(&mut self, scope: Scope<'a>) {
         self.scope_stack.push(self.scopes.len());
         self.scopes.push(scope);
     }
@@ -1896,7 +1902,7 @@ impl<'a> Checker<'a> {
             let mut import_starred = false;
             for scope_index in self.scope_stack.iter().rev() {
                 let scope = &mut self.scopes[*scope_index];
-                if matches!(scope.kind, ScopeKind::Class) {
+                if matches!(scope.kind, ScopeKind::Class(_)) {
                     if id == "__class__" {
                         return;
                     } else if !first_iter && !in_generator {
@@ -2433,7 +2439,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_shadowing(&mut self, name: &str, location: Range, is_attribute: bool) {
-        if is_attribute && matches!(self.current_scope().kind, ScopeKind::Class) {
+        if is_attribute && matches!(self.current_scope().kind, ScopeKind::Class(_)) {
             if self.settings.enabled.contains(&CheckCode::A003) {
                 if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,

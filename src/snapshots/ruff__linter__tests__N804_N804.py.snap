@@ -4,10 +4,18 @@ expression: checks
 ---
 - kind: InvalidFirstArgumentNameForClassMethod
   location:
-    row: 3
-    column: 25
+    row: 30
+    column: 26
   end_location:
-    row: 3
-    column: 29
+    row: 30
+    column: 30
+  fix: ~
+- kind: InvalidFirstArgumentNameForClassMethod
+  location:
+    row: 35
+    column: 19
+  end_location:
+    row: 35
+    column: 23
   fix: ~
 
