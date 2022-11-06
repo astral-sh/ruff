@@ -70,12 +70,10 @@ pub fn check_lines(
                     },
                 );
                 if autofix.patch() {
-                    if autofix.patch() {
-                        check.amend(Fix::deletion(
-                            Location::new(lineno + 1, 0),
-                            Location::new(lineno + 1, line_length + 1),
-                        ));
-                    }
+                    check.amend(Fix::deletion(
+                        Location::new(lineno + 1, 0),
+                        Location::new(lineno + 1, line_length + 1),
+                    ));
                 }
                 line_checks.push(check);
             }
