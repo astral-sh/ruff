@@ -124,6 +124,7 @@ pub enum CheckCode {
     U006,
     U007,
     U008,
+    U009,
     // pydocstyle
     D100,
     D101,
@@ -365,6 +366,7 @@ pub enum CheckKind {
     UsePEP585Annotation(String),
     UsePEP604Annotation,
     SuperCallWithParameters,
+    PEP3120UnnecessaryCodingComment,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -438,7 +440,9 @@ impl CheckCode {
     /// physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            CheckCode::E501 | CheckCode::W292 | CheckCode::M001 => &LintSource::Lines,
+            CheckCode::E501 | CheckCode::W292 | CheckCode::M001 | CheckCode::U009 => {
+                &LintSource::Lines
+            }
             CheckCode::Q000
             | CheckCode::Q001
             | CheckCode::Q002
@@ -573,6 +577,7 @@ impl CheckCode {
             CheckCode::U006 => CheckKind::UsePEP585Annotation("List".to_string()),
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
+            CheckCode::U009 => CheckKind::PEP3120UnnecessaryCodingComment,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -750,6 +755,7 @@ impl CheckCode {
             CheckCode::U006 => CheckCategory::Pyupgrade,
             CheckCode::U007 => CheckCategory::Pyupgrade,
             CheckCode::U008 => CheckCategory::Pyupgrade,
+            CheckCode::U009 => CheckCategory::Pyupgrade,
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -918,6 +924,7 @@ impl CheckKind {
             CheckKind::UsePEP604Annotation => &CheckCode::U007,
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             CheckKind::SuperCallWithParameters => &CheckCode::U008,
+            CheckKind::PEP3120UnnecessaryCodingComment => &CheckCode::U009,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -1478,6 +1485,9 @@ impl CheckKind {
             CheckKind::ErrorSuffixOnExceptionName(name) => {
                 format!("Exception name `{name}` should be named with an Error suffix")
             }
+            CheckKind::PEP3120UnnecessaryCodingComment => {
+                "utf-8 encoding declaration is unnecessary".to_string()
+            }
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(
@@ -1583,6 +1593,7 @@ impl CheckKind {
                 | CheckKind::UsePEP604Annotation
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(_)
+                | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::IsLiteral
         )
     }

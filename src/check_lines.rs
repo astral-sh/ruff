@@ -2,6 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use once_cell::sync::Lazy;
+use regex::Regex;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
@@ -10,6 +12,10 @@ use crate::checks::{Check, CheckCode, CheckKind};
 use crate::noqa;
 use crate::noqa::Directive;
 use crate::settings::Settings;
+
+// Regex from PEP263
+static CODING_COMMENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").expect("Invalid regex"));
 
 /// Whether the given line is too long and should be reported.
 fn should_enforce_line_length(line: &str, length: usize, limit: usize) -> bool {
@@ -51,6 +57,27 @@ pub fn check_lines(
             .get(lineno)
             .map(|lineno| lineno - 1)
             .unwrap_or(lineno);
+
+        if lineno < 2 {
+            // PEP3120 makes utf-8 the default encoding.
+            if CODING_COMMENT_REGEX.is_match(line) {
+                let line_length = line.len();
+                let mut check = Check::new(
+                    CheckKind::PEP3120UnnecessaryCodingComment,
+                    Range {
+                        location: Location::new(lineno + 1, 0),
+                        end_location: Location::new(lineno + 1, line_length + 1),
+                    },
+                );
+                if autofix.patch() {
+                    check.amend(Fix::deletion(
+                        Location::new(lineno + 1, 0),
+                        Location::new(lineno + 1, line_length + 1),
+                    ));
+                }
+                line_checks.push(check);
+            }
+        }
 
         if enforce_noqa {
             noqa_directives

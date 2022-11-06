@@ -426,6 +426,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
+| U009 | PEP3120UnnecessaryCodingComment | utf-8 encoding declaration is unnecessary | 🛠 |
 
 ### pep8-naming
 
@@ -606,7 +607,7 @@ including:
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (15/32)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (10/34)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (11/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
 Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
@@ -630,7 +631,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (15/32)
 
 Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
-and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (10/34).
+and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (11/34).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 
