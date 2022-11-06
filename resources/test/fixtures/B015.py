@@ -22,3 +22,6 @@ data = [x for x in [1, 2, 3] if x in (1, 2)]
 
 class TestClass:
     1 == 1
+
+
+print(1 == 1)
