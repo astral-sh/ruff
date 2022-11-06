@@ -4,7 +4,7 @@ use anyhow::Result;
 use ruff::flake8_quotes::settings::Quote;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
-use ruff::{flake8_quotes, pep8_naming};
+use ruff::{flake8_annotations, flake8_quotes, pep8_naming};
 
 use crate::plugin::Plugin;
 use crate::{parser, plugin};
@@ -39,6 +39,7 @@ pub fn convert(
 
     // Parse each supported option.
     let mut options: Options = Default::default();
+    let mut flake8_annotations: flake8_annotations::settings::Options = Default::default();
     let mut flake8_quotes: flake8_quotes::settings::Options = Default::default();
     let mut pep8_naming: pep8_naming::settings::Options = Default::default();
     for (key, value) in flake8 {
@@ -78,6 +79,25 @@ pub fn convert(
                         Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                     }
                 }
+                // flake8-annotations
+                "suppress-none-returning" | "suppress_none_returning" => {
+                    match parser::parse_bool(value.as_ref()) {
+                        Ok(bool) => flake8_annotations.suppress_none_returning = Some(bool),
+                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    }
+                }
+                "suppress-dummy-args" | "suppress_dummy_args" => {
+                    match parser::parse_bool(value.as_ref()) {
+                        Ok(bool) => flake8_annotations.suppress_dummy_args = Some(bool),
+                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    }
+                }
+                "mypy-init-return" | "mypy_init_return" => {
+                    match parser::parse_bool(value.as_ref()) {
+                        Ok(bool) => flake8_annotations.mypy_init_return = Some(bool),
+                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    }
+                }
                 // flake8-quotes
                 "quotes" | "inline-quotes" | "inline_quotes" => match value.trim() {
                     "'" | "single" => flake8_quotes.inline_quotes = Some(Quote::Single),
@@ -94,10 +114,9 @@ pub fn convert(
                     "\"" | "double" => flake8_quotes.docstring_quotes = Some(Quote::Single),
                     _ => eprintln!("Unexpected '{key}' value: {value}"),
                 },
-                "avoid-escape" | "avoid_escape" => match value.trim() {
-                    "true" => flake8_quotes.avoid_escape = Some(true),
-                    "false" => flake8_quotes.avoid_escape = Some(false),
-                    _ => eprintln!("Unexpected '{key}' value: {value}"),
+                "avoid-escape" | "avoid_escape" => match parser::parse_bool(value.as_ref()) {
+                    Ok(bool) => flake8_quotes.avoid_escape = Some(bool),
+                    Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                 },
                 // pep8-naming
                 "ignore-names" | "ignore_names" => {
@@ -166,6 +185,7 @@ mod tests {
             per_file_ignores: None,
             dummy_variable_rgx: None,
             target_version: None,
+            flake8_annotations: None,
             flake8_quotes: None,
             pep8_naming: None,
         });
@@ -195,6 +215,7 @@ mod tests {
             per_file_ignores: None,
             dummy_variable_rgx: None,
             target_version: None,
+            flake8_annotations: None,
             flake8_quotes: None,
             pep8_naming: None,
         });
@@ -224,6 +245,7 @@ mod tests {
             per_file_ignores: None,
             dummy_variable_rgx: None,
             target_version: None,
+            flake8_annotations: None,
             flake8_quotes: None,
             pep8_naming: None,
         });
@@ -253,6 +275,7 @@ mod tests {
             per_file_ignores: None,
             dummy_variable_rgx: None,
             target_version: None,
+            flake8_annotations: None,
             flake8_quotes: None,
             pep8_naming: None,
         });
@@ -282,6 +305,7 @@ mod tests {
             per_file_ignores: None,
             dummy_variable_rgx: None,
             target_version: None,
+            flake8_annotations: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
@@ -354,6 +378,7 @@ mod tests {
             per_file_ignores: None,
             dummy_variable_rgx: None,
             target_version: None,
+            flake8_annotations: None,
             flake8_quotes: None,
             pep8_naming: None,
         });
@@ -384,6 +409,7 @@ mod tests {
             per_file_ignores: None,
             dummy_variable_rgx: None,
             target_version: None,
+            flake8_annotations: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,

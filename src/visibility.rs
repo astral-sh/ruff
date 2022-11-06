@@ -28,13 +28,24 @@ pub struct VisibleScope {
 }
 
 /// Returns `true` if a function is a "static method".
-pub fn is_static(stmt: &Stmt) -> bool {
+pub fn is_staticmethod(stmt: &Stmt) -> bool {
     match &stmt.node {
         StmtKind::FunctionDef { decorator_list, .. }
         | StmtKind::AsyncFunctionDef { decorator_list, .. } => decorator_list
             .iter()
             .any(|expr| match_name_or_attr(expr, "staticmethod")),
-        _ => panic!("Found non-FunctionDef in is_overload"),
+        _ => panic!("Found non-FunctionDef in is_staticmethod"),
+    }
+}
+
+/// Returns `true` if a function is a "class method".
+pub fn is_classmethod(stmt: &Stmt) -> bool {
+    match &stmt.node {
+        StmtKind::FunctionDef { decorator_list, .. }
+        | StmtKind::AsyncFunctionDef { decorator_list, .. } => decorator_list
+            .iter()
+            .any(|expr| match_name_or_attr(expr, "classmethod")),
+        _ => panic!("Found non-FunctionDef in is_classmethod"),
     }
 }
 

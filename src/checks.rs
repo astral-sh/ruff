@@ -115,6 +115,17 @@ pub enum CheckCode {
     Q001,
     Q002,
     Q003,
+    // flake8-annotations
+    ANN001,
+    ANN002,
+    ANN003,
+    ANN101,
+    ANN102,
+    ANN201,
+    ANN202,
+    ANN204,
+    ANN205,
+    ANN206,
     // pyupgrade
     U001,
     U002,
@@ -205,6 +216,7 @@ pub enum CheckCategory {
     Flake8Builtins,
     Flake8Print,
     Flake8Quotes,
+    Flake8Annotations,
     Ruff,
     Meta,
 }
@@ -219,6 +231,7 @@ impl CheckCategory {
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
+            CheckCategory::Flake8Annotations => "flake8-annotations",
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Pydocstyle => "pydocstyle",
             CheckCategory::PEP8Naming => "pep8-naming",
@@ -242,6 +255,9 @@ impl CheckCategory {
             }
             CheckCategory::Flake8Print => Some("https://pypi.org/project/flake8-print/5.0.0/"),
             CheckCategory::Flake8Quotes => Some("https://pypi.org/project/flake8-quotes/3.3.1/"),
+            CheckCategory::Flake8Annotations => {
+                Some("https://pypi.org/project/flake8-annotations/2.9.1/")
+            }
             CheckCategory::Pyupgrade => Some("https://pypi.org/project/pyupgrade/3.2.0/"),
             CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
             CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
@@ -357,6 +373,17 @@ pub enum CheckKind {
     BadQuotesMultilineString(Quote),
     BadQuotesDocstring(Quote),
     AvoidQuoteEscape,
+    // flake8-annotations
+    MissingTypeFunctionArgument,
+    MissingTypeArgs,
+    MissingTypeKwargs,
+    MissingTypeSelf,
+    MissingTypeCls,
+    MissingReturnTypePublicFunction,
+    MissingReturnTypePrivateFunction,
+    MissingReturnTypeMagicMethod,
+    MissingReturnTypeStaticMethod,
+    MissingReturnTypeClassMethod,
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UnnecessaryAbspath,
@@ -565,6 +592,17 @@ impl CheckCode {
             CheckCode::Q001 => CheckKind::BadQuotesMultilineString(Quote::Double),
             CheckCode::Q002 => CheckKind::BadQuotesDocstring(Quote::Double),
             CheckCode::Q003 => CheckKind::AvoidQuoteEscape,
+            // flake8-annotations
+            CheckCode::ANN001 => CheckKind::MissingTypeFunctionArgument,
+            CheckCode::ANN002 => CheckKind::MissingTypeArgs,
+            CheckCode::ANN003 => CheckKind::MissingTypeKwargs,
+            CheckCode::ANN101 => CheckKind::MissingTypeSelf,
+            CheckCode::ANN102 => CheckKind::MissingTypeCls,
+            CheckCode::ANN201 => CheckKind::MissingReturnTypePublicFunction,
+            CheckCode::ANN202 => CheckKind::MissingReturnTypePrivateFunction,
+            CheckCode::ANN204 => CheckKind::MissingReturnTypeMagicMethod,
+            CheckCode::ANN205 => CheckKind::MissingReturnTypeStaticMethod,
+            CheckCode::ANN206 => CheckKind::MissingReturnTypeClassMethod,
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
@@ -747,6 +785,16 @@ impl CheckCode {
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
             CheckCode::Q002 => CheckCategory::Flake8Quotes,
             CheckCode::Q003 => CheckCategory::Flake8Quotes,
+            CheckCode::ANN001 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN002 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN003 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN101 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN102 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN201 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN202 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN204 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN205 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN206 => CheckCategory::Flake8Annotations,
             CheckCode::U001 => CheckCategory::Pyupgrade,
             CheckCode::U002 => CheckCategory::Pyupgrade,
             CheckCode::U003 => CheckCategory::Pyupgrade,
@@ -915,6 +963,17 @@ impl CheckKind {
             CheckKind::BadQuotesMultilineString(_) => &CheckCode::Q001,
             CheckKind::BadQuotesDocstring(_) => &CheckCode::Q002,
             CheckKind::AvoidQuoteEscape => &CheckCode::Q003,
+            // flake8-annotations
+            CheckKind::MissingTypeFunctionArgument => &CheckCode::ANN001,
+            CheckKind::MissingTypeArgs => &CheckCode::ANN002,
+            CheckKind::MissingTypeKwargs => &CheckCode::ANN003,
+            CheckKind::MissingTypeSelf => &CheckCode::ANN101,
+            CheckKind::MissingTypeCls => &CheckCode::ANN102,
+            CheckKind::MissingReturnTypePublicFunction => &CheckCode::ANN201,
+            CheckKind::MissingReturnTypePrivateFunction => &CheckCode::ANN202,
+            CheckKind::MissingReturnTypeMagicMethod => &CheckCode::ANN204,
+            CheckKind::MissingReturnTypeStaticMethod => &CheckCode::ANN205,
+            CheckKind::MissingReturnTypeClassMethod => &CheckCode::ANN206,
             // pyupgrade
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
@@ -1299,6 +1358,33 @@ impl CheckKind {
             },
             CheckKind::AvoidQuoteEscape => {
                 "Change outer quotes to avoid escaping inner quotes".to_string()
+            }
+            // flake8-annotations
+            CheckKind::MissingTypeFunctionArgument => {
+                "Missing type annotation for function argument".to_string()
+            }
+            CheckKind::MissingTypeArgs => "Missing type annotation for `*args`".to_string(),
+            CheckKind::MissingTypeKwargs => "Missing type annotation for `**kwargs`".to_string(),
+            CheckKind::MissingTypeSelf => {
+                "Missing type annotation for `self` in method".to_string()
+            }
+            CheckKind::MissingTypeCls => {
+                "Missing type annotation for `cls` in classmethod".to_string()
+            }
+            CheckKind::MissingReturnTypePublicFunction => {
+                "Missing return type annotation for public function".to_string()
+            }
+            CheckKind::MissingReturnTypePrivateFunction => {
+                "Missing return type annotation for private function".to_string()
+            }
+            CheckKind::MissingReturnTypeMagicMethod => {
+                "Missing return type annotation for magic method".to_string()
+            }
+            CheckKind::MissingReturnTypeStaticMethod => {
+                "Missing return type annotation for staticmethod".to_string()
+            }
+            CheckKind::MissingReturnTypeClassMethod => {
+                "Missing return type annotation for classmethod".to_string()
             }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {

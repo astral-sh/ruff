@@ -1,0 +1,50 @@
+---
+source: src/flake8_quotes/mod.rs
+expression: checks
+---
+- kind:
+    BadQuotesMultilineString: single
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 7
+    column: 3
+  fix: ~
+- kind:
+    BadQuotesMultilineString: single
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 18
+    column: 7
+  fix: ~
+- kind:
+    BadQuotesMultilineString: single
+  location:
+    row: 21
+    column: 20
+  end_location:
+    row: 22
+    column: 37
+  fix: ~
+- kind:
+    BadQuotesMultilineString: single
+  location:
+    row: 30
+    column: 8
+  end_location:
+    row: 32
+    column: 11
+  fix: ~
+- kind:
+    BadQuotesMultilineString: single
+  location:
+    row: 35
+    column: 12
+  end_location:
+    row: 37
+    column: 15
+  fix: ~
+

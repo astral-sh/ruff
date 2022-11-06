@@ -1,0 +1,29 @@
+---
+source: src/flake8_annotations/mod.rs
+expression: checks
+---
+- kind: MissingReturnTypeMagicMethod
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 10
+    column: 0
+  fix: ~
+- kind: MissingReturnTypeMagicMethod
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 16
+    column: 0
+  fix: ~
+- kind: MissingReturnTypePrivateFunction
+  location:
+    row: 40
+    column: 0
+  end_location:
+    row: 42
+    column: 0
+  fix: ~
+

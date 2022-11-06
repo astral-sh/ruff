@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::types::PythonVersion;
-use crate::{flake8_quotes, pep8_naming};
+use crate::{flake8_annotations, flake8_quotes, pep8_naming};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -22,6 +22,7 @@ pub struct Options {
     pub dummy_variable_rgx: Option<String>,
     pub target_version: Option<PythonVersion>,
     // Plugins
+    pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
 }

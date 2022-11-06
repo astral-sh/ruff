@@ -37,6 +37,15 @@ pub fn parse_strings(value: &str) -> Vec<String> {
         .collect()
 }
 
+/// Parse a boolean.
+pub fn parse_bool(value: &str) -> Result<bool> {
+    match value.trim() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(anyhow::anyhow!("Unexpected boolean value: {value}")),
+    }
+}
+
 #[derive(Debug)]
 struct Token {
     token_name: TokenType,
