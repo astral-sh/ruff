@@ -58,8 +58,9 @@ pattern implemented therein.
 
 To trigger the rule, you'll likely want to augment the logic in `src/check_ast.rs`, which defines
 the Python AST visitor, responsible for iterating over the abstract syntax tree and collecting
-lint-rule violations as it goes. Grep for the `Check::new` invocations to understand how other,
-similar rules are implemented.
+lint-rule violations as it goes. If you need to inspect the AST, you can run `cargo dev print-ast`
+with a python file. Grep for the `Check::new` invocations to understand how other, similar rules
+are implemented.
 
 To add a test fixture, create a file under `resources/test/fixtures`, named to match the `CheckCode`
 you defined earlier (e.g., `E402.py`). This file should contain a variety of violations and
