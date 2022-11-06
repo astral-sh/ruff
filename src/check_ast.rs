@@ -23,6 +23,7 @@ use crate::ast::{helpers, operations, visitor};
 use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
+use crate::import_tracking::{normalize, ImportTracker};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
@@ -77,6 +78,7 @@ pub struct Checker<'a> {
     deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_assignments: Vec<usize>,
+    import_tracker: ImportTracker<'a>,
     // Internal, derivative state.
     visible_scope: VisibleScope,
     in_f_string: Option<Range>,
@@ -115,6 +117,8 @@ impl<'a> Checker<'a> {
             deferred_functions: Default::default(),
             deferred_lambdas: Default::default(),
             deferred_assignments: Default::default(),
+            import_tracker: ImportTracker::new(),
+            // Internal, derivative state.
             visible_scope: VisibleScope {
                 modifier: Modifier::Module,
                 visibility: module_visibility(path),
@@ -208,6 +212,9 @@ where
                 }
             }
         }
+
+        // Track all import blocks (to power import sorting).
+        self.import_tracker.visit_stmt(stmt);
 
         // Pre-visit.
         match &stmt.node {
@@ -2590,6 +2597,12 @@ pub fn check_ast(
 
     // Check docstrings.
     checker.check_definitions();
+
+    for block in checker.import_tracker.blocks {
+        if !block.is_empty() {
+            println!("{:?}", normalize(block));
+        }
+    }
 
     checker.checks
 }
