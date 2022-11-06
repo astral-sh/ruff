@@ -1,17 +1,15 @@
 use log::error;
 use rustpython_ast::{Expr, Stmt};
 
-use crate::ast::types::{CheckLocator, Range};
+use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::check_ast::Checker;
 use crate::pyupgrade::checks;
 
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
-    if let Some(mut check) = checks::useless_metaclass_type(
-        targets,
-        value,
-        checker.locate_check(Range::from_located(stmt)),
-    ) {
+    if let Some(mut check) =
+        checks::useless_metaclass_type(targets, value, Range::from_located(stmt))
+    {
         if checker.patch() {
             let context = checker.binding_context();
             let deleted: Vec<&Stmt> = checker

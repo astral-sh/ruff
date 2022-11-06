@@ -4,7 +4,7 @@ use itertools::Itertools;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Stmt};
 
 use crate::ast::helpers;
-use crate::ast::types::{CheckLocator, Range};
+use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
@@ -47,7 +47,7 @@ pub fn duplicate_handler_exceptions(
                 CheckKind::DuplicateHandlerException(
                     duplicates.into_iter().sorted().collect::<Vec<String>>(),
                 ),
-                checker.locate_check(Range::from_located(expr)),
+                Range::from_located(expr),
             );
             if checker.patch() {
                 // TODO(charlie): If we have a single element, remove the tuple.
@@ -106,7 +106,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Exce
         for duplicate in duplicates.into_iter().sorted() {
             checker.add_check(Check::new(
                 CheckKind::DuplicateTryBlockException(duplicate),
-                checker.locate_check(Range::from_located(stmt)),
+                Range::from_located(stmt),
             ));
         }
     }

@@ -1,6 +1,6 @@
 use rustpython_ast::{Arguments, Expr, ExprKind};
 
-use crate::ast::types::{CheckLocator, Range};
+use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
@@ -45,14 +45,14 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
             | ExprKind::SetComp { .. } => {
                 checker.add_check(Check::new(
                     CheckKind::MutableArgumentDefault,
-                    checker.locate_check(Range::from_located(expr)),
+                    Range::from_located(expr),
                 ));
             }
             ExprKind::Call { func, .. } => {
                 if is_mutable_func(func) {
                     checker.add_check(Check::new(
                         CheckKind::MutableArgumentDefault,
-                        checker.locate_check(Range::from_located(expr)),
+                        Range::from_located(expr),
                     ));
                 }
             }

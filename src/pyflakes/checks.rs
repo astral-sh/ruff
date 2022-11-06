@@ -5,7 +5,7 @@ use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
-use crate::ast::types::{BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind};
+use crate::ast::types::{BindingKind, FunctionScope, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 
 /// F631
@@ -28,12 +28,30 @@ pub fn if_tuple(test: &Expr, location: Range) -> Option<Check> {
     None
 }
 
+/// F821
+pub fn undefined_local(scopes: &[&Scope], name: &str) -> Option<Check> {
+    let current = &scopes.last().expect("No current scope found.");
+    if matches!(current.kind, ScopeKind::Function(_)) && !current.values.contains_key(name) {
+        for scope in scopes.iter().rev().skip(1) {
+            if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
+                if let Some(binding) = scope.values.get(name) {
+                    if let Some((scope_id, location)) = binding.used {
+                        if scope_id == current.id {
+                            return Some(Check::new(
+                                CheckKind::UndefinedLocal(name.to_string()),
+                                location,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 /// F841
-pub fn unused_variables(
-    scope: &Scope,
-    locator: &dyn CheckLocator,
-    dummy_variable_rgx: &Regex,
-) -> Vec<Check> {
+pub fn unused_variables(scope: &Scope, dummy_variable_rgx: &Regex) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
     if matches!(
@@ -53,7 +71,7 @@ pub fn unused_variables(
         {
             checks.push(Check::new(
                 CheckKind::UnusedVariable(name.to_string()),
-                locator.locate_check(binding.range),
+                binding.range,
             ));
         }
     }
@@ -129,7 +147,6 @@ pub fn repeated_keys(
     keys: &[Expr],
     check_repeated_literals: bool,
     check_repeated_variables: bool,
-    locator: &dyn CheckLocator,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
@@ -144,7 +161,7 @@ pub fn repeated_keys(
                     if check_repeated_literals && v1 == v2 {
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyLiteral,
-                            locator.locate_check(Range::from_located(k2)),
+                            Range::from_located(k2),
                         ))
                     }
                 }
@@ -152,7 +169,7 @@ pub fn repeated_keys(
                     if check_repeated_variables && v1 == v2 {
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyVariable((*v2).to_string()),
-                            locator.locate_check(Range::from_located(k2)),
+                            Range::from_located(k2),
                         ))
                     }
                 }
@@ -195,12 +212,7 @@ pub fn starred_expressions(
 }
 
 /// F701
-pub fn break_outside_loop(
-    stmt: &Stmt,
-    parents: &[&Stmt],
-    parent_stack: &[usize],
-    locator: &dyn CheckLocator,
-) -> Option<Check> {
+pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]) -> Option<Check> {
     let mut allowed: bool = false;
     let mut parent = stmt;
     for index in parent_stack.iter().rev() {
@@ -228,7 +240,7 @@ pub fn break_outside_loop(
     if !allowed {
         Some(Check::new(
             CheckKind::BreakOutsideLoop,
-            locator.locate_check(Range::from_located(stmt)),
+            Range::from_located(stmt),
         ))
     } else {
         None
@@ -240,7 +252,6 @@ pub fn continue_outside_loop(
     stmt: &Stmt,
     parents: &[&Stmt],
     parent_stack: &[usize],
-    locator: &dyn CheckLocator,
 ) -> Option<Check> {
     let mut allowed: bool = false;
     let mut parent = stmt;
@@ -269,7 +280,7 @@ pub fn continue_outside_loop(
     if !allowed {
         Some(Check::new(
             CheckKind::ContinueOutsideLoop,
-            locator.locate_check(Range::from_located(stmt)),
+            Range::from_located(stmt),
         ))
     } else {
         None
