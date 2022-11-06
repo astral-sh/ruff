@@ -1,27 +1,14 @@
 use anyhow::Result;
 use libcst_native::{
     Arg, Call, Codegen, Dict, DictComp, DictElement, Element, Expr, Expression, LeftCurlyBrace,
-    LeftParen, LeftSquareBracket, List, ListComp, Module, Name, ParenthesizableWhitespace,
-    RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
-    SmallStatement, Statement, Tuple,
+    LeftParen, LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace, RightCurlyBrace,
+    RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace, Tuple,
 };
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::cst::matchers::match_module;
+use crate::cst::matchers::{match_expr, match_module};
 use crate::source_code_locator::SourceCodeLocator;
-
-fn match_expr<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Expr<'b>> {
-    if let Some(Statement::Simple(expr)) = module.body.first_mut() {
-        if let Some(SmallStatement::Expr(expr)) = expr.body.first_mut() {
-            Ok(expr)
-        } else {
-            Err(anyhow::anyhow!("Expected node to be: SmallStatement::Expr"))
-        }
-    } else {
-        Err(anyhow::anyhow!("Expected node to be: Statement::Simple"))
-    }
-}
 
 fn match_call<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Call<'b>> {
     if let Expression::Call(call) = &mut expr.value {

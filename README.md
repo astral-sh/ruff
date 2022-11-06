@@ -322,7 +322,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment |  |
 | F622 | TwoStarredExpressions | Two starred expressions in assignment |  |
 | F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |  |
-| F632 | IsLiteral | Use `==` and `!=` to compare constant literals |  |
+| F632 | IsLiteral | Use `==` and `!=` to compare constant literals | 🛠 |
 | F633 | InvalidPrintSyntax | Use of `>>` is invalid with `print` function |  |
 | F634 | IfTuple | If test is a tuple, which is always `True` |  |
 | F701 | BreakOutsideLoop | `break` outside loop |  |

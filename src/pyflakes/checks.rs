@@ -1,10 +1,8 @@
 use std::collections::BTreeSet;
 
-use itertools::izip;
 use regex::Regex;
 use rustpython_parser::ast::{
-    Arg, Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt,
-    StmtKind,
+    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
 use crate::ast::types::{BindingKind, CheckLocator, FunctionScope, Range, Scope, ScopeKind};
@@ -161,45 +159,6 @@ pub fn repeated_keys(
                 _ => {}
             }
         }
-    }
-
-    checks
-}
-
-fn is_constant(expr: &Expr) -> bool {
-    match &expr.node {
-        ExprKind::Constant { .. } => true,
-        ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant),
-        _ => false,
-    }
-}
-
-fn is_singleton(expr: &Expr) -> bool {
-    matches!(
-        expr.node,
-        ExprKind::Constant {
-            value: Constant::None | Constant::Bool(_) | Constant::Ellipsis,
-            ..
-        }
-    )
-}
-
-fn is_constant_non_singleton(expr: &Expr) -> bool {
-    is_constant(expr) && !is_singleton(expr)
-}
-
-/// F632
-pub fn is_literal(left: &Expr, ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
-
-    let mut left = left;
-    for (op, right) in izip!(ops, comparators) {
-        if matches!(op, Cmpop::Is | Cmpop::IsNot)
-            && (is_constant_non_singleton(left) || is_constant_non_singleton(right))
-        {
-            checks.push(Check::new(CheckKind::IsLiteral, location));
-        }
-        left = right;
     }
 
     checks

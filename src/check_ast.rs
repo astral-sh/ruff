@@ -1324,12 +1324,13 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::F632) {
-                    self.checks.extend(pyflakes::checks::is_literal(
+                    pyflakes::plugins::invalid_literal_comparison(
+                        self,
                         left,
                         ops,
                         comparators,
                         self.locate_check(Range::from_located(expr)),
-                    ));
+                    );
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E721) {
