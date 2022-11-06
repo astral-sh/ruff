@@ -143,11 +143,7 @@ fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {
 }
 
 /// F601, F602
-pub fn repeated_keys(
-    keys: &[Expr],
-    check_repeated_literals: bool,
-    check_repeated_variables: bool,
-) -> Vec<Check> {
+pub fn repeated_keys(keys: &[Expr]) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
     let num_keys = keys.len();
@@ -158,7 +154,7 @@ pub fn repeated_keys(
             let v2 = convert_to_value(k2);
             match (&v1, &v2) {
                 (Some(DictionaryKey::Constant(v1)), Some(DictionaryKey::Constant(v2))) => {
-                    if check_repeated_literals && v1 == v2 {
+                    if v1 == v2 {
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyLiteral,
                             Range::from_located(k2),
@@ -166,7 +162,7 @@ pub fn repeated_keys(
                     }
                 }
                 (Some(DictionaryKey::Variable(v1)), Some(DictionaryKey::Variable(v2))) => {
-                    if check_repeated_variables && v1 == v2 {
+                    if v1 == v2 {
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyVariable((*v2).to_string()),
                             Range::from_located(k2),
@@ -182,17 +178,12 @@ pub fn repeated_keys(
 }
 
 /// F621, F622
-pub fn starred_expressions(
-    elts: &[Expr],
-    check_too_many_expressions: bool,
-    check_two_starred_expressions: bool,
-    location: Range,
-) -> Option<Check> {
+pub fn starred_expressions(elts: &[Expr], location: Range) -> Option<Check> {
     let mut has_starred: bool = false;
     let mut starred_index: Option<usize> = None;
     for (index, elt) in elts.iter().enumerate() {
         if matches!(elt.node, ExprKind::Starred { .. }) {
-            if has_starred && check_two_starred_expressions {
+            if has_starred {
                 return Some(Check::new(CheckKind::TwoStarredExpressions, location));
             }
             has_starred = true;
@@ -200,11 +191,9 @@ pub fn starred_expressions(
         }
     }
 
-    if check_too_many_expressions {
-        if let Some(starred_index) = starred_index {
-            if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
-                return Some(Check::new(CheckKind::ExpressionsInStarAssignment, location));
-            }
+    if let Some(starred_index) = starred_index {
+        if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
+            return Some(Check::new(CheckKind::ExpressionsInStarAssignment, location));
         }
     }
 

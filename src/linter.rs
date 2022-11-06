@@ -98,6 +98,12 @@ pub(crate) fn check_path(
     // Run the lines-based checks.
     check_lines(&mut checks, contents, noqa_line_for, settings, autofix);
 
+    // Filter out any disabled checks. Throughout the codebase, we skip work based
+    // on the set of enabled checks, but we don't _guarantee_ that disabled
+    // checks aren't added. (Sometimes, it's not worth repeatedly checking the
+    // code list for similar checks.)
+    checks.retain(|check| settings.enabled.contains(check.kind.code()));
+
     // Create path ignores.
     if !checks.is_empty() && !settings.per_file_ignores.is_empty() {
         let ignores = fs::ignores_from_path(path, &settings.per_file_ignores)?;

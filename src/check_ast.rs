@@ -970,17 +970,14 @@ where
             }
             ExprKind::Tuple { elts, ctx } | ExprKind::List { elts, ctx } => {
                 if matches!(ctx, ExprContext::Store) {
-                    let check_too_many_expressions =
-                        self.settings.enabled.contains(&CheckCode::F621);
-                    let check_two_starred_expressions =
-                        self.settings.enabled.contains(&CheckCode::F622);
-                    if let Some(check) = pyflakes::checks::starred_expressions(
-                        elts,
-                        check_too_many_expressions,
-                        check_two_starred_expressions,
-                        Range::from_located(expr),
-                    ) {
-                        self.add_check(check);
+                    if self.settings.enabled.contains(&CheckCode::F621)
+                        || self.settings.enabled.contains(&CheckCode::F622)
+                    {
+                        if let Some(check) =
+                            pyflakes::checks::starred_expressions(elts, Range::from_located(expr))
+                        {
+                            self.add_check(check);
+                        }
                     }
                 }
             }
@@ -1279,17 +1276,10 @@ where
                 }
             }
             ExprKind::Dict { keys, .. } => {
-                let check_repeated_literals = self.settings.enabled.contains(&CheckCode::F601);
-                let check_repeated_variables = self.settings.enabled.contains(&CheckCode::F602);
-                if check_repeated_literals || check_repeated_variables {
-                    self.add_checks(
-                        pyflakes::checks::repeated_keys(
-                            keys,
-                            check_repeated_literals,
-                            check_repeated_variables,
-                        )
-                        .into_iter(),
-                    );
+                if self.settings.enabled.contains(&CheckCode::F601)
+                    || self.settings.enabled.contains(&CheckCode::F602)
+                {
+                    self.add_checks(pyflakes::checks::repeated_keys(keys).into_iter());
                 }
             }
             ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. } => {
@@ -1328,13 +1318,10 @@ where
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
-                let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
-                let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
-                if check_not_in || check_not_is {
-                    self.add_checks(
-                        pycodestyle::checks::not_tests(op, operand, check_not_in, check_not_is)
-                            .into_iter(),
-                    );
+                if self.settings.enabled.contains(&CheckCode::E713)
+                    || self.settings.enabled.contains(&CheckCode::E714)
+                {
+                    self.add_checks(pycodestyle::checks::not_tests(op, operand).into_iter());
                 }
 
                 if self.settings.enabled.contains(&CheckCode::B002) {
@@ -1346,18 +1333,12 @@ where
                 ops,
                 comparators,
             } => {
-                let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
-                let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
-                if check_none_comparisons || check_true_false_comparisons {
+                if self.settings.enabled.contains(&CheckCode::E711)
+                    || self.settings.enabled.contains(&CheckCode::E712)
+                {
                     self.add_checks(
-                        pycodestyle::checks::literal_comparisons(
-                            left,
-                            ops,
-                            comparators,
-                            check_none_comparisons,
-                            check_true_false_comparisons,
-                        )
-                        .into_iter(),
+                        pycodestyle::checks::literal_comparisons(left, ops, comparators)
+                            .into_iter(),
                     );
                 }
 

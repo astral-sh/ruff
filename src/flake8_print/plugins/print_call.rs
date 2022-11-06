@@ -4,17 +4,10 @@ use rustpython_ast::{Expr, Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::check_ast::Checker;
-use crate::checks::CheckCode;
 use crate::flake8_print::checks;
 
 pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let Some(mut check) = checks::print_call(
-        expr,
-        func,
-        checker.settings.enabled.contains(&CheckCode::T201),
-        checker.settings.enabled.contains(&CheckCode::T203),
-        Range::from_located(expr),
-    ) {
+    if let Some(mut check) = checks::print_call(expr, func, Range::from_located(expr)) {
         if checker.patch() {
             let context = checker.binding_context();
             if matches!(
