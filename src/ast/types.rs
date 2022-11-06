@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use rustpython_ast::{Expr, Keyword};
 use rustpython_parser::ast::{Located, Location};
 
 fn id() -> usize {
@@ -30,9 +31,17 @@ pub struct FunctionScope {
     pub uses_locals: bool,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct ClassScope<'a> {
+    pub name: &'a str,
+    pub bases: &'a [Expr],
+    pub keywords: &'a [Keyword],
+    pub decorator_list: &'a [Expr],
+}
+
 #[derive(Clone, Debug)]
-pub enum ScopeKind {
-    Class,
+pub enum ScopeKind<'a> {
+    Class(ClassScope<'a>),
     Function(FunctionScope),
     Generator,
     Module,
@@ -40,15 +49,15 @@ pub enum ScopeKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct Scope {
+pub struct Scope<'a> {
     pub id: usize,
-    pub kind: ScopeKind,
+    pub kind: ScopeKind<'a>,
     pub import_starred: bool,
     pub values: BTreeMap<String, Binding>,
 }
 
-impl Scope {
-    pub fn new(kind: ScopeKind) -> Self {
+impl<'a> Scope<'a> {
+    pub fn new(kind: ScopeKind<'a>) -> Self {
         Scope {
             id: id(),
             kind,
