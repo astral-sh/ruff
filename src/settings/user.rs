@@ -7,7 +7,7 @@ use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::types::{FilePattern, PythonVersion};
-use crate::{flake8_quotes, pep8_naming, Configuration};
+use crate::{flake8_annotations, flake8_quotes, pep8_naming, Configuration};
 
 /// Struct to render user-facing exclusion patterns.
 #[derive(Debug)]
@@ -46,6 +46,7 @@ pub struct UserConfiguration {
     pub select: Vec<CheckCodePrefix>,
     pub target_version: PythonVersion,
     // Plugins
+    pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
     // Non-settings exposed to the user
@@ -78,6 +79,7 @@ impl UserConfiguration {
             per_file_ignores: configuration.per_file_ignores,
             select: configuration.select,
             target_version: configuration.target_version,
+            flake8_annotations: configuration.flake8_annotations,
             flake8_quotes: configuration.flake8_quotes,
             pep8_naming: configuration.pep8_naming,
             project_root,

@@ -1,0 +1,21 @@
+---
+source: src/flake8_annotations/mod.rs
+expression: checks
+---
+- kind: MissingReturnTypePublicFunction
+  location:
+    row: 45
+    column: 0
+  end_location:
+    row: 50
+    column: 0
+  fix: ~
+- kind: MissingReturnTypePublicFunction
+  location:
+    row: 50
+    column: 0
+  end_location:
+    row: 56
+    column: 0
+  fix: ~
+

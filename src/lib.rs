@@ -25,6 +25,7 @@ pub mod cli;
 pub mod code_gen;
 mod cst;
 mod docstrings;
+pub mod flake8_annotations;
 mod flake8_bugbear;
 mod flake8_builtins;
 mod flake8_comprehensions;

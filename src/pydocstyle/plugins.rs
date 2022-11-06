@@ -13,7 +13,7 @@ use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::docstrings::helpers;
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
-use crate::visibility::{is_init, is_magic, is_overload, is_static, Visibility};
+use crate::visibility::{is_init, is_magic, is_overload, is_staticmethod, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub fn not_missing(
@@ -1308,7 +1308,8 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
                 .skip(
                     // If this is a non-static method, skip `cls` or `self`.
                     usize::from(
-                        matches!(definition.kind, DefinitionKind::Method(_)) && !is_static(parent),
+                        matches!(definition.kind, DefinitionKind::Method(_))
+                            && !is_staticmethod(parent),
                     ),
                 )
                 .collect();

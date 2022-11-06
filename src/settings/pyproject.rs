@@ -143,6 +143,7 @@ mod tests {
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_annotations: None,
                     flake8_quotes: None,
                     pep8_naming: None,
                 })
@@ -170,6 +171,7 @@ line-length = 79
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_annotations: None,
                     flake8_quotes: None,
                     pep8_naming: None,
                 })
@@ -197,6 +199,7 @@ exclude = ["foo.py"]
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_annotations: None,
                     flake8_quotes: None,
                     pep8_naming: None,
                 })
@@ -224,6 +227,7 @@ select = ["E501"]
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_annotations: None,
                     flake8_quotes: None,
                     pep8_naming: None,
                 })
@@ -252,6 +256,7 @@ ignore = ["E501"]
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
                     target_version: None,
+                    flake8_annotations: None,
                     flake8_quotes: None,
                     pep8_naming: None,
                 })
@@ -326,6 +331,7 @@ other-attribute = 1
                 ),])),
                 dummy_variable_rgx: None,
                 target_version: None,
+                flake8_annotations: None,
                 flake8_quotes: Some(flake8_quotes::settings::Options {
                     inline_quotes: Some(Quote::Single),
                     multiline_quotes: Some(Quote::Double),

@@ -52,8 +52,9 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    8. [flake8-builtins](#flake8-builtins)
    9. [flake8-print](#flake8-print)
    10. [flake8-quotes](#flake8-quotes)
-   11. [Ruff-specific rules](#ruff-specific-rules)
-   12. [Meta rules](#meta-rules)
+   11. [flake8-annotations](#flake8-annotations)
+   12. [Ruff-specific rules](#ruff-specific-rules)
+   13. [Meta rules](#meta-rules)
 5. [Editor Integrations](#editor-integrations)
 6. [FAQ](#faq)
 7. [Development](#development)
@@ -523,6 +524,23 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on 
 | Q002 | BadQuotesDocstring | Single quote docstring found but double quotes preferred |  |
 | Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes |  |
 
+### flake8-annotations
+
+For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2.9.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument |  |
+| ANN002 | MissingTypeArgs | Missing type annotation for `*args` |  |
+| ANN003 | MissingTypeKwargs | Missing type annotation for `**kwargs` |  |
+| ANN101 | MissingTypeSelf | Missing type annotation for `self` in method |  |
+| ANN102 | MissingTypeCls | Missing type annotation for `cls` in classmethod |  |
+| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function |  |
+| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function |  |
+| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method |  |
+| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod |  |
+| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod |  |
+
 ### Ruff-specific rules
 
 | Code | Name | Message | Fix |
@@ -605,6 +623,7 @@ including:
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
+- [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (15/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (11/34)
@@ -627,6 +646,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
+- [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (15/32)
 

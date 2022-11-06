@@ -12,6 +12,7 @@ pub enum Plugin {
     Flake8Docstrings,
     Flake8Print,
     Flake8Quotes,
+    Flake8Annotations,
     PEP8Naming,
     Pyupgrade,
 }
@@ -27,6 +28,7 @@ impl FromStr for Plugin {
             "flake8-docstrings" => Ok(Plugin::Flake8Docstrings),
             "flake8-print" => Ok(Plugin::Flake8Print),
             "flake8-quotes" => Ok(Plugin::Flake8Quotes),
+            "flake8-annotations" => Ok(Plugin::Flake8Annotations),
             "pep8-naming" => Ok(Plugin::PEP8Naming),
             "pyupgrade" => Ok(Plugin::Pyupgrade),
             _ => Err(anyhow!("Unknown plugin: {}", string)),
@@ -58,6 +60,7 @@ impl Plugin {
             }
             Plugin::Flake8Print => vec![CheckCodePrefix::T],
             Plugin::Flake8Quotes => vec![CheckCodePrefix::Q],
+            Plugin::Flake8Annotations => vec![CheckCodePrefix::ANN],
             Plugin::PEP8Naming => vec![CheckCodePrefix::N],
             Plugin::Pyupgrade => vec![CheckCodePrefix::U],
         }
@@ -261,6 +264,31 @@ pub fn infer_plugins(flake8: &HashMap<String, Option<String>>) -> Vec<Plugin> {
             }
             "avoid-escape" | "avoid_escape" => {
                 plugins.insert(Plugin::Flake8Quotes);
+            }
+            // flake8-annotations
+            "suppress-none-returning" | "suppress_none_returning" => {
+                plugins.insert(Plugin::Flake8Annotations);
+            }
+            "suppress-dummy-args" | "suppress_dummy_args" => {
+                plugins.insert(Plugin::Flake8Annotations);
+            }
+            "allow-untyped-defs" | "allow_untyped_defs" => {
+                plugins.insert(Plugin::Flake8Annotations);
+            }
+            "allow-untyped-nested" | "allow_untyped_nested" => {
+                plugins.insert(Plugin::Flake8Annotations);
+            }
+            "mypy-init-return" | "mypy_init_return" => {
+                plugins.insert(Plugin::Flake8Annotations);
+            }
+            "dispatch-decorators" | "dispatch_decorators" => {
+                plugins.insert(Plugin::Flake8Annotations);
+            }
+            "overload-decorators" | "overload_decorators" => {
+                plugins.insert(Plugin::Flake8Annotations);
+            }
+            "allow-star-arg-any" | "allow_star_arg_any" => {
+                plugins.insert(Plugin::Flake8Annotations);
             }
             // pep8-naming
             "ignore-names" | "ignore_names" => {
