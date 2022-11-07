@@ -6,6 +6,7 @@ pub use duplicate_exceptions::{duplicate_exceptions, duplicate_handler_exception
 pub use function_call_argument_default::function_call_argument_default;
 pub use mutable_argument_default::mutable_argument_default;
 pub use redundant_tuple_in_exception_handler::redundant_tuple_in_exception_handler;
+pub use strip_with_multi_characters::strip_with_multi_characters;
 pub use unary_prefix_increment::unary_prefix_increment;
 pub use unreliable_callable_check::unreliable_callable_check;
 pub use unused_loop_control_variable::unused_loop_control_variable;
@@ -20,6 +21,7 @@ mod duplicate_exceptions;
 mod function_call_argument_default;
 mod mutable_argument_default;
 mod redundant_tuple_in_exception_handler;
+mod strip_with_multi_characters;
 mod unary_prefix_increment;
 mod unreliable_callable_check;
 mod unused_loop_control_variable;

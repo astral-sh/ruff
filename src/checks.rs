@@ -80,6 +80,7 @@ pub enum CheckCode {
     B002,
     B003,
     B004,
+    B005,
     B006,
     B007,
     B008,
@@ -339,6 +340,7 @@ pub enum CheckKind {
     UnaryPrefixIncrement,
     AssignmentToOsEnviron,
     UnreliableCallableCheck,
+    StripWithMultiCharacters,
     MutableArgumentDefault,
     UnusedLoopControlVariable(String),
     FunctionCallArgumentDefault,
@@ -544,6 +546,7 @@ impl CheckCode {
             CheckCode::B002 => CheckKind::UnaryPrefixIncrement,
             CheckCode::B003 => CheckKind::AssignmentToOsEnviron,
             CheckCode::B004 => CheckKind::UnreliableCallableCheck,
+            CheckCode::B005 => CheckKind::StripWithMultiCharacters,
             CheckCode::B006 => CheckKind::MutableArgumentDefault,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B008 => CheckKind::FunctionCallArgumentDefault,
@@ -756,6 +759,7 @@ impl CheckCode {
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
             CheckCode::B003 => CheckCategory::Flake8Bugbear,
             CheckCode::B004 => CheckCategory::Flake8Bugbear,
+            CheckCode::B005 => CheckCategory::Flake8Bugbear,
             CheckCode::B006 => CheckCategory::Flake8Bugbear,
             CheckCode::B007 => CheckCategory::Flake8Bugbear,
             CheckCode::B008 => CheckCategory::Flake8Bugbear,
@@ -932,6 +936,7 @@ impl CheckKind {
             CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
             CheckKind::AssignmentToOsEnviron => &CheckCode::B003,
             CheckKind::UnreliableCallableCheck => &CheckCode::B004,
+            CheckKind::StripWithMultiCharacters => &CheckCode::B005,
             CheckKind::MutableArgumentDefault => &CheckCode::B006,
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
             CheckKind::FunctionCallArgumentDefault => &CheckCode::B008,
@@ -1219,6 +1224,9 @@ impl CheckKind {
             CheckKind::UnreliableCallableCheck => " Using `hasattr(x, '__call__')` to test if x \
                                                    is callable is unreliable. Use `callable(x)` \
                                                    for consistent results."
+                .to_string(),
+            CheckKind::StripWithMultiCharacters => "Using `.strip()` with multi-character strings \
+                                                    is misleading the reader."
                 .to_string(),
             CheckKind::MutableArgumentDefault => {
                 "Do not use mutable data structures for argument defaults.".to_string()
