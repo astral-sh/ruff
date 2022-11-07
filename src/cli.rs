@@ -38,8 +38,10 @@ pub struct Cli {
     #[arg(short, long)]
     pub watch: bool,
     /// Attempt to automatically fix lint errors.
-    #[arg(short, long)]
-    pub fix: bool,
+    #[arg(long, overrides_with("no_fix"))]
+    fix: bool,
+    #[clap(long, overrides_with("fix"), hide = true)]
+    no_fix: bool,
     /// Disable cache reads.
     #[arg(short, long)]
     pub no_cache: bool,
@@ -92,6 +94,22 @@ pub struct Cli {
     /// The name of the file when passing it through stdin.
     #[arg(long)]
     pub stdin_filename: Option<String>,
+}
+
+impl Cli {
+    // See: https://github.com/clap-rs/clap/issues/3146
+    pub fn fix(&self) -> Option<bool> {
+        resolve_bool_arg(self.fix, self.no_fix)
+    }
+}
+
+fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
+    match (yes, no) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        (false, false) => None,
+        (..) => unreachable!("Clap should make this impossible"),
+    }
 }
 
 /// Map the CLI settings to a `LogLevel`.
@@ -165,7 +183,7 @@ pub fn warn_on(
     }
 }
 
-/// Collect a list of `PatternPrefixPair` structs as a `BTreeMap`.
+/// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
 pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
     project_root: &Option<PathBuf>,

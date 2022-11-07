@@ -40,6 +40,7 @@ pub struct UserConfiguration {
     pub extend_exclude: Vec<Exclusion>,
     pub extend_ignore: Vec<CheckCodePrefix>,
     pub extend_select: Vec<CheckCodePrefix>,
+    pub fix: bool,
     pub ignore: Vec<CheckCodePrefix>,
     pub line_length: usize,
     pub per_file_ignores: Vec<(Exclusion, Vec<CheckCode>)>,
@@ -74,6 +75,7 @@ impl UserConfiguration {
                 .collect(),
             extend_ignore: configuration.extend_ignore,
             extend_select: configuration.extend_select,
+            fix: configuration.fix,
             ignore: configuration.ignore,
             line_length: configuration.line_length,
             per_file_ignores: configuration
