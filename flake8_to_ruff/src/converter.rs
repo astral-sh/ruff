@@ -202,6 +202,7 @@ mod tests {
         let actual = convert(&HashMap::from([]), None)?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            fix: None,
             exclude: None,
             extend_exclude: None,
             select: Some(vec![
@@ -232,6 +233,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: Some(100),
+            fix: None,
             exclude: None,
             extend_exclude: None,
             select: Some(vec![
@@ -262,6 +264,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: Some(100),
+            fix: None,
             exclude: None,
             extend_exclude: None,
             select: Some(vec![
@@ -292,6 +295,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            fix: None,
             exclude: None,
             extend_exclude: None,
             select: Some(vec![
@@ -322,6 +326,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            fix: None,
             exclude: None,
             extend_exclude: None,
             select: Some(vec![
@@ -360,6 +365,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            fix: None,
             exclude: None,
             extend_exclude: None,
             select: Some(vec![
@@ -425,6 +431,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            fix: None,
             exclude: None,
             extend_exclude: None,
             select: Some(vec![
