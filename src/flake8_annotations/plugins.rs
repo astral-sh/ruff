@@ -73,6 +73,8 @@ fn match_returns(stmt: &Stmt) -> &Option<Box<Expr>> {
 
 /// Generate flake8-annotation checks for a given `Definition`.
 pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &Visibility) {
+    // TODO(charlie): Consider using the AST directly here rather than `Definition`. We could adhere
+    // more closely to `flake8-annotations` by defining public vs. secret vs. protected.
     match &definition.kind {
         DefinitionKind::Module => {}
         DefinitionKind::Package => {}
