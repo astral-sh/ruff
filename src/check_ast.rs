@@ -624,6 +624,14 @@ where
                             }
                         }
 
+                        if self.settings.enabled.contains(&CheckCode::U010) {
+                            pyupgrade::plugins::unnecessary_future_import(
+                                self,
+                                stmt,
+                                &alias.node.name,
+                            );
+                        }
+
                         if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
                         {
                             self.add_check(Check::new(

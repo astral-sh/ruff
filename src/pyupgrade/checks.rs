@@ -4,6 +4,30 @@ use crate::ast::helpers;
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::types::Primitive;
+use crate::settings::types::PythonVersion;
+
+pub const PY3_PLUS_REMOVE_FUTURES: &[&str] = &[
+    "nested_scopes",
+    "generators",
+    "with_statement",
+    "division",
+    "absolute_import",
+    "with_statement",
+    "print_function",
+    "unicode_literals",
+];
+
+pub const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
+    "nested_scopes",
+    "generators",
+    "with_statement",
+    "division",
+    "absolute_import",
+    "with_statement",
+    "print_function",
+    "unicode_literals",
+    "generator_stop",
+];
 
 /// U008
 pub fn super_args(
@@ -153,5 +177,22 @@ pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<
         }
     }
 
+    None
+}
+
+/// U010
+pub fn unnecessary_future_import(
+    version: PythonVersion,
+    name: &str,
+    location: Range,
+) -> Option<Check> {
+    if (version >= PythonVersion::Py33 && PY3_PLUS_REMOVE_FUTURES.contains(&name))
+        || (version >= PythonVersion::Py37 && PY37_PLUS_REMOVE_FUTURES.contains(&name))
+    {
+        return Some(Check::new(
+            CheckKind::UnnecessaryFutureImport(name.to_string()),
+            location,
+        ));
+    }
     None
 }
