@@ -1045,6 +1045,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::B004) {
                     flake8_bugbear::plugins::unreliable_callable_check(self, expr, func, args);
                 }
+                if self.settings.enabled.contains(&CheckCode::B005) {
+                    flake8_bugbear::plugins::strip_with_multi_characters(self, expr, func, args);
+                }
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {
