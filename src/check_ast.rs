@@ -2390,15 +2390,13 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::ANN001)
                 || self.settings.enabled.contains(&CheckCode::ANN002)
                 || self.settings.enabled.contains(&CheckCode::ANN003)
-                || self.settings.enabled.contains(&CheckCode::ANN201)
-                || self.settings.enabled.contains(&CheckCode::ANN202)
-                || self.settings.enabled.contains(&CheckCode::ANN001)
-                || self.settings.enabled.contains(&CheckCode::ANN002)
-                || self.settings.enabled.contains(&CheckCode::ANN003)
                 || self.settings.enabled.contains(&CheckCode::ANN101)
                 || self.settings.enabled.contains(&CheckCode::ANN102)
                 || self.settings.enabled.contains(&CheckCode::ANN201)
                 || self.settings.enabled.contains(&CheckCode::ANN202)
+                || self.settings.enabled.contains(&CheckCode::ANN204)
+                || self.settings.enabled.contains(&CheckCode::ANN205)
+                || self.settings.enabled.contains(&CheckCode::ANN206)
             {
                 flake8_annotations::plugins::definition(self, &definition, &visibility);
             }
