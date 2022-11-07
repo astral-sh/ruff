@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
+use ruff::checks_gen::CheckCodePrefix;
 use ruff::flake8_quotes::settings::Quote;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
@@ -13,6 +14,29 @@ pub fn convert(
     flake8: &HashMap<String, Option<String>>,
     plugins: Option<Vec<Plugin>>,
 ) -> Result<Pyproject> {
+    // Extract all referenced check code prefixes, to power plugin inference.
+    let mut referenced_codes: BTreeSet<CheckCodePrefix> = Default::default();
+    for (key, value) in flake8 {
+        if let Some(value) = value {
+            match key.as_str() {
+                "select" | "ignore" | "extend-select" | "extend_select" | "extend-ignore"
+                | "extend_ignore" => {
+                    referenced_codes.extend(parser::parse_prefix_codes(value.as_ref()));
+                }
+                "per-file-ignores" | "per_file_ignores" => {
+                    if let Ok(per_file_ignores) =
+                        parser::parse_files_to_codes_mapping(value.as_ref())
+                    {
+                        for (_, codes) in parser::collect_per_file_ignores(per_file_ignores) {
+                            referenced_codes.extend(codes);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     // Check if the user has specified a `select`. If not, we'll add our own
     // default `select`, and populate it based on user plugins.
     let mut select = flake8
@@ -25,7 +49,12 @@ pub fn convert(
         .unwrap_or_else(|| {
             plugin::resolve_select(
                 flake8,
-                &plugins.unwrap_or_else(|| plugin::infer_plugins(flake8)),
+                &plugins.unwrap_or_else(|| {
+                    plugin::infer_plugins_from_options(flake8)
+                        .into_iter()
+                        .chain(plugin::infer_plugins_from_codes(&referenced_codes))
+                        .collect()
+                }),
             )
         });
     let mut ignore = flake8
@@ -52,6 +81,7 @@ pub fn convert(
                 },
                 "select" => {
                     // No-op (handled above).
+                    select.extend(parser::parse_prefix_codes(value.as_ref()));
                 }
                 "ignore" => {
                     // No-op (handled above).
