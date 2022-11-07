@@ -4,66 +4,82 @@ expression: checks
 ---
 - kind: MissingReturnTypePublicFunction
   location:
-    row: 2
+    row: 4
     column: 0
   end_location:
-    row: 7
+    row: 9
     column: 0
   fix: ~
 - kind: MissingTypeFunctionArgument
   location:
-    row: 2
+    row: 4
     column: 8
   end_location:
-    row: 2
+    row: 4
     column: 9
   fix: ~
 - kind: MissingTypeFunctionArgument
   location:
-    row: 2
+    row: 4
     column: 11
   end_location:
-    row: 2
+    row: 4
     column: 12
   fix: ~
 - kind: MissingReturnTypePublicFunction
   location:
-    row: 7
+    row: 9
     column: 0
   end_location:
-    row: 12
+    row: 14
     column: 0
   fix: ~
 - kind: MissingTypeFunctionArgument
   location:
-    row: 7
+    row: 9
     column: 16
   end_location:
-    row: 7
+    row: 9
     column: 17
   fix: ~
 - kind: MissingTypeFunctionArgument
   location:
-    row: 12
+    row: 14
     column: 16
   end_location:
-    row: 12
+    row: 14
     column: 17
   fix: ~
 - kind: MissingReturnTypePublicFunction
   location:
-    row: 17
+    row: 19
     column: 0
   end_location:
-    row: 22
+    row: 24
     column: 0
   fix: ~
 - kind: MissingReturnTypePublicFunction
   location:
-    row: 22
+    row: 24
     column: 0
   end_location:
-    row: 27
+    row: 29
     column: 0
+  fix: ~
+- kind: MissingTypeSelf
+  location:
+    row: 44
+    column: 12
+  end_location:
+    row: 44
+    column: 16
+  fix: ~
+- kind: MissingTypeCls
+  location:
+    row: 54
+    column: 12
+  end_location:
+    row: 54
+    column: 15
   fix: ~
 
