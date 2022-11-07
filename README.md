@@ -627,7 +627,7 @@ including:
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (16/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (17/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (11/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
@@ -650,7 +650,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (16/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (17/32)
 
 Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (11/34).
