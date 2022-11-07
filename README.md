@@ -200,7 +200,7 @@ Options:
           Exit with status code "0", even upon detecting errors
   -w, --watch
           Run in watch mode by re-running whenever files change
-  -f, --fix
+      --fix
           Attempt to automatically fix lint errors
   -n, --no-cache
           Disable cache reads
