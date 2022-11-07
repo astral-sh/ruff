@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -8,7 +7,6 @@ use std::time::Instant;
 #[cfg(not(target_family = "wasm"))]
 use ::ruff::cache;
 use ::ruff::checks::{CheckCode, CheckKind};
-use ::ruff::checks_gen::CheckCodePrefix;
 use ::ruff::cli::{collect_per_file_ignores, extract_log_level, warn_on, Cli, Warnable};
 use ::ruff::fs::iter_python_files;
 use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin};
@@ -252,8 +250,6 @@ fn inner_main() -> Result<ExitCode> {
         .iter()
         .map(|path| FilePattern::from_user(path, &project_root))
         .collect();
-    let per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>> =
-        collect_per_file_ignores(cli.per_file_ignores);
 
     let mut configuration = Configuration::from_pyproject(&pyproject, &project_root)?;
     if !exclude.is_empty() {
@@ -262,8 +258,9 @@ fn inner_main() -> Result<ExitCode> {
     if !extend_exclude.is_empty() {
         configuration.extend_exclude = extend_exclude;
     }
-    if !per_file_ignores.is_empty() {
-        configuration.per_file_ignores = per_file_ignores;
+    if !cli.per_file_ignores.is_empty() {
+        configuration.per_file_ignores =
+            collect_per_file_ignores(cli.per_file_ignores, &project_root);
     }
     if !cli.select.is_empty() {
         warn_on(

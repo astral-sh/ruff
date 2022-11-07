@@ -1,10 +1,10 @@
 //! Structs to render user-facing settings.
 
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use regex::Regex;
 
+use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::types::{FilePattern, PythonVersion};
 use crate::{flake8_annotations, flake8_quotes, pep8_naming, Configuration};
@@ -42,7 +42,7 @@ pub struct UserConfiguration {
     pub extend_select: Vec<CheckCodePrefix>,
     pub ignore: Vec<CheckCodePrefix>,
     pub line_length: usize,
-    pub per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>>,
+    pub per_file_ignores: Vec<(Exclusion, Vec<CheckCode>)>,
     pub select: Vec<CheckCodePrefix>,
     pub target_version: PythonVersion,
     // Plugins
@@ -76,7 +76,16 @@ impl UserConfiguration {
             extend_select: configuration.extend_select,
             ignore: configuration.ignore,
             line_length: configuration.line_length,
-            per_file_ignores: configuration.per_file_ignores,
+            per_file_ignores: configuration
+                .per_file_ignores
+                .into_iter()
+                .map(|per_file_ignore| {
+                    (
+                        Exclusion::from_file_pattern(per_file_ignore.pattern),
+                        Vec::from_iter(per_file_ignore.codes),
+                    )
+                })
+                .collect(),
             select: configuration.select,
             target_version: configuration.target_version,
             flake8_annotations: configuration.flake8_annotations,

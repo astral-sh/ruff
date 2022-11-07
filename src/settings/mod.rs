@@ -2,7 +2,7 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 
 use regex::Regex;
@@ -50,7 +50,7 @@ impl Settings {
             flake8_quotes: config.flake8_quotes,
             line_length: config.line_length,
             pep8_naming: config.pep8_naming,
-            per_file_ignores: resolve_per_file_ignores(&config.per_file_ignores),
+            per_file_ignores: config.per_file_ignores,
             target_version: config.target_version,
         }
     }
@@ -146,15 +146,6 @@ fn resolve_codes(
         }
     }
     codes
-}
-
-fn resolve_per_file_ignores(
-    per_file_ignores: &BTreeMap<String, Vec<CheckCodePrefix>>,
-) -> Vec<PerFileIgnore> {
-    per_file_ignores
-        .iter()
-        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, prefixes, &None))
-        .collect()
 }
 
 #[cfg(test)]

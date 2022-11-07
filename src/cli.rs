@@ -10,7 +10,7 @@ use crate::checks_gen::CheckCodePrefix;
 use crate::logging::LogLevel;
 use crate::printer::SerializationFormat;
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{PatternPrefixPair, PythonVersion};
+use crate::settings::types::{PatternPrefixPair, PerFileIgnore, PythonVersion};
 
 #[derive(Debug, Parser)]
 #[command(author, about = "ruff: An extremely fast Python linter.")]
@@ -168,7 +168,8 @@ pub fn warn_on(
 /// Collect a list of `PatternPrefixPair` structs as a `BTreeMap`.
 pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
-) -> BTreeMap<String, Vec<CheckCodePrefix>> {
+    project_root: &Option<PathBuf>,
+) -> Vec<PerFileIgnore> {
     let mut per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>> = BTreeMap::new();
     for pair in pairs {
         per_file_ignores
@@ -177,4 +178,7 @@ pub fn collect_per_file_ignores(
             .push(pair.prefix);
     }
     per_file_ignores
+        .iter()
+        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, prefixes, project_root))
+        .collect()
 }
