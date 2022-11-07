@@ -1225,10 +1225,9 @@ impl CheckKind {
                                                    is callable is unreliable. Use `callable(x)` \
                                                    for consistent results."
                 .to_string(),
-            CheckKind::StripWithMultiCharacters => {
-                "Using `.strip()` with multi-character strings is misleading the reader."
-                    .to_string()
-            }
+            CheckKind::StripWithMultiCharacters => "Using `.strip()` with multi-character strings \
+                                                    is misleading the reader."
+                .to_string(),
             CheckKind::MutableArgumentDefault => {
                 "Do not use mutable data structures for argument defaults.".to_string()
             }
