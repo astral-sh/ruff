@@ -546,7 +546,7 @@ impl CheckCode {
             CheckCode::B002 => CheckKind::UnaryPrefixIncrement,
             CheckCode::B003 => CheckKind::AssignmentToOsEnviron,
             CheckCode::B004 => CheckKind::UnreliableCallableCheck,
-            CheckCode::B005 => CheckKind::UnreliableCallableCheck,
+            CheckCode::B005 => CheckKind::StripWithMultiCharacters,
             CheckCode::B006 => CheckKind::MutableArgumentDefault,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B008 => CheckKind::FunctionCallArgumentDefault,
