@@ -241,14 +241,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 if let Some(arg) = args.args.first() {
                     if arg.node.annotation.is_none() {
                         if visibility::is_classmethod(stmt) {
-                            if checker.settings.enabled.contains(&CheckCode::ANN101) {
+                            if checker.settings.enabled.contains(&CheckCode::ANN102) {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingTypeCls,
                                     Range::from_located(arg),
                                 ));
                             }
                         } else {
-                            if checker.settings.enabled.contains(&CheckCode::ANN102) {
+                            if checker.settings.enabled.contains(&CheckCode::ANN101) {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingTypeSelf,
                                     Range::from_located(arg),
