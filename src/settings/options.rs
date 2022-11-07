@@ -11,15 +11,16 @@ use crate::{flake8_annotations, flake8_quotes, pep8_naming};
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
-    pub line_length: Option<usize>,
+    pub dummy_variable_rgx: Option<String>,
     pub exclude: Option<Vec<String>>,
     pub extend_exclude: Option<Vec<String>>,
-    pub select: Option<Vec<CheckCodePrefix>>,
-    pub extend_select: Option<Vec<CheckCodePrefix>>,
-    pub ignore: Option<Vec<CheckCodePrefix>>,
     pub extend_ignore: Option<Vec<CheckCodePrefix>>,
+    pub extend_select: Option<Vec<CheckCodePrefix>>,
+    pub fix: Option<bool>,
+    pub ignore: Option<Vec<CheckCodePrefix>>,
+    pub line_length: Option<usize>,
     pub per_file_ignores: Option<BTreeMap<String, Vec<CheckCodePrefix>>>,
-    pub dummy_variable_rgx: Option<String>,
+    pub select: Option<Vec<CheckCodePrefix>>,
     pub target_version: Option<PythonVersion>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
