@@ -482,6 +482,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | ---- | ---- | ------- | --- |
 | B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
 | B003 | AssignmentToOsEnviron | Assigning to `os.environ` doesn't clear the environment. |  |
+| B004 | UnreliableCallableCheck |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
 | B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults. |  |
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body. | 🛠 |
 | B008 | FunctionCallArgumentDefault | Do not perform function calls in argument defaults. |  |
@@ -625,7 +626,7 @@ including:
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (15/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (16/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (11/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
@@ -648,7 +649,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (15/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (16/32)
 
 Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (11/34).

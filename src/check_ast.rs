@@ -1042,6 +1042,10 @@ where
                     flake8_print::plugins::print_call(self, expr, func);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::B004) {
+                    flake8_bugbear::plugins::unreliable_callable_check(self, expr, func, args);
+                }
+
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_list(
