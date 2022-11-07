@@ -79,6 +79,7 @@ pub enum CheckCode {
     // flake8-bugbear
     B002,
     B003,
+    B004,
     B006,
     B007,
     B008,
@@ -337,6 +338,7 @@ pub enum CheckKind {
     // flake8-bugbear
     UnaryPrefixIncrement,
     AssignmentToOsEnviron,
+    UnreliableCallableCheck,
     MutableArgumentDefault,
     UnusedLoopControlVariable(String),
     FunctionCallArgumentDefault,
@@ -541,6 +543,7 @@ impl CheckCode {
             // flake8-bugbear
             CheckCode::B002 => CheckKind::UnaryPrefixIncrement,
             CheckCode::B003 => CheckKind::AssignmentToOsEnviron,
+            CheckCode::B004 => CheckKind::UnreliableCallableCheck,
             CheckCode::B006 => CheckKind::MutableArgumentDefault,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B008 => CheckKind::FunctionCallArgumentDefault,
@@ -752,6 +755,7 @@ impl CheckCode {
             CheckCode::A003 => CheckCategory::Flake8Builtins,
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
             CheckCode::B003 => CheckCategory::Flake8Bugbear,
+            CheckCode::B004 => CheckCategory::Flake8Bugbear,
             CheckCode::B006 => CheckCategory::Flake8Bugbear,
             CheckCode::B007 => CheckCategory::Flake8Bugbear,
             CheckCode::B008 => CheckCategory::Flake8Bugbear,
@@ -927,6 +931,7 @@ impl CheckKind {
             // flake8-bugbear
             CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
             CheckKind::AssignmentToOsEnviron => &CheckCode::B003,
+            CheckKind::UnreliableCallableCheck => &CheckCode::B004,
             CheckKind::MutableArgumentDefault => &CheckCode::B006,
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
             CheckKind::FunctionCallArgumentDefault => &CheckCode::B008,
@@ -1211,6 +1216,10 @@ impl CheckKind {
             CheckKind::AssignmentToOsEnviron => {
                 "Assigning to `os.environ` doesn't clear the environment.".to_string()
             }
+            CheckKind::UnreliableCallableCheck => " Using `hasattr(x, '__call__')` to test if x \
+                                                   is callable is unreliable. Use `callable(x)` \
+                                                   for consistent results."
+                .to_string(),
             CheckKind::MutableArgumentDefault => {
                 "Do not use mutable data structures for argument defaults.".to_string()
             }

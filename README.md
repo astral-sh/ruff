@@ -482,6 +482,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | ---- | ---- | ------- | --- |
 | B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
 | B003 | AssignmentToOsEnviron | Assigning to `os.environ` doesn't clear the environment. |  |
+| B004 | UnreliableCallableCheck |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
 | B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults. |  |
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body. | 🛠 |
 | B008 | FunctionCallArgumentDefault | Do not perform function calls in argument defaults. |  |
