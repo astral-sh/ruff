@@ -378,16 +378,16 @@ pub enum CheckKind {
     BadQuotesDocstring(Quote),
     AvoidQuoteEscape,
     // flake8-annotations
-    MissingTypeFunctionArgument,
-    MissingTypeArgs,
-    MissingTypeKwargs,
-    MissingTypeSelf,
-    MissingTypeCls,
-    MissingReturnTypePublicFunction,
-    MissingReturnTypePrivateFunction,
-    MissingReturnTypeMagicMethod,
-    MissingReturnTypeStaticMethod,
-    MissingReturnTypeClassMethod,
+    MissingTypeFunctionArgument(String),
+    MissingTypeArgs(String),
+    MissingTypeKwargs(String),
+    MissingTypeSelf(String),
+    MissingTypeCls(String),
+    MissingReturnTypePublicFunction(String),
+    MissingReturnTypePrivateFunction(String),
+    MissingReturnTypeMagicMethod(String),
+    MissingReturnTypeStaticMethod(String),
+    MissingReturnTypeClassMethod(String),
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UnnecessaryAbspath,
@@ -599,16 +599,16 @@ impl CheckCode {
             CheckCode::Q002 => CheckKind::BadQuotesDocstring(Quote::Double),
             CheckCode::Q003 => CheckKind::AvoidQuoteEscape,
             // flake8-annotations
-            CheckCode::ANN001 => CheckKind::MissingTypeFunctionArgument,
-            CheckCode::ANN002 => CheckKind::MissingTypeArgs,
-            CheckCode::ANN003 => CheckKind::MissingTypeKwargs,
-            CheckCode::ANN101 => CheckKind::MissingTypeSelf,
-            CheckCode::ANN102 => CheckKind::MissingTypeCls,
-            CheckCode::ANN201 => CheckKind::MissingReturnTypePublicFunction,
-            CheckCode::ANN202 => CheckKind::MissingReturnTypePrivateFunction,
-            CheckCode::ANN204 => CheckKind::MissingReturnTypeMagicMethod,
-            CheckCode::ANN205 => CheckKind::MissingReturnTypeStaticMethod,
-            CheckCode::ANN206 => CheckKind::MissingReturnTypeClassMethod,
+            CheckCode::ANN001 => CheckKind::MissingTypeFunctionArgument("...".to_string()),
+            CheckCode::ANN002 => CheckKind::MissingTypeArgs("...".to_string()),
+            CheckCode::ANN003 => CheckKind::MissingTypeKwargs("...".to_string()),
+            CheckCode::ANN101 => CheckKind::MissingTypeSelf("...".to_string()),
+            CheckCode::ANN102 => CheckKind::MissingTypeCls("...".to_string()),
+            CheckCode::ANN201 => CheckKind::MissingReturnTypePublicFunction("...".to_string()),
+            CheckCode::ANN202 => CheckKind::MissingReturnTypePrivateFunction("...".to_string()),
+            CheckCode::ANN204 => CheckKind::MissingReturnTypeMagicMethod("...".to_string()),
+            CheckCode::ANN205 => CheckKind::MissingReturnTypeStaticMethod("...".to_string()),
+            CheckCode::ANN206 => CheckKind::MissingReturnTypeClassMethod("...".to_string()),
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
@@ -974,16 +974,16 @@ impl CheckKind {
             CheckKind::BadQuotesDocstring(_) => &CheckCode::Q002,
             CheckKind::AvoidQuoteEscape => &CheckCode::Q003,
             // flake8-annotations
-            CheckKind::MissingTypeFunctionArgument => &CheckCode::ANN001,
-            CheckKind::MissingTypeArgs => &CheckCode::ANN002,
-            CheckKind::MissingTypeKwargs => &CheckCode::ANN003,
-            CheckKind::MissingTypeSelf => &CheckCode::ANN101,
-            CheckKind::MissingTypeCls => &CheckCode::ANN102,
-            CheckKind::MissingReturnTypePublicFunction => &CheckCode::ANN201,
-            CheckKind::MissingReturnTypePrivateFunction => &CheckCode::ANN202,
-            CheckKind::MissingReturnTypeMagicMethod => &CheckCode::ANN204,
-            CheckKind::MissingReturnTypeStaticMethod => &CheckCode::ANN205,
-            CheckKind::MissingReturnTypeClassMethod => &CheckCode::ANN206,
+            CheckKind::MissingTypeFunctionArgument(_) => &CheckCode::ANN001,
+            CheckKind::MissingTypeArgs(_) => &CheckCode::ANN002,
+            CheckKind::MissingTypeKwargs(_) => &CheckCode::ANN003,
+            CheckKind::MissingTypeSelf(_) => &CheckCode::ANN101,
+            CheckKind::MissingTypeCls(_) => &CheckCode::ANN102,
+            CheckKind::MissingReturnTypePublicFunction(_) => &CheckCode::ANN201,
+            CheckKind::MissingReturnTypePrivateFunction(_) => &CheckCode::ANN202,
+            CheckKind::MissingReturnTypeMagicMethod(_) => &CheckCode::ANN204,
+            CheckKind::MissingReturnTypeStaticMethod(_) => &CheckCode::ANN205,
+            CheckKind::MissingReturnTypeClassMethod(_) => &CheckCode::ANN206,
             // pyupgrade
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
@@ -1377,31 +1377,33 @@ impl CheckKind {
                 "Change outer quotes to avoid escaping inner quotes".to_string()
             }
             // flake8-annotations
-            CheckKind::MissingTypeFunctionArgument => {
-                "Missing type annotation for function argument".to_string()
+            CheckKind::MissingTypeFunctionArgument(name) => {
+                format!("Missing type annotation for function argument `{name}`")
             }
-            CheckKind::MissingTypeArgs => "Missing type annotation for `*args`".to_string(),
-            CheckKind::MissingTypeKwargs => "Missing type annotation for `**kwargs`".to_string(),
-            CheckKind::MissingTypeSelf => {
-                "Missing type annotation for `self` in method".to_string()
+            CheckKind::MissingTypeArgs(name) => format!("Missing type annotation for `*{name}`"),
+            CheckKind::MissingTypeKwargs(name) => {
+                format!("Missing type annotation for `**{name}`")
             }
-            CheckKind::MissingTypeCls => {
-                "Missing type annotation for `cls` in classmethod".to_string()
+            CheckKind::MissingTypeSelf(name) => {
+                format!("Missing type annotation for `{name}` in method")
             }
-            CheckKind::MissingReturnTypePublicFunction => {
-                "Missing return type annotation for public function".to_string()
+            CheckKind::MissingTypeCls(name) => {
+                format!("Missing type annotation for `{name}` in classmethod")
             }
-            CheckKind::MissingReturnTypePrivateFunction => {
-                "Missing return type annotation for private function".to_string()
+            CheckKind::MissingReturnTypePublicFunction(name) => {
+                format!("Missing return type annotation for public function `{name}`")
             }
-            CheckKind::MissingReturnTypeMagicMethod => {
-                "Missing return type annotation for magic method".to_string()
+            CheckKind::MissingReturnTypePrivateFunction(name) => {
+                format!("Missing return type annotation for private function `{name}`")
             }
-            CheckKind::MissingReturnTypeStaticMethod => {
-                "Missing return type annotation for staticmethod".to_string()
+            CheckKind::MissingReturnTypeMagicMethod(name) => {
+                format!("Missing return type annotation for magic method `{name}`")
             }
-            CheckKind::MissingReturnTypeClassMethod => {
-                "Missing return type annotation for classmethod".to_string()
+            CheckKind::MissingReturnTypeStaticMethod(name) => {
+                format!("Missing return type annotation for staticmethod `{name}`")
+            }
+            CheckKind::MissingReturnTypeClassMethod(name) => {
+                format!("Missing return type annotation for classmethod `{name}`")
             }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
