@@ -5,9 +5,10 @@
 //! parse a whole program, a single statement, or a single
 //! expression.
 
-use crate::lexer::LexResult;
+use crate::lexer::{LexResult, Tok};
 pub use crate::mode::Mode;
 use crate::{ast, error::ParseError, lexer, python};
+use itertools::Itertools;
 use std::iter;
 
 /*
@@ -74,7 +75,9 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
     let lxr = lexer::make_tokenizer(source);
     let marker_token = (Default::default(), mode.to_marker(), Default::default());
-    let tokenizer = iter::once(Ok(marker_token)).chain(lxr);
+    let tokenizer = iter::once(Ok(marker_token))
+        .chain(lxr)
+        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment));
 
     python::TopParser::new()
         .parse(tokenizer)
@@ -88,7 +91,9 @@ pub fn parse_tokens(
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
     let marker_token = (Default::default(), mode.to_marker(), Default::default());
-    let tokenizer = iter::once(Ok(marker_token)).chain(lxr);
+    let tokenizer = iter::once(Ok(marker_token))
+        .chain(lxr)
+        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment));
 
     python::TopParser::new()
         .parse(tokenizer)
