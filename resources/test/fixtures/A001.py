@@ -1,3 +1,6 @@
+import os.path
+import ospath
+from os import path
 import some as sum
 from some import other as int
 

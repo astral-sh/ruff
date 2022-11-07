@@ -1,0 +1,10 @@
+id: C001
+message: Don't import os
+severity: warning
+language: Python
+rule:
+  any:
+    - pattern: import os
+    - pattern: import os.$_
+    - pattern: from os import $_
+    - pattern: from os.$_ import $_
