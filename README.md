@@ -15,21 +15,24 @@ An extremely fast Python linter, written in Rust.
   <i>Linting the CPython codebase from scratch.</i>
 </p>
 
-- ⚡️ 10-100x faster than existing linters
-- 🐍 Installable via `pip`
-- 🤝 Python 3.10 compatibility
-- 🛠️ `pyproject.toml` support
-- 📦 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache support
-- 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix)-inspired autofix support (e.g., automatically remove unused imports)
-- 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` support, for continuous file monitoring
-- ⚖️ [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
-- 🔌 Native re-implementations of popular Flake8 plugins, like [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) ([`pydocstyle`](https://pypi.org/project/pydocstyle/))
+- ⚡️  10-100x faster than existing linters
+- 🐍  Installable via `pip`
+- 🤝  Python 3.10 compatibility
+- 🛠️  `pyproject.toml` support
+- 📦  Built-in caching, to avoid re-analyzing unchanged files
+- 🔧  `--fix` support, for automatic error correction (e.g., automatically remove unused imports)
+- 👀  `--watch` support, for continuous file monitoring
+- ⚖️  [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
+- 🔌  Native re-implementations of popular Flake8 plugins, like [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) ([`pydocstyle`](https://pypi.org/project/pydocstyle/))
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface. Ruff can be used to replace Flake8 (plus a variety
 of plugins), [`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](https://github.com/asottile/yesqa),
 and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/) and [`autoflake`](https://pypi.org/project/autoflake/)
 all while executing tens or hundreds of times faster than any individual tool.
+
+(Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
+automatically convert your existing configuration.)
 
 Ruff is actively developed and used in major open-source projects
 like [Zulip](https://github.com/zulip/zulip), [pydantic](https://github.com/pydantic/pydantic),
@@ -607,6 +610,9 @@ As a project, Ruff is designed to be used alongside Black and, as such, will def
 stylistic lint rules that are obviated by autoformatting.
 
 ### How does Ruff compare to Flake8?
+
+(Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
+automatically convert your existing configuration.)
 
 Ruff can be used as a (near) drop-in replacement for Flake8 when used (1) without or with a small
 number of plugins, (2) alongside Black, and (3) on Python 3 code.
