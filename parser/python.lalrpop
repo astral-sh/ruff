@@ -1414,5 +1414,6 @@ extern {
         name => lexer::Tok::Name { name: <String> },
         "\n" => lexer::Tok::Newline,
         ";" => lexer::Tok::Semi,
+        "#" => lexer::Tok::Comment,
     }
 }
