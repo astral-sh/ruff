@@ -175,7 +175,6 @@ static IMPORTED_SUBSCRIPTS: Lazy<BTreeMap<&'static str, BTreeSet<&'static str>>>
             ("Counter", "typing_extensions"),
             ("DefaultDict", "typing_extensions"),
             ("Deque", "typing_extensions"),
-            ("Literal", "typing_extensions"),
             ("Type", "typing_extensions"),
             // `weakref`
             ("WeakKeyDictionary", "weakref"),
