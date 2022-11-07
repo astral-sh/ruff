@@ -2,7 +2,8 @@
 source: src/flake8_annotations/mod.rs
 expression: checks
 ---
-- kind: MissingReturnTypePublicFunction
+- kind:
+    MissingReturnTypePublicFunction: foo
   location:
     row: 45
     column: 0
@@ -10,7 +11,8 @@ expression: checks
     row: 50
     column: 0
   fix: ~
-- kind: MissingReturnTypePublicFunction
+- kind:
+    MissingReturnTypePublicFunction: foo
   location:
     row: 50
     column: 0

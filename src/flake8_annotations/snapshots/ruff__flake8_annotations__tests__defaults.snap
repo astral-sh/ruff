@@ -2,7 +2,8 @@
 source: src/flake8_annotations/mod.rs
 expression: checks
 ---
-- kind: MissingReturnTypePublicFunction
+- kind:
+    MissingReturnTypePublicFunction: foo
   location:
     row: 4
     column: 0
@@ -10,7 +11,8 @@ expression: checks
     row: 9
     column: 0
   fix: ~
-- kind: MissingTypeFunctionArgument
+- kind:
+    MissingTypeFunctionArgument: a
   location:
     row: 4
     column: 8
@@ -18,7 +20,8 @@ expression: checks
     row: 4
     column: 9
   fix: ~
-- kind: MissingTypeFunctionArgument
+- kind:
+    MissingTypeFunctionArgument: b
   location:
     row: 4
     column: 11
@@ -26,7 +29,8 @@ expression: checks
     row: 4
     column: 12
   fix: ~
-- kind: MissingReturnTypePublicFunction
+- kind:
+    MissingReturnTypePublicFunction: foo
   location:
     row: 9
     column: 0
@@ -34,7 +38,8 @@ expression: checks
     row: 14
     column: 0
   fix: ~
-- kind: MissingTypeFunctionArgument
+- kind:
+    MissingTypeFunctionArgument: b
   location:
     row: 9
     column: 16
@@ -42,7 +47,8 @@ expression: checks
     row: 9
     column: 17
   fix: ~
-- kind: MissingTypeFunctionArgument
+- kind:
+    MissingTypeFunctionArgument: b
   location:
     row: 14
     column: 16
@@ -50,7 +56,8 @@ expression: checks
     row: 14
     column: 17
   fix: ~
-- kind: MissingReturnTypePublicFunction
+- kind:
+    MissingReturnTypePublicFunction: foo
   location:
     row: 19
     column: 0
@@ -58,7 +65,8 @@ expression: checks
     row: 24
     column: 0
   fix: ~
-- kind: MissingReturnTypePublicFunction
+- kind:
+    MissingReturnTypePublicFunction: foo
   location:
     row: 24
     column: 0
@@ -66,7 +74,8 @@ expression: checks
     row: 29
     column: 0
   fix: ~
-- kind: MissingTypeSelf
+- kind:
+    MissingTypeSelf: self
   location:
     row: 44
     column: 12
@@ -74,7 +83,8 @@ expression: checks
     row: 44
     column: 16
   fix: ~
-- kind: MissingTypeCls
+- kind:
+    MissingTypeCls: cls
   location:
     row: 54
     column: 12

@@ -535,16 +535,16 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument |  |
-| ANN002 | MissingTypeArgs | Missing type annotation for `*args` |  |
-| ANN003 | MissingTypeKwargs | Missing type annotation for `**kwargs` |  |
-| ANN101 | MissingTypeSelf | Missing type annotation for `self` in method |  |
-| ANN102 | MissingTypeCls | Missing type annotation for `cls` in classmethod |  |
-| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function |  |
-| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function |  |
-| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method |  |
-| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod |  |
-| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod |  |
+| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument `...` |  |
+| ANN002 | MissingTypeArgs | Missing type annotation for `*...` |  |
+| ANN003 | MissingTypeKwargs | Missing type annotation for `**...` |  |
+| ANN101 | MissingTypeSelf | Missing type annotation for `...` in method |  |
+| ANN102 | MissingTypeCls | Missing type annotation for `...` in classmethod |  |
+| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function `...` |  |
+| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function `...` |  |
+| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method `...` |  |
+| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `...` |  |
+| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
 
 ### Ruff-specific rules
 
