@@ -1119,9 +1119,12 @@ where
                 if self.settings.enabled.contains(&CheckCode::C404) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_dict(
+                            expr,
                             func,
                             args,
                             keywords,
+                            self.locator,
+                            self.patch(),
                             Range::from_located(expr),
                         )
                     {

@@ -149,19 +149,26 @@ pub fn unnecessary_list_comprehension_set(
 
 /// C404 (`dict([...])`)
 pub fn unnecessary_list_comprehension_dict(
+    expr: &Expr,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
+    locator: &SourceCodeLocator,
+    fix: bool,
     location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     if let ExprKind::ListComp { elt, .. } = &argument {
         match &elt.node {
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                return Some(Check::new(
-                    CheckKind::UnnecessaryListComprehensionDict,
-                    location,
-                ));
+                let mut check = Check::new(CheckKind::UnnecessaryListComprehensionDict, location);
+                if fix {
+                    match fixes::fix_unnecessary_list_comprehension_dict(locator, expr) {
+                        Ok(fix) => check.amend(fix),
+                        Err(e) => error!("Failed to generate fix: {}", e),
+                    }
+                }
+                return Some(check);
             }
             _ => {}
         }

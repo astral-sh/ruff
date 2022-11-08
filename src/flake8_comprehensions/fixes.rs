@@ -220,6 +220,64 @@ pub fn fix_unnecessary_list_comprehension_set(
     ))
 }
 
+/// (C404) Convert `dict([(i, i) for i in range(3)])` to `{i: i for i in
+/// range(3)}`.
+pub fn fix_unnecessary_list_comprehension_dict(
+    locator: &SourceCodeLocator,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
+
+    let list_comp = if let Expression::ListComp(list_comp) = &arg.value {
+        list_comp
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Expression::ListComp"));
+    };
+
+    let tuple = if let Expression::Tuple(tuple) = &*list_comp.elt {
+        tuple
+    } else {
+        return Err(anyhow::anyhow!("Expected node to be: Expression::Tuple"));
+    };
+
+    let (key, comma, value) = match &tuple.elements[..] {
+        [Element::Simple {
+            value: key,
+            comma: Some(comma),
+        }, Element::Simple { value, .. }] => (key, comma, value),
+        _ => return Err(anyhow::anyhow!("Expected tuple with two elements")),
+    };
+
+    body.value = Expression::DictComp(Box::new(DictComp {
+        key: Box::new(key.clone()),
+        value: Box::new(value.clone()),
+        for_in: list_comp.for_in.clone(),
+        whitespace_before_colon: comma.whitespace_before.clone(),
+        whitespace_after_colon: comma.whitespace_after.clone(),
+        lbrace: LeftCurlyBrace {
+            whitespace_after: call.whitespace_before_args.clone(),
+        },
+        rbrace: RightCurlyBrace {
+            whitespace_before: arg.whitespace_after_arg.clone(),
+        },
+        lpar: list_comp.lpar.clone(),
+        rpar: list_comp.rpar.clone(),
+    }));
+
+    let mut state = Default::default();
+    tree.codegen(&mut state);
+
+    Ok(Fix::replacement(
+        state.to_string(),
+        expr.location,
+        expr.end_location.unwrap(),
+    ))
+}
+
 /// (C405) Convert `set((1, 2))` to `{1, 2}`.
 pub fn fix_unnecessary_literal_set(
     locator: &SourceCodeLocator,
