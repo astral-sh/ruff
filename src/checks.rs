@@ -128,6 +128,7 @@ pub enum CheckCode {
     ANN204,
     ANN205,
     ANN206,
+    ANN401,
     // pyupgrade
     U001,
     U002,
@@ -390,6 +391,7 @@ pub enum CheckKind {
     MissingReturnTypeMagicMethod(String),
     MissingReturnTypeStaticMethod(String),
     MissingReturnTypeClassMethod(String),
+    DynamicallyTypedExpression(String),
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UnnecessaryAbspath,
@@ -614,6 +616,7 @@ impl CheckCode {
             CheckCode::ANN204 => CheckKind::MissingReturnTypeMagicMethod("...".to_string()),
             CheckCode::ANN205 => CheckKind::MissingReturnTypeStaticMethod("...".to_string()),
             CheckCode::ANN206 => CheckKind::MissingReturnTypeClassMethod("...".to_string()),
+            CheckCode::ANN401 => CheckKind::DynamicallyTypedExpression("...".to_string()),
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
@@ -810,6 +813,7 @@ impl CheckCode {
             CheckCode::ANN204 => CheckCategory::Flake8Annotations,
             CheckCode::ANN205 => CheckCategory::Flake8Annotations,
             CheckCode::ANN206 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN401 => CheckCategory::Flake8Annotations,
             CheckCode::U001 => CheckCategory::Pyupgrade,
             CheckCode::U002 => CheckCategory::Pyupgrade,
             CheckCode::U003 => CheckCategory::Pyupgrade,
@@ -993,6 +997,7 @@ impl CheckKind {
             CheckKind::MissingReturnTypeMagicMethod(_) => &CheckCode::ANN204,
             CheckKind::MissingReturnTypeStaticMethod(_) => &CheckCode::ANN205,
             CheckKind::MissingReturnTypeClassMethod(_) => &CheckCode::ANN206,
+            CheckKind::DynamicallyTypedExpression(_) => &CheckCode::ANN401,
             // pyupgrade
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
@@ -1415,6 +1420,9 @@ impl CheckKind {
             }
             CheckKind::MissingReturnTypeClassMethod(name) => {
                 format!("Missing return type annotation for classmethod `{name}`")
+            }
+            CheckKind::DynamicallyTypedExpression(name) => {
+                format!("Dynamically typed expressions (typing.Any) are disallowed in `{name}`")
             }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {

@@ -16,6 +16,8 @@ pub struct Options {
     /// - Explicit `return` statement(s) all return `None` (explicitly or
     ///   implicitly).
     pub suppress_none_returning: Option<bool>,
+    /// Suppress ANN401 for dynamically typed *args and **kwargs.
+    pub allow_star_arg_any: Option<bool>,
 }
 
 #[derive(Debug, Hash, Default)]
@@ -23,6 +25,7 @@ pub struct Settings {
     pub mypy_init_return: bool,
     pub suppress_dummy_args: bool,
     pub suppress_none_returning: bool,
+    pub allow_star_arg_any: bool,
 }
 
 impl Settings {
@@ -31,6 +34,7 @@ impl Settings {
             mypy_init_return: options.mypy_init_return.unwrap_or_default(),
             suppress_dummy_args: options.suppress_dummy_args.unwrap_or_default(),
             suppress_none_returning: options.suppress_none_returning.unwrap_or_default(),
+            allow_star_arg_any: options.allow_star_arg_any.unwrap_or_default(),
         }
     }
 }

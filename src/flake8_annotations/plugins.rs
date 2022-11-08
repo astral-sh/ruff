@@ -48,6 +48,16 @@ fn is_none_returning(body: &[Stmt]) -> bool {
     true
 }
 
+/// ANN401
+fn check_dynamically_typed(checker: &mut Checker, annotation: &Expr, name: &str) {
+    if checker.match_typing_module(annotation, "Any") {
+        checker.add_check(Check::new(
+            CheckKind::DynamicallyTypedExpression(name.to_string()),
+            Range::from_located(annotation),
+        ));
+    };
+}
+
 fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, &Option<Box<Expr>>, &Vec<Stmt>) {
     match &stmt.node {
         StmtKind::FunctionDef {
@@ -81,14 +91,18 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
         DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
             let (name, args, returns, body) = match_function_def(stmt);
 
-            // ANN001
+            // ANN001, ANN401
             for arg in args
                 .args
                 .iter()
                 .chain(args.posonlyargs.iter())
                 .chain(args.kwonlyargs.iter())
             {
-                if arg.node.annotation.is_none() {
+                if let Some(expr) = &arg.node.annotation {
+                    if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                        check_dynamically_typed(checker, expr, &arg.node.arg);
+                    };
+                } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
@@ -102,9 +116,16 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 }
             }
 
-            // ANN002
+            // ANN002, ANN401
             if let Some(arg) = &args.vararg {
-                if arg.node.annotation.is_none() {
+                if let Some(expr) = &arg.node.annotation {
+                    if !checker.settings.flake8_annotations.allow_star_arg_any {
+                        if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                            let name = arg.node.arg.to_string();
+                            check_dynamically_typed(checker, expr, &format!("*{name}"));
+                        }
+                    }
+                } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
@@ -118,9 +139,16 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 }
             }
 
-            // ANN003
+            // ANN003, ANN401
             if let Some(arg) = &args.kwarg {
-                if arg.node.annotation.is_none() {
+                if let Some(expr) = &arg.node.annotation {
+                    if !checker.settings.flake8_annotations.allow_star_arg_any {
+                        if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                            let name = arg.node.arg.to_string();
+                            check_dynamically_typed(checker, expr, &format!("**{name}"));
+                        }
+                    }
+                } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
@@ -134,8 +162,12 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 }
             }
 
-            // ANN201, ANN202
-            if returns.is_none() {
+            // ANN201, ANN202, ANN401
+            if let Some(expr) = &returns {
+                if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                    check_dynamically_typed(checker, expr, name);
+                };
+            } else {
                 // Allow omission of return annotation in `__init__` functions, if the function
                 // only returns `None` (explicitly or implicitly).
                 if checker.settings.flake8_annotations.suppress_none_returning
@@ -179,7 +211,13 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     usize::from(!visibility::is_staticmethod(stmt)),
                 )
             {
-                if arg.node.annotation.is_none() {
+                // ANN401 for dynamically typed arguments
+                if let Some(annotation) = &arg.node.annotation {
+                    has_any_typed_arg = true;
+                    if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                        check_dynamically_typed(checker, annotation, &arg.node.arg);
+                    }
+                } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
@@ -190,14 +228,20 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             ));
                         }
                     }
-                } else {
-                    has_any_typed_arg = true;
                 }
             }
 
-            // ANN002
+            // ANN002, ANN401
             if let Some(arg) = &args.vararg {
-                if arg.node.annotation.is_none() {
+                has_any_typed_arg = true;
+                if let Some(expr) = &arg.node.annotation {
+                    if !checker.settings.flake8_annotations.allow_star_arg_any {
+                        if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                            let name = arg.node.arg.to_string();
+                            check_dynamically_typed(checker, expr, &format!("*{name}"));
+                        }
+                    }
+                } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
@@ -208,14 +252,20 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             ));
                         }
                     }
-                } else {
-                    has_any_typed_arg = true;
                 }
             }
 
-            // ANN003
+            // ANN003, ANN401
             if let Some(arg) = &args.kwarg {
-                if arg.node.annotation.is_none() {
+                has_any_typed_arg = true;
+                if let Some(expr) = &arg.node.annotation {
+                    if !checker.settings.flake8_annotations.allow_star_arg_any {
+                        if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                            let name = arg.node.arg.to_string();
+                            check_dynamically_typed(checker, expr, &format!("**{name}"));
+                        }
+                    }
+                } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
@@ -226,8 +276,6 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             ));
                         }
                     }
-                } else {
-                    has_any_typed_arg = true;
                 }
             }
 
@@ -255,7 +303,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             }
 
             // ANN201, ANN202
-            if returns.is_none() {
+            if let Some(expr) = &returns {
+                if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                    check_dynamically_typed(checker, expr, name);
+                }
+            } else {
                 // Allow omission of return annotation in `__init__` functions, if the function
                 // only returns `None` (explicitly or implicitly).
                 if checker.settings.flake8_annotations.suppress_none_returning
