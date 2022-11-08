@@ -565,6 +565,10 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 
 ## Editor Integrations
 
+### VS Code (Official)
+
+Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff).
+
 ### PyCharm
 
 Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
@@ -576,6 +580,19 @@ add a new tool with the following configuration:
 Ruff should then appear as a runnable action:
 
 ![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
+
+### Vim & Neovim (Unofficial)
+
+Ruff is available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright) extension
+for coc.nvim.
+
+Ruff can also be integrated via [efm](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm)
+in just a [few lines](https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20).
+
+### Language Server Protocol (Unofficial)
+
+[`ruffd`](https://github.com/Seamooo/ruffd) is a Rust-based language server for Ruff that implements
+the Language Server Protocol (LSP).
 
 ### GitHub Actions
 
