@@ -1,0 +1,25 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    AmbiguousUnicodeCharacterComment:
+      - ᜵
+      - /
+  location:
+    row: 6
+    column: 61
+  end_location:
+    row: 6
+    column: 62
+  fix:
+    patch:
+      content: /
+      location:
+        row: 6
+        column: 61
+      end_location:
+        row: 6
+        column: 62
+    applied: false
+

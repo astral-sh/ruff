@@ -202,6 +202,7 @@ pub enum CheckCode {
     // Ruff
     RUF001,
     RUF002,
+    RUF003,
     // Meta
     M001,
 }
@@ -462,6 +463,7 @@ pub enum CheckKind {
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
+    AmbiguousUnicodeCharacterComment(char, char),
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -480,7 +482,8 @@ impl CheckCode {
             | CheckCode::Q003
             | CheckCode::W605
             | CheckCode::RUF001
-            | CheckCode::RUF002 => &LintSource::Tokens,
+            | CheckCode::RUF002
+            | CheckCode::RUF003 => &LintSource::Tokens,
             CheckCode::E902 => &LintSource::FileSystem,
             _ => &LintSource::AST,
         }
@@ -702,6 +705,7 @@ impl CheckCode {
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
+            CheckCode::RUF003 => CheckKind::AmbiguousUnicodeCharacterComment('𝐁', 'B'),
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -873,6 +877,7 @@ impl CheckCode {
             CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
+            CheckCode::RUF003 => CheckCategory::Ruff,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -1058,6 +1063,7 @@ impl CheckKind {
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
+            CheckKind::AmbiguousUnicodeCharacterComment(..) => &CheckCode::RUF003,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -1603,6 +1609,12 @@ impl CheckKind {
             CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant) => {
                 format!(
                     "Docstring contains ambiguous unicode character '{confusable}' (did you mean \
+                     '{representant}'?)"
+                )
+            }
+            CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {
+                format!(
+                    "Comment contains ambiguous unicode character '{confusable}' (did you mean \
                      '{representant}'?)"
                 )
             }
