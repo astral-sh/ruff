@@ -1,8 +1,9 @@
 use anyhow::Result;
 use libcst_native::{
-    Arg, Call, Codegen, Dict, DictComp, DictElement, Element, Expr, Expression, LeftCurlyBrace,
-    LeftParen, LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace, RightCurlyBrace,
-    RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace, Tuple,
+    Arg, AssignEqual, Call, Codegen, Dict, DictComp, DictElement, Element, Expr, Expression,
+    LeftCurlyBrace, LeftParen, LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace,
+    RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
+    Tuple,
 };
 
 use crate::ast::types::Range;
@@ -580,6 +581,92 @@ pub fn fix_unnecessary_list_call(
     let arg = match_arg(call)?;
 
     body.value = arg.value.clone();
+
+    let mut state = Default::default();
+    tree.codegen(&mut state);
+
+    Ok(Fix::replacement(
+        state.to_string(),
+        expr.location,
+        expr.end_location.unwrap(),
+    ))
+}
+
+/// (C413) Convert `list(sorted([2, 3, 1]))` to `sorted([2, 3, 1])`.
+/// (C413) Convert `reversed(sorted([2, 3, 1]))` to `sorted([2, 3, 1],
+/// reverse=True)`.
+pub fn fix_unnecessary_call_around_sorted(
+    locator: &SourceCodeLocator,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let mut tree = match_module(&module_text)?;
+    let mut body = match_expr(&mut tree)?;
+    let outer_call = match_call(body)?;
+    let inner_call = match &outer_call.args[..] {
+        [arg] => {
+            if let Expression::Call(call) = &arg.value {
+                call
+            } else {
+                return Err(anyhow::anyhow!("Expected node to be: Expression::Call "));
+            }
+        }
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Expected one argument in outer function call"
+            ))
+        }
+    };
+
+    if let Expression::Name(outer_name) = &*outer_call.func {
+        if outer_name.value == "list" {
+            body.value = Expression::Call(inner_call.clone());
+        } else {
+            let args = if inner_call.args.iter().any(|arg| {
+                matches!(
+                    arg.keyword,
+                    Some(Name {
+                        value: "reverse",
+                        ..
+                    })
+                )
+            }) {
+                inner_call.args.clone()
+            } else {
+                let mut args = inner_call.args.clone();
+                args.push(Arg {
+                    value: Expression::Name(Box::new(Name {
+                        value: "True",
+                        lpar: Default::default(),
+                        rpar: Default::default(),
+                    })),
+                    keyword: Some(Name {
+                        value: "reverse",
+                        lpar: Default::default(),
+                        rpar: Default::default(),
+                    }),
+                    equal: Some(AssignEqual {
+                        whitespace_before: Default::default(),
+                        whitespace_after: Default::default(),
+                    }),
+                    comma: Default::default(),
+                    star: Default::default(),
+                    whitespace_after_star: Default::default(),
+                    whitespace_after_arg: Default::default(),
+                });
+                args
+            };
+
+            body.value = Expression::Call(Box::new(Call {
+                func: inner_call.func.clone(),
+                args,
+                lpar: inner_call.lpar.clone(),
+                rpar: inner_call.rpar.clone(),
+                whitespace_after_func: inner_call.whitespace_after_func.clone(),
+                whitespace_before_args: inner_call.whitespace_before_args.clone(),
+            }))
+        }
+    }
 
     let mut state = Default::default();
     tree.codegen(&mut state);

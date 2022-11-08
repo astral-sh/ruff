@@ -1217,8 +1217,11 @@ where
                 if self.settings.enabled.contains(&CheckCode::C413) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_call_around_sorted(
+                            expr,
                             func,
                             args,
+                            self.locator,
+                            self.patch(),
                             Range::from_located(expr),
                         )
                     {
