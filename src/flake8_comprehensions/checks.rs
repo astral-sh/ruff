@@ -371,7 +371,6 @@ pub fn unnecessary_call_around_sorted(
                     Err(e) => error!("Failed to generate fix: {}", e),
                 }
             }
-
             return Some(check);
         }
     }

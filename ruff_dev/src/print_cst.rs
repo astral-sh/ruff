@@ -1,4 +1,4 @@
-//! Print the LibCST AST for a given Python file.
+//! Print the LibCST CST for a given Python file.
 
 use std::fs;
 use std::path::PathBuf;
@@ -8,7 +8,7 @@ use clap::Args;
 
 #[derive(Args)]
 pub struct Cli {
-    /// Python file for which to generate the AST.
+    /// Python file for which to generate the CST.
     #[arg(required = true)]
     file: PathBuf,
 }
@@ -16,8 +16,10 @@ pub struct Cli {
 pub fn main(cli: &Cli) -> Result<()> {
     let contents = fs::read_to_string(&cli.file)?;
     match libcst_native::parse_module(&contents, None) {
-        Ok(m) => println!("{:#?}", m),
-        Err(_) => {}
+        Ok(python_cst) => {
+            println!("{:#?}", python_cst);
+            Ok(())
+        }
+        Err(_) => Err(anyhow::anyhow!("Failed to parse CST")),
     }
-    Ok(())
 }
