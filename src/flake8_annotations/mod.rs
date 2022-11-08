@@ -136,9 +136,7 @@ mod tests {
     #[test]
     fn allow_star_arg_any() -> Result<()> {
         let mut checks = check_path(
-            Path::new(
-                "./resources/test/fixtures/flake8_annotations/allow_star_arg_any.py",
-            ),
+            Path::new("./resources/test/fixtures/flake8_annotations/allow_star_arg_any.py"),
             &Settings {
                 flake8_annotations: flake8_annotations::settings::Settings {
                     mypy_init_return: false,
