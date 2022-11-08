@@ -2405,6 +2405,7 @@ impl<'a> Checker<'a> {
                 || self.settings.enabled.contains(&CheckCode::ANN204)
                 || self.settings.enabled.contains(&CheckCode::ANN205)
                 || self.settings.enabled.contains(&CheckCode::ANN206)
+                || self.settings.enabled.contains(&CheckCode::ANN401)
             {
                 flake8_annotations::plugins::definition(self, &definition, &visibility);
             }

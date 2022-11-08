@@ -45,6 +45,7 @@ mod tests {
                     CheckCode::ANN204,
                     CheckCode::ANN205,
                     CheckCode::ANN206,
+                    CheckCode::ANN401,
                 ])
             },
             &fixer::Mode::Generate,
@@ -63,6 +64,7 @@ mod tests {
                     mypy_init_return: false,
                     suppress_dummy_args: true,
                     suppress_none_returning: false,
+                    allow_star_arg_any: false,
                 },
                 ..Settings::for_rules(vec![
                     CheckCode::ANN001,
@@ -88,6 +90,7 @@ mod tests {
                     mypy_init_return: true,
                     suppress_dummy_args: false,
                     suppress_none_returning: false,
+                    allow_star_arg_any: false,
                 },
                 ..Settings::for_rules(vec![
                     CheckCode::ANN201,
@@ -113,6 +116,7 @@ mod tests {
                     mypy_init_return: false,
                     suppress_dummy_args: false,
                     suppress_none_returning: true,
+                    allow_star_arg_any: false,
                 },
                 ..Settings::for_rules(vec![
                     CheckCode::ANN201,
@@ -121,6 +125,28 @@ mod tests {
                     CheckCode::ANN205,
                     CheckCode::ANN206,
                 ])
+            },
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn allow_star_arg_any() -> Result<()> {
+        let mut checks = check_path(
+            Path::new(
+                "./resources/test/fixtures/flake8_annotations/allow_star_arg_any.py",
+            ),
+            &Settings {
+                flake8_annotations: flake8_annotations::settings::Settings {
+                    mypy_init_return: false,
+                    suppress_dummy_args: false,
+                    suppress_none_returning: false,
+                    allow_star_arg_any: true,
+                },
+                ..Settings::for_rules(vec![CheckCode::ANN401])
             },
             &fixer::Mode::Generate,
         )?;

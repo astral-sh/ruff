@@ -546,6 +546,7 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 | ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method `...` |  |
 | ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `...` |  |
 | ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
+| ANN401 | DynamicallyTypedExpression | Dynamically typed expressions (typing.Any) are disallowed in `...` |  |
 
 ### Ruff-specific rules
 

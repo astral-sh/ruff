@@ -75,21 +75,129 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    MissingTypeSelf: self
+    DynamicallyTypedExpression: a
   location:
     row: 44
-    column: 12
+    column: 11
   end_location:
     row: 44
+    column: 14
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: foo
+  location:
+    row: 49
+    column: 46
+  end_location:
+    row: 49
+    column: 49
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: "*args"
+  location:
+    row: 54
+    column: 23
+  end_location:
+    row: 54
+    column: 26
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: "**kwargs"
+  location:
+    row: 54
+    column: 38
+  end_location:
+    row: 54
+    column: 41
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: "*args"
+  location:
+    row: 59
+    column: 23
+  end_location:
+    row: 59
+    column: 26
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: "**kwargs"
+  location:
+    row: 64
+    column: 38
+  end_location:
+    row: 64
+    column: 41
+  fix: ~
+- kind:
+    MissingTypeSelf: self
+  location:
+    row: 74
+    column: 12
+  end_location:
+    row: 74
     column: 16
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: a
+  location:
+    row: 78
+    column: 28
+  end_location:
+    row: 78
+    column: 31
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: foo
+  location:
+    row: 82
+    column: 66
+  end_location:
+    row: 82
+    column: 69
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: "*params"
+  location:
+    row: 86
+    column: 42
+  end_location:
+    row: 86
+    column: 45
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: "**options"
+  location:
+    row: 86
+    column: 58
+  end_location:
+    row: 86
+    column: 61
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: "*params"
+  location:
+    row: 90
+    column: 42
+  end_location:
+    row: 90
+    column: 45
+  fix: ~
+- kind:
+    DynamicallyTypedExpression: "**options"
+  location:
+    row: 94
+    column: 58
+  end_location:
+    row: 94
+    column: 61
   fix: ~
 - kind:
     MissingTypeCls: cls
   location:
-    row: 54
+    row: 104
     column: 12
   end_location:
-    row: 54
+    row: 104
     column: 15
   fix: ~
 
