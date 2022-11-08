@@ -1596,11 +1596,17 @@ static CONFUSABLES: Lazy<BTreeMap<u32, u32>> = Lazy::new(|| {
     ])
 });
 
+pub enum Context {
+    String,
+    Docstring,
+    Comment,
+}
+
 pub fn ambiguous_unicode_character(
     locator: &SourceCodeLocator,
     start: &Location,
     end: &Location,
-    is_docstring: bool,
+    context: Context,
     fix: bool,
 ) -> Vec<Check> {
     let mut checks = vec![];
@@ -1623,10 +1629,17 @@ pub fn ambiguous_unicode_character(
                 };
                 let end_location = Location::new(location.row(), location.column() + 1);
                 let mut check = Check::new(
-                    if is_docstring {
-                        CheckKind::AmbiguousUnicodeCharacterDocstring(current_char, representant)
-                    } else {
-                        CheckKind::AmbiguousUnicodeCharacterString(current_char, representant)
+                    match context {
+                        Context::String => {
+                            CheckKind::AmbiguousUnicodeCharacterString(current_char, representant)
+                        }
+                        Context::Docstring => CheckKind::AmbiguousUnicodeCharacterDocstring(
+                            current_char,
+                            representant,
+                        ),
+                        Context::Comment => {
+                            CheckKind::AmbiguousUnicodeCharacterComment(current_char, representant)
+                        }
                     },
                     Range {
                         location,

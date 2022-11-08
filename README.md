@@ -552,6 +552,7 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 | ---- | ---- | ------- | --- |
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
+| RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
 
 ### Meta rules
 
