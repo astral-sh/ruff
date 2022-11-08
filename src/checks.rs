@@ -1417,7 +1417,7 @@ impl CheckKind {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
             CheckKind::UnnecessaryFutureImport(name) => {
-                format!("Unnessary __future__ import `{name}` for target python version")
+                format!("Unnessary __future__ import `{name}` for target Python version")
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
