@@ -355,8 +355,11 @@ pub fn unnecessary_list_call(
 
 /// C413
 pub fn unnecessary_call_around_sorted(
+    expr: &Expr,
     func: &Expr,
     args: &[Expr],
+    locator: &SourceCodeLocator,
+    fix: bool,
     location: Range,
 ) -> Option<Check> {
     let outer = function_name(func)?;
@@ -365,10 +368,17 @@ pub fn unnecessary_call_around_sorted(
     }
     if let ExprKind::Call { func, .. } = &args.first()?.node {
         if function_name(func)? == "sorted" {
-            return Some(Check::new(
+            let mut check = Check::new(
                 CheckKind::UnnecessaryCallAroundSorted(outer.to_string()),
                 location,
-            ));
+            );
+            if fix {
+                match fixes::fix_unnecessary_call_around_sorted(locator, expr) {
+                    Ok(fix) => check.amend(fix),
+                    Err(e) => error!("Failed to generate fix: {}", e),
+                }
+            }
+            return Some(check);
         }
     }
     None

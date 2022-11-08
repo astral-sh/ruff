@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use ruff_dev::{
-    generate_check_code_prefix, generate_rules_table, generate_source_code, print_ast, print_tokens,
+    generate_check_code_prefix, generate_rules_table, generate_source_code, print_ast, print_cst,
+    print_tokens,
 };
 
 #[derive(Parser)]
@@ -22,6 +23,8 @@ enum Commands {
     GenerateSourceCode(generate_source_code::Cli),
     /// Print the AST for a given Python file.
     PrintAST(print_ast::Cli),
+    /// Print the LibCST CST for a given Python file.
+    PrintCST(print_cst::Cli),
     /// Print the token stream for a given Python file.
     PrintTokens(print_tokens::Cli),
 }
@@ -33,6 +36,7 @@ fn main() -> Result<()> {
         Commands::GenerateRulesTable(args) => generate_rules_table::main(args)?,
         Commands::GenerateSourceCode(args) => generate_source_code::main(args)?,
         Commands::PrintAST(args) => print_ast::main(args)?,
+        Commands::PrintCST(args) => print_cst::main(args)?,
         Commands::PrintTokens(args) => print_tokens::main(args)?,
     }
     Ok(())
