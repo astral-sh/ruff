@@ -920,7 +920,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.107-dev.0"
+version = "0.0.108-dev.0"
 dependencies = [
  "anyhow",
  "clap 4.0.15",
@@ -2221,7 +2221,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.107"
+version = "0.0.108"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2266,7 +2266,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.107"
+version = "0.0.108"
 dependencies = [
  "anyhow",
  "clap 4.0.15",
