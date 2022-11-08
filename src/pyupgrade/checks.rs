@@ -6,7 +6,7 @@ use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::types::Primitive;
 use crate::settings::types::PythonVersion;
 
-pub const PY3_PLUS_REMOVE_FUTURES: &[&str] = &[
+pub const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
     "nested_scopes",
     "generators",
     "with_statement",
@@ -186,7 +186,7 @@ pub fn unnecessary_future_import(
     name: &str,
     location: Range,
 ) -> Option<Check> {
-    if (version >= PythonVersion::Py33 && PY3_PLUS_REMOVE_FUTURES.contains(&name))
+    if (version >= PythonVersion::Py33 && PY33_PLUS_REMOVE_FUTURES.contains(&name))
         || (version >= PythonVersion::Py37 && PY37_PLUS_REMOVE_FUTURES.contains(&name))
     {
         return Some(Check::new(

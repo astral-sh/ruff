@@ -10,9 +10,6 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name: &str)
         name,
         Range::from_located(stmt),
     ) {
-        // TODO - remove unnecessary import
-        // if checker.patch() {
-        // }
         checker.add_check(check);
     }
 }
