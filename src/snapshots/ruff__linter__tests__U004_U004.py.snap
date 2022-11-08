@@ -269,7 +269,7 @@ expression: checks
         row: 98
         column: 4
       end_location:
-        row: 100
+        row: 99
         column: 4
     applied: false
 - kind:

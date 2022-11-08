@@ -5,7 +5,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 2
-    column: 13
+    column: 3
   end_location:
     row: 2
     column: 24
@@ -13,7 +13,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 5
-    column: 13
+    column: 3
   end_location:
     row: 5
     column: 24
@@ -21,7 +21,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 10
-    column: 7
+    column: 3
   end_location:
     row: 10
     column: 23
@@ -29,7 +29,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 15
-    column: 13
+    column: 3
   end_location:
     row: 15
     column: 34
@@ -37,7 +37,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 18
-    column: 17
+    column: 7
   end_location:
     row: 18
     column: 31
@@ -45,7 +45,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 18
-    column: 45
+    column: 35
   end_location:
     row: 18
     column: 58
@@ -53,7 +53,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 20
-    column: 17
+    column: 7
   end_location:
     row: 20
     column: 28
@@ -61,7 +61,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 22
-    column: 17
+    column: 7
   end_location:
     row: 22
     column: 28
@@ -69,7 +69,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 24
-    column: 17
+    column: 7
   end_location:
     row: 24
     column: 30
@@ -77,7 +77,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 26
-    column: 17
+    column: 7
   end_location:
     row: 26
     column: 29
@@ -85,7 +85,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 28
-    column: 17
+    column: 7
   end_location:
     row: 28
     column: 30
@@ -93,7 +93,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 30
-    column: 17
+    column: 7
   end_location:
     row: 30
     column: 30
@@ -101,7 +101,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 32
-    column: 17
+    column: 7
   end_location:
     row: 32
     column: 34
@@ -109,7 +109,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 34
-    column: 17
+    column: 7
   end_location:
     row: 38
     column: 1
@@ -117,7 +117,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 40
-    column: 17
+    column: 7
   end_location:
     row: 40
     column: 28
@@ -125,7 +125,7 @@ expression: checks
 - kind: TypeComparison
   location:
     row: 42
-    column: 17
+    column: 7
   end_location:
     row: 42
     column: 30
