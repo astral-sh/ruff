@@ -128,6 +128,12 @@ pub fn convert(
                         Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                     }
                 }
+                "allow-star-arg-any" | "allow_star_arg_any" => {
+                    match parser::parse_bool(value.as_ref()) {
+                        Ok(bool) => flake8_annotations.allow_star_arg_any = Some(bool),
+                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    }
+                }
                 // flake8-quotes
                 "quotes" | "inline-quotes" | "inline_quotes" => match value.trim() {
                     "'" | "single" => flake8_quotes.inline_quotes = Some(Quote::Single),
