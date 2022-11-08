@@ -2272,6 +2272,7 @@ dependencies = [
  "clap 4.0.15",
  "codegen",
  "itertools",
+ "libcst",
  "ruff",
  "rustpython-ast",
  "rustpython-common",
