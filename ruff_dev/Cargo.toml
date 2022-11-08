@@ -4,11 +4,11 @@ version = "0.0.108"
 edition = "2021"
 
 [dependencies]
-anyhow = { version = "1.0.60" }
+anyhow = { version = "1.0.66" }
 clap = { version = "4.0.1", features = ["derive"] }
 codegen = { version = "0.2.0" }
 itertools = { version = "0.10.5" }
-libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "32a044c127668df44582f85699358e67803b0d73" }
+libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "a13ec97dd4eb925bde4d426c6e422582793b260c" }
 ruff = { path = ".." }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }

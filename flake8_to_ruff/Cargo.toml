@@ -7,14 +7,14 @@ edition = "2021"
 name = "flake8_to_ruff"
 
 [dependencies]
-anyhow = { version = "1.0.60" }
+anyhow = { version = "1.0.66" }
 clap = { version = "4.0.1", features = ["derive"] }
 configparser = { version = "3.0.2" }
-once_cell = { version = "1.13.1" }
+once_cell = { version = "1.16.0" }
 regex = { version = "1.6.0" }
 ruff = { path = "..", default-features = false }
-serde = { version = "1.0.143", features = ["derive"] }
-serde_json = { version = "1.0.83" }
+serde = { version = "1.0.147", features = ["derive"] }
+serde_json = { version = "1.0.87" }
 toml = { version = "0.5.9" }
 
 [dev-dependencies]
