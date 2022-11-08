@@ -15,21 +15,24 @@ An extremely fast Python linter, written in Rust.
   <i>Linting the CPython codebase from scratch.</i>
 </p>
 
-- ⚡️ 10-100x faster than existing linters
-- 🐍 Installable via `pip`
-- 🤝 Python 3.10 compatibility
-- 🛠️ `pyproject.toml` support
-- 📦 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#caching)-inspired cache support
-- 🔧 [ESLint](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix)-inspired autofix support (e.g., automatically remove unused imports)
-- 👀 [TypeScript](https://www.typescriptlang.org/docs/handbook/configuring-watch.html)-inspired `--watch` support, for continuous file monitoring
-- ⚖️ [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
-- 🔌 Native re-implementations of popular Flake8 plugins, like [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) ([`pydocstyle`](https://pypi.org/project/pydocstyle/))
+- ⚡️  10-100x faster than existing linters
+- 🐍  Installable via `pip`
+- 🤝  Python 3.10 compatibility
+- 🛠️  `pyproject.toml` support
+- 📦  Built-in caching, to avoid re-analyzing unchanged files
+- 🔧  `--fix` support, for automatic error correction (e.g., automatically remove unused imports)
+- 👀  `--watch` support, for continuous file monitoring
+- ⚖️  [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
+- 🔌  Native re-implementations of popular Flake8 plugins, like [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) ([`pydocstyle`](https://pypi.org/project/pydocstyle/))
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface. Ruff can be used to replace Flake8 (plus a variety
 of plugins), [`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](https://github.com/asottile/yesqa),
 and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/) and [`autoflake`](https://pypi.org/project/autoflake/)
 all while executing tens or hundreds of times faster than any individual tool.
+
+(Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
+automatically convert your existing configuration.)
 
 Ruff is actively developed and used in major open-source projects
 like [Zulip](https://github.com/zulip/zulip), [pydantic](https://github.com/pydantic/pydantic),
@@ -94,7 +97,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.105
+    rev: v0.0.107
     hooks:
       - id: ruff
 ```
@@ -200,7 +203,7 @@ Options:
           Exit with status code "0", even upon detecting errors
   -w, --watch
           Run in watch mode by re-running whenever files change
-  -f, --fix
+      --fix
           Attempt to automatically fix lint errors
   -n, --no-cache
           Disable cache reads
@@ -483,6 +486,8 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | ---- | ---- | ------- | --- |
 | B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
 | B003 | AssignmentToOsEnviron | Assigning to `os.environ` doesn't clear the environment. |  |
+| B004 | UnreliableCallableCheck |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
+| B005 | StripWithMultiCharacters | Using `.strip()` with multi-character strings is misleading the reader. |  |
 | B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults. |  |
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body. | 🛠 |
 | B008 | FunctionCallArgumentDefault | Do not perform function calls in argument defaults. |  |
@@ -531,16 +536,16 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument |  |
-| ANN002 | MissingTypeArgs | Missing type annotation for `*args` |  |
-| ANN003 | MissingTypeKwargs | Missing type annotation for `**kwargs` |  |
-| ANN101 | MissingTypeSelf | Missing type annotation for `self` in method |  |
-| ANN102 | MissingTypeCls | Missing type annotation for `cls` in classmethod |  |
-| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function |  |
-| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function |  |
-| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method |  |
-| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod |  |
-| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod |  |
+| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument `...` |  |
+| ANN002 | MissingTypeArgs | Missing type annotation for `*...` |  |
+| ANN003 | MissingTypeKwargs | Missing type annotation for `**...` |  |
+| ANN101 | MissingTypeSelf | Missing type annotation for `...` in method |  |
+| ANN102 | MissingTypeCls | Missing type annotation for `...` in classmethod |  |
+| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function `...` |  |
+| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function `...` |  |
+| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method `...` |  |
+| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `...` |  |
+| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
 
 ### Ruff-specific rules
 
@@ -548,6 +553,7 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 | ---- | ---- | ------- | --- |
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
+| RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
 
 ### Meta rules
 
@@ -607,6 +613,9 @@ stylistic lint rules that are obviated by autoformatting.
 
 ### How does Ruff compare to Flake8?
 
+(Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
+automatically convert your existing configuration.)
+
 Ruff can be used as a (near) drop-in replacement for Flake8 when used (1) without or with a small
 number of plugins, (2) alongside Black, and (3) on Python 3 code.
 
@@ -626,7 +635,7 @@ including:
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (15/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (17/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (12/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
@@ -649,7 +658,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (15/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (17/32)
 
 Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (12/34).

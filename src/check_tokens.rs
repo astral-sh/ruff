@@ -5,6 +5,7 @@ use rustpython_parser::lexer::{LexResult, Tok};
 use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode};
 use crate::lex::docstring_detection::StateMachine;
+use crate::rules::checks::Context;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::{flake8_quotes, pycodestyle, rules, Settings};
 
@@ -16,7 +17,8 @@ pub fn check_tokens(
     autofix: &fixer::Mode,
 ) {
     let enforce_ambiguous_unicode_character = settings.enabled.contains(&CheckCode::RUF001)
-        || settings.enabled.contains(&CheckCode::RUF002);
+        || settings.enabled.contains(&CheckCode::RUF002)
+        || settings.enabled.contains(&CheckCode::RUF003);
     let enforce_quotes = settings.enabled.contains(&CheckCode::Q000)
         || settings.enabled.contains(&CheckCode::Q001)
         || settings.enabled.contains(&CheckCode::Q002)
@@ -31,14 +33,22 @@ pub fn check_tokens(
             false
         };
 
-        // RUF001, RUF002
+        // RUF001, RUF002, RUF003
         if enforce_ambiguous_unicode_character {
-            if matches!(tok, Tok::String { .. }) {
+            if matches!(tok, Tok::String { .. } | Tok::Comment) {
                 for check in rules::checks::ambiguous_unicode_character(
                     locator,
                     start,
                     end,
-                    is_docstring,
+                    if matches!(tok, Tok::String { .. }) {
+                        if is_docstring {
+                            Context::Docstring
+                        } else {
+                            Context::String
+                        }
+                    } else {
+                        Context::Comment
+                    },
                     autofix.patch(),
                 ) {
                     if settings.enabled.contains(check.kind.code()) {

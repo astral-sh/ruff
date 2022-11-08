@@ -29,9 +29,9 @@ where
     }
 }
 
-fn is_none_returning(stmt: &Stmt) -> bool {
+fn is_none_returning(body: &[Stmt]) -> bool {
     let mut visitor: ReturnStatementVisitor = Default::default();
-    for stmt in match_body(stmt) {
+    for stmt in body {
         visitor.visit_stmt(stmt);
     }
     for expr in visitor.returns.into_iter().flatten() {
@@ -48,26 +48,23 @@ fn is_none_returning(stmt: &Stmt) -> bool {
     true
 }
 
-fn match_args(stmt: &Stmt) -> &Arguments {
+fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, &Option<Box<Expr>>, &Vec<Stmt>) {
     match &stmt.node {
-        StmtKind::FunctionDef { args, .. } | StmtKind::AsyncFunctionDef { args, .. } => args,
-        _ => panic!("Found non-FunctionDef in match_args"),
-    }
-}
-
-fn match_body(stmt: &Stmt) -> &Vec<Stmt> {
-    match &stmt.node {
-        StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => body,
-        _ => panic!("Found non-FunctionDef in match_body"),
-    }
-}
-
-fn match_returns(stmt: &Stmt) -> &Option<Box<Expr>> {
-    match &stmt.node {
-        StmtKind::FunctionDef { returns, .. } | StmtKind::AsyncFunctionDef { returns, .. } => {
-            returns
+        StmtKind::FunctionDef {
+            name,
+            args,
+            returns,
+            body,
+            ..
         }
-        _ => panic!("Found non-FunctionDef in match_returns"),
+        | StmtKind::AsyncFunctionDef {
+            name,
+            args,
+            returns,
+            body,
+            ..
+        } => (name, args, returns, body),
+        _ => panic!("Found non-FunctionDef in match_name"),
     }
 }
 
@@ -82,8 +79,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
         DefinitionKind::Class(_) => {}
         DefinitionKind::NestedClass(_) => {}
         DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
-            let args = match_args(stmt);
-            let returns = match_returns(stmt);
+            let (name, args, returns, body) = match_function_def(stmt);
 
             // ANN001
             for arg in args
@@ -98,7 +94,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN001) {
                             checker.add_check(Check::new(
-                                CheckKind::MissingTypeFunctionArgument,
+                                CheckKind::MissingTypeFunctionArgument(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
                         }
@@ -114,7 +110,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN002) {
                             checker.add_check(Check::new(
-                                CheckKind::MissingTypeArgs,
+                                CheckKind::MissingTypeArgs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
                         }
@@ -130,7 +126,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN003) {
                             checker.add_check(Check::new(
-                                CheckKind::MissingTypeKwargs,
+                                CheckKind::MissingTypeKwargs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
                         }
@@ -143,7 +139,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 // Allow omission of return annotation in `__init__` functions, if the function
                 // only returns `None` (explicitly or implicitly).
                 if checker.settings.flake8_annotations.suppress_none_returning
-                    && is_none_returning(stmt)
+                    && is_none_returning(body)
                 {
                     return;
                 }
@@ -152,7 +148,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     Visibility::Public => {
                         if checker.settings.enabled.contains(&CheckCode::ANN201) {
                             checker.add_check(Check::new(
-                                CheckKind::MissingReturnTypePublicFunction,
+                                CheckKind::MissingReturnTypePublicFunction(name.to_string()),
                                 Range::from_located(stmt),
                             ));
                         }
@@ -160,7 +156,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     Visibility::Private => {
                         if checker.settings.enabled.contains(&CheckCode::ANN202) {
                             checker.add_check(Check::new(
-                                CheckKind::MissingReturnTypePrivateFunction,
+                                CheckKind::MissingReturnTypePrivateFunction(name.to_string()),
                                 Range::from_located(stmt),
                             ));
                         }
@@ -169,8 +165,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             }
         }
         DefinitionKind::Method(stmt) => {
-            let args = match_args(stmt);
-            let returns = match_returns(stmt);
+            let (name, args, returns, body) = match_function_def(stmt);
             let mut has_any_typed_arg = false;
 
             // ANN001
@@ -190,7 +185,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN001) {
                             checker.add_check(Check::new(
-                                CheckKind::MissingTypeFunctionArgument,
+                                CheckKind::MissingTypeFunctionArgument(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
                         }
@@ -208,7 +203,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN002) {
                             checker.add_check(Check::new(
-                                CheckKind::MissingTypeArgs,
+                                CheckKind::MissingTypeArgs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
                         }
@@ -226,7 +221,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN003) {
                             checker.add_check(Check::new(
-                                CheckKind::MissingTypeKwargs,
+                                CheckKind::MissingTypeKwargs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
                         }
@@ -241,16 +236,16 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 if let Some(arg) = args.args.first() {
                     if arg.node.annotation.is_none() {
                         if visibility::is_classmethod(stmt) {
-                            if checker.settings.enabled.contains(&CheckCode::ANN101) {
+                            if checker.settings.enabled.contains(&CheckCode::ANN102) {
                                 checker.add_check(Check::new(
-                                    CheckKind::MissingTypeCls,
+                                    CheckKind::MissingTypeCls(arg.node.arg.to_string()),
                                     Range::from_located(arg),
                                 ));
                             }
                         } else {
-                            if checker.settings.enabled.contains(&CheckCode::ANN102) {
+                            if checker.settings.enabled.contains(&CheckCode::ANN101) {
                                 checker.add_check(Check::new(
-                                    CheckKind::MissingTypeSelf,
+                                    CheckKind::MissingTypeSelf(arg.node.arg.to_string()),
                                     Range::from_located(arg),
                                 ));
                             }
@@ -264,7 +259,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 // Allow omission of return annotation in `__init__` functions, if the function
                 // only returns `None` (explicitly or implicitly).
                 if checker.settings.flake8_annotations.suppress_none_returning
-                    && is_none_returning(stmt)
+                    && is_none_returning(body)
                 {
                     return;
                 }
@@ -272,21 +267,21 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 if visibility::is_classmethod(stmt) {
                     if checker.settings.enabled.contains(&CheckCode::ANN206) {
                         checker.add_check(Check::new(
-                            CheckKind::MissingReturnTypeClassMethod,
+                            CheckKind::MissingReturnTypeClassMethod(name.to_string()),
                             Range::from_located(stmt),
                         ));
                     }
                 } else if visibility::is_staticmethod(stmt) {
                     if checker.settings.enabled.contains(&CheckCode::ANN205) {
                         checker.add_check(Check::new(
-                            CheckKind::MissingReturnTypeStaticMethod,
+                            CheckKind::MissingReturnTypeStaticMethod(name.to_string()),
                             Range::from_located(stmt),
                         ));
                     }
                 } else if visibility::is_magic(stmt) {
                     if checker.settings.enabled.contains(&CheckCode::ANN204) {
                         checker.add_check(Check::new(
-                            CheckKind::MissingReturnTypeMagicMethod,
+                            CheckKind::MissingReturnTypeMagicMethod(name.to_string()),
                             Range::from_located(stmt),
                         ));
                     }
@@ -298,7 +293,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             && has_any_typed_arg)
                         {
                             checker.add_check(Check::new(
-                                CheckKind::MissingReturnTypeMagicMethod,
+                                CheckKind::MissingReturnTypeMagicMethod(name.to_string()),
                                 Range::from_located(stmt),
                             ));
                         }
@@ -308,7 +303,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         Visibility::Public => {
                             if checker.settings.enabled.contains(&CheckCode::ANN201) {
                                 checker.add_check(Check::new(
-                                    CheckKind::MissingReturnTypePublicFunction,
+                                    CheckKind::MissingReturnTypePublicFunction(name.to_string()),
                                     Range::from_located(stmt),
                                 ));
                             }
@@ -316,7 +311,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         Visibility::Private => {
                             if checker.settings.enabled.contains(&CheckCode::ANN202) {
                                 checker.add_check(Check::new(
-                                    CheckKind::MissingReturnTypePrivateFunction,
+                                    CheckKind::MissingReturnTypePrivateFunction(name.to_string()),
                                     Range::from_located(stmt),
                                 ));
                             }

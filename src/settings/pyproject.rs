@@ -134,6 +134,7 @@ mod tests {
             Some(Tools {
                 ruff: Some(Options {
                     line_length: None,
+                    fix: None,
                     exclude: None,
                     extend_exclude: None,
                     select: None,
@@ -162,6 +163,7 @@ line-length = 79
             Some(Tools {
                 ruff: Some(Options {
                     line_length: Some(79),
+                    fix: None,
                     exclude: None,
                     extend_exclude: None,
                     select: None,
@@ -190,6 +192,7 @@ exclude = ["foo.py"]
             Some(Tools {
                 ruff: Some(Options {
                     line_length: None,
+                    fix: None,
                     exclude: Some(vec!["foo.py".to_string()]),
                     extend_exclude: None,
                     select: None,
@@ -218,6 +221,7 @@ select = ["E501"]
             Some(Tools {
                 ruff: Some(Options {
                     line_length: None,
+                    fix: None,
                     exclude: None,
                     extend_exclude: None,
                     select: Some(vec![CheckCodePrefix::E501]),
@@ -247,6 +251,7 @@ ignore = ["E501"]
             Some(Tools {
                 ruff: Some(Options {
                     line_length: None,
+                    fix: None,
                     exclude: None,
                     extend_exclude: None,
                     select: None,
@@ -315,6 +320,7 @@ other-attribute = 1
             config,
             Options {
                 line_length: Some(88),
+                fix: None,
                 exclude: None,
                 extend_exclude: Some(vec![
                     "excluded.py".to_string(),

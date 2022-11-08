@@ -5,7 +5,7 @@ expression: checks
 - kind: NotInTest
   location:
     row: 2
-    column: 9
+    column: 7
   end_location:
     row: 2
     column: 13
@@ -13,7 +13,7 @@ expression: checks
 - kind: NotInTest
   location:
     row: 5
-    column: 11
+    column: 7
   end_location:
     row: 5
     column: 15
@@ -21,7 +21,7 @@ expression: checks
 - kind: NotInTest
   location:
     row: 8
-    column: 9
+    column: 7
   end_location:
     row: 8
     column: 13
@@ -29,7 +29,7 @@ expression: checks
 - kind: NotInTest
   location:
     row: 11
-    column: 24
+    column: 22
   end_location:
     row: 11
     column: 28
@@ -37,7 +37,7 @@ expression: checks
 - kind: NotInTest
   location:
     row: 14
-    column: 10
+    column: 8
   end_location:
     row: 14
     column: 14

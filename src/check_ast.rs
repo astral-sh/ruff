@@ -1050,6 +1050,13 @@ where
                     flake8_print::plugins::print_call(self, expr, func);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::B004) {
+                    flake8_bugbear::plugins::unreliable_callable_check(self, expr, func, args);
+                }
+                if self.settings.enabled.contains(&CheckCode::B005) {
+                    flake8_bugbear::plugins::strip_with_multi_characters(self, expr, func, args);
+                }
+
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_list(
@@ -2391,15 +2398,13 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::ANN001)
                 || self.settings.enabled.contains(&CheckCode::ANN002)
                 || self.settings.enabled.contains(&CheckCode::ANN003)
-                || self.settings.enabled.contains(&CheckCode::ANN201)
-                || self.settings.enabled.contains(&CheckCode::ANN202)
-                || self.settings.enabled.contains(&CheckCode::ANN001)
-                || self.settings.enabled.contains(&CheckCode::ANN002)
-                || self.settings.enabled.contains(&CheckCode::ANN003)
                 || self.settings.enabled.contains(&CheckCode::ANN101)
                 || self.settings.enabled.contains(&CheckCode::ANN102)
                 || self.settings.enabled.contains(&CheckCode::ANN201)
                 || self.settings.enabled.contains(&CheckCode::ANN202)
+                || self.settings.enabled.contains(&CheckCode::ANN204)
+                || self.settings.enabled.contains(&CheckCode::ANN205)
+                || self.settings.enabled.contains(&CheckCode::ANN206)
             {
                 flake8_annotations::plugins::definition(self, &definition, &visibility);
             }

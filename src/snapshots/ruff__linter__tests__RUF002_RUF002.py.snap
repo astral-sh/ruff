@@ -8,18 +8,18 @@ expression: checks
       - )
   location:
     row: 5
-    column: 53
+    column: 55
   end_location:
     row: 5
-    column: 54
+    column: 56
   fix:
     patch:
       content: )
       location:
         row: 5
-        column: 53
+        column: 55
       end_location:
         row: 5
-        column: 54
+        column: 56
     applied: false
 

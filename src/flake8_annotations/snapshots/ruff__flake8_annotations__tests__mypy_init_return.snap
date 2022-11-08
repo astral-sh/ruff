@@ -2,7 +2,8 @@
 source: src/flake8_annotations/mod.rs
 expression: checks
 ---
-- kind: MissingReturnTypeMagicMethod
+- kind:
+    MissingReturnTypeMagicMethod: __init__
   location:
     row: 5
     column: 4
@@ -10,7 +11,8 @@ expression: checks
     row: 10
     column: 0
   fix: ~
-- kind: MissingReturnTypeMagicMethod
+- kind:
+    MissingReturnTypeMagicMethod: __init__
   location:
     row: 11
     column: 4
@@ -18,7 +20,8 @@ expression: checks
     row: 16
     column: 0
   fix: ~
-- kind: MissingReturnTypePrivateFunction
+- kind:
+    MissingReturnTypePrivateFunction: __init__
   location:
     row: 40
     column: 0

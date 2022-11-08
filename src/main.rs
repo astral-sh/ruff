@@ -220,7 +220,9 @@ fn autoformat(files: &[PathBuf], settings: &Settings) -> Result<usize> {
 }
 
 fn inner_main() -> Result<ExitCode> {
+    // Extract command-line arguments.
     let cli = Cli::parse();
+    let fix = cli.fix();
 
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
@@ -239,7 +241,7 @@ fn inner_main() -> Result<ExitCode> {
         None => debug!("Unable to find pyproject.toml; using default settings..."),
     };
 
-    // Parse the settings from the pyproject.toml and command-line arguments.
+    // Reconcile configuration from pyproject.toml and command-line arguments.
     let exclude: Vec<FilePattern> = cli
         .exclude
         .iter()
@@ -296,6 +298,9 @@ fn inner_main() -> Result<ExitCode> {
     if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
         configuration.dummy_variable_rgx = dummy_variable_rgx;
     }
+    if let Some(fix) = fix {
+        configuration.fix = fix;
+    }
 
     if cli.show_settings && cli.show_files {
         eprintln!("Error: specify --show-settings or show-files (not both).");
@@ -306,6 +311,8 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
+    // Extract settings for internal use.
+    let autofix = configuration.fix;
     let settings = Settings::from_configuration(configuration);
 
     if cli.show_files {
@@ -318,7 +325,7 @@ fn inner_main() -> Result<ExitCode> {
 
     let printer = Printer::new(&cli.format, &log_level);
     if cli.watch {
-        if cli.fix {
+        if autofix {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
 
@@ -381,15 +388,15 @@ fn inner_main() -> Result<ExitCode> {
         let messages = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            run_once_stdin(&settings, path, cli.fix)?
+            run_once_stdin(&settings, path, autofix)?
         } else {
-            run_once(&cli.files, &settings, !cli.no_cache, cli.fix)?
+            run_once(&cli.files, &settings, !cli.no_cache, autofix)?
         };
 
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && cli.fix) {
+        if !(is_stdin && autofix) {
             printer.write_once(&messages)?;
         }
 

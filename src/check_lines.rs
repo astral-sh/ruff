@@ -40,6 +40,7 @@ pub fn check_lines(
     settings: &Settings,
     autofix: &fixer::Mode,
 ) {
+    let enforce_unnecessary_coding_comment = settings.enabled.contains(&CheckCode::U009);
     let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
     let enforce_noqa = settings.enabled.contains(&CheckCode::M001);
 
@@ -58,24 +59,27 @@ pub fn check_lines(
             .map(|lineno| lineno - 1)
             .unwrap_or(lineno);
 
-        if lineno < 2 {
-            // PEP3120 makes utf-8 the default encoding.
-            if CODING_COMMENT_REGEX.is_match(line) {
-                let line_length = line.len();
-                let mut check = Check::new(
-                    CheckKind::PEP3120UnnecessaryCodingComment,
-                    Range {
-                        location: Location::new(lineno + 1, 0),
-                        end_location: Location::new(lineno + 1, line_length + 1),
-                    },
-                );
-                if autofix.patch() {
-                    check.amend(Fix::deletion(
-                        Location::new(lineno + 1, 0),
-                        Location::new(lineno + 1, line_length + 1),
-                    ));
+        // Enforce unnecessary coding comments (U009).
+        if enforce_unnecessary_coding_comment {
+            if lineno < 2 {
+                // PEP3120 makes utf-8 the default encoding.
+                if CODING_COMMENT_REGEX.is_match(line) {
+                    let line_length = line.len();
+                    let mut check = Check::new(
+                        CheckKind::PEP3120UnnecessaryCodingComment,
+                        Range {
+                            location: Location::new(lineno + 1, 0),
+                            end_location: Location::new(lineno + 1, line_length + 1),
+                        },
+                    );
+                    if autofix.patch() {
+                        check.amend(Fix::deletion(
+                            Location::new(lineno + 1, 0),
+                            Location::new(lineno + 1, line_length + 1),
+                        ));
+                    }
+                    line_checks.push(check);
                 }
-                line_checks.push(check);
             }
         }
 
@@ -109,7 +113,7 @@ pub fn check_lines(
             }
         }
 
-        // Enforce line length.
+        // Enforce line length violations (E501).
         if enforce_line_too_long {
             let line_length = line.chars().count();
             if should_enforce_line_length(line, line_length, settings.line_length) {

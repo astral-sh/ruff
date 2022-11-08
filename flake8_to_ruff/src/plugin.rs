@@ -37,6 +37,20 @@ impl FromStr for Plugin {
 }
 
 impl Plugin {
+    pub fn default(&self) -> CheckCodePrefix {
+        match self {
+            Plugin::Flake8Bugbear => CheckCodePrefix::B,
+            Plugin::Flake8Builtins => CheckCodePrefix::A,
+            Plugin::Flake8Comprehensions => CheckCodePrefix::C,
+            Plugin::Flake8Docstrings => CheckCodePrefix::D,
+            Plugin::Flake8Print => CheckCodePrefix::T,
+            Plugin::Flake8Quotes => CheckCodePrefix::Q,
+            Plugin::Flake8Annotations => CheckCodePrefix::ANN,
+            Plugin::PEP8Naming => CheckCodePrefix::N,
+            Plugin::Pyupgrade => CheckCodePrefix::U,
+        }
+    }
+
     pub fn select(&self, flake8: &HashMap<String, Option<String>>) -> Vec<CheckCodePrefix> {
         match self {
             Plugin::Flake8Bugbear => vec![CheckCodePrefix::B],
@@ -239,8 +253,11 @@ impl DocstringConvention {
     }
 }
 
-/// Infer the enabled plugins based on user-provided settings.
-pub fn infer_plugins(flake8: &HashMap<String, Option<String>>) -> Vec<Plugin> {
+/// Infer the enabled plugins based on user-provided options.
+///
+/// For example, if the user specified a `mypy-init-return` setting, we should
+/// infer that `flake8-annotations` is active.
+pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> Vec<Plugin> {
     let mut plugins = BTreeSet::new();
     for key in flake8.keys() {
         match key.as_str() {
@@ -306,6 +323,38 @@ pub fn infer_plugins(flake8: &HashMap<String, Option<String>>) -> Vec<Plugin> {
     Vec::from_iter(plugins)
 }
 
+/// Infer the enabled plugins based on the referenced prefixes.
+///
+/// For example, if the user ignores `ANN101`, we should infer that
+/// `flake8-annotations` is active.
+pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin> {
+    [
+        Plugin::Flake8Bugbear,
+        Plugin::Flake8Builtins,
+        Plugin::Flake8Comprehensions,
+        Plugin::Flake8Docstrings,
+        Plugin::Flake8Print,
+        Plugin::Flake8Quotes,
+        Plugin::Flake8Annotations,
+        Plugin::PEP8Naming,
+        Plugin::Pyupgrade,
+    ]
+    .into_iter()
+    .filter(|plugin| {
+        for prefix in codes {
+            if prefix
+                .codes()
+                .iter()
+                .any(|code| plugin.default().codes().contains(code))
+            {
+                return true;
+            }
+        }
+        false
+    })
+    .collect()
+}
+
 /// Resolve the set of enabled `CheckCodePrefix` values for the given plugins.
 pub fn resolve_select(
     flake8: &HashMap<String, Option<String>>,
@@ -316,9 +365,7 @@ pub fn resolve_select(
 
     // Add prefix codes for every plugin.
     for plugin in plugins {
-        for prefix in plugin.select(flake8) {
-            select.insert(prefix);
-        }
+        select.extend(plugin.select(flake8));
     }
 
     select
@@ -328,18 +375,18 @@ pub fn resolve_select(
 mod tests {
     use std::collections::HashMap;
 
-    use crate::plugin::{infer_plugins, Plugin};
+    use crate::plugin::{infer_plugins_from_options, Plugin};
 
     #[test]
     fn it_infers_plugins() {
-        let actual = infer_plugins(&HashMap::from([(
+        let actual = infer_plugins_from_options(&HashMap::from([(
             "inline-quotes".to_string(),
             Some("single".to_string()),
         )]));
         let expected = vec![Plugin::Flake8Quotes];
         assert_eq!(actual, expected);
 
-        let actual = infer_plugins(&HashMap::from([(
+        let actual = infer_plugins_from_options(&HashMap::from([(
             "staticmethod-decorators".to_string(),
             Some("[]".to_string()),
         )]));
