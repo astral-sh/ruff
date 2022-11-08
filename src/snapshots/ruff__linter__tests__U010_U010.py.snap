@@ -1,0 +1,50 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UnnecessaryFutureImport: nested_scopes
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 61
+  fix: ~
+- kind:
+    UnnecessaryFutureImport: generators
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 61
+  fix: ~
+- kind:
+    UnnecessaryFutureImport: absolute_import
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 48
+  fix: ~
+- kind:
+    UnnecessaryFutureImport: division
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 48
+  fix: ~
+- kind:
+    UnnecessaryFutureImport: generator_stop
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 37
+  fix: ~
+
