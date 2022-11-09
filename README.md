@@ -432,7 +432,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
 | U009 | PEP3120UnnecessaryCodingComment | utf-8 encoding declaration is unnecessary | 🛠 |
 | U010 | UnnecessaryFutureImport | Unnessary __future__ import `...` for target Python version |  |
-| U011 | UnnecessaryLRUCacheParams | Unnessary parameters to functool.lru_cache |  |
+| U011 | UnnecessaryLRUCacheParams | Unnessary parameters to functools.lru_cache |  |
 
 ### pep8-naming
 

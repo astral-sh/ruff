@@ -29,3 +29,17 @@ def correct2():
     pass
 
 
+@functoools.lru_cache(maxsize=64)
+def correct3():
+    pass
+
+def user_func():
+    pass
+
+@lru_cache(user_func)
+def correct4():
+    pass
+
+@lru_cache(user_func, maxsize=None)
+def correct5():
+    pass

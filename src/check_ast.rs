@@ -37,10 +37,11 @@ use crate::{
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
-const TRACK_FROM_IMPORTS: [&str; 9] = [
+const TRACK_FROM_IMPORTS: [&str; 10] = [
     "collections",
     "collections.abc",
     "contextlib",
+    "functools",
     "re",
     "typing",
     "typing.io",
@@ -84,7 +85,7 @@ pub struct Checker<'a> {
     futures_allowed: bool,
     annotations_future_enabled: bool,
     except_handlers: Vec<Vec<String>>,
-    from_imports: BTreeMap<&'a str, BTreeSet<&'a str>>,
+    pub(crate) from_imports: BTreeMap<&'a str, BTreeSet<&'a str>>,
 }
 
 impl<'a> Checker<'a> {

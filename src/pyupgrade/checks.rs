@@ -1,5 +1,6 @@
 use rustpython_ast::{Constant as RpAstConstant, KeywordData};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
+use std::collections::BTreeSet;
 
 use crate::ast::helpers;
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
@@ -202,6 +203,7 @@ pub fn unnecessary_future_import(
 pub fn unnecessary_lru_cache_params(
     version: PythonVersion,
     decorator_list: &[Expr],
+    imports: Option<&BTreeSet<&str>>,
 ) -> Option<Check> {
     for expr in decorator_list.iter() {
         if let ExprKind::Call {
@@ -210,13 +212,14 @@ pub fn unnecessary_lru_cache_params(
             keywords,
         } = &expr.node
         {
-            if args.is_empty() && helpers::match_name_or_attr(func, "lru_cache") {
+            if args.is_empty()
+                && helpers::match_name_or_attr_from_module(func, "lru_cache", "functools", imports)
+            {
                 if keywords.is_empty() {
-                    let check = Some(Check::new(
+                    return Some(Check::new(
                         CheckKind::UnnecessaryLRUCacheParams,
                         Range::from_located(expr),
                     ));
-                    return check;
                 }
                 if version >= PythonVersion::Py39 && keywords.len() == 1 {
                     let keyword = &keywords[0];
@@ -227,11 +230,10 @@ pub fn unnecessary_lru_cache_params(
                             kind: None,
                         } = &value.node
                         {
-                            let check = Some(Check::new(
+                            return Some(Check::new(
                                 CheckKind::UnnecessaryLRUCacheParams,
                                 Range::from_located(expr),
                             ));
-                            return check;
                         }
                     }
                 }
