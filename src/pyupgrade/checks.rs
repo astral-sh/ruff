@@ -210,67 +210,30 @@ pub fn unnecessary_lru_cache_params(
             keywords,
         } = &expr.node
         {
-            if args.is_empty() {
-                match &func.node {
-                    ExprKind::Name { id, .. } => {
-                        if id == "lru_cache" {
-                            if keywords.is_empty() {
-                                let check = Some(Check::new(
-                                    CheckKind::UnnecessaryLRUCacheParams,
-                                    Range::from_located(expr),
-                                ));
-                                return check;
-                            }
-                            if version >= PythonVersion::Py39 && keywords.len() == 1 {
-                                let keyword = &keywords[0];
-                                let KeywordData { arg, value } = &keyword.node;
-                                if arg.as_ref().unwrap().as_str() == "maxsize" {
-                                    if let ExprKind::Constant {
-                                        value: RpAstConstant::None,
-                                        kind: None,
-                                    } = &value.node
-                                    {
-                                        let check = Some(Check::new(
-                                            CheckKind::UnnecessaryLRUCacheParams,
-                                            Range::from_located(expr),
-                                        ));
-                                        return check;
-                                    }
-                                }
-                            }
+            if args.is_empty() && helpers::match_name_or_attr(func, "lru_cache") {
+                if keywords.is_empty() {
+                    let check = Some(Check::new(
+                        CheckKind::UnnecessaryLRUCacheParams,
+                        Range::from_located(expr),
+                    ));
+                    return check;
+                }
+                if version >= PythonVersion::Py39 && keywords.len() == 1 {
+                    let keyword = &keywords[0];
+                    let KeywordData { arg, value } = &keyword.node;
+                    if arg.as_ref().unwrap().as_str() == "maxsize" {
+                        if let ExprKind::Constant {
+                            value: RpAstConstant::None,
+                            kind: None,
+                        } = &value.node
+                        {
+                            let check = Some(Check::new(
+                                CheckKind::UnnecessaryLRUCacheParams,
+                                Range::from_located(expr),
+                            ));
+                            return check;
                         }
                     }
-                    ExprKind::Attribute { value, attr, .. } => {
-                        if let ExprKind::Name { id, .. } = &value.node {
-                            if attr == "lru_cache" && id == "functools" {
-                                if keywords.is_empty() {
-                                    let check = Some(Check::new(
-                                        CheckKind::UnnecessaryLRUCacheParams,
-                                        Range::from_located(expr),
-                                    ));
-                                    return check;
-                                }
-                                if version >= PythonVersion::Py39 && keywords.len() == 1 {
-                                    let keyword = &keywords[0];
-                                    let KeywordData { arg, value } = &keyword.node;
-                                    if arg.as_ref().unwrap().as_str() == "maxsize" {
-                                        if let ExprKind::Constant {
-                                            value: RpAstConstant::None,
-                                            kind: None,
-                                        } = &value.node
-                                        {
-                                            let check = Some(Check::new(
-                                                CheckKind::UnnecessaryLRUCacheParams,
-                                                Range::from_located(expr),
-                                            ));
-                                            return check;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
                 }
             }
         }
