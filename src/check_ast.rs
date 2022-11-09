@@ -37,10 +37,11 @@ use crate::{
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
-const TRACK_FROM_IMPORTS: [&str; 9] = [
+const TRACK_FROM_IMPORTS: [&str; 10] = [
     "collections",
     "collections.abc",
     "contextlib",
+    "functools",
     "re",
     "typing",
     "typing.io",
@@ -62,6 +63,8 @@ pub struct Checker<'a> {
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
     pub(crate) deletions: BTreeSet<usize>,
+    // Import tracking.
+    pub(crate) from_imports: BTreeMap<&'a str, BTreeSet<&'a str>>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
     // at various points in time.
     pub(crate) parents: Vec<&'a Stmt>,
@@ -84,7 +87,6 @@ pub struct Checker<'a> {
     futures_allowed: bool,
     annotations_future_enabled: bool,
     except_handlers: Vec<Vec<String>>,
-    from_imports: BTreeMap<&'a str, BTreeSet<&'a str>>,
 }
 
 impl<'a> Checker<'a> {
@@ -102,6 +104,7 @@ impl<'a> Checker<'a> {
             checks: Default::default(),
             definitions: Default::default(),
             deletions: Default::default(),
+            from_imports: Default::default(),
             parents: Default::default(),
             parent_stack: Default::default(),
             scopes: Default::default(),
@@ -124,7 +127,6 @@ impl<'a> Checker<'a> {
             futures_allowed: true,
             annotations_future_enabled: Default::default(),
             except_handlers: Default::default(),
-            from_imports: Default::default(),
         }
     }
 
@@ -330,6 +332,12 @@ where
                     {
                         self.add_check(check);
                     }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::U011)
+                    && self.settings.target_version >= PythonVersion::Py38
+                {
+                    pyupgrade::plugins::unnecessary_lru_cache_params(self, decorator_list);
                 }
 
                 if self.settings.enabled.contains(&CheckCode::B018) {

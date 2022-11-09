@@ -1,3 +1,6 @@
+use std::collections::BTreeSet;
+
+use rustpython_ast::{Constant, KeywordData};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
@@ -193,6 +196,53 @@ pub fn unnecessary_future_import(
             CheckKind::UnnecessaryFutureImport(name.to_string()),
             location,
         ));
+    }
+    None
+}
+
+/// U011
+pub fn unnecessary_lru_cache_params(
+    decorator_list: &[Expr],
+    target_version: PythonVersion,
+    imports: Option<&BTreeSet<&str>>,
+) -> Option<Check> {
+    for expr in decorator_list.iter() {
+        if let ExprKind::Call {
+            func,
+            args,
+            keywords,
+        } = &expr.node
+        {
+            if args.is_empty()
+                && helpers::match_name_or_attr_from_module(func, "lru_cache", "functools", imports)
+            {
+                // Ex) `functools.lru_cache()`
+                if keywords.is_empty() {
+                    return Some(Check::new(
+                        CheckKind::UnnecessaryLRUCacheParams,
+                        Range::from_located(expr),
+                    ));
+                }
+                // Ex) `functools.lru_cache(maxsize=None)`
+                if target_version >= PythonVersion::Py39 && keywords.len() == 1 {
+                    let KeywordData { arg, value } = &keywords[0].node;
+                    if arg.as_ref().map(|arg| arg == "maxsize").unwrap_or_default()
+                        && matches!(
+                            value.node,
+                            ExprKind::Constant {
+                                value: Constant::None,
+                                kind: None,
+                            }
+                        )
+                    {
+                        return Some(Check::new(
+                            CheckKind::UnnecessaryLRUCacheParams,
+                            Range::from_located(expr),
+                        ));
+                    }
+                }
+            }
+        }
     }
     None
 }
