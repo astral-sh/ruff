@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use rustpython_ast::{Constant as RpAstConstant, KeywordData};
+use rustpython_ast::{Constant, KeywordData};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
@@ -202,8 +202,8 @@ pub fn unnecessary_future_import(
 
 /// U011
 pub fn unnecessary_lru_cache_params(
-    version: PythonVersion,
     decorator_list: &[Expr],
+    target_version: PythonVersion,
     imports: Option<&BTreeSet<&str>>,
 ) -> Option<Check> {
     for expr in decorator_list.iter() {
@@ -222,20 +222,21 @@ pub fn unnecessary_lru_cache_params(
                         Range::from_located(expr),
                     ));
                 }
-                if version >= PythonVersion::Py39 && keywords.len() == 1 {
-                    let keyword = &keywords[0];
-                    let KeywordData { arg, value } = &keyword.node;
-                    if arg.as_ref().unwrap().as_str() == "maxsize" {
-                        if let ExprKind::Constant {
-                            value: RpAstConstant::None,
-                            kind: None,
-                        } = &value.node
-                        {
-                            return Some(Check::new(
-                                CheckKind::UnnecessaryLRUCacheParams,
-                                Range::from_located(expr),
-                            ));
-                        }
+                if target_version >= PythonVersion::Py39 && keywords.len() == 1 {
+                    let KeywordData { arg, value } = &keywords[0].node;
+                    if arg.as_ref().map(|arg| arg == "maxsize").unwrap_or_default()
+                        && matches!(
+                            value.node,
+                            ExprKind::Constant {
+                                value: Constant::None,
+                                kind: None,
+                            }
+                        )
+                    {
+                        return Some(Check::new(
+                            CheckKind::UnnecessaryLRUCacheParams,
+                            Range::from_located(expr),
+                        ));
                     }
                 }
             }
