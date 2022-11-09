@@ -1450,7 +1450,7 @@ impl CheckKind {
                 format!("Unnessary __future__ import `{name}` for target Python version")
             }
             CheckKind::UnnecessaryLRUCacheParams => {
-                "Unnessary parameters to functool.lru_cache".to_string()
+                "Unnessary parameters to functools.lru_cache".to_string()
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
