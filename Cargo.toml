@@ -29,6 +29,7 @@ log = { version = "0.4.17" }
 notify = { version = "4.0.17" }
 num-bigint = { version = "0.4.3" }
 once_cell = { version = "1.16.0" }
+operational-transform = "0.6.1"
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
