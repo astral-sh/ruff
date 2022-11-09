@@ -1686,6 +1686,7 @@ impl CheckKind {
                 | CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DuplicateHandlerException(_)
+                | CheckKind::IsLiteral
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(_)
                 | CheckKind::NoBlankLineAfterFunction(_)
@@ -1697,6 +1698,7 @@ impl CheckKind {
                 | CheckKind::NoUnderIndentation
                 | CheckKind::OneBlankLineAfterClass(_)
                 | CheckKind::OneBlankLineBeforeClass(_)
+                | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::RaiseNotImplemented
@@ -1713,6 +1715,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet
+                | CheckKind::UnnecessaryLRUCacheParams
                 | CheckKind::UnnecessaryListCall
                 | CheckKind::UnnecessaryListComprehensionSet
                 | CheckKind::UnnecessaryLiteralDict(_)
@@ -1726,8 +1729,6 @@ impl CheckKind {
                 | CheckKind::UsePEP604Annotation
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(_)
-                | CheckKind::PEP3120UnnecessaryCodingComment
-                | CheckKind::IsLiteral
         )
     }
 }
