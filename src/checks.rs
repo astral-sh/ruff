@@ -139,6 +139,7 @@ pub enum CheckCode {
     U008,
     U009,
     U010,
+    U011,
     // pydocstyle
     D100,
     D101,
@@ -401,6 +402,7 @@ pub enum CheckKind {
     SuperCallWithParameters,
     PEP3120UnnecessaryCodingComment,
     UnnecessaryFutureImport(String),
+    UnnecessaryLRUCacheParams,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -628,6 +630,7 @@ impl CheckCode {
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             CheckCode::U009 => CheckKind::PEP3120UnnecessaryCodingComment,
             CheckCode::U010 => CheckKind::UnnecessaryFutureImport("...".to_string()),
+            CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -820,6 +823,7 @@ impl CheckCode {
             CheckCode::U008 => CheckCategory::Pyupgrade,
             CheckCode::U009 => CheckCategory::Pyupgrade,
             CheckCode::U010 => CheckCategory::Pyupgrade,
+            CheckCode::U011 => CheckCategory::Pyupgrade,
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -1004,6 +1008,7 @@ impl CheckKind {
             CheckKind::SuperCallWithParameters => &CheckCode::U008,
             CheckKind::PEP3120UnnecessaryCodingComment => &CheckCode::U009,
             CheckKind::UnnecessaryFutureImport(_) => &CheckCode::U010,
+            CheckKind::UnnecessaryLRUCacheParams => &CheckCode::U011,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -1443,6 +1448,9 @@ impl CheckKind {
             }
             CheckKind::UnnecessaryFutureImport(name) => {
                 format!("Unnessary __future__ import `{name}` for target Python version")
+            }
+            CheckKind::UnnecessaryLRUCacheParams => {
+                "Unnessary parameters to functool.lru_cache".to_string()
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),

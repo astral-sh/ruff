@@ -332,6 +332,12 @@ where
                     }
                 }
 
+                if self.settings.enabled.contains(&CheckCode::U011)
+                    && self.settings.target_version >= PythonVersion::Py38
+                {
+                    pyupgrade::plugins::unnecessary_lru_cache_params(self, decorator_list);
+                }
+
                 if self.settings.enabled.contains(&CheckCode::B018) {
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }

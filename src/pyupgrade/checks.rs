@@ -1,3 +1,4 @@
+use rustpython_ast::{Constant as RpAstConstant, KeywordData};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
@@ -193,6 +194,86 @@ pub fn unnecessary_future_import(
             CheckKind::UnnecessaryFutureImport(name.to_string()),
             location,
         ));
+    }
+    None
+}
+
+/// U011
+pub fn unnecessary_lru_cache_params(
+    version: PythonVersion,
+    decorator_list: &[Expr],
+) -> Option<Check> {
+    for expr in decorator_list.iter() {
+        if let ExprKind::Call {
+            func,
+            args,
+            keywords,
+        } = &expr.node
+        {
+            if args.is_empty() {
+                match &func.node {
+                    ExprKind::Name { id, .. } => {
+                        if id == "lru_cache" {
+                            if keywords.is_empty() {
+                                let check = Some(Check::new(
+                                    CheckKind::UnnecessaryLRUCacheParams,
+                                    Range::from_located(expr),
+                                ));
+                                return check;
+                            }
+                            if version >= PythonVersion::Py39 && keywords.len() == 1 {
+                                let keyword = &keywords[0];
+                                let KeywordData { arg, value } = &keyword.node;
+                                if arg.as_ref().unwrap().as_str() == "maxsize" {
+                                    if let ExprKind::Constant {
+                                        value: RpAstConstant::None,
+                                        kind: None,
+                                    } = &value.node
+                                    {
+                                        let check = Some(Check::new(
+                                            CheckKind::UnnecessaryLRUCacheParams,
+                                            Range::from_located(expr),
+                                        ));
+                                        return check;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    ExprKind::Attribute { value, attr, .. } => {
+                        if let ExprKind::Name { id, .. } = &value.node {
+                            if attr == "lru_cache" && id == "functools" {
+                                if keywords.is_empty() {
+                                    let check = Some(Check::new(
+                                        CheckKind::UnnecessaryLRUCacheParams,
+                                        Range::from_located(expr),
+                                    ));
+                                    return check;
+                                }
+                                if version >= PythonVersion::Py39 && keywords.len() == 1 {
+                                    let keyword = &keywords[0];
+                                    let KeywordData { arg, value } = &keyword.node;
+                                    if arg.as_ref().unwrap().as_str() == "maxsize" {
+                                        if let ExprKind::Constant {
+                                            value: RpAstConstant::None,
+                                            kind: None,
+                                        } = &value.node
+                                        {
+                                            let check = Some(Check::new(
+                                                CheckKind::UnnecessaryLRUCacheParams,
+                                                Range::from_located(expr),
+                                            ));
+                                            return check;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
     None
 }
