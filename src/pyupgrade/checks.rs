@@ -1,6 +1,7 @@
+use std::collections::BTreeSet;
+
 use rustpython_ast::{Constant as RpAstConstant, KeywordData};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
-use std::collections::BTreeSet;
 
 use crate::ast::helpers;
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
