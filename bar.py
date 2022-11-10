@@ -1,4 +1,4 @@
 try:
-	import sys
-except:
 	import os
+except:
+	import sys

@@ -185,6 +185,9 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        // Call-through to any composed visitors.
+        self.import_tracker.visit_stmt(stmt);
+
         self.push_parent(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
@@ -942,9 +945,6 @@ where
         };
 
         self.pop_parent();
-
-        // Call-through to any composed visitors.
-        self.import_tracker.visit_stmt(stmt);
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -1664,6 +1664,9 @@ where
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
+        // Call-through to any composed visitors.
+        self.import_tracker.visit_excepthandler(excepthandler);
+
         match &excepthandler.node {
             ExcepthandlerKind::ExceptHandler { type_, name, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E722) && type_.is_none() {
@@ -1743,9 +1746,6 @@ where
                 }
             }
         }
-
-        // Call-through to any composed visitors.
-        self.import_tracker.visit_excepthandler(excepthandler);
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {

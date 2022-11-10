@@ -139,16 +139,57 @@ pub fn sort_imports(
 
             // Format `StmtKind::ImportFrom` statements.
             for (import_from, aliases) in import_block.import_from.iter() {
-                // STOPSHIP(charlie): Try to squeeze into available line-length.
-                output.append(&format!("from {} import (\n", import_from.module_name()));
-                for AliasData { name, asname } in aliases {
-                    if let Some(asname) = asname {
-                        output.append(&format!("{}{} as {},\n", INDENT, name, asname));
-                    } else {
-                        output.append(&format!("{}{},\n", INDENT, name));
+                let prelude: String = format!("from {} import ", import_from.module_name());
+                let members: Vec<String> = aliases
+                    .iter()
+                    .map(|AliasData { name, asname }| {
+                        if let Some(asname) = asname {
+                            format!("{} as {}", name, asname)
+                        } else {
+                            format!("{}", name)
+                        }
+                    })
+                    .collect();
+
+                // Can we fit the import on a single line?
+                let expected_len: usize =
+                    // `from base import `
+                    prelude.len()
+                        // `member( as alias)?`
+                        + members.iter().map(|part| part.len()).sum::<usize>()
+                        // `, `
+                        + 2 * (members.len() - 1);
+
+                if expected_len <= *line_length {
+                    // `from base import `
+                    output.append(&prelude);
+                    // `member( as alias)?(, )?`
+                    for (index, part) in members.into_iter().enumerate() {
+                        if index > 0 {
+                            output.append(", ");
+                        }
+                        output.append(&part);
                     }
+                    // `\n`
+                    output.append("\n");
+                } else {
+                    // `from base import (\n`
+                    output.append(&prelude);
+                    output.append("(");
+                    output.append("\n");
+
+                    // `    member( as alias)?,\n`
+                    for part in members {
+                        output.append(INDENT);
+                        output.append(&part);
+                        output.append(",");
+                        output.append("\n");
+                    }
+
+                    // `)\n`
+                    output.append(")");
+                    output.append("\n");
                 }
-                output.append(")\n");
             }
         }
     }

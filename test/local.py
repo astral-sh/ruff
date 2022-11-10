@@ -9,7 +9,8 @@ import __future__.baz
 import wop
 from . import bar
 from .boop import bar
-from wop import wop
+from wop import wop as wop
+from wop import bop as bop
 import foo, bar
 import local_from
 

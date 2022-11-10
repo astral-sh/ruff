@@ -1,7 +1,8 @@
 //! Settings for the `isort` plugin.
 
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
