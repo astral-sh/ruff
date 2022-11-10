@@ -134,33 +134,33 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
 }
 
 /// U011 -fix
-pub fn remove_unnecessary_lur_cache_params(
+pub fn remove_unnecessary_lru_cache_params(
     locator: &SourceCodeLocator,
-    decor_at: Location,
+    decor_at: &Location,
 ) -> Option<Fix> {
-    let contents = locator.slice_source_code_at(&decor_at);
-    let fix_start = lexer::make_tokenizer(&contents)
-        .flatten()
-        .find_map(|(start, tok, _)| {
-            if matches!(tok, Tok::Lpar) {
-                Some(helpers::to_absolute(&start, &decor_at))
-            } else {
-                None
+    let contents = locator.slice_source_code_at(decor_at);
+    let mut fix_start = None;
+    let mut fix_end = None;
+    let mut count: usize = 0;
+    for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
+        if matches!(tok, Tok::Lpar) {
+            if count == 0 {
+                fix_start = Some(helpers::to_absolute(&start, decor_at));
             }
-        });
+            count += 1;
+        }
 
-    let fix_end = lexer::make_tokenizer(&contents)
-        .flatten()
-        .find_map(|(_, tok, end)| {
-            if matches!(tok, Tok::Rpar) {
-                Some(helpers::to_absolute(&end, &decor_at))
-            } else {
-                None
+        if matches!(tok, Tok::Rpar) {
+            count -= 1;
+            if count == 0 {
+                fix_end = Some(helpers::to_absolute(&end, decor_at));
+                break;
             }
-        });
+        }
+    }
 
     match (fix_start, fix_end) {
-        (Some(start), Some(end)) => Some(Fix::replacement("".to_string(), start, end)),
+        (Some(start), Some(end)) => Some(Fix::deletion(start, end)),
         _ => None,
     }
 }
