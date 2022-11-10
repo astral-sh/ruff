@@ -1269,7 +1269,9 @@ impl CheckKind {
             CheckKind::FunctionCallArgumentDefault => {
                 "Do not perform function calls in argument defaults.".to_string()
             }
-            CheckKind::GetAttrWithConstant => "Do not call `getattr` with a constant attribute value, it is not any safer than normal property access."
+            CheckKind::GetAttrWithConstant => "Do not call `getattr` with a constant attribute \
+                                               value, it is not any safer than normal property \
+                                               access."
                 .to_string(),
             CheckKind::DoNotAssertFalse => "Do not `assert False` (`python -O` removes these \
                                             calls), raise `AssertionError()`"
