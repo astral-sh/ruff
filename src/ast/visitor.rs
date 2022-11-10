@@ -7,6 +7,9 @@ use rustpython_parser::ast::{
 use crate::ast::helpers::match_name_or_attr;
 
 pub trait Visitor<'a> {
+    fn visit_body(&mut self, body: &[&'a Stmt]) {
+        walk_body(self, body);
+    }
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         walk_stmt(self, stmt);
     }
@@ -63,6 +66,12 @@ pub trait Visitor<'a> {
     }
 }
 
+pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &[&'a Stmt]) {
+    for stmt in body {
+        visitor.visit_stmt(stmt);
+    }
+}
+
 pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
     match &stmt.node {
         StmtKind::FunctionDef {
@@ -79,9 +88,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
+            vistor.visit_body(body);
         }
         StmtKind::AsyncFunctionDef {
             args,

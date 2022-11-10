@@ -1,5 +1,5 @@
 [tool.ruff.isort]
-#src-paths = ['test']
+src-paths = ['test']
 
 [tool.isort]
 line_length = 88
