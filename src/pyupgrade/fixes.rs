@@ -159,8 +159,8 @@ pub fn remove_unnecessary_lur_cache_params(
             }
         });
 
-    return match (fix_start, fix_end) {
+    match (fix_start, fix_end) {
         (Some(start), Some(end)) => Some(Fix::replacement("".to_string(), start, end)),
         _ => None,
-    };
+    }
 }
