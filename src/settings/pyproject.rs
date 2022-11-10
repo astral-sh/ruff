@@ -323,9 +323,9 @@ other-attribute = 1
                 fix: None,
                 exclude: None,
                 extend_exclude: Some(vec![
-                    "excluded.py".to_string(),
+                    "excluded_file.py".to_string(),
                     "migrations".to_string(),
-                    "directory/also_excluded.py".to_string(),
+                    "with_excluded_file/other_excluded_file.py".to_string(),
                 ]),
                 select: None,
                 extend_select: None,
