@@ -11,6 +11,7 @@ from . import bar
 from .boop import bar
 from wop import wop
 import foo, bar
+import local_from
 
 # [isort]
 # import __future__.bar as foo

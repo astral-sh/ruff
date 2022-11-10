@@ -1,3 +1,4 @@
+use path_absolutize::path_dedot;
 use rustpython_ast::{Location, Stmt};
 use textwrap::{dedent, indent};
 
@@ -6,7 +7,7 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::CheckKind;
 use crate::docstrings::helpers::leading_space;
-use crate::imports::sort_imports;
+use crate::isort::sort_imports;
 use crate::{Check, SourceCodeLocator};
 
 // STOPSHIP(charlie): If an import isn't the first or last statement on a line,
@@ -40,7 +41,15 @@ pub fn check_imports(checker: &mut Checker, body: Vec<&Stmt>) {
     let actual = dedent(&existing);
 
     // Generate the sorted import block.
-    let expected = sort_imports(body, 100);
+    let expected = sort_imports(
+        body,
+        &checker.settings.line_length,
+        &checker.settings.src_paths,
+        &checker.settings.isort.known_first_party,
+        &checker.settings.isort.known_third_party,
+        &checker.settings.isort.extra_standard_library,
+    )
+    .unwrap();
 
     // Compare the two?
     if actual != expected {
@@ -68,7 +77,15 @@ fn expected(body: Vec<&Stmt>, locator: &SourceCodeLocator) -> String {
     let range = extract_range(&body);
     let existing = locator.slice_source_code_range(&range);
     let indentation = leading_space(&existing);
-    let expected = sort_imports(body, 100);
+    let expected = sort_imports(
+        body,
+        &100,
+        &vec![path_dedot::CWD.clone()],
+        &Default::default(),
+        &Default::default(),
+        &Default::default(),
+    )
+    .unwrap();
     indent(&expected, &indentation)
 }
 
@@ -78,7 +95,7 @@ mod tests {
     use rustpython_ast::Stmt;
     use rustpython_parser::parser;
 
-    use crate::imports::plugins::{actual, expected};
+    use crate::isort::plugins::{actual, expected};
     use crate::SourceCodeLocator;
 
     #[test]

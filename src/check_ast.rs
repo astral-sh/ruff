@@ -23,7 +23,7 @@ use crate::ast::{helpers, operations, visitor};
 use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
-use crate::imports::track::ImportTracker;
+use crate::isort::track::ImportTracker;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
@@ -34,7 +34,7 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_annotations, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_print, imports, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    flake8_print, isort, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -186,11 +186,6 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         self.push_parent(stmt);
-
-        // Track all import blocks (to power import sorting).
-        // TODO(charlie): This doesn't work with exception handlers. Maybe we should
-        // have some more general clearing mechanism?
-        self.import_tracker.visit_stmt(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
         match &stmt.node {
@@ -947,6 +942,9 @@ where
         };
 
         self.pop_parent();
+
+        // Call-through to any composed visitors.
+        self.import_tracker.visit_stmt(stmt);
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -1745,6 +1743,9 @@ where
                 }
             }
         }
+
+        // Call-through to any composed visitors.
+        self.import_tracker.visit_excepthandler(excepthandler);
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
@@ -2428,9 +2429,9 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        while let Some(block) = self.import_tracker.blocks.pop() {
+        while let Some(block) = self.import_tracker.next() {
             if !block.is_empty() {
-                imports::plugins::check_imports(self, block);
+                isort::plugins::check_imports(self, block);
             }
         }
     }

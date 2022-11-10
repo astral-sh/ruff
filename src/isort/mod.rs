@@ -1,13 +1,17 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
+use anyhow::Result;
 use ropey::RopeBuilder;
 use rustpython_ast::{Stmt, StmtKind};
 
-use crate::imports::categorize::{categorize, ImportType};
-use crate::imports::types::ImportBlock;
+use crate::isort::categorize::{categorize, ImportType};
+use crate::isort::settings::Settings;
+use crate::isort::types::{AliasData, ImportBlock, ImportFromData, Importable};
 
 mod categorize;
 pub mod plugins;
+pub mod settings;
 pub mod track;
 mod types;
 
@@ -20,7 +24,10 @@ fn normalize_imports<'a>(imports: &'a [&'a Stmt]) -> ImportBlock<'a> {
         match &import.node {
             StmtKind::Import { names } => {
                 for name in names {
-                    block.import.insert((&name.node.name, &name.node.asname));
+                    block.import.insert(AliasData {
+                        name: &name.node.name,
+                        asname: &name.node.asname,
+                    });
                 }
             }
             StmtKind::ImportFrom {
@@ -28,9 +35,15 @@ fn normalize_imports<'a>(imports: &'a [&'a Stmt]) -> ImportBlock<'a> {
                 names,
                 level,
             } => {
-                let targets = block.import_from.entry((module, level)).or_default();
+                let targets = block
+                    .import_from
+                    .entry(ImportFromData { module, level })
+                    .or_default();
                 for name in names {
-                    targets.insert((&name.node.name, &name.node.asname));
+                    targets.insert(AliasData {
+                        name: &name.node.name,
+                        asname: &name.node.asname,
+                    });
                 }
             }
             _ => unreachable!("Expected StmtKind::Import | StmtKind::ImportFrom"),
@@ -39,46 +52,66 @@ fn normalize_imports<'a>(imports: &'a [&'a Stmt]) -> ImportBlock<'a> {
     block
 }
 
-fn categorize_imports(block: ImportBlock) -> BTreeMap<ImportType, ImportBlock> {
+fn categorize_imports<'a>(
+    block: ImportBlock<'a>,
+    src_paths: &[PathBuf],
+    known_first_party: &BTreeSet<String>,
+    known_third_party: &BTreeSet<String>,
+    extra_standard_library: &BTreeSet<String>,
+) -> Result<BTreeMap<ImportType, ImportBlock<'a>>> {
     let mut block_by_type: BTreeMap<ImportType, ImportBlock> = Default::default();
     // Categorize `StmtKind::Import`.
-    for (name, asname) in block.import {
-        let module_base = name.split('.').next().unwrap();
-        let import_type = categorize(module_base);
+    for alias in block.import {
+        let import_type = categorize(
+            &alias.module_base(),
+            src_paths,
+            known_first_party,
+            known_third_party,
+            extra_standard_library,
+        )?;
         block_by_type
             .entry(import_type)
             .or_default()
             .import
-            .insert((name, asname));
+            .insert(alias);
     }
     // Categorize `StmtKind::ImportFrom`.
-    for ((module, level), aliases) in block.import_from {
-        let mut module_base = String::new();
-        if let Some(level) = level {
-            if level > &0 {
-                module_base.push_str(&".".repeat(*level));
-            }
-        }
-        if let Some(module) = module {
-            module_base.push_str(module);
-        }
-        let module_base = module_base.split('.').next().unwrap();
-        let classification = categorize(module_base);
+    for (import_from, aliases) in block.import_from {
+        let classification = categorize(
+            &import_from.module_base(),
+            src_paths,
+            known_first_party,
+            known_third_party,
+            extra_standard_library,
+        )?;
         block_by_type
             .entry(classification)
             .or_default()
             .import_from
-            .insert((module, level), aliases);
+            .insert(import_from, aliases);
     }
-    block_by_type
+    Ok(block_by_type)
 }
 
-pub fn sort_imports(block: Vec<&Stmt>, line_length: usize) -> String {
+pub fn sort_imports(
+    block: Vec<&Stmt>,
+    line_length: &usize,
+    src_paths: &[PathBuf],
+    known_first_party: &BTreeSet<String>,
+    known_third_party: &BTreeSet<String>,
+    extra_standard_library: &BTreeSet<String>,
+) -> Result<String> {
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(&block);
 
     // Categorize by type (e.g., first-party vs. third-party).
-    let block_by_type = categorize_imports(block);
+    let block_by_type = categorize_imports(
+        block,
+        src_paths,
+        known_first_party,
+        known_third_party,
+        extra_standard_library,
+    )?;
 
     // Generate replacement source code.
     let mut output = RopeBuilder::new();
@@ -98,7 +131,7 @@ pub fn sort_imports(block: Vec<&Stmt>, line_length: usize) -> String {
             }
 
             // Format `StmtKind::Import` statements.
-            for (name, asname) in import_block.import.iter() {
+            for AliasData { name, asname } in import_block.import.iter() {
                 if let Some(asname) = asname {
                     output.append(&format!("import {} as {}\n", name, asname));
                 } else {
@@ -107,20 +140,10 @@ pub fn sort_imports(block: Vec<&Stmt>, line_length: usize) -> String {
             }
 
             // Format `StmtKind::ImportFrom` statements.
-            for ((module, level), aliases) in import_block.import_from.iter() {
-                // STOPSHIP(charlie): Extract this into a method.
-                let mut module_base = String::new();
-                if let Some(level) = level {
-                    if level > &0 {
-                        module_base.push_str(&".".repeat(*level));
-                    }
-                }
-                if let Some(module) = module {
-                    module_base.push_str(module);
-                }
+            for (import_from, aliases) in import_block.import_from.iter() {
                 // STOPSHIP(charlie): Try to squeeze into available line-length.
-                output.append(&format!("from {} import (\n", module_base));
-                for (name, asname) in aliases {
+                output.append(&format!("from {} import (\n", import_from.module_name()));
+                for AliasData { name, asname } in aliases {
                     if let Some(asname) = asname {
                         output.append(&format!("{}{} as {},\n", INDENT, name, asname));
                     } else {
@@ -131,5 +154,5 @@ pub fn sort_imports(block: Vec<&Stmt>, line_length: usize) -> String {
             }
         }
     }
-    output.finish().to_string()
+    Ok(output.finish().to_string())
 }
