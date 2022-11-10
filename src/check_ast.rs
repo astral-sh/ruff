@@ -1064,6 +1064,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::B005) {
                     flake8_bugbear::plugins::strip_with_multi_characters(self, expr, func, args);
                 }
+                if self.settings.enabled.contains(&CheckCode::B009) {
+                    flake8_bugbear::plugins::getattr_with_constant(self, expr, func, args);
+                }
                 if self.settings.enabled.contains(&CheckCode::B026) {
                     flake8_bugbear::plugins::star_arg_unpacking_after_keyword_arg(
                         self, args, keywords,
