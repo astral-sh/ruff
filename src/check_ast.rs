@@ -2424,18 +2424,6 @@ impl<'a> Checker<'a> {
         self.add_checks(checks.into_iter());
     }
 
-    fn check_import_blocks(&mut self) {
-        if !self.settings.enabled.contains(&CheckCode::I001) {
-            return;
-        }
-
-        while let Some(block) = self.import_tracker.next() {
-            if !block.is_empty() {
-                isort::plugins::check_imports(self, block);
-            }
-        }
-    }
-
     fn check_definitions(&mut self) {
         while let Some((definition, visibility)) = self.definitions.pop() {
             // flake8-annotations
@@ -2614,7 +2602,7 @@ pub fn check_ast(
     checker.check_definitions();
 
     // Check import blocks.
-    checker.check_import_blocks();
+    // checker.check_import_blocks();
 
     checker.checks
 }

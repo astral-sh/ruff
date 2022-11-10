@@ -1,4 +1,7 @@
 try:
-	import os
+    import os
+    import sys
+
+    import x
 except:
-	import sys
+    import os

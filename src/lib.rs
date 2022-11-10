@@ -17,6 +17,7 @@ mod ast;
 pub mod autofix;
 pub mod cache;
 pub mod check_ast;
+mod check_imports;
 mod check_lines;
 mod check_tokens;
 pub mod checks;

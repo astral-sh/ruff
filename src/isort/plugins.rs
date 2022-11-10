@@ -3,12 +3,12 @@ use rustpython_ast::{Location, Stmt};
 use textwrap::{dedent, indent};
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
+use crate::autofix::{fixer, Fix};
 use crate::check_ast::Checker;
 use crate::checks::CheckKind;
 use crate::docstrings::helpers::leading_space;
 use crate::isort::sort_imports;
-use crate::{Check, SourceCodeLocator};
+use crate::{Check, Settings, SourceCodeLocator};
 
 // STOPSHIP(charlie): If an import isn't the first or last statement on a line,
 // this will remove other valid code.
@@ -29,10 +29,15 @@ fn extract_range(body: &[&Stmt]) -> Range {
 }
 
 /// I001
-pub fn check_imports(checker: &mut Checker, body: Vec<&Stmt>) {
+pub fn check_imports(
+    body: Vec<&Stmt>,
+    locator: &SourceCodeLocator,
+    settings: &Settings,
+    autofix: &fixer::Mode,
+) -> Option<Check> {
     // Extract the existing import block.
     let range = extract_range(&body);
-    let existing = checker.locator.slice_source_code_range(&range);
+    let existing = locator.slice_source_code_range(&range);
 
     // Infer existing indentation.
     let indentation = leading_space(&existing);
@@ -43,24 +48,26 @@ pub fn check_imports(checker: &mut Checker, body: Vec<&Stmt>) {
     // Generate the sorted import block.
     let expected = sort_imports(
         body,
-        &checker.settings.line_length,
-        &checker.settings.src_paths,
-        &checker.settings.isort.known_first_party,
-        &checker.settings.isort.known_third_party,
-        &checker.settings.isort.extra_standard_library,
+        &settings.line_length,
+        &settings.src_paths,
+        &settings.isort.known_first_party,
+        &settings.isort.known_third_party,
+        &settings.isort.extra_standard_library,
     );
 
     // Compare the two?
     if actual != expected {
         let mut check = Check::new(CheckKind::UnsortedImports, range);
-        if checker.patch() {
+        if autofix.patch() {
             check.amend(Fix::replacement(
                 indent(&expected, &indentation),
                 range.location,
                 range.end_location,
             ));
         }
-        checker.add_check(check);
+        Some(check)
+    } else {
+        None
     }
 }
 

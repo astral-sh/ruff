@@ -286,6 +286,7 @@ pub enum LintSource {
     FileSystem,
     Lines,
     Tokens,
+    Imports,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -502,6 +503,7 @@ impl CheckCode {
             | CheckCode::RUF002
             | CheckCode::RUF003 => &LintSource::Tokens,
             CheckCode::E902 => &LintSource::FileSystem,
+            CheckCode::I001 => &LintSource::Imports,
             _ => &LintSource::AST,
         }
     }
