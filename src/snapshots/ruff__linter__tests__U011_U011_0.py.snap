@@ -9,7 +9,16 @@ expression: checks
   end_location:
     row: 5
     column: 12
-  fix: ~
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 5
+        column: 10
+      end_location:
+        row: 5
+        column: 12
+    applied: false
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 11
@@ -17,7 +26,16 @@ expression: checks
   end_location:
     row: 11
     column: 22
-  fix: ~
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 11
+        column: 20
+      end_location:
+        row: 11
+        column: 22
+    applied: false
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 16
@@ -25,7 +43,16 @@ expression: checks
   end_location:
     row: 16
     column: 24
-  fix: ~
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 16
+        column: 10
+      end_location:
+        row: 16
+        column: 24
+    applied: false
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 21
@@ -33,5 +60,116 @@ expression: checks
   end_location:
     row: 21
     column: 34
-  fix: ~
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 21
+        column: 20
+      end_location:
+        row: 21
+        column: 34
+    applied: false
+- kind: UnnecessaryLRUCacheParams
+  location:
+    row: 27
+    column: 1
+  end_location:
+    row: 28
+    column: 1
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 27
+        column: 10
+      end_location:
+        row: 28
+        column: 1
+    applied: false
+- kind: UnnecessaryLRUCacheParams
+  location:
+    row: 33
+    column: 1
+  end_location:
+    row: 35
+    column: 1
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 33
+        column: 10
+      end_location:
+        row: 35
+        column: 1
+    applied: false
+- kind: UnnecessaryLRUCacheParams
+  location:
+    row: 40
+    column: 1
+  end_location:
+    row: 42
+    column: 19
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 40
+        column: 20
+      end_location:
+        row: 42
+        column: 19
+    applied: false
+- kind: UnnecessaryLRUCacheParams
+  location:
+    row: 47
+    column: 1
+  end_location:
+    row: 51
+    column: 1
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 47
+        column: 20
+      end_location:
+        row: 51
+        column: 1
+    applied: false
+- kind: UnnecessaryLRUCacheParams
+  location:
+    row: 56
+    column: 1
+  end_location:
+    row: 62
+    column: 1
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 56
+        column: 20
+      end_location:
+        row: 62
+        column: 1
+    applied: false
+- kind: UnnecessaryLRUCacheParams
+  location:
+    row: 67
+    column: 1
+  end_location:
+    row: 72
+    column: 1
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 67
+        column: 20
+      end_location:
+        row: 72
+        column: 1
+    applied: false
 
