@@ -4,7 +4,6 @@ use rustpython_ast::{
     Unaryop, Withitem,
 };
 
-use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 
 #[derive(Debug)]

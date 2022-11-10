@@ -32,7 +32,7 @@ pub fn categorize(
     } else if KNOWN_STANDARD_LIBRARY.contains(module_base) {
         ImportType::StandardLibrary
     } else {
-        if find_local(&src_paths, module_base) {
+        if find_local(src_paths, module_base) {
             ImportType::FirstParty
         } else {
             ImportType::ThirdParty

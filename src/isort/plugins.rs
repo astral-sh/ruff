@@ -45,9 +45,7 @@ fn match_trailing_content(body: &[&Stmt], locator: &SourceCodeLocator) -> bool {
         end_location: Location::new(end_location.row() + 1, 0),
     };
     let suffix = locator.slice_source_code_range(&range);
-    suffix
-        .chars()
-        .any(|char| !char.is_whitespace() && char != '#')
+    suffix.chars().any(|char| !char.is_whitespace())
 }
 
 /// I001
@@ -127,7 +125,7 @@ fn expected(body: Vec<&Stmt>, locator: &SourceCodeLocator) -> String {
     let expected = sort_imports(
         body,
         &100,
-        &vec![path_dedot::CWD.clone()],
+        &[path_dedot::CWD.clone()],
         &Default::default(),
         &Default::default(),
         &Default::default(),

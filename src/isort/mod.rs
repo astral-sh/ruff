@@ -146,7 +146,7 @@ pub fn sort_imports(
                         if let Some(asname) = asname {
                             format!("{} as {}", name, asname)
                         } else {
-                            format!("{}", name)
+                            name.to_string()
                         }
                     })
                     .collect();

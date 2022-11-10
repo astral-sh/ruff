@@ -12,7 +12,7 @@ pub struct Options {
     pub extra_standard_library: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Default)]
 pub struct Settings {
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
@@ -27,16 +27,6 @@ impl Settings {
             extra_standard_library: BTreeSet::from_iter(
                 options.extra_standard_library.unwrap_or_default(),
             ),
-        }
-    }
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            known_first_party: BTreeSet::new(),
-            known_third_party: BTreeSet::new(),
-            extra_standard_library: BTreeSet::new(),
         }
     }
 }

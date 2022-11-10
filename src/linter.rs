@@ -60,6 +60,7 @@ pub(crate) fn check_path(
     settings: &Settings,
     autofix: &fixer::Mode,
 ) -> Result<Vec<Check>> {
+    println!("{:?}", path);
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
