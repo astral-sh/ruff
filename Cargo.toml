@@ -32,7 +32,7 @@ once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-ropey = { version = "1.5.0" }
+ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }
@@ -43,7 +43,7 @@ strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
 titlecase = { version = "2.2.1" }
 toml = { version = "0.5.9" }
-update-informer = { version = "0.5.0", default_features = false, features = ["pypi"], optional = true }
+update-informer = { version = "0.5.0", default-features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
