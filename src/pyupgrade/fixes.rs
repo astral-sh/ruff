@@ -132,3 +132,35 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
 
     None
 }
+
+/// U011 -fix
+pub fn remove_unnecessary_lur_cache_params(
+    locator: &SourceCodeLocator,
+    decor_at: Location,
+) -> Option<Fix> {
+    let contents = locator.slice_source_code_at(&decor_at);
+    let fix_start = lexer::make_tokenizer(&contents)
+        .flatten()
+        .find_map(|(start, tok, _)| {
+            if matches!(tok, Tok::Lpar) {
+                Some(helpers::to_absolute(&start, &decor_at))
+            } else {
+                None
+            }
+        });
+
+    let fix_end = lexer::make_tokenizer(&contents)
+        .flatten()
+        .find_map(|(_, tok, end)| {
+            if matches!(tok, Tok::Rpar) {
+                Some(helpers::to_absolute(&end, &decor_at))
+            } else {
+                None
+            }
+        });
+
+    return match (fix_start, fix_end) {
+        (Some(start), Some(end)) => Some(Fix::replacement("".to_string(), start, end)),
+        _ => None,
+    };
+}
