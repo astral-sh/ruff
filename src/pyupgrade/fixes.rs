@@ -133,7 +133,7 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
     None
 }
 
-/// U011 -fix
+/// U011
 pub fn remove_unnecessary_lru_cache_params(
     locator: &SourceCodeLocator,
     decor_at: &Location,
@@ -158,7 +158,6 @@ pub fn remove_unnecessary_lru_cache_params(
             }
         }
     }
-
     match (fix_start, fix_end) {
         (Some(start), Some(end)) => Some(Fix::deletion(start, end)),
         _ => None,
