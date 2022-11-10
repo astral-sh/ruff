@@ -52,7 +52,7 @@ fn normalize_imports<'a>(imports: &'a [&'a Stmt]) -> ImportBlock<'a> {
 
 fn categorize_imports<'a>(
     block: ImportBlock<'a>,
-    src_paths: &[PathBuf],
+    src: &[PathBuf],
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
@@ -62,7 +62,7 @@ fn categorize_imports<'a>(
     for alias in block.import {
         let import_type = categorize(
             &alias.module_base(),
-            src_paths,
+            src,
             known_first_party,
             known_third_party,
             extra_standard_library,
@@ -77,7 +77,7 @@ fn categorize_imports<'a>(
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
             &import_from.module_base(),
-            src_paths,
+            src,
             known_first_party,
             known_third_party,
             extra_standard_library,
@@ -94,7 +94,7 @@ fn categorize_imports<'a>(
 pub fn sort_imports(
     block: Vec<&Stmt>,
     line_length: &usize,
-    src_paths: &[PathBuf],
+    src: &[PathBuf],
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
@@ -105,7 +105,7 @@ pub fn sort_imports(
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
         block,
-        src_paths,
+        src,
         known_first_party,
         known_third_party,
         extra_standard_library,
@@ -194,4 +194,63 @@ pub fn sort_imports(
         }
     }
     output.finish().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use anyhow::Result;
+    use rustpython_parser::lexer::LexResult;
+    use test_case::test_case;
+
+    use crate::autofix::fixer;
+    use crate::checks::{Check, CheckCode};
+    use crate::linter::tokenize;
+    use crate::{fs, linter, noqa, Settings, SourceCodeLocator};
+
+    fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
+        let contents = fs::read_file(path)?;
+        let tokens: Vec<LexResult> = tokenize(&contents);
+        let locator = SourceCodeLocator::new(&contents);
+        let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+        linter::check_path(
+            path,
+            &contents,
+            tokens,
+            &locator,
+            &noqa_line_for,
+            settings,
+            autofix,
+        )
+    }
+
+    #[test_case(Path::new("reorder_within_section.py"))]
+    #[test_case(Path::new("no_reorder_within_section.py"))]
+    #[test_case(Path::new("separate_future_imports.py"))]
+    #[test_case(Path::new("separate_third_party_imports.py"))]
+    #[test_case(Path::new("separate_first_party_imports.py"))]
+    #[test_case(Path::new("deduplicate_imports.py"))]
+    #[test_case(Path::new("combine_import_froms.py"))]
+    #[test_case(Path::new("preserve_indentation.py"))]
+    #[test_case(Path::new("fit_line_length.py"))]
+    #[test_case(Path::new("import_from_after_import.py"))]
+    #[test_case(Path::new("leading_prefix.py"))]
+    #[test_case(Path::new("trailing_suffix.py"))]
+    fn isort(path: &Path) -> Result<()> {
+        let snapshot = format!("{}", path.to_string_lossy());
+        let mut checks = check_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+            &fixer::Mode::Generate,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
 }

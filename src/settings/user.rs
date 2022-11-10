@@ -45,7 +45,7 @@ pub struct UserConfiguration {
     pub line_length: usize,
     pub per_file_ignores: Vec<(Exclusion, Vec<CheckCode>)>,
     pub select: Vec<CheckCodePrefix>,
-    pub src_paths: Vec<PathBuf>,
+    pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -91,7 +91,7 @@ impl UserConfiguration {
                 })
                 .collect(),
             select: configuration.select,
-            src_paths: configuration.src_paths,
+            src: configuration.src,
             target_version: configuration.target_version,
             flake8_annotations: configuration.flake8_annotations,
             flake8_quotes: configuration.flake8_quotes,

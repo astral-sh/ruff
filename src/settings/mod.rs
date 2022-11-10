@@ -29,7 +29,7 @@ pub struct Settings {
     pub extend_exclude: Vec<FilePattern>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
-    pub src_paths: Vec<PathBuf>,
+    pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -56,7 +56,7 @@ impl Settings {
             line_length: config.line_length,
             pep8_naming: config.pep8_naming,
             per_file_ignores: config.per_file_ignores,
-            src_paths: config.src_paths,
+            src: config.src,
             target_version: config.target_version,
         }
     }
@@ -69,7 +69,7 @@ impl Settings {
             extend_exclude: Default::default(),
             line_length: 88,
             per_file_ignores: Default::default(),
-            src_paths: vec![path_dedot::CWD.clone()],
+            src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
             flake8_annotations: Default::default(),
             flake8_quotes: Default::default(),
@@ -86,7 +86,7 @@ impl Settings {
             extend_exclude: Default::default(),
             line_length: 88,
             per_file_ignores: Default::default(),
-            src_paths: vec![path_dedot::CWD.clone()],
+            src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
             flake8_annotations: Default::default(),
             flake8_quotes: Default::default(),

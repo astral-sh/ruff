@@ -16,7 +16,7 @@ pub enum ImportType {
 
 pub fn categorize(
     module_base: &str,
-    src_paths: &[PathBuf],
+    src: &[PathBuf],
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
@@ -32,7 +32,7 @@ pub fn categorize(
     } else if KNOWN_STANDARD_LIBRARY.contains(module_base) {
         ImportType::StandardLibrary
     } else {
-        if find_local(src_paths, module_base) {
+        if find_local(src, module_base) {
             ImportType::FirstParty
         } else {
             ImportType::ThirdParty

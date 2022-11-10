@@ -26,7 +26,7 @@ pub struct Configuration {
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub select: Vec<CheckCodePrefix>,
-    pub src_paths: Vec<PathBuf>,
+    pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -74,11 +74,10 @@ impl Configuration {
                     .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
                 None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
             },
-            src_paths: options
-                .src_paths
-                .map(|src_paths| {
-                    src_paths
-                        .iter()
+            src: options
+                .src
+                .map(|src| {
+                    src.iter()
                         .map(|path| {
                             let path = Path::new(path);
                             match project_root {

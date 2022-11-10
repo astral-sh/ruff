@@ -21,7 +21,7 @@ pub struct Options {
     pub line_length: Option<usize>,
     pub per_file_ignores: Option<BTreeMap<String, Vec<CheckCodePrefix>>>,
     pub select: Option<Vec<CheckCodePrefix>>,
-    pub src_paths: Option<Vec<String>>,
+    pub src: Option<Vec<String>>,
     pub target_version: Option<PythonVersion>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,

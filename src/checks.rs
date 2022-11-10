@@ -218,6 +218,7 @@ pub enum CheckCode {
 pub enum CheckCategory {
     Pyflakes,
     Pycodestyle,
+    Isort,
     Pydocstyle,
     Pyupgrade,
     PEP8Naming,
@@ -227,7 +228,6 @@ pub enum CheckCategory {
     Flake8Print,
     Flake8Quotes,
     Flake8Annotations,
-    ISort,
     Ruff,
     Meta,
 }
@@ -237,6 +237,7 @@ impl CheckCategory {
         match self {
             CheckCategory::Pycodestyle => "pycodestyle",
             CheckCategory::Pyflakes => "Pyflakes",
+            CheckCategory::Isort => "isort",
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
@@ -246,7 +247,6 @@ impl CheckCategory {
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Pydocstyle => "pydocstyle",
             CheckCategory::PEP8Naming => "pep8-naming",
-            CheckCategory::ISort => "isort",
             CheckCategory::Ruff => "Ruff-specific rules",
             CheckCategory::Meta => "Meta rules",
         }
@@ -256,6 +256,7 @@ impl CheckCategory {
         match self {
             CheckCategory::Pycodestyle => Some("https://pypi.org/project/pycodestyle/2.9.1/"),
             CheckCategory::Pyflakes => Some("https://pypi.org/project/pyflakes/2.5.0/"),
+            CheckCategory::Isort => Some("https://pypi.org/project/isort/5.10.1/"),
             CheckCategory::Flake8Builtins => {
                 Some("https://pypi.org/project/flake8-builtins/2.0.1/")
             }
@@ -273,7 +274,6 @@ impl CheckCategory {
             CheckCategory::Pyupgrade => Some("https://pypi.org/project/pyupgrade/3.2.0/"),
             CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
             CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
-            CheckCategory::ISort => Some("https://pypi.org/project/isort/5.10.1/"),
             CheckCategory::Ruff => None,
             CheckCategory::Meta => None,
         }
@@ -906,7 +906,7 @@ impl CheckCode {
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
-            CheckCode::I001 => CheckCategory::ISort,
+            CheckCode::I001 => CheckCategory::Isort,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,

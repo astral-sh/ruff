@@ -1,5 +1,6 @@
-try:
-    import os
+if True:
     import sys
-except:
+    import os
+else:
+    import sys
     import os

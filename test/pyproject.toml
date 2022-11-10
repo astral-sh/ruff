@@ -1,6 +1,0 @@
-[tool.ruff.isort]
-src-paths = ['test']
-
-[tool.isort]
-line_length = 88
-profile = 'black'

@@ -158,15 +158,25 @@ where
             _ => {}
         }
     }
+
     fn visit_annotation(&mut self, _: &'b Expr) {}
+
     fn visit_expr(&mut self, _: &'b Expr) {}
+
     fn visit_constant(&mut self, _: &'b Constant) {}
+
     fn visit_expr_context(&mut self, _: &'b ExprContext) {}
+
     fn visit_boolop(&mut self, _: &'b Boolop) {}
+
     fn visit_operator(&mut self, _: &'b Operator) {}
+
     fn visit_unaryop(&mut self, _: &'b Unaryop) {}
+
     fn visit_cmpop(&mut self, _: &'b Cmpop) {}
+
     fn visit_comprehension(&mut self, _: &'b Comprehension) {}
+
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         let ExcepthandlerKind::ExceptHandler { body, .. } = &excepthandler.node;
         for stmt in body {
@@ -174,16 +184,23 @@ where
         }
         self.finalize();
     }
+
     fn visit_arguments(&mut self, _: &'b Arguments) {}
+
     fn visit_arg(&mut self, _: &'b Arg) {}
+
     fn visit_keyword(&mut self, _: &'b Keyword) {}
+
     fn visit_alias(&mut self, _: &'b Alias) {}
+
     fn visit_withitem(&mut self, _: &'b Withitem) {}
+
     fn visit_match_case(&mut self, match_case: &'b MatchCase) {
         for stmt in &match_case.body {
             self.visit_stmt(stmt);
         }
         self.finalize();
     }
+
     fn visit_pattern(&mut self, _: &'b Pattern) {}
 }
