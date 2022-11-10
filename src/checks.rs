@@ -1687,6 +1687,9 @@ impl CheckKind {
             CheckKind::NoAssertRaisesException => {
                 "`assertRaises(Exception):` should be considered evil.".to_string()
             }
+            CheckKind::StarArgUnpackingAfterKeywordArg => {
+                "Star-arg unpacking after a keyword argument is strongly discouraged.".to_string()
+            }
             _ => self.body(),
         }
     }

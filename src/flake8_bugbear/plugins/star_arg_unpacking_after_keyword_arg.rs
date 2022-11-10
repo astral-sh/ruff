@@ -10,16 +10,15 @@ pub fn star_arg_unpacking_after_keyword_arg(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if keywords.is_empty() {
-        return;
-    }
-    for arg in args {
-        if let ExprKind::Starred { .. } = arg.node {
-            if (arg.location) > (keywords[0].location) {
-                checker.add_check(Check::new(
-                    CheckKind::StarArgUnpackingAfterKeywordArg,
-                    Range::from_located(arg),
-                ));
+    if let Some(keyword) = keywords.first() {
+        for arg in args {
+            if let ExprKind::Starred { .. } = arg.node {
+                if arg.location > keyword.location {
+                    checker.add_check(Check::new(
+                        CheckKind::StarArgUnpackingAfterKeywordArg,
+                        Range::from_located(arg),
+                    ));
+                }
             }
         }
     }

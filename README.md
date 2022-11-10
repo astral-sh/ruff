@@ -500,7 +500,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
-| B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged, because it only works when the keyword parameter is declared after all parameters supplied by the unpacked sequence, and this change of ordering can surprise and mislead readers. |  |
+| B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged. |  |
 
 ### flake8-builtins
 
