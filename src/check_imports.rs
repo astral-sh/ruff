@@ -11,13 +11,13 @@ use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 
 fn check_import_blocks(
-    tracker: &mut ImportTracker,
+    tracker: ImportTracker,
     locator: &SourceCodeLocator,
     settings: &Settings,
     autofix: &fixer::Mode,
 ) -> Vec<Check> {
     let mut checks = vec![];
-    while let Some(block) = tracker.next() {
+    for block in tracker.into_iter() {
         if !block.is_empty() {
             if let Some(check) = isort::plugins::check_imports(block, locator, settings, autofix) {
                 checks.push(check);
@@ -37,6 +37,5 @@ pub fn check_imports(
     for stmt in python_ast {
         tracker.visit_stmt(stmt);
     }
-    println!("{:?}", tracker.blocks);
-    check_import_blocks(&mut tracker, locator, settings, autofix)
+    check_import_blocks(tracker, locator, settings, autofix)
 }

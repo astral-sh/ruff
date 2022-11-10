@@ -34,7 +34,7 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_annotations, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_print, isort, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    flake8_print, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;

@@ -30,8 +30,8 @@ impl<'a> ImportTracker<'a> {
         }
     }
 
-    pub fn next(&mut self) -> Option<Vec<&'a Stmt>> {
-        self.blocks.pop()
+    pub fn into_iter(self) -> impl IntoIterator<Item = Vec<&'a Stmt>> {
+        self.blocks.into_iter()
     }
 }
 
@@ -169,12 +169,11 @@ where
     fn visit_cmpop(&mut self, _: &'b Cmpop) {}
     fn visit_comprehension(&mut self, _: &'b Comprehension) {}
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
-        if let ExcepthandlerKind::ExceptHandler { body, .. } = &excepthandler.node {
-            for stmt in body {
-                self.visit_stmt(stmt);
-            }
-            self.finalize();
+        let ExcepthandlerKind::ExceptHandler { body, .. } = &excepthandler.node;
+        for stmt in body {
+            self.visit_stmt(stmt);
         }
+        self.finalize();
     }
     fn visit_arguments(&mut self, _: &'b Arguments) {}
     fn visit_arg(&mut self, _: &'b Arg) {}

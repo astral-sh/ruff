@@ -4,28 +4,50 @@ use textwrap::{dedent, indent};
 
 use crate::ast::types::Range;
 use crate::autofix::{fixer, Fix};
-use crate::check_ast::Checker;
 use crate::checks::CheckKind;
 use crate::docstrings::helpers::leading_space;
 use crate::isort::sort_imports;
 use crate::{Check, Settings, SourceCodeLocator};
 
-// STOPSHIP(charlie): If an import isn't the first or last statement on a line,
-// this will remove other valid code.
 fn extract_range(body: &[&Stmt]) -> Range {
-    // Extract the range of the existing import block. We extend to include the
-    // entire first and last line.
-    let location = body.iter().map(|stmt| stmt.location).min().unwrap();
-    let end_location = body
-        .iter()
-        .map(|stmt| stmt.end_location)
-        .max()
-        .unwrap()
-        .unwrap();
+    let location = body.first().unwrap().location;
+    let end_location = body.last().unwrap().end_location.unwrap();
     Range {
-        location: Location::new(location.row(), 0),
-        end_location: Location::new(end_location.row() + 1, 0),
+        location,
+        end_location,
     }
+}
+
+fn extract_indentation(body: &[&Stmt], locator: &SourceCodeLocator) -> String {
+    let location = body.first().unwrap().location;
+    let range = Range {
+        location: Location::new(location.row(), 0),
+        end_location: location,
+    };
+    let existing = locator.slice_source_code_range(&range);
+    leading_space(&existing)
+}
+
+fn match_leading_content(body: &[&Stmt], locator: &SourceCodeLocator) -> bool {
+    let location = body.first().unwrap().location;
+    let range = Range {
+        location: Location::new(location.row(), 0),
+        end_location: location,
+    };
+    let prefix = locator.slice_source_code_range(&range);
+    prefix.chars().any(|char| !char.is_whitespace())
+}
+
+fn match_trailing_content(body: &[&Stmt], locator: &SourceCodeLocator) -> bool {
+    let end_location = body.last().unwrap().end_location.unwrap();
+    let range = Range {
+        location: end_location,
+        end_location: Location::new(end_location.row() + 1, 0),
+    };
+    let suffix = locator.slice_source_code_range(&range);
+    suffix
+        .chars()
+        .any(|char| !char.is_whitespace() && char != '#')
 }
 
 /// I001
@@ -35,15 +57,12 @@ pub fn check_imports(
     settings: &Settings,
     autofix: &fixer::Mode,
 ) -> Option<Check> {
-    // Extract the existing import block.
     let range = extract_range(&body);
-    let existing = locator.slice_source_code_range(&range);
+    let indentation = extract_indentation(&body, locator);
 
-    // Infer existing indentation.
-    let indentation = leading_space(&existing);
-
-    // Dedent the existing import block.
-    let actual = dedent(&existing);
+    // Special-cases: there's leading or trailing content in the import block.
+    let has_leading_content = match_leading_content(&body, locator);
+    let has_trailing_content = match_trailing_content(&body, locator);
 
     // Generate the sorted import block.
     let expected = sort_imports(
@@ -55,19 +74,41 @@ pub fn check_imports(
         &settings.isort.extra_standard_library,
     );
 
-    // Compare the two?
-    if actual != expected {
+    if has_leading_content || has_trailing_content {
         let mut check = Check::new(CheckKind::UnsortedImports, range);
         if autofix.patch() {
+            let mut content = String::new();
+            if has_leading_content {
+                // TODO(charlie): Strip semicolon.
+                content.push('\n');
+            }
+            content.push_str(&indent(&expected, &indentation));
+            if has_trailing_content {
+                // TODO(charlie): Strip semicolon.
+                content.push('\n');
+            }
             check.amend(Fix::replacement(
-                indent(&expected, &indentation),
+                content,
                 range.location,
                 range.end_location,
             ));
         }
         Some(check)
     } else {
-        None
+        let actual = dedent(&locator.slice_source_code_range(&range));
+        if actual != expected {
+            let mut check = Check::new(CheckKind::UnsortedImports, range);
+            if autofix.patch() {
+                check.amend(Fix::replacement(
+                    indent(&expected, &indentation),
+                    range.location,
+                    range.end_location,
+                ));
+            }
+            Some(check)
+        } else {
+            None
+        }
     }
 }
 
