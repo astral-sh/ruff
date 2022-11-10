@@ -350,7 +350,7 @@ pub enum CheckKind {
     MutableArgumentDefault,
     UnusedLoopControlVariable(String),
     FunctionCallArgumentDefault,
-    DoNotCallGetAttr,
+    GetAttrWithConstant,
     DoNotAssertFalse,
     RedundantTupleInExceptionHandler(String),
     DuplicateHandlerException(Vec<String>),
@@ -563,7 +563,7 @@ impl CheckCode {
             CheckCode::B006 => CheckKind::MutableArgumentDefault,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B008 => CheckKind::FunctionCallArgumentDefault,
-            CheckCode::B009 => CheckKind::DoNotCallGetAttr,
+            CheckCode::B009 => CheckKind::GetAttrWithConstant,
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
             CheckCode::B013 => {
                 CheckKind::RedundantTupleInExceptionHandler("ValueError".to_string())
@@ -965,7 +965,7 @@ impl CheckKind {
             CheckKind::MutableArgumentDefault => &CheckCode::B006,
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
             CheckKind::FunctionCallArgumentDefault => &CheckCode::B008,
-            CheckKind::DoNotCallGetAttr => &CheckCode::B009,
+            CheckKind::GetAttrWithConstant => &CheckCode::B009,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
             CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
@@ -1269,8 +1269,7 @@ impl CheckKind {
             CheckKind::FunctionCallArgumentDefault => {
                 "Do not perform function calls in argument defaults.".to_string()
             }
-            CheckKind::DoNotCallGetAttr => "Do not call `getattr(x, 'attr')`, instead use normal \
-                                            property access: `x.attr`."
+            CheckKind::GetAttrWithConstant => "Do not call `getattr` with a constant attribute value, it is not any safer than normal property access."
                 .to_string(),
             CheckKind::DoNotAssertFalse => "Do not `assert False` (`python -O` removes these \
                                             calls), raise `AssertionError()`"
