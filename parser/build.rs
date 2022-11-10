@@ -17,9 +17,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn requires_lalrpop(source: &str, target: &str) -> Option<String> {
-    let target = if let Ok(target) = File::open(target) {
-        target
-    } else {
+    let Ok(target) = File::open(target) else {
         return Some("python.rs doesn't exist. regenerate.".to_owned());
     };
 
@@ -71,9 +69,7 @@ fn requires_lalrpop(source: &str, target: &str) -> Option<String> {
 }
 
 fn try_lalrpop(source: &str, target: &str) -> anyhow::Result<()> {
-    let _message = if let Some(msg) = requires_lalrpop(source, target) {
-        msg
-    } else {
+    let Some(_message) = requires_lalrpop(source, target) else {
         return Ok(());
     };
 
