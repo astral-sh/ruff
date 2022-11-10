@@ -1,12 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use anyhow::Result;
 use ropey::RopeBuilder;
 use rustpython_ast::{Stmt, StmtKind};
 
 use crate::isort::categorize::{categorize, ImportType};
-use crate::isort::settings::Settings;
 use crate::isort::types::{AliasData, ImportBlock, ImportFromData, Importable};
 
 mod categorize;
@@ -58,7 +56,7 @@ fn categorize_imports<'a>(
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
-) -> Result<BTreeMap<ImportType, ImportBlock<'a>>> {
+) -> BTreeMap<ImportType, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<ImportType, ImportBlock> = Default::default();
     // Categorize `StmtKind::Import`.
     for alias in block.import {
@@ -68,7 +66,7 @@ fn categorize_imports<'a>(
             known_first_party,
             known_third_party,
             extra_standard_library,
-        )?;
+        );
         block_by_type
             .entry(import_type)
             .or_default()
@@ -83,14 +81,14 @@ fn categorize_imports<'a>(
             known_first_party,
             known_third_party,
             extra_standard_library,
-        )?;
+        );
         block_by_type
             .entry(classification)
             .or_default()
             .import_from
             .insert(import_from, aliases);
     }
-    Ok(block_by_type)
+    block_by_type
 }
 
 pub fn sort_imports(
@@ -100,7 +98,7 @@ pub fn sort_imports(
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
-) -> Result<String> {
+) -> String {
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(&block);
 
@@ -111,7 +109,7 @@ pub fn sort_imports(
         known_first_party,
         known_third_party,
         extra_standard_library,
-    )?;
+    );
 
     // Generate replacement source code.
     let mut output = RopeBuilder::new();
@@ -154,5 +152,5 @@ pub fn sort_imports(
             }
         }
     }
-    Ok(output.finish().to_string())
+    output.finish().to_string()
 }

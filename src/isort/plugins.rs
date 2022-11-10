@@ -48,8 +48,7 @@ pub fn check_imports(checker: &mut Checker, body: Vec<&Stmt>) {
         &checker.settings.isort.known_first_party,
         &checker.settings.isort.known_third_party,
         &checker.settings.isort.extra_standard_library,
-    )
-    .unwrap();
+    );
 
     // Compare the two?
     if actual != expected {
@@ -84,8 +83,7 @@ fn expected(body: Vec<&Stmt>, locator: &SourceCodeLocator) -> String {
         &Default::default(),
         &Default::default(),
         &Default::default(),
-    )
-    .unwrap();
+    );
     indent(&expected, &indentation)
 }
 
