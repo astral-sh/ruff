@@ -92,6 +92,7 @@ pub enum CheckCode {
     B017,
     B018,
     B025,
+    B026,
     // flake8-comprehensions
     C400,
     C401,
@@ -356,6 +357,7 @@ pub enum CheckKind {
     NoAssertRaisesException,
     UselessExpression,
     DuplicateTryBlockException(String),
+    StarArgUnpackingAfterKeywordArg,
     // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
@@ -569,6 +571,7 @@ impl CheckCode {
             CheckCode::B017 => CheckKind::NoAssertRaisesException,
             CheckCode::B018 => CheckKind::UselessExpression,
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
+            CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
             CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
@@ -784,6 +787,7 @@ impl CheckCode {
             CheckCode::B017 => CheckCategory::Flake8Bugbear,
             CheckCode::B018 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
+            CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
             CheckCode::C402 => CheckCategory::Flake8Comprehensions,
@@ -965,6 +969,7 @@ impl CheckKind {
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::UselessExpression => &CheckCode::B018,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
+            CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
             CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,
@@ -1296,6 +1301,13 @@ impl CheckKind {
             }
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
+            }
+            CheckKind::StarArgUnpackingAfterKeywordArg => {
+                "Star-arg unpacking after a keyword argument is strongly discouraged, because it \
+                 only works when the keyword parameter is declared after all parameters supplied \
+                 by the unpacked sequence, and this change of ordering can surprise and mislead \
+                 readers."
+                    .to_string()
             }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {
@@ -1674,6 +1686,9 @@ impl CheckKind {
             }
             CheckKind::NoAssertRaisesException => {
                 "`assertRaises(Exception):` should be considered evil.".to_string()
+            }
+            CheckKind::StarArgUnpackingAfterKeywordArg => {
+                "Star-arg unpacking after a keyword argument is strongly discouraged.".to_string()
             }
             _ => self.body(),
         }

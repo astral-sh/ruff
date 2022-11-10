@@ -53,6 +53,7 @@ pub enum CheckCodePrefix {
     B018,
     B02,
     B025,
+    B026,
     C,
     C4,
     C40,
@@ -343,6 +344,7 @@ impl CheckCodePrefix {
                 CheckCode::B017,
                 CheckCode::B018,
                 CheckCode::B025,
+                CheckCode::B026,
             ],
             CheckCodePrefix::B0 => vec![
                 CheckCode::B002,
@@ -360,6 +362,7 @@ impl CheckCodePrefix {
                 CheckCode::B017,
                 CheckCode::B018,
                 CheckCode::B025,
+                CheckCode::B026,
             ],
             CheckCodePrefix::B00 => vec![
                 CheckCode::B002,
@@ -393,8 +396,9 @@ impl CheckCodePrefix {
             CheckCodePrefix::B016 => vec![CheckCode::B016],
             CheckCodePrefix::B017 => vec![CheckCode::B017],
             CheckCodePrefix::B018 => vec![CheckCode::B018],
-            CheckCodePrefix::B02 => vec![CheckCode::B025],
+            CheckCodePrefix::B02 => vec![CheckCode::B025, CheckCode::B026],
             CheckCodePrefix::B025 => vec![CheckCode::B025],
+            CheckCodePrefix::B026 => vec![CheckCode::B026],
             CheckCodePrefix::C => vec![
                 CheckCode::C400,
                 CheckCode::C401,
@@ -1057,6 +1061,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::B018 => PrefixSpecificity::Explicit,
             CheckCodePrefix::B02 => PrefixSpecificity::Tens,
             CheckCodePrefix::B025 => PrefixSpecificity::Explicit,
+            CheckCodePrefix::B026 => PrefixSpecificity::Explicit,
             CheckCodePrefix::C => PrefixSpecificity::Category,
             CheckCodePrefix::C4 => PrefixSpecificity::Hundreds,
             CheckCodePrefix::C40 => PrefixSpecificity::Tens,
