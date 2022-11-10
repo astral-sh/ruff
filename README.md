@@ -500,6 +500,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
+| B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged, because it only works when the keyword parameter is declared after all parameters supplied by the unpacked sequence, and this change of ordering can surprise and mislead readers. |  |
 
 ### flake8-builtins
 
@@ -654,7 +655,7 @@ including:
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (17/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (18/32)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
@@ -677,7 +678,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (17/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (18/32)
 
 Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34).
