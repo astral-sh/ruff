@@ -1075,11 +1075,11 @@ where
                     flake8_bugbear::plugins::getattr_with_constant(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&CheckCode::B010) {
-                    if self
-                        .scopes
+                    if !self
+                        .scope_stack
                         .iter()
                         .rev()
-                        .all(|scope| !matches!(scope.kind, ScopeKind::Lambda))
+                        .any(|index| matches!(self.scopes[*index].kind, ScopeKind::Lambda))
                     {
                         flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
                     }
@@ -2254,7 +2254,7 @@ impl<'a> Checker<'a> {
         while let Some((expr, scopes, parents)) = self.deferred_lambdas.pop() {
             self.parent_stack = parents;
             self.scope_stack = scopes;
-            self.push_scope(Scope::new(ScopeKind::Function(Default::default())));
+            self.push_scope(Scope::new(ScopeKind::Lambda));
 
             if let ExprKind::Lambda { args, body } = &expr.node {
                 self.visit_arguments(args);
