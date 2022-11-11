@@ -1074,6 +1074,16 @@ where
                 if self.settings.enabled.contains(&CheckCode::B009) {
                     flake8_bugbear::plugins::getattr_with_constant(self, expr, func, args);
                 }
+                if self.settings.enabled.contains(&CheckCode::B010) {
+                    if !self
+                        .scopes
+                        .iter()
+                        .rev()
+                        .any(|scope| matches!(scope.kind, ScopeKind::Lambda))
+                    {
+                        flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
+                    }
+                }
                 if self.settings.enabled.contains(&CheckCode::B026) {
                     flake8_bugbear::plugins::star_arg_unpacking_after_keyword_arg(
                         self, args, keywords,
@@ -1461,6 +1471,7 @@ where
                 for expr in &args.defaults {
                     self.visit_expr(expr);
                 }
+                self.push_scope(Scope::new(ScopeKind::Lambda))
             }
 
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {

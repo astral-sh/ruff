@@ -85,6 +85,7 @@ pub enum CheckCode {
     B007,
     B008,
     B009,
+    B010,
     B011,
     B013,
     B014,
@@ -357,6 +358,7 @@ pub enum CheckKind {
     UnusedLoopControlVariable(String),
     FunctionCallArgumentDefault,
     GetAttrWithConstant,
+    SetAttrWithConstant,
     DoNotAssertFalse,
     RedundantTupleInExceptionHandler(String),
     DuplicateHandlerException(Vec<String>),
@@ -573,6 +575,7 @@ impl CheckCode {
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B008 => CheckKind::FunctionCallArgumentDefault,
             CheckCode::B009 => CheckKind::GetAttrWithConstant,
+            CheckCode::B010 => CheckKind::SetAttrWithConstant,
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
             CheckCode::B013 => {
                 CheckKind::RedundantTupleInExceptionHandler("ValueError".to_string())
@@ -794,6 +797,7 @@ impl CheckCode {
             CheckCode::B007 => CheckCategory::Flake8Bugbear,
             CheckCode::B008 => CheckCategory::Flake8Bugbear,
             CheckCode::B009 => CheckCategory::Flake8Bugbear,
+            CheckCode::B010 => CheckCategory::Flake8Bugbear,
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
             CheckCode::B013 => CheckCategory::Flake8Bugbear,
             CheckCode::B014 => CheckCategory::Flake8Bugbear,
@@ -978,6 +982,7 @@ impl CheckKind {
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
             CheckKind::FunctionCallArgumentDefault => &CheckCode::B008,
             CheckKind::GetAttrWithConstant => &CheckCode::B009,
+            CheckKind::SetAttrWithConstant => &CheckCode::B010,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
             CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
@@ -1286,6 +1291,10 @@ impl CheckKind {
             CheckKind::GetAttrWithConstant => "Do not call `getattr` with a constant attribute \
                                                value, it is not any safer than normal property \
                                                access."
+                .to_string(),
+            CheckKind::SetAttrWithConstant => "Do not call setattr with a constant attribute \
+                                               value, it is not any safer than normal property \
+                                               access"
                 .to_string(),
             CheckKind::DoNotAssertFalse => "Do not `assert False` (`python -O` removes these \
                                             calls), raise `AssertionError()`"
