@@ -1,14 +1,10 @@
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
+use crate::flake8_bugbear::constants::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
-
-pub static IDENTIFIER_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap());
 
 /// B009
 pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {

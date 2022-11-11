@@ -1660,7 +1660,8 @@ where
 
         // Post-visit.
         match &expr.node {
-            ExprKind::GeneratorExp { .. }
+            ExprKind::Lambda { .. }
+            | ExprKind::GeneratorExp { .. }
             | ExprKind::ListComp { .. }
             | ExprKind::DictComp { .. }
             | ExprKind::SetComp { .. } => {

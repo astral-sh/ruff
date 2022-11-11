@@ -1294,7 +1294,7 @@ impl CheckKind {
                 .to_string(),
             CheckKind::SetAttrWithConstant => "Do not call setattr with a constant attribute \
                                                value, it is not any safer than normal property \
-                                               access"
+                                               access."
                 .to_string(),
             CheckKind::DoNotAssertFalse => "Do not `assert False` (`python -O` removes these \
                                             calls), raise `AssertionError()`"

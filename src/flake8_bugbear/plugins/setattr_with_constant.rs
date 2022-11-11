@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
-use crate::flake8_bugbear::plugins::getattr_with_constant::IDENTIFIER_REGEX;
+use crate::flake8_bugbear::constants::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 
 /// B010
