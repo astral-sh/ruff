@@ -12,13 +12,13 @@ use crate::python::keyword::KWLIST;
 static IDENTIFIER_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap());
 
-fn attribute(value: &Expr, attr: String) -> Expr {
+fn attribute(value: &Expr, attr: &str) -> Expr {
     Expr::new(
         Default::default(),
         Default::default(),
         ExprKind::Attribute {
             value: Box::new(value.clone()),
-            attr,
+            attr: attr.to_string(),
             ctx: ExprContext::Load,
         },
     )
@@ -39,9 +39,7 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                             Check::new(CheckKind::GetAttrWithConstant, Range::from_located(expr));
                         if checker.patch() {
                             let mut generator = SourceGenerator::new();
-                            if let Ok(()) =
-                                generator.unparse_expr(&attribute(obj, value.to_string()), 0)
-                            {
+                            if let Ok(()) = generator.unparse_expr(&attribute(obj, value), 0) {
                                 if let Ok(content) = generator.generate() {
                                     check.amend(Fix::replacement(
                                         content,
