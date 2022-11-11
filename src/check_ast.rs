@@ -847,6 +847,13 @@ where
                 if self.settings.enabled.contains(&CheckCode::B003) {
                     flake8_bugbear::plugins::assignment_to_os_environ(self, targets);
                 }
+                if self.settings.enabled.contains(&CheckCode::S105) {
+                    if let Some(check) =
+                        flake8_bandit::checks::assign_hardcoded_password_string(value, targets)
+                    {
+                        self.add_check(check);
+                    }
+                }
             }
             StmtKind::AnnAssign { value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
@@ -1460,6 +1467,16 @@ where
                     || self.settings.enabled.contains(&CheckCode::YTT302)
                 {
                     flake8_2020::plugins::compare(self, left, ops, comparators);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::S105) {
+                    self.add_checks(
+                        flake8_bandit::checks::compare_to_hardcoded_password_string(
+                            left,
+                            comparators,
+                        )
+                        .into_iter(),
+                    );
                 }
             }
             ExprKind::Constant {

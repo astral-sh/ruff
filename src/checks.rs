@@ -221,6 +221,7 @@ pub enum CheckCode {
     // flake8-bandit
     S101,
     S102,
+    S105,
     // Ruff
     RUF001,
     RUF002,
@@ -514,6 +515,7 @@ pub enum CheckKind {
     // flake8-bandit
     AssertUsed,
     ExecUsed,
+    HardcodedPasswordString(String),
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -779,6 +781,7 @@ impl CheckCode {
             // flake8-bandit
             CheckCode::S101 => CheckKind::AssertUsed,
             CheckCode::S102 => CheckKind::ExecUsed,
+            CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -971,6 +974,7 @@ impl CheckCode {
             CheckCode::I001 => CheckCategory::Isort,
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
+            CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
@@ -1178,6 +1182,7 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => &CheckCode::S101,
             CheckKind::ExecUsed => &CheckCode::S102,
+            CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -1778,6 +1783,9 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => "Use of `assert` detected".to_string(),
             CheckKind::ExecUsed => "Use of `exec` detected".to_string(),
+            CheckKind::HardcodedPasswordString(string) => {
+                format!("Possible hardcoded password: '{string}'")
+            }
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(
