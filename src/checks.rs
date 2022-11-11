@@ -1292,7 +1292,7 @@ impl CheckKind {
                                                value, it is not any safer than normal property \
                                                access."
                 .to_string(),
-            CheckKind::SetAttrWithConstant => "Do not call setattr with a constant attribute \
+            CheckKind::SetAttrWithConstant => "Do not call `setattr` with a constant attribute \
                                                value, it is not any safer than normal property \
                                                access."
                 .to_string(),
