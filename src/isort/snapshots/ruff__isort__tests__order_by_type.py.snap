@@ -1,0 +1,22 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 13
+    column: 0
+  fix:
+    patch:
+      content: "import glob\nimport os\nimport shutil\nimport tempfile\nimport time\nfrom subprocess import PIPE, STDOUT, Popen\n\nimport BAR\nimport bar\nimport FOO\nimport foo\nimport StringIO\nfrom module import BASIC, CONSTANT, Apple, Class, function\n"
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 13
+        column: 0
+    applied: false
+

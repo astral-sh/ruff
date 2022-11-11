@@ -5,6 +5,7 @@ use crate::checks::{Check, CheckKind};
 use crate::pep8_naming::helpers;
 use crate::pep8_naming::helpers::FunctionType;
 use crate::pep8_naming::settings::Settings;
+use crate::python::string;
 
 /// N801
 pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
@@ -133,7 +134,7 @@ pub fn constant_imported_as_non_constant(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if helpers::is_upper(name) && !helpers::is_upper(asname) {
+    if string::is_upper(name) && !string::is_upper(asname) {
         return Some(Check::new(
             CheckKind::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -148,7 +149,7 @@ pub fn lowercase_imported_as_non_lowercase(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if !helpers::is_upper(name) && helpers::is_lower(name) && asname.to_lowercase() != asname {
+    if !string::is_upper(name) && string::is_lower(name) && asname.to_lowercase() != asname {
         return Some(Check::new(
             CheckKind::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -163,7 +164,7 @@ pub fn camelcase_imported_as_lowercase(
     name: &str,
     asname: &str,
 ) -> Option<Check> {
-    if helpers::is_camelcase(name) && helpers::is_lower(asname) {
+    if helpers::is_camelcase(name) && string::is_lower(asname) {
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
@@ -179,8 +180,8 @@ pub fn camelcase_imported_as_constant(
     asname: &str,
 ) -> Option<Check> {
     if helpers::is_camelcase(name)
-        && !helpers::is_lower(asname)
-        && helpers::is_upper(asname)
+        && !string::is_lower(asname)
+        && string::is_upper(asname)
         && !helpers::is_acronym(name, asname)
     {
         return Some(Check::new(
@@ -230,8 +231,8 @@ pub fn camelcase_imported_as_acronym(
     asname: &str,
 ) -> Option<Check> {
     if helpers::is_camelcase(name)
-        && !helpers::is_lower(asname)
-        && helpers::is_upper(asname)
+        && !string::is_lower(asname)
+        && string::is_upper(asname)
         && helpers::is_acronym(name, asname)
     {
         return Some(Check::new(

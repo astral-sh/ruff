@@ -53,3 +53,11 @@ pub struct ImportBlock<'a> {
     // Set of (name, asname).
     pub import: BTreeSet<AliasData<'a>>,
 }
+
+#[derive(Debug, Default)]
+pub struct OrderedImportBlock<'a> {
+    // Map from (module, level) to `AliasData`.
+    pub import_from: Vec<(ImportFromData<'a>, Vec<AliasData<'a>>)>,
+    // Set of (name, asname).
+    pub import: Vec<AliasData<'a>>,
+}

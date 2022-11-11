@@ -4,6 +4,7 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::helpers::match_name_or_attr;
 use crate::ast::types::{Scope, ScopeKind};
 use crate::pep8_naming::settings::Settings;
+use crate::python::string::{is_lower, is_upper};
 
 const CLASS_METHODS: [&str; 3] = ["__new__", "__init_subclass__", "__class_getitem__"];
 const METACLASS_BASES: [&str; 2] = ["type", "ABCMeta"];
@@ -59,30 +60,6 @@ pub fn function_type(
     }
 }
 
-pub fn is_lower(s: &str) -> bool {
-    let mut cased = false;
-    for c in s.chars() {
-        if c.is_uppercase() {
-            return false;
-        } else if !cased && c.is_lowercase() {
-            cased = true;
-        }
-    }
-    cased
-}
-
-pub fn is_upper(s: &str) -> bool {
-    let mut cased = false;
-    for c in s.chars() {
-        if c.is_lowercase() {
-            return false;
-        } else if !cased && c.is_uppercase() {
-            cased = true;
-        }
-    }
-    cased
-}
-
 pub fn is_camelcase(name: &str) -> bool {
     !is_lower(name) && !is_upper(name) && !name.contains('_')
 }
@@ -103,31 +80,7 @@ pub fn is_acronym(name: &str, asname: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::pep8_naming::helpers::{
-        is_acronym, is_camelcase, is_lower, is_mixed_case, is_upper,
-    };
-
-    #[test]
-    fn test_is_lower() -> () {
-        assert!(is_lower("abc"));
-        assert!(is_lower("a_b_c"));
-        assert!(is_lower("a2c"));
-        assert!(!is_lower("aBc"));
-        assert!(!is_lower("ABC"));
-        assert!(!is_lower(""));
-        assert!(!is_lower("_"));
-    }
-
-    #[test]
-    fn test_is_upper() -> () {
-        assert!(is_upper("ABC"));
-        assert!(is_upper("A_B_C"));
-        assert!(is_upper("A2C"));
-        assert!(!is_upper("aBc"));
-        assert!(!is_upper("abc"));
-        assert!(!is_upper(""));
-        assert!(!is_upper("_"));
-    }
+    use crate::pep8_naming::helpers::{is_acronym, is_camelcase, is_mixed_case};
 
     #[test]
     fn test_is_camelcase() -> () {
