@@ -27,9 +27,10 @@ An extremely fast Python linter, written in Rust.
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface. Ruff can be used to replace Flake8 (plus a variety
-of plugins), [`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](https://github.com/asottile/yesqa),
-and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/) and [`autoflake`](https://pypi.org/project/autoflake/)
-all while executing tens or hundreds of times faster than any individual tool.
+of plugins), [`isort`](https://pypi.org/project/isort/), [`pydocstyle`](https://pypi.org/project/pydocstyle/),
+[`yesqa`](https://github.com/asottile/yesqa), and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/)
+and [`autoflake`](https://pypi.org/project/autoflake/) all while executing tens or hundreds of times
+faster than any individual tool.
 
 (Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
 automatically convert your existing configuration.)
@@ -285,16 +286,16 @@ Ruff supports several workflows to aid in `noqa` management.
 
 First, Ruff provides a special error code, `M001`, to enforce that your `noqa` directives are
 "valid", in that the errors they _say_ they ignore are actually being triggered on that line (and
-thus suppressed). **You can run `ruff /path/to/file.py --extend-select M001` to flag unused `noqa`
-directives.**
+thus suppressed). You can run `ruff /path/to/file.py --extend-select M001` to flag unused `noqa`
+directives.
 
 Second, Ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
-**You can run `ruff /path/to/file.py --extend-select M001 --fix` to automatically remove unused
-`noqa` directives.**
+You can run `ruff /path/to/file.py --extend-select M001 --fix` to automatically remove unused
+`noqa` directives.
 
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
-migrating a new codebase to Ruff. **You can run `ruff /path/to/file.py --add-noqa` to automatically
-add `noqa` directives to all failing lines, with the appropriate error codes.**
+migrating a new codebase to Ruff. You can run `ruff /path/to/file.py --add-noqa` to automatically
+add `noqa` directives to all failing lines, with the appropriate error codes.
 
 ## Supported Rules
 
@@ -364,6 +365,14 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E999 | SyntaxError | SyntaxError: `...` |  |
 | W292 | NoNewLineAtEndOfFile | No newline at end of file |  |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' |  |
+
+### isort
+
+For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| I001 | UnsortedImports | Import block is un-sorted or un-formatted | 🛠 |
 
 ### pydocstyle
 
@@ -681,7 +690,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (19/32)
 
-Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
+Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
@@ -701,6 +710,31 @@ on Rust at all.
 
 Ruff does not yet support third-party plugins, though a plugin system is within-scope for the
 project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
+
+### How does Ruff's import sorting compare to [`isort`](https://pypi.org/project/isort/)?
+
+Ruff's import sorting is intended to be equivalent to `isort` when used `profile = "black"` and
+`combine_as_imports = true`. Like `isort`, Ruff's import sorting is compatible with Black.
+
+Ruff is less configurable than `isort`, but supports the `known-first-party`, `known-third-party`,
+`extra-standard-library`, and `src` settings, like so:
+
+```toml
+[tool.ruff]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I"
+]
+src = ["src", "tests"]
+
+[tool.ruff.isort]
+known-first-party = ["my_module1", "my_module2"]
+```
 
 ### Does Ruff support NumPy- or Google-style docstrings?
 

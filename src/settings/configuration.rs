@@ -2,16 +2,17 @@
 //! command-line options. Structure mirrors the user-facing representation of
 //! the various parameters.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
+use path_absolutize::path_dedot;
 use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
-use crate::{flake8_annotations, flake8_quotes, pep8_naming};
+use crate::{flake8_annotations, flake8_quotes, fs, isort, pep8_naming};
 
 #[derive(Debug)]
 pub struct Configuration {
@@ -25,10 +26,12 @@ pub struct Configuration {
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub select: Vec<CheckCodePrefix>,
+    pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
+    pub isort: isort::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
 }
 
@@ -71,6 +74,25 @@ impl Configuration {
                     .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
                 None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
             },
+            src: options
+                .src
+                .map(|src| {
+                    src.iter()
+                        .map(|path| {
+                            let path = Path::new(path);
+                            match project_root {
+                                Some(project_root) => fs::normalize_path_to(path, project_root),
+                                None => fs::normalize_path(path),
+                            }
+                        })
+                        .collect()
+                })
+                .unwrap_or_else(|| {
+                    vec![match project_root {
+                        Some(project_root) => project_root.clone(),
+                        None => path_dedot::CWD.clone(),
+                    }]
+                }),
             target_version: options.target_version.unwrap_or(PythonVersion::Py310),
             exclude: options
                 .exclude
@@ -114,6 +136,10 @@ impl Configuration {
             flake8_quotes: options
                 .flake8_quotes
                 .map(flake8_quotes::settings::Settings::from_options)
+                .unwrap_or_default(),
+            isort: options
+                .isort
+                .map(isort::settings::Settings::from_options)
                 .unwrap_or_default(),
             pep8_naming: options
                 .pep8_naming

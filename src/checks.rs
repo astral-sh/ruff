@@ -204,6 +204,8 @@ pub enum CheckCode {
     N816,
     N817,
     N818,
+    // isort
+    I001,
     // Ruff
     RUF001,
     RUF002,
@@ -216,6 +218,7 @@ pub enum CheckCode {
 pub enum CheckCategory {
     Pyflakes,
     Pycodestyle,
+    Isort,
     Pydocstyle,
     Pyupgrade,
     PEP8Naming,
@@ -234,6 +237,7 @@ impl CheckCategory {
         match self {
             CheckCategory::Pycodestyle => "pycodestyle",
             CheckCategory::Pyflakes => "Pyflakes",
+            CheckCategory::Isort => "isort",
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
@@ -252,6 +256,7 @@ impl CheckCategory {
         match self {
             CheckCategory::Pycodestyle => Some("https://pypi.org/project/pycodestyle/2.9.1/"),
             CheckCategory::Pyflakes => Some("https://pypi.org/project/pyflakes/2.5.0/"),
+            CheckCategory::Isort => Some("https://pypi.org/project/isort/5.10.1/"),
             CheckCategory::Flake8Builtins => {
                 Some("https://pypi.org/project/flake8-builtins/2.0.1/")
             }
@@ -281,6 +286,7 @@ pub enum LintSource {
     FileSystem,
     Lines,
     Tokens,
+    Imports,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -470,6 +476,8 @@ pub enum CheckKind {
     MixedCaseVariableInGlobalScope(String),
     CamelcaseImportedAsAcronym(String, String),
     ErrorSuffixOnExceptionName(String),
+    // isort
+    UnsortedImports,
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -495,6 +503,7 @@ impl CheckCode {
             | CheckCode::RUF002
             | CheckCode::RUF003 => &LintSource::Tokens,
             CheckCode::E902 => &LintSource::FileSystem,
+            CheckCode::I001 => &LintSource::Imports,
             _ => &LintSource::AST,
         }
     }
@@ -717,6 +726,8 @@ impl CheckCode {
                 CheckKind::CamelcaseImportedAsAcronym("...".to_string(), "...".to_string())
             }
             CheckCode::N818 => CheckKind::ErrorSuffixOnExceptionName("...".to_string()),
+            // isort
+            CheckCode::I001 => CheckKind::UnsortedImports,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -895,6 +906,7 @@ impl CheckCode {
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
+            CheckCode::I001 => CheckCategory::Isort,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
@@ -1085,6 +1097,8 @@ impl CheckKind {
             CheckKind::MixedCaseVariableInGlobalScope(..) => &CheckCode::N816,
             CheckKind::CamelcaseImportedAsAcronym(..) => &CheckCode::N817,
             CheckKind::ErrorSuffixOnExceptionName(..) => &CheckCode::N818,
+            // isort
+            CheckKind::UnsortedImports => &CheckCode::I001,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -1644,6 +1658,8 @@ impl CheckKind {
             CheckKind::PEP3120UnnecessaryCodingComment => {
                 "utf-8 encoding declaration is unnecessary".to_string()
             }
+            // isort
+            CheckKind::UnsortedImports => "Import block is un-sorted or un-formatted".to_string(),
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(
@@ -1749,12 +1765,13 @@ impl CheckKind {
                 | CheckKind::UnnecessaryGeneratorSet
                 | CheckKind::UnnecessaryLRUCacheParams
                 | CheckKind::UnnecessaryListCall
-                | CheckKind::UnnecessaryListComprehensionSet
                 | CheckKind::UnnecessaryListComprehensionDict
+                | CheckKind::UnnecessaryListComprehensionSet
                 | CheckKind::UnnecessaryLiteralDict(_)
                 | CheckKind::UnnecessaryLiteralSet(_)
                 | CheckKind::UnnecessaryLiteralWithinListCall(_)
                 | CheckKind::UnnecessaryLiteralWithinTupleCall(_)
+                | CheckKind::UnsortedImports
                 | CheckKind::UnusedImport(_, false)
                 | CheckKind::UnusedLoopControlVariable(_)
                 | CheckKind::UnusedNOQA(_)

@@ -16,6 +16,7 @@ use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
+use crate::check_imports::check_imports;
 use crate::check_lines::check_lines;
 use crate::check_tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
@@ -63,23 +64,32 @@ pub(crate) fn check_path(
     let mut checks: Vec<Check> = vec![];
 
     // Run the token-based checks.
-    if settings
+    let use_tokens = settings
         .enabled
         .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens))
-    {
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens));
+    if use_tokens {
         check_tokens(&mut checks, locator, &tokens, settings, autofix);
     }
 
     // Run the AST-based checks.
-    if settings
+    let use_ast = settings
         .enabled
         .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
-    {
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::AST));
+    let use_imports = settings
+        .enabled
+        .iter()
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports));
+    if use_ast || use_imports {
         match parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
-                checks.extend(check_ast(&python_ast, locator, settings, autofix, path))
+                if use_ast {
+                    checks.extend(check_ast(&python_ast, locator, settings, autofix, path));
+                }
+                if use_imports {
+                    checks.extend(check_imports(&python_ast, locator, settings, autofix));
+                }
             }
             Err(parse_error) => {
                 if settings.enabled.contains(&CheckCode::E999) {

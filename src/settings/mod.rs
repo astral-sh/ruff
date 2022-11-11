@@ -4,14 +4,16 @@
 
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
 
+use path_absolutize::path_dedot;
 use regex::Regex;
 
 use crate::checks::CheckCode;
 use crate::checks_gen::{CheckCodePrefix, PrefixSpecificity};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
-use crate::{flake8_annotations, flake8_quotes, pep8_naming};
+use crate::{flake8_annotations, flake8_quotes, isort, pep8_naming};
 
 pub mod configuration;
 pub mod options;
@@ -27,10 +29,12 @@ pub struct Settings {
     pub extend_exclude: Vec<FilePattern>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
+    pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
+    pub isort: isort::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
 }
 
@@ -48,9 +52,11 @@ impl Settings {
             extend_exclude: config.extend_exclude,
             flake8_annotations: config.flake8_annotations,
             flake8_quotes: config.flake8_quotes,
+            isort: config.isort,
             line_length: config.line_length,
             pep8_naming: config.pep8_naming,
             per_file_ignores: config.per_file_ignores,
+            src: config.src,
             target_version: config.target_version,
         }
     }
@@ -63,9 +69,11 @@ impl Settings {
             extend_exclude: Default::default(),
             line_length: 88,
             per_file_ignores: Default::default(),
+            src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
             flake8_annotations: Default::default(),
             flake8_quotes: Default::default(),
+            isort: Default::default(),
             pep8_naming: Default::default(),
         }
     }
@@ -78,9 +86,11 @@ impl Settings {
             extend_exclude: Default::default(),
             line_length: 88,
             per_file_ignores: Default::default(),
+            src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
             flake8_annotations: Default::default(),
             flake8_quotes: Default::default(),
+            isort: Default::default(),
             pep8_naming: Default::default(),
         }
     }
@@ -101,6 +111,7 @@ impl Hash for Settings {
         // Add plugin properties in alphabetical order.
         self.flake8_annotations.hash(state);
         self.flake8_quotes.hash(state);
+        self.isort.hash(state);
         self.pep8_naming.hash(state);
     }
 }
