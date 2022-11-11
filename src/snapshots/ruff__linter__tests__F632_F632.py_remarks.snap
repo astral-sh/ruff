@@ -1,0 +1,16 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| if x is "abc":
+|> Use `==` and `!=` to compare constant literals
+      pass
+  
+| if 123 is not y:
+|> Use `==` and `!=` to compare constant literals
+      pass
+  
+| if "123" is x < 3:
+|> Use `==` and `!=` to compare constant literals
+      pass
+

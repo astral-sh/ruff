@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  lower = 0
+  CONSTANT = 0
+| mixedCase = 0
+|> Variable `mixedCase` in global scope should not be mixedCase
+| _mixedCase = 0
+|> Variable `_mixedCase` in global scope should not be mixedCase
+| mixed_Case = 0
+|> Variable `mixed_Case` in global scope should not be mixedCase
+

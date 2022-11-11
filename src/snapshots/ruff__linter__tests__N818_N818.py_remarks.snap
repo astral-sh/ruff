@@ -1,0 +1,15 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  class Error(Exception):
+      pass
+  
+  
+  class AnotherError(Exception):
+      pass
+  
+  
+| class C(Exception):
+|     pass
+

@@ -1,0 +1,54 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  try:
+      pass
+| except:
+|     pass
+| except ValueError:
+|> An `except:` block as not the last exception handler
+      pass
+  
+  try:
+      pass
+| except:
+|     pass
+| except ValueError:
+|> An `except:` block as not the last exception handler
+      pass
+  finally:
+      pass
+  
+  try:
+      pass
+| except:
+|     pass
+| except ValueError:
+|> An `except:` block as not the last exception handler
+      pass
+  else:
+      pass
+  
+  try:
+      pass
+  except:
+      pass
+  
+  try:
+      pass
+  except ValueError:
+      pass
+  except:
+      pass
+  
+  try:
+      pass
+  except ValueError:
+      pass
+  
+  try:
+      pass
+  finally:
+      pass
+

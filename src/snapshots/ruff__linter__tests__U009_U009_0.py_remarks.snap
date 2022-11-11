@@ -1,0 +1,9 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| # coding=utf8
+|> utf-8 encoding declaration is unnecessary
+  
+  print('Hello world')
+

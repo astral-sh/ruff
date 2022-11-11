@@ -1,0 +1,50 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  import unittest
+  
+  
+| def Bad():
+|     pass
+| 
+| 
+| def _Bad():
+|> Function name `Bad` should be lowercase
+|     pass
+| 
+| 
+| def BAD():
+|> Function name `_Bad` should be lowercase
+|     pass
+| 
+| 
+| def BAD_FUNC():
+|> Function name `BAD` should be lowercase
+|     pass
+| 
+| 
+| def good():
+|> Function name `BAD_FUNC` should be lowercase
+      pass
+  
+  
+  def _good():
+      pass
+  
+  
+  def good_func():
+      pass
+  
+  
+  def tearDownModule():
+      pass
+  
+  
+  class Test(unittest.TestCase):
+      def tearDown(self):
+          return super().tearDown()
+  
+|     def testTest(self):
+|         assert True
+

@@ -1,0 +1,16 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  import os
+  import os.path as path
+  
+  
+| for os in range(3):
+|> Import `os` from line 1 shadowed by loop variable
+      pass
+  
+| for path in range(3):
+|> Import `path` from line 2 shadowed by loop variable
+      pass
+

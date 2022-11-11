@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| t = tuple()
+|> Unnecessary `tuple` call (rewrite as a literal)
+| l = list()
+|> Unnecessary `list` call (rewrite as a literal)
+| d1 = dict()
+|> Unnecessary `dict` call (rewrite as a literal)
+| d2 = dict(a=1)
+|> Unnecessary `dict` call (rewrite as a literal)
+  d3 = dict(**d2)
+

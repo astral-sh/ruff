@@ -1,0 +1,10 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  #!/usr/bin/python
+| # -*- coding: utf-8 -*-
+|> utf-8 encoding declaration is unnecessary
+  
+  print('Hello world')
+

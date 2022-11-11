@@ -1,0 +1,19 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  import unittest
+  
+  
+  class Suite(unittest.TestCase):
+      def test(self) -> None:
+|         self.assertEquals (1, 2)
+|> `assertEquals` is deprecated, use `assertEqual` instead
+|         self.assertEquals(1, 2)
+|> `assertEquals` is deprecated, use `assertEqual` instead
+          self.assertEqual(3, 4)
+|         self.failUnlessAlmostEqual(1, 1.1)
+|> `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual` instead
+|         self.assertNotRegexpMatches("a", "b")
+|> `assertNotRegexpMatches` is deprecated, use `assertNotRegex` instead
+

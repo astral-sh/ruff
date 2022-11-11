@@ -1,0 +1,166 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  class A:
+      ...
+  
+  
+| class A(object):
+|> Class `A` inherits from object
+      ...
+  
+  
+  class A(
+|     object,
+|> Class `A` inherits from object
+  ):
+      ...
+  
+  
+  class A(
+|     object,
+|> Class `A` inherits from object
+      #
+  ):
+      ...
+  
+  
+  class A(
+      #
+|     object,
+|> Class `A` inherits from object
+  ):
+      ...
+  
+  
+  class A(
+      #
+|     object
+|> Class `A` inherits from object
+  ):
+      ...
+  
+  
+  class A(
+|     object
+|> Class `A` inherits from object
+      #
+  ):
+      ...
+  
+  
+  class A(
+      #
+|     object,
+|> Class `A` inherits from object
+      #
+  ):
+      ...
+  
+  
+  class A(
+      #
+|     object,
+|> Class `A` inherits from object
+      #
+  ):
+      ...
+  
+  
+  class A(
+      #
+|     object
+|> Class `A` inherits from object
+      #
+  ):
+      ...
+  
+  
+  class A(
+      #
+|     object
+|> Class `A` inherits from object
+      #
+  ):
+      ...
+  
+  
+| class B(A, object):
+|> Class `B` inherits from object
+      ...
+  
+  
+| class B(object, A):
+|> Class `B` inherits from object
+      ...
+  
+  
+  class B(
+|     object,
+|> Class `B` inherits from object
+      A,
+  ):
+      ...
+  
+  
+  class B(
+      A,
+|     object,
+|> Class `B` inherits from object
+  ):
+      ...
+  
+  
+  class B(
+|     object,
+|> Class `B` inherits from object
+      # Comment on A.
+      A,
+  ):
+      ...
+  
+  
+  class B(
+      # Comment on A.
+      A,
+|     object,
+|> Class `B` inherits from object
+  ):
+      ...
+  
+  
+  def f():
+|     class A(object):
+|> Class `A` inherits from object
+          ...
+  
+  
+  class A(
+|     object,
+|> Class `A` inherits from object
+  ):
+      ...
+  
+  
+  class A(
+|     object,  # )
+|> Class `A` inherits from object
+  ):
+      ...
+  
+  
+  class A(
+|     object  # )
+|> Class `A` inherits from object
+      ,
+  ):
+      ...
+  
+  
+  object = A
+  
+  
+  class B(object):
+      ...
+

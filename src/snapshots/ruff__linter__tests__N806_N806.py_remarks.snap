@@ -1,0 +1,12 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  def f():
+      lower = 0
+|     Camel = 0
+|> Variable `Camel` in function should be lowercase
+|     CONSTANT = 0
+|> Variable `CONSTANT` in function should be lowercase
+      _ = 0
+

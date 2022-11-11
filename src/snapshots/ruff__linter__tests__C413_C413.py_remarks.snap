@@ -1,0 +1,15 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  x = [2, 3, 1]
+  list(x)
+| list(sorted(x))
+|> Unnecessary `list` call around `sorted()`
+| reversed(sorted(x))
+|> Unnecessary `reversed` call around `sorted()`
+| reversed(sorted(x, key=lambda e: e))
+|> Unnecessary `reversed` call around `sorted()`
+| reversed(sorted(x, reverse=True))
+|> Unnecessary `reversed` call around `sorted()`
+

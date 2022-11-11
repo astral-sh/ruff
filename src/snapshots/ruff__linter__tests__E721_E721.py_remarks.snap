@@ -1,0 +1,75 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  #: E721
+| if type(res) == type(42):
+|> Do not compare types, use `isinstance()`
+      pass
+  #: E721
+| if type(res) != type(""):
+|> Do not compare types, use `isinstance()`
+      pass
+  #: E721
+  import types
+  
+| if res == types.IntType:
+|> Do not compare types, use `isinstance()`
+      pass
+  #: E721
+  import types
+  
+| if type(res) is not types.ListType:
+|> Do not compare types, use `isinstance()`
+      pass
+  #: E721
+| assert type(res) == type(False) or type(res) == type(None)
+|> Do not compare types, use `isinstance()`
+|> Do not compare types, use `isinstance()`
+  #: E721
+| assert type(res) == type([])
+|> Do not compare types, use `isinstance()`
+  #: E721
+| assert type(res) == type(())
+|> Do not compare types, use `isinstance()`
+  #: E721
+| assert type(res) == type((0,))
+|> Do not compare types, use `isinstance()`
+  #: E721
+| assert type(res) == type((0))
+|> Do not compare types, use `isinstance()`
+  #: E721
+| assert type(res) != type((1,))
+|> Do not compare types, use `isinstance()`
+  #: E721
+| assert type(res) is type((1,))
+|> Do not compare types, use `isinstance()`
+  #: E721
+| assert type(res) is not type((1,))
+|> Do not compare types, use `isinstance()`
+  #: E211 E721
+| assert type(res) == type(
+|     [
+|         2,
+|     ]
+| )
+|> Do not compare types, use `isinstance()`
+  #: E201 E201 E202 E721
+| assert type(res) == type(())
+|> Do not compare types, use `isinstance()`
+  #: E201 E202 E721
+| assert type(res) == type((0,))
+|> Do not compare types, use `isinstance()`
+  
+  #: Okay
+  import types
+  
+  if isinstance(res, int):
+      pass
+  if isinstance(res, str):
+      pass
+  if isinstance(res, types.MethodType):
+      pass
+  if type(a) != type(b) or type(a) == type(ccc):
+      pass
+

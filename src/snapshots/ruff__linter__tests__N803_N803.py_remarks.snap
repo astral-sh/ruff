@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| def func(_, a, A):
+|> Argument name `A` should be lowercase
+      return _, a, A
+  
+  
+  class Class:
+|     def method(self, _, a, A):
+|> Argument name `A` should be lowercase
+          return _, a, A
+

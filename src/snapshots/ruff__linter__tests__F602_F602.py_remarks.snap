@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  a = 1
+  b = 2
+  x = {
+      a: 1,
+|     a: 2,
+|> Dictionary key `a` repeated
+      b: 3,
+  }
+

@@ -1,0 +1,39 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  """Test: typing module imports."""
+  from foo import cast
+  
+  # OK
+  x = cast("Model")
+  
+  from typing import cast
+  
+  
+  # F821 Undefined name `Model`
+| x = cast("Model", x)
+|> Undefined name `Model`
+  
+  
+  import typing
+  
+  
+  # F821 Undefined name `Model`
+| x = typing.cast("Model", x)
+|> Undefined name `Model`
+  
+  
+  from typing import Pattern
+  
+  # F821 Undefined name `Model`
+| x = Pattern["Model"]
+|> Undefined name `Model`
+  
+  
+  from typing.re import Match
+  
+  # F821 Undefined name `Model`
+| x = Match["Model"]
+|> Undefined name `Model`
+

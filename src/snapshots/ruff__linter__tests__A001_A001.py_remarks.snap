@@ -1,0 +1,50 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| import some as sum
+|> Variable `sum` is shadowing a python builtin
+| from some import other as int
+|> Variable `int` is shadowing a python builtin
+  
+| print = 1
+|> Variable `print` is shadowing a python builtin
+| copyright: 'annotation' = 2
+|> Variable `copyright` is shadowing a python builtin
+| (complex := 3)
+|> Variable `complex` is shadowing a python builtin
+| float = object = 4
+|> Variable `float` is shadowing a python builtin
+|> Variable `object` is shadowing a python builtin
+| min, max = 5, 6
+|> Variable `min` is shadowing a python builtin
+|> Variable `max` is shadowing a python builtin
+  
+| def bytes():
+|     pass
+| 
+| class slice:
+|> Variable `bytes` is shadowing a python builtin
+|     pass
+| 
+| try:
+|> Variable `slice` is shadowing a python builtin
+      ...
+| except ImportError as ValueError:
+|     ...
+| 
+| for memoryview, *bytearray in []:
+|> Variable `ValueError` is shadowing a python builtin
+|> Variable `memoryview` is shadowing a python builtin
+|> Variable `bytearray` is shadowing a python builtin
+      pass
+  
+| with open('file') as str, open('file2') as (all, any):
+|> Variable `str` is shadowing a python builtin
+|> Variable `all` is shadowing a python builtin
+|> Variable `any` is shadowing a python builtin
+      pass
+  
+| [0 for sum in ()]
+|> Variable `sum` is shadowing a python builtin
+

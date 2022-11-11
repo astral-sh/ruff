@@ -1,0 +1,53 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  from typing import Optional
+  
+  
+| def f(x: Optional[str]) -> None:
+|> Use `X | Y` for type annotations
+      ...
+  
+  
+  import typing
+  
+  
+| def f(x: typing.Optional[str]) -> None:
+|> Use `X | Y` for type annotations
+      ...
+  
+  
+  from typing import Union
+  
+  
+| def f(x: Union[str, int, Union[float, bytes]]) -> None:
+|> Use `X | Y` for type annotations
+|> Use `X | Y` for type annotations
+      ...
+  
+  
+  import typing
+  
+  
+| def f(x: typing.Union[str, int]) -> None:
+|> Use `X | Y` for type annotations
+      ...
+  
+  
+  from typing import Union
+  
+  
+| def f(x: "Union[str, int, Union[float, bytes]]") -> None:
+|> Use `X | Y` for type annotations
+|> Use `X | Y` for type annotations
+      ...
+  
+  
+  import typing
+  
+  
+| def f(x: "typing.Union[str, int]") -> None:
+|> Use `X | Y` for type annotations
+      ...
+

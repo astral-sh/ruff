@@ -1,0 +1,17 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  """
+  Should emit:
+  B011 - on line 8
+  B011 - on line 10
+  """
+  
+  assert 1 != 2
+| assert False
+|> Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
+  assert 1 != 2, "message"
+| assert False, "message"
+|> Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
+

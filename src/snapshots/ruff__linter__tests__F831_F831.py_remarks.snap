@@ -1,0 +1,18 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| def foo(x: int, y: int, x: int) -> None:
+|> Duplicate argument name in function definition
+      pass
+  
+  
+| def bar(x: int, y: int, *, x: int) -> None:
+|> Duplicate argument name in function definition
+      pass
+  
+  
+| def baz(x: int, y: int, **x: int) -> None:
+|> Duplicate argument name in function definition
+      pass
+

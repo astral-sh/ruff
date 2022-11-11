@@ -1,0 +1,19 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  """
+  Should emit:
+  B016 - on lines 6, 7, and 8
+  """
+  
+| raise False
+|> Cannot raise a literal. Did you intend to return it or raise an Exception?
+| raise 1
+|> Cannot raise a literal. Did you intend to return it or raise an Exception?
+| raise "string"
+|> Cannot raise a literal. Did you intend to return it or raise an Exception?
+  raise Exception(False)
+  raise Exception(1)
+  raise Exception("string")
+

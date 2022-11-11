@@ -1,0 +1,31 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  #: E731
+| f = lambda x: 2 * x
+|> Do not assign a lambda expression, use a def
+  #: E731
+| f = lambda x: 2 * x
+|> Do not assign a lambda expression, use a def
+  #: E731
+  while False:
+|     this = lambda y, z: 2 * x
+|> Do not assign a lambda expression, use a def
+  
+  
+  f = object()
+  #: E731
+| f.method = lambda: "Method"
+|> Do not assign a lambda expression, use a def
+  
+  f = {}
+  #: E731
+| f["a"] = lambda x: x ** 2
+|> Do not assign a lambda expression, use a def
+  
+  f = []
+  f.append(lambda x: x ** 2)
+  
+  lambda: "no-op"
+

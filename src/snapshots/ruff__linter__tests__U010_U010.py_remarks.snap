@@ -1,0 +1,15 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| from __future__ import annotations, nested_scopes, generators
+|> Unnessary __future__ import `nested_scopes` for target Python version
+|> Unnessary __future__ import `generators` for target Python version
+  
+| from __future__ import absolute_import, division
+|> Unnessary __future__ import `absolute_import` for target Python version
+|> Unnessary __future__ import `division` for target Python version
+  
+| from __future__ import generator_stop
+|> Unnessary __future__ import `generator_stop` for target Python version
+

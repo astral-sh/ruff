@@ -1,0 +1,33 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  """
+  Should emit:
+  B026 - on lines 16, 17, 18, 19, 20, 21
+  """
+  
+  
+  def foo(bar, baz, bam):
+      print(bar, baz, bam)
+  
+  
+  bar_baz = ["bar", "baz"]
+  
+  foo("bar", "baz", bam="bam")
+  foo("bar", baz="baz", bam="bam")
+  foo(bar="bar", baz="baz", bam="bam")
+| foo(bam="bam", *["bar", "baz"])
+|> Star-arg unpacking after a keyword argument is strongly discouraged.
+| foo(bam="bam", *bar_baz)
+|> Star-arg unpacking after a keyword argument is strongly discouraged.
+| foo(baz="baz", bam="bam", *["bar"])
+|> Star-arg unpacking after a keyword argument is strongly discouraged.
+| foo(bar="bar", baz="baz", bam="bam", *[])
+|> Star-arg unpacking after a keyword argument is strongly discouraged.
+| foo(bam="bam", *["bar"], *["baz"])
+|> Star-arg unpacking after a keyword argument is strongly discouraged.
+|> Star-arg unpacking after a keyword argument is strongly discouraged.
+| foo(*["bar"], bam="bam", *["baz"])
+|> Star-arg unpacking after a keyword argument is strongly discouraged.
+

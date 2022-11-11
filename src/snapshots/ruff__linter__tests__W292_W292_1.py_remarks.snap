@@ -1,0 +1,7 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  def fn() -> None:
+      pass  # noqa: W292
+

@@ -1,0 +1,19 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  nums = [1, 2, 3]
+| map(lambda x: x + 1, nums)
+|> Unnecessary `map` usage (rewrite using a generator expression)
+| map(lambda x: str(x), nums)
+|> Unnecessary `map` usage (rewrite using a generator expression)
+| list(map(lambda x: x * 2, nums))
+|> Unnecessary `map` usage (rewrite using a `list` comprehension)
+|> Unnecessary `map` usage (rewrite using a generator expression)
+| set(map(lambda x: x % 2 == 0, nums))
+|> Unnecessary `map` usage (rewrite using a `set` comprehension)
+|> Unnecessary `map` usage (rewrite using a generator expression)
+| dict(map(lambda v: (v, v**2), nums))
+|> Unnecessary `map` usage (rewrite using a `dict` comprehension)
+|> Unnecessary `map` usage (rewrite using a generator expression)
+

@@ -1,0 +1,32 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  x = [1, 2, 3]
+| list(list(x))
+|> Unnecessary `list` call within `list()`
+| list(tuple(x))
+|> Unnecessary `tuple` call within `list()`
+| tuple(list(x))
+|> Unnecessary `list` call within `tuple()`
+| tuple(tuple(x))
+|> Unnecessary `tuple` call within `tuple()`
+| set(set(x))
+|> Unnecessary `set` call within `set()`
+| set(list(x))
+|> Unnecessary `list` call within `set()`
+| set(tuple(x))
+|> Unnecessary `tuple` call within `set()`
+| set(sorted(x))
+|> Unnecessary `sorted` call within `set()`
+| set(reversed(x))
+|> Unnecessary `reversed` call within `set()`
+| sorted(list(x))
+|> Unnecessary `list` call within `sorted()`
+| sorted(tuple(x))
+|> Unnecessary `tuple` call within `sorted()`
+| sorted(sorted(x))
+|> Unnecessary `sorted` call within `sorted()`
+| sorted(reversed(x))
+|> Unnecessary `reversed` call within `sorted()`
+

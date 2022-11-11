@@ -1,0 +1,20 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  x = {
+      "a": 1,
+|     "a": 2,
+|> Dictionary key literal repeated
+      "b": 3,
+      ("a", "b"): 3,
+      ("a", "b"): 4,
+      1.0: 2,
+      1: 0,
+|     1: 3,
+|> Dictionary key literal repeated
+      b"123": 1,
+|     b"123": 4,
+|> Dictionary key literal repeated
+  }
+

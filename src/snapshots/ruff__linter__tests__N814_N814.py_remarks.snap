@@ -1,0 +1,11 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| import mod.Camel as CAMEL
+|> Camelcase `Camel` imported as constant `CAMEL`
+| from mod import CamelCase as CAMELCASE
+|> Camelcase `CamelCase` imported as constant `CAMELCASE`
+| from mod import AnotherCamelCase as ANOTHER_CAMELCASE
+|> Camelcase `AnotherCamelCase` imported as constant `ANOTHER_CAMELCASE`
+

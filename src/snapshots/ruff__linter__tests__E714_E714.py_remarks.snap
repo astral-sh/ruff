@@ -1,0 +1,46 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  #: E714
+| if not X is Y:
+|> Test for object identity should be `is not`
+      pass
+  #: E714
+| if not X.B is Y:
+|> Test for object identity should be `is not`
+      pass
+  #: E714
+| if not X is Y is not Z:
+|> Test for object identity should be `is not`
+      pass
+  
+  #: Okay
+  if not X is not Y:
+      pass
+  
+  if x not in y:
+      pass
+  
+  if not (X in Y or X is Z):
+      pass
+  
+  if not (X in Y):
+      pass
+  
+  if x is not y:
+      pass
+  
+  if X is not Y is not Z:
+      pass
+  
+  if TrueElement.get_element(True) == TrueElement.get_element(False):
+      pass
+  
+  if (True) == TrueElement or x == TrueElement:
+      pass
+  
+  assert (not foo) in bar
+  assert {"x": not foo} in bar
+  assert [42, not foo] in bar
+

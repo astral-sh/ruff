@@ -1,0 +1,16 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  def f() -> int:
+      return 1
+  
+  
+  class Foo:
+|     return 2
+|> `return` statement outside of a function/method
+  
+  
+| return 3
+|> `return` statement outside of a function/method
+

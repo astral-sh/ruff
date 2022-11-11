@@ -1,0 +1,19 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  def this_is_a_bug():
+      o = object()
+|     if hasattr(o, "__call__"):
+|>  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+          print("Ooh, callable! Or is it?")
+|     if getattr(o, "__call__", False):
+|>  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+          print("Ooh, callable! Or is it?")
+  
+  
+  def this_is_fine():
+      o = object()
+      if callable(o):
+          print("Ooh, this is actually callable.")
+

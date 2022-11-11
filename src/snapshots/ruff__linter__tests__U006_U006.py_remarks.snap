@@ -1,0 +1,19 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  from typing import List
+  
+  
+| def f(x: List[str]) -> None:
+|> Use `list` instead of `List` for type annotations
+      ...
+  
+  
+  import typing
+  
+  
+| def f(x: typing.List[str]) -> None:
+|> Use `list` instead of `List` for type annotations
+      ...
+

@@ -1,0 +1,32 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  for i in range(10):
+      break
+  else:
+|     break
+|> `break` outside loop
+  
+  i = 0
+  while i < 10:
+      i += 1
+      break
+  
+  
+  def f():
+      for i in range(10):
+          break
+  
+|     break
+|> `break` outside loop
+  
+  
+  class Foo:
+|     break
+|> `break` outside loop
+  
+  
+| break
+|> `break` outside loop
+

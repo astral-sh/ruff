@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  x = "𝐁ad string"
+  
+  
+  def f():
+      """Here's a docstring with an unusual parenthesis: ）"""
+|     # And here's a comment with an unusual punctuation mark: ᜵
+|> Comment contains ambiguous unicode character '᜵' (did you mean '/'?)
+      ...
+

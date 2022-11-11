@@ -1,0 +1,16 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  class A:
+      pass
+  
+  
+  def f() -> "A":
+      pass
+  
+  
+| def g() -> "///":
+|> Syntax error in forward annotation: `///`
+      pass
+

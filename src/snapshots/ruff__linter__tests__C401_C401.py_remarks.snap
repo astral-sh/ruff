@@ -1,0 +1,11 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| x = set(x for x in range(3))
+|> Unnecessary generator (rewrite as a `set` comprehension)
+| x = set(
+|     x for x in range(3)
+| )
+|> Unnecessary generator (rewrite as a `set` comprehension)
+

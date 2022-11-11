@@ -1,0 +1,8 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  from __future__ import print_function
+| from __future__ import non_existent_feature
+|> Future feature `non_existent_feature` is not defined
+

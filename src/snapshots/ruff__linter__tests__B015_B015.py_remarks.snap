@@ -1,0 +1,36 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  assert 1 == 1
+  
+| 1 == 1
+|> Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+  
+  assert 1 in (1, 2)
+  
+| 1 in (1, 2)
+|> Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+  
+  
+  if 1 == 2:
+      pass
+  
+  
+  def test():
+      assert 1 in (1, 2)
+  
+|     1 in (1, 2)
+|> Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+  
+  
+  data = [x for x in [1, 2, 3] if x in (1, 2)]
+  
+  
+  class TestClass:
+|     1 == 1
+|> Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+  
+  
+  print(1 == 1)
+

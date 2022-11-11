@@ -1,0 +1,15 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| type('')
+|> Use `str` instead of `type(...)`
+| type(b'')
+|> Use `bytes` instead of `type(...)`
+| type(0)
+|> Use `int` instead of `type(...)`
+| type(0.)
+|> Use `float` instead of `type(...)`
+| type(0j)
+|> Use `complex` instead of `type(...)`
+

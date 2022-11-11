@@ -1,0 +1,44 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| class bad:
+|     pass
+| 
+| 
+| class _bad:
+|> Class name `bad` should use CapWords convention 
+|     pass
+| 
+| 
+| class bad_class:
+|> Class name `_bad` should use CapWords convention 
+|     pass
+| 
+| 
+| class Bad_Class:
+|> Class name `bad_class` should use CapWords convention 
+|     pass
+| 
+| 
+| class BAD_CLASS:
+|> Class name `Bad_Class` should use CapWords convention 
+|     pass
+| 
+| 
+| class Good:
+|> Class name `BAD_CLASS` should use CapWords convention 
+      pass
+  
+  
+  class _Good:
+      pass
+  
+  
+  class GoodClass:
+      pass
+  
+  
+  class GOOD:
+      pass
+

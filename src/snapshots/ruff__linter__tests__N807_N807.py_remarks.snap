@@ -1,0 +1,21 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| def __bad__():
+|     pass
+| 
+| 
+| def __good():
+|> Function name should not start and end with `__`
+      pass
+  
+  
+  def good__():
+      pass
+  
+  
+  class Class:
+      def __good__(self):
+          pass
+

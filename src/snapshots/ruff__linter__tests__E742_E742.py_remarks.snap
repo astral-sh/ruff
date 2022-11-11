@@ -1,0 +1,22 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| class l:
+|     pass
+| 
+| 
+| class I:
+|> Ambiguous class name: `l`
+|     pass
+| 
+| 
+| class O:
+|> Ambiguous class name: `I`
+|     pass
+| 
+| 
+| class X:
+|> Ambiguous class name: `O`
+      pass
+

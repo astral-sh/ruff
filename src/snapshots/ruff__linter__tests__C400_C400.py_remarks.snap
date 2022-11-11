@@ -1,0 +1,11 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| x = list(x for x in range(3))
+|> Unnecessary generator (rewrite as a `list` comprehension)
+| x = list(
+|     x for x in range(3)
+| )
+|> Unnecessary generator (rewrite as a `list` comprehension)
+

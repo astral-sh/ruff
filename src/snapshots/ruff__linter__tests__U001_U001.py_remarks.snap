@@ -1,0 +1,20 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  class A:
+|     __metaclass__ = type
+|> `__metaclass__ = type` is implied
+  
+  
+  class B:
+|     __metaclass__ = type
+|> `__metaclass__ = type` is implied
+  
+      def __init__(self) -> None:
+          pass
+  
+  
+  class C(metaclass=type):
+      pass
+

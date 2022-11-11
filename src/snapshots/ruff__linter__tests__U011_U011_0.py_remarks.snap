@@ -1,0 +1,118 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  import functools
+  from functools import lru_cache
+  
+  
+| @lru_cache()
+|> Unnessary parameters to functools.lru_cache
+  def fixme1():
+      pass
+  
+  
+  @other_deco_after
+| @functools.lru_cache()
+|> Unnessary parameters to functools.lru_cache
+  def fixme2():
+      pass
+  
+  
+| @lru_cache(maxsize=None)
+|> Unnessary parameters to functools.lru_cache
+  def fixme3():
+      pass
+  
+  
+| @functools.lru_cache(maxsize=None)
+|> Unnessary parameters to functools.lru_cache
+  @other_deco_before
+  def fixme4():
+      pass
+  
+  
+| @lru_cache( # A 
+| ) # B
+|> Unnessary parameters to functools.lru_cache
+  def fixme5():
+      pass
+  
+  
+| @lru_cache(
+|     # A
+| )   # B
+|> Unnessary parameters to functools.lru_cache
+  def fixme6():
+      pass
+  
+  
+| @functools.lru_cache(
+|     # A
+|     maxsize = None) # B
+|> Unnessary parameters to functools.lru_cache
+  def fixme7():
+      pass
+  
+  
+| @functools.lru_cache(
+|     # A1
+|     maxsize = None
+|     # A2
+| ) # B
+|> Unnessary parameters to functools.lru_cache
+  def fixme8():
+      pass
+  
+  
+| @functools.lru_cache(
+|     # A1
+|     maxsize = 
+|     None
+|     # A2
+| 
+| )
+|> Unnessary parameters to functools.lru_cache
+  def fixme9():
+      pass
+  
+  
+| @functools.lru_cache(
+|     # A1
+|     maxsize = 
+|     None
+|     # A2
+| )
+|> Unnessary parameters to functools.lru_cache
+  def fixme10():
+      pass
+  
+  
+  @lru_cache
+  def correct1():
+      pass
+  
+  
+  @functools.lru_cache
+  def correct2():
+      pass
+  
+  
+  @functoools.lru_cache(maxsize=64)
+  def correct3():
+      pass
+  
+  
+  def user_func():
+      pass
+  
+  
+  @lru_cache(user_func)
+  def correct4():
+      pass
+  
+  
+  @lru_cache(user_func, maxsize=None)
+  def correct5():
+      pass
+

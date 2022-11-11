@@ -1,0 +1,41 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  #: E722
+  try:
+      pass
+| except:
+|     pass
+| #: E722
+| try:
+|> Do not use bare `except`
+      pass
+  except Exception:
+      pass
+| except:
+|     pass
+| #: E722
+| try:
+|> Do not use bare `except`
+      pass
+| except:
+|     pass
+| #: Okay
+| fake_code = """"
+|> Do not use bare `except`
+  try:
+      do_something()
+  except:
+      pass
+  """
+  try:
+      pass
+  except Exception:
+      pass
+  #: Okay
+  from . import compute_type
+  
+  if compute_type(foo) == 5:
+      pass
+

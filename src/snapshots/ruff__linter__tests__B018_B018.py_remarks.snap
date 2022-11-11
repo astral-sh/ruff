@@ -1,0 +1,88 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  class Foo1:
+      """abc"""
+  
+  
+  class Foo2:
+      """abc"""
+  
+      a = 2
+      "str"  # Str (no raise)
+      f"{int}"  # JoinedStr (no raise)
+|     1j  # Number (complex)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     1  # Number (int)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     1.0  # Number (float)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     b"foo"  # Binary
+|> Found useless expression. Either assign it to a variable or remove it.
+|     True  # NameConstant (True)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     False  # NameConstant (False)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     None  # NameConstant (None)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     [1, 2]  # list
+|> Found useless expression. Either assign it to a variable or remove it.
+|     {1, 2}  # set
+|> Found useless expression. Either assign it to a variable or remove it.
+|     {"foo": "bar"}  # dict
+|> Found useless expression. Either assign it to a variable or remove it.
+  
+  
+  class Foo3:
+|     123
+|> Found useless expression. Either assign it to a variable or remove it.
+      a = 2
+      "str"
+|     1
+|> Found useless expression. Either assign it to a variable or remove it.
+  
+  
+  def foo1():
+      """my docstring"""
+  
+  
+  def foo2():
+      """my docstring"""
+      a = 2
+      "str"  # Str (no raise)
+      f"{int}"  # JoinedStr (no raise)
+|     1j  # Number (complex)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     1  # Number (int)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     1.0  # Number (float)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     b"foo"  # Binary
+|> Found useless expression. Either assign it to a variable or remove it.
+|     True  # NameConstant (True)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     False  # NameConstant (False)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     None  # NameConstant (None)
+|> Found useless expression. Either assign it to a variable or remove it.
+|     [1, 2]  # list
+|> Found useless expression. Either assign it to a variable or remove it.
+|     {1, 2}  # set
+|> Found useless expression. Either assign it to a variable or remove it.
+|     {"foo": "bar"}  # dict
+|> Found useless expression. Either assign it to a variable or remove it.
+  
+  
+  def foo3():
+|     123
+|> Found useless expression. Either assign it to a variable or remove it.
+      a = 2
+      "str"
+|     3
+|> Found useless expression. Either assign it to a variable or remove it.
+  
+  
+  def foo4():
+      ...
+

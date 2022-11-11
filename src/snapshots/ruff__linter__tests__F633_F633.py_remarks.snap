@@ -1,0 +1,10 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  from __future__ import print_function
+  import sys
+  
+| print >> sys.stderr, "Hello"
+|> Use of `>>` is invalid with `print` function
+

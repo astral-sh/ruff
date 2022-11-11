@@ -1,0 +1,44 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  #: W605:1:10
+| regex = '\.png$'
+|> Invalid escape sequence: '\.'
+  
+  #: W605:2:1
+  regex = '''
+| \.png$
+|> Invalid escape sequence: '\.'
+  '''
+  
+  #: W605:2:6
+  f(
+|     '\_'
+|> Invalid escape sequence: '\_'
+  )
+  
+  #: W605:4:6
+  """
+  multi-line
+  literal
+| with \_ somewhere
+|> Invalid escape sequence: '\_'
+  in the middle
+  """
+  
+  #: Okay
+  regex = r'\.png$'
+  regex = '\\.png$'
+  regex = r'''
+  \.png$
+  '''
+  regex = r'''
+  \\.png$
+  '''
+  s = '\\'
+  regex = '\w'  # noqa
+  regex = '''
+  \w
+  '''  # noqa
+

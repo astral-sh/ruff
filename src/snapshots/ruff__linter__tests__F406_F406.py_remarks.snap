@@ -1,0 +1,16 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  from F634 import *
+  
+  
+  def f():
+|     from F634 import *
+|> `from F634 import *` only allowed at module level
+  
+  
+  class F:
+|     from F634 import *
+|> `from F634 import *` only allowed at module level
+

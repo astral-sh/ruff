@@ -1,0 +1,21 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| def func1(str, /, type, *complex, Exception, **getattr):
+|> Argument `str` is shadowing a python builtin
+|> Argument `type` is shadowing a python builtin
+|> Argument `complex` is shadowing a python builtin
+|> Argument `Exception` is shadowing a python builtin
+|> Argument `getattr` is shadowing a python builtin
+      pass
+  
+  
+| async def func2(bytes):
+|> Argument `bytes` is shadowing a python builtin
+      pass
+  
+  
+| map([], lambda float: ...)
+|> Argument `float` is shadowing a python builtin
+

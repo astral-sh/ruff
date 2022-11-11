@@ -1,0 +1,8 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  def fn() -> None:
+|     pass
+|> No newline at end of file
+

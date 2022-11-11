@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| s1 = set([1, 2])
+|> Unnecessary `list` literal (rewrite as a `set` literal)
+| s2 = set((1, 2))
+|> Unnecessary `tuple` literal (rewrite as a `set` literal)
+| s3 = set([])
+|> Unnecessary `list` literal (rewrite as a `set` literal)
+| s4 = set(())
+|> Unnecessary `tuple` literal (rewrite as a `set` literal)
+  s5 = set()
+

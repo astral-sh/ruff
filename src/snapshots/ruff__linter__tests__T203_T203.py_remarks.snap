@@ -1,0 +1,17 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  from pprint import pprint
+  
+| pprint("Hello, world!")  # T203
+|> `pprint` found
+  
+  
+  import pprint
+  
+| pprint.pprint("Hello, world!")  # T203
+|> `pprint` found
+  
+  pprint.pformat("Hello, world!")
+

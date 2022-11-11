@@ -1,0 +1,8 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  x = [1, 2, 3]
+| list([i for i in x])
+|> Unnecessary `list` call (remove the outer call to `list()`)
+

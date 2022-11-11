@@ -1,0 +1,18 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  from mymodule import *
+  
+  
+  def print_name():
+|     print(name)
+|> `name` may be undefined, or defined from star imports: `mymodule`
+  
+  
+  def print_name(name):
+      print(name)
+  
+| __all__ = ['a']
+|> `a` may be undefined, or defined from star imports: `mymodule`
+

@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  def f() -> None:
+|     raise NotImplemented()
+|> `raise NotImplemented` should be `raise NotImplementedError`
+  
+  
+  def g() -> None:
+|     raise NotImplemented
+|> `raise NotImplemented` should be `raise NotImplementedError`
+

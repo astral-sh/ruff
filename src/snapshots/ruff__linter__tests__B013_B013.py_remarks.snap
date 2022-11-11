@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  try:
+      pass
+| except (ValueError,):
+|> A length-one tuple literal is redundant. Write `except ValueError:` instead of `except (ValueError,):`.
+      pass
+  except AttributeError:
+      pass
+  except (ImportError, TypeError):
+      pass
+

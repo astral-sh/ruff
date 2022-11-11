@@ -1,0 +1,21 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  """Test (edge case): accesses of object named `dict`."""
+  
+  # OK
+  dict = {"parameters": {}}
+  dict["parameters"]["userId"] = "userId"
+  dict["parameters"]["itemId"] = "itemId"
+  del dict["parameters"]["itemId"]
+  
+  # F821 Undefined name `key`
+  # F821 Undefined name `value`
+| x: dict["key", "value"]
+|> Undefined name `key`
+|> Undefined name `value`
+  
+  # OK
+  x: dict[str, str]
+

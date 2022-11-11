@@ -1,0 +1,19 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  a = "abc"
+  b = f"ghi{'jkl'}"
+  
+| c = f"def"
+|> f-string without any placeholders
+| d = f"def" + "ghi"
+|> f-string without any placeholders
+  e = (
+|     f"def" +
+|> f-string without any placeholders
+      "ghi"
+  )
+  
+  g = f"ghi{123:{45}}"
+

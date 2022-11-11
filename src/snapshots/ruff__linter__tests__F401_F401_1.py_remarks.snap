@@ -1,0 +1,10 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  """Access a sub-importation via an alias."""
+  import pyarrow as pa
+  import pyarrow.csv
+  
+  print(pa.csv.read_csv("test.csv"))
+

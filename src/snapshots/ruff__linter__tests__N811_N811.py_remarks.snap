@@ -1,0 +1,11 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| import mod.CONST as const
+|> Constant `CONST` imported as non-constant `const`
+| from mod import CONSTANT as constant
+|> Constant `CONSTANT` imported as non-constant `constant`
+| from mod import ANOTHER_CONSTANT as another_constant
+|> Constant `ANOTHER_CONSTANT` imported as non-constant `another_constant`
+

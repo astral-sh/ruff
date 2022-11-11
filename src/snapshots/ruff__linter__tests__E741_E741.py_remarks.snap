@@ -1,0 +1,105 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  from contextlib import contextmanager
+  
+| l = 0
+|> Ambiguous variable name: `l`
+| I = 0
+|> Ambiguous variable name: `I`
+| O = 0
+|> Ambiguous variable name: `O`
+| l: int = 0
+|> Ambiguous variable name: `l`
+  
+| a, l = 0, 1
+|> Ambiguous variable name: `l`
+| [a, l] = 0, 1
+|> Ambiguous variable name: `l`
+| a, *l = 0, 1, 2
+|> Ambiguous variable name: `l`
+| a = l = 0
+|> Ambiguous variable name: `l`
+  
+  o = 0
+  i = 0
+  
+| for l in range(3):
+|> Ambiguous variable name: `l`
+      pass
+  
+  
+| for a, l in zip(range(3), range(3)):
+|> Ambiguous variable name: `l`
+      pass
+  
+  
+  def f1():
+|     global l
+|> Ambiguous variable name: `l`
+|     l = 0
+|> Ambiguous variable name: `l`
+  
+  
+  def f2():
+|     l = 0
+|> Ambiguous variable name: `l`
+  
+      def f3():
+|         nonlocal l
+|> Ambiguous variable name: `l`
+|         l = 1
+|> Ambiguous variable name: `l`
+  
+      f3()
+      return l
+  
+  
+| def f4(l, /, I):
+|> Ambiguous variable name: `l`
+|> Ambiguous variable name: `I`
+      return l, I, O
+  
+  
+| def f5(l=0, *, I=1):
+|> Ambiguous variable name: `l`
+|> Ambiguous variable name: `I`
+      return l, I
+  
+  
+| def f6(*l, **I):
+|> Ambiguous variable name: `l`
+|> Ambiguous variable name: `I`
+      return l, I
+  
+  
+  @contextmanager
+  def ctx1():
+      yield 0
+  
+  
+| with ctx1() as l:
+|> Ambiguous variable name: `l`
+      pass
+  
+  
+  @contextmanager
+  def ctx2():
+      yield 0, 1
+  
+  
+| with ctx2() as (a, l):
+|> Ambiguous variable name: `l`
+      pass
+  
+  try:
+      pass
+| except ValueError as l:
+|     pass
+| 
+| if (l := 5) > 0:
+|> Ambiguous variable name: `l`
+|> Ambiguous variable name: `l`
+      pass
+

@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  """Test: removal of multi-segment and aliases imports."""
+| from a.b import c
+|> `a.b.c` imported but unused
+| from d.e import f as g
+|> `d.e.f` imported but unused
+| import h.i
+|> `h.i` imported but unused
+| import j.k as l
+|> `j.k` imported but unused
+

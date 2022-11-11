@@ -1,0 +1,11 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| assert (False, "x")
+|> Assert test is a non-empty tuple, which is always `True`
+| assert (False,)
+|> Assert test is a non-empty tuple, which is always `True`
+  assert ()
+  assert True
+

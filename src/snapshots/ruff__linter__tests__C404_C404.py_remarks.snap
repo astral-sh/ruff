@@ -1,0 +1,8 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| dict([(i, i) for i in range(3)])
+|> Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+  dict([(i, i) for i in range(3)], z=4)
+

@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| l1 = list([1, 2])
+|> Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+| l2 = list((1, 2))
+|> Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
+| l3 = list([])
+|> Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+| l4 = list(())
+|> Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
+

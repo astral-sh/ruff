@@ -1,0 +1,32 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  for i in range(10):
+      continue
+  else:
+|     continue
+|> `continue` not properly in loop
+  
+  i = 0
+  while i < 10:
+      i += 1
+      continue
+  
+  
+  def f():
+      for i in range(10):
+          continue
+  
+|     continue
+|> `continue` not properly in loop
+  
+  
+  class Foo:
+|     continue
+|> `continue` not properly in loop
+  
+  
+| continue
+|> `continue` not properly in loop
+

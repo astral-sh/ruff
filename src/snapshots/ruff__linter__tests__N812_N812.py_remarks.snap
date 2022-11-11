@@ -1,0 +1,11 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+| import modl.lowercase as Lower
+|> Lowercase `lowercase` imported as non-lowercase `Lower`
+| from mod import lowercase as Lowercase
+|> Lowercase `lowercase` imported as non-lowercase `Lowercase`
+| from mod import another_lowercase as AnotherLowercase
+|> Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`
+

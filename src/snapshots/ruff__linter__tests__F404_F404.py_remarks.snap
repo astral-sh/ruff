@@ -1,0 +1,12 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  """Docstring"""
+  from __future__ import absolute_import
+  
+  from collections import namedtuple
+  
+| from __future__ import print_function
+|> `from __future__` imports must occur at the beginning of the file
+

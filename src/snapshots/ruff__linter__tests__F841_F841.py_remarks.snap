@@ -1,0 +1,47 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  try:
+      1 / 0
+| except ValueError as e:
+|     pass
+| 
+| 
+| try:
+|> Local variable `e` is assigned to but never used
+      1 / 0
+  except ValueError as e:
+      print(e)
+  
+  
+  def f1():
+      x = 1
+      y = 2
+|     z = x + y
+|> Local variable `z` is assigned to but never used
+  
+  
+  def f2():
+|     foo = (1, 2)
+|> Local variable `foo` is assigned to but never used
+|     (a, b) = (1, 2)
+|> Local variable `a` is assigned to but never used
+|> Local variable `b` is assigned to but never used
+  
+      bar = (1, 2)
+      (c, d) = bar
+  
+      (x, y) = baz = bar
+  
+  
+  def f3():
+      locals()
+      x = 1
+  
+  
+  def f4():
+      _ = 1
+      __ = 1
+      _discarded = 1
+

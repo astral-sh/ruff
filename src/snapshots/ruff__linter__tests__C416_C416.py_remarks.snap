@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  x = [1, 2, 3]
+| [i for i in x]
+|> Unnecessary `list` comprehension (rewrite using `list()`)
+| {i for i in x}
+|> Unnecessary `set` comprehension (rewrite using `set()`)
+  
+  [i for i in x if i > 1]
+  [i for i in x for j in x]
+

@@ -1,0 +1,18 @@
+---
+source: src/linter.rs
+expression: output.finish().to_string()
+---
+  def f() -> int:
+      yield 1
+  
+  
+  class Foo:
+|     yield 2
+|> `yield` or `yield from` statement outside of a function
+  
+  
+| yield 3
+|> `yield` or `yield from` statement outside of a function
+| yield from 3
+|> `yield` or `yield from` statement outside of a function
+
