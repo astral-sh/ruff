@@ -46,6 +46,7 @@ pub enum ScopeKind<'a> {
     Generator,
     Module,
     Arg,
+    Lambda,
 }
 
 #[derive(Clone, Debug)]

@@ -1,5 +1,3 @@
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 
 use crate::ast::types::Range;
@@ -7,10 +5,8 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::code_gen::SourceGenerator;
+use crate::flake8_bugbear::constants::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
-
-static IDENTIFIER_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap());
 
 fn attribute(value: &Expr, attr: &str) -> Expr {
     Expr::new(
@@ -24,7 +20,6 @@ fn attribute(value: &Expr, attr: &str) -> Expr {
     )
 }
 
-/// B009
 pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if let ExprKind::Name { id, .. } = &func.node {
         if id == "getattr" {
