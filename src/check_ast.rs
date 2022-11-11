@@ -600,6 +600,12 @@ where
                     }
                 }
 
+                if let Some("__future__") = module.as_deref() {
+                    if self.settings.enabled.contains(&CheckCode::U010) {
+                        pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
+                    }
+                }
+
                 for alias in names {
                     if let Some("__future__") = module.as_deref() {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -630,14 +636,6 @@ where
                                     Range::from_located(stmt),
                                 ));
                             }
-                        }
-
-                        if self.settings.enabled.contains(&CheckCode::U010) {
-                            pyupgrade::plugins::unnecessary_future_import(
-                                self,
-                                stmt,
-                                &alias.node.name,
-                            );
                         }
 
                         if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
