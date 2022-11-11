@@ -3,14 +3,14 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use nohash_hasher::IntMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::checks::{Check, CheckCode};
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)(?P<noqa>\s*# noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
+    Regex::new(r"(?P<noqa>\s*# noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
         .expect("Invalid regex")
 });
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").expect("Invalid regex"));
@@ -43,30 +43,21 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
     }
 }
 
-pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
-    let mut noqa_line_for: Vec<usize> = vec![];
-    for (start, tok, end) in lxr.iter().flatten() {
-        if matches!(tok, Tok::EndOfFile) {
-            break;
-        }
-        // For multi-line strings, we expect `noqa` directives on the last line of the
-        // string. By definition, we can't have multiple multi-line strings on
-        // the same line, so we don't need to verify that we haven't already
-        // traversed past the current line.
-        if matches!(tok, Tok::String { .. }) && end.row() > start.row() {
-            for i in (noqa_line_for.len())..(start.row() - 1) {
-                noqa_line_for.push(i + 1);
-            }
-            noqa_line_for.extend(vec![end.row(); (end.row() + 1) - start.row()]);
-        }
-    }
-    noqa_line_for
+pub fn add_noqa(
+    checks: &[Check],
+    contents: &str,
+    noqa_line_for: &IntMap<usize, usize>,
+    path: &Path,
+) -> Result<usize> {
+    let (count, output) = add_noqa_inner(checks, contents, noqa_line_for)?;
+    fs::write(path, output)?;
+    Ok(count)
 }
 
 fn add_noqa_inner(
     checks: &[Check],
     contents: &str,
-    noqa_line_for: &[usize],
+    noqa_line_for: &IntMap<usize, usize>,
 ) -> Result<(usize, String)> {
     let lines: Vec<&str> = contents.lines().collect();
     let mut matches_by_line: BTreeMap<usize, BTreeSet<&CheckCode>> = BTreeMap::new();
@@ -82,7 +73,7 @@ fn add_noqa_inner(
         // If there are newlines at the end of the file, they won't be represented in
         // `noqa_line_for`, so fallback to the current line.
         let noqa_lineno = noqa_line_for
-            .get(lineno)
+            .get(&lineno)
             .map(|lineno| lineno - 1)
             .unwrap_or(lineno);
 
@@ -120,108 +111,20 @@ fn add_noqa_inner(
     Ok((count, output))
 }
 
-pub fn add_noqa(
-    checks: &[Check],
-    contents: &str,
-    noqa_line_for: &[usize],
-    path: &Path,
-) -> Result<usize> {
-    let (count, output) = add_noqa_inner(checks, contents, noqa_line_for)?;
-    fs::write(path, output)?;
-    Ok(count)
-}
-
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
     use rustpython_parser::ast::Location;
-    use rustpython_parser::lexer;
-    use rustpython_parser::lexer::LexResult;
 
     use crate::ast::types::Range;
     use crate::checks::{Check, CheckKind};
-    use crate::noqa::{add_noqa_inner, extract_noqa_line_for};
-
-    #[test]
-    fn extraction() -> Result<()> {
-        let empty: Vec<usize> = Default::default();
-
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
-            "x = 1
-y = 2
-z = x + 1",
-        )
-        .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), empty);
-
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
-            "
-x = 1
-y = 2
-z = x + 1",
-        )
-        .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), empty);
-
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
-            "x = 1
-y = 2
-z = x + 1
-        ",
-        )
-        .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), empty);
-
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
-            "x = 1
-
-y = 2
-z = x + 1
-        ",
-        )
-        .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), empty);
-
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
-            "x = '''abc
-def
-ghi
-'''
-y = 2
-z = x + 1",
-        )
-        .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), vec![4, 4, 4, 4]);
-
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
-            "x = 1
-y = '''abc
-def
-ghi
-'''
-z = 2",
-        )
-        .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 5, 5, 5, 5]);
-
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
-            "x = 1
-y = '''abc
-def
-ghi
-'''",
-        )
-        .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 5, 5, 5, 5]);
-
-        Ok(())
-    }
+    use crate::noqa::add_noqa_inner;
 
     #[test]
     fn modification() -> Result<()> {
         let checks = vec![];
         let contents = "x = 1";
-        let noqa_line_for = vec![1];
+        let noqa_line_for = Default::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
         assert_eq!(count, 0);
         assert_eq!(output.trim(), contents.trim());
@@ -234,7 +137,7 @@ ghi
             },
         )];
         let contents = "x = 1";
-        let noqa_line_for = vec![1];
+        let noqa_line_for = Default::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: F841".trim());
@@ -256,7 +159,7 @@ ghi
             ),
         ];
         let contents = "x = 1  # noqa: E741";
-        let noqa_line_for = vec![1];
+        let noqa_line_for = Default::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());
@@ -278,7 +181,7 @@ ghi
             ),
         ];
         let contents = "x = 1  # noqa";
-        let noqa_line_for = vec![1];
+        let noqa_line_for = Default::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());

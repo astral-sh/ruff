@@ -21,11 +21,12 @@ use crate::check_lines::check_lines;
 use crate::check_tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::code_gen::SourceGenerator;
+use crate::directives::Directives;
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::{cache, fs, noqa};
+use crate::{cache, directives, fs};
 
 /// Collect tokens up to and including the first error.
 pub(crate) fn tokenize(contents: &str) -> Vec<LexResult> {
@@ -56,7 +57,7 @@ pub(crate) fn check_path(
     contents: &str,
     tokens: Vec<LexResult>,
     locator: &SourceCodeLocator,
-    noqa_line_for: &[usize],
+    directives: &Directives,
     settings: &Settings,
     autofix: &fixer::Mode,
 ) -> Result<Vec<Check>> {
@@ -88,7 +89,13 @@ pub(crate) fn check_path(
                     checks.extend(check_ast(&python_ast, locator, settings, autofix, path));
                 }
                 if use_imports {
-                    checks.extend(check_imports(&python_ast, locator, settings, autofix));
+                    checks.extend(check_imports(
+                        &python_ast,
+                        locator,
+                        &directives.isort_exclusions,
+                        settings,
+                        autofix,
+                    ));
                 }
             }
             Err(parse_error) => {
@@ -106,7 +113,13 @@ pub(crate) fn check_path(
     }
 
     // Run the lines-based checks.
-    check_lines(&mut checks, contents, noqa_line_for, settings, autofix);
+    check_lines(
+        &mut checks,
+        contents,
+        &directives.noqa_line_for,
+        settings,
+        autofix,
+    );
 
     // Create path ignores.
     if !checks.is_empty() && !settings.per_file_ignores.is_empty() {
@@ -134,8 +147,12 @@ pub fn lint_stdin(
     // Initialize the SourceCodeLocator (which computes offsets lazily).
     let locator = SourceCodeLocator::new(stdin);
 
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    // Extract the `# noqa` and `# isort: skip` directives from the source.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
 
     // Generate checks.
     let mut checks = check_path(
@@ -143,7 +160,7 @@ pub fn lint_stdin(
         stdin,
         tokens,
         &locator,
-        &noqa_line_for,
+        &directives,
         settings,
         autofix,
     )?;
@@ -188,8 +205,12 @@ pub fn lint_path(
     // Initialize the SourceCodeLocator (which computes offsets lazily).
     let locator = SourceCodeLocator::new(&contents);
 
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    // Determine the noqa and isort exclusions.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
 
     // Generate checks.
     let mut checks = check_path(
@@ -197,7 +218,7 @@ pub fn lint_path(
         &contents,
         tokens,
         &locator,
-        &noqa_line_for,
+        &directives,
         settings,
         autofix,
     )?;
@@ -230,8 +251,12 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     // Initialize the SourceCodeLocator (which computes offsets lazily).
     let locator = SourceCodeLocator::new(&contents);
 
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    // Extract the `# noqa` and `# isort: skip` directives from the source.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
 
     // Generate checks.
     let checks = check_path(
@@ -239,12 +264,12 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &contents,
         tokens,
         &locator,
-        &noqa_line_for,
+        &directives,
         settings,
         &fixer::Mode::None,
     )?;
 
-    add_noqa(&checks, &contents, &noqa_line_for, path)
+    add_noqa(&checks, &contents, &directives.noqa_line_for, path)
 }
 
 pub fn autoformat_path(path: &Path) -> Result<()> {
@@ -268,13 +293,17 @@ pub fn test_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Res
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
     check_path(
         path,
         &contents,
         tokens,
         &locator,
-        &noqa_line_for,
+        &directives,
         settings,
         autofix,
     )

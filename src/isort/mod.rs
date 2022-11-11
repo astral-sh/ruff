@@ -208,17 +208,18 @@ mod tests {
     use crate::linter::test_path;
     use crate::Settings;
 
-    #[test_case(Path::new("reorder_within_section.py"))]
-    #[test_case(Path::new("no_reorder_within_section.py"))]
-    #[test_case(Path::new("separate_future_imports.py"))]
-    #[test_case(Path::new("separate_third_party_imports.py"))]
-    #[test_case(Path::new("separate_first_party_imports.py"))]
-    #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("combine_import_froms.py"))]
-    #[test_case(Path::new("preserve_indentation.py"))]
+    #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
+    #[test_case(Path::new("no_reorder_within_section.py"))]
+    #[test_case(Path::new("preserve_indentation.py"))]
+    #[test_case(Path::new("reorder_within_section.py"))]
+    #[test_case(Path::new("separate_first_party_imports.py"))]
+    #[test_case(Path::new("separate_future_imports.py"))]
+    #[test_case(Path::new("separate_third_party_imports.py"))]
+    #[test_case(Path::new("skip.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     fn isort(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());

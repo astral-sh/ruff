@@ -1,0 +1,22 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 11
+    column: 0
+  fix:
+    patch:
+      content: "import abc\nimport collections\n"
+      location:
+        row: 9
+        column: 0
+      end_location:
+        row: 11
+        column: 0
+    applied: false
+

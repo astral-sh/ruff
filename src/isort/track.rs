@@ -1,3 +1,4 @@
+use nohash_hasher::IntSet;
 use rustpython_ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
@@ -8,16 +9,19 @@ use crate::ast::visitor::Visitor;
 
 #[derive(Debug)]
 pub struct ImportTracker<'a> {
-    pub blocks: Vec<Vec<&'a Stmt>>,
+    exclusions: &'a IntSet<usize>,
+    blocks: Vec<Vec<&'a Stmt>>,
 }
+
 impl<'a> ImportTracker<'a> {
-    pub fn new() -> Self {
+    pub fn new(exclusions: &'a IntSet<usize>) -> Self {
         Self {
+            exclusions,
             blocks: vec![vec![]],
         }
     }
 
-    fn add_import(&mut self, stmt: &'a Stmt) {
+    fn track_import(&mut self, stmt: &'a Stmt) {
         let index = self.blocks.len() - 1;
         self.blocks[index].push(stmt);
     }
@@ -43,8 +47,9 @@ where
         if matches!(
             stmt.node,
             StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
-        ) {
-            self.add_import(stmt);
+        ) && !self.exclusions.contains(&stmt.location.row())
+        {
+            self.track_import(stmt);
         } else {
             self.finalize();
         }
