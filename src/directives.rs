@@ -1,39 +1,62 @@
 //! Extract `# noqa` and `# isort: skip` directives from tokenized source.
 
-use nohash_hasher::IntSet;
-use once_cell::sync::Lazy;
-use regex::Regex;
+use bitflags::bitflags;
+use nohash_hasher::{IntMap, IntSet};
 use rustpython_ast::Location;
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::types::Range;
-use crate::SourceCodeLocator;
+use crate::checks::LintSource;
+use crate::{Settings, SourceCodeLocator};
 
-static ISORT_SKIP_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"isort:\s?skip").expect("Invalid regex"));
-static ISORT_OFF_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^# isort:\s?off$").expect("Invalid regex"));
-static ISORT_ON_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^# isort:\s?on$").expect("Invalid regex"));
+bitflags! {
+    pub struct Flags: u32 {
+        const NOQA = 0b00000001;
+        const ISORT = 0b00000010;
+    }
+}
+
+impl Flags {
+    pub fn from_settings(settings: &Settings) -> Self {
+        if settings
+            .enabled
+            .iter()
+            .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports))
+        {
+            Flags::NOQA | Flags::ISORT
+        } else {
+            Flags::NOQA
+        }
+    }
+}
 
 pub struct Directives {
-    // TODO(charlie): Benchmark use of IntMap.
-    pub noqa_line_for: Vec<usize>,
+    pub noqa_line_for: IntMap<usize, usize>,
     pub isort_exclusions: IntSet<usize>,
 }
 
-pub fn extract_directives(lxr: &[LexResult], locator: &SourceCodeLocator) -> Directives {
+pub fn extract_directives(
+    lxr: &[LexResult],
+    locator: &SourceCodeLocator,
+    flags: &Flags,
+) -> Directives {
     Directives {
-        // TODO(charlie): Compute these in one pass.
-        noqa_line_for: extract_noqa_line_for(lxr),
-        // TODO(charlie): Skip if `isort` is disabled.
-        isort_exclusions: extract_isort_exclusions(lxr, locator),
+        noqa_line_for: if flags.contains(Flags::NOQA) {
+            extract_noqa_line_for(lxr)
+        } else {
+            Default::default()
+        },
+        isort_exclusions: if flags.contains(Flags::ISORT) {
+            extract_isort_exclusions(lxr, locator)
+        } else {
+            Default::default()
+        },
     }
 }
 
 /// Extract a mapping from logical line to noqa line.
-pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
-    let mut noqa_line_for: Vec<usize> = vec![];
+pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
+    let mut noqa_line_for: IntMap<usize, usize> = IntMap::default();
     for (start, tok, end) in lxr.iter().flatten() {
         if matches!(tok, Tok::EndOfFile) {
             break;
@@ -43,10 +66,9 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
         // the same line, so we don't need to verify that we haven't already
         // traversed past the current line.
         if matches!(tok, Tok::String { .. }) && end.row() > start.row() {
-            for i in (noqa_line_for.len())..(start.row() - 1) {
-                noqa_line_for.push(i + 1);
+            for i in start.row()..=end.row() {
+                noqa_line_for.insert(i, end.row());
             }
-            noqa_line_for.extend(vec![end.row(); (end.row() + 1) - start.row()]);
         }
     }
     noqa_line_for
@@ -57,13 +79,14 @@ pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) 
     let mut exclusions: IntSet<usize> = IntSet::default();
     let mut off: Option<&Location> = None;
     for (start, tok, end) in lxr.iter().flatten() {
+        // TODO(charlie): Modify RustPython to include the comment text in the token.
         if matches!(tok, Tok::Comment) {
             let comment_text = locator.slice_source_code_range(&Range {
                 location: *start,
                 end_location: *end,
             });
             if off.is_some() {
-                if ISORT_ON_REGEX.is_match(&comment_text) {
+                if comment_text == "# isort: on" {
                     if let Some(start) = off {
                         for row in start.row() + 1..=end.row() {
                             exclusions.insert(row);
@@ -72,9 +95,9 @@ pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) 
                     off = None;
                 }
             } else {
-                if ISORT_SKIP_REGEX.is_match(&comment_text) {
+                if comment_text.contains("isort: skip") || comment_text.contains("isort:skip") {
                     exclusions.insert(start.row());
-                } else if ISORT_OFF_REGEX.is_match(&comment_text) {
+                } else if comment_text == "# isort: off" {
                     off = Some(start);
                 }
             }

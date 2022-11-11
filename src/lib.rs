@@ -76,7 +76,11 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     let locator = SourceCodeLocator::new(contents);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(&tokens, &locator);
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(&settings),
+    );
 
     // Generate checks.
     let checks = check_path(

@@ -148,7 +148,11 @@ pub fn lint_stdin(
     let locator = SourceCodeLocator::new(stdin);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(&tokens, &locator);
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
 
     // Generate checks.
     let mut checks = check_path(
@@ -202,7 +206,11 @@ pub fn lint_path(
     let locator = SourceCodeLocator::new(&contents);
 
     // Determine the noqa and isort exclusions.
-    let directives = directives::extract_directives(&tokens, &locator);
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
 
     // Generate checks.
     let mut checks = check_path(
@@ -244,7 +252,11 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     let locator = SourceCodeLocator::new(&contents);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(&tokens, &locator);
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
 
     // Generate checks.
     let checks = check_path(
@@ -281,7 +293,11 @@ pub fn test_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Res
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
-    let directives = directives::extract_directives(&tokens, &locator);
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
     check_path(
         path,
         &contents,

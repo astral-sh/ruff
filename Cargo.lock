@@ -2245,6 +2245,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "bincode",
+ "bitflags",
  "cacache",
  "chrono",
  "clap 4.0.22",
