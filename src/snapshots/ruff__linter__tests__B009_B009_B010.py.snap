@@ -73,18 +73,18 @@ expression: checks
 - kind: GetAttrWithConstant
   location:
     row: 22
-    column: 10
+    column: 14
   end_location:
     row: 22
-    column: 27
+    column: 31
   fix:
     patch:
       content: x.bar
       location:
         row: 22
-        column: 10
+        column: 14
       end_location:
         row: 22
-        column: 27
+        column: 31
     applied: false
 

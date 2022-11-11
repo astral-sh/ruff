@@ -2,28 +2,5 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: GetAttrWithConstant
-  location:
-    row: 28
-    column: 0
-  end_location:
-    row: 28
-    column: 25
-  fix: ~
-- kind: GetAttrWithConstant
-  location:
-    row: 29
-    column: 0
-  end_location:
-    row: 29
-    column: 29
-  fix: ~
-- kind: GetAttrWithConstant
-  location:
-    row: 30
-    column: 0
-  end_location:
-    row: 30
-    column: 28
-  fix: ~
+[]
 
