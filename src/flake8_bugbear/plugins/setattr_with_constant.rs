@@ -18,7 +18,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                 {
                     if IDENTIFIER_REGEX.is_match(value) && !KWLIST.contains(&value.as_str()) {
                         checker.add_check(Check::new(
-                            CheckKind::GetAttrWithConstant,
+                            CheckKind::SetAttrWithConstant,
                             Range::from_located(expr),
                         ));
                     }

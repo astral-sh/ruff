@@ -1743,6 +1743,7 @@ impl CheckKind {
                 | CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DuplicateHandlerException(_)
+                | CheckKind::GetAttrWithConstant
                 | CheckKind::IsLiteral
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(_)

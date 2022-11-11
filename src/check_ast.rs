@@ -1075,11 +1075,11 @@ where
                     flake8_bugbear::plugins::getattr_with_constant(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&CheckCode::B010) {
-                    if !self
+                    if self
                         .scopes
                         .iter()
                         .rev()
-                        .any(|scope| matches!(scope.kind, ScopeKind::Lambda))
+                        .all(|scope| !matches!(scope.kind, ScopeKind::Lambda))
                     {
                         flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
                     }
@@ -1473,7 +1473,6 @@ where
                 }
                 self.push_scope(Scope::new(ScopeKind::Lambda))
             }
-
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&CheckCode::C416) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_comprehension(
@@ -1489,7 +1488,6 @@ where
                 }
                 self.push_scope(Scope::new(ScopeKind::Generator))
             }
-
             ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
                 self.push_scope(Scope::new(ScopeKind::Generator))
             }
