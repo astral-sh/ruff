@@ -282,17 +282,51 @@ pub fn test_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Res
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
     use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
     use regex::Regex;
+    use ropey::{Rope, RopeBuilder};
     use test_case::test_case;
 
-    use crate::autofix::fixer;
-    use crate::checks::CheckCode;
+    use crate::autofix::fixer::{self, fix_file};
+    use crate::checks::{Check, CheckCode};
     use crate::linter::test_path;
-    use crate::settings;
+    use crate::source_code_locator::SourceCodeLocator;
+    use crate::{fs, settings};
+
+    fn assert_inline_report_snapshot(path: &Path, check_code: &CheckCode, checks: &mut [Check]) {
+        let contents =
+            fs::read_file(Path::new("./resources/test/fixtures").join(path).as_path()).unwrap();
+        let snapshot = format!("{}_{}_remarks", check_code.as_ref(), path.to_string_lossy());
+
+        let mut output = RopeBuilder::new();
+        for (lineno, line) in contents.lines().enumerate() {
+            let applied_checks: Vec<&Check> = checks
+                .iter()
+                .filter(|c| {
+                    (lineno + 1) >= c.location.row() && (lineno + 1) <= c.end_location.row()
+                })
+                .collect();
+
+            if !applied_checks.is_empty() {
+                output.append("| ");
+            } else {
+                output.append("  ");
+            }
+            output.append(line);
+            output.append("\n");
+
+            for check in checks.iter().filter(|c| lineno + 1 == c.end_location.row()) {
+                output.append("|> ");
+                output.append(&check.kind.summary());
+                output.append("\n");
+            }
+        }
+        insta::assert_snapshot!(snapshot, output.finish().to_string());
+    }
 
     #[test_case(CheckCode::A001, Path::new("A001.py"); "A001")]
     #[test_case(CheckCode::A002, Path::new("A002.py"); "A002")]
@@ -472,6 +506,9 @@ mod tests {
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
+
+        assert_inline_report_snapshot(path, &check_code, &mut checks);
+
         Ok(())
     }
 
