@@ -25,6 +25,11 @@ impl<'a> SourceCodeLocator<'a> {
         self.rope.get_or_init(|| Rope::from_str(self.contents))
     }
 
+    pub fn get_source_code_at_line(&self, line_idx: usize) -> Cow<'_, str> {
+        let rope = self.get_or_init_rope();
+        Cow::from(rope.line(line_idx - 1))
+    }
+
     pub fn slice_source_code_at(&self, location: &Location) -> Cow<'_, str> {
         let rope = self.get_or_init_rope();
         let offset = rope.line_to_char(location.row() - 1) + location.column();

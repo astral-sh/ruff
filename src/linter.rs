@@ -6,7 +6,7 @@ use std::path::Path;
 use anyhow::Result;
 #[cfg(not(target_family = "wasm"))]
 use log::debug;
-use rustpython_ast::{Mod, Suite};
+use rustpython_ast::{Location, Mod, Suite};
 use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::parser::Mode;
@@ -116,6 +116,20 @@ pub(crate) fn check_path(
                 .into_iter()
                 .filter(|check| !ignores.contains(&check.kind.code()))
                 .collect());
+        }
+    }
+
+    // Move up the end location of the check to the nearest non-empty line. This
+    // removes trailing empty lines from the range of code the check is
+    // reporting.
+    for check in checks.iter_mut() {
+        loop {
+            if check.end_location.column() == 0 && check.end_location.row() > 1 {
+                let f = locator.get_source_code_at_line(check.end_location.row() - 1);
+                check.end_location = Location::new(check.end_location.row() - 1, f.trim().len());
+            } else {
+                break;
+            }
         }
     }
 
