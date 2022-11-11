@@ -49,6 +49,9 @@ pub fn check_lines(
     let mut line_checks = vec![];
     let mut ignored = vec![];
 
+    checks.sort_by_key(|check| check.location);
+    let mut checks_iter = checks.iter().enumerate().peekable();
+
     let lines: Vec<&str> = contents.lines().collect();
     for (lineno, line) in lines.iter().enumerate() {
         // Grab the noqa (logical) line number for the current (physical) line.
@@ -90,8 +93,9 @@ pub fn check_lines(
         }
 
         // Remove any ignored checks.
-        // TODO(charlie): Only validate checks for the current line.
-        for (index, check) in checks.iter().enumerate() {
+        while let Some((index, check)) =
+            checks_iter.next_if(|(_index, check)| check.location.row() <= lineno + 1)
+        {
             if check.location.row() == lineno + 1 {
                 let noqa = noqa_directives
                     .entry(noqa_lineno)
