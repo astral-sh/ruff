@@ -1,8 +1,6 @@
 //! Lint rules based on checking raw physical lines.
 
 use nohash_hasher::IntMap;
-use std::collections::BTreeMap;
-
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::Location;
@@ -45,8 +43,7 @@ pub fn check_lines(
     let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
     let enforce_noqa = settings.enabled.contains(&CheckCode::M001);
 
-    let mut noqa_directives: BTreeMap<usize, (Directive, Vec<&str>)> = BTreeMap::new();
-
+    let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut line_checks = vec![];
     let mut ignored = vec![];
 
@@ -258,6 +255,8 @@ pub fn check_lines(
 
 #[cfg(test)]
 mod tests {
+    use nohash_hasher::IntMap;
+
     use super::check_lines;
     use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
@@ -266,7 +265,7 @@ mod tests {
     #[test]
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
-        let noqa_line_for: Vec<usize> = vec![1];
+        let noqa_line_for: IntMap<usize, usize> = Default::default();
         let check_with_max_line_length = |line_length: usize| {
             let mut checks: Vec<Check> = vec![];
             check_lines(

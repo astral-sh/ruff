@@ -62,11 +62,9 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
             break;
         }
         // For multi-line strings, we expect `noqa` directives on the last line of the
-        // string. By definition, we can't have multiple multi-line strings on
-        // the same line, so we don't need to verify that we haven't already
-        // traversed past the current line.
+        // string.
         if matches!(tok, Tok::String { .. }) && end.row() > start.row() {
-            for i in start.row()..=end.row() {
+            for i in start.row()..end.row() {
                 noqa_line_for.insert(i, end.row());
             }
         }
@@ -116,6 +114,7 @@ pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) 
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use nohash_hasher::IntMap;
     use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
 
@@ -123,7 +122,7 @@ mod tests {
 
     #[test]
     fn extraction() -> Result<()> {
-        let empty: Vec<usize> = Default::default();
+        let empty: IntMap<usize, usize> = Default::default();
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
@@ -170,28 +169,37 @@ y = 2
 z = x + 1",
         )
         .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), vec![4, 4, 4, 4]);
+        assert_eq!(
+            extract_noqa_line_for(&lxr),
+            IntMap::from_iter([(1, 4), (2, 4), (3, 4)])
+        );
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
-y = '''abc
-def
-ghi
-'''
-z = 2",
+        y = '''abc
+        def
+        ghi
+        '''
+        z = 2",
         )
         .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 5, 5, 5, 5]);
+        assert_eq!(
+            extract_noqa_line_for(&lxr),
+            IntMap::from_iter([(2, 5), (3, 5), (4, 5)])
+        );
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
-y = '''abc
-def
-ghi
-'''",
+        y = '''abc
+        def
+        ghi
+        '''",
         )
         .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), vec![1, 5, 5, 5, 5]);
+        assert_eq!(
+            extract_noqa_line_for(&lxr),
+            IntMap::from_iter([(2, 5), (3, 5), (4, 5)])
+        );
 
         Ok(())
     }
