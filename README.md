@@ -579,6 +579,15 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 | YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
 | YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
 
+### flake8-bandit
+
+For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| S101 | AssertUsed | Use of `assert` detected |  |
+| S102 | ExecUsed | Use of `exec` detected |  |
+
 ### Ruff-specific rules
 
 | Code | Name | Message | Fix |

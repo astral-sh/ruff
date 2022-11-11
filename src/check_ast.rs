@@ -32,7 +32,7 @@ use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_2020, flake8_annotations, flake8_bugbear, flake8_builtins,
+    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
     flake8_comprehensions, flake8_print, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
@@ -802,6 +802,11 @@ where
                 if self.settings.enabled.contains(&CheckCode::B011) {
                     flake8_bugbear::plugins::assert_false(self, stmt, test, msg);
                 }
+
+                // flake8-bandit
+                if self.settings.enabled.contains(&CheckCode::S101) {
+                    self.add_check(Check::new(CheckKind::AssertUsed, Range::from_located(stmt)));
+                }
             }
             StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
                 if self.settings.enabled.contains(&CheckCode::B017) {
@@ -1102,6 +1107,11 @@ where
                     flake8_bugbear::plugins::star_arg_unpacking_after_keyword_arg(
                         self, args, keywords,
                     );
+                }
+
+                // flake8-bandit
+                if self.settings.enabled.contains(&CheckCode::S102) {
+                    flake8_bandit::checks::exec_used(self, expr, func);
                 }
 
                 // flake8-comprehensions
