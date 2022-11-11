@@ -264,40 +264,35 @@ pub fn autoformat_path(path: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
+pub fn test_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
+    let contents = fs::read_file(path)?;
+    let tokens: Vec<LexResult> = tokenize(&contents);
+    let locator = SourceCodeLocator::new(&contents);
+    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    check_path(
+        path,
+        &contents,
+        tokens,
+        &locator,
+        &noqa_line_for,
+        settings,
+        autofix,
+    )
+}
+
+#[cfg(test)]
 mod tests {
     use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
     use regex::Regex;
-    use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
 
     use crate::autofix::fixer;
-    use crate::checks::{Check, CheckCode};
-    use crate::linter::tokenize;
-    use crate::source_code_locator::SourceCodeLocator;
-    use crate::{fs, linter, noqa, settings};
-
-    fn check_path(
-        path: &Path,
-        settings: &settings::Settings,
-        autofix: &fixer::Mode,
-    ) -> Result<Vec<Check>> {
-        let contents = fs::read_file(path)?;
-        let tokens: Vec<LexResult> = tokenize(&contents);
-        let locator = SourceCodeLocator::new(&contents);
-        let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-        linter::check_path(
-            path,
-            &contents,
-            tokens,
-            &locator,
-            &noqa_line_for,
-            settings,
-            autofix,
-        )
-    }
+    use crate::checks::CheckCode;
+    use crate::linter::test_path;
+    use crate::settings;
 
     #[test_case(CheckCode::A001, Path::new("A001.py"); "A001")]
     #[test_case(CheckCode::A002, Path::new("A002.py"); "A002")]
@@ -470,7 +465,7 @@ mod tests {
     #[test_case(CheckCode::RUF003, Path::new("RUF003.py"); "RUF003")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures").join(path).as_path(),
             &settings::Settings::for_rule(check_code.clone()),
             &fixer::Mode::Generate,
@@ -482,7 +477,7 @@ mod tests {
 
     #[test]
     fn f841_dummy_variable_rgx() -> Result<()> {
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/F841.py"),
             &settings::Settings {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
@@ -497,7 +492,7 @@ mod tests {
 
     #[test]
     fn m001() -> Result<()> {
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/M001.py"),
             &settings::Settings::for_rules(vec![CheckCode::M001, CheckCode::E501, CheckCode::F841]),
             &fixer::Mode::Generate,
@@ -509,7 +504,7 @@ mod tests {
 
     #[test]
     fn init() -> Result<()> {
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/__init__.py"),
             &settings::Settings::for_rules(vec![CheckCode::F821, CheckCode::F822]),
             &fixer::Mode::Generate,
@@ -521,7 +516,7 @@ mod tests {
 
     #[test]
     fn future_annotations() -> Result<()> {
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/future_annotations.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
             &fixer::Mode::Generate,
