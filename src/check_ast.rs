@@ -23,7 +23,6 @@ use crate::ast::{helpers, operations, visitor};
 use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
-use crate::isort::track::ImportTracker;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
@@ -78,7 +77,6 @@ pub struct Checker<'a> {
     deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_assignments: Vec<usize>,
-    import_tracker: ImportTracker<'a>,
     // Internal, derivative state.
     visible_scope: VisibleScope,
     in_f_string: Option<Range>,
@@ -117,7 +115,6 @@ impl<'a> Checker<'a> {
             deferred_functions: Default::default(),
             deferred_lambdas: Default::default(),
             deferred_assignments: Default::default(),
-            import_tracker: ImportTracker::new(),
             // Internal, derivative state.
             visible_scope: VisibleScope {
                 modifier: Modifier::Module,
@@ -185,9 +182,6 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        // Call-through to any composed visitors.
-        self.import_tracker.visit_stmt(stmt);
-
         self.push_parent(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
@@ -1674,9 +1668,6 @@ where
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
-        // Call-through to any composed visitors.
-        self.import_tracker.visit_excepthandler(excepthandler);
-
         match &excepthandler.node {
             ExcepthandlerKind::ExceptHandler { type_, name, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E722) && type_.is_none() {

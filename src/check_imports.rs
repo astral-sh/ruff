@@ -1,5 +1,6 @@
 //! Lint rules based on import analysis.
 
+use nohash_hasher::IntSet;
 use rustpython_parser::ast::Suite;
 
 use crate::ast::visitor::Visitor;
@@ -30,10 +31,11 @@ fn check_import_blocks(
 pub fn check_imports(
     python_ast: &Suite,
     locator: &SourceCodeLocator,
+    exclusions: &IntSet<usize>,
     settings: &Settings,
     autofix: &fixer::Mode,
 ) -> Vec<Check> {
-    let mut tracker = ImportTracker::new();
+    let mut tracker = ImportTracker::new(exclusions);
     for stmt in python_ast {
         tracker.visit_stmt(stmt);
     }
