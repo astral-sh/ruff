@@ -201,29 +201,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
 
     use crate::autofix::fixer;
-    use crate::checks::{Check, CheckCode};
-    use crate::linter::tokenize;
-    use crate::{fs, linter, noqa, Settings, SourceCodeLocator};
-
-    fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
-        let contents = fs::read_file(path)?;
-        let tokens: Vec<LexResult> = tokenize(&contents);
-        let locator = SourceCodeLocator::new(&contents);
-        let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-        linter::check_path(
-            path,
-            &contents,
-            tokens,
-            &locator,
-            &noqa_line_for,
-            settings,
-            autofix,
-        )
-    }
+    use crate::checks::CheckCode;
+    use crate::linter::test_path;
+    use crate::Settings;
 
     #[test_case(Path::new("reorder_within_section.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
@@ -239,7 +222,7 @@ mod tests {
     #[test_case(Path::new("trailing_suffix.py"))]
     fn isort(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
