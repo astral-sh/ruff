@@ -15,7 +15,7 @@ expression: checks
     row: 529
     column: 4
   end_location:
-    row: 533
-    column: 0
+    row: 530
+    column: 4
   fix: ~
 

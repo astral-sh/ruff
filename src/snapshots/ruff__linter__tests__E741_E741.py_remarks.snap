@@ -97,9 +97,9 @@ expression: output.finish().to_string()
       pass
 | except ValueError as l:
 |     pass
-| 
-| if (l := 5) > 0:
 |> Ambiguous variable name: `l`
+  
+| if (l := 5) > 0:
 |> Ambiguous variable name: `l`
       pass
 

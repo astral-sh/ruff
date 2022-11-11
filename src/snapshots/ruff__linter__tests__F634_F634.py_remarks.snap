@@ -4,9 +4,9 @@ expression: output.finish().to_string()
 ---
 | if (1, 2):
 |     pass
-| 
-| for _ in range(5):
 |> If test is a tuple, which is always `True`
+  
+  for _ in range(5):
       if True:
           pass
 |     elif (3, 4):

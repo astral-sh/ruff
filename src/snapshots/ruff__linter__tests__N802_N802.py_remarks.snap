@@ -7,25 +7,25 @@ expression: output.finish().to_string()
   
 | def Bad():
 |     pass
-| 
-| 
-| def _Bad():
 |> Function name `Bad` should be lowercase
+  
+  
+| def _Bad():
 |     pass
-| 
-| 
-| def BAD():
 |> Function name `_Bad` should be lowercase
+  
+  
+| def BAD():
 |     pass
-| 
-| 
-| def BAD_FUNC():
 |> Function name `BAD` should be lowercase
+  
+  
+| def BAD_FUNC():
 |     pass
-| 
-| 
-| def good():
 |> Function name `BAD_FUNC` should be lowercase
+  
+  
+  def good():
       pass
   
   
@@ -47,4 +47,5 @@ expression: output.finish().to_string()
   
 |     def testTest(self):
 |         assert True
+|> Function name `testTest` should be lowercase
 

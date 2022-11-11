@@ -7,8 +7,8 @@ expression: checks
     row: 1
     column: 0
   end_location:
-    row: 6
-    column: 0
+    row: 5
+    column: 32
   fix:
     patch:
       content: "import os\nimport sys\n\nimport numpy as np\n\nimport leading_prefix\nfrom leading_prefix import Class\n"

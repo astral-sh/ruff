@@ -8,8 +8,8 @@ expression: checks
     row: 15
     column: 0
   end_location:
-    row: 22
-    column: 0
+    row: 20
+    column: 5
   fix: ~
 - kind:
     DuplicateTryBlockException: pickle.PickleError
@@ -17,8 +17,8 @@ expression: checks
     row: 22
     column: 0
   end_location:
-    row: 31
-    column: 0
+    row: 29
+    column: 5
   fix: ~
 - kind:
     DuplicateTryBlockException: TypeError
@@ -26,8 +26,8 @@ expression: checks
     row: 31
     column: 0
   end_location:
-    row: 39
-    column: 0
+    row: 38
+    column: 5
   fix: ~
 - kind:
     DuplicateTryBlockException: ValueError
@@ -35,7 +35,7 @@ expression: checks
     row: 31
     column: 0
   end_location:
-    row: 39
-    column: 0
+    row: 38
+    column: 5
   fix: ~
 

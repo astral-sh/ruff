@@ -23,7 +23,7 @@ expression: checks
     row: 105
     column: 0
   end_location:
-    row: 110
-    column: 0
+    row: 107
+    column: 3
   fix: ~
 

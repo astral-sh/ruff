@@ -8,22 +8,22 @@ expression: output.finish().to_string()
 | except:
 |     pass
 | #: E722
-| try:
 |> Do not use bare `except`
+  try:
       pass
   except Exception:
       pass
 | except:
 |     pass
 | #: E722
-| try:
 |> Do not use bare `except`
+  try:
       pass
 | except:
 |     pass
 | #: Okay
-| fake_code = """"
 |> Do not use bare `except`
+  fake_code = """"
   try:
       do_something()
   except:

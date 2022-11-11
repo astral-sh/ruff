@@ -9,8 +9,8 @@ expression: checks
     row: 283
     column: 4
   end_location:
-    row: 296
-    column: 0
+    row: 293
+    column: 8
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -19,8 +19,8 @@ expression: checks
     row: 300
     column: 0
   end_location:
-    row: 309
-    column: 0
+    row: 306
+    column: 3
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -76,8 +76,8 @@ expression: checks
     row: 389
     column: 0
   end_location:
-    row: 401
-    column: 0
+    row: 398
+    column: 3
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -121,7 +121,7 @@ expression: checks
     row: 489
     column: 4
   end_location:
-    row: 498
-    column: 0
+    row: 497
+    column: 3
   fix: ~
 

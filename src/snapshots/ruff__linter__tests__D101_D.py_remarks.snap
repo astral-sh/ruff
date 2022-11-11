@@ -66,10 +66,10 @@ expression: output.finish().to_string()
 |     @expect('D102: Missing docstring in public method')
 |     def __call__(self=None, x=None, y=None, z=None):
 |         pass
-| 
-| 
-| @expect('D419: Docstring is empty')
 |> Missing docstring in public class
+  
+  
+  @expect('D419: Docstring is empty')
   def function():
       """ """
       def ok_since_nested():

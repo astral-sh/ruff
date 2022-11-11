@@ -22,9 +22,9 @@ expression: output.finish().to_string()
 |     a = 2
 | except ValueError:
 |     a = 2
-| 
-| try:
 |> try-except block with duplicate exception `ValueError`
+  
+| try:
 |     a = 1
 | except pickle.PickleError:
 |     a = 2
@@ -32,9 +32,9 @@ expression: output.finish().to_string()
 |     a = 2
 | except pickle.PickleError:
 |     a = 2
-| 
-| try:
 |> try-except block with duplicate exception `pickle.PickleError`
+  
+| try:
 |     a = 1
 | except (ValueError, TypeError):
 |     a = 2
@@ -42,4 +42,6 @@ expression: output.finish().to_string()
 |     a = 2
 | except (OSError, TypeError):
 |     a = 2
+|> try-except block with duplicate exception `TypeError`
+|> try-except block with duplicate exception `ValueError`
 

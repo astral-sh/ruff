@@ -8,8 +8,8 @@ expression: checks
     row: 5
     column: 4
   end_location:
-    row: 10
-    column: 0
+    row: 9
+    column: 7
   fix: ~
 - kind:
     MissingReturnTypeMagicMethod: __init__
@@ -17,8 +17,8 @@ expression: checks
     row: 11
     column: 4
   end_location:
-    row: 16
-    column: 0
+    row: 15
+    column: 4
   fix: ~
 - kind:
     MissingReturnTypePrivateFunction: __init__
@@ -26,7 +26,7 @@ expression: checks
     row: 40
     column: 0
   end_location:
-    row: 42
-    column: 0
+    row: 41
+    column: 3
   fix: ~
 

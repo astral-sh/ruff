@@ -22,19 +22,19 @@ expression: output.finish().to_string()
   
 | def bytes():
 |     pass
-| 
-| class slice:
 |> Variable `bytes` is shadowing a python builtin
+  
+| class slice:
 |     pass
-| 
-| try:
 |> Variable `slice` is shadowing a python builtin
+  
+  try:
       ...
 | except ImportError as ValueError:
 |     ...
-| 
-| for memoryview, *bytearray in []:
 |> Variable `ValueError` is shadowing a python builtin
+  
+| for memoryview, *bytearray in []:
 |> Variable `memoryview` is shadowing a python builtin
 |> Variable `bytearray` is shadowing a python builtin
       pass

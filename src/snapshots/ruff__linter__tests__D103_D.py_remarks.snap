@@ -397,8 +397,8 @@ expression: output.finish().to_string()
   
   @expect("D103: Missing docstring in public function")
 | def oneliner_d102(): return
-| 
 |> Missing docstring in public function
+  
   
   @expect("D400: First line should end with a period (not 'r')")
   @expect("D415: First line should end with a period, question mark,"

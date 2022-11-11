@@ -4,20 +4,20 @@ expression: output.finish().to_string()
 ---
 | def l():
 |     pass
-| 
-| 
-| def I():
 |> Ambiguous function name: `l`
+  
+  
+| def I():
 |     pass
-| 
-| 
-| class X:
 |> Ambiguous function name: `I`
+  
+  
+  class X:
 |     def O(self):
 |         pass
-| 
-| 
-| def x():
 |> Ambiguous function name: `O`
+  
+  
+  def x():
       pass
 

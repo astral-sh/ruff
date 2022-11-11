@@ -6,16 +6,16 @@ expression: output.finish().to_string()
       pass
 | except:
 |     pass
-| except ValueError:
 |> An `except:` block as not the last exception handler
+  except ValueError:
       pass
   
   try:
       pass
 | except:
 |     pass
-| except ValueError:
 |> An `except:` block as not the last exception handler
+  except ValueError:
       pass
   finally:
       pass
@@ -24,8 +24,8 @@ expression: output.finish().to_string()
       pass
 | except:
 |     pass
-| except ValueError:
 |> An `except:` block as not the last exception handler
+  except ValueError:
       pass
   else:
       pass

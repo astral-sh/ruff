@@ -7,8 +7,8 @@ expression: checks
     row: 227
     column: 0
   end_location:
-    row: 227
-    column: 0
+    row: 225
+    column: 11
   fix:
     patch:
       content: "    "
@@ -24,8 +24,8 @@ expression: checks
     row: 435
     column: 0
   end_location:
-    row: 435
-    column: 0
+    row: 433
+    column: 50
   fix:
     patch:
       content: "                                    "

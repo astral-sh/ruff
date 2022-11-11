@@ -4,19 +4,19 @@ expression: output.finish().to_string()
 ---
 | class l:
 |     pass
-| 
-| 
-| class I:
 |> Ambiguous class name: `l`
+  
+  
+| class I:
 |     pass
-| 
-| 
-| class O:
 |> Ambiguous class name: `I`
+  
+  
+| class O:
 |     pass
-| 
-| 
-| class X:
 |> Ambiguous class name: `O`
+  
+  
+  class X:
       pass
 

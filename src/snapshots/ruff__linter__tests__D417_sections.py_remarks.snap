@@ -295,10 +295,10 @@ expression: output.finish().to_string()
 | 
 |         """
 |         print(x)
-| 
-| 
-| @expect(_D213)
 |> Missing argument description in the docstring: `y`
+  
+  
+  @expect(_D213)
   @expect("D417: Missing argument descriptions in the docstring "
           "(argument(s) y are missing descriptions in "
           "'test_missing_google_args' docstring)")
@@ -309,10 +309,10 @@ expression: output.finish().to_string()
 |         x (int): The greatest integer.
 | 
 |     """
-| 
-| 
-| class TestGoogle:  # noqa: D203
 |> Missing argument description in the docstring: `y`
+  
+  
+  class TestGoogle:  # noqa: D203
       """Test class."""
   
       def test_method(self, test, another_test, _):  # noqa: D213, D407
@@ -406,10 +406,10 @@ expression: output.finish().to_string()
 | of the entire world.
 | 
 |     """
-| 
-| 
-| class TestNumpy:  # noqa: D203
 |> Missing argument description in the docstring: `y`
+  
+  
+  class TestNumpy:  # noqa: D203
       """Test class."""
   
       def test_method(self, test, another_test, z, _, x=1, y=2, _private_arg=1):  # noqa: D213, D407
@@ -509,4 +509,5 @@ expression: output.finish().to_string()
 |             x: Test argument.
 | 
 |         """
+|> Missing argument description in the docstring: `y`
 

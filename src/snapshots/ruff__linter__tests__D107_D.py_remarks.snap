@@ -533,9 +533,9 @@ expression: output.finish().to_string()
   
 |     def __init__(self, x):
 |         pass
-| 
-| 
-| expect(os.path.normcase(__file__ if __file__[-1] != 'c' else __file__[:-1]),
 |> Missing docstring in `__init__`
+  
+  
+  expect(os.path.normcase(__file__ if __file__[-1] != 'c' else __file__[:-1]),
          'D100: Missing docstring in public module')
 

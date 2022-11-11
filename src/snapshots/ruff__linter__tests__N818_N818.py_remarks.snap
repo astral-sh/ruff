@@ -12,4 +12,5 @@ expression: output.finish().to_string()
   
 | class C(Exception):
 |     pass
+|> Exception name `C` should be named with an Error suffix
 

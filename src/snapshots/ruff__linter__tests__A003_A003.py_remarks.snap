@@ -11,4 +11,5 @@ expression: output.finish().to_string()
   
 |     def str(self):
 |         pass
+|> Class attribute `str` is shadowing a python builtin
 

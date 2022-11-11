@@ -6,10 +6,10 @@ expression: output.finish().to_string()
       1 / 0
 | except ValueError as e:
 |     pass
-| 
-| 
-| try:
 |> Local variable `e` is assigned to but never used
+  
+  
+  try:
       1 / 0
   except ValueError as e:
       print(e)

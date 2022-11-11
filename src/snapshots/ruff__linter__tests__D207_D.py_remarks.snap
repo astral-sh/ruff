@@ -227,9 +227,9 @@ expression: output.finish().to_string()
   @expect('D213: Multi-line docstring summary should start at the second line')
   def asdfsdf():
       """Summary.
-  
-| Description.
 |> Docstring is under-indented
+  
+  Description.
   
       """
   
@@ -436,9 +436,9 @@ expression: output.finish().to_string()
   @expect("D207: Docstring is under-indented")
   @expect('D213: Multi-line docstring summary should start at the second line')
   def docstring_start_in_same_line(): """First Line.
-  
-|     Second Line
 |> Docstring is under-indented
+  
+      Second Line
       """
   
   

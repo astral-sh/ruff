@@ -4,10 +4,10 @@ expression: output.finish().to_string()
 ---
 | def __bad__():
 |     pass
-| 
-| 
-| def __good():
 |> Function name should not start and end with `__`
+  
+  
+  def __good():
       pass
   
   
