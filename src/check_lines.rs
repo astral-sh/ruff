@@ -51,6 +51,9 @@ pub fn check_lines(
 
     checks.sort_by_key(|check| check.location);
     let mut checks_iter = checks.iter().enumerate().peekable();
+    if let Some((_index, check)) = checks_iter.peek() {
+        assert!(check.location.row() >= 1);
+    }
 
     let lines: Vec<&str> = contents.lines().collect();
     for (lineno, line) in lines.iter().enumerate() {
@@ -94,26 +97,24 @@ pub fn check_lines(
 
         // Remove any ignored checks.
         while let Some((index, check)) =
-            checks_iter.next_if(|(_index, check)| check.location.row() <= lineno + 1)
+            checks_iter.next_if(|(_index, check)| check.location.row() == lineno + 1)
         {
-            if check.location.row() == lineno + 1 {
-                let noqa = noqa_directives
-                    .entry(noqa_lineno)
-                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
+            let noqa = noqa_directives
+                .entry(noqa_lineno)
+                .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
 
-                match noqa {
-                    (Directive::All(..), matches) => {
-                        matches.push(check.kind.code().as_ref());
-                        ignored.push(index)
-                    }
-                    (Directive::Codes(_, _, codes), matches) => {
-                        if codes.contains(&check.kind.code().as_ref()) {
-                            matches.push(check.kind.code().as_ref());
-                            ignored.push(index);
-                        }
-                    }
-                    (Directive::None, _) => {}
+            match noqa {
+                (Directive::All(..), matches) => {
+                    matches.push(check.kind.code().as_ref());
+                    ignored.push(index)
                 }
+                (Directive::Codes(_, _, codes), matches) => {
+                    if codes.contains(&check.kind.code().as_ref()) {
+                        matches.push(check.kind.code().as_ref());
+                        ignored.push(index);
+                    }
+                }
+                (Directive::None, _) => {}
             }
         }
 
