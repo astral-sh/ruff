@@ -31,7 +31,7 @@ impl Flags {
 }
 
 pub struct Directives {
-    pub noqa_line_for: IntMap<usize, usize>,
+    pub noqa_line_for: Vec<usize>,
     pub isort_exclusions: IntSet<usize>,
 }
 
@@ -55,8 +55,8 @@ pub fn extract_directives(
 }
 
 /// Extract a mapping from logical line to noqa line.
-pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
-    let mut noqa_line_for: IntMap<usize, usize> = IntMap::default();
+pub fn extract_noqa_line_for(lxr: &[LexResult]) -> Vec<usize> {
+    let mut noqa_line_for: Vec<usize> = vec![];
     for (start, tok, end) in lxr.iter().flatten() {
         if matches!(tok, Tok::EndOfFile) {
             break;
@@ -66,9 +66,10 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
         // the same line, so we don't need to verify that we haven't already
         // traversed past the current line.
         if matches!(tok, Tok::String { .. }) && end.row() > start.row() {
-            for i in start.row()..=end.row() {
-                noqa_line_for.insert(i, end.row());
+            for i in (noqa_line_for.len())..(start.row() - 1) {
+                noqa_line_for.push(i + 1);
             }
+            noqa_line_for.extend(vec![end.row(); (end.row() + 1) - start.row()]);
         }
     }
     noqa_line_for

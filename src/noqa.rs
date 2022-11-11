@@ -46,7 +46,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 pub fn add_noqa(
     checks: &[Check],
     contents: &str,
-    noqa_line_for: &IntMap<usize, usize>,
+    noqa_line_for: &[usize],
     path: &Path,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(checks, contents, noqa_line_for)?;
@@ -57,7 +57,7 @@ pub fn add_noqa(
 fn add_noqa_inner(
     checks: &[Check],
     contents: &str,
-    noqa_line_for: &IntMap<usize, usize>,
+    noqa_line_for: &[usize],
 ) -> Result<(usize, String)> {
     let lines: Vec<&str> = contents.lines().collect();
     let mut matches_by_line: BTreeMap<usize, BTreeSet<&CheckCode>> = BTreeMap::new();
@@ -73,7 +73,7 @@ fn add_noqa_inner(
         // If there are newlines at the end of the file, they won't be represented in
         // `noqa_line_for`, so fallback to the current line.
         let noqa_lineno = noqa_line_for
-            .get(&lineno)
+            .get(lineno)
             .map(|lineno| lineno - 1)
             .unwrap_or(lineno);
 
