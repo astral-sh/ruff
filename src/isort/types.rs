@@ -1,4 +1,9 @@
+use crate::isort::comments::Comment;
 use fnv::{FnvHashMap, FnvHashSet};
+use std::borrow::Cow;
+use std::collections::BTreeSet;
+
+// pub struct A
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ImportFromData<'a> {
@@ -10,6 +15,12 @@ pub struct ImportFromData<'a> {
 pub struct AliasData<'a> {
     pub name: &'a str,
     pub asname: &'a Option<String>,
+}
+
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Default)]
+pub struct CommentSet<'a> {
+    pub atop: BTreeSet<Cow<'a, str>>,
+    pub inline: BTreeSet<Cow<'a, str>>,
 }
 
 pub trait Importable {
@@ -50,17 +61,22 @@ impl Importable for ImportFromData<'_> {
 pub struct ImportBlock<'a> {
     // Set of (name, asname), used to track regular imports.
     // Ex) `import module`
-    pub import: FnvHashSet<AliasData<'a>>,
+    pub import: FnvHashMap<AliasData<'a>, CommentSet<'a>>,
     // Map from (module, level) to `AliasData`, used to track 'from' imports.
     // Ex) `from module import member`
-    pub import_from: FnvHashMap<ImportFromData<'a>, FnvHashSet<AliasData<'a>>>,
+    pub import_from:
+        FnvHashMap<ImportFromData<'a>, (CommentSet<'a>, FnvHashMap<AliasData<'a>, CommentSet<'a>>)>,
     // Set of (module, level, name, asname), used to track re-exported 'from' imports.
     // Ex) `from module import member as member`
-    pub import_from_as: FnvHashSet<(ImportFromData<'a>, AliasData<'a>)>,
+    pub import_from_as: FnvHashMap<(ImportFromData<'a>, AliasData<'a>), CommentSet<'a>>,
 }
 
 #[derive(Debug, Default)]
 pub struct OrderedImportBlock<'a> {
-    pub import: Vec<AliasData<'a>>,
-    pub import_from: Vec<(ImportFromData<'a>, Vec<AliasData<'a>>)>,
+    pub import: Vec<(AliasData<'a>, CommentSet<'a>)>,
+    pub import_from: Vec<(
+        ImportFromData<'a>,
+        CommentSet<'a>,
+        Vec<(AliasData<'a>, CommentSet<'a>)>,
+    )>,
 }

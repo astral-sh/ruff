@@ -5,7 +5,7 @@ use crate::ast::types::Range;
 use crate::autofix::{fixer, Fix};
 use crate::checks::CheckKind;
 use crate::docstrings::helpers::leading_space;
-use crate::isort::format_imports;
+use crate::isort::{comments, format_imports};
 use crate::{Check, Settings, SourceCodeLocator};
 
 fn extract_range(body: &[&Stmt]) -> Range {
@@ -57,13 +57,23 @@ pub fn check_imports(
     let range = extract_range(&body);
     let indentation = extract_indentation(&body, locator);
 
+    // Extract comments. Take care to grab any inline comments from the last line.
+    let comments = comments::collect_comments(
+        &Range {
+            location: range.location,
+            end_location: Location::new(range.end_location.row() + 1, 0),
+        },
+        locator,
+    );
+
     // Special-cases: there's leading or trailing content in the import block.
     let has_leading_content = match_leading_content(&body, locator);
     let has_trailing_content = match_trailing_content(&body, locator);
 
     // Generate the sorted import block.
     let expected = format_imports(
-        body,
+        &body,
+        comments,
         &(settings.line_length - indentation.len()),
         &settings.src,
         &settings.isort.known_first_party,

@@ -1,16 +1,20 @@
+use fnv::FnvHashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use fnv::FnvHashSet;
 use itertools::Itertools;
 use ropey::RopeBuilder;
 use rustpython_ast::{Stmt, StmtKind};
 
 use crate::isort::categorize::{categorize, ImportType};
+use crate::isort::comments::Comment;
 use crate::isort::sorting::{member_key, module_key};
-use crate::isort::types::{AliasData, ImportBlock, ImportFromData, Importable, OrderedImportBlock};
+use crate::isort::types::{
+    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
+};
 
 mod categorize;
+mod comments;
 pub mod plugins;
 pub mod settings;
 mod sorting;
@@ -20,45 +24,266 @@ mod types;
 // Hard-code four-space indentation for the imports themselves, to match Black.
 const INDENT: &str = "    ";
 
-fn normalize_imports<'a>(imports: &'a [&'a Stmt]) -> ImportBlock<'a> {
-    let mut block: ImportBlock = Default::default();
+pub struct AnnotatedAliasData<'a> {
+    pub name: &'a str,
+    pub asname: &'a Option<String>,
+    pub atop: Vec<Comment<'a>>,
+    pub inline: Vec<Comment<'a>>,
+}
+
+pub enum AnnotatedImport<'a> {
+    Import {
+        names: Vec<AliasData<'a>>,
+        atop: Vec<Comment<'a>>,
+        inline: Vec<Comment<'a>>,
+    },
+    ImportFrom {
+        module: &'a Option<String>,
+        names: Vec<AnnotatedAliasData<'a>>,
+        level: &'a Option<usize>,
+        atop: Vec<Comment<'a>>,
+        inline: Vec<Comment<'a>>,
+    },
+}
+
+fn annotate_imports<'a>(
+    imports: &'a [&'a Stmt],
+    comments: Vec<Comment<'a>>,
+) -> Vec<AnnotatedImport<'a>> {
+    let mut annotated = vec![];
+    let mut comments_iter = comments.into_iter().peekable();
     for import in imports {
         match &import.node {
             StmtKind::Import { names } => {
-                for name in names {
-                    block.import.insert(AliasData {
-                        name: &name.node.name,
-                        asname: &name.node.asname,
-                    });
+                // Find comments above.
+                let mut atop = vec![];
+                while let Some(comment) =
+                    comments_iter.next_if(|comment| comment.location.row() < import.location.row())
+                {
+                    atop.push(comment);
                 }
+
+                // Find comments inline.
+                let mut inline = vec![];
+                while let Some(comment) = comments_iter.next_if(|comment| {
+                    comment.end_location.row() == import.end_location.unwrap().row()
+                }) {
+                    inline.push(comment);
+                }
+
+                annotated.push(AnnotatedImport::Import {
+                    names: names
+                        .iter()
+                        .map(|alias| AliasData {
+                            name: &alias.node.name,
+                            asname: &alias.node.asname,
+                        })
+                        .collect(),
+                    atop,
+                    inline,
+                });
             }
             StmtKind::ImportFrom {
                 module,
                 names,
                 level,
             } => {
-                for name in names {
-                    if name.node.asname.is_none() {
-                        block
+                // Find comments above.
+                let mut atop = vec![];
+                while let Some(comment) =
+                    comments_iter.next_if(|comment| comment.location.row() < import.location.row())
+                {
+                    atop.push(comment);
+                }
+
+                // Find comments inline. In this case, we're looking for structures like:
+                //   from module import (  # Comment
+                //     ...
+                //   )
+                // That is, the members have to be on the next line (otherwise those comments will
+                // be associated with the members).
+                let mut inline = vec![];
+                if let Some(alias) = names.first() {
+                    if alias.location.row() > import.location.row() {
+                        while let Some(comment) = comments_iter
+                            .next_if(|comment| comment.location.row() == import.location.row())
+                        {
+                            inline.push(comment);
+                        }
+                    }
+                }
+
+                // Capture names.
+                let mut aliases = vec![];
+                for alias in names {
+                    // Find comments above.
+                    let mut alias_atop = vec![];
+                    while let Some(comment) = comments_iter
+                        .next_if(|comment| comment.location.row() < import.location.row())
+                    {
+                        alias_atop.push(comment);
+                    }
+
+                    // Find comments inline.
+                    let mut alias_inline = vec![];
+                    while let Some(comment) = comments_iter.next_if(|comment| {
+                        comment.end_location.row() == import.end_location.unwrap().row()
+                    }) {
+                        alias_inline.push(comment);
+                    }
+
+                    aliases.push(AnnotatedAliasData {
+                        name: &alias.node.name,
+                        asname: &alias.node.asname,
+                        atop: alias_atop,
+                        inline: alias_inline,
+                    })
+                }
+
+                annotated.push(AnnotatedImport::ImportFrom {
+                    module,
+                    names: aliases,
+                    level,
+                    atop,
+                    inline,
+                });
+                // Repeat for each member.
+            }
+            _ => unreachable!("Expected StmtKind::Import | StmtKind::ImportFrom"),
+        }
+    }
+    annotated
+}
+
+fn normalize_imports<'a>(imports: Vec<AnnotatedImport<'a>>) -> ImportBlock<'a> {
+    let mut block: ImportBlock = Default::default();
+    for import in imports {
+        match import {
+            AnnotatedImport::Import {
+                names,
+                atop,
+                inline,
+            } => {
+                // Associate the comments with the first alias (best effort).
+                if let Some(name) = names.first() {
+                    let mut entry = block
+                        .import
+                        .entry(AliasData {
+                            name: &name.name,
+                            asname: &name.asname,
+                        })
+                        .or_default();
+                    for comment in atop {
+                        entry.atop.insert(comment.value);
+                    }
+                    for comment in inline {
+                        entry.inline.insert(comment.value);
+                    }
+                }
+
+                // Create an entry for every alias.
+                for name in &names {
+                    block
+                        .import
+                        .entry(AliasData {
+                            name: name.name,
+                            asname: name.asname,
+                        })
+                        .or_default();
+                }
+            }
+            AnnotatedImport::ImportFrom {
+                module,
+                names,
+                level,
+                atop,
+                inline,
+            } => {
+                // Associate the comments with the first alias (best effort).
+                if let Some(alias) = names.first() {
+                    if alias.asname.is_none() {
+                        let mut entry = &mut block
                             .import_from
-                            .entry(ImportFromData { module, level })
+                            .entry(ImportFromData {
+                                module: &module,
+                                level: &level,
+                            })
                             .or_default()
-                            .insert(AliasData {
-                                name: &name.node.name,
-                                asname: &name.node.asname,
-                            });
+                            .0;
+                        for comment in atop {
+                            entry.atop.insert(comment.value);
+                        }
+                        for comment in inline {
+                            entry.inline.insert(comment.value);
+                        }
                     } else {
-                        block.import_from_as.insert((
-                            ImportFromData { module, level },
-                            AliasData {
-                                name: &name.node.name,
-                                asname: &name.node.asname,
-                            },
-                        ));
+                        let mut entry = &mut block
+                            .import_from_as
+                            .entry((
+                                ImportFromData {
+                                    module: &module,
+                                    level: &level,
+                                },
+                                AliasData {
+                                    name: &alias.name,
+                                    asname: &alias.asname,
+                                },
+                            ))
+                            .or_default();
+                        for comment in atop {
+                            entry.atop.insert(comment.value);
+                        }
+                        for comment in inline {
+                            entry.inline.insert(comment.value);
+                        }
+                    }
+                }
+
+                // Create an entry for every alias.
+                for alias in names {
+                    if alias.asname.is_none() {
+                        let mut entry = block
+                            .import_from
+                            .entry(ImportFromData {
+                                module: &module,
+                                level: &level,
+                            })
+                            .or_default()
+                            .1
+                            .entry(AliasData {
+                                name: &alias.name,
+                                asname: &alias.asname,
+                            })
+                            .or_default();
+                        for comment in alias.atop {
+                            entry.atop.insert(comment.value);
+                        }
+                        for comment in alias.inline {
+                            entry.inline.insert(comment.value);
+                        }
+                    } else {
+                        let mut entry = block
+                            .import_from_as
+                            .entry((
+                                ImportFromData {
+                                    module: &module,
+                                    level: &level,
+                                },
+                                AliasData {
+                                    name: &alias.name,
+                                    asname: &alias.asname,
+                                },
+                            ))
+                            .or_default();
+                        for comment in alias.atop {
+                            entry.atop.insert(comment.value);
+                        }
+                        for comment in alias.inline {
+                            entry.inline.insert(comment.value);
+                        }
                     }
                 }
             }
-            _ => unreachable!("Expected StmtKind::Import | StmtKind::ImportFrom"),
         }
     }
     block
@@ -73,7 +298,7 @@ fn categorize_imports<'a>(
 ) -> BTreeMap<ImportType, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<ImportType, ImportBlock> = Default::default();
     // Categorize `StmtKind::Import`.
-    for alias in block.import {
+    for (alias, comments) in block.import {
         let import_type = categorize(
             &alias.module_base(),
             &None,
@@ -86,7 +311,7 @@ fn categorize_imports<'a>(
             .entry(import_type)
             .or_default()
             .import
-            .insert(alias);
+            .insert(alias, comments);
     }
     // Categorize `StmtKind::ImportFrom` (without re-export).
     for (import_from, aliases) in block.import_from {
@@ -105,7 +330,7 @@ fn categorize_imports<'a>(
             .insert(import_from, aliases);
     }
     // Categorize `StmtKind::ImportFrom` (with re-export).
-    for (import_from, alias) in block.import_from_as {
+    for ((import_from, alias), comments) in block.import_from_as {
         let classification = categorize(
             &import_from.module_base(),
             import_from.level,
@@ -118,7 +343,7 @@ fn categorize_imports<'a>(
             .entry(classification)
             .or_default()
             .import_from_as
-            .insert((import_from, alias));
+            .insert((import_from, alias), comments);
     }
     block_by_type
 }
@@ -131,7 +356,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
         block
             .import
             .into_iter()
-            .sorted_by_cached_key(|alias| module_key(alias.name, alias.asname)),
+            .sorted_by_cached_key(|(alias, _)| module_key(alias.name, alias.asname)),
     );
 
     // Sort `StmtKind::ImportFrom`.
@@ -140,24 +365,33 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
         block
             .import_from
             .into_iter()
-            .chain(
-                // Include all re-exports.
-                block
-                    .import_from_as
-                    .into_iter()
-                    .map(|(import_from, alias)| (import_from, FnvHashSet::from_iter([alias]))),
-            )
-            .map(|(import_from, aliases)| {
+            // .chain(
+            //     // Include all re-exports.
+            //     block
+            //         .import_from_as
+            //         .into_iter()
+            //         .map(|((import_from, alias), comments)| {
+            //             (
+            //                 import_from,
+            //                 (
+            //                     comments,
+            //                     FnvHashSet::from_iter([(alias, CommentSet::default())]),
+            //                 ),
+            //             )
+            //         }),
+            // )
+            .map(|(import_from, (comments, aliases))| {
                 // Within each `StmtKind::ImportFrom`, sort the members.
                 (
                     import_from,
+                    comments,
                     aliases
                         .into_iter()
-                        .sorted_by_cached_key(|alias| member_key(alias.name, alias.asname))
-                        .collect::<Vec<AliasData>>(),
+                        .sorted_by_cached_key(|(alias, _)| member_key(alias.name, alias.asname))
+                        .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
             })
-            .sorted_by_cached_key(|(import_from, aliases)| {
+            .sorted_by_cached_key(|(import_from, _, aliases)| {
                 // Sort each `StmtKind::ImportFrom` by module key, breaking ties based on
                 // members.
                 (
@@ -167,7 +401,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                         .map(|module| module_key(module, &None)),
                     aliases
                         .first()
-                        .map(|alias| member_key(alias.name, alias.asname)),
+                        .map(|(alias, _)| member_key(alias.name, alias.asname)),
                 )
             }),
     );
@@ -176,15 +410,21 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
 }
 
 pub fn format_imports(
-    block: Vec<&Stmt>,
+    block: &[&Stmt],
+    comments: Vec<Comment>,
     line_length: &usize,
     src: &[PathBuf],
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
 ) -> String {
+    println!("comments = {:?}", comments);
+    println!("block = {:?}", block);
+
+    let block = annotate_imports(&block, comments);
+
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
-    let block = normalize_imports(&block);
+    let block = normalize_imports(block);
 
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
@@ -209,20 +449,29 @@ pub fn format_imports(
         }
 
         // Format `StmtKind::Import` statements.
-        for AliasData { name, asname } in import_block.import.iter() {
-            if let Some(asname) = asname {
-                output.append(&format!("import {} as {}\n", name, asname));
-            } else {
-                output.append(&format!("import {}\n", name));
+        for (AliasData { name, asname }, comments) in import_block.import.iter() {
+            for comment in &comments.atop {
+                output.append(&format!("{}\n", comment));
             }
+            if let Some(asname) = asname {
+                output.append(&format!("import {} as {}", name, asname));
+            } else {
+                output.append(&format!("import {}", name));
+            }
+            for comment in &comments.inline {
+                output.append(&format!("  {}", comment));
+            }
+            output.append("\n");
         }
 
         // Format `StmtKind::ImportFrom` statements.
-        for (import_from, aliases) in import_block.import_from.iter() {
+        for (import_from, comments, aliases) in import_block.import_from.iter() {
+            // STOPSHIP: comments
             let prelude: String = format!("from {} import ", import_from.module_name());
             let members: Vec<String> = aliases
                 .iter()
-                .map(|AliasData { name, asname }| {
+                .map(|(AliasData { name, asname }, comments)| {
+                    // STOPSHIP: comments
                     if let Some(asname) = asname {
                         format!("{} as {}", name, asname)
                     } else {
@@ -233,12 +482,12 @@ pub fn format_imports(
 
             // Can we fit the import on a single line?
             let expected_len: usize =
-                    // `from base import `
-                    prelude.len()
-                        // `member( as alias)?`
-                        + members.iter().map(|part| part.len()).sum::<usize>()
-                        // `, `
-                        + 2 * (members.len() - 1);
+                // `from base import `
+                prelude.len()
+                    // `member( as alias)?`
+                    + members.iter().map(|part| part.len()).sum::<usize>()
+                    // `, `
+                    + 2 * (members.len() - 1);
 
             if expected_len <= *line_length {
                 // `from base import `
