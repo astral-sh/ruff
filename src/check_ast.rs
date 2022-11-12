@@ -32,7 +32,7 @@ use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_2020, flake8_annotations, flake8_bugbear, flake8_builtins,
+    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
     flake8_comprehensions, flake8_print, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
@@ -348,6 +348,12 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B019) {
                     flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::S107) {
+                    self.add_checks(
+                        flake8_bandit::plugins::hardcoded_password_default(args).into_iter(),
+                    );
                 }
 
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
@@ -803,6 +809,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::B011) {
                     flake8_bugbear::plugins::assert_false(self, stmt, test, msg);
                 }
+                if self.settings.enabled.contains(&CheckCode::S101) {
+                    self.add_check(flake8_bandit::plugins::assert_used(stmt));
+                }
             }
             StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
                 if self.settings.enabled.contains(&CheckCode::B017) {
@@ -842,6 +851,13 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B003) {
                     flake8_bugbear::plugins::assignment_to_os_environ(self, targets);
+                }
+                if self.settings.enabled.contains(&CheckCode::S105) {
+                    if let Some(check) =
+                        flake8_bandit::plugins::assign_hardcoded_password_string(value, targets)
+                    {
+                        self.add_check(check);
+                    }
                 }
             }
             StmtKind::AnnAssign { value, .. } => {
@@ -1106,6 +1122,16 @@ where
                 if self.settings.enabled.contains(&CheckCode::B026) {
                     flake8_bugbear::plugins::star_arg_unpacking_after_keyword_arg(
                         self, args, keywords,
+                    );
+                }
+                if self.settings.enabled.contains(&CheckCode::S102) {
+                    if let Some(check) = flake8_bandit::plugins::exec_used(expr, func) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::S106) {
+                    self.add_checks(
+                        flake8_bandit::plugins::hardcoded_password_func_arg(keywords).into_iter(),
                     );
                 }
 
@@ -1456,6 +1482,16 @@ where
                 {
                     flake8_2020::plugins::compare(self, left, ops, comparators);
                 }
+
+                if self.settings.enabled.contains(&CheckCode::S105) {
+                    self.add_checks(
+                        flake8_bandit::plugins::compare_to_hardcoded_password_string(
+                            left,
+                            comparators,
+                        )
+                        .into_iter(),
+                    );
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),
@@ -1464,6 +1500,14 @@ where
                 if self.in_annotation && !self.in_literal {
                     self.deferred_string_annotations
                         .push((Range::from_located(expr), value));
+                }
+                if self.settings.enabled.contains(&CheckCode::S104) {
+                    if let Some(check) = flake8_bandit::plugins::hardcoded_bind_all_interfaces(
+                        value,
+                        &Range::from_located(expr),
+                    ) {
+                        self.add_check(check);
+                    }
                 }
             }
             ExprKind::Lambda { args, .. } => {

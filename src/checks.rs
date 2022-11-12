@@ -220,6 +220,13 @@ pub enum CheckCode {
     N818,
     // isort
     I001,
+    // flake8-bandit
+    S101,
+    S102,
+    S104,
+    S105,
+    S106,
+    S107,
     // Ruff
     RUF001,
     RUF002,
@@ -236,6 +243,7 @@ pub enum CheckCategory {
     Pydocstyle,
     Pyupgrade,
     PEP8Naming,
+    Flake8Bandit,
     Flake8Comprehensions,
     Flake8Bugbear,
     Flake8Builtins,
@@ -253,6 +261,7 @@ impl CheckCategory {
             CheckCategory::Pycodestyle => "pycodestyle",
             CheckCategory::Pyflakes => "Pyflakes",
             CheckCategory::Isort => "isort",
+            CheckCategory::Flake8Bandit => "flake8-bandit",
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
@@ -291,6 +300,7 @@ impl CheckCategory {
             CheckCategory::Pyupgrade => Some("https://pypi.org/project/pyupgrade/3.2.0/"),
             CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
             CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
+            CheckCategory::Flake8Bandit => Some("https://pypi.org/project/flake8-bandit/4.1.1/"),
             CheckCategory::Ruff => None,
             CheckCategory::Meta => None,
         }
@@ -509,6 +519,13 @@ pub enum CheckKind {
     ErrorSuffixOnExceptionName(String),
     // isort
     UnsortedImports,
+    // flake8-bandit
+    AssertUsed,
+    ExecUsed,
+    HardcodedBindAllInterfaces,
+    HardcodedPasswordString(String),
+    HardcodedPasswordFuncArg(String),
+    HardcodedPasswordDefault(String),
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -773,6 +790,13 @@ impl CheckCode {
             CheckCode::N818 => CheckKind::ErrorSuffixOnExceptionName("...".to_string()),
             // isort
             CheckCode::I001 => CheckKind::UnsortedImports,
+            // flake8-bandit
+            CheckCode::S101 => CheckKind::AssertUsed,
+            CheckCode::S102 => CheckKind::ExecUsed,
+            CheckCode::S104 => CheckKind::HardcodedBindAllInterfaces,
+            CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
+            CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
+            CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -965,6 +989,12 @@ impl CheckCode {
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::I001 => CheckCategory::Isort,
+            CheckCode::S101 => CheckCategory::Flake8Bandit,
+            CheckCode::S102 => CheckCategory::Flake8Bandit,
+            CheckCode::S104 => CheckCategory::Flake8Bandit,
+            CheckCode::S105 => CheckCategory::Flake8Bandit,
+            CheckCode::S106 => CheckCategory::Flake8Bandit,
+            CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
@@ -1171,6 +1201,13 @@ impl CheckKind {
             CheckKind::ErrorSuffixOnExceptionName(..) => &CheckCode::N818,
             // isort
             CheckKind::UnsortedImports => &CheckCode::I001,
+            // flake8-bandit
+            CheckKind::AssertUsed => &CheckCode::S101,
+            CheckKind::ExecUsed => &CheckCode::S102,
+            CheckKind::HardcodedBindAllInterfaces => &CheckCode::S104,
+            CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
+            CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
+            CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -1778,6 +1815,21 @@ impl CheckKind {
             }
             // isort
             CheckKind::UnsortedImports => "Import block is un-sorted or un-formatted".to_string(),
+            // flake8-bandit
+            CheckKind::AssertUsed => "Use of `assert` detected".to_string(),
+            CheckKind::ExecUsed => "Use of `exec` detected".to_string(),
+            CheckKind::HardcodedBindAllInterfaces => {
+                "Possible binding to all interfaces".to_string()
+            }
+            CheckKind::HardcodedPasswordString(string) => {
+                format!("Possible hardcoded password: `'{string}'`")
+            }
+            CheckKind::HardcodedPasswordFuncArg(string) => {
+                format!("Possible hardcoded password: `'{string}'`")
+            }
+            CheckKind::HardcodedPasswordDefault(string) => {
+                format!("Possible hardcoded password: `'{string}'`")
+            }
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(

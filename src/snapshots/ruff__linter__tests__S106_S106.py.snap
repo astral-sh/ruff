@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    HardcodedPasswordFuncArg: s3cr3t
+  location:
+    row: 13
+    column: 8
+  end_location:
+    row: 13
+    column: 25
+  fix: ~
+

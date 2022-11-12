@@ -467,6 +467,19 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyP
 | N817 | CamelcaseImportedAsAcronym | Camelcase `...` imported as acronym `...` |  |
 | N818 | ErrorSuffixOnExceptionName | Exception name `...` should be named with an Error suffix |  |
 
+### flake8-bandit
+
+For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| S101 | AssertUsed | Use of `assert` detected |  |
+| S102 | ExecUsed | Use of `exec` detected |  |
+| S104 | HardcodedBindAllInterfaces | Possible binding to all interfaces |  |
+| S105 | HardcodedPasswordString | Possible hardcoded password: `'...'` |  |
+| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `'...'` |  |
+| S107 | HardcodedPasswordDefault | Possible hardcoded password: `'...'` |  |
+
 ### flake8-comprehensions
 
 For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/3.10.1/) on PyPI.
@@ -686,6 +699,7 @@ including:
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
+- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/34)
@@ -709,6 +723,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
+- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
