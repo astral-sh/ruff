@@ -1126,6 +1126,11 @@ where
                 if self.settings.enabled.contains(&CheckCode::S102) {
                     flake8_bandit::checks::exec_used(self, expr, func);
                 }
+                if self.settings.enabled.contains(&CheckCode::S106) {
+                    self.add_checks(
+                        flake8_bandit::checks::hardcoded_password_funcarg(keywords).into_iter(),
+                    );
+                }
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {

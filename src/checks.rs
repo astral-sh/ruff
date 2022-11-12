@@ -222,6 +222,7 @@ pub enum CheckCode {
     S101,
     S102,
     S105,
+    S106,
     S107,
     // Ruff
     RUF001,
@@ -517,6 +518,7 @@ pub enum CheckKind {
     AssertUsed,
     ExecUsed,
     HardcodedPasswordString(String),
+    HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
@@ -784,6 +786,7 @@ impl CheckCode {
             CheckCode::S101 => CheckKind::AssertUsed,
             CheckCode::S102 => CheckKind::ExecUsed,
             CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
+            CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
@@ -978,6 +981,7 @@ impl CheckCode {
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
             CheckCode::S105 => CheckCategory::Flake8Bandit,
+            CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
@@ -1187,6 +1191,7 @@ impl CheckKind {
             CheckKind::AssertUsed => &CheckCode::S101,
             CheckKind::ExecUsed => &CheckCode::S102,
             CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
+            CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
@@ -1789,6 +1794,9 @@ impl CheckKind {
             CheckKind::AssertUsed => "Use of `assert` detected".to_string(),
             CheckKind::ExecUsed => "Use of `exec` detected".to_string(),
             CheckKind::HardcodedPasswordString(string) => {
+                format!("Possible hardcoded password: '{string}'")
+            }
+            CheckKind::HardcodedPasswordFuncArg(string) => {
                 format!("Possible hardcoded password: '{string}'")
             }
             CheckKind::HardcodedPasswordDefault(string) => {
