@@ -5,7 +5,7 @@ use ruff::checks_gen::CheckCodePrefix;
 use ruff::flake8_quotes::settings::Quote;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
-use ruff::{flake8_annotations, flake8_quotes, pep8_naming};
+use ruff::{flake8_annotations, flake8_bugbear, flake8_quotes, pep8_naming};
 
 use crate::plugin::Plugin;
 use crate::{parser, plugin};
@@ -69,6 +69,7 @@ pub fn convert(
     // Parse each supported option.
     let mut options: Options = Default::default();
     let mut flake8_annotations: flake8_annotations::settings::Options = Default::default();
+    let mut flake8_bugbear: flake8_bugbear::settings::Options = Default::default();
     let mut flake8_quotes: flake8_quotes::settings::Options = Default::default();
     let mut pep8_naming: pep8_naming::settings::Options = Default::default();
     for (key, value) in flake8 {
@@ -108,6 +109,11 @@ pub fn convert(
                         }
                         Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                     }
+                }
+                // flake8-bugbear
+                "extend-immutable-calls" | "extend_immutable_calls" => {
+                    flake8_bugbear.extend_immutable_calls =
+                        Some(parser::parse_strings(value.as_ref()));
                 }
                 // flake8-annotations
                 "suppress-none-returning" | "suppress_none_returning" => {
@@ -179,6 +185,12 @@ pub fn convert(
     // Deduplicate and sort.
     options.select = Some(Vec::from_iter(select));
     options.ignore = Some(Vec::from_iter(ignore));
+    if flake8_annotations != Default::default() {
+        options.flake8_annotations = Some(flake8_annotations);
+    }
+    if flake8_bugbear != Default::default() {
+        options.flake8_bugbear = Some(flake8_bugbear);
+    }
     if flake8_quotes != Default::default() {
         options.flake8_quotes = Some(flake8_quotes);
     }
