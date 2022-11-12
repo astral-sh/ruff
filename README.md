@@ -588,6 +588,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S101 | AssertUsed | Use of `assert` detected |  |
 | S102 | ExecUsed | Use of `exec` detected |  |
 | S105 | HardcodedPasswordString | Possible hardcoded password: `...` |  |
+| S107 | HardcodedPasswordDefault | Possible hardcoded password: `...` |  |
 
 ### Ruff-specific rules
 

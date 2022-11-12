@@ -347,6 +347,12 @@ where
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::S107) {
+                    self.add_checks(
+                        flake8_bandit::checks::hardcoded_password_default(args).into_iter(),
+                    );
+                }
+
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be

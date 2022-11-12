@@ -1,4 +1,4 @@
-use rustpython_ast::{Constant, Expr, ExprKind};
+use rustpython_ast::{ArgData, Arguments, Constant, Expr, ExprKind, Located};
 
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
@@ -54,6 +54,19 @@ fn is_password_target(target: &Expr) -> bool {
     matches_password_name(target_name)
 }
 
+fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Check> {
+    if let Some(string) = string_literal(default) {
+        let kwarg_name = &arg.node.arg;
+        if matches_password_name(kwarg_name) {
+            return Some(Check::new(
+                CheckKind::HardcodedPasswordDefault(string.to_string()),
+                Range::from_located(default),
+            ));
+        }
+    }
+    None
+}
+
 /// S105
 pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -> Vec<Check> {
     let mut checks: Vec<Check> = Vec::new();
@@ -84,4 +97,37 @@ pub fn assign_hardcoded_password_string(value: &Expr, targets: &Vec<Expr>) -> Op
         }
     }
     None
+}
+
+/// S107
+pub fn hardcoded_password_default(arguments: &Arguments) -> Vec<Check> {
+    let mut checks: Vec<Check> = Vec::new();
+
+    let defaults_start =
+        arguments.posonlyargs.len() + arguments.args.len() - arguments.defaults.len();
+    for (i, arg) in arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .enumerate()
+    {
+        if let Some(i) = i.checked_sub(defaults_start) {
+            let default = &arguments.defaults[i];
+            if let Some(check) = check_password_kwarg(arg, default) {
+                checks.push(check);
+            }
+        }
+    }
+
+    let defaults_start = arguments.kwonlyargs.len() - arguments.kw_defaults.len();
+    for (i, kwarg) in arguments.kwonlyargs.iter().enumerate() {
+        if let Some(i) = i.checked_sub(defaults_start) {
+            let default = &arguments.kw_defaults[i];
+            if let Some(check) = check_password_kwarg(kwarg, default) {
+                checks.push(check);
+            }
+        }
+    }
+
+    checks
 }
