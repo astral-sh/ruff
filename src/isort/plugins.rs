@@ -64,7 +64,7 @@ pub fn check_imports(
     // Generate the sorted import block.
     let expected = format_imports(
         body,
-        &settings.line_length,
+        &(settings.line_length - indentation.len()),
         &settings.src,
         &settings.isort.known_first_party,
         &settings.isort.known_third_party,
