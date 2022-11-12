@@ -26,11 +26,11 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
                 if decorator_path == "classmethod" || decorator_path == "staticmethod" {
                     return;
                 }
-                let decorator_attr = match &decorator.node {
+                let deco = match &decorator.node {
                     ExprKind::Call { func, .. } => func,
                     _ => decorator,
                 };
-                if is_cache_func(checker, decorator_attr) {
+                if is_cache_func(checker, deco) {
                     checker.add_check(Check::new(
                         CheckKind::CachedInstanceMethod,
                         Range::from_located(decorator),
