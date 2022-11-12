@@ -75,7 +75,7 @@ where
                     && !is_nan_or_infinity(func, args)
                 {
                     self.checks.push((
-                        CheckKind::FunctionCallArgumentDefault,
+                        CheckKind::FunctionCallArgumentDefault(compose_call_path(expr)),
                         Range::from_located(expr),
                     ))
                 }

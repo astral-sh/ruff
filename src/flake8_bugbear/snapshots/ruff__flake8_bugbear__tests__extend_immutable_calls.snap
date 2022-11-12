@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: Depends
   location:
     row: 19
     column: 50

@@ -382,7 +382,7 @@ pub enum CheckKind {
     StripWithMultiCharacters,
     MutableArgumentDefault,
     UnusedLoopControlVariable(String),
-    FunctionCallArgumentDefault,
+    FunctionCallArgumentDefault(Option<String>),
     GetAttrWithConstant,
     SetAttrWithConstant,
     DoNotAssertFalse,
@@ -619,7 +619,7 @@ impl CheckCode {
             CheckCode::B005 => CheckKind::StripWithMultiCharacters,
             CheckCode::B006 => CheckKind::MutableArgumentDefault,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
-            CheckCode::B008 => CheckKind::FunctionCallArgumentDefault,
+            CheckCode::B008 => CheckKind::FunctionCallArgumentDefault(None),
             CheckCode::B009 => CheckKind::GetAttrWithConstant,
             CheckCode::B010 => CheckKind::SetAttrWithConstant,
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
@@ -1064,7 +1064,7 @@ impl CheckKind {
             CheckKind::StripWithMultiCharacters => &CheckCode::B005,
             CheckKind::MutableArgumentDefault => &CheckCode::B006,
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
-            CheckKind::FunctionCallArgumentDefault => &CheckCode::B008,
+            CheckKind::FunctionCallArgumentDefault(_) => &CheckCode::B008,
             CheckKind::GetAttrWithConstant => &CheckCode::B009,
             CheckKind::SetAttrWithConstant => &CheckCode::B010,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
@@ -1389,8 +1389,12 @@ impl CheckKind {
                 "Loop control variable `{name}` not used within the loop body. If this is \
                  intended, start the name with an underscore."
             ),
-            CheckKind::FunctionCallArgumentDefault => {
-                "Do not perform function calls in argument defaults.".to_string()
+            CheckKind::FunctionCallArgumentDefault(name) => {
+                if let Some(name) = name {
+                    format!("Do not perform function call `{name}` in argument defaults")
+                } else {
+                    "Do not perform function call in argument defaults".to_string()
+                }
             }
             CheckKind::GetAttrWithConstant => "Do not call `getattr` with a constant attribute \
                                                value, it is not any safer than normal property \

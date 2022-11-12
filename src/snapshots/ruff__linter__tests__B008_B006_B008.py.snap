@@ -2,7 +2,8 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: range
   location:
     row: 85
     column: 60
@@ -10,7 +11,8 @@ expression: checks
     row: 85
     column: 68
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: range
   location:
     row: 89
     column: 63
@@ -18,7 +20,8 @@ expression: checks
     row: 89
     column: 71
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: range
   location:
     row: 93
     column: 59
@@ -26,7 +29,8 @@ expression: checks
     row: 93
     column: 67
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: time.time
   location:
     row: 109
     column: 38
@@ -34,7 +38,8 @@ expression: checks
     row: 109
     column: 49
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: dt.datetime.now
   location:
     row: 113
     column: 11
@@ -42,7 +47,8 @@ expression: checks
     row: 113
     column: 28
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: dt.timedelta
   location:
     row: 113
     column: 31
@@ -50,7 +56,8 @@ expression: checks
     row: 113
     column: 51
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: ~
   location:
     row: 117
     column: 29
@@ -58,7 +65,8 @@ expression: checks
     row: 117
     column: 44
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: float
   location:
     row: 155
     column: 33
@@ -66,7 +74,8 @@ expression: checks
     row: 155
     column: 47
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: float
   location:
     row: 160
     column: 29
@@ -74,7 +83,8 @@ expression: checks
     row: 160
     column: 37
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: float
   location:
     row: 164
     column: 44
@@ -82,7 +92,8 @@ expression: checks
     row: 164
     column: 57
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: float
   location:
     row: 170
     column: 20
@@ -90,7 +101,8 @@ expression: checks
     row: 170
     column: 28
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: dt.datetime.now
   location:
     row: 170
     column: 30
@@ -98,7 +110,8 @@ expression: checks
     row: 170
     column: 47
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: map
   location:
     row: 176
     column: 21
@@ -106,7 +119,8 @@ expression: checks
     row: 176
     column: 62
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: random.randint
   location:
     row: 181
     column: 18
@@ -114,7 +128,8 @@ expression: checks
     row: 181
     column: 59
   fix: ~
-- kind: FunctionCallArgumentDefault
+- kind:
+    FunctionCallArgumentDefault: dt.datetime.now
   location:
     row: 181
     column: 36

@@ -515,7 +515,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B005 | StripWithMultiCharacters | Using `.strip()` with multi-character strings is misleading the reader. |  |
 | B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults. |  |
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body. | 🛠 |
-| B008 | FunctionCallArgumentDefault | Do not perform function calls in argument defaults. |  |
+| B008 | FunctionCallArgumentDefault | Do not perform function call in argument defaults |  |
 | B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value, it is not any safer than normal property access. | 🛠 |
 | B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value, it is not any safer than normal property access. |  |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
