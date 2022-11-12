@@ -3,9 +3,9 @@ source: src/linter.rs
 expression: checks
 ---
 - kind:
-    UnnecessaryFutureImports:
-      - nested_scopes
+    UnnecessaryFutureImport:
       - generators
+      - nested_scopes
   location:
     row: 1
     column: 0
@@ -23,9 +23,9 @@ expression: checks
         column: 0
     applied: false
 - kind:
-    UnnecessaryFutureImports:
-      - with_statement
+    UnnecessaryFutureImport:
       - unicode_literals
+      - with_statement
   location:
     row: 3
     column: 0
@@ -43,7 +43,7 @@ expression: checks
         column: 0
     applied: false
 - kind:
-    UnnecessaryFutureImports:
+    UnnecessaryFutureImport:
       - absolute_import
       - division
   location:
@@ -63,7 +63,7 @@ expression: checks
         column: 0
     applied: false
 - kind:
-    UnnecessaryFutureImports:
+    UnnecessaryFutureImport:
       - generator_stop
   location:
     row: 7
@@ -82,9 +82,9 @@ expression: checks
         column: 0
     applied: false
 - kind:
-    UnnecessaryFutureImports:
-      - print_function
+    UnnecessaryFutureImport:
       - generator_stop
+      - print_function
   location:
     row: 9
     column: 0
@@ -102,7 +102,7 @@ expression: checks
         column: 0
     applied: false
 - kind:
-    UnnecessaryFutureImports:
+    UnnecessaryFutureImport:
       - generators
   location:
     row: 11
@@ -121,9 +121,9 @@ expression: checks
         column: 49
     applied: false
 - kind:
-    UnnecessaryFutureImports:
-      - with_statement
+    UnnecessaryFutureImport:
       - print_function
+      - with_statement
   location:
     row: 15
     column: 0

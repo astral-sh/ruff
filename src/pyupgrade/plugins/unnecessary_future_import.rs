@@ -1,5 +1,6 @@
 use rustpython_ast::{AliasData, Located};
 use rustpython_parser::ast::Stmt;
+use std::collections::BTreeSet;
 
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
@@ -7,7 +8,7 @@ use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
 
-pub const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
+const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
     "nested_scopes",
     "generators",
     "with_statement",
@@ -18,7 +19,7 @@ pub const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
     "unicode_literals",
 ];
 
-pub const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
+const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
     "nested_scopes",
     "generators",
     "with_statement",
@@ -30,27 +31,31 @@ pub const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
     "generator_stop",
 ];
 
+/// U010
 pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Located<AliasData>]) {
     let target_version = checker.settings.target_version;
 
-    let mut removable_index = vec![];
-    let mut removable_names = vec![];
+    let mut removable_index: Vec<usize> = vec![];
+    let mut removable_names: BTreeSet<&str> = BTreeSet::new();
     for (index, alias) in names.iter().enumerate() {
-        let name = &alias.node.name.as_str();
-        if (target_version >= PythonVersion::Py33 && PY33_PLUS_REMOVE_FUTURES.contains(name))
-            || (target_version >= PythonVersion::Py37 && PY37_PLUS_REMOVE_FUTURES.contains(name))
+        let name = alias.node.name.as_str();
+        if (target_version >= PythonVersion::Py33 && PY33_PLUS_REMOVE_FUTURES.contains(&name))
+            || (target_version >= PythonVersion::Py37 && PY37_PLUS_REMOVE_FUTURES.contains(&name))
         {
             removable_index.push(index);
-            removable_names.push(name.to_string())
+            removable_names.insert(name);
         }
     }
 
-    if !removable_names.is_empty() {
+    if !removable_index.is_empty() {
         let mut check = Check::new(
-            CheckKind::UnnecessaryFutureImports(removable_names),
+            CheckKind::UnnecessaryFutureImport(
+                removable_names.into_iter().map(String::from).collect(),
+            ),
             Range::from_located(stmt),
         );
         if checker.patch() {
+            let context = checker.binding_context();
             let deleted: Vec<&Stmt> = checker
                 .deletions
                 .iter()
@@ -58,8 +63,9 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
                 .collect();
             if let Ok(fix) = fixes::remove_unnecessary_future_import(
                 checker.locator,
-                stmt,
                 &removable_index,
+                checker.parents[context.defined_by],
+                context.defined_in.map(|index| checker.parents[index]),
                 &deleted,
             ) {
                 check.amend(fix);

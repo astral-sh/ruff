@@ -136,14 +136,14 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
 }
 
 /// U010
-/// This fix mirrors the pyflakes::fixes::remove_unused_import_froms, possible
-/// merger of common code into helpers is better
 pub fn remove_unnecessary_future_import(
     locator: &SourceCodeLocator,
-    stmt: &Stmt,
     removable: &[usize],
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
     deleted: &[&Stmt],
 ) -> Result<Fix> {
+    // TODO(charlie): DRY up with pyflakes::fixes::remove_unused_import_froms.
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text)?;
 
@@ -179,7 +179,7 @@ pub fn remove_unnecessary_future_import(
     }
 
     if aliases.is_empty() {
-        autofix::helpers::remove_stmt(stmt, None, deleted)
+        autofix::helpers::remove_stmt(stmt, parent, deleted)
     } else {
         let mut state = Default::default();
         tree.codegen(&mut state);

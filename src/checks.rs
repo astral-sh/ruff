@@ -405,7 +405,7 @@ pub enum CheckKind {
     UsePEP604Annotation,
     SuperCallWithParameters,
     PEP3120UnnecessaryCodingComment,
-    UnnecessaryFutureImports(Vec<String>),
+    UnnecessaryFutureImport(Vec<String>),
     UnnecessaryLRUCacheParams,
     // pydocstyle
     BlankLineAfterLastSection(String),
@@ -635,7 +635,7 @@ impl CheckCode {
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             CheckCode::U009 => CheckKind::PEP3120UnnecessaryCodingComment,
-            CheckCode::U010 => CheckKind::UnnecessaryFutureImports(vec!["...".to_string()]),
+            CheckCode::U010 => CheckKind::UnnecessaryFutureImport(vec!["...".to_string()]),
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
@@ -1017,7 +1017,7 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(_) => &CheckCode::U004,
             CheckKind::SuperCallWithParameters => &CheckCode::U008,
             CheckKind::PEP3120UnnecessaryCodingComment => &CheckCode::U009,
-            CheckKind::UnnecessaryFutureImports(_) => &CheckCode::U010,
+            CheckKind::UnnecessaryFutureImport(_) => &CheckCode::U010,
             CheckKind::UnnecessaryLRUCacheParams => &CheckCode::U011,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
@@ -1466,7 +1466,7 @@ impl CheckKind {
             CheckKind::SuperCallWithParameters => {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
-            CheckKind::UnnecessaryFutureImports(names) => {
+            CheckKind::UnnecessaryFutureImport(names) => {
                 if names.len() == 1 {
                     let import = &names[0];
                     format!("Unnessary __future__ import `{import}` for target Python version")
@@ -1741,7 +1741,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnnecessaryCollectionCall(_)
                 | CheckKind::UnnecessaryComprehension(_)
-                | CheckKind::UnnecessaryFutureImports(_)
+                | CheckKind::UnnecessaryFutureImport(_)
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet
