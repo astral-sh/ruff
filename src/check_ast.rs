@@ -1074,7 +1074,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::U012) {
-                pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
+                    pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
                 }
 
                 // flake8-print
