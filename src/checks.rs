@@ -1879,6 +1879,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnnecessaryCollectionCall(_)
                 | CheckKind::UnnecessaryComprehension(_)
+                | CheckKind::UnnecessaryEncodeUTF8
                 | CheckKind::UnnecessaryFutureImport(_)
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
