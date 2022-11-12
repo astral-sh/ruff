@@ -30,16 +30,16 @@ fn is_immutable_func(expr: &Expr, extend_immutable_calls: &[String]) -> bool {
     )
 }
 
-struct ArgumentDefaultVisitor {
+struct ArgumentDefaultVisitor<'a> {
     checks: Vec<(CheckKind, Range)>,
-    extend_immutable_calls: Vec<String>,
+    extend_immutable_calls: &'a [String],
 }
 
-impl<'a, 'b> Visitor<'b> for ArgumentDefaultVisitor
+impl<'a, 'b> Visitor<'b> for ArgumentDefaultVisitor<'b>
 where
     'b: 'a,
 {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
             ExprKind::Call { func, args, .. } => {
                 if !is_mutable_func(func)
@@ -89,11 +89,7 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
 pub fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
     let mut visitor = ArgumentDefaultVisitor {
         checks: vec![],
-        extend_immutable_calls: checker
-            .settings
-            .flake8_bugbear
-            .extend_immutable_calls
-            .clone(),
+        extend_immutable_calls: &checker.settings.flake8_bugbear.extend_immutable_calls,
     };
     for expr in arguments
         .defaults
