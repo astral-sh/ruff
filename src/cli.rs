@@ -94,6 +94,9 @@ pub struct Cli {
     /// The name of the file when passing it through stdin.
     #[arg(long)]
     pub stdin_filename: Option<String>,
+    /// Show violations with source code.
+    #[arg(long)]
+    pub show_source: bool,
 }
 
 impl Cli {

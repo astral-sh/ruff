@@ -323,7 +323,7 @@ fn inner_main() -> Result<ExitCode> {
     #[cfg(not(target_family = "wasm"))]
     cache::init()?;
 
-    let printer = Printer::new(&cli.format, &log_level);
+    let printer = Printer::new(&cli.format, &log_level, cli.show_source);
     if cli.watch {
         if autofix {
             eprintln!("Warning: --fix is not enabled in watch mode.");

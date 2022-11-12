@@ -1,7 +1,12 @@
 use std::cmp::Ordering;
 use std::fmt;
+use std::fs;
 use std::path::Path;
 
+use annotate_snippets::{
+    display_list::{DisplayList, FormatOptions},
+    snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation},
+};
 use colored::Colorize;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
@@ -60,5 +65,60 @@ impl fmt::Display for Message {
             self.kind.code().as_ref().red().bold(),
             self.kind.body()
         )
+    }
+}
+
+// https://github.com/rust-lang/rust/issues/59346
+impl Message {
+    pub fn to_annotated_source(&self) -> String {
+        let source = fs::read_to_string(&self.filename).unwrap();
+        let error_lines = source
+            .lines()
+            .skip(self.location.row() - 1)
+            .take(self.end_location.row() - self.location.row() + 1)
+            .collect::<Vec<_>>();
+        let range_end = if self.location.row() == self.end_location.row() {
+            self.end_location.column()
+        } else {
+            error_lines
+                .iter()
+                .enumerate()
+                .map(|(row, line)| {
+                    if row == error_lines.len() - 1 {
+                        self.end_location.column()
+                    } else {
+                        line.len() + 1
+                    }
+                })
+                .sum()
+        };
+        let body = self.kind.body();
+        let code = self.kind.code().as_ref();
+        let rel_path = relativize_path(Path::new(&self.filename));
+        let source = error_lines.join("\n");
+        let snippet = Snippet {
+            title: Some(Annotation {
+                label: Some(&body),
+                id: Some(code),
+                annotation_type: AnnotationType::Error,
+            }),
+            footer: vec![],
+            slices: vec![Slice {
+                source: &source,
+                line_start: self.location.row(),
+                origin: Some(&rel_path),
+                fold: false,
+                annotations: vec![SourceAnnotation {
+                    label: "",
+                    annotation_type: AnnotationType::Error,
+                    range: (self.location.column() - 1, range_end - 1),
+                }],
+            }],
+            opt: FormatOptions {
+                color: true,
+                ..Default::default()
+            },
+        };
+        DisplayList::from(snippet).to_string()
     }
 }
