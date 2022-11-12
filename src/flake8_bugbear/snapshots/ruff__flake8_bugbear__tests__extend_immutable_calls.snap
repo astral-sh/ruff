@@ -1,0 +1,13 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind: FunctionCallArgumentDefault
+  location:
+    row: 15
+    column: 66
+  end_location:
+    row: 15
+    column: 77
+  fix: ~
+

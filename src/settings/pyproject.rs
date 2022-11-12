@@ -109,7 +109,7 @@ mod tests {
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
-    use crate::{flake8_quotes, pep8_naming};
+    use crate::{flake8_bugbear, flake8_quotes, pep8_naming};
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -146,6 +146,7 @@ mod tests {
                     src: None,
                     target_version: None,
                     flake8_annotations: None,
+                    flake8_bugbear: None,
                     flake8_quotes: None,
                     isort: None,
                     pep8_naming: None,
@@ -177,6 +178,7 @@ line-length = 79
                     src: None,
                     target_version: None,
                     flake8_annotations: None,
+                    flake8_bugbear: None,
                     flake8_quotes: None,
                     isort: None,
                     pep8_naming: None,
@@ -208,6 +210,7 @@ exclude = ["foo.py"]
                     src: None,
                     target_version: None,
                     flake8_annotations: None,
+                    flake8_bugbear: None,
                     flake8_quotes: None,
                     isort: None,
                     pep8_naming: None,
@@ -239,6 +242,7 @@ select = ["E501"]
                     src: None,
                     target_version: None,
                     flake8_annotations: None,
+                    flake8_bugbear: None,
                     flake8_quotes: None,
                     isort: None,
                     pep8_naming: None,
@@ -271,6 +275,7 @@ ignore = ["E501"]
                     src: None,
                     target_version: None,
                     flake8_annotations: None,
+                    flake8_bugbear: None,
                     flake8_quotes: None,
                     isort: None,
                     pep8_naming: None,
@@ -349,6 +354,12 @@ other-attribute = 1
                 src: None,
                 target_version: None,
                 flake8_annotations: None,
+                flake8_bugbear: Some(flake8_bugbear::settings::Options {
+                    extend_immutable_calls: Some(vec![
+                        "fastapi.Depends".to_string(),
+                        "fastapi.Query".to_string(),
+                    ]),
+                }),
                 flake8_quotes: Some(flake8_quotes::settings::Options {
                     inline_quotes: Some(Quote::Single),
                     multiline_quotes: Some(Quote::Double),
