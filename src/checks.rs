@@ -1393,11 +1393,9 @@ impl CheckKind {
             CheckKind::UselessExpression => {
                 "Found useless expression. Either assign it to a variable or remove it.".to_string()
             }
-            CheckKind::CachedInstanceMethod => {
-                "Use of `functools.lru_cache` or `functools.cache` on \
-                                            methods can lead to memory leaks."
-                    .to_string()
-            }
+            CheckKind::CachedInstanceMethod => "Use of `functools.lru_cache` or `functools.cache` \
+                                                on methods can lead to memory leaks."
+                .to_string(),
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
             }

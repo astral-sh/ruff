@@ -1,8 +1,7 @@
 use rustpython_ast::Expr;
 
 use crate::ast::helpers::compose_call_path;
-use crate::ast::types::Range;
-use crate::ast::types::ScopeKind;
+use crate::ast::types::{Range, ScopeKind};
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
