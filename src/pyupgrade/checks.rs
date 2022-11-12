@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
-use itertools::Itertools;
-use rustpython_ast::{AliasData, Constant, KeywordData, Located};
+use rustpython_ast::{Constant, KeywordData};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
@@ -9,29 +8,6 @@ use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::types::Primitive;
 use crate::settings::types::PythonVersion;
-
-pub const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
-    "nested_scopes",
-    "generators",
-    "with_statement",
-    "division",
-    "absolute_import",
-    "with_statement",
-    "print_function",
-    "unicode_literals",
-];
-
-pub const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
-    "nested_scopes",
-    "generators",
-    "with_statement",
-    "division",
-    "absolute_import",
-    "with_statement",
-    "print_function",
-    "unicode_literals",
-    "generator_stop",
-];
 
 /// U008
 pub fn super_args(
@@ -181,35 +157,6 @@ pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<
         }
     }
 
-    None
-}
-
-/// U010
-pub fn unnecessary_future_import(
-    version: PythonVersion,
-    names: &[Located<AliasData>],
-    location: Range,
-) -> Option<Check> {
-    let removable = names
-        .iter()
-        .filter_map(|alias| {
-            let name = &alias.node.name.as_str();
-            if (version >= PythonVersion::Py33 && PY33_PLUS_REMOVE_FUTURES.contains(name))
-                || (version >= PythonVersion::Py37 && PY37_PLUS_REMOVE_FUTURES.contains(name))
-            {
-                Some(name.to_string())
-            } else {
-                None
-            }
-        })
-        .join(", ");
-
-    if !removable.is_empty() {
-        return Some(Check::new(
-            CheckKind::UnnecessaryFutureImports(removable),
-            location,
-        ));
-    }
     None
 }
 

@@ -405,7 +405,7 @@ pub enum CheckKind {
     UsePEP604Annotation,
     SuperCallWithParameters,
     PEP3120UnnecessaryCodingComment,
-    UnnecessaryFutureImports(String),
+    UnnecessaryFutureImports(Vec<String>),
     UnnecessaryLRUCacheParams,
     // pydocstyle
     BlankLineAfterLastSection(String),
@@ -635,7 +635,7 @@ impl CheckCode {
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             CheckCode::U009 => CheckKind::PEP3120UnnecessaryCodingComment,
-            CheckCode::U010 => CheckKind::UnnecessaryFutureImports("...".to_string()),
+            CheckCode::U010 => CheckKind::UnnecessaryFutureImports(vec!["...".to_string()]),
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
@@ -1466,8 +1466,14 @@ impl CheckKind {
             CheckKind::SuperCallWithParameters => {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
-            CheckKind::UnnecessaryFutureImports(name) => {
-                format!("Unnessary __future__ import(s) `{name}` for target Python version")
+            CheckKind::UnnecessaryFutureImports(names) => {
+                if names.len() == 1 {
+                    let import = &names[0];
+                    format!("Unnessary __future__ import `{import}` for target Python version")
+                } else {
+                    let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
+                    format!("Unnessary __future__ imports `{imports}` for target Python version")
+                }
             }
             CheckKind::UnnecessaryLRUCacheParams => {
                 "Unnessary parameters to functools.lru_cache".to_string()
