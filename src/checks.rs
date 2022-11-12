@@ -1610,7 +1610,7 @@ impl CheckKind {
                 }
             }
             CheckKind::UnnecessaryLRUCacheParams => {
-                "Unnecessary parameters to functools.lru_cache".to_string()
+                "Unnecessary parameters to `functools.lru_cache`".to_string()
             }
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
             // pydocstyle
