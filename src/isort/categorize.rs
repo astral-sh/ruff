@@ -45,9 +45,6 @@ pub fn categorize(
 static STATIC_CLASSIFICATIONS: Lazy<BTreeMap<&'static str, ImportType>> = Lazy::new(|| {
     BTreeMap::from([
         ("__future__", ImportType::Future),
-        ("__main__", ImportType::FirstParty),
-        // Force `disutils` to be considered third-party.
-        ("disutils", ImportType::ThirdParty),
         // Relative imports (e.g., `from . import module`).
         ("", ImportType::FirstParty),
     ])
