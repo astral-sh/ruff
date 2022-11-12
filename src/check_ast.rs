@@ -38,20 +38,6 @@ use crate::{
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
-const TRACK_FROM_IMPORTS: [&str; 12] = [
-    "collections",
-    "collections.abc",
-    "contextlib",
-    "functools",
-    "re",
-    "six",
-    "sys",
-    "typing",
-    "typing.io",
-    "typing.re",
-    "typing_extensions",
-    "weakref",
-];
 
 pub struct Checker<'a> {
     // Input data.
@@ -590,17 +576,15 @@ where
                 // references like `from typing import Union`.
                 if level.map(|level| level == 0).unwrap_or(true) {
                     if let Some(module) = module {
-                        if TRACK_FROM_IMPORTS.contains(&module.as_str()) {
-                            self.from_imports
-                                .entry(module)
-                                .or_insert_with(FnvHashSet::default)
-                                .extend(
-                                    names
-                                        .iter()
-                                        .filter(|alias| alias.node.asname.is_none())
-                                        .map(|alias| alias.node.name.as_str()),
-                                )
-                        }
+                        self.from_imports
+                            .entry(module)
+                            .or_insert_with(FnvHashSet::default)
+                            .extend(
+                                names
+                                    .iter()
+                                    .filter(|alias| alias.node.asname.is_none())
+                                    .map(|alias| alias.node.name.as_str()),
+                            )
                     }
                 }
 
