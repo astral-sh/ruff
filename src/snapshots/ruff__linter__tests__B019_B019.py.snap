@@ -1,0 +1,69 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: CachedInstanceMethod
+  location:
+    row: 78
+    column: 5
+  end_location:
+    row: 78
+    column: 20
+  fix: ~
+- kind: CachedInstanceMethod
+  location:
+    row: 82
+    column: 5
+  end_location:
+    row: 82
+    column: 10
+  fix: ~
+- kind: CachedInstanceMethod
+  location:
+    row: 86
+    column: 5
+  end_location:
+    row: 86
+    column: 22
+  fix: ~
+- kind: CachedInstanceMethod
+  location:
+    row: 90
+    column: 5
+  end_location:
+    row: 90
+    column: 12
+  fix: ~
+- kind: CachedInstanceMethod
+  location:
+    row: 94
+    column: 5
+  end_location:
+    row: 94
+    column: 24
+  fix: ~
+- kind: CachedInstanceMethod
+  location:
+    row: 98
+    column: 5
+  end_location:
+    row: 98
+    column: 14
+  fix: ~
+- kind: CachedInstanceMethod
+  location:
+    row: 102
+    column: 5
+  end_location:
+    row: 102
+    column: 26
+  fix: ~
+- kind: CachedInstanceMethod
+  location:
+    row: 106
+    column: 5
+  end_location:
+    row: 106
+    column: 16
+  fix: ~
+

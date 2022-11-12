@@ -93,6 +93,7 @@ pub enum CheckCode {
     B016,
     B017,
     B018,
+    B019,
     B025,
     B026,
     // flake8-comprehensions
@@ -380,6 +381,7 @@ pub enum CheckKind {
     CannotRaiseLiteral,
     NoAssertRaisesException,
     UselessExpression,
+    CachedInstanceMethod,
     DuplicateTryBlockException(String),
     StarArgUnpackingAfterKeywordArg,
     // flake8-comprehensions
@@ -610,6 +612,7 @@ impl CheckCode {
             CheckCode::B016 => CheckKind::CannotRaiseLiteral,
             CheckCode::B017 => CheckKind::NoAssertRaisesException,
             CheckCode::B018 => CheckKind::UselessExpression,
+            CheckCode::B019 => CheckKind::CachedInstanceMethod,
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
             CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
             // flake8-comprehensions
@@ -841,6 +844,7 @@ impl CheckCode {
             CheckCode::B016 => CheckCategory::Flake8Bugbear,
             CheckCode::B017 => CheckCategory::Flake8Bugbear,
             CheckCode::B018 => CheckCategory::Flake8Bugbear,
+            CheckCode::B019 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
@@ -1036,6 +1040,7 @@ impl CheckKind {
             CheckKind::CannotRaiseLiteral => &CheckCode::B016,
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::UselessExpression => &CheckCode::B018,
+            CheckKind::CachedInstanceMethod => &CheckCode::B019,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
             CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             // flake8-comprehensions
@@ -1387,6 +1392,11 @@ impl CheckKind {
             }
             CheckKind::UselessExpression => {
                 "Found useless expression. Either assign it to a variable or remove it.".to_string()
+            }
+            CheckKind::CachedInstanceMethod => {
+                "Use of `functools.lru_cache` or `functools.cache` on \
+                                            methods can lead to memory leaks."
+                    .to_string()
             }
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
