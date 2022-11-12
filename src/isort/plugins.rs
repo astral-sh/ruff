@@ -5,7 +5,7 @@ use crate::ast::types::Range;
 use crate::autofix::{fixer, Fix};
 use crate::checks::CheckKind;
 use crate::docstrings::helpers::leading_space;
-use crate::isort::sort_imports;
+use crate::isort::format_imports;
 use crate::{Check, Settings, SourceCodeLocator};
 
 fn extract_range(body: &[&Stmt]) -> Range {
@@ -62,7 +62,7 @@ pub fn check_imports(
     let has_trailing_content = match_trailing_content(&body, locator);
 
     // Generate the sorted import block.
-    let expected = sort_imports(
+    let expected = format_imports(
         body,
         &settings.line_length,
         &settings.src,
