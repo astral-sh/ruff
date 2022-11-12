@@ -1,8 +1,8 @@
 use rustpython_ast::{ArgData, Arguments, Expr, Located};
 
-use super::super::helpers::{matches_password_name, string_literal};
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
+use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Check> {
     if let Some(string) = string_literal(default) {

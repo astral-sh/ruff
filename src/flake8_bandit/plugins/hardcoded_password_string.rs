@@ -1,8 +1,8 @@
 use rustpython_ast::{Constant, Expr, ExprKind};
 
-use super::super::helpers::{matches_password_name, string_literal};
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
+use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 fn is_password_target(target: &Expr) -> bool {
     let target_name = match &target.node {
@@ -26,19 +26,20 @@ fn is_password_target(target: &Expr) -> bool {
 
 /// S105
 pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -> Vec<Check> {
-    let mut checks: Vec<Check> = Vec::new();
-
-    comparators.iter().for_each(|comp| {
-        if let Some(string) = string_literal(comp) {
-            if is_password_target(left) {
-                checks.push(Check::new(
-                    CheckKind::HardcodedPasswordString(string.to_string()),
-                    Range::from_located(comp),
-                ));
+    comparators
+        .iter()
+        .filter_map(|comp| {
+            if let Some(string) = string_literal(comp) {
+                if is_password_target(left) {
+                    return Some(Check::new(
+                        CheckKind::HardcodedPasswordString(string.to_string()),
+                        Range::from_located(comp),
+                    ));
+                }
             }
-        }
-    });
-    checks
+            None
+        })
+        .collect()
 }
 
 /// S105
