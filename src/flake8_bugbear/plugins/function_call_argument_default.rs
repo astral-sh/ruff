@@ -8,6 +8,7 @@ use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::flake8_bugbear::plugins::mutable_argument_default::is_mutable_func;
 
+// TODO(charlie): Verify imports for each of the imported members.
 const IMMUTABLE_FUNCS: [&str; 11] = [
     "tuple",
     "frozenset",
