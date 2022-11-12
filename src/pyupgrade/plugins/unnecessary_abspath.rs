@@ -5,6 +5,7 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::pyupgrade::checks;
 
+/// U002
 pub fn unnecessary_abspath(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if let Some(mut check) = checks::unnecessary_abspath(func, args, Range::from_located(expr)) {
         if checker.patch() {

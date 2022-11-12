@@ -131,50 +131,69 @@ expression: checks
     column: 41
   fix:
     patch:
-      content: pass
-      location:
-        row: 9
-        column: 4
-      end_location:
-        row: 9
-        column: 41
-    applied: false
-- kind:
-    UnnecessaryFutureImport:
-      - generator_stop
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 12
-    column: 41
-  fix:
-    patch:
       content: ""
       location:
-        row: 12
+        row: 9
         column: 0
       end_location:
-        row: 13
+        row: 10
         column: 0
     applied: false
 - kind:
     UnnecessaryFutureImport:
       - generators
   location:
+    row: 10
+    column: 4
+  end_location:
+    row: 10
+    column: 37
+  fix:
+    patch:
+      content: pass
+      location:
+        row: 10
+        column: 4
+      end_location:
+        row: 10
+        column: 37
+    applied: false
+- kind:
+    UnnecessaryFutureImport:
+      - generator_stop
+  location:
     row: 13
     column: 4
   end_location:
     row: 13
+    column: 41
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 13
+        column: 0
+      end_location:
+        row: 14
+        column: 0
+    applied: false
+- kind:
+    UnnecessaryFutureImport:
+      - generators
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
     column: 53
   fix:
     patch:
       content: from __future__ import invalid_module
       location:
-        row: 13
+        row: 14
         column: 4
       end_location:
-        row: 13
+        row: 14
         column: 53
     applied: false
 

@@ -2411,16 +2411,20 @@ impl<'a> Checker<'a> {
                             .iter()
                             .map(|index| self.parents[*index])
                             .collect();
-
-                        let removal_fn = match kind {
+                        match match kind {
                             ImportKind::Import => pyflakes::fixes::remove_unused_imports,
                             ImportKind::ImportFrom => pyflakes::fixes::remove_unused_import_froms,
-                        };
-
-                        match removal_fn(self.locator, &full_names, child, parent, &deleted) {
-                            Ok(fix) => Some(fix),
+                        }(
+                            self.locator, &full_names, child, parent, &deleted
+                        ) {
+                            Ok(fix) => {
+                                if fix.patch.content.is_empty() || fix.patch.content == "pass" {
+                                    self.deletions.insert(defined_by);
+                                }
+                                Some(fix)
+                            }
                             Err(e) => {
-                                error!("Failed to fix unused imports: {}", e);
+                                error!("Failed to remove unused imports: {}", e);
                                 None
                             }
                         }
