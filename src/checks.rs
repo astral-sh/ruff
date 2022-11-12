@@ -442,7 +442,7 @@ pub enum CheckKind {
     UsePEP604Annotation,
     SuperCallWithParameters,
     PEP3120UnnecessaryCodingComment,
-    UnnecessaryFutureImport(String),
+    UnnecessaryFutureImport(Vec<String>),
     UnnecessaryLRUCacheParams,
     // pydocstyle
     BlankLineAfterLastSection(String),
@@ -689,7 +689,7 @@ impl CheckCode {
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             CheckCode::U009 => CheckKind::PEP3120UnnecessaryCodingComment,
-            CheckCode::U010 => CheckKind::UnnecessaryFutureImport("...".to_string()),
+            CheckCode::U010 => CheckKind::UnnecessaryFutureImport(vec!["...".to_string()]),
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
@@ -1595,11 +1595,17 @@ impl CheckKind {
             CheckKind::SuperCallWithParameters => {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
-            CheckKind::UnnecessaryFutureImport(name) => {
-                format!("Unnessary __future__ import `{name}` for target Python version")
+            CheckKind::UnnecessaryFutureImport(names) => {
+                if names.len() == 1 {
+                    let import = &names[0];
+                    format!("Unnecessary `__future__` import `{import}` for target Python version")
+                } else {
+                    let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
+                    format!("Unnecessary `__future__` imports {imports} for target Python version")
+                }
             }
             CheckKind::UnnecessaryLRUCacheParams => {
-                "Unnessary parameters to functools.lru_cache".to_string()
+                "Unnecessary parameters to functools.lru_cache".to_string()
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
@@ -1867,6 +1873,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnnecessaryCollectionCall(_)
                 | CheckKind::UnnecessaryComprehension(_)
+                | CheckKind::UnnecessaryFutureImport(_)
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet
