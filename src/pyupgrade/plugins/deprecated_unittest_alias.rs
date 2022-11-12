@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-
+use fnv::FnvHashMap;
 use once_cell::sync::Lazy;
 use rustpython_ast::{Expr, ExprKind};
 
@@ -8,8 +7,8 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-static DEPRECATED_ALIASES: Lazy<BTreeMap<&'static str, &'static str>> = Lazy::new(|| {
-    BTreeMap::from([
+static DEPRECATED_ALIASES: Lazy<FnvHashMap<&'static str, &'static str>> = Lazy::new(|| {
+    FnvHashMap::from_iter([
         ("failUnlessEqual", "assertEqual"),
         ("assertEquals", "assertEqual"),
         ("failIfEqual", "assertNotEqual"),

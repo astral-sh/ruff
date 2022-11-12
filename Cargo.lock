@@ -2253,6 +2253,7 @@ dependencies = [
  "dirs 4.0.0",
  "fern",
  "filetime",
+ "fnv",
  "getrandom 0.2.8",
  "glob",
  "insta",

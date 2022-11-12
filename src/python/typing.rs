@@ -1,11 +1,10 @@
-use std::collections::{BTreeMap, BTreeSet};
-
+use fnv::{FnvHashMap, FnvHashSet};
 use once_cell::sync::Lazy;
 use rustpython_ast::{Expr, ExprKind};
 
 // See: https://pypi.org/project/typing-extensions/
-static TYPING_EXTENSIONS: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
-    BTreeSet::from([
+static TYPING_EXTENSIONS: Lazy<FnvHashSet<&'static str>> = Lazy::new(|| {
+    FnvHashSet::from_iter([
         "Annotated",
         "Any",
         "AsyncContextManager",
@@ -64,9 +63,9 @@ pub fn in_extensions(name: &str) -> bool {
 }
 
 // See: https://docs.python.org/3/library/typing.html
-static IMPORTED_SUBSCRIPTS: Lazy<BTreeMap<&'static str, BTreeSet<&'static str>>> =
+static IMPORTED_SUBSCRIPTS: Lazy<FnvHashMap<&'static str, FnvHashSet<&'static str>>> =
     Lazy::new(|| {
-        let mut import_map = BTreeMap::new();
+        let mut import_map = FnvHashMap::default();
         for (name, module) in [
             // `collections`
             ("ChainMap", "collections"),
@@ -183,7 +182,7 @@ static IMPORTED_SUBSCRIPTS: Lazy<BTreeMap<&'static str, BTreeSet<&'static str>>>
         ] {
             import_map
                 .entry(name)
-                .or_insert_with(BTreeSet::new)
+                .or_insert_with(FnvHashSet::default)
                 .insert(module);
         }
         import_map
@@ -191,13 +190,13 @@ static IMPORTED_SUBSCRIPTS: Lazy<BTreeMap<&'static str, BTreeSet<&'static str>>>
 
 // These are all assumed to come from the `typing` module.
 // See: https://peps.python.org/pep-0585/
-static PEP_585_BUILTINS_ELIGIBLE: Lazy<BTreeSet<&'static str>> =
-    Lazy::new(|| BTreeSet::from(["Dict", "FrozenSet", "List", "Set", "Tuple", "Type"]));
+static PEP_585_BUILTINS_ELIGIBLE: Lazy<FnvHashSet<&'static str>> =
+    Lazy::new(|| FnvHashSet::from_iter(["Dict", "FrozenSet", "List", "Set", "Tuple", "Type"]));
 
 // These are all assumed to come from the `typing` module.
 // See: https://peps.python.org/pep-0585/
-static PEP_585_BUILTINS: Lazy<BTreeSet<&'static str>> =
-    Lazy::new(|| BTreeSet::from(["dict", "frozenset", "list", "set", "tuple", "type"]));
+static PEP_585_BUILTINS: Lazy<FnvHashSet<&'static str>> =
+    Lazy::new(|| FnvHashSet::from_iter(["dict", "frozenset", "list", "set", "tuple", "type"]));
 
 fn is_pep593_annotated_subscript(name: &str) -> bool {
     name == "Annotated"
@@ -210,7 +209,7 @@ pub enum SubscriptKind {
 
 pub fn match_annotated_subscript(
     expr: &Expr,
-    imports: &BTreeMap<&str, BTreeSet<&str>>,
+    imports: &FnvHashMap<&str, FnvHashSet<&str>>,
 ) -> Option<SubscriptKind> {
     match &expr.node {
         ExprKind::Attribute { attr, value, .. } => {
@@ -261,7 +260,7 @@ pub fn match_annotated_subscript(
 /// Returns `true` if `Expr` represents a reference to a typing object with a
 /// PEP 585 built-in. Note that none of the PEP 585 built-ins are in
 /// `typing_extensions`.
-pub fn is_pep585_builtin(expr: &Expr, typing_imports: Option<&BTreeSet<&str>>) -> bool {
+pub fn is_pep585_builtin(expr: &Expr, typing_imports: Option<&FnvHashSet<&str>>) -> bool {
     match &expr.node {
         ExprKind::Attribute { attr, value, .. } => {
             if let ExprKind::Name { id, .. } = &value.node {
