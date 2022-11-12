@@ -4,10 +4,10 @@ expression: checks
 ---
 - kind: FunctionCallArgumentDefault
   location:
-    row: 16
-    column: 66
+    row: 19
+    column: 50
   end_location:
-    row: 16
-    column: 77
+    row: 19
+    column: 63
   fix: ~
 

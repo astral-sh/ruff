@@ -4,14 +4,17 @@ import fastapi
 from fastapi import Query
 
 
-def this_is_okay_extended(db=fastapi.Depends(get_db)):
+def okay(db=fastapi.Depends(get_db)):
     ...
 
 
-def this_is_okay_extended_second(data: List[str] = fastapi.Query(None)):
+def okay(data: List[str] = fastapi.Query(None)):
     ...
 
 
-# TODO(charlie): Support `import from`.
-def this_is_not_okay_relative_import_not_listed(data: List[str] = Query(None)):
+def okay(data: List[str] = Query(None)):
+    ...
+
+
+def error_due_to_missing_import(data: List[str] = Depends(None)):
     ...

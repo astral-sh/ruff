@@ -1,33 +1,53 @@
+use crate::ast::helpers::compose_call_path;
+use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-// TODO(charlie): Verify imports for each of the imported members.
-pub fn is_mutable_func(expr: &Expr) -> bool {
-    match &expr.node {
-        ExprKind::Name { id, .. }
-            if id == "dict"
-                || id == "list"
-                || id == "set"
-                || id == "Counter"
-                || id == "OrderedDict"
-                || id == "defaultdict"
-                || id == "deque" =>
-        {
-            true
-        }
-        ExprKind::Attribute { value, attr, .. }
-            if (attr == "Counter"
-                || attr == "OrderedDict"
-                || attr == "defaultdict"
-                || attr == "deque") =>
-        {
-            matches!(&value.node, ExprKind::Name { id, .. } if id == "collections")
-        }
-        _ => false,
-    }
+const MUTABLE_FUNCS: [&str; 7] = [
+    "dict",
+    "list",
+    "set",
+    "collections.Counter",
+    "collections.OrderedDict",
+    "collections.defaultdict",
+    "collections.deque",
+];
+
+pub fn is_mutable_func(expr: &Expr, from_imports: &FnvHashMap<&str, FnvHashSet<&str>>) -> bool {
+    compose_call_path(expr).map_or_else(
+        || false,
+        |call_path| {
+            // It matches the call path exactly (`collections.Counter`).
+            for target in MUTABLE_FUNCS {
+                if call_path == target {
+                    return true;
+                }
+            }
+
+            // It matches the member name, and was imported from that module (`Counter`
+            // following `from collections import Counter`).
+            if !call_path.contains('.') {
+                for target in MUTABLE_FUNCS {
+                    let mut splitter = target.rsplit('.');
+                    if let (Some(member), Some(module)) = (splitter.next(), splitter.next()) {
+                        if call_path == member
+                            && from_imports
+                                .get(module)
+                                .map(|module| module.contains(member))
+                                .unwrap_or(false)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            false
+        },
+    )
 }
 
 /// B006
@@ -50,7 +70,7 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
                 ));
             }
             ExprKind::Call { func, .. } => {
-                if is_mutable_func(func) {
+                if is_mutable_func(func, &checker.from_imports) {
                     checker.add_check(Check::new(
                         CheckKind::MutableArgumentDefault,
                         Range::from_located(expr),
