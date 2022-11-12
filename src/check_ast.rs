@@ -346,6 +346,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::B018) {
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
+                if self.settings.enabled.contains(&CheckCode::B019) {
+                    flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
+                }
 
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
 

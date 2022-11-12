@@ -511,6 +511,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B016 | CannotRaiseLiteral | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
+| B019 | CachedInstanceMethod | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
 | B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged. |  |
 
@@ -684,7 +685,7 @@ including:
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (20/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
@@ -708,7 +709,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (20/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
