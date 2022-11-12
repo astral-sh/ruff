@@ -1236,7 +1236,7 @@ impl CheckKind {
             CheckKind::BreakOutsideLoop => "`break` outside loop".to_string(),
             CheckKind::ContinueOutsideLoop => "`continue` not properly in loop".to_string(),
             CheckKind::DefaultExceptNotLast => {
-                "An `except:` block as not the last exception handler".to_string()
+                "An `except` block as not the last exception handler".to_string()
             }
             CheckKind::DoNotAssignLambda => {
                 "Do not assign a lambda expression, use a def".to_string()
@@ -1373,17 +1373,17 @@ impl CheckKind {
                                                 `+(+(n))`, which equals `n`. You meant `n += 1`."
                 .to_string(),
             CheckKind::AssignmentToOsEnviron => {
-                "Assigning to `os.environ` doesn't clear the environment.".to_string()
+                "Assigning to `os.environ` doesn't clear the environment".to_string()
             }
             CheckKind::UnreliableCallableCheck => " Using `hasattr(x, '__call__')` to test if x \
                                                    is callable is unreliable. Use `callable(x)` \
                                                    for consistent results."
                 .to_string(),
-            CheckKind::StripWithMultiCharacters => "Using `.strip()` with multi-character strings \
-                                                    is misleading the reader."
-                .to_string(),
+            CheckKind::StripWithMultiCharacters => {
+                "Using `.strip()` with multi-character strings is misleading the reader".to_string()
+            }
             CheckKind::MutableArgumentDefault => {
-                "Do not use mutable data structures for argument defaults.".to_string()
+                "Do not use mutable data structures for argument defaults".to_string()
             }
             CheckKind::UnusedLoopControlVariable(name) => format!(
                 "Loop control variable `{name}` not used within the loop body. If this is \
@@ -1397,11 +1397,11 @@ impl CheckKind {
                 }
             }
             CheckKind::GetAttrWithConstant => "Do not call `getattr` with a constant attribute \
-                                               value, it is not any safer than normal property \
+                                               value. It is not any safer than normal property \
                                                access."
                 .to_string(),
             CheckKind::SetAttrWithConstant => "Do not call `setattr` with a constant attribute \
-                                               value, it is not any safer than normal property \
+                                               value. It is not any safer than normal property \
                                                access."
                 .to_string(),
             CheckKind::DoNotAssertFalse => "Do not `assert False` (`python -O` removes these \
@@ -1409,8 +1409,8 @@ impl CheckKind {
                 .to_string(),
             CheckKind::RedundantTupleInExceptionHandler(name) => {
                 format!(
-                    "A length-one tuple literal is redundant. Write `except {name}:` instead of \
-                     `except ({name},):`."
+                    "A length-one tuple literal is redundant. Write `except {name}` instead of \
+                     `except ({name},)`."
                 )
             }
             CheckKind::UselessComparison => "Pointless comparison. This comparison does nothing \
@@ -1430,7 +1430,7 @@ impl CheckKind {
                 }
             }
             CheckKind::NoAssertRaisesException => {
-                "`assertRaises(Exception):` should be considered evil. It can lead to your test \
+                "`assertRaises(Exception)` should be considered evil. It can lead to your test \
                  passing even if the code being tested is never executed due to a typo. Either \
                  assert for a more specific exception (builtin or custom), use \
                  `assertRaisesRegex`, or use the context manager form of `assertRaises`."
@@ -1440,16 +1440,15 @@ impl CheckKind {
                 "Found useless expression. Either assign it to a variable or remove it.".to_string()
             }
             CheckKind::CachedInstanceMethod => "Use of `functools.lru_cache` or `functools.cache` \
-                                                on methods can lead to memory leaks."
+                                                on methods can lead to memory leaks"
                 .to_string(),
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
             }
             CheckKind::StarArgUnpackingAfterKeywordArg => {
-                "Star-arg unpacking after a keyword argument is strongly discouraged, because it \
-                 only works when the keyword parameter is declared after all parameters supplied \
-                 by the unpacked sequence, and this change of ordering can surprise and mislead \
-                 readers."
+                "Star-arg unpacking after a keyword argument is strongly discouraged. It only \
+                 works when the keyword parameter is declared after all parameters supplied by the \
+                 unpacked sequence, and this change of ordering can surprise and mislead readers."
                     .to_string()
             }
             // flake8-comprehensions
@@ -1707,7 +1706,7 @@ impl CheckKind {
             CheckKind::PublicNestedClass => "Missing docstring in public nested class".to_string(),
             CheckKind::PublicInit => "Missing docstring in `__init__`".to_string(),
             CheckKind::NoThisPrefix => {
-                "First word of the docstring should not be 'This'".to_string()
+                "First word of the docstring should not be \"This\"".to_string()
             }
             CheckKind::SkipDocstring => {
                 "Function decorated with `@overload` shouldn't contain a docstring".to_string()
@@ -1815,7 +1814,7 @@ impl CheckKind {
                 format!("Exception name `{name}` should be named with an Error suffix")
             }
             CheckKind::PEP3120UnnecessaryCodingComment => {
-                "utf-8 encoding declaration is unnecessary".to_string()
+                "UTF-8 encoding declaration is unnecessary".to_string()
             }
             // isort
             CheckKind::UnsortedImports => "Import block is un-sorted or un-formatted".to_string(),
@@ -1826,13 +1825,13 @@ impl CheckKind {
                 "Possible binding to all interfaces".to_string()
             }
             CheckKind::HardcodedPasswordString(string) => {
-                format!("Possible hardcoded password: `'{string}'`")
+                format!("Possible hardcoded password: `\"{string}\"`")
             }
             CheckKind::HardcodedPasswordFuncArg(string) => {
-                format!("Possible hardcoded password: `'{string}'`")
+                format!("Possible hardcoded password: `\"{string}\"`")
             }
             CheckKind::HardcodedPasswordDefault(string) => {
-                format!("Possible hardcoded password: `'{string}'`")
+                format!("Possible hardcoded password: `\"{string}\"`")
             }
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
@@ -1878,16 +1877,16 @@ impl CheckKind {
     pub fn summary(&self) -> String {
         match self {
             CheckKind::UnaryPrefixIncrement => {
-                "Python does not support the unary prefix increment.".to_string()
+                "Python does not support the unary prefix increment".to_string()
             }
             CheckKind::UnusedLoopControlVariable(name) => {
-                format!("Loop control variable `{name}` not used within the loop body.")
+                format!("Loop control variable `{name}` not used within the loop body")
             }
             CheckKind::NoAssertRaisesException => {
-                "`assertRaises(Exception):` should be considered evil.".to_string()
+                "`assertRaises(Exception)` should be considered evil".to_string()
             }
             CheckKind::StarArgUnpackingAfterKeywordArg => {
-                "Star-arg unpacking after a keyword argument is strongly discouraged.".to_string()
+                "Star-arg unpacking after a keyword argument is strongly discouraged".to_string()
             }
             _ => self.body(),
         }

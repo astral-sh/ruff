@@ -409,7 +409,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D400 | EndsInPeriod | First line should end with a period |  |
 | D402 | NoSignature | First line should not be the function's signature |  |
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |
-| D404 | NoThisPrefix | First word of the docstring should not be 'This' |  |
+| D404 | NoThisPrefix | First word of the docstring should not be "This" |  |
 | D405 | CapitalizeSectionName | Section name should be properly capitalized ("returns") | 🛠 |
 | D406 | NewLineAfterSectionName | Section name should end with a newline ("Returns") | 🛠 |
 | D407 | DashedUnderlineAfterSection | Missing dashed underline after section ("Returns") | 🛠 |
@@ -440,7 +440,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
-| U009 | PEP3120UnnecessaryCodingComment | utf-8 encoding declaration is unnecessary | 🛠 |
+| U009 | PEP3120UnnecessaryCodingComment | UTF-8 encoding declaration is unnecessary | 🛠 |
 | U010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
 | U011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
 | U012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
@@ -476,9 +476,9 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S101 | AssertUsed | Use of `assert` detected |  |
 | S102 | ExecUsed | Use of `exec` detected |  |
 | S104 | HardcodedBindAllInterfaces | Possible binding to all interfaces |  |
-| S105 | HardcodedPasswordString | Possible hardcoded password: `'...'` |  |
-| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `'...'` |  |
-| S107 | HardcodedPasswordDefault | Possible hardcoded password: `'...'` |  |
+| S105 | HardcodedPasswordString | Possible hardcoded password: `"..."` |  |
+| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `"..."` |  |
+| S107 | HardcodedPasswordDefault | Possible hardcoded password: `"..."` |  |
 
 ### flake8-comprehensions
 
@@ -509,25 +509,25 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment. |  |
-| B003 | AssignmentToOsEnviron | Assigning to `os.environ` doesn't clear the environment. |  |
+| B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment |  |
+| B003 | AssignmentToOsEnviron | Assigning to `os.environ` doesn't clear the environment |  |
 | B004 | UnreliableCallableCheck |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
-| B005 | StripWithMultiCharacters | Using `.strip()` with multi-character strings is misleading the reader. |  |
-| B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults. |  |
-| B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body. | 🛠 |
+| B005 | StripWithMultiCharacters | Using `.strip()` with multi-character strings is misleading the reader |  |
+| B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults |  |
+| B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body | 🛠 |
 | B008 | FunctionCallArgumentDefault | Do not perform function call in argument defaults |  |
-| B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value, it is not any safer than normal property access. | 🛠 |
-| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value, it is not any safer than normal property access. |  |
+| B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
+| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. |  |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError:` instead of `except (ValueError,):`. |  |
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
 | B015 | UselessComparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
 | B016 | CannotRaiseLiteral | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
-| B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
+| B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
-| B019 | CachedInstanceMethod | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks. |  |
+| B019 | CachedInstanceMethod | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
-| B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged. |  |
+| B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged |  |
 
 ### flake8-builtins
 
