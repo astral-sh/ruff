@@ -16,9 +16,7 @@ pub struct Settings {
 impl Settings {
     pub fn from_options(options: Options) -> Self {
         Self {
-            extend_immutable_calls: options
-                .extend_immutable_calls
-                .unwrap_or_default()
+            extend_immutable_calls: options.extend_immutable_calls.unwrap_or_default(),
         }
     }
 }
