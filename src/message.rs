@@ -79,8 +79,8 @@ impl Message {
             error_lines
                 .iter()
                 .enumerate()
-                .map(|(row, line)| {
-                    if row == error_lines.len() - 1 {
+                .map(|(i, line)| {
+                    if i == error_lines.len() - 1 {
                         self.end_location.column()
                     } else {
                         line.len() + 1
