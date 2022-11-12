@@ -32,17 +32,19 @@ use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_annotations, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_print, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    docstrings, flake8_2020, flake8_annotations, flake8_bugbear, flake8_builtins,
+    flake8_comprehensions, flake8_print, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
-const TRACK_FROM_IMPORTS: [&str; 10] = [
+const TRACK_FROM_IMPORTS: [&str; 12] = [
     "collections",
     "collections.abc",
     "contextlib",
     "functools",
     "re",
+    "six",
+    "sys",
     "typing",
     "typing.io",
     "typing.re",
@@ -115,6 +117,7 @@ impl<'a> Checker<'a> {
             deferred_functions: Default::default(),
             deferred_lambdas: Default::default(),
             deferred_assignments: Default::default(),
+            // Internal, derivative state.
             visible_scope: VisibleScope {
                 modifier: Modifier::Module,
                 visibility: module_visibility(path),
@@ -342,6 +345,9 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::B018) {
                     flake8_bugbear::plugins::useless_expression(self, body);
+                }
+                if self.settings.enabled.contains(&CheckCode::B019) {
+                    flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
                 }
 
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
@@ -600,6 +606,12 @@ where
                     }
                 }
 
+                if let Some("__future__") = module.as_deref() {
+                    if self.settings.enabled.contains(&CheckCode::U010) {
+                        pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
+                    }
+                }
+
                 for alias in names {
                     if let Some("__future__") = module.as_deref() {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -630,14 +642,6 @@ where
                                     Range::from_located(stmt),
                                 ));
                             }
-                        }
-
-                        if self.settings.enabled.contains(&CheckCode::U010) {
-                            pyupgrade::plugins::unnecessary_future_import(
-                                self,
-                                stmt,
-                                &alias.node.name,
-                            );
                         }
 
                         if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
@@ -983,6 +987,14 @@ where
                 if self.match_typing_module(value, "Literal") {
                     self.in_literal = true;
                 }
+
+                if self.settings.enabled.contains(&CheckCode::YTT101)
+                    || self.settings.enabled.contains(&CheckCode::YTT102)
+                    || self.settings.enabled.contains(&CheckCode::YTT301)
+                    || self.settings.enabled.contains(&CheckCode::YTT303)
+                {
+                    flake8_2020::plugins::subscript(self, value, slice);
+                }
             }
             ExprKind::Tuple { elts, ctx } | ExprKind::List { elts, ctx } => {
                 if matches!(ctx, ExprContext::Store) {
@@ -1000,34 +1012,40 @@ where
                     }
                 }
             }
-            ExprKind::Name { id, ctx } => match ctx {
-                ExprContext::Load => {
-                    // Ex) List[...]
-                    if self.settings.enabled.contains(&CheckCode::U006)
-                        && self.settings.target_version >= PythonVersion::Py39
-                        && typing::is_pep585_builtin(expr, self.from_imports.get("typing"))
-                    {
-                        pyupgrade::plugins::use_pep585_annotation(self, expr, id);
-                    }
-
-                    self.handle_node_load(expr);
-                }
-                ExprContext::Store => {
-                    if self.settings.enabled.contains(&CheckCode::E741) {
-                        if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
-                            id,
-                            Range::from_located(expr),
-                        ) {
-                            self.add_check(check);
+            ExprKind::Name { id, ctx } => {
+                match ctx {
+                    ExprContext::Load => {
+                        // Ex) List[...]
+                        if self.settings.enabled.contains(&CheckCode::U006)
+                            && self.settings.target_version >= PythonVersion::Py39
+                            && typing::is_pep585_builtin(expr, self.from_imports.get("typing"))
+                        {
+                            pyupgrade::plugins::use_pep585_annotation(self, expr, id);
                         }
+
+                        self.handle_node_load(expr);
                     }
+                    ExprContext::Store => {
+                        if self.settings.enabled.contains(&CheckCode::E741) {
+                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                                id,
+                                Range::from_located(expr),
+                            ) {
+                                self.add_check(check);
+                            }
+                        }
 
-                    self.check_builtin_shadowing(id, Range::from_located(expr), true);
+                        self.check_builtin_shadowing(id, Range::from_located(expr), true);
 
-                    self.handle_node_store(expr, self.current_parent());
+                        self.handle_node_store(expr, self.current_parent());
+                    }
+                    ExprContext::Del => self.handle_node_delete(expr),
                 }
-                ExprContext::Del => self.handle_node_delete(expr),
-            },
+
+                if self.settings.enabled.contains(&CheckCode::YTT202) {
+                    flake8_2020::plugins::name_or_attribute(self, expr);
+                }
+            }
             ExprKind::Attribute { attr, .. } => {
                 // Ex) typing.List[...]
                 if self.settings.enabled.contains(&CheckCode::U006)
@@ -1035,6 +1053,10 @@ where
                     && typing::is_pep585_builtin(expr, self.from_imports.get("typing"))
                 {
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::YTT202) {
+                    flake8_2020::plugins::name_or_attribute(self, expr);
                 }
             }
             ExprKind::Call {
@@ -1067,6 +1089,24 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B005) {
                     flake8_bugbear::plugins::strip_with_multi_characters(self, expr, func, args);
+                }
+                if self.settings.enabled.contains(&CheckCode::B009) {
+                    flake8_bugbear::plugins::getattr_with_constant(self, expr, func, args);
+                }
+                if self.settings.enabled.contains(&CheckCode::B010) {
+                    if !self
+                        .scope_stack
+                        .iter()
+                        .rev()
+                        .any(|index| matches!(self.scopes[*index].kind, ScopeKind::Lambda))
+                    {
+                        flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::B026) {
+                    flake8_bugbear::plugins::star_arg_unpacking_after_keyword_arg(
+                        self, args, keywords,
+                    );
                 }
 
                 // flake8-comprehensions
@@ -1407,6 +1447,15 @@ where
                         .into_iter(),
                     );
                 }
+
+                if self.settings.enabled.contains(&CheckCode::YTT103)
+                    || self.settings.enabled.contains(&CheckCode::YTT201)
+                    || self.settings.enabled.contains(&CheckCode::YTT203)
+                    || self.settings.enabled.contains(&CheckCode::YTT204)
+                    || self.settings.enabled.contains(&CheckCode::YTT302)
+                {
+                    flake8_2020::plugins::compare(self, left, ops, comparators);
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),
@@ -1450,8 +1499,8 @@ where
                 for expr in &args.defaults {
                     self.visit_expr(expr);
                 }
+                self.push_scope(Scope::new(ScopeKind::Lambda))
             }
-
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&CheckCode::C416) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_comprehension(
@@ -1467,7 +1516,6 @@ where
                 }
                 self.push_scope(Scope::new(ScopeKind::Generator))
             }
-
             ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
                 self.push_scope(Scope::new(ScopeKind::Generator))
             }
@@ -1638,7 +1686,8 @@ where
 
         // Post-visit.
         match &expr.node {
-            ExprKind::GeneratorExp { .. }
+            ExprKind::Lambda { .. }
+            | ExprKind::GeneratorExp { .. }
             | ExprKind::ListComp { .. }
             | ExprKind::DictComp { .. }
             | ExprKind::SetComp { .. } => {
@@ -2230,7 +2279,7 @@ impl<'a> Checker<'a> {
         while let Some((expr, scopes, parents)) = self.deferred_lambdas.pop() {
             self.parent_stack = parents;
             self.scope_stack = scopes;
-            self.push_scope(Scope::new(ScopeKind::Function(Default::default())));
+            self.push_scope(Scope::new(ScopeKind::Lambda));
 
             if let ExprKind::Lambda { args, body } = &expr.node {
                 self.visit_arguments(args);
@@ -2366,16 +2415,20 @@ impl<'a> Checker<'a> {
                             .iter()
                             .map(|index| self.parents[*index])
                             .collect();
-
-                        let removal_fn = match kind {
+                        match match kind {
                             ImportKind::Import => pyflakes::fixes::remove_unused_imports,
                             ImportKind::ImportFrom => pyflakes::fixes::remove_unused_import_froms,
-                        };
-
-                        match removal_fn(self.locator, &full_names, child, parent, &deleted) {
-                            Ok(fix) => Some(fix),
+                        }(
+                            self.locator, &full_names, child, parent, &deleted
+                        ) {
+                            Ok(fix) => {
+                                if fix.patch.content.is_empty() || fix.patch.content == "pass" {
+                                    self.deletions.insert(defined_by);
+                                }
+                                Some(fix)
+                            }
                             Err(e) => {
-                                error!("Failed to fix unused imports: {}", e);
+                                error!("Failed to remove unused imports: {}", e);
                                 None
                             }
                         }
@@ -2586,6 +2639,9 @@ pub fn check_ast(
 
     // Check docstrings.
     checker.check_definitions();
+
+    // Check import blocks.
+    // checker.check_import_blocks();
 
     checker.checks
 }

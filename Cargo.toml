@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "ruff"
-version = "0.0.108"
+version = "0.0.113"
 edition = "2021"
 
 [lib]
@@ -15,7 +15,8 @@ name = "ruff"
 [dependencies]
 anyhow = { version = "1.0.66" }
 bincode = { version = "1.3.3" }
-chrono = { version = "0.4.21" }
+bitflags = { version = "1.3.2" }
+chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
 clap = { version = "4.0.1", features = ["derive"] }
 colored = { version = "2.0.0" }
 common-path = { version = "1.0.0" }
@@ -26,13 +27,14 @@ glob = { version = "0.3.0" }
 itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "a13ec97dd4eb925bde4d426c6e422582793b260c" }
 log = { version = "0.4.17" }
+nohash-hasher = { version = "0.2.0" }
 notify = { version = "4.0.17" }
 num-bigint = { version = "0.4.3" }
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
-ropey = { version = "1.5.0" }
+ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }
@@ -43,7 +45,7 @@ strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
 titlecase = { version = "2.2.1" }
 toml = { version = "0.5.9" }
-update-informer = { version = "0.5.0", default_features = false, features = ["pypi"], optional = true }
+update-informer = { version = "0.5.0", default-features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

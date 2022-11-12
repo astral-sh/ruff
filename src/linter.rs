@@ -16,15 +16,17 @@ use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
+use crate::check_imports::check_imports;
 use crate::check_lines::check_lines;
 use crate::check_tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::code_gen::SourceGenerator;
+use crate::directives::Directives;
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::{cache, fs, noqa};
+use crate::{cache, directives, fs};
 
 /// Collect tokens up to and including the first error.
 pub(crate) fn tokenize(contents: &str) -> Vec<LexResult> {
@@ -55,7 +57,7 @@ pub(crate) fn check_path(
     contents: &str,
     tokens: Vec<LexResult>,
     locator: &SourceCodeLocator,
-    noqa_line_for: &[usize],
+    directives: &Directives,
     settings: &Settings,
     autofix: &fixer::Mode,
 ) -> Result<Vec<Check>> {
@@ -63,23 +65,38 @@ pub(crate) fn check_path(
     let mut checks: Vec<Check> = vec![];
 
     // Run the token-based checks.
-    if settings
+    let use_tokens = settings
         .enabled
         .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens))
-    {
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens));
+    if use_tokens {
         check_tokens(&mut checks, locator, &tokens, settings, autofix);
     }
 
     // Run the AST-based checks.
-    if settings
+    let use_ast = settings
         .enabled
         .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::AST))
-    {
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::AST));
+    let use_imports = settings
+        .enabled
+        .iter()
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports));
+    if use_ast || use_imports {
         match parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
-                checks.extend(check_ast(&python_ast, locator, settings, autofix, path))
+                if use_ast {
+                    checks.extend(check_ast(&python_ast, locator, settings, autofix, path));
+                }
+                if use_imports {
+                    checks.extend(check_imports(
+                        &python_ast,
+                        locator,
+                        &directives.isort_exclusions,
+                        settings,
+                        autofix,
+                    ));
+                }
             }
             Err(parse_error) => {
                 if settings.enabled.contains(&CheckCode::E999) {
@@ -96,7 +113,13 @@ pub(crate) fn check_path(
     }
 
     // Run the lines-based checks.
-    check_lines(&mut checks, contents, noqa_line_for, settings, autofix);
+    check_lines(
+        &mut checks,
+        contents,
+        &directives.noqa_line_for,
+        settings,
+        autofix,
+    );
 
     // Create path ignores.
     if !checks.is_empty() && !settings.per_file_ignores.is_empty() {
@@ -124,8 +147,12 @@ pub fn lint_stdin(
     // Initialize the SourceCodeLocator (which computes offsets lazily).
     let locator = SourceCodeLocator::new(stdin);
 
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    // Extract the `# noqa` and `# isort: skip` directives from the source.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
 
     // Generate checks.
     let mut checks = check_path(
@@ -133,7 +160,7 @@ pub fn lint_stdin(
         stdin,
         tokens,
         &locator,
-        &noqa_line_for,
+        &directives,
         settings,
         autofix,
     )?;
@@ -178,8 +205,12 @@ pub fn lint_path(
     // Initialize the SourceCodeLocator (which computes offsets lazily).
     let locator = SourceCodeLocator::new(&contents);
 
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    // Determine the noqa and isort exclusions.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
 
     // Generate checks.
     let mut checks = check_path(
@@ -187,7 +218,7 @@ pub fn lint_path(
         &contents,
         tokens,
         &locator,
-        &noqa_line_for,
+        &directives,
         settings,
         autofix,
     )?;
@@ -220,8 +251,12 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     // Initialize the SourceCodeLocator (which computes offsets lazily).
     let locator = SourceCodeLocator::new(&contents);
 
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    // Extract the `# noqa` and `# isort: skip` directives from the source.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
 
     // Generate checks.
     let checks = check_path(
@@ -229,12 +264,12 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &contents,
         tokens,
         &locator,
-        &noqa_line_for,
+        &directives,
         settings,
         &fixer::Mode::None,
     )?;
 
-    add_noqa(&checks, &contents, &noqa_line_for, path)
+    add_noqa(&checks, &contents, &directives.noqa_line_for, path)
 }
 
 pub fn autoformat_path(path: &Path) -> Result<()> {
@@ -254,40 +289,39 @@ pub fn autoformat_path(path: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
+pub fn test_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
+    let contents = fs::read_file(path)?;
+    let tokens: Vec<LexResult> = tokenize(&contents);
+    let locator = SourceCodeLocator::new(&contents);
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(settings),
+    );
+    check_path(
+        path,
+        &contents,
+        tokens,
+        &locator,
+        &directives,
+        settings,
+        autofix,
+    )
+}
+
+#[cfg(test)]
 mod tests {
     use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
     use regex::Regex;
-    use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
 
     use crate::autofix::fixer;
-    use crate::checks::{Check, CheckCode};
-    use crate::linter::tokenize;
-    use crate::source_code_locator::SourceCodeLocator;
-    use crate::{fs, linter, noqa, settings};
-
-    fn check_path(
-        path: &Path,
-        settings: &settings::Settings,
-        autofix: &fixer::Mode,
-    ) -> Result<Vec<Check>> {
-        let contents = fs::read_file(path)?;
-        let tokens: Vec<LexResult> = tokenize(&contents);
-        let locator = SourceCodeLocator::new(&contents);
-        let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-        linter::check_path(
-            path,
-            &contents,
-            tokens,
-            &locator,
-            &noqa_line_for,
-            settings,
-            autofix,
-        )
-    }
+    use crate::checks::CheckCode;
+    use crate::linter::test_path;
+    use crate::settings;
 
     #[test_case(CheckCode::A001, Path::new("A001.py"); "A001")]
     #[test_case(CheckCode::A002, Path::new("A002.py"); "A002")]
@@ -299,6 +333,8 @@ mod tests {
     #[test_case(CheckCode::B006, Path::new("B006_B008.py"); "B006")]
     #[test_case(CheckCode::B007, Path::new("B007.py"); "B007")]
     #[test_case(CheckCode::B008, Path::new("B006_B008.py"); "B008")]
+    #[test_case(CheckCode::B009, Path::new("B009_B010.py"); "B009")]
+    #[test_case(CheckCode::B010, Path::new("B009_B010.py"); "B010")]
     #[test_case(CheckCode::B011, Path::new("B011.py"); "B011")]
     #[test_case(CheckCode::B013, Path::new("B013.py"); "B013")]
     #[test_case(CheckCode::B014, Path::new("B014.py"); "B014")]
@@ -306,7 +342,9 @@ mod tests {
     #[test_case(CheckCode::B016, Path::new("B016.py"); "B016")]
     #[test_case(CheckCode::B017, Path::new("B017.py"); "B017")]
     #[test_case(CheckCode::B018, Path::new("B018.py"); "B018")]
+    #[test_case(CheckCode::B019, Path::new("B019.py"); "B019")]
     #[test_case(CheckCode::B025, Path::new("B025.py"); "B025")]
+    #[test_case(CheckCode::B026, Path::new("B026.py"); "B026")]
     #[test_case(CheckCode::C400, Path::new("C400.py"); "C400")]
     #[test_case(CheckCode::C401, Path::new("C401.py"); "C401")]
     #[test_case(CheckCode::C402, Path::new("C402.py"); "C402")]
@@ -457,9 +495,19 @@ mod tests {
     #[test_case(CheckCode::RUF001, Path::new("RUF001.py"); "RUF001")]
     #[test_case(CheckCode::RUF002, Path::new("RUF002.py"); "RUF002")]
     #[test_case(CheckCode::RUF003, Path::new("RUF003.py"); "RUF003")]
+    #[test_case(CheckCode::YTT101, Path::new("YTT101.py"); "YTT101")]
+    #[test_case(CheckCode::YTT102, Path::new("YTT102.py"); "YTT102")]
+    #[test_case(CheckCode::YTT103, Path::new("YTT103.py"); "YTT103")]
+    #[test_case(CheckCode::YTT201, Path::new("YTT201.py"); "YTT201")]
+    #[test_case(CheckCode::YTT202, Path::new("YTT202.py"); "YTT202")]
+    #[test_case(CheckCode::YTT203, Path::new("YTT203.py"); "YTT203")]
+    #[test_case(CheckCode::YTT204, Path::new("YTT204.py"); "YTT204")]
+    #[test_case(CheckCode::YTT301, Path::new("YTT301.py"); "YTT301")]
+    #[test_case(CheckCode::YTT302, Path::new("YTT302.py"); "YTT302")]
+    #[test_case(CheckCode::YTT303, Path::new("YTT303.py"); "YTT303")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures").join(path).as_path(),
             &settings::Settings::for_rule(check_code.clone()),
             &fixer::Mode::Generate,
@@ -471,7 +519,7 @@ mod tests {
 
     #[test]
     fn f841_dummy_variable_rgx() -> Result<()> {
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/F841.py"),
             &settings::Settings {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
@@ -486,7 +534,7 @@ mod tests {
 
     #[test]
     fn m001() -> Result<()> {
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/M001.py"),
             &settings::Settings::for_rules(vec![CheckCode::M001, CheckCode::E501, CheckCode::F841]),
             &fixer::Mode::Generate,
@@ -498,7 +546,7 @@ mod tests {
 
     #[test]
     fn init() -> Result<()> {
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/__init__.py"),
             &settings::Settings::for_rules(vec![CheckCode::F821, CheckCode::F822]),
             &fixer::Mode::Generate,
@@ -510,7 +558,7 @@ mod tests {
 
     #[test]
     fn future_annotations() -> Result<()> {
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/future_annotations.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
             &fixer::Mode::Generate,

@@ -6,30 +6,13 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
 
     use crate::autofix::fixer;
-    use crate::checks::{Check, CheckCode};
+    use crate::checks::CheckCode;
     use crate::flake8_quotes::settings::Quote;
-    use crate::linter::tokenize;
-    use crate::{flake8_quotes, fs, linter, noqa, Settings, SourceCodeLocator};
-
-    fn check_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
-        let contents = fs::read_file(path)?;
-        let tokens: Vec<LexResult> = tokenize(&contents);
-        let locator = SourceCodeLocator::new(&contents);
-        let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
-        linter::check_path(
-            path,
-            &contents,
-            tokens,
-            &locator,
-            &noqa_line_for,
-            settings,
-            autofix,
-        )
-    }
+    use crate::linter::test_path;
+    use crate::{flake8_quotes, Settings};
 
     #[test_case(Path::new("doubles.py"))]
     #[test_case(Path::new("doubles_escaped.py"))]
@@ -38,7 +21,7 @@ mod tests {
     #[test_case(Path::new("doubles_wrapped.py"))]
     fn doubles(path: &Path) -> Result<()> {
         let snapshot = format!("doubles_{}", path.to_string_lossy());
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -70,7 +53,7 @@ mod tests {
     #[test_case(Path::new("singles_wrapped.py"))]
     fn singles(path: &Path) -> Result<()> {
         let snapshot = format!("singles_{}", path.to_string_lossy());
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -107,7 +90,7 @@ mod tests {
     #[test_case(Path::new("docstring_singles_function.py"))]
     fn double_docstring(path: &Path) -> Result<()> {
         let snapshot = format!("double_docstring_{}", path.to_string_lossy());
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -144,7 +127,7 @@ mod tests {
     #[test_case(Path::new("docstring_singles_function.py"))]
     fn single_docstring(path: &Path) -> Result<()> {
         let snapshot = format!("single_docstring_{}", path.to_string_lossy());
-        let mut checks = check_path(
+        let mut checks = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),

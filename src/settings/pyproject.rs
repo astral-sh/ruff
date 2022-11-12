@@ -143,9 +143,11 @@ mod tests {
                     extend_ignore: None,
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
+                    src: None,
                     target_version: None,
                     flake8_annotations: None,
                     flake8_quotes: None,
+                    isort: None,
                     pep8_naming: None,
                 })
             })
@@ -172,9 +174,11 @@ line-length = 79
                     extend_ignore: None,
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
+                    src: None,
                     target_version: None,
                     flake8_annotations: None,
                     flake8_quotes: None,
+                    isort: None,
                     pep8_naming: None,
                 })
             })
@@ -201,9 +205,11 @@ exclude = ["foo.py"]
                     extend_ignore: None,
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
+                    src: None,
                     target_version: None,
                     flake8_annotations: None,
                     flake8_quotes: None,
+                    isort: None,
                     pep8_naming: None,
                 })
             })
@@ -230,9 +236,11 @@ select = ["E501"]
                     extend_ignore: None,
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
+                    src: None,
                     target_version: None,
                     flake8_annotations: None,
                     flake8_quotes: None,
+                    isort: None,
                     pep8_naming: None,
                 })
             })
@@ -260,9 +268,11 @@ ignore = ["E501"]
                     extend_ignore: None,
                     per_file_ignores: None,
                     dummy_variable_rgx: None,
+                    src: None,
                     target_version: None,
                     flake8_annotations: None,
                     flake8_quotes: None,
+                    isort: None,
                     pep8_naming: None,
                 })
             })
@@ -323,9 +333,9 @@ other-attribute = 1
                 fix: None,
                 exclude: None,
                 extend_exclude: Some(vec![
-                    "excluded.py".to_string(),
+                    "excluded_file.py".to_string(),
                     "migrations".to_string(),
-                    "directory/also_excluded.py".to_string(),
+                    "with_excluded_file/other_excluded_file.py".to_string(),
                 ]),
                 select: None,
                 extend_select: None,
@@ -336,6 +346,7 @@ other-attribute = 1
                     vec![CheckCodePrefix::F401]
                 ),])),
                 dummy_variable_rgx: None,
+                src: None,
                 target_version: None,
                 flake8_annotations: None,
                 flake8_quotes: Some(flake8_quotes::settings::Options {
@@ -344,6 +355,7 @@ other-attribute = 1
                     docstring_quotes: Some(Quote::Double),
                     avoid_escape: Some(true),
                 }),
+                isort: None,
                 pep8_naming: Some(pep8_naming::settings::Options {
                     ignore_names: Some(vec![
                         "setUp".to_string(),

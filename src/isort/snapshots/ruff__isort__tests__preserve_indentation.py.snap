@@ -1,0 +1,39 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 4
+    column: 0
+  fix:
+    patch:
+      content: "    import os\n    import sys\n"
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 4
+        column: 0
+    applied: false
+- kind: UnsortedImports
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 7
+    column: 0
+  fix:
+    patch:
+      content: "    import os\n    import sys\n"
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 7
+        column: 0
+    applied: false
+

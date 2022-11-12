@@ -1,0 +1,90 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: GetAttrWithConstant
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 19
+  fix:
+    patch:
+      content: foo.bar
+      location:
+        row: 18
+        column: 0
+      end_location:
+        row: 18
+        column: 19
+    applied: false
+- kind: GetAttrWithConstant
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 23
+  fix:
+    patch:
+      content: foo._123abc
+      location:
+        row: 19
+        column: 0
+      end_location:
+        row: 19
+        column: 23
+    applied: false
+- kind: GetAttrWithConstant
+  location:
+    row: 20
+    column: 0
+  end_location:
+    row: 20
+    column: 22
+  fix:
+    patch:
+      content: foo.abc123
+      location:
+        row: 20
+        column: 0
+      end_location:
+        row: 20
+        column: 22
+    applied: false
+- kind: GetAttrWithConstant
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 23
+  fix:
+    patch:
+      content: foo.abc123
+      location:
+        row: 21
+        column: 0
+      end_location:
+        row: 21
+        column: 23
+    applied: false
+- kind: GetAttrWithConstant
+  location:
+    row: 22
+    column: 14
+  end_location:
+    row: 22
+    column: 31
+  fix:
+    patch:
+      content: x.bar
+      location:
+        row: 22
+        column: 14
+      end_location:
+        row: 22
+        column: 31
+    applied: false
+

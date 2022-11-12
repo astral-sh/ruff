@@ -27,9 +27,10 @@ An extremely fast Python linter, written in Rust.
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface. Ruff can be used to replace Flake8 (plus a variety
-of plugins), [`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](https://github.com/asottile/yesqa),
-and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/) and [`autoflake`](https://pypi.org/project/autoflake/)
-all while executing tens or hundreds of times faster than any individual tool.
+of plugins), [`isort`](https://pypi.org/project/isort/), [`pydocstyle`](https://pypi.org/project/pydocstyle/),
+[`yesqa`](https://github.com/asottile/yesqa), and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/)
+and [`autoflake`](https://pypi.org/project/autoflake/) all while executing tens or hundreds of times
+faster than any individual tool.
 
 (Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
 automatically convert your existing configuration.)
@@ -56,8 +57,9 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    9. [flake8-print](#flake8-print)
    10. [flake8-quotes](#flake8-quotes)
    11. [flake8-annotations](#flake8-annotations)
-   12. [Ruff-specific rules](#ruff-specific-rules)
-   13. [Meta rules](#meta-rules)
+   12. [flake8-2020](#flake8-2020)
+   13. [Ruff-specific rules](#ruff-specific-rules)
+   14. [Meta rules](#meta-rules)
 5. [Editor Integrations](#editor-integrations)
 6. [FAQ](#faq)
 7. [Development](#development)
@@ -97,7 +99,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.108
+    rev: v0.0.113
     hooks:
       - id: ruff
 ```
@@ -285,16 +287,16 @@ Ruff supports several workflows to aid in `noqa` management.
 
 First, Ruff provides a special error code, `M001`, to enforce that your `noqa` directives are
 "valid", in that the errors they _say_ they ignore are actually being triggered on that line (and
-thus suppressed). **You can run `ruff /path/to/file.py --extend-select M001` to flag unused `noqa`
-directives.**
+thus suppressed). You can run `ruff /path/to/file.py --extend-select M001` to flag unused `noqa`
+directives.
 
 Second, Ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
-**You can run `ruff /path/to/file.py --extend-select M001 --fix` to automatically remove unused
-`noqa` directives.**
+You can run `ruff /path/to/file.py --extend-select M001 --fix` to automatically remove unused
+`noqa` directives.
 
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
-migrating a new codebase to Ruff. **You can run `ruff /path/to/file.py --add-noqa` to automatically
-add `noqa` directives to all failing lines, with the appropriate error codes.**
+migrating a new codebase to Ruff. You can run `ruff /path/to/file.py --add-noqa` to automatically
+add `noqa` directives to all failing lines, with the appropriate error codes.
 
 ## Supported Rules
 
@@ -365,6 +367,14 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | W292 | NoNewLineAtEndOfFile | No newline at end of file |  |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' |  |
 
+### isort
+
+For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| I001 | UnsortedImports | Import block is un-sorted or un-formatted | 🛠 |
+
 ### pydocstyle
 
 For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
@@ -431,8 +441,8 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
 | U009 | PEP3120UnnecessaryCodingComment | utf-8 encoding declaration is unnecessary | 🛠 |
-| U010 | UnnecessaryFutureImport | Unnessary __future__ import `...` for target Python version |  |
-| U011 | UnnecessaryLRUCacheParams | Unnessary parameters to functools.lru_cache | 🛠 |
+| U010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
+| U011 | UnnecessaryLRUCacheParams | Unnecessary parameters to functools.lru_cache | 🛠 |
 
 ### pep8-naming
 
@@ -492,6 +502,8 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults. |  |
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body. | 🛠 |
 | B008 | FunctionCallArgumentDefault | Do not perform function calls in argument defaults. |  |
+| B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value, it is not any safer than normal property access. | 🛠 |
+| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value, it is not any safer than normal property access. |  |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError:` instead of `except (ValueError,):`. |  |
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
@@ -499,7 +511,9 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B016 | CannotRaiseLiteral | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
+| B019 | CachedInstanceMethod | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
+| B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged. |  |
 
 ### flake8-builtins
 
@@ -548,6 +562,23 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 | ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `...` |  |
 | ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
 | ANN401 | DynamicallyTypedExpression | Dynamically typed expressions (typing.Any) are disallowed in `...` |  |
+
+### flake8-2020
+
+For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| YTT101 | SysVersionSlice3Referenced | `sys.version[:3]` referenced (python3.10), use `sys.version_info` |  |
+| YTT102 | SysVersion2Referenced | `sys.version[2]` referenced (python3.10), use `sys.version_info` |  |
+| YTT103 | SysVersionCmpStr3 | `sys.version` compared to string (python3.10), use `sys.version_info` |  |
+| YTT201 | SysVersionInfo0Eq3Referenced | `sys.version_info[0] == 3` referenced (python4), use `>=` |  |
+| YTT202 | SixPY3Referenced | `six.PY3` referenced (python4), use `not six.PY2` |  |
+| YTT203 | SysVersionInfo1CmpInt | `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT204 | SysVersionInfoMinorCmpInt | `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
+| YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
+| YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
 
 ### Ruff-specific rules
 
@@ -654,7 +685,8 @@ including:
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (17/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
+- [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
@@ -677,9 +709,10 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (17/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
+- [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 
-Ruff also implements the functionality that you get from [`yesqa`](https://github.com/asottile/yesqa),
+Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
@@ -699,6 +732,34 @@ on Rust at all.
 
 Ruff does not yet support third-party plugins, though a plugin system is within-scope for the
 project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
+
+### How does Ruff's import sorting compare to [`isort`](https://pypi.org/project/isort/)?
+
+Ruff's import sorting is intended to be equivalent to `isort` when used `profile = "black"`, and a
+few other settings (`combine_as_imports = true`, `order_by_type = false`, and
+`case_sensitive` = true`).
+
+Like `isort`, Ruff's import sorting is compatible with Black.
+
+Ruff is less configurable than `isort`, but supports the `known-first-party`, `known-third-party`,
+`extra-standard-library`, and `src` settings, like so:
+
+```toml
+[tool.ruff]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I"
+]
+src = ["src", "tests"]
+
+[tool.ruff.isort]
+known-first-party = ["my_module1", "my_module2"]
+```
 
 ### Does Ruff support NumPy- or Google-style docstrings?
 

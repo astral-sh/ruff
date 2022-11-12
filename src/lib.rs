@@ -17,6 +17,7 @@ mod ast;
 pub mod autofix;
 pub mod cache;
 pub mod check_ast;
+mod check_imports;
 mod check_lines;
 mod check_tokens;
 pub mod checks;
@@ -24,7 +25,9 @@ pub mod checks_gen;
 pub mod cli;
 pub mod code_gen;
 mod cst;
+mod directives;
 mod docstrings;
+mod flake8_2020;
 pub mod flake8_annotations;
 mod flake8_bugbear;
 mod flake8_builtins;
@@ -32,6 +35,7 @@ mod flake8_comprehensions;
 mod flake8_print;
 pub mod flake8_quotes;
 pub mod fs;
+mod isort;
 mod lex;
 pub mod linter;
 pub mod logging;
@@ -72,8 +76,12 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     // Initialize the SourceCodeLocator (which computes offsets lazily).
     let locator = SourceCodeLocator::new(contents);
 
-    // Determine the noqa line for every line in the source.
-    let noqa_line_for = noqa::extract_noqa_line_for(&tokens);
+    // Extract the `# noqa` and `# isort: skip` directives from the source.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        &directives::Flags::from_settings(&settings),
+    );
 
     // Generate checks.
     let checks = check_path(
@@ -81,7 +89,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         contents,
         tokens,
         &locator,
-        &noqa_line_for,
+        &directives,
         &settings,
         &if autofix { Mode::Generate } else { Mode::None },
     )?;

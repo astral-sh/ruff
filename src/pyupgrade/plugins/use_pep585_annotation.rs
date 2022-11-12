@@ -5,6 +5,7 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+/// U006
 pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr, id: &str) {
     let mut check = Check::new(
         CheckKind::UsePEP585Annotation(id.to_string()),

@@ -4,6 +4,7 @@ use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+// TODO(charlie): Verify imports for each of the imported members.
 pub fn is_mutable_func(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::Name { id, .. }

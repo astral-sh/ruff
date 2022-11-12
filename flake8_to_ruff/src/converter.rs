@@ -208,6 +208,7 @@ mod tests {
         let actual = convert(&HashMap::from([]), None)?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            src: None,
             fix: None,
             exclude: None,
             extend_exclude: None,
@@ -224,6 +225,7 @@ mod tests {
             target_version: None,
             flake8_annotations: None,
             flake8_quotes: None,
+            isort: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -239,6 +241,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: Some(100),
+            src: None,
             fix: None,
             exclude: None,
             extend_exclude: None,
@@ -255,6 +258,7 @@ mod tests {
             target_version: None,
             flake8_annotations: None,
             flake8_quotes: None,
+            isort: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -270,6 +274,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: Some(100),
+            src: None,
             fix: None,
             exclude: None,
             extend_exclude: None,
@@ -286,6 +291,7 @@ mod tests {
             target_version: None,
             flake8_annotations: None,
             flake8_quotes: None,
+            isort: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -301,6 +307,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            src: None,
             fix: None,
             exclude: None,
             extend_exclude: None,
@@ -317,6 +324,7 @@ mod tests {
             target_version: None,
             flake8_annotations: None,
             flake8_quotes: None,
+            isort: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -332,6 +340,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            src: None,
             fix: None,
             exclude: None,
             extend_exclude: None,
@@ -353,6 +362,7 @@ mod tests {
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
+            isort: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -371,6 +381,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            src: None,
             fix: None,
             exclude: None,
             extend_exclude: None,
@@ -422,6 +433,7 @@ mod tests {
             target_version: None,
             flake8_annotations: None,
             flake8_quotes: None,
+            isort: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -437,6 +449,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             line_length: None,
+            src: None,
             fix: None,
             exclude: None,
             extend_exclude: None,
@@ -459,6 +472,7 @@ mod tests {
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
+            isort: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);

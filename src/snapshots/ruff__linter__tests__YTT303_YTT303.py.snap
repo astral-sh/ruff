@@ -1,0 +1,21 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: SysVersionSlice1Referenced
+  location:
+    row: 4
+    column: 6
+  end_location:
+    row: 4
+    column: 17
+  fix: ~
+- kind: SysVersionSlice1Referenced
+  location:
+    row: 5
+    column: 6
+  end_location:
+    row: 5
+    column: 13
+  fix: ~
+

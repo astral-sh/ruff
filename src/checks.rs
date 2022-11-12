@@ -84,6 +84,8 @@ pub enum CheckCode {
     B006,
     B007,
     B008,
+    B009,
+    B010,
     B011,
     B013,
     B014,
@@ -91,7 +93,9 @@ pub enum CheckCode {
     B016,
     B017,
     B018,
+    B019,
     B025,
+    B026,
     // flake8-comprehensions
     C400,
     C401,
@@ -129,6 +133,17 @@ pub enum CheckCode {
     ANN205,
     ANN206,
     ANN401,
+    // flake8-2020
+    YTT101,
+    YTT102,
+    YTT103,
+    YTT201,
+    YTT202,
+    YTT203,
+    YTT204,
+    YTT301,
+    YTT302,
+    YTT303,
     // pyupgrade
     U001,
     U002,
@@ -203,6 +218,8 @@ pub enum CheckCode {
     N816,
     N817,
     N818,
+    // isort
+    I001,
     // Ruff
     RUF001,
     RUF002,
@@ -215,6 +232,7 @@ pub enum CheckCode {
 pub enum CheckCategory {
     Pyflakes,
     Pycodestyle,
+    Isort,
     Pydocstyle,
     Pyupgrade,
     PEP8Naming,
@@ -224,6 +242,7 @@ pub enum CheckCategory {
     Flake8Print,
     Flake8Quotes,
     Flake8Annotations,
+    Flake82020,
     Ruff,
     Meta,
 }
@@ -233,12 +252,14 @@ impl CheckCategory {
         match self {
             CheckCategory::Pycodestyle => "pycodestyle",
             CheckCategory::Pyflakes => "Pyflakes",
+            CheckCategory::Isort => "isort",
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Flake8Annotations => "flake8-annotations",
+            CheckCategory::Flake82020 => "flake8-2020",
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Pydocstyle => "pydocstyle",
             CheckCategory::PEP8Naming => "pep8-naming",
@@ -251,6 +272,7 @@ impl CheckCategory {
         match self {
             CheckCategory::Pycodestyle => Some("https://pypi.org/project/pycodestyle/2.9.1/"),
             CheckCategory::Pyflakes => Some("https://pypi.org/project/pyflakes/2.5.0/"),
+            CheckCategory::Isort => Some("https://pypi.org/project/isort/5.10.1/"),
             CheckCategory::Flake8Builtins => {
                 Some("https://pypi.org/project/flake8-builtins/2.0.1/")
             }
@@ -265,6 +287,7 @@ impl CheckCategory {
             CheckCategory::Flake8Annotations => {
                 Some("https://pypi.org/project/flake8-annotations/2.9.1/")
             }
+            CheckCategory::Flake82020 => Some("https://pypi.org/project/flake8-2020/1.7.0/"),
             CheckCategory::Pyupgrade => Some("https://pypi.org/project/pyupgrade/3.2.0/"),
             CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
             CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
@@ -280,6 +303,7 @@ pub enum LintSource {
     FileSystem,
     Lines,
     Tokens,
+    Imports,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -349,6 +373,8 @@ pub enum CheckKind {
     MutableArgumentDefault,
     UnusedLoopControlVariable(String),
     FunctionCallArgumentDefault,
+    GetAttrWithConstant,
+    SetAttrWithConstant,
     DoNotAssertFalse,
     RedundantTupleInExceptionHandler(String),
     DuplicateHandlerException(Vec<String>),
@@ -356,7 +382,9 @@ pub enum CheckKind {
     CannotRaiseLiteral,
     NoAssertRaisesException,
     UselessExpression,
+    CachedInstanceMethod,
     DuplicateTryBlockException(String),
+    StarArgUnpackingAfterKeywordArg,
     // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
@@ -394,6 +422,17 @@ pub enum CheckKind {
     MissingReturnTypeStaticMethod(String),
     MissingReturnTypeClassMethod(String),
     DynamicallyTypedExpression(String),
+    // flake8-2020
+    SysVersionSlice3Referenced,
+    SysVersion2Referenced,
+    SysVersionCmpStr3,
+    SysVersionInfo0Eq3Referenced,
+    SixPY3Referenced,
+    SysVersionInfo1CmpInt,
+    SysVersionInfoMinorCmpInt,
+    SysVersion0Referenced,
+    SysVersionCmpStr10,
+    SysVersionSlice1Referenced,
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UnnecessaryAbspath,
@@ -404,7 +443,7 @@ pub enum CheckKind {
     UsePEP604Annotation,
     SuperCallWithParameters,
     PEP3120UnnecessaryCodingComment,
-    UnnecessaryFutureImport(String),
+    UnnecessaryFutureImport(Vec<String>),
     UnnecessaryLRUCacheParams,
     UnnecessaryEncodeUTF8,
     // pydocstyle
@@ -468,6 +507,8 @@ pub enum CheckKind {
     MixedCaseVariableInGlobalScope(String),
     CamelcaseImportedAsAcronym(String, String),
     ErrorSuffixOnExceptionName(String),
+    // isort
+    UnsortedImports,
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -493,6 +534,7 @@ impl CheckCode {
             | CheckCode::RUF002
             | CheckCode::RUF003 => &LintSource::Tokens,
             CheckCode::E902 => &LintSource::FileSystem,
+            CheckCode::I001 => &LintSource::Imports,
             _ => &LintSource::AST,
         }
     }
@@ -561,6 +603,8 @@ impl CheckCode {
             CheckCode::B006 => CheckKind::MutableArgumentDefault,
             CheckCode::B007 => CheckKind::UnusedLoopControlVariable("i".to_string()),
             CheckCode::B008 => CheckKind::FunctionCallArgumentDefault,
+            CheckCode::B009 => CheckKind::GetAttrWithConstant,
+            CheckCode::B010 => CheckKind::SetAttrWithConstant,
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
             CheckCode::B013 => {
                 CheckKind::RedundantTupleInExceptionHandler("ValueError".to_string())
@@ -570,7 +614,9 @@ impl CheckCode {
             CheckCode::B016 => CheckKind::CannotRaiseLiteral,
             CheckCode::B017 => CheckKind::NoAssertRaisesException,
             CheckCode::B018 => CheckKind::UselessExpression,
+            CheckCode::B019 => CheckKind::CachedInstanceMethod,
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
+            CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
             CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
@@ -621,6 +667,17 @@ impl CheckCode {
             CheckCode::ANN205 => CheckKind::MissingReturnTypeStaticMethod("...".to_string()),
             CheckCode::ANN206 => CheckKind::MissingReturnTypeClassMethod("...".to_string()),
             CheckCode::ANN401 => CheckKind::DynamicallyTypedExpression("...".to_string()),
+            // flake8-2020
+            CheckCode::YTT101 => CheckKind::SysVersionSlice3Referenced,
+            CheckCode::YTT102 => CheckKind::SysVersion2Referenced,
+            CheckCode::YTT103 => CheckKind::SysVersionCmpStr3,
+            CheckCode::YTT201 => CheckKind::SysVersionInfo0Eq3Referenced,
+            CheckCode::YTT202 => CheckKind::SixPY3Referenced,
+            CheckCode::YTT203 => CheckKind::SysVersionInfo1CmpInt,
+            CheckCode::YTT204 => CheckKind::SysVersionInfoMinorCmpInt,
+            CheckCode::YTT301 => CheckKind::SysVersion0Referenced,
+            CheckCode::YTT302 => CheckKind::SysVersionCmpStr10,
+            CheckCode::YTT303 => CheckKind::SysVersionSlice1Referenced,
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U002 => CheckKind::UnnecessaryAbspath,
@@ -634,7 +691,7 @@ impl CheckCode {
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             CheckCode::U009 => CheckKind::PEP3120UnnecessaryCodingComment,
-            CheckCode::U010 => CheckKind::UnnecessaryFutureImport("...".to_string()),
+            CheckCode::U010 => CheckKind::UnnecessaryFutureImport(vec!["...".to_string()]),
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
             CheckCode::U012 => CheckKind::UnnecessaryEncodeUTF8,
             // pydocstyle
@@ -714,6 +771,8 @@ impl CheckCode {
                 CheckKind::CamelcaseImportedAsAcronym("...".to_string(), "...".to_string())
             }
             CheckCode::N818 => CheckKind::ErrorSuffixOnExceptionName("...".to_string()),
+            // isort
+            CheckCode::I001 => CheckKind::UnsortedImports,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -779,6 +838,8 @@ impl CheckCode {
             CheckCode::B006 => CheckCategory::Flake8Bugbear,
             CheckCode::B007 => CheckCategory::Flake8Bugbear,
             CheckCode::B008 => CheckCategory::Flake8Bugbear,
+            CheckCode::B009 => CheckCategory::Flake8Bugbear,
+            CheckCode::B010 => CheckCategory::Flake8Bugbear,
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
             CheckCode::B013 => CheckCategory::Flake8Bugbear,
             CheckCode::B014 => CheckCategory::Flake8Bugbear,
@@ -786,7 +847,9 @@ impl CheckCode {
             CheckCode::B016 => CheckCategory::Flake8Bugbear,
             CheckCode::B017 => CheckCategory::Flake8Bugbear,
             CheckCode::B018 => CheckCategory::Flake8Bugbear,
+            CheckCode::B019 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
+            CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
             CheckCode::C402 => CheckCategory::Flake8Comprehensions,
@@ -820,6 +883,16 @@ impl CheckCode {
             CheckCode::ANN205 => CheckCategory::Flake8Annotations,
             CheckCode::ANN206 => CheckCategory::Flake8Annotations,
             CheckCode::ANN401 => CheckCategory::Flake8Annotations,
+            CheckCode::YTT101 => CheckCategory::Flake82020,
+            CheckCode::YTT102 => CheckCategory::Flake82020,
+            CheckCode::YTT103 => CheckCategory::Flake82020,
+            CheckCode::YTT201 => CheckCategory::Flake82020,
+            CheckCode::YTT202 => CheckCategory::Flake82020,
+            CheckCode::YTT203 => CheckCategory::Flake82020,
+            CheckCode::YTT204 => CheckCategory::Flake82020,
+            CheckCode::YTT301 => CheckCategory::Flake82020,
+            CheckCode::YTT302 => CheckCategory::Flake82020,
+            CheckCode::YTT303 => CheckCategory::Flake82020,
             CheckCode::U001 => CheckCategory::Pyupgrade,
             CheckCode::U002 => CheckCategory::Pyupgrade,
             CheckCode::U003 => CheckCategory::Pyupgrade,
@@ -891,6 +964,7 @@ impl CheckCode {
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
+            CheckCode::I001 => CheckCategory::Isort,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
@@ -961,6 +1035,8 @@ impl CheckKind {
             CheckKind::MutableArgumentDefault => &CheckCode::B006,
             CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
             CheckKind::FunctionCallArgumentDefault => &CheckCode::B008,
+            CheckKind::GetAttrWithConstant => &CheckCode::B009,
+            CheckKind::SetAttrWithConstant => &CheckCode::B010,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
             CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
@@ -968,7 +1044,9 @@ impl CheckKind {
             CheckKind::CannotRaiseLiteral => &CheckCode::B016,
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::UselessExpression => &CheckCode::B018,
+            CheckKind::CachedInstanceMethod => &CheckCode::B019,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
+            CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
             CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,
@@ -1006,6 +1084,17 @@ impl CheckKind {
             CheckKind::MissingReturnTypeStaticMethod(_) => &CheckCode::ANN205,
             CheckKind::MissingReturnTypeClassMethod(_) => &CheckCode::ANN206,
             CheckKind::DynamicallyTypedExpression(_) => &CheckCode::ANN401,
+            // flake8-2020
+            CheckKind::SysVersionSlice3Referenced => &CheckCode::YTT101,
+            CheckKind::SysVersion2Referenced => &CheckCode::YTT102,
+            CheckKind::SysVersionCmpStr3 => &CheckCode::YTT103,
+            CheckKind::SysVersionInfo0Eq3Referenced => &CheckCode::YTT201,
+            CheckKind::SixPY3Referenced => &CheckCode::YTT202,
+            CheckKind::SysVersionInfo1CmpInt => &CheckCode::YTT203,
+            CheckKind::SysVersionInfoMinorCmpInt => &CheckCode::YTT204,
+            CheckKind::SysVersion0Referenced => &CheckCode::YTT301,
+            CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
+            CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // pyupgrade
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
             CheckKind::UnnecessaryAbspath => &CheckCode::U002,
@@ -1080,6 +1169,8 @@ impl CheckKind {
             CheckKind::MixedCaseVariableInGlobalScope(..) => &CheckCode::N816,
             CheckKind::CamelcaseImportedAsAcronym(..) => &CheckCode::N817,
             CheckKind::ErrorSuffixOnExceptionName(..) => &CheckCode::N818,
+            // isort
+            CheckKind::UnsortedImports => &CheckCode::I001,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -1264,6 +1355,14 @@ impl CheckKind {
             CheckKind::FunctionCallArgumentDefault => {
                 "Do not perform function calls in argument defaults.".to_string()
             }
+            CheckKind::GetAttrWithConstant => "Do not call `getattr` with a constant attribute \
+                                               value, it is not any safer than normal property \
+                                               access."
+                .to_string(),
+            CheckKind::SetAttrWithConstant => "Do not call `setattr` with a constant attribute \
+                                               value, it is not any safer than normal property \
+                                               access."
+                .to_string(),
             CheckKind::DoNotAssertFalse => "Do not `assert False` (`python -O` removes these \
                                             calls), raise `AssertionError()`"
                 .to_string(),
@@ -1299,8 +1398,18 @@ impl CheckKind {
             CheckKind::UselessExpression => {
                 "Found useless expression. Either assign it to a variable or remove it.".to_string()
             }
+            CheckKind::CachedInstanceMethod => "Use of `functools.lru_cache` or `functools.cache` \
+                                                on methods can lead to memory leaks."
+                .to_string(),
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
+            }
+            CheckKind::StarArgUnpackingAfterKeywordArg => {
+                "Star-arg unpacking after a keyword argument is strongly discouraged, because it \
+                 only works when the keyword parameter is declared after all parameters supplied \
+                 by the unpacked sequence, and this change of ordering can surprise and mislead \
+                 readers."
+                    .to_string()
             }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {
@@ -1434,6 +1543,38 @@ impl CheckKind {
             CheckKind::DynamicallyTypedExpression(name) => {
                 format!("Dynamically typed expressions (typing.Any) are disallowed in `{name}`")
             }
+            // flake8-2020
+            CheckKind::SysVersionSlice3Referenced => {
+                "`sys.version[:3]` referenced (python3.10), use `sys.version_info`".to_string()
+            }
+            CheckKind::SysVersion2Referenced => {
+                "`sys.version[2]` referenced (python3.10), use `sys.version_info`".to_string()
+            }
+            CheckKind::SysVersionCmpStr3 => {
+                "`sys.version` compared to string (python3.10), use `sys.version_info`".to_string()
+            }
+            CheckKind::SysVersionInfo0Eq3Referenced => {
+                "`sys.version_info[0] == 3` referenced (python4), use `>=`".to_string()
+            }
+            CheckKind::SixPY3Referenced => {
+                "`six.PY3` referenced (python4), use `not six.PY2`".to_string()
+            }
+            CheckKind::SysVersionInfo1CmpInt => "`sys.version_info[1]` compared to integer \
+                                                 (python4), compare `sys.version_info` to tuple"
+                .to_string(),
+            CheckKind::SysVersionInfoMinorCmpInt => "`sys.version_info.minor` compared to integer \
+                                                     (python4), compare `sys.version_info` to \
+                                                     tuple"
+                .to_string(),
+            CheckKind::SysVersion0Referenced => {
+                "`sys.version[0]` referenced (python10), use `sys.version_info`".to_string()
+            }
+            CheckKind::SysVersionCmpStr10 => {
+                "`sys.version` compared to string (python10), use `sys.version_info`".to_string()
+            }
+            CheckKind::SysVersionSlice1Referenced => {
+                "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
+            }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
@@ -1459,11 +1600,17 @@ impl CheckKind {
             CheckKind::SuperCallWithParameters => {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
-            CheckKind::UnnecessaryFutureImport(name) => {
-                format!("Unnessary __future__ import `{name}` for target Python version")
+            CheckKind::UnnecessaryFutureImport(names) => {
+                if names.len() == 1 {
+                    let import = &names[0];
+                    format!("Unnecessary `__future__` import `{import}` for target Python version")
+                } else {
+                    let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
+                    format!("Unnecessary `__future__` imports {imports} for target Python version")
+                }
             }
             CheckKind::UnnecessaryLRUCacheParams => {
-                "Unnessary parameters to functools.lru_cache".to_string()
+                "Unnecessary parameters to functools.lru_cache".to_string()
             }
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to encode utf8".to_string(),
             // pydocstyle
@@ -1629,6 +1776,8 @@ impl CheckKind {
             CheckKind::PEP3120UnnecessaryCodingComment => {
                 "utf-8 encoding declaration is unnecessary".to_string()
             }
+            // isort
+            CheckKind::UnsortedImports => "Import block is un-sorted or un-formatted".to_string(),
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(
@@ -1681,6 +1830,9 @@ impl CheckKind {
             CheckKind::NoAssertRaisesException => {
                 "`assertRaises(Exception):` should be considered evil.".to_string()
             }
+            CheckKind::StarArgUnpackingAfterKeywordArg => {
+                "Star-arg unpacking after a keyword argument is strongly discouraged.".to_string()
+            }
             _ => self.body(),
         }
     }
@@ -1700,6 +1852,7 @@ impl CheckKind {
                 | CheckKind::DeprecatedUnittestAlias(_, _)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DuplicateHandlerException(_)
+                | CheckKind::GetAttrWithConstant
                 | CheckKind::IsLiteral
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(_)
@@ -1726,17 +1879,19 @@ impl CheckKind {
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnnecessaryCollectionCall(_)
                 | CheckKind::UnnecessaryComprehension(_)
+                | CheckKind::UnnecessaryFutureImport(_)
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet
                 | CheckKind::UnnecessaryLRUCacheParams
                 | CheckKind::UnnecessaryListCall
-                | CheckKind::UnnecessaryListComprehensionSet
                 | CheckKind::UnnecessaryListComprehensionDict
+                | CheckKind::UnnecessaryListComprehensionSet
                 | CheckKind::UnnecessaryLiteralDict(_)
                 | CheckKind::UnnecessaryLiteralSet(_)
                 | CheckKind::UnnecessaryLiteralWithinListCall(_)
                 | CheckKind::UnnecessaryLiteralWithinTupleCall(_)
+                | CheckKind::UnsortedImports
                 | CheckKind::UnusedImport(_, false)
                 | CheckKind::UnusedLoopControlVariable(_)
                 | CheckKind::UnusedNOQA(_)

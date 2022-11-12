@@ -24,6 +24,56 @@ def fixme4():
     pass
 
 
+@lru_cache( # A 
+) # B
+def fixme5():
+    pass
+
+
+@lru_cache(
+    # A
+)   # B
+def fixme6():
+    pass
+
+
+@functools.lru_cache(
+    # A
+    maxsize = None) # B
+def fixme7():
+    pass
+
+
+@functools.lru_cache(
+    # A1
+    maxsize = None
+    # A2
+) # B
+def fixme8():
+    pass
+
+
+@functools.lru_cache(
+    # A1
+    maxsize = 
+    None
+    # A2
+
+)
+def fixme9():
+    pass
+
+
+@functools.lru_cache(
+    # A1
+    maxsize = 
+    None
+    # A2
+)
+def fixme10():
+    pass
+
+
 @lru_cache
 def correct1():
     pass

@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, Location};
+use rustpython_ast::{Located, Location};
 
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
@@ -24,9 +24,9 @@ pub fn leading_space(line: &str) -> String {
         .collect()
 }
 
-/// Extract the leading indentation from a docstring.
-pub fn indentation<'a>(checker: &'a Checker, docstring: &Expr) -> String {
-    let range = Range::from_located(docstring);
+/// Extract the leading indentation from a line.
+pub fn indentation<'a, T>(checker: &'a Checker, located: &Located<T>) -> String {
+    let range = Range::from_located(located);
     checker
         .locator
         .slice_source_code_range(&Range {

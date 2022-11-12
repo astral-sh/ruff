@@ -1,0 +1,22 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 6
+    column: 0
+  fix:
+    patch:
+      content: "import os\nimport sys\n\nimport numpy as np\n\nimport leading_prefix\nfrom leading_prefix import Class\n"
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 6
+        column: 0
+    applied: false
+
