@@ -1612,7 +1612,7 @@ impl CheckKind {
             CheckKind::UnnecessaryLRUCacheParams => {
                 "Unnecessary parameters to functools.lru_cache".to_string()
             }
-            CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to encode utf8".to_string(),
+            CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
