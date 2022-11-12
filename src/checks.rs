@@ -221,6 +221,7 @@ pub enum CheckCode {
     // flake8-bandit
     S101,
     S102,
+    S104,
     S105,
     S106,
     S107,
@@ -517,6 +518,7 @@ pub enum CheckKind {
     // flake8-bandit
     AssertUsed,
     ExecUsed,
+    HardcodedBindAllInterfaces,
     HardcodedPasswordString(String),
     HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
@@ -785,6 +787,7 @@ impl CheckCode {
             // flake8-bandit
             CheckCode::S101 => CheckKind::AssertUsed,
             CheckCode::S102 => CheckKind::ExecUsed,
+            CheckCode::S104 => CheckKind::HardcodedBindAllInterfaces,
             CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
@@ -980,6 +983,7 @@ impl CheckCode {
             CheckCode::I001 => CheckCategory::Isort,
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
+            CheckCode::S104 => CheckCategory::Flake8Bandit,
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
@@ -1190,6 +1194,7 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => &CheckCode::S101,
             CheckKind::ExecUsed => &CheckCode::S102,
+            CheckKind::HardcodedBindAllInterfaces => &CheckCode::S104,
             CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
@@ -1793,6 +1798,9 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => "Use of `assert` detected".to_string(),
             CheckKind::ExecUsed => "Use of `exec` detected".to_string(),
+            CheckKind::HardcodedBindAllInterfaces => {
+                "Possible binding to all interfaces".to_string()
+            }
             CheckKind::HardcodedPasswordString(string) => {
                 format!("Possible hardcoded password: `'{string}'`")
             }

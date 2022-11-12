@@ -1498,6 +1498,14 @@ where
                     self.deferred_string_annotations
                         .push((Range::from_located(expr), value));
                 }
+                if self.settings.enabled.contains(&CheckCode::S104) {
+                    if let Some(check) = flake8_bandit::checks::hardcoded_bind_all_interfaces(
+                        value,
+                        &Range::from_located(expr),
+                    ) {
+                        self.add_check(check);
+                    }
+                }
             }
             ExprKind::Lambda { args, .. } => {
                 // Visit the arguments, but avoid the body, which will be deferred.

@@ -67,6 +67,15 @@ fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Check>
     None
 }
 
+/// S104
+pub fn hardcoded_bind_all_interfaces(value: &str, range: &Range) -> Option<Check> {
+    if value == "0.0.0.0" {
+        return Some(Check::new(CheckKind::HardcodedBindAllInterfaces, *range));
+    } else {
+        None
+    }
+}
+
 /// S105
 pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -> Vec<Check> {
     let mut checks: Vec<Check> = Vec::new();

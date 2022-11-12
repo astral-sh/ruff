@@ -470,6 +470,7 @@ mod tests {
     #[test_case(CheckCode::N818, Path::new("N818.py"); "N818")]
     #[test_case(CheckCode::S101, Path::new("S101.py"); "S101")] 
     #[test_case(CheckCode::S102, Path::new("S102.py"); "S102")] 
+    #[test_case(CheckCode::S104, Path::new("S104.py"); "S104")]
     #[test_case(CheckCode::S105, Path::new("S105.py"); "S105")]
     #[test_case(CheckCode::S106, Path::new("S106.py"); "S106")]
     #[test_case(CheckCode::S107, Path::new("S107.py"); "S107")]
