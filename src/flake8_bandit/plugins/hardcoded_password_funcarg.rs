@@ -14,7 +14,7 @@ pub fn hardcoded_password_funcarg(keywords: &Vec<Located<KeywordData>>) -> Vec<C
                 if matches_password_name(arg) {
                     checks.push(Check::new(
                         CheckKind::HardcodedPasswordFuncArg(string.to_string()),
-                        Range::from_located(&keyword),
+                        Range::from_located(keyword),
                     ));
                 }
             }
