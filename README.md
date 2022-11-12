@@ -431,8 +431,8 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
 | U009 | PEP3120UnnecessaryCodingComment | utf-8 encoding declaration is unnecessary | 🛠 |
-| U010 | UnnecessaryFutureImports | Unnessary __future__ import `...` for target Python version | 🛠 |
-| U011 | UnnecessaryLRUCacheParams | Unnessary parameters to functools.lru_cache | 🛠 |
+| U010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
+| U011 | UnnecessaryLRUCacheParams | Unnecessary parameters to functools.lru_cache | 🛠 |
 
 ### pep8-naming
 
