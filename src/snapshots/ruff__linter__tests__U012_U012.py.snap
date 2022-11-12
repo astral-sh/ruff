@@ -1,0 +1,260 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 21
+  fix:
+    patch:
+      content: "b\"foo\""
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 2
+        column: 21
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 18
+  fix:
+    patch:
+      content: "b\"foo\""
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 3
+        column: 18
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 14
+  fix:
+    patch:
+      content: "b\"foo\""
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 4
+        column: 14
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 20
+  fix:
+    patch:
+      content: "b\"foo\""
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 5
+        column: 20
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 22
+  fix:
+    patch:
+      content: "b\"foo\""
+      location:
+        row: 6
+        column: 0
+      end_location:
+        row: 6
+        column: 22
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 30
+  fix:
+    patch:
+      content: "b\"foo\""
+      location:
+        row: 7
+        column: 0
+      end_location:
+        row: 7
+        column: 30
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 14
+    column: 1
+  fix:
+    patch:
+      content: "b\"\"\"\nLorem\n\nIpsum\n\"\"\""
+      location:
+        row: 8
+        column: 0
+      end_location:
+        row: 14
+        column: 1
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 26
+    column: 27
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 26
+        column: 19
+      end_location:
+        row: 26
+        column: 26
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 31
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 44
+        column: 23
+      end_location:
+        row: 44
+        column: 30
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 46
+    column: 0
+  end_location:
+    row: 46
+    column: 39
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 46
+        column: 23
+      end_location:
+        row: 46
+        column: 38
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 48
+    column: 0
+  end_location:
+    row: 48
+    column: 23
+  fix:
+    patch:
+      content: "br\"fo\\o\""
+      location:
+        row: 48
+        column: 0
+      end_location:
+        row: 48
+        column: 23
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 49
+    column: 0
+  end_location:
+    row: 49
+    column: 22
+  fix:
+    patch:
+      content: "b\"foo\""
+      location:
+        row: 49
+        column: 0
+      end_location:
+        row: 49
+        column: 22
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 50
+    column: 0
+  end_location:
+    row: 50
+    column: 23
+  fix:
+    patch:
+      content: "bR\"fo\\o\""
+      location:
+        row: 50
+        column: 0
+      end_location:
+        row: 50
+        column: 23
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 51
+    column: 0
+  end_location:
+    row: 51
+    column: 22
+  fix:
+    patch:
+      content: "b\"foo\""
+      location:
+        row: 51
+        column: 0
+      end_location:
+        row: 51
+        column: 22
+    applied: false
+- kind: UnnecessaryEncodeUTF8
+  location:
+    row: 52
+    column: 6
+  end_location:
+    row: 52
+    column: 20
+  fix:
+    patch:
+      content: "b\"foo\""
+      location:
+        row: 52
+        column: 6
+      end_location:
+        row: 52
+        column: 20
+    applied: false
+

@@ -99,7 +99,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.113
+    rev: v0.0.114
     hooks:
       - id: ruff
 ```
@@ -441,8 +441,9 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
 | U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
 | U009 | PEP3120UnnecessaryCodingComment | utf-8 encoding declaration is unnecessary | 🛠 |
-| U010 | UnnecessaryFutureImport | Unnessary __future__ import `...` for target Python version |  |
-| U011 | UnnecessaryLRUCacheParams | Unnessary parameters to functools.lru_cache | 🛠 |
+| U010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
+| U011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
+| U012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
 
 ### pep8-naming
 
@@ -465,6 +466,19 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyP
 | N816 | MixedCaseVariableInGlobalScope | Variable `mixedCase` in global scope should not be mixedCase |  |
 | N817 | CamelcaseImportedAsAcronym | Camelcase `...` imported as acronym `...` |  |
 | N818 | ErrorSuffixOnExceptionName | Exception name `...` should be named with an Error suffix |  |
+
+### flake8-bandit
+
+For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| S101 | AssertUsed | Use of `assert` detected |  |
+| S102 | ExecUsed | Use of `exec` detected |  |
+| S104 | HardcodedBindAllInterfaces | Possible binding to all interfaces |  |
+| S105 | HardcodedPasswordString | Possible hardcoded password: `'...'` |  |
+| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `'...'` |  |
+| S107 | HardcodedPasswordDefault | Possible hardcoded password: `'...'` |  |
 
 ### flake8-comprehensions
 
@@ -511,6 +525,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B016 | CannotRaiseLiteral | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
 | B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil. |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
+| B019 | CachedInstanceMethod | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
 | B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged. |  |
 
@@ -578,19 +593,6 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 | YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
 | YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
 | YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
-
-### flake8-bandit
-
-For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| S101 | AssertUsed | Use of `assert` detected |  |
-| S102 | ExecUsed | Use of `exec` detected |  |
-| S104 | HardcodedBindAllInterfaces | Possible binding to all interfaces |  |
-| S105 | HardcodedPasswordString | Possible hardcoded password: `...` |  |
-| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `...` |  |
-| S107 | HardcodedPasswordDefault | Possible hardcoded password: `...` |  |
 
 ### Ruff-specific rules
 
@@ -698,9 +700,9 @@ including:
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (20/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
 Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
@@ -723,11 +725,11 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (20/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
-and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34).
+and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/34).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 

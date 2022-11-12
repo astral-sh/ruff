@@ -41,6 +41,7 @@ fn union(elts: &[Expr]) -> Expr {
     }
 }
 
+/// U007
 pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
     if checker.match_typing_module(value, "Optional") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));

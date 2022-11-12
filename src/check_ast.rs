@@ -346,6 +346,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::B018) {
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
+                if self.settings.enabled.contains(&CheckCode::B019) {
+                    flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
+                }
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
                     self.add_checks(
@@ -609,6 +612,12 @@ where
                     }
                 }
 
+                if let Some("__future__") = module.as_deref() {
+                    if self.settings.enabled.contains(&CheckCode::U010) {
+                        pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
+                    }
+                }
+
                 for alias in names {
                     if let Some("__future__") = module.as_deref() {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -639,14 +648,6 @@ where
                                     Range::from_located(stmt),
                                 ));
                             }
-                        }
-
-                        if self.settings.enabled.contains(&CheckCode::U010) {
-                            pyupgrade::plugins::unnecessary_future_import(
-                                self,
-                                stmt,
-                                &alias.node.name,
-                            );
                         }
 
                         if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
@@ -1086,6 +1087,10 @@ where
                 // flake8-super
                 if self.settings.enabled.contains(&CheckCode::U008) {
                     pyupgrade::plugins::super_call_with_parameters(self, expr, func, args);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::U012) {
+                    pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
                 }
 
                 // flake8-print
@@ -2454,16 +2459,20 @@ impl<'a> Checker<'a> {
                             .iter()
                             .map(|index| self.parents[*index])
                             .collect();
-
-                        let removal_fn = match kind {
+                        match match kind {
                             ImportKind::Import => pyflakes::fixes::remove_unused_imports,
                             ImportKind::ImportFrom => pyflakes::fixes::remove_unused_import_froms,
-                        };
-
-                        match removal_fn(self.locator, &full_names, child, parent, &deleted) {
-                            Ok(fix) => Some(fix),
+                        }(
+                            self.locator, &full_names, child, parent, &deleted
+                        ) {
+                            Ok(fix) => {
+                                if fix.patch.content.is_empty() || fix.patch.content == "pass" {
+                                    self.deletions.insert(defined_by);
+                                }
+                                Some(fix)
+                            }
                             Err(e) => {
-                                error!("Failed to fix unused imports: {}", e);
+                                error!("Failed to remove unused imports: {}", e);
                                 None
                             }
                         }

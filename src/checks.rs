@@ -93,6 +93,7 @@ pub enum CheckCode {
     B016,
     B017,
     B018,
+    B019,
     B025,
     B026,
     // flake8-comprehensions
@@ -155,6 +156,7 @@ pub enum CheckCode {
     U009,
     U010,
     U011,
+    U012,
     // pydocstyle
     D100,
     D101,
@@ -390,6 +392,7 @@ pub enum CheckKind {
     CannotRaiseLiteral,
     NoAssertRaisesException,
     UselessExpression,
+    CachedInstanceMethod,
     DuplicateTryBlockException(String),
     StarArgUnpackingAfterKeywordArg,
     // flake8-comprehensions
@@ -450,8 +453,9 @@ pub enum CheckKind {
     UsePEP604Annotation,
     SuperCallWithParameters,
     PEP3120UnnecessaryCodingComment,
-    UnnecessaryFutureImport(String),
+    UnnecessaryFutureImport(Vec<String>),
     UnnecessaryLRUCacheParams,
+    UnnecessaryEncodeUTF8,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -627,6 +631,7 @@ impl CheckCode {
             CheckCode::B016 => CheckKind::CannotRaiseLiteral,
             CheckCode::B017 => CheckKind::NoAssertRaisesException,
             CheckCode::B018 => CheckKind::UselessExpression,
+            CheckCode::B019 => CheckKind::CachedInstanceMethod,
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
             CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
             // flake8-comprehensions
@@ -703,8 +708,9 @@ impl CheckCode {
             CheckCode::U007 => CheckKind::UsePEP604Annotation,
             CheckCode::U008 => CheckKind::SuperCallWithParameters,
             CheckCode::U009 => CheckKind::PEP3120UnnecessaryCodingComment,
-            CheckCode::U010 => CheckKind::UnnecessaryFutureImport("...".to_string()),
+            CheckCode::U010 => CheckKind::UnnecessaryFutureImport(vec!["...".to_string()]),
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
+            CheckCode::U012 => CheckKind::UnnecessaryEncodeUTF8,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -865,6 +871,7 @@ impl CheckCode {
             CheckCode::B016 => CheckCategory::Flake8Bugbear,
             CheckCode::B017 => CheckCategory::Flake8Bugbear,
             CheckCode::B018 => CheckCategory::Flake8Bugbear,
+            CheckCode::B019 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
@@ -921,6 +928,7 @@ impl CheckCode {
             CheckCode::U009 => CheckCategory::Pyupgrade,
             CheckCode::U010 => CheckCategory::Pyupgrade,
             CheckCode::U011 => CheckCategory::Pyupgrade,
+            CheckCode::U012 => CheckCategory::Pyupgrade,
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -1066,6 +1074,7 @@ impl CheckKind {
             CheckKind::CannotRaiseLiteral => &CheckCode::B016,
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::UselessExpression => &CheckCode::B018,
+            CheckKind::CachedInstanceMethod => &CheckCode::B019,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
             CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             // flake8-comprehensions
@@ -1128,6 +1137,7 @@ impl CheckKind {
             CheckKind::PEP3120UnnecessaryCodingComment => &CheckCode::U009,
             CheckKind::UnnecessaryFutureImport(_) => &CheckCode::U010,
             CheckKind::UnnecessaryLRUCacheParams => &CheckCode::U011,
+            CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::U012,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -1425,6 +1435,9 @@ impl CheckKind {
             CheckKind::UselessExpression => {
                 "Found useless expression. Either assign it to a variable or remove it.".to_string()
             }
+            CheckKind::CachedInstanceMethod => "Use of `functools.lru_cache` or `functools.cache` \
+                                                on methods can lead to memory leaks."
+                .to_string(),
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
             }
@@ -1624,12 +1637,19 @@ impl CheckKind {
             CheckKind::SuperCallWithParameters => {
                 "Use `super()` instead of `super(__class__, self)`".to_string()
             }
-            CheckKind::UnnecessaryFutureImport(name) => {
-                format!("Unnessary __future__ import `{name}` for target Python version")
+            CheckKind::UnnecessaryFutureImport(names) => {
+                if names.len() == 1 {
+                    let import = &names[0];
+                    format!("Unnecessary `__future__` import `{import}` for target Python version")
+                } else {
+                    let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
+                    format!("Unnecessary `__future__` imports {imports} for target Python version")
+                }
             }
             CheckKind::UnnecessaryLRUCacheParams => {
-                "Unnessary parameters to functools.lru_cache".to_string()
+                "Unnecessary parameters to `functools.lru_cache`".to_string()
             }
+            CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
@@ -1911,6 +1931,8 @@ impl CheckKind {
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnnecessaryCollectionCall(_)
                 | CheckKind::UnnecessaryComprehension(_)
+                | CheckKind::UnnecessaryEncodeUTF8
+                | CheckKind::UnnecessaryFutureImport(_)
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet
