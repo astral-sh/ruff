@@ -1,6 +1,7 @@
+use std::collections::BTreeSet;
+
 use rustpython_ast::{AliasData, Located};
 use rustpython_parser::ast::Stmt;
-use std::collections::BTreeSet;
 
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
