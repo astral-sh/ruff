@@ -269,6 +269,10 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
             "docstring-convention" | "docstring_convention" => {
                 plugins.insert(Plugin::Flake8Docstrings);
             }
+            // flake8-bugbear
+            "extend-immutable-calls" | "extend_immutable_calls" => {
+                plugins.insert(Plugin::Flake8Bugbear);
+            }
             // flake8-builtins
             "builtins-ignorelist" | "builtins_ignorelist" => {
                 plugins.insert(Plugin::Flake8Builtins);

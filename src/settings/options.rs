@@ -19,7 +19,6 @@ pub struct Options {
     pub fix: Option<bool>,
     pub ignore: Option<Vec<CheckCodePrefix>>,
     pub line_length: Option<usize>,
-    pub per_file_ignores: Option<BTreeMap<String, Vec<CheckCodePrefix>>>,
     pub select: Option<Vec<CheckCodePrefix>>,
     pub src: Option<Vec<String>>,
     pub target_version: Option<PythonVersion>,
@@ -29,4 +28,6 @@ pub struct Options {
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     pub isort: Option<isort::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
+    // Tables are required to go last.
+    pub per_file_ignores: Option<BTreeMap<String, Vec<CheckCodePrefix>>>,
 }
