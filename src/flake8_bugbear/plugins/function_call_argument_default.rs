@@ -43,7 +43,7 @@ where
         match &expr.node {
             ExprKind::Call { func, args, .. } => {
                 if !is_mutable_func(func)
-                    && !is_immutable_func(func, &self.extend_immutable_calls)
+                    && !is_immutable_func(func, self.extend_immutable_calls)
                     && !is_nan_or_infinity(func, args)
                 {
                     self.checks.push((

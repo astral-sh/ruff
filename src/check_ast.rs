@@ -1,9 +1,10 @@
 //! Lint rules based on AST traversal.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::Path;
 
+use fnv::{FnvHashMap, FnvHashSet};
 use log::error;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
@@ -64,9 +65,9 @@ pub struct Checker<'a> {
     definitions: Vec<(Definition<'a>, Visibility)>,
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
-    pub(crate) deletions: BTreeSet<usize>,
+    pub(crate) deletions: FnvHashSet<usize>,
     // Import tracking.
-    pub(crate) from_imports: BTreeMap<&'a str, BTreeSet<&'a str>>,
+    pub(crate) from_imports: FnvHashMap<&'a str, FnvHashSet<&'a str>>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
     // at various points in time.
     pub(crate) parents: Vec<&'a Stmt>,
@@ -409,14 +410,14 @@ where
             StmtKind::Return { .. } => {
                 if self.settings.enabled.contains(&CheckCode::F706) {
                     if let Some(index) = self.scope_stack.last().cloned() {
-                        match self.scopes[index].kind {
-                            ScopeKind::Class(_) | ScopeKind::Module => {
-                                self.add_check(Check::new(
-                                    CheckKind::ReturnOutsideFunction,
-                                    Range::from_located(stmt),
-                                ));
-                            }
-                            _ => {}
+                        if matches!(
+                            self.scopes[index].kind,
+                            ScopeKind::Class(_) | ScopeKind::Module
+                        ) {
+                            self.add_check(Check::new(
+                                CheckKind::ReturnOutsideFunction,
+                                Range::from_located(stmt),
+                            ));
                         }
                     }
                 }
@@ -592,7 +593,7 @@ where
                         if TRACK_FROM_IMPORTS.contains(&module.as_str()) {
                             self.from_imports
                                 .entry(module)
-                                .or_insert_with(BTreeSet::new)
+                                .or_insert_with(FnvHashSet::default)
                                 .extend(
                                     names
                                         .iter()

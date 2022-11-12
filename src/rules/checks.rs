@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-
+use fnv::FnvHashMap;
 use once_cell::sync::Lazy;
 use rustpython_ast::Location;
 
@@ -10,8 +9,8 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::Check;
 
 /// See: https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094
-static CONFUSABLES: Lazy<BTreeMap<u32, u32>> = Lazy::new(|| {
-    BTreeMap::from([
+static CONFUSABLES: Lazy<FnvHashMap<u32, u32>> = Lazy::new(|| {
+    FnvHashMap::from_iter([
         (8232, 32),
         (8233, 32),
         (5760, 32),

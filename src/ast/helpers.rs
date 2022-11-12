@@ -1,5 +1,4 @@
-use std::collections::BTreeSet;
-
+use fnv::FnvHashSet;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, StmtKind};
@@ -47,7 +46,7 @@ pub fn match_name_or_attr_from_module(
     expr: &Expr,
     target: &str,
     module: &str,
-    imports: Option<&BTreeSet<&str>>,
+    imports: Option<&FnvHashSet<&str>>,
 ) -> bool {
     match &expr.node {
         ExprKind::Attribute { value, attr, .. } => match &value.node {
