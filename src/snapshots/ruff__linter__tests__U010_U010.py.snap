@@ -27,11 +27,31 @@ expression: checks
       - unicode_literals
       - with_statement
   location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 55
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 3
+        column: 0
+    applied: false
+- kind:
+    UnnecessaryFutureImport:
+      - absolute_import
+      - division
+  location:
     row: 3
     column: 0
   end_location:
     row: 3
-    column: 55
+    column: 48
   fix:
     patch:
       content: ""
@@ -44,14 +64,33 @@ expression: checks
     applied: false
 - kind:
     UnnecessaryFutureImport:
-      - absolute_import
-      - division
+      - generator_stop
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 37
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 5
+        column: 0
+    applied: false
+- kind:
+    UnnecessaryFutureImport:
+      - generator_stop
+      - print_function
   location:
     row: 5
     column: 0
   end_location:
     row: 5
-    column: 48
+    column: 53
   fix:
     patch:
       content: ""
@@ -64,80 +103,78 @@ expression: checks
     applied: false
 - kind:
     UnnecessaryFutureImport:
-      - generator_stop
+      - generators
   location:
-    row: 7
+    row: 6
     column: 0
   end_location:
-    row: 7
-    column: 37
+    row: 6
+    column: 49
   fix:
     patch:
-      content: ""
+      content: from __future__ import invalid_module
       location:
-        row: 7
+        row: 6
         column: 0
       end_location:
-        row: 8
-        column: 0
+        row: 6
+        column: 49
     applied: false
 - kind:
     UnnecessaryFutureImport:
       - generator_stop
-      - print_function
   location:
     row: 9
-    column: 0
+    column: 4
   end_location:
     row: 9
-    column: 53
+    column: 41
+  fix:
+    patch:
+      content: pass
+      location:
+        row: 9
+        column: 4
+      end_location:
+        row: 9
+        column: 41
+    applied: false
+- kind:
+    UnnecessaryFutureImport:
+      - generator_stop
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 41
   fix:
     patch:
       content: ""
       location:
-        row: 9
+        row: 12
         column: 0
       end_location:
-        row: 10
+        row: 13
         column: 0
     applied: false
 - kind:
     UnnecessaryFutureImport:
       - generators
   location:
-    row: 11
-    column: 0
+    row: 13
+    column: 4
   end_location:
-    row: 11
-    column: 49
+    row: 13
+    column: 53
   fix:
     patch:
       content: from __future__ import invalid_module
       location:
-        row: 11
-        column: 0
+        row: 13
+        column: 4
       end_location:
-        row: 11
-        column: 49
-    applied: false
-- kind:
-    UnnecessaryFutureImport:
-      - print_function
-      - with_statement
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 15
-    column: 70
-  fix:
-    patch:
-      content: from __future__ import invalid_module2
-      location:
-        row: 15
-        column: 0
-      end_location:
-        row: 15
-        column: 70
+        row: 13
+        column: 53
     applied: false
 

@@ -1469,14 +1469,14 @@ impl CheckKind {
             CheckKind::UnnecessaryFutureImport(names) => {
                 if names.len() == 1 {
                     let import = &names[0];
-                    format!("Unnessary __future__ import `{import}` for target Python version")
+                    format!("Unnecessary `__future__` import `{import}` for target Python version")
                 } else {
                     let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
-                    format!("Unnessary __future__ imports `{imports}` for target Python version")
+                    format!("Unnecessary `__future__` imports {imports} for target Python version")
                 }
             }
             CheckKind::UnnecessaryLRUCacheParams => {
-                "Unnessary parameters to functools.lru_cache".to_string()
+                "Unnecessary parameters to functools.lru_cache".to_string()
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
