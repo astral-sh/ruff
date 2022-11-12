@@ -493,6 +493,16 @@ mod tests {
     #[test_case(CheckCode::RUF001, Path::new("RUF001.py"); "RUF001")]
     #[test_case(CheckCode::RUF002, Path::new("RUF002.py"); "RUF002")]
     #[test_case(CheckCode::RUF003, Path::new("RUF003.py"); "RUF003")]
+    #[test_case(CheckCode::YTT101, Path::new("YTT101.py"); "YTT101")]
+    #[test_case(CheckCode::YTT102, Path::new("YTT102.py"); "YTT102")]
+    #[test_case(CheckCode::YTT103, Path::new("YTT103.py"); "YTT103")]
+    #[test_case(CheckCode::YTT201, Path::new("YTT201.py"); "YTT201")]
+    #[test_case(CheckCode::YTT202, Path::new("YTT202.py"); "YTT202")]
+    #[test_case(CheckCode::YTT203, Path::new("YTT203.py"); "YTT203")]
+    #[test_case(CheckCode::YTT204, Path::new("YTT204.py"); "YTT204")]
+    #[test_case(CheckCode::YTT301, Path::new("YTT301.py"); "YTT301")]
+    #[test_case(CheckCode::YTT302, Path::new("YTT302.py"); "YTT302")]
+    #[test_case(CheckCode::YTT303, Path::new("YTT303.py"); "YTT303")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let mut checks = test_path(
