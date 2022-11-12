@@ -28,6 +28,7 @@ static DEPRECATED_ALIASES: Lazy<BTreeMap<&'static str, &'static str>> = Lazy::ne
     ])
 });
 
+/// U005
 pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, attr, .. } = &expr.node {
         if let Some(target) = DEPRECATED_ALIASES.get(attr.as_str()) {

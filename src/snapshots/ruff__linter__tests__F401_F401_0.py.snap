@@ -67,19 +67,19 @@ expression: checks
       - - shelve
       - false
   location:
-    row: 33
+    row: 32
     column: 4
   end_location:
-    row: 33
+    row: 32
     column: 17
   fix:
     patch:
       content: ""
       location:
-        row: 33
+        row: 32
         column: 0
       end_location:
-        row: 34
+        row: 33
         column: 0
     applied: false
 - kind:
@@ -87,39 +87,39 @@ expression: checks
       - - importlib
       - false
   location:
-    row: 34
+    row: 33
     column: 4
   end_location:
-    row: 34
+    row: 33
     column: 20
   fix:
     patch:
-      content: ""
+      content: pass
       location:
-        row: 34
-        column: 0
+        row: 33
+        column: 4
       end_location:
-        row: 35
-        column: 0
+        row: 33
+        column: 20
     applied: false
 - kind:
     UnusedImport:
       - - pathlib
       - false
   location:
-    row: 38
+    row: 37
     column: 4
   end_location:
-    row: 38
+    row: 37
     column: 18
   fix:
     patch:
       content: ""
       location:
-        row: 38
+        row: 37
         column: 0
       end_location:
-        row: 39
+        row: 38
         column: 0
     applied: false
 - kind:
@@ -127,19 +127,19 @@ expression: checks
       - - pickle
       - false
   location:
-    row: 53
+    row: 52
     column: 8
   end_location:
-    row: 53
+    row: 52
     column: 21
   fix:
     patch:
       content: pass
       location:
-        row: 53
+        row: 52
         column: 8
       end_location:
-        row: 53
+        row: 52
         column: 21
     applied: false
 

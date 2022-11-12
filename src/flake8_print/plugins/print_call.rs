@@ -7,6 +7,7 @@ use crate::check_ast::Checker;
 use crate::checks::CheckCode;
 use crate::flake8_print::checks;
 
+/// T201, T203
 pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let Some(mut check) = checks::print_call(
         expr,
@@ -26,7 +27,6 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
                     .iter()
                     .map(|index| checker.parents[*index])
                     .collect();
-
                 match helpers::remove_stmt(
                     checker.parents[context.defined_by],
                     context.defined_in.map(|index| checker.parents[index]),
@@ -38,7 +38,7 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
                         }
                         check.amend(fix)
                     }
-                    Err(e) => error!("Failed to fix unused imports: {}", e),
+                    Err(e) => error!("Failed to remove print call: {}", e),
                 }
             }
         }

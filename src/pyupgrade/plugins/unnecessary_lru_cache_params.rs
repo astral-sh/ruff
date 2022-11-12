@@ -3,6 +3,7 @@ use rustpython_parser::ast::Expr;
 use crate::check_ast::Checker;
 use crate::pyupgrade::{checks, fixes};
 
+/// U011
 pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Expr]) {
     if let Some(mut check) = checks::unnecessary_lru_cache_params(
         decorator_list,

@@ -4,6 +4,7 @@ use crate::check_ast::Checker;
 use crate::pyupgrade;
 use crate::pyupgrade::checks;
 
+/// U004
 pub fn useless_object_inheritance(
     checker: &mut Checker,
     stmt: &Stmt,

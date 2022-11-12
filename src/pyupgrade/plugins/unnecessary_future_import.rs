@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use log::error;
 use rustpython_ast::{AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
@@ -62,14 +63,20 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
                 .iter()
                 .map(|index| checker.parents[*index])
                 .collect();
-            if let Ok(fix) = fixes::remove_unnecessary_future_import(
+            match fixes::remove_unnecessary_future_import(
                 checker.locator,
                 &removable_index,
                 checker.parents[context.defined_by],
                 context.defined_in.map(|index| checker.parents[index]),
                 &deleted,
             ) {
-                check.amend(fix);
+                Ok(fix) => {
+                    if fix.patch.content.is_empty() || fix.patch.content == "pass" {
+                        checker.deletions.insert(context.defined_by);
+                    }
+                    check.amend(fix);
+                }
+                Err(e) => error!("Failed to remove __future__ import: {}", e),
             }
         }
         checker.add_check(check);
