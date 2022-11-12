@@ -2,10 +2,10 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
+use fnv::FnvHashSet;
 use path_absolutize::path_dedot;
 use regex::Regex;
 
@@ -24,7 +24,7 @@ pub mod user;
 #[derive(Debug)]
 pub struct Settings {
     pub dummy_variable_rgx: Regex,
-    pub enabled: BTreeSet<CheckCode>,
+    pub enabled: FnvHashSet<CheckCode>,
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
     pub line_length: usize,
@@ -66,7 +66,7 @@ impl Settings {
     pub fn for_rule(check_code: CheckCode) -> Self {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: BTreeSet::from([check_code]),
+            enabled: FnvHashSet::from_iter([check_code]),
             exclude: Default::default(),
             extend_exclude: Default::default(),
             line_length: 88,
@@ -84,7 +84,7 @@ impl Settings {
     pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: BTreeSet::from_iter(check_codes),
+            enabled: FnvHashSet::from_iter(check_codes),
             exclude: Default::default(),
             extend_exclude: Default::default(),
             line_length: 88,
@@ -127,8 +127,8 @@ fn resolve_codes(
     extend_select: &[CheckCodePrefix],
     ignore: &[CheckCodePrefix],
     extend_ignore: &[CheckCodePrefix],
-) -> BTreeSet<CheckCode> {
-    let mut codes: BTreeSet<CheckCode> = BTreeSet::new();
+) -> FnvHashSet<CheckCode> {
+    let mut codes: FnvHashSet<CheckCode> = FnvHashSet::default();
     for specificity in [
         PrefixSpecificity::Category,
         PrefixSpecificity::Hundreds,
@@ -165,7 +165,7 @@ fn resolve_codes(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use fnv::FnvHashSet;
 
     use crate::checks::CheckCode;
     use crate::checks_gen::CheckCodePrefix;
@@ -174,19 +174,19 @@ mod tests {
     #[test]
     fn resolver() {
         let actual = resolve_codes(&[CheckCodePrefix::W], &[], &[], &[]);
-        let expected = BTreeSet::from_iter([CheckCode::W292, CheckCode::W605]);
+        let expected = FnvHashSet::from_iter([CheckCode::W292, CheckCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(&[CheckCodePrefix::W6], &[], &[], &[]);
-        let expected = BTreeSet::from_iter([CheckCode::W605]);
+        let expected = FnvHashSet::from_iter([CheckCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(&[CheckCodePrefix::W], &[], &[CheckCodePrefix::W292], &[]);
-        let expected = BTreeSet::from_iter([CheckCode::W605]);
+        let expected = FnvHashSet::from_iter([CheckCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(&[CheckCodePrefix::W605], &[], &[CheckCodePrefix::W605], &[]);
-        let expected = BTreeSet::from_iter([]);
+        let expected = FnvHashSet::from_iter([]);
         assert_eq!(actual, expected);
     }
 }
