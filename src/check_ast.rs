@@ -1131,7 +1131,7 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::S106) {
                     self.add_checks(
-                        flake8_bandit::plugins::hardcoded_password_funcarg(keywords).into_iter(),
+                        flake8_bandit::plugins::hardcoded_password_func_arg(keywords).into_iter(),
                     );
                 }
 

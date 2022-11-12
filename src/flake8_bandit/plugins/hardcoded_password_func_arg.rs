@@ -5,7 +5,7 @@ use crate::checks::{Check, CheckKind};
 use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 /// S106
-pub fn hardcoded_password_funcarg(keywords: &[Keyword]) -> Vec<Check> {
+pub fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Check> {
     keywords
         .iter()
         .filter_map(|keyword| {
