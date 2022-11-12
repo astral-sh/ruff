@@ -1,7 +1,7 @@
-use crate::ast::helpers::compose_call_path;
 use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Expr, ExprKind};
 
+use crate::ast::helpers::compose_call_path;
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
