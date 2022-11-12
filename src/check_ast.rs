@@ -1073,6 +1073,10 @@ where
                     pyupgrade::plugins::super_call_with_parameters(self, expr, func, args);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::U012) {
+                    pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
+                }
+
                 // flake8-print
                 if self.settings.enabled.contains(&CheckCode::T201)
                     || self.settings.enabled.contains(&CheckCode::T203)

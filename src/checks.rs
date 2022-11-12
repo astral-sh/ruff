@@ -156,6 +156,7 @@ pub enum CheckCode {
     U009,
     U010,
     U011,
+    U012,
     // pydocstyle
     D100,
     D101,
@@ -444,6 +445,7 @@ pub enum CheckKind {
     PEP3120UnnecessaryCodingComment,
     UnnecessaryFutureImport(Vec<String>),
     UnnecessaryLRUCacheParams,
+    UnnecessaryEncodeUTF8,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -691,6 +693,7 @@ impl CheckCode {
             CheckCode::U009 => CheckKind::PEP3120UnnecessaryCodingComment,
             CheckCode::U010 => CheckKind::UnnecessaryFutureImport(vec!["...".to_string()]),
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
+            CheckCode::U012 => CheckKind::UnnecessaryEncodeUTF8,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -901,6 +904,7 @@ impl CheckCode {
             CheckCode::U009 => CheckCategory::Pyupgrade,
             CheckCode::U010 => CheckCategory::Pyupgrade,
             CheckCode::U011 => CheckCategory::Pyupgrade,
+            CheckCode::U012 => CheckCategory::Pyupgrade,
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -1103,6 +1107,7 @@ impl CheckKind {
             CheckKind::PEP3120UnnecessaryCodingComment => &CheckCode::U009,
             CheckKind::UnnecessaryFutureImport(_) => &CheckCode::U010,
             CheckKind::UnnecessaryLRUCacheParams => &CheckCode::U011,
+            CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::U012,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -1607,6 +1612,7 @@ impl CheckKind {
             CheckKind::UnnecessaryLRUCacheParams => {
                 "Unnecessary parameters to functools.lru_cache".to_string()
             }
+            CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
@@ -1873,6 +1879,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnnecessaryCollectionCall(_)
                 | CheckKind::UnnecessaryComprehension(_)
+                | CheckKind::UnnecessaryEncodeUTF8
                 | CheckKind::UnnecessaryFutureImport(_)
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
