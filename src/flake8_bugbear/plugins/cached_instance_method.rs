@@ -19,6 +19,7 @@ fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
     )
 }
 
+/// B019
 pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
     if matches!(checker.current_scope().kind, ScopeKind::Class(_)) {
         for decorator in decorator_list {
@@ -26,16 +27,20 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
                 if decorator_path == "classmethod" || decorator_path == "staticmethod" {
                     return;
                 }
-                let deco = match &decorator.node {
+            }
+        }
+        for decorator in decorator_list {
+            if is_cache_func(
+                checker,
+                match &decorator.node {
                     ExprKind::Call { func, .. } => func,
                     _ => decorator,
-                };
-                if is_cache_func(checker, deco) {
-                    checker.add_check(Check::new(
-                        CheckKind::CachedInstanceMethod,
-                        Range::from_located(decorator),
-                    ));
-                }
+                },
+            ) {
+                checker.add_check(Check::new(
+                    CheckKind::CachedInstanceMethod,
+                    Range::from_located(decorator),
+                ));
             }
         }
     }
