@@ -27,6 +27,7 @@ pub mod code_gen;
 mod cst;
 mod directives;
 mod docstrings;
+mod flake8_2020;
 pub mod flake8_annotations;
 mod flake8_bugbear;
 mod flake8_builtins;

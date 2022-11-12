@@ -57,8 +57,9 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    9. [flake8-print](#flake8-print)
    10. [flake8-quotes](#flake8-quotes)
    11. [flake8-annotations](#flake8-annotations)
-   12. [Ruff-specific rules](#ruff-specific-rules)
-   13. [Meta rules](#meta-rules)
+   12. [flake8-2020](#flake8-2020)
+   13. [Ruff-specific rules](#ruff-specific-rules)
+   14. [Meta rules](#meta-rules)
 5. [Editor Integrations](#editor-integrations)
 6. [FAQ](#faq)
 7. [Development](#development)
@@ -561,6 +562,23 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 | ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
 | ANN401 | DynamicallyTypedExpression | Dynamically typed expressions (typing.Any) are disallowed in `...` |  |
 
+### flake8-2020
+
+For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| YTT101 | SysVersionSlice3Referenced | `sys.version[:3]` referenced (python3.10), use `sys.version_info` |  |
+| YTT102 | SysVersion2Referenced | `sys.version[2]` referenced (python3.10), use `sys.version_info` |  |
+| YTT103 | SysVersionCmpStr3 | `sys.version` compared to string (python3.10), use `sys.version_info` |  |
+| YTT201 | SysVersionInfo0Eq3Referenced | `sys.version_info[0] == 3` referenced (python4), use `>=` |  |
+| YTT202 | SixPY3Referenced | `six.PY3` referenced (python4), use `not six.PY2` |  |
+| YTT203 | SysVersionInfo1CmpInt | `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT204 | SysVersionInfoMinorCmpInt | `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
+| YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
+| YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
+
 ### Ruff-specific rules
 
 | Code | Name | Message | Fix |
@@ -667,6 +685,7 @@ including:
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (20/32)
+- [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
@@ -690,6 +709,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (20/32)
+- [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/34).
