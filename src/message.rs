@@ -68,7 +68,6 @@ impl fmt::Display for Message {
     }
 }
 
-// https://github.com/rust-lang/rust/issues/59346
 impl Message {
     pub fn to_annotated_source(&self) -> String {
         let source = fs::read_to_string(&self.filename).unwrap();
