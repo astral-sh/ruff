@@ -1794,13 +1794,13 @@ impl CheckKind {
             CheckKind::AssertUsed => "Use of `assert` detected".to_string(),
             CheckKind::ExecUsed => "Use of `exec` detected".to_string(),
             CheckKind::HardcodedPasswordString(string) => {
-                format!("Possible hardcoded password: '{string}'")
+                format!("Possible hardcoded password: `'{string}'`")
             }
             CheckKind::HardcodedPasswordFuncArg(string) => {
-                format!("Possible hardcoded password: '{string}'")
+                format!("Possible hardcoded password: `'{string}'`")
             }
             CheckKind::HardcodedPasswordDefault(string) => {
-                format!("Possible hardcoded password: '{string}'")
+                format!("Possible hardcoded password: `'{string}'`")
             }
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
