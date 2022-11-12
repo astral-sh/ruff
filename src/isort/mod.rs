@@ -62,6 +62,7 @@ fn categorize_imports<'a>(
     for alias in block.import {
         let import_type = categorize(
             &alias.module_base(),
+            &None,
             src,
             known_first_party,
             known_third_party,
@@ -77,6 +78,7 @@ fn categorize_imports<'a>(
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
             &import_from.module_base(),
+            import_from.level,
             src,
             known_first_party,
             known_third_party,
@@ -119,6 +121,7 @@ pub fn sort_imports(
         ImportType::StandardLibrary,
         ImportType::ThirdParty,
         ImportType::FirstParty,
+        ImportType::LocalFolder,
     ] {
         if let Some(import_block) = block_by_type.get(&import_type) {
             // Add a blank line between every section.
@@ -218,6 +221,7 @@ mod tests {
     #[test_case(Path::new("reorder_within_section.py"))]
     #[test_case(Path::new("separate_first_party_imports.py"))]
     #[test_case(Path::new("separate_future_imports.py"))]
+    #[test_case(Path::new("separate_local_folder_imports.py"))]
     #[test_case(Path::new("separate_third_party_imports.py"))]
     #[test_case(Path::new("skip.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
