@@ -8,7 +8,7 @@ use crate::source_code_locator::SourceCodeLocator;
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
-fn get_encoded_variable(func: &Expr) -> Option<&Expr> {
+fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
     if let ExprKind::Attribute {
         value: variable,
         attr,
@@ -28,9 +28,10 @@ fn is_utf8_encoding_arg(arg: &Expr) -> bool {
         ..
     } = &arg.node
     {
-        return UTF8_LITERALS.contains(&value.to_lowercase().as_str());
+        UTF8_LITERALS.contains(&value.to_lowercase().as_str())
+    } else {
+        false
     }
-    false
 }
 
 fn is_default_encode(args: &Vec<Expr>, kwargs: &Vec<Keyword>) -> bool {
@@ -49,8 +50,8 @@ fn is_default_encode(args: &Vec<Expr>, kwargs: &Vec<Keyword>) -> bool {
     }
 }
 
-// May return a Fix for a default encode call removing the encoding argument,
-// keyword or positional
+// Return a Fix for a default `encode` call removing the encoding argument,
+// keyword, or positional.
 fn delete_default_encode_arg_or_kwarg(
     expr: &Expr,
     args: &[Expr],
@@ -74,7 +75,7 @@ fn delete_default_encode_arg_or_kwarg(
     }
 }
 
-// Return a Fix replacing the call to encode by a b prefix on the string
+// Return a Fix replacing the call to encode by a `"b"` prefix on the string.
 fn replace_with_bytes_literal(
     expr: &Expr,
     constant: &Expr,
@@ -83,13 +84,13 @@ fn replace_with_bytes_literal(
 ) -> Check {
     let mut check = Check::new(CheckKind::UnnecessaryEncodeUTF8, Range::from_located(expr));
     if patch {
-        let raw_constant = locator.slice_source_code_range(&Range {
+        let content = locator.slice_source_code_range(&Range {
             location: constant.location,
             end_location: constant.end_location.unwrap(),
         });
         let content = format!(
             "b{}",
-            raw_constant.trim_start_matches('u').trim_start_matches('U')
+            content.trim_start_matches('u').trim_start_matches('U')
         );
         check.amend(Fix::replacement(
             content,
@@ -100,6 +101,7 @@ fn replace_with_bytes_literal(
     check
 }
 
+/// U012
 pub fn unnecessary_encode_utf8(
     checker: &mut Checker,
     expr: &Expr,
@@ -107,26 +109,25 @@ pub fn unnecessary_encode_utf8(
     args: &Vec<Expr>,
     kwargs: &Vec<Keyword>,
 ) {
-    if let Some(variable) = get_encoded_variable(func) {
+    if let Some(variable) = match_encoded_variable(func) {
         match &variable.node {
             ExprKind::Constant {
                 value: Constant::Str(literal),
                 ..
             } => {
-                // any.encode()
-                // any.encode("utf-8")
+                // "str".encode()
+                // "str".encode("utf-8")
                 if is_default_encode(args, kwargs) {
-                    // "foo".encode()
                     if literal.is_ascii() {
+                        // "foo".encode()
                         checker.add_check(replace_with_bytes_literal(
                             expr,
                             variable,
                             checker.locator,
                             checker.patch(),
                         ));
-                    }
-                    // "unicode text©".encode("utf-8")
-                    else {
+                    } else {
+                        // "unicode text©".encode("utf-8")
                         if let Some(check) =
                             delete_default_encode_arg_or_kwarg(expr, args, kwargs, checker.patch())
                         {
@@ -145,7 +146,7 @@ pub fn unnecessary_encode_utf8(
                     }
                 }
             }
-            _ => (),
+            _ => {}
         }
     }
 }
