@@ -875,6 +875,9 @@ where
         let prev_visible_scope = self.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
+                if self.settings.enabled.contains(&CheckCode::B021) {
+                    flake8_bugbear::plugins::f_string_docstring(self, body);
+                }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
                     stmt,
@@ -894,6 +897,9 @@ where
                 ));
             }
             StmtKind::ClassDef { body, .. } => {
+                if self.settings.enabled.contains(&CheckCode::B021) {
+                    flake8_bugbear::plugins::f_string_docstring(self, body);
+                }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
                     stmt,
@@ -2248,6 +2254,9 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
+        if self.settings.enabled.contains(&CheckCode::B021) {
+            flake8_bugbear::plugins::f_string_docstring(self, python_ast);
+        }
         let docstring = docstrings::extraction::docstring_from(python_ast);
         self.definitions.push((
             Definition {

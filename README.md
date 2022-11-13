@@ -527,6 +527,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B017 | NoAssertRaisesException | `assertRaises(Exception)` should be considered evil |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B019 | CachedInstanceMethod | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
+| B021 | FStringDocstring | f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring. |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
 | B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged |  |
 
