@@ -8,7 +8,12 @@ fn walk_stmt(checker: &mut Checker, body: &Vec<Stmt>, f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
             checker.add_check(Check::new(
-                CheckKind::JumpStatementInFinally,
+                CheckKind::JumpStatementInFinally(match &stmt.node {
+                    StmtKind::Break { .. } => "break".to_string(),
+                    StmtKind::Continue { .. } => "continue".to_string(),
+                    StmtKind::Return { .. } => "return".to_string(),
+                    _ => unreachable!(),
+                }),
                 Range::from_located(stmt),
             ));
         }

@@ -2,7 +2,8 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: return
   location:
     row: 5
     column: 8
@@ -10,7 +11,8 @@ expression: checks
     row: 5
     column: 14
   fix: ~
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: return
   location:
     row: 13
     column: 12
@@ -18,7 +20,8 @@ expression: checks
     row: 13
     column: 18
   fix: ~
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: return
   location:
     row: 21
     column: 12
@@ -26,7 +29,8 @@ expression: checks
     row: 21
     column: 18
   fix: ~
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: return
   location:
     row: 31
     column: 12
@@ -34,7 +38,8 @@ expression: checks
     row: 31
     column: 18
   fix: ~
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: return
   location:
     row: 44
     column: 20
@@ -42,7 +47,8 @@ expression: checks
     row: 44
     column: 26
   fix: ~
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: break
   location:
     row: 66
     column: 12
@@ -50,7 +56,8 @@ expression: checks
     row: 66
     column: 17
   fix: ~
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: continue
   location:
     row: 78
     column: 12
@@ -58,7 +65,8 @@ expression: checks
     row: 78
     column: 20
   fix: ~
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: return
   location:
     row: 94
     column: 12
@@ -66,7 +74,8 @@ expression: checks
     row: 94
     column: 18
   fix: ~
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: continue
   location:
     row: 101
     column: 8
@@ -74,7 +83,8 @@ expression: checks
     row: 101
     column: 16
   fix: ~
-- kind: JumpStatementInFinally
+- kind:
+    JumpStatementInFinally: break
   location:
     row: 107
     column: 8
