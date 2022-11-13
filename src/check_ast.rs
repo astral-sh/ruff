@@ -341,9 +341,6 @@ where
                 if self.settings.enabled.contains(&CheckCode::B019) {
                     flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
                 }
-                if self.settings.enabled.contains(&CheckCode::B021) {
-                    flake8_bugbear::plugins::f_string_docstring(self, body);
-                }
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
                     self.add_checks(
@@ -453,9 +450,6 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::B018) {
                     flake8_bugbear::plugins::useless_expression(self, body);
-                }
-                if self.settings.enabled.contains(&CheckCode::B021) {
-                    flake8_bugbear::plugins::f_string_docstring(self, body);
                 }
 
                 self.check_builtin_shadowing(name, Range::from_located(stmt), false);
@@ -881,6 +875,9 @@ where
         let prev_visible_scope = self.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
+                if self.settings.enabled.contains(&CheckCode::B021) {
+                    flake8_bugbear::plugins::f_string_docstring(self, body);
+                }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
                     stmt,
@@ -900,6 +897,9 @@ where
                 ));
             }
             StmtKind::ClassDef { body, .. } => {
+                if self.settings.enabled.contains(&CheckCode::B021) {
+                    flake8_bugbear::plugins::f_string_docstring(self, body);
+                }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
                     stmt,
@@ -2251,6 +2251,9 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
+        if self.settings.enabled.contains(&CheckCode::B021) {
+            flake8_bugbear::plugins::f_string_docstring(self, python_ast);
+        }
         let docstring = docstrings::extraction::docstring_from(python_ast);
         self.definitions.push((
             Definition {
