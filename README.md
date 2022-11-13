@@ -755,7 +755,7 @@ project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
 
 Ruff's import sorting is intended to be equivalent to `isort` when used `profile = "black"`, and a
 few other settings (`combine_as_imports = true`, `order_by_type = false`, and
-`case_sensitive` = true`).
+`case_sensitive = true`).
 
 Like `isort`, Ruff's import sorting is compatible with Black.
 
