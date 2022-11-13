@@ -36,10 +36,12 @@ impl Message {
             location: Location::new(check.location.row(), 0),
             end_location: Location::new(check.end_location.row() + 1, 0),
         });
-        let error_source = locator.slice_source_code_range(&Range {
-            location: check.location,
-            end_location: check.end_location,
-        });
+        let num_chars_in_range = locator
+            .slice_source_code_range(&Range {
+                location: check.location,
+                end_location: check.end_location,
+            })
+            .len();
         Self {
             kind: check.kind,
             fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
@@ -49,7 +51,7 @@ impl Message {
             source: Some(source.to_string()),
             range: Some((
                 check.location.column(),
-                check.location.column() + error_source.len(),
+                check.location.column() + num_chars_in_range,
             )),
             show_source,
         }
