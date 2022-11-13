@@ -4,7 +4,7 @@ use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-fn walk_stmt(checker: &mut Checker, body: &Vec<Stmt>, f: fn(&Stmt) -> bool) {
+fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
             checker.add_check(Check::new(
@@ -12,7 +12,9 @@ fn walk_stmt(checker: &mut Checker, body: &Vec<Stmt>, f: fn(&Stmt) -> bool) {
                     StmtKind::Break { .. } => "break".to_string(),
                     StmtKind::Continue { .. } => "continue".to_string(),
                     StmtKind::Return { .. } => "return".to_string(),
-                    _ => unreachable!(),
+                    _ => unreachable!(
+                        "Expected StmtKind::Break | StmtKind::Continue | StmtKind::Return"
+                    ),
                 }),
                 Range::from_located(stmt),
             ));
@@ -37,7 +39,7 @@ fn walk_stmt(checker: &mut Checker, body: &Vec<Stmt>, f: fn(&Stmt) -> bool) {
 }
 
 /// B012
-pub fn jump_statement_in_finally(checker: &mut Checker, finalbody: &Vec<Stmt>) {
+pub fn jump_statement_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
     walk_stmt(checker, finalbody, |stmt| {
         matches!(
             stmt.node,
