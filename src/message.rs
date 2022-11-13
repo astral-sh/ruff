@@ -73,9 +73,12 @@ impl Message {
             .skip(self.location.row() - 1)
             .take(self.end_location.row() - self.location.row() + 1)
             .collect::<Vec<_>>();
-        let range_end = if self.location.row() == self.end_location.row() {
-            self.end_location.column()
-        } else {
+        let body = self.kind.body();
+        let code = self.kind.code().as_ref();
+        let rel_path = relativize_path(Path::new(&self.filename));
+        let source = error_lines.join("\n");
+        let range = (
+            self.location.column() - 1,
             error_lines
                 .iter()
                 .enumerate()
@@ -86,12 +89,9 @@ impl Message {
                         line.len() + 1
                     }
                 })
-                .sum()
-        };
-        let body = self.kind.body();
-        let code = self.kind.code().as_ref();
-        let rel_path = relativize_path(Path::new(&self.filename));
-        let source = error_lines.join("\n");
+                .sum::<usize>()
+                - 1,
+        );
         let snippet = Snippet {
             title: Some(Annotation {
                 label: Some(&body),
@@ -107,7 +107,7 @@ impl Message {
                 annotations: vec![SourceAnnotation {
                     label: "",
                     annotation_type: AnnotationType::Error,
-                    range: (self.location.column() - 1, range_end - 1),
+                    range,
                 }],
             }],
             opt: FormatOptions {
