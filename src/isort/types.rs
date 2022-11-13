@@ -7,6 +7,14 @@ pub struct ImportFromData<'a> {
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub struct ImportFromAsData<'a> {
+    pub module: &'a Option<String>,
+    pub level: &'a Option<usize>,
+    pub name: &'a str,
+    pub asname: &'a str,
+}
+
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct AliasData<'a> {
     pub name: &'a str,
     pub asname: &'a Option<String>,
@@ -48,6 +56,8 @@ impl Importable for ImportFromData<'_> {
 
 #[derive(Debug, Default)]
 pub struct ImportBlock<'a> {
+    // Map from (module, level) to `AliasData`.
+    pub import_from_as: BTreeMap<ImportFromData<'a>, BTreeSet<AliasData<'a>>>,
     // Map from (module, level) to `AliasData`.
     pub import_from: BTreeMap<ImportFromData<'a>, BTreeSet<AliasData<'a>>>,
     // Set of (name, asname).
