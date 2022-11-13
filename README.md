@@ -335,7 +335,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F702 | ContinueOutsideLoop | `continue` not properly in loop |  |
 | F704 | YieldOutsideFunction | `yield` or `yield from` statement outside of a function |  |
 | F706 | ReturnOutsideFunction | `return` statement outside of a function/method |  |
-| F707 | DefaultExceptNotLast | An `except:` block as not the last exception handler |  |
+| F707 | DefaultExceptNotLast | An `except` block as not the last exception handler |  |
 | F722 | ForwardAnnotationSyntaxError | Syntax error in forward annotation: `...` |  |
 | F821 | UndefinedName | Undefined name `...` |  |
 | F822 | UndefinedExport | Undefined name `...` in `__all__` |  |
@@ -519,11 +519,11 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. |  |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
-| B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError:` instead of `except (ValueError,):`. |  |
+| B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`. |  |
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
 | B015 | UselessComparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
 | B016 | CannotRaiseLiteral | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
-| B017 | NoAssertRaisesException | `assertRaises(Exception):` should be considered evil |  |
+| B017 | NoAssertRaisesException | `assertRaises(Exception)` should be considered evil |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B019 | CachedInstanceMethod | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
