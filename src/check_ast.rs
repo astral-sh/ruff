@@ -916,6 +916,9 @@ where
                 finalbody,
             } => {
                 self.except_handlers.push(extract_handler_names(handlers));
+                if self.settings.enabled.contains(&CheckCode::B012) {
+                    flake8_bugbear::plugins::jump_statement_in_finally(self, finalbody);
+                }
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
