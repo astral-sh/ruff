@@ -117,8 +117,9 @@ impl fmt::Display for Message {
         if self.show_source {
             message.push('\n');
         }
-        // `message` (which contains color codes) looks like "error: path/to/file.py:1:1: ...".
-        // `split_once(' ').unwrap().1` stirps "error: ".
+        // `message` (which contains color codes) looks like "error:
+        // path/to/file.py:1:1: ...". `split_once(' ').unwrap().1` stirps
+        // "error: ".
         write!(f, "{}", message.split_once(' ').unwrap().1)
     }
 }
