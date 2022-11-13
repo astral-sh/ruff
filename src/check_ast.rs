@@ -945,6 +945,11 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::U013) {
+                    pyupgrade::plugins::convert_typed_dict_functional_to_class(
+                        self, stmt, targets, value,
+                    );
+                }
             }
             StmtKind::AnnAssign { target, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
