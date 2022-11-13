@@ -1,4 +1,4 @@
-use fnv::FnvHashSet;
+use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Constant, KeywordData};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
@@ -163,7 +163,7 @@ pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<
 pub fn unnecessary_lru_cache_params(
     decorator_list: &[Expr],
     target_version: PythonVersion,
-    imports: Option<&FnvHashSet<&str>>,
+    imports: &FnvHashMap<&str, FnvHashSet<&str>>,
 ) -> Option<Check> {
     for expr in decorator_list.iter() {
         if let ExprKind::Call {
@@ -172,8 +172,7 @@ pub fn unnecessary_lru_cache_params(
             keywords,
         } = &expr.node
         {
-            if args.is_empty()
-                && helpers::match_name_or_attr_from_module(func, "lru_cache", "functools", imports)
+            if args.is_empty() && helpers::match_module_member(func, "functools.lru_cache", imports)
             {
                 // Ex) `functools.lru_cache()`
                 if keywords.is_empty() {

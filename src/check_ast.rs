@@ -12,7 +12,7 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast::helpers::{extract_handler_names, match_name_or_attr_from_module};
+use crate::ast::helpers::{extract_handler_names, match_module_member};
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -155,13 +155,12 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_module(&self, expr: &Expr, target: &str) -> bool {
-        match_name_or_attr_from_module(expr, target, "typing", self.from_imports.get("typing"))
+        match_module_member(expr, &format!("typing.{target}"), &self.from_imports)
             || (typing::in_extensions(target)
-                && match_name_or_attr_from_module(
+                && match_module_member(
                     expr,
-                    target,
-                    "typing_extensions",
-                    self.from_imports.get("typing_extensions"),
+                    &format!("typing_extensions.{target}"),
+                    &self.from_imports,
                 ))
     }
 }
@@ -192,7 +191,13 @@ where
                 self.futures_allowed = false;
                 if !self.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(node)
-                    && !operations::in_nested_block(&self.parent_stack, &self.parents)
+                    && !operations::in_nested_block(
+                        &mut self
+                            .parent_stack
+                            .iter()
+                            .rev()
+                            .map(|index| self.parents[*index]),
+                    )
                 {
                     self.seen_import_boundary = true;
                 }
@@ -1019,7 +1024,7 @@ where
                         // Ex) List[...]
                         if self.settings.enabled.contains(&CheckCode::U006)
                             && self.settings.target_version >= PythonVersion::Py39
-                            && typing::is_pep585_builtin(expr, self.from_imports.get("typing"))
+                            && typing::is_pep585_builtin(expr, &self.from_imports)
                         {
                             pyupgrade::plugins::use_pep585_annotation(self, expr, id);
                         }
@@ -1051,7 +1056,7 @@ where
                 // Ex) typing.List[...]
                 if self.settings.enabled.contains(&CheckCode::U006)
                     && self.settings.target_version >= PythonVersion::Py39
-                    && typing::is_pep585_builtin(expr, self.from_imports.get("typing"))
+                    && typing::is_pep585_builtin(expr, &self.from_imports)
                 {
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
@@ -2214,7 +2219,13 @@ impl<'a> Checker<'a> {
 
     fn handle_node_delete(&mut self, expr: &Expr) {
         if let ExprKind::Name { id, .. } = &expr.node {
-            if operations::on_conditional_branch(&self.parent_stack, &self.parents) {
+            if operations::on_conditional_branch(
+                &mut self
+                    .parent_stack
+                    .iter()
+                    .rev()
+                    .map(|index| self.parents[*index]),
+            ) {
                 return;
             }
 

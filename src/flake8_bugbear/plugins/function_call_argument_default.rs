@@ -1,7 +1,7 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
-use crate::ast::helpers::compose_call_path;
+use crate::ast::helpers::{compose_call_path, match_call_path};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -24,37 +24,14 @@ fn is_immutable_func(
     extend_immutable_calls: &[&str],
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
 ) -> bool {
-    compose_call_path(expr).map_or_else(
-        || false,
-        |call_path| {
-            // It matches the call path exactly (`operator.methodcaller`).
-            for target in IMMUTABLE_FUNCS.iter().chain(extend_immutable_calls) {
-                if &call_path == target {
-                    return true;
-                }
-            }
-
-            // It matches the member name, and was imported from that module (`methodcaller`
-            // following `from operator import methodcaller`).
-            if !call_path.contains('.') {
-                for target in IMMUTABLE_FUNCS.iter().chain(extend_immutable_calls) {
-                    let mut splitter = target.rsplit('.');
-                    if let (Some(member), Some(module)) = (splitter.next(), splitter.next()) {
-                        if call_path == member
-                            && from_imports
-                                .get(module)
-                                .map(|module| module.contains(member))
-                                .unwrap_or(false)
-                        {
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            false
-        },
-    )
+    compose_call_path(expr)
+        .map(|call_path| {
+            IMMUTABLE_FUNCS
+                .iter()
+                .chain(extend_immutable_calls)
+                .any(|target| match_call_path(&call_path, target, from_imports))
+        })
+        .unwrap_or(false)
 }
 
 struct ArgumentDefaultVisitor<'a> {

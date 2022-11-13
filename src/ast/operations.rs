@@ -67,9 +67,8 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
 }
 
 /// Check if a node is parent of a conditional branch.
-pub fn on_conditional_branch(parent_stack: &[usize], parents: &[&Stmt]) -> bool {
-    for index in parent_stack.iter().rev() {
-        let parent = parents[*index];
+pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
+    parents.any(|parent| {
         if matches!(parent.node, StmtKind::If { .. } | StmtKind::While { .. }) {
             return true;
         }
@@ -78,24 +77,18 @@ pub fn on_conditional_branch(parent_stack: &[usize], parents: &[&Stmt]) -> bool 
                 return true;
             }
         }
-    }
-
-    false
+        false
+    })
 }
 
 /// Check if a node is in a nested block.
-pub fn in_nested_block(parent_stack: &[usize], parents: &[&Stmt]) -> bool {
-    for index in parent_stack.iter().rev() {
-        let parent = parents[*index];
-        if matches!(
+pub fn in_nested_block<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
+    parents.any(|parent| {
+        matches!(
             parent.node,
             StmtKind::Try { .. } | StmtKind::If { .. } | StmtKind::With { .. }
-        ) {
-            return true;
-        }
-    }
-
-    false
+        )
+    })
 }
 
 /// Check if a node represents an unpacking assignment.

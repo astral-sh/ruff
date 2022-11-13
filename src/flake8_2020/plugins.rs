@@ -1,13 +1,13 @@
 use num_bigint::BigInt;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Located};
 
-use crate::ast::helpers::match_name_or_attr_from_module;
+use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 
 fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
-    match_name_or_attr_from_module(expr, target, "sys", checker.from_imports.get("sys"))
+    match_module_member(expr, &format!("sys.{target}"), &checker.from_imports)
 }
 
 /// YTT101, YTT102, YTT301, YTT303
@@ -181,9 +181,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
 
 /// YTT202
 pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
-    if match_name_or_attr_from_module(expr, "PY3", "six", checker.from_imports.get("six"))
-        && checker.settings.enabled.contains(&CheckCode::YTT202)
-    {
+    if match_module_member(expr, "six.PY3", &checker.from_imports) {
         checker.add_check(Check::new(
             CheckKind::SixPY3Referenced,
             Range::from_located(expr),
