@@ -83,7 +83,7 @@ mod tests {
     use crate::pep8_naming::helpers::{is_acronym, is_camelcase, is_mixed_case};
 
     #[test]
-    fn test_is_camelcase() -> () {
+    fn test_is_camelcase() {
         assert!(is_camelcase("Camel"));
         assert!(is_camelcase("CamelCase"));
         assert!(!is_camelcase("camel"));
@@ -93,7 +93,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_mixed_case() -> () {
+    fn test_is_mixed_case() {
         assert!(is_mixed_case("mixedCase"));
         assert!(is_mixed_case("mixed_Case"));
         assert!(is_mixed_case("_mixed_Case"));
@@ -104,7 +104,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_acronym() -> () {
+    fn test_is_acronym() {
         assert!(is_acronym("AB", "AB"));
         assert!(is_acronym("AbcDef", "AD"));
         assert!(!is_acronym("AbcDef", "Ad"));

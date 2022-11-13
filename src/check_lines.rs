@@ -283,7 +283,7 @@ mod tests {
                 },
                 &fixer::Mode::Generate,
             );
-            return checks;
+            checks
         };
         assert!(!check_with_max_line_length(6).is_empty());
         assert!(check_with_max_line_length(7).is_empty());

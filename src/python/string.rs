@@ -27,7 +27,7 @@ mod tests {
     use crate::python::string::{is_lower, is_upper};
 
     #[test]
-    fn test_is_lower() -> () {
+    fn test_is_lower() {
         assert!(is_lower("abc"));
         assert!(is_lower("a_b_c"));
         assert!(is_lower("a2c"));
@@ -38,7 +38,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_upper() -> () {
+    fn test_is_upper() {
         assert!(is_upper("ABC"));
         assert!(is_upper("A_B_C"));
         assert!(is_upper("A2C"));
