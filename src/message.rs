@@ -77,11 +77,11 @@ impl fmt::Display for Message {
         let label = format!(
             "{}{}{}{}{}{} {} {}",
             relativize_path(Path::new(&self.filename)).white().bold(),
-            ":".blue(),
+            ":".cyan(),
             self.location.row(),
-            ":".blue(),
+            ":".cyan(),
             self.location.column(),
-            ":".blue(),
+            ":".cyan(),
             self.kind.code().as_ref().red().bold(),
             self.kind.body(),
         );
