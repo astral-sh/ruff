@@ -1,3 +1,4 @@
+use fnv::FnvHashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
@@ -36,15 +37,25 @@ fn normalize_imports<'a>(imports: &'a [&'a Stmt]) -> ImportBlock<'a> {
                 names,
                 level,
             } => {
-                let targets = block
-                    .import_from
-                    .entry(ImportFromData { module, level })
-                    .or_default();
                 for name in names {
-                    targets.insert(AliasData {
-                        name: &name.node.name,
-                        asname: &name.node.asname,
-                    });
+                    if name.node.asname.is_none() {
+                        block
+                            .import_from
+                            .entry(ImportFromData { module, level })
+                            .or_default()
+                            .insert(AliasData {
+                                name: &name.node.name,
+                                asname: &name.node.asname,
+                            });
+                    } else {
+                        block.import_from_as.insert((
+                            ImportFromData { module, level },
+                            AliasData {
+                                name: &name.node.name,
+                                asname: &name.node.asname,
+                            },
+                        ));
+                    }
                 }
             }
             _ => unreachable!("Expected StmtKind::Import | StmtKind::ImportFrom"),
@@ -77,7 +88,7 @@ fn categorize_imports<'a>(
             .import
             .insert(alias);
     }
-    // Categorize `StmtKind::ImportFrom`.
+    // Categorize `StmtKind::ImportFrom` (without re-export).
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
             &import_from.module_base(),
@@ -93,36 +104,73 @@ fn categorize_imports<'a>(
             .import_from
             .insert(import_from, aliases);
     }
+    // Categorize `StmtKind::ImportFrom` (with re-export).
+    for (import_from, alias) in block.import_from_as {
+        let classification = categorize(
+            &import_from.module_base(),
+            import_from.level,
+            src,
+            known_first_party,
+            known_third_party,
+            extra_standard_library,
+        );
+        block_by_type
+            .entry(classification)
+            .or_default()
+            .import_from_as
+            .insert((import_from, alias));
+    }
     block_by_type
 }
 
 fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     let mut ordered: OrderedImportBlock = Default::default();
+
     // Sort `StmtKind::Import`.
-    for import in block
-        .import
-        .into_iter()
-        .sorted_by_cached_key(|alias| module_key(alias.name))
-    {
-        ordered.import.push(import);
-    }
+    ordered.import.extend(
+        block
+            .import
+            .into_iter()
+            .sorted_by_cached_key(|alias| module_key(alias.name, alias.asname)),
+    );
+
     // Sort `StmtKind::ImportFrom`.
-    for (import_from, aliases) in
+    ordered.import_from.extend(
+        // Include all non-re-exports.
         block
             .import_from
             .into_iter()
-            .sorted_by_cached_key(|(import_from, _)| {
-                import_from.module.as_ref().map(|module| module_key(module))
+            .chain(
+                // Include all re-exports.
+                block
+                    .import_from_as
+                    .into_iter()
+                    .map(|(import_from, alias)| (import_from, FnvHashSet::from_iter([alias]))),
+            )
+            .map(|(import_from, aliases)| {
+                // Within each `StmtKind::ImportFrom`, sort the members.
+                (
+                    import_from,
+                    aliases
+                        .into_iter()
+                        .sorted_by_cached_key(|alias| member_key(alias.name, alias.asname))
+                        .collect::<Vec<AliasData>>(),
+                )
             })
-    {
-        ordered.import_from.push((
-            import_from,
-            aliases
-                .into_iter()
-                .sorted_by_cached_key(|alias| member_key(alias.name))
-                .collect(),
-        ));
-    }
+            .sorted_by_cached_key(|(import_from, aliases)| {
+                // Sort each `StmtKind::ImportFrom` by module key, breaking ties based on members.
+                (
+                    import_from
+                        .module
+                        .as_ref()
+                        .map(|module| module_key(module, &None)),
+                    aliases
+                        .first()
+                        .map(|alias| member_key(alias.name, alias.asname)),
+                )
+            }),
+    );
+
     ordered
 }
 
@@ -137,6 +185,8 @@ pub fn format_imports(
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(&block);
 
+    println!("block = {:?}", block);
+
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
         block,
@@ -145,6 +195,8 @@ pub fn format_imports(
         known_third_party,
         extra_standard_library,
     );
+
+    println!("block_by_type = {:?}", block_by_type);
 
     // Generate replacement source code.
     let mut output = RopeBuilder::new();
@@ -170,6 +222,8 @@ pub fn format_imports(
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, aliases) in import_block.import_from.iter() {
+            println!("import_from = {:?}", import_from);
+            println!("aliases = {:?}", aliases);
             let prelude: String = format!("from {} import ", import_from.module_name());
             let members: Vec<String> = aliases
                 .iter()
@@ -181,6 +235,8 @@ pub fn format_imports(
                     }
                 })
                 .collect();
+
+            println!("members = {:?}", members);
 
             // Can we fit the import on a single line?
             let expected_len: usize =

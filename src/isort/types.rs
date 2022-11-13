@@ -1,17 +1,9 @@
-use std::collections::{BTreeMap, BTreeSet};
+use fnv::{FnvHashMap, FnvHashSet};
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ImportFromData<'a> {
     pub module: &'a Option<String>,
     pub level: &'a Option<usize>,
-}
-
-#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct ImportFromAsData<'a> {
-    pub module: &'a Option<String>,
-    pub level: &'a Option<usize>,
-    pub name: &'a str,
-    pub asname: &'a str,
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -56,18 +48,19 @@ impl Importable for ImportFromData<'_> {
 
 #[derive(Debug, Default)]
 pub struct ImportBlock<'a> {
-    // Map from (module, level) to `AliasData`.
-    pub import_from_as: BTreeMap<ImportFromData<'a>, BTreeSet<AliasData<'a>>>,
-    // Map from (module, level) to `AliasData`.
-    pub import_from: BTreeMap<ImportFromData<'a>, BTreeSet<AliasData<'a>>>,
-    // Set of (name, asname).
-    pub import: BTreeSet<AliasData<'a>>,
+    // Set of (name, asname), used to track regular imports.
+    // Ex) `import module`
+    pub import: FnvHashSet<AliasData<'a>>,
+    // Map from (module, level) to `AliasData`, used to track 'from' imports.
+    // Ex) `from module import member`
+    pub import_from: FnvHashMap<ImportFromData<'a>, FnvHashSet<AliasData<'a>>>,
+    // Set of (module, level, name, asname), used to track re-exported 'from' imports.
+    // Ex) `from module import member as member`
+    pub import_from_as: FnvHashSet<(ImportFromData<'a>, AliasData<'a>)>,
 }
 
 #[derive(Debug, Default)]
 pub struct OrderedImportBlock<'a> {
-    // Map from (module, level) to `AliasData`.
-    pub import_from: Vec<(ImportFromData<'a>, Vec<AliasData<'a>>)>,
-    // Set of (name, asname).
     pub import: Vec<AliasData<'a>>,
+    pub import_from: Vec<(ImportFromData<'a>, Vec<AliasData<'a>>)>,
 }
