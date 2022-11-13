@@ -10,7 +10,7 @@ use regex::Regex;
 use crate::checks::{Check, CheckCode};
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?P<noqa>\s*# noqa(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
+    Regex::new(r"(?P<noqa>\s*(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
         .expect("Invalid regex")
 });
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").expect("Invalid regex"));
@@ -118,7 +118,21 @@ mod tests {
 
     use crate::ast::types::Range;
     use crate::checks::{Check, CheckKind};
-    use crate::noqa::add_noqa_inner;
+    use crate::noqa::{add_noqa_inner, NO_QA_REGEX};
+
+    #[test]
+    fn regex() {
+        assert!(NO_QA_REGEX.is_match("# noqa"));
+        assert!(NO_QA_REGEX.is_match("# NoQA"));
+
+        assert!(NO_QA_REGEX.is_match("# noqa: F401"));
+        assert!(NO_QA_REGEX.is_match("# NoQA: F401"));
+        assert!(NO_QA_REGEX.is_match("# noqa: F401, E501"));
+
+        assert!(NO_QA_REGEX.is_match("# noqa:F401"));
+        assert!(NO_QA_REGEX.is_match("# NoQA:F401"));
+        assert!(NO_QA_REGEX.is_match("# noqa:F401, E501"));
+    }
 
     #[test]
     fn modification() -> Result<()> {
