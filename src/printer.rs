@@ -28,21 +28,12 @@ struct ExpandedMessage<'a> {
 
 pub struct Printer<'a> {
     format: &'a SerializationFormat,
-    show_source: bool,
     log_level: &'a LogLevel,
 }
 
 impl<'a> Printer<'a> {
-    pub fn new(
-        format: &'a SerializationFormat,
-        log_level: &'a LogLevel,
-        show_source: bool,
-    ) -> Self {
-        Self {
-            format,
-            log_level,
-            show_source,
-        }
+    pub fn new(format: &'a SerializationFormat, log_level: &'a LogLevel) -> Self {
+        Self { format, log_level }
     }
 
     pub fn write_to_user(&self, message: &str) {
@@ -97,11 +88,7 @@ impl<'a> Printer<'a> {
                 }
 
                 for message in outstanding {
-                    if self.show_source {
-                        println!("{}\n", message.to_annotated_source())
-                    } else {
-                        println!("{}", message)
-                    }
+                    println!("{}", message)
                 }
 
                 if self.log_level >= &LogLevel::Default {

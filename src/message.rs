@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
+use std::fmt;
 use std::path::Path;
-use std::{fmt, fs};
 
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
@@ -8,8 +8,10 @@ use colored::Colorize;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
+use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
 use crate::fs::relativize_path;
+use crate::source_code_locator::SourceCodeLocator;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
@@ -18,16 +20,38 @@ pub struct Message {
     pub location: Location,
     pub end_location: Location,
     pub filename: String,
+    pub source: Option<String>,
+    pub range: Option<(usize, usize)>,
+    pub show_source: bool,
 }
 
 impl Message {
-    pub fn from_check(filename: String, check: Check) -> Self {
+    pub fn from_check(
+        filename: String,
+        check: Check,
+        locator: &SourceCodeLocator,
+        show_source: bool,
+    ) -> Self {
+        let source = locator.slice_source_code_range(&Range {
+            location: Location::new(check.location.row(), 0),
+            end_location: Location::new(check.end_location.row() + 1, 0),
+        });
+        let error_source = locator.slice_source_code_range(&Range {
+            location: check.location,
+            end_location: check.end_location,
+        });
         Self {
             kind: check.kind,
             fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
             location: Location::new(check.location.row(), check.location.column() + 1),
             end_location: Location::new(check.end_location.row(), check.end_location.column() + 1),
             filename,
+            source: Some(source.to_string()),
+            range: Some((
+                check.location.column(),
+                check.location.column() + error_source.len(),
+            )),
+            show_source,
         }
     }
 }
@@ -50,71 +74,51 @@ impl PartialOrd for Message {
 
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
+        let label = format!(
             "{}{}{}{}{}{} {} {}",
             relativize_path(Path::new(&self.filename)).white().bold(),
-            ":".cyan(),
+            ":".blue(),
             self.location.row(),
-            ":".cyan(),
+            ":".blue(),
             self.location.column(),
-            ":".cyan(),
+            ":".blue(),
             self.kind.code().as_ref().red().bold(),
-            self.kind.body()
-        )
-    }
-}
-
-impl Message {
-    pub fn to_annotated_source(&self) -> String {
-        let source = fs::read_to_string(&self.filename).unwrap();
-        let error_lines = source
-            .lines()
-            .skip(self.location.row() - 1)
-            .take(self.end_location.row() - self.location.row() + 1)
-            .collect::<Vec<_>>();
-        let body = self.kind.body();
-        let code = self.kind.code().as_ref();
-        let rel_path = relativize_path(Path::new(&self.filename));
-        let source = error_lines.join("\n");
-        let range = (
-            self.location.column() - 1,
-            error_lines
-                .iter()
-                .enumerate()
-                .map(|(i, line)| {
-                    if i == error_lines.len() - 1 {
-                        self.end_location.column()
-                    } else {
-                        line.len() + 1
-                    }
-                })
-                .sum::<usize>()
-                - 1,
+            self.kind.body(),
         );
-        let snippet = Snippet {
-            title: Some(Annotation {
-                label: Some(&body),
-                id: Some(code),
-                annotation_type: AnnotationType::Error,
-            }),
-            footer: vec![],
-            slices: vec![Slice {
-                source: &source,
+        let slices = if self.show_source && self.source.is_some() && self.range.is_some() {
+            vec![Slice {
+                source: self.source.as_ref().unwrap(),
                 line_start: self.location.row(),
-                origin: Some(&rel_path),
+                origin: None,
                 fold: false,
                 annotations: vec![SourceAnnotation {
                     label: "",
                     annotation_type: AnnotationType::Error,
-                    range,
+                    range: self.range.unwrap(),
                 }],
-            }],
+            }]
+        } else {
+            vec![]
+        };
+        let snippet = Snippet {
+            title: Some(Annotation {
+                label: Some(&label),
+                id: None,
+                annotation_type: AnnotationType::Error,
+            }),
+            footer: vec![],
+            slices,
             opt: FormatOptions {
                 color: true,
                 ..Default::default()
             },
         };
-        DisplayList::from(snippet).to_string()
+        let mut message = DisplayList::from(snippet).to_string();
+        if self.show_source {
+            message.push('\n');
+        }
+        // `message` (which contains color codes) looks like "error: path/to/file.py:1:1: ...".
+        // `split_once(' ').unwrap().1` stirps "error: ".
+        write!(f, "{}", message.split_once(' ').unwrap().1)
     }
 }

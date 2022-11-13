@@ -144,6 +144,9 @@ fn run_once(
                             location: Default::default(),
                             end_location: Default::default(),
                             filename: path.to_string_lossy().to_string(),
+                            source: None,
+                            range: None,
+                            show_source: false,
                         }]
                     } else {
                         error!("Failed to check {}: {message}", path.to_string_lossy());
@@ -301,6 +304,9 @@ fn inner_main() -> Result<ExitCode> {
     if let Some(fix) = fix {
         configuration.fix = fix;
     }
+    if cli.show_source {
+        configuration.show_source = true;
+    }
 
     if cli.show_settings && cli.show_files {
         eprintln!("Error: specify --show-settings or show-files (not both).");
@@ -323,7 +329,7 @@ fn inner_main() -> Result<ExitCode> {
     #[cfg(not(target_family = "wasm"))]
     cache::init()?;
 
-    let printer = Printer::new(&cli.format, &log_level, cli.show_source);
+    let printer = Printer::new(&cli.format, &log_level);
     if cli.watch {
         if autofix {
             eprintln!("Warning: --fix is not enabled in watch mode.");

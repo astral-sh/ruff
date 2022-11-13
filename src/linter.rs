@@ -176,7 +176,14 @@ pub fn lint_stdin(
     // Convert to messages.
     Ok(checks
         .into_iter()
-        .map(|check| Message::from_check(path.to_string_lossy().to_string(), check))
+        .map(|check| {
+            Message::from_check(
+                path.to_string_lossy().to_string(),
+                check,
+                &locator,
+                settings.show_source,
+            )
+        })
         .collect())
 }
 
@@ -233,7 +240,14 @@ pub fn lint_path(
     // Convert to messages.
     let messages: Vec<Message> = checks
         .into_iter()
-        .map(|check| Message::from_check(path.to_string_lossy().to_string(), check))
+        .map(|check| {
+            Message::from_check(
+                path.to_string_lossy().to_string(),
+                check,
+                &locator,
+                settings.show_source,
+            )
+        })
         .collect();
     #[cfg(not(target_family = "wasm"))]
     cache::set(path, &metadata, settings, autofix, &messages, mode);

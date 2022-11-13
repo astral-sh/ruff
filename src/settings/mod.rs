@@ -31,6 +31,7 @@ pub struct Settings {
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+    pub show_source: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
@@ -60,6 +61,7 @@ impl Settings {
             per_file_ignores: config.per_file_ignores,
             src: config.src,
             target_version: config.target_version,
+            show_source: config.show_source,
         }
     }
 
@@ -78,6 +80,7 @@ impl Settings {
             flake8_quotes: Default::default(),
             isort: Default::default(),
             pep8_naming: Default::default(),
+            show_source: Default::default(),
         }
     }
 
@@ -96,6 +99,7 @@ impl Settings {
             flake8_quotes: Default::default(),
             isort: Default::default(),
             pep8_naming: Default::default(),
+            show_source: Default::default(),
         }
     }
 }
