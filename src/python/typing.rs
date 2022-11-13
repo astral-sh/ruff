@@ -209,7 +209,7 @@ pub enum SubscriptKind {
 
 pub fn match_annotated_subscript(
     expr: &Expr,
-    imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
 ) -> Option<SubscriptKind> {
     match &expr.node {
         ExprKind::Attribute { attr, value, .. } => {
@@ -238,9 +238,9 @@ pub fn match_annotated_subscript(
             // Verify that, e.g., `Union` is a reference to `typing.Union`.
             if let Some(modules) = IMPORTED_SUBSCRIPTS.get(&id.as_str()) {
                 for module in modules {
-                    if imports
+                    if from_imports
                         .get(module)
-                        .map(|imports| imports.contains(&id.as_str()))
+                        .map(|imports| imports.contains(&id.as_str()) || imports.contains("*"))
                         .unwrap_or_default()
                     {
                         return if is_pep593_annotated_subscript(id) {
@@ -260,7 +260,7 @@ pub fn match_annotated_subscript(
 /// Returns `true` if `Expr` represents a reference to a typing object with a
 /// PEP 585 built-in. Note that none of the PEP 585 built-ins are in
 /// `typing_extensions`.
-pub fn is_pep585_builtin(expr: &Expr, typing_imports: Option<&FnvHashSet<&str>>) -> bool {
+pub fn is_pep585_builtin(expr: &Expr, from_imports: &FnvHashMap<&str, FnvHashSet<&str>>) -> bool {
     match &expr.node {
         ExprKind::Attribute { attr, value, .. } => {
             if let ExprKind::Name { id, .. } = &value.node {
@@ -270,8 +270,9 @@ pub fn is_pep585_builtin(expr: &Expr, typing_imports: Option<&FnvHashSet<&str>>)
             }
         }
         ExprKind::Name { id, .. } => {
-            typing_imports
-                .map(|imports| imports.contains(&id.as_str()))
+            from_imports
+                .get("typing")
+                .map(|imports| imports.contains(&id.as_str()) || imports.contains("*"))
                 .unwrap_or_default()
                 && PEP_585_BUILTINS_ELIGIBLE.contains(&id.as_str())
         }

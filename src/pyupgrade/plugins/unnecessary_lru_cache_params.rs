@@ -8,7 +8,7 @@ pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Exp
     if let Some(mut check) = checks::unnecessary_lru_cache_params(
         decorator_list,
         checker.settings.target_version,
-        checker.from_imports.get("functools"),
+        &checker.from_imports,
     ) {
         if checker.patch() {
             if let Some(fix) =

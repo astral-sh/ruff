@@ -1,22 +1,13 @@
 use rustpython_ast::{Expr, ExprKind};
 
-use crate::ast::helpers::{compose_call_path, match_name_or_attr_from_module};
+use crate::ast::helpers::{compose_call_path, match_module_member};
 use crate::ast::types::{Range, ScopeKind};
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
-    match_name_or_attr_from_module(
-        expr,
-        "lru_cache",
-        "functools",
-        checker.from_imports.get("functools"),
-    ) || match_name_or_attr_from_module(
-        expr,
-        "cache",
-        "functools",
-        checker.from_imports.get("functools"),
-    )
+    match_module_member(expr, "functools.lru_cache", &checker.from_imports)
+        || match_module_member(expr, "functools.cache", &checker.from_imports)
 }
 
 /// B019
