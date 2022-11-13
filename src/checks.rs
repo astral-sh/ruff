@@ -87,6 +87,7 @@ pub enum CheckCode {
     B009,
     B010,
     B011,
+    B012,
     B013,
     B014,
     B015,
@@ -387,6 +388,7 @@ pub enum CheckKind {
     GetAttrWithConstant,
     SetAttrWithConstant,
     DoNotAssertFalse,
+    JumpStatementInFinally(String),
     RedundantTupleInExceptionHandler(String),
     DuplicateHandlerException(Vec<String>),
     UselessComparison,
@@ -625,6 +627,9 @@ impl CheckCode {
             CheckCode::B009 => CheckKind::GetAttrWithConstant,
             CheckCode::B010 => CheckKind::SetAttrWithConstant,
             CheckCode::B011 => CheckKind::DoNotAssertFalse,
+            CheckCode::B012 => {
+                CheckKind::JumpStatementInFinally("return/continue/break".to_string())
+            }
             CheckCode::B013 => {
                 CheckKind::RedundantTupleInExceptionHandler("ValueError".to_string())
             }
@@ -868,6 +873,7 @@ impl CheckCode {
             CheckCode::B009 => CheckCategory::Flake8Bugbear,
             CheckCode::B010 => CheckCategory::Flake8Bugbear,
             CheckCode::B011 => CheckCategory::Flake8Bugbear,
+            CheckCode::B012 => CheckCategory::Flake8Bugbear,
             CheckCode::B013 => CheckCategory::Flake8Bugbear,
             CheckCode::B014 => CheckCategory::Flake8Bugbear,
             CheckCode::B015 => CheckCategory::Flake8Bugbear,
@@ -1072,6 +1078,7 @@ impl CheckKind {
             CheckKind::GetAttrWithConstant => &CheckCode::B009,
             CheckKind::SetAttrWithConstant => &CheckCode::B010,
             CheckKind::DoNotAssertFalse => &CheckCode::B011,
+            CheckKind::JumpStatementInFinally(_) => &CheckCode::B012,
             CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
             CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
             CheckKind::UselessComparison => &CheckCode::B015,
@@ -1412,6 +1419,9 @@ impl CheckKind {
             CheckKind::DoNotAssertFalse => "Do not `assert False` (`python -O` removes these \
                                             calls), raise `AssertionError()`"
                 .to_string(),
+            CheckKind::JumpStatementInFinally(name) => {
+                format!("`{name}` inside finally blocks cause exceptions to be silenced")
+            }
             CheckKind::RedundantTupleInExceptionHandler(name) => {
                 format!(
                     "A length-one tuple literal is redundant. Write `except {name}` instead of \

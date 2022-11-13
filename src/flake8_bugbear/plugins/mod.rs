@@ -7,6 +7,7 @@ pub use duplicate_exceptions::{duplicate_exceptions, duplicate_handler_exception
 pub use f_string_docstring::f_string_docstring;
 pub use function_call_argument_default::function_call_argument_default;
 pub use getattr_with_constant::getattr_with_constant;
+pub use jump_statement_in_finally::jump_statement_in_finally;
 pub use mutable_argument_default::mutable_argument_default;
 pub use redundant_tuple_in_exception_handler::redundant_tuple_in_exception_handler;
 pub use setattr_with_constant::setattr_with_constant;
@@ -27,6 +28,7 @@ mod duplicate_exceptions;
 mod f_string_docstring;
 mod function_call_argument_default;
 mod getattr_with_constant;
+mod jump_statement_in_finally;
 mod mutable_argument_default;
 mod redundant_tuple_in_exception_handler;
 mod setattr_with_constant;

@@ -519,6 +519,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. |  |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
+| B012 | JumpStatementInFinally | `return/continue/break` inside finally blocks cause exceptions to be silenced |  |
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`. |  |
 | B014 | DuplicateHandlerException | Exception handler with duplicate exception: `ValueError` | 🛠 |
 | B015 | UselessComparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
@@ -701,7 +702,7 @@ including:
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (22/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/34)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
@@ -726,7 +727,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (21/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (22/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
