@@ -1481,7 +1481,7 @@ impl CheckKind {
                     .to_string()
             }
             CheckKind::AbstractBaseClassWithoutAbstractMethod(name) => {
-                format!("{name} is an abstract base class, but it has no abstract methods")
+                format!("`{name}` is an abstract base class, but it has no abstract methods")
             }
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
@@ -1494,7 +1494,7 @@ impl CheckKind {
             }
             CheckKind::EmptyMethodWithoutAbstractDecorator(name) => {
                 format!(
-                    "{name} is an empty method in an abstract base class, but has no abstract \
+                    "`{name}` is an empty method in an abstract base class, but has no abstract \
                      decorator"
                 )
             }
