@@ -47,7 +47,7 @@ fn is_empty_body(body: &[Stmt]) -> bool {
 }
 
 fn is_abstractmethod(expr: &Expr, from_imports: &FnvHashMap<&str, FnvHashSet<&str>>) -> bool {
-    compose_call_path(decorator)
+    compose_call_path(expr)
         .map(|call_path| match_call_path(&call_path, "abc.abstractmethod", from_imports))
         .unwrap_or(false)
 }
