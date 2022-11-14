@@ -2174,32 +2174,22 @@ impl<'a> Checker<'a> {
             }
 
             if self.settings.enabled.contains(&CheckCode::N806) {
-                let current =
-                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-                if let Some(check) =
-                    pep8_naming::checks::non_lowercase_variable_in_function(current, expr, id)
-                {
-                    self.add_check(check);
+                if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
+                    pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
                 }
             }
 
             if self.settings.enabled.contains(&CheckCode::N815) {
-                let current =
-                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-                if let Some(check) =
-                    pep8_naming::checks::mixed_case_variable_in_class_scope(current, expr, id)
-                {
-                    self.add_check(check);
+                if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
+                    pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id)
                 }
             }
 
             if self.settings.enabled.contains(&CheckCode::N816) {
-                let current =
-                    &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-                if let Some(check) =
-                    pep8_naming::checks::mixed_case_variable_in_global_scope(current, expr, id)
-                {
-                    self.add_check(check);
+                if matches!(self.current_scope().kind, ScopeKind::Module) {
+                    pep8_naming::plugins::mixed_case_variable_in_global_scope(
+                        self, expr, parent, id,
+                    )
                 }
             }
 

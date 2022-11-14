@@ -1,11 +1,11 @@
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
-use crate::ast::types::{FunctionScope, Range, Scope, ScopeKind};
+use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 use crate::pep8_naming::helpers;
 use crate::pep8_naming::helpers::FunctionType;
 use crate::pep8_naming::settings::Settings;
-use crate::python::string;
+use crate::python::string::{self};
 
 /// N801
 pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
@@ -100,20 +100,6 @@ pub fn invalid_first_argument_name_for_method(
     None
 }
 
-/// N806
-pub fn non_lowercase_variable_in_function(scope: &Scope, expr: &Expr, name: &str) -> Option<Check> {
-    if !matches!(scope.kind, ScopeKind::Function(FunctionScope { .. })) {
-        return None;
-    }
-    if name.to_lowercase() != name {
-        return Some(Check::new(
-            CheckKind::NonLowercaseVariableInFunction(name.to_string()),
-            Range::from_located(expr),
-        ));
-    }
-    None
-}
-
 /// N807
 pub fn dunder_function_name(scope: &Scope, stmt: &Stmt, name: &str) -> Option<Check> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
@@ -187,38 +173,6 @@ pub fn camelcase_imported_as_constant(
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
             Range::from_located(import_from),
-        ));
-    }
-    None
-}
-
-/// N815
-pub fn mixed_case_variable_in_class_scope(scope: &Scope, expr: &Expr, name: &str) -> Option<Check> {
-    if !matches!(scope.kind, ScopeKind::Class(_)) {
-        return None;
-    }
-    if helpers::is_mixed_case(name) {
-        return Some(Check::new(
-            CheckKind::MixedCaseVariableInClassScope(name.to_string()),
-            Range::from_located(expr),
-        ));
-    }
-    None
-}
-
-/// N816
-pub fn mixed_case_variable_in_global_scope(
-    scope: &Scope,
-    expr: &Expr,
-    name: &str,
-) -> Option<Check> {
-    if !matches!(scope.kind, ScopeKind::Module) {
-        return None;
-    }
-    if helpers::is_mixed_case(name) {
-        return Some(Check::new(
-            CheckKind::MixedCaseVariableInGlobalScope(name.to_string()),
-            Range::from_located(expr),
         ));
     }
     None
