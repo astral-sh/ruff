@@ -96,6 +96,7 @@ pub enum CheckCode {
     B018,
     B019,
     B021,
+    B022,
     B025,
     B026,
     // flake8-comprehensions
@@ -397,6 +398,7 @@ pub enum CheckKind {
     UselessExpression,
     CachedInstanceMethod,
     FStringDocstring,
+    UselessContextlibSuppress,
     DuplicateTryBlockException(String),
     StarArgUnpackingAfterKeywordArg,
     // flake8-comprehensions
@@ -640,6 +642,7 @@ impl CheckCode {
             CheckCode::B018 => CheckKind::UselessExpression,
             CheckCode::B019 => CheckKind::CachedInstanceMethod,
             CheckCode::B021 => CheckKind::FStringDocstring,
+            CheckCode::B022 => CheckKind::UselessContextlibSuppress,
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
             CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
             // flake8-comprehensions
@@ -882,6 +885,7 @@ impl CheckCode {
             CheckCode::B018 => CheckCategory::Flake8Bugbear,
             CheckCode::B019 => CheckCategory::Flake8Bugbear,
             CheckCode::B021 => CheckCategory::Flake8Bugbear,
+            CheckCode::B022 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
@@ -1087,6 +1091,7 @@ impl CheckKind {
             CheckKind::UselessExpression => &CheckCode::B018,
             CheckKind::CachedInstanceMethod => &CheckCode::B019,
             CheckKind::FStringDocstring => &CheckCode::B021,
+            CheckKind::UselessContextlibSuppress => &CheckCode::B022,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
             CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             // flake8-comprehensions
@@ -1460,6 +1465,11 @@ impl CheckKind {
             CheckKind::FStringDocstring => "f-string used as docstring. This will be interpreted \
                                             by python as a joined string rather than a docstring."
                 .to_string(),
+            CheckKind::UselessContextlibSuppress => {
+                "No arguments passed to `contextlib.suppress`. No exceptions will be suppressed \
+                 and therefore this context manager is redundant"
+                    .to_string()
+            }
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
             }
