@@ -1,7 +1,11 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
+<<<<<<< HEAD
 use crate::ast::helpers::{collect_call_paths, compose_call_path, match_call_path};
+=======
+use crate::ast::helpers::{compose_call_path, dealias, match_call_path};
+>>>>>>> 4b06237 (Track aliases)
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -23,18 +27,32 @@ fn is_immutable_func(
     expr: &Expr,
     extend_immutable_calls: &[(&str, &str)],
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
 ) -> bool {
+<<<<<<< HEAD
     let call_path = collect_call_paths(expr);
     IMMUTABLE_FUNCS
         .iter()
         .chain(extend_immutable_calls)
         .any(|(module, member)| match_call_path(&call_path, module, member, from_imports))
+=======
+    compose_call_path(expr)
+        .map(|call_path| dealias(call_path, import_aliases))
+        .map(|call_path| {
+            IMMUTABLE_FUNCS
+                .iter()
+                .chain(extend_immutable_calls)
+                .any(|target| match_call_path(&call_path, target, from_imports))
+        })
+        .unwrap_or(false)
+>>>>>>> 4b06237 (Track aliases)
 }
 
 struct ArgumentDefaultVisitor<'a> {
     checks: Vec<(CheckKind, Range)>,
     extend_immutable_calls: &'a [(&'a str, &'a str)],
     from_imports: &'a FnvHashMap<&'a str, FnvHashSet<&'a str>>,
+    import_aliases: &'a FnvHashMap<&'a str, &'a str>,
 }
 
 impl<'a, 'b> Visitor<'b> for ArgumentDefaultVisitor<'b>
@@ -44,8 +62,13 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
             ExprKind::Call { func, args, .. } => {
-                if !is_mutable_func(func, self.from_imports)
-                    && !is_immutable_func(func, self.extend_immutable_calls, self.from_imports)
+                if !is_mutable_func(func, self.from_imports, self.import_aliases)
+                    && !is_immutable_func(
+                        func,
+                        self.extend_immutable_calls,
+                        self.from_imports,
+                        self.import_aliases,
+                    )
                     && !is_nan_or_infinity(func, args)
                 {
                     self.checks.push((
@@ -108,6 +131,7 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
         checks: vec![],
         extend_immutable_calls: &extend_immutable_cells,
         from_imports: &checker.from_imports,
+        import_aliases: &checker.import_aliases,
     };
     for expr in arguments
         .defaults

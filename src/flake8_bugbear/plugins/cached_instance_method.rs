@@ -7,8 +7,19 @@ use crate::checks::{Check, CheckKind};
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
     let call_path = collect_call_paths(expr);
-    match_call_path(&call_path, "functools", "lru_cache", &checker.from_imports)
-        || match_call_path(&call_path, "functools", "cache", &checker.from_imports)
+    match_call_path(
+        &call_path,
+        "functools",
+        "lru_cache",
+        &checker.from_imports,
+        &checker.import_aliases,
+    ) || match_call_path(
+        &call_path,
+        "functools",
+        "cache",
+        &checker.from_imports,
+        &checker.import_aliases,
+    )
 }
 
 /// B019

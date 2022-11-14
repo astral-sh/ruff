@@ -210,6 +210,7 @@ pub enum SubscriptKind {
 pub fn match_annotated_subscript(
     expr: &Expr,
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
 ) -> Option<SubscriptKind> {
     match &expr.node {
         ExprKind::Attribute { attr, value, .. } => {
@@ -260,21 +261,31 @@ pub fn match_annotated_subscript(
 /// Returns `true` if `Expr` represents a reference to a typing object with a
 /// PEP 585 built-in. Note that none of the PEP 585 built-ins are in
 /// `typing_extensions`.
-pub fn is_pep585_builtin(expr: &Expr, from_imports: &FnvHashMap<&str, FnvHashSet<&str>>) -> bool {
+pub fn is_pep585_builtin(
+    expr: &Expr,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
+) -> bool {
     match &expr.node {
         ExprKind::Attribute { attr, value, .. } => {
+            let attr = attr.as_str();
+            let attr = import_aliases.get(&attr).unwrap_or(&attr);
             if let ExprKind::Name { id, .. } = &value.node {
-                id == "typing" && PEP_585_BUILTINS_ELIGIBLE.contains(&attr.as_str())
+                let id = id.as_str();
+                let id = import_aliases.get(&id).unwrap_or(&id);
+                id == &"typing" && PEP_585_BUILTINS_ELIGIBLE.contains(attr)
             } else {
                 false
             }
         }
         ExprKind::Name { id, .. } => {
+            let id = id.as_str();
+            let id = import_aliases.get(&id).unwrap_or(&id);
             from_imports
                 .get("typing")
-                .map(|imports| imports.contains(&id.as_str()) || imports.contains("*"))
+                .map(|imports| imports.contains(id) || imports.contains("*"))
                 .unwrap_or_default()
-                && PEP_585_BUILTINS_ELIGIBLE.contains(&id.as_str())
+                && PEP_585_BUILTINS_ELIGIBLE.contains(id)
         }
         _ => false,
     }

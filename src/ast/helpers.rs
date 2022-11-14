@@ -39,6 +39,23 @@ pub fn collect_call_paths(expr: &Expr) -> Vec<&str> {
     segments
 }
 
+/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
+pub fn dealias(call_path: String, import_aliases: &FnvHashMap<&str, &str>) -> String {
+    if let Some((head, tail)) = call_path.split_once('.') {
+        if let Some(head) = import_aliases.get(head) {
+            format!("{head}.{tail}")
+        } else {
+            call_path
+        }
+    } else {
+        if let Some(call_path) = import_aliases.get(&call_path.as_str()) {
+            call_path.to_string()
+        } else {
+            call_path
+        }
+    }
+}
+
 /// Return `true` if the `Expr` is a name or attribute reference to `${target}`.
 pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
     match &expr.node {
@@ -139,7 +156,9 @@ pub fn match_module_member(
     module: &str,
     member: &str,
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
 ) -> bool {
+    // map(|call_path| dealias(call_path, import_aliases))
     match_call_path(&collect_call_paths(expr), module, member, from_imports)
 }
 
@@ -239,7 +258,8 @@ mod tests {
             &expr,
             "",
             "list",
-            &FnvHashMap::default()
+            &FnvHashMap::default(),
+            &FnvHashMap::default(),
         ));
         Ok(())
     }
@@ -251,7 +271,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::default()
+            &FnvHashMap::default(),
+            &FnvHashMap::default(),
         ));
         Ok(())
     }
@@ -264,12 +285,14 @@ mod tests {
             "typing.re",
             "Match",
             &FnvHashMap::default(),
+            &FnvHashMap::default(),
         ));
         let expr = parser::parse_expression("re.Match", "<filename>")?;
         assert!(!match_module_member(
             &expr,
             "typing.re",
             "Match",
+            &FnvHashMap::default(),
             &FnvHashMap::default(),
         ));
         Ok(())
@@ -282,7 +305,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["*"]))])
+            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["*"]))]),
+            &FnvHashMap::default()
         ));
         Ok(())
     }
@@ -294,7 +318,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["Match"]))])
+            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["Match"]))]),
+            &FnvHashMap::default()
         ));
         Ok(())
     }
@@ -306,7 +331,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))])
+            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))]),
+            &FnvHashMap::default()
         ));
 
         let expr = parser::parse_expression("match.Match", "<filename>")?;
@@ -314,7 +340,8 @@ mod tests {
             &expr,
             "typing.re.match",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["match"]))])
+            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["match"]))]),
+            &FnvHashMap::default()
         ));
 
         let expr = parser::parse_expression("re.match.Match", "<filename>")?;
@@ -322,7 +349,47 @@ mod tests {
             &expr,
             "typing.re.match",
             "Match",
-            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))])
+            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))]),
+            &FnvHashMap::default()
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn from_alias() -> Result<()> {
+        let expr = parser::parse_expression("IMatch", "<filename>")?;
+        assert!(match_module_member(
+            &expr,
+            "typing.re",
+            "Match",
+            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["Match"]))]),
+            &FnvHashMap::from_iter([("IMatch", "Match")]),
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn from_aliased_parent() -> Result<()> {
+        let expr = parser::parse_expression("t.Match", "<filename>")?;
+        assert!(match_module_member(
+            &expr,
+            "typing.re",
+            "Match",
+            &FnvHashMap::default(),
+            &FnvHashMap::from_iter([("t", "typing.re")]),
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn from_aliased_grandparent() -> Result<()> {
+        let expr = parser::parse_expression("t.re.Match", "<filename>")?;
+        assert!(match_module_member(
+            &expr,
+            "typing.re",
+            "Match",
+            &FnvHashMap::default(),
+            &FnvHashMap::from_iter([("t", "typing")]),
         ));
         Ok(())
     }

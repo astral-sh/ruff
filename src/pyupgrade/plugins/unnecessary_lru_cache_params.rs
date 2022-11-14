@@ -9,6 +9,7 @@ pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Exp
         decorator_list,
         checker.settings.target_version,
         &checker.from_imports,
+        &checker.import_aliases,
     ) {
         if checker.patch() {
             if let Some(fix) =

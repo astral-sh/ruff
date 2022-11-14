@@ -18,4 +18,12 @@ expression: checks
     row: 7
     column: 13
   fix: ~
+- kind: SysVersionSlice3Referenced
+  location:
+    row: 8
+    column: 6
+  end_location:
+    row: 8
+    column: 7
+  fix: ~
 
