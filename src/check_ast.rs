@@ -12,7 +12,7 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast::helpers::{extract_handler_names, match_module_member};
+use crate::ast::helpers::{collect_call_paths, extract_handler_names, match_call_path};
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -75,7 +75,7 @@ pub struct Checker<'a> {
     seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
-    except_handlers: Vec<Vec<String>>,
+    except_handlers: Vec<Vec<Vec<&'a str>>>,
 }
 
 impl<'a> Checker<'a> {
@@ -154,14 +154,10 @@ impl<'a> Checker<'a> {
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
-    pub fn match_typing_module(&self, expr: &Expr, target: &str) -> bool {
-        match_module_member(expr, &format!("typing.{target}"), &self.from_imports)
+    pub fn match_typing_module(&self, call_path: &[&str], target: &str) -> bool {
+        match_call_path(call_path, "typing", target, &self.from_imports)
             || (typing::in_extensions(target)
-                && match_module_member(
-                    expr,
-                    &format!("typing_extensions.{target}"),
-                    &self.from_imports,
-                ))
+                && match_call_path(call_path, "typing_extensions", target, &self.from_imports))
     }
 }
 
@@ -1046,7 +1042,7 @@ where
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
 
-                if self.match_typing_module(value, "Literal") {
+                if self.match_typing_module(&collect_call_paths(value), "Literal") {
                     self.in_literal = true;
                 }
 
@@ -1629,12 +1625,13 @@ where
                 args,
                 keywords,
             } => {
-                if self.match_typing_module(func, "ForwardRef") {
+                let call_path = collect_call_paths(func);
+                if self.match_typing_module(&call_path, "ForwardRef") {
                     self.visit_expr(func);
                     for expr in args {
                         self.visit_annotation(expr);
                     }
-                } else if self.match_typing_module(func, "cast") {
+                } else if self.match_typing_module(&call_path, "cast") {
                     self.visit_expr(func);
                     if !args.is_empty() {
                         self.visit_annotation(&args[0]);
@@ -1642,12 +1639,12 @@ where
                     for expr in args.iter().skip(1) {
                         self.visit_expr(expr);
                     }
-                } else if self.match_typing_module(func, "NewType") {
+                } else if self.match_typing_module(&call_path, "NewType") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.visit_annotation(expr);
                     }
-                } else if self.match_typing_module(func, "TypeVar") {
+                } else if self.match_typing_module(&call_path, "TypeVar") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.visit_annotation(expr);
@@ -1664,7 +1661,7 @@ where
                             }
                         }
                     }
-                } else if self.match_typing_module(func, "NamedTuple") {
+                } else if self.match_typing_module(&call_path, "NamedTuple") {
                     self.visit_expr(func);
 
                     // Ex) NamedTuple("a", [("a", int)])
@@ -1696,7 +1693,7 @@ where
                         let KeywordData { value, .. } = &keyword.node;
                         self.visit_annotation(value);
                     }
-                } else if self.match_typing_module(func, "TypedDict") {
+                } else if self.match_typing_module(&call_path, "TypedDict") {
                     self.visit_expr(func);
 
                     // Ex) TypedDict("a", {"a": int})
@@ -2147,7 +2144,10 @@ impl<'a> Checker<'a> {
 
                 // Avoid flagging if NameError is handled.
                 if let Some(handler_names) = self.except_handlers.last() {
-                    if handler_names.contains(&"NameError".to_string()) {
+                    if handler_names
+                        .iter()
+                        .any(|call_path| call_path.len() == 1 && call_path[0] == "NameError")
+                    {
                         return;
                     }
                 }

@@ -1,13 +1,14 @@
 use rustpython_ast::{Expr, ExprKind};
 
-use crate::ast::helpers::{compose_call_path, match_module_member};
+use crate::ast::helpers::{collect_call_paths, match_call_path};
 use crate::ast::types::{Range, ScopeKind};
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
-    match_module_member(expr, "functools.lru_cache", &checker.from_imports)
-        || match_module_member(expr, "functools.cache", &checker.from_imports)
+    let call_path = collect_call_paths(expr);
+    match_call_path(&call_path, "functools", "lru_cache", &checker.from_imports)
+        || match_call_path(&call_path, "functools", "cache", &checker.from_imports)
 }
 
 /// B019
@@ -16,8 +17,8 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
         for decorator in decorator_list {
             // TODO(charlie): This should take into account `classmethod-decorators` and
             // `staticmethod-decorators`.
-            if let Some(decorator_path) = compose_call_path(decorator) {
-                if decorator_path == "classmethod" || decorator_path == "staticmethod" {
+            if let ExprKind::Name { id, .. } = &decorator.node {
+                if id == "classmethod" || id == "staticmethod" {
                     return;
                 }
             }

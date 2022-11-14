@@ -1,7 +1,7 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
-use crate::ast::helpers::{compose_call_path, match_call_path};
+use crate::ast::helpers::{collect_call_paths, compose_call_path, match_call_path};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -9,34 +9,31 @@ use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::flake8_bugbear::plugins::mutable_argument_default::is_mutable_func;
 
-const IMMUTABLE_FUNCS: [&str; 7] = [
-    "tuple",
-    "frozenset",
-    "operator.attrgetter",
-    "operator.itemgetter",
-    "operator.methodcaller",
-    "types.MappingProxyType",
-    "re.compile",
+const IMMUTABLE_FUNCS: [(&str, &str); 7] = [
+    ("", "tuple"),
+    ("", "frozenset"),
+    ("operator", "attrgetter"),
+    ("operator", "itemgetter"),
+    ("operator", "methodcaller"),
+    ("types", "MappingProxyType"),
+    ("re", "compile"),
 ];
 
 fn is_immutable_func(
     expr: &Expr,
-    extend_immutable_calls: &[&str],
+    extend_immutable_calls: &[(&str, &str)],
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
 ) -> bool {
-    compose_call_path(expr)
-        .map(|call_path| {
-            IMMUTABLE_FUNCS
-                .iter()
-                .chain(extend_immutable_calls)
-                .any(|target| match_call_path(&call_path, target, from_imports))
-        })
-        .unwrap_or(false)
+    let call_path = collect_call_paths(expr);
+    IMMUTABLE_FUNCS
+        .iter()
+        .chain(extend_immutable_calls)
+        .any(|(module, member)| match_call_path(&call_path, module, member, from_imports))
 }
 
 struct ArgumentDefaultVisitor<'a> {
     checks: Vec<(CheckKind, Range)>,
-    extend_immutable_calls: &'a [&'a str],
+    extend_immutable_calls: &'a [(&'a str, &'a str)],
     from_imports: &'a FnvHashMap<&'a str, FnvHashSet<&'a str>>,
 }
 
@@ -92,12 +89,20 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
 
 /// B008
 pub fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
-    let extend_immutable_cells: Vec<&str> = checker
+    // Map immutable calls to (module, member) format.
+    let extend_immutable_cells: Vec<(&str, &str)> = checker
         .settings
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
-        .map(|s| s.as_str())
+        .map(|s| {
+            let s = s.as_str();
+            if let Some(index) = s.rfind('.') {
+                (&s[..index], &s[index + 1..])
+            } else {
+                ("", s)
+            }
+        })
         .collect();
     let mut visitor = ArgumentDefaultVisitor {
         checks: vec![],

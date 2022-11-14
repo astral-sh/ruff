@@ -7,7 +7,7 @@ use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 
 fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
-    match_module_member(expr, &format!("sys.{target}"), &checker.from_imports)
+    match_module_member(expr, "sys", target, &checker.from_imports)
 }
 
 /// YTT101, YTT102, YTT301, YTT303
@@ -181,7 +181,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
 
 /// YTT202
 pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
-    if match_module_member(expr, "six.PY3", &checker.from_imports) {
+    if match_module_member(expr, "six", "PY3", &checker.from_imports) {
         checker.add_check(Check::new(
             CheckKind::SixPY3Referenced,
             Range::from_located(expr),

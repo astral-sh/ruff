@@ -172,7 +172,8 @@ pub fn unnecessary_lru_cache_params(
             keywords,
         } = &expr.node
         {
-            if args.is_empty() && helpers::match_module_member(func, "functools.lru_cache", imports)
+            if args.is_empty()
+                && helpers::match_module_member(func, "functools", "lru_cache", imports)
             {
                 // Ex) `functools.lru_cache()`
                 if keywords.is_empty() {
