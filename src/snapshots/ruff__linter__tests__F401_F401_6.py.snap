@@ -42,4 +42,44 @@ expression: checks
         row: 11
         column: 0
     applied: false
+- kind:
+    UnusedImport:
+      - - background
+      - false
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 17
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 17
+        column: 0
+      end_location:
+        row: 18
+        column: 0
+    applied: false
+- kind:
+    UnusedImport:
+      - - datastructures
+      - false
+  location:
+    row: 20
+    column: 0
+  end_location:
+    row: 20
+    column: 35
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 20
+        column: 0
+      end_location:
+        row: 21
+        column: 0
+    applied: false
 
