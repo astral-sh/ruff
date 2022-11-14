@@ -11,7 +11,7 @@ fn is_abc_class(
     keywords: &[Keyword],
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
 ) -> bool {
-    if keywords.iter().any(|keyword| {
+    keywords.iter().any(|keyword| {
         keyword
             .node
             .arg
@@ -23,10 +23,7 @@ fn is_abc_class(
                 "abc.ABCMeta",
                 from_imports,
             )
-    }) {
-        return true;
-    }
-    bases.iter().any(|base| {
+    }) || bases.iter().any(|base| {
         compose_call_path(base)
             .map(|call_path| match_call_path(&call_path, "abc.ABC", from_imports))
             .unwrap_or(false)
