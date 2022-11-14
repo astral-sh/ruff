@@ -1,29 +1,31 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, Stmt, StmtKind};
+use rustpython_ast as rspy_ast;
 
 use crate::ast::types::Range;
 use crate::SourceCodeLocator;
+use crate::ast::nodes::{self, Attribute, Name, ExprKind, Call, Ident};
 
-fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
-    match &expr.node {
-        ExprKind::Call { func, .. } => {
-            collect_call_path_inner(func, parts);
+fn collect_call_path_inner<'a, E: nodes::Expr<'a>>(expr: &E, parts: &mut Vec<&'a str>) {
+    match expr.expr() {
+        ExprKind::Call(node)  => {
+            collect_call_path_inner(node.func(), parts);
         }
-        ExprKind::Attribute { value, attr, .. } => {
-            collect_call_path_inner(value, parts);
-            parts.push(attr);
+        nodes::ExprKind::Attribute(node) => {
+            collect_call_path_inner(node.value(), parts);
+            parts.push(node.attr().val());
         }
-        ExprKind::Name { id, .. } => {
-            parts.push(id);
+        nodes::ExprKind::Name(node) => {
+            parts.push(node.id().val());
         }
         _ => {}
     }
 }
 
 /// Convert an `Expr` to its call path (like `List`, or `typing.List`).
-pub fn compose_call_path(expr: &Expr) -> Option<String> {
+#[inline(always)]
+pub fn compose_call_path<'a, E: nodes::Expr<'a>>(expr: &E) -> Option<String> {
     let segments = collect_call_paths(expr);
     if segments.is_empty() {
         None
@@ -33,7 +35,8 @@ pub fn compose_call_path(expr: &Expr) -> Option<String> {
 }
 
 /// Convert an `Expr` to its call path segments (like ["typing", "List"]).
-pub fn collect_call_paths(expr: &Expr) -> Vec<&str> {
+#[inline(always)]
+pub fn collect_call_paths<'a, E: nodes::Expr<'a>>(expr: &E) -> Vec<&str> {
     let mut segments = vec![];
     collect_call_path_inner(expr, &mut segments);
     segments
@@ -60,10 +63,10 @@ pub fn dealias_call_path<'a>(
 }
 
 /// Return `true` if the `Expr` is a name or attribute reference to `${target}`.
-pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
+pub fn match_name_or_attr(expr: &rspy_ast::Expr, target: &str) -> bool {
     match &expr.node {
-        ExprKind::Attribute { attr, .. } => target == attr,
-        ExprKind::Name { id, .. } => target == id,
+        rspy_ast::ExprKind::Attribute { attr, .. } => target == attr,
+        rspy_ast::ExprKind::Name { id, .. } => target == id,
         _ => false,
     }
 }
@@ -73,14 +76,14 @@ pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
 /// Useful for, e.g., ensuring that a `Union` reference represents
 /// `typing.Union`.
 pub fn match_module_member(
-    expr: &Expr,
+    expr: &rspy_ast::Expr,
     module: &str,
     member: &str,
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     match_call_path(
-        &dealias_call_path(collect_call_paths(expr), import_aliases),
+        &dealias_call_path(collect_call_paths(&*expr), import_aliases),
         module,
         member,
         from_imports,
@@ -156,11 +159,11 @@ pub fn match_call_path(
 
 static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
-pub fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
+pub fn is_assignment_to_a_dunder(node: &rspy_ast::StmtKind) -> bool {
     // Check whether it's an assignment to a dunder, with or without a type
     // annotation. This is what pycodestyle (as of 2.9.1) does.
     match node {
-        StmtKind::Assign {
+        rspy_ast::StmtKind::Assign {
             targets,
             value: _,
             type_comment: _,
@@ -169,17 +172,17 @@ pub fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
                 return false;
             }
             match &targets[0].node {
-                ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
+                rspy_ast::ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
                 _ => false,
             }
         }
-        StmtKind::AnnAssign {
+        rspy_ast::StmtKind::AnnAssign {
             target,
             annotation: _,
             value: _,
             simple: _,
         } => match &target.node {
-            ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
+            rspy_ast::ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
             _ => false,
         },
         _ => false,
@@ -187,13 +190,13 @@ pub fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
 }
 
 /// Extract the names of all handled exceptions.
-pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<Vec<&str>> {
+pub fn extract_handler_names(handlers: &[rspy_ast::Excepthandler]) -> Vec<Vec<&str>> {
     let mut handler_names = vec![];
     for handler in handlers {
         match &handler.node {
-            ExcepthandlerKind::ExceptHandler { type_, .. } => {
+            rspy_ast::ExcepthandlerKind::ExceptHandler { type_, .. } => {
                 if let Some(type_) = type_ {
-                    if let ExprKind::Tuple { elts, .. } = &type_.node {
+                    if let rspy_ast::ExprKind::Tuple { elts, .. } = &type_.node {
                         for type_ in elts {
                             let call_path = collect_call_paths(type_);
                             if !call_path.is_empty() {
@@ -201,7 +204,7 @@ pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<Vec<&str>> {
                             }
                         }
                     } else {
-                        let call_path = collect_call_paths(type_);
+                        let call_path = collect_call_paths(&**type_);
                         if !call_path.is_empty() {
                             handler_names.push(call_path);
                         }
@@ -214,9 +217,9 @@ pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<Vec<&str>> {
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
-pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
+pub fn is_super_call_with_arguments(func: &rspy_ast::Expr, args: &[rspy_ast::Expr]) -> bool {
     // Check: is this a `super` call?
-    if let ExprKind::Name { id, .. } = &func.node {
+    if let rspy_ast::ExprKind::Name { id, .. } = &func.node {
         id == "super" && !args.is_empty()
     } else {
         false
@@ -248,21 +251,21 @@ pub fn to_module_and_member(target: &str) -> (&str, &str) {
 
 /// Convert a location within a file (relative to `base`) to an absolute
 /// position.
-pub fn to_absolute(relative: Location, base: Location) -> Location {
+pub fn to_absolute(relative: &rspy_ast::Location, base: &rspy_ast::Location) -> rspy_ast::Location {
     if relative.row() == 1 {
-        Location::new(
+        rspy_ast::Location::new(
             relative.row() + base.row() - 1,
             relative.column() + base.column(),
         )
     } else {
-        Location::new(relative.row() + base.row() - 1, relative.column())
+        rspy_ast::Location::new(relative.row() + base.row() - 1, relative.column())
     }
 }
 
 /// Return `true` if a `Stmt` has leading content.
-pub fn match_leading_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+pub fn match_leading_content(stmt: &rspy_ast::Stmt, locator: &SourceCodeLocator) -> bool {
     let range = Range {
-        location: Location::new(stmt.location.row(), 0),
+        location: rspy_ast::Location::new(stmt.location.row(), 0),
         end_location: stmt.location,
     };
     let prefix = locator.slice_source_code_range(&range);
@@ -270,10 +273,10 @@ pub fn match_leading_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
 }
 
 /// Return `true` if a `Stmt` has trailing content.
-pub fn match_trailing_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+pub fn match_trailing_content(stmt: &rspy_ast::Stmt, locator: &SourceCodeLocator) -> bool {
     let range = Range {
         location: stmt.end_location.unwrap(),
-        end_location: Location::new(stmt.end_location.unwrap().row() + 1, 0),
+        end_location: rspy_ast::Location::new(stmt.end_location.unwrap().row() + 1, 0),
     };
     let suffix = locator.slice_source_code_range(&range);
     for char in suffix.chars() {

@@ -84,7 +84,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Exce
                 if let Some(type_) = type_ {
                     match &type_.node {
                         ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
-                            let call_path = helpers::collect_call_paths(type_);
+                            let call_path = helpers::collect_call_paths(&**type_);
                             if !call_path.is_empty() {
                                 if seen.contains(&call_path) {
                                     duplicates.insert(call_path);
