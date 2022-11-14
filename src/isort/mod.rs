@@ -1,7 +1,7 @@
-use fnv::FnvHashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
+use fnv::FnvHashSet;
 use itertools::Itertools;
 use ropey::RopeBuilder;
 use rustpython_ast::{Stmt, StmtKind};
@@ -158,7 +158,8 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                 )
             })
             .sorted_by_cached_key(|(import_from, aliases)| {
-                // Sort each `StmtKind::ImportFrom` by module key, breaking ties based on members.
+                // Sort each `StmtKind::ImportFrom` by module key, breaking ties based on
+                // members.
                 (
                     import_from
                         .module
@@ -185,8 +186,6 @@ pub fn format_imports(
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(&block);
 
-    println!("block = {:?}", block);
-
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
         block,
@@ -195,8 +194,6 @@ pub fn format_imports(
         known_third_party,
         extra_standard_library,
     );
-
-    println!("block_by_type = {:?}", block_by_type);
 
     // Generate replacement source code.
     let mut output = RopeBuilder::new();
@@ -222,8 +219,6 @@ pub fn format_imports(
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, aliases) in import_block.import_from.iter() {
-            println!("import_from = {:?}", import_from);
-            println!("aliases = {:?}", aliases);
             let prelude: String = format!("from {} import ", import_from.module_name());
             let members: Vec<String> = aliases
                 .iter()
@@ -235,8 +230,6 @@ pub fn format_imports(
                     }
                 })
                 .collect();
-
-            println!("members = {:?}", members);
 
             // Can we fit the import on a single line?
             let expected_len: usize =
@@ -308,6 +301,7 @@ mod tests {
     #[test_case(Path::new("separate_local_folder_imports.py"))]
     #[test_case(Path::new("separate_third_party_imports.py"))]
     #[test_case(Path::new("skip.py"))]
+    #[test_case(Path::new("sort_similar_imports.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     fn isort(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());

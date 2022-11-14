@@ -8,8 +8,11 @@ pub enum Prefix {
     Variables,
 }
 
-pub fn module_key<'a>(name: &'a str, asname: &'a Option<String>) -> (String, &'a Option<String>) {
-    (name.to_lowercase(), asname)
+pub fn module_key<'a>(
+    name: &'a str,
+    asname: &'a Option<String>,
+) -> (String, &'a str, &'a Option<String>) {
+    (name.to_lowercase(), name, asname)
 }
 
 pub fn member_key<'a>(
