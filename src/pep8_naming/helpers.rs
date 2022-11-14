@@ -2,7 +2,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use itertools::Itertools;
 use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::helpers::{compose_call_path, match_call_path, match_name_or_attr};
+use crate::ast::helpers::{collect_call_paths, match_call_path, match_name_or_attr};
 use crate::ast::types::{Scope, ScopeKind};
 use crate::pep8_naming::settings::Settings;
 use crate::python::string::{is_lower, is_upper};
@@ -84,9 +84,12 @@ pub fn is_namedtuple_assignment(
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
 ) -> bool {
     if let StmtKind::Assign { value, .. } = &stmt.node {
-        compose_call_path(value)
-            .map(|call_path| match_call_path(&call_path, "collections.namedtuple", from_imports))
-            .unwrap_or(false)
+        match_call_path(
+            &collect_call_paths(value),
+            "collections",
+            "namedtuple",
+            from_imports,
+        )
     } else {
         false
     }

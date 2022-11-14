@@ -1,7 +1,7 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
-use crate::ast::helpers::{compose_call_path, match_call_path};
+use crate::ast::helpers::{collect_call_paths, match_call_path};
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
@@ -18,14 +18,15 @@ fn is_abc_class(
             .as_ref()
             .map(|a| a == "metaclass")
             .unwrap_or(false)
-            && compose_call_path(&keyword.node.value)
-                .map(|call_path| match_call_path(&call_path, "abc.ABCMeta", from_imports))
-                .unwrap_or(false)
-    }) || bases.iter().any(|base| {
-        compose_call_path(base)
-            .map(|call_path| match_call_path(&call_path, "abc.ABC", from_imports))
-            .unwrap_or(false)
-    })
+            && match_call_path(
+                &collect_call_paths(&keyword.node.value),
+                "abc",
+                "ABCMeta",
+                from_imports,
+            )
+    }) || bases
+        .iter()
+        .any(|base| match_call_path(&collect_call_paths(base), "abc", "ABC", from_imports))
 }
 
 fn is_empty_body(body: &[Stmt]) -> bool {
@@ -42,15 +43,21 @@ fn is_empty_body(body: &[Stmt]) -> bool {
 }
 
 fn is_abstractmethod(expr: &Expr, from_imports: &FnvHashMap<&str, FnvHashSet<&str>>) -> bool {
-    compose_call_path(expr)
-        .map(|call_path| match_call_path(&call_path, "abc.abstractmethod", from_imports))
-        .unwrap_or(false)
+    match_call_path(
+        &collect_call_paths(expr),
+        "abc",
+        "abstractmethod",
+        from_imports,
+    )
 }
 
 fn is_overload(expr: &Expr, from_imports: &FnvHashMap<&str, FnvHashSet<&str>>) -> bool {
-    compose_call_path(expr)
-        .map(|call_path| match_call_path(&call_path, "typing.overload", from_imports))
-        .unwrap_or(false)
+    match_call_path(
+        &collect_call_paths(expr),
+        "typing",
+        "overload",
+        from_imports,
+    )
 }
 
 pub fn abstract_base_class(

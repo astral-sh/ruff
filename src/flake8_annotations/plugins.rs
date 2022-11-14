@@ -1,5 +1,6 @@
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Stmt, StmtKind};
 
+use crate::ast::helpers::collect_call_paths;
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -50,7 +51,7 @@ fn is_none_returning(body: &[Stmt]) -> bool {
 
 /// ANN401
 fn check_dynamically_typed(checker: &mut Checker, annotation: &Expr, name: &str) {
-    if checker.match_typing_module(annotation, "Any") {
+    if checker.match_typing_module(&collect_call_paths(annotation), "Any") {
         checker.add_check(Check::new(
             CheckKind::DynamicallyTypedExpression(name.to_string()),
             Range::from_located(annotation),

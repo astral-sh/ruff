@@ -1,5 +1,6 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Operator};
 
+use crate::ast::helpers::collect_call_paths;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
@@ -43,7 +44,8 @@ fn union(elts: &[Expr]) -> Expr {
 
 /// U007
 pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
-    if checker.match_typing_module(value, "Optional") {
+    let call_path = collect_call_paths(value);
+    if checker.match_typing_module(&call_path, "Optional") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch() {
             let mut generator = SourceGenerator::new();
@@ -58,7 +60,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             }
         }
         checker.add_check(check);
-    } else if checker.match_typing_module(value, "Union") {
+    } else if checker.match_typing_module(&call_path, "Union") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch() {
             match &slice.node {

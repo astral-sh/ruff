@@ -1,29 +1,26 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Expr, ExprKind};
 
-use crate::ast::helpers::{compose_call_path, match_call_path};
+use crate::ast::helpers::{collect_call_paths, match_call_path};
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-const MUTABLE_FUNCS: [&str; 7] = [
-    "dict",
-    "list",
-    "set",
-    "collections.Counter",
-    "collections.OrderedDict",
-    "collections.defaultdict",
-    "collections.deque",
+const MUTABLE_FUNCS: [(&str, &str); 7] = [
+    ("", "dict"),
+    ("", "list"),
+    ("", "set"),
+    ("collections", "Counter"),
+    ("collections", "OrderedDict"),
+    ("collections", "defaultdict"),
+    ("collections", "deque"),
 ];
 
 pub fn is_mutable_func(expr: &Expr, from_imports: &FnvHashMap<&str, FnvHashSet<&str>>) -> bool {
-    compose_call_path(expr)
-        .map(|call_path| {
-            MUTABLE_FUNCS
-                .iter()
-                .any(|target| match_call_path(&call_path, target, from_imports))
-        })
-        .unwrap_or(false)
+    let call_path = collect_call_paths(expr);
+    MUTABLE_FUNCS
+        .iter()
+        .any(|(module, member)| match_call_path(&call_path, module, member, from_imports))
 }
 
 /// B006
