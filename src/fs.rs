@@ -1,11 +1,11 @@
 use std::borrow::Cow;
-use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use fnv::FnvHashSet;
 use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
 use walkdir::{DirEntry, WalkDir};
@@ -121,7 +121,7 @@ pub fn iter_python_files<'a>(
 pub(crate) fn ignores_from_path<'a>(
     path: &Path,
     pattern_code_pairs: &'a [PerFileIgnore],
-) -> Result<BTreeSet<&'a CheckCode>> {
+) -> Result<FnvHashSet<&'a CheckCode>> {
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
         .iter()

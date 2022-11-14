@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use anyhow::Result;
+use fnv::FnvHashMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff::checks_gen::CheckCodePrefix;
@@ -179,8 +179,8 @@ pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair
 /// Collect a list of `PatternPrefixPair` structs as a `BTreeMap`.
 pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
-) -> BTreeMap<String, Vec<CheckCodePrefix>> {
-    let mut per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>> = BTreeMap::new();
+) -> FnvHashMap<String, Vec<CheckCodePrefix>> {
+    let mut per_file_ignores: FnvHashMap<String, Vec<CheckCodePrefix>> = FnvHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)

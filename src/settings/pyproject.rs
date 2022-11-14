@@ -96,12 +96,12 @@ pub fn load_options(pyproject: &Option<PathBuf>) -> Result<Options> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::env::current_dir;
     use std::path::PathBuf;
     use std::str::FromStr;
 
     use anyhow::Result;
+    use fnv::FnvHashMap;
 
     use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes::settings::Quote;
@@ -346,7 +346,7 @@ other-attribute = 1
                 extend_select: None,
                 ignore: None,
                 extend_ignore: None,
-                per_file_ignores: Some(BTreeMap::from([(
+                per_file_ignores: Some(FnvHashMap::from_iter([(
                     "__init__.py".to_string(),
                     vec![CheckCodePrefix::F401]
                 ),])),

@@ -1,7 +1,6 @@
 //! Options that the user can provide via pyproject.toml.
 
-use std::collections::BTreeMap;
-
+use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::checks_gen::CheckCodePrefix;
@@ -29,5 +28,5 @@ pub struct Options {
     pub isort: Option<isort::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
     // Tables are required to go last.
-    pub per_file_ignores: Option<BTreeMap<String, Vec<CheckCodePrefix>>>,
+    pub per_file_ignores: Option<FnvHashMap<String, Vec<CheckCodePrefix>>>,
 }
