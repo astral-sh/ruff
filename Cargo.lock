@@ -935,6 +935,7 @@ dependencies = [
  "anyhow",
  "clap 4.0.22",
  "configparser",
+ "fnv",
  "once_cell",
  "regex",
  "ruff",

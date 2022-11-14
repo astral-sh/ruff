@@ -61,7 +61,7 @@ fn apply_fixes<'a>(
 ) -> Cow<'a, str> {
     let mut output = RopeBuilder::new();
     let mut last_pos: Location = Location::new(1, 0);
-    let mut applied: BTreeSet<&Patch> = BTreeSet::new();
+    let mut applied: BTreeSet<&Patch> = BTreeSet::default();
 
     for fix in fixes.sorted_by_key(|fix| fix.patch.location) {
         // If we already applied an identical fix as part of another correction, skip

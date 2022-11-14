@@ -1,11 +1,10 @@
 //! Abstractions for NumPy-style docstrings.
 
-use std::collections::BTreeSet;
-
+use fnv::FnvHashSet;
 use once_cell::sync::Lazy;
 
-pub(crate) static LOWERCASE_NUMPY_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
-    BTreeSet::from([
+pub(crate) static LOWERCASE_NUMPY_SECTION_NAMES: Lazy<FnvHashSet<&'static str>> = Lazy::new(|| {
+    FnvHashSet::from_iter([
         "short summary",
         "extended summary",
         "parameters",
@@ -22,8 +21,8 @@ pub(crate) static LOWERCASE_NUMPY_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = 
     ])
 });
 
-pub(crate) static NUMPY_SECTION_NAMES: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
-    BTreeSet::from([
+pub(crate) static NUMPY_SECTION_NAMES: Lazy<FnvHashSet<&'static str>> = Lazy::new(|| {
+    FnvHashSet::from_iter([
         "Short Summary",
         "Extended Summary",
         "Parameters",

@@ -1,10 +1,9 @@
-use std::collections::BTreeSet;
-
+use fnv::FnvHashSet;
 use once_cell::sync::Lazy;
 
 // See: https://pycqa.github.io/isort/docs/configuration/options.html#known-standard-library
-pub static KNOWN_STANDARD_LIBRARY: Lazy<BTreeSet<&'static str>> = Lazy::new(|| {
-    BTreeSet::from([
+pub static KNOWN_STANDARD_LIBRARY: Lazy<FnvHashSet<&'static str>> = Lazy::new(|| {
+    FnvHashSet::from_iter([
         "_ast",
         "_dummy_thread",
         "_thread",

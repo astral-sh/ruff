@@ -1,8 +1,8 @@
-use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 
 use clap::{command, Parser};
+use fnv::FnvHashMap;
 use log::warn;
 use regex::Regex;
 
@@ -188,7 +188,7 @@ pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
     project_root: &Option<PathBuf>,
 ) -> Vec<PerFileIgnore> {
-    let mut per_file_ignores: BTreeMap<String, Vec<CheckCodePrefix>> = BTreeMap::new();
+    let mut per_file_ignores: FnvHashMap<String, Vec<CheckCodePrefix>> = FnvHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)

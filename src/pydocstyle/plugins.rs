@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use fnv::FnvHashSet;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -1287,7 +1288,11 @@ fn common_section(
     blanks_and_section_underline(checker, definition, context);
 }
 
-fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args: &BTreeSet<&str>) {
+fn missing_args(
+    checker: &mut Checker,
+    definition: &Definition,
+    docstrings_args: &FnvHashSet<&str>,
+) {
     if let DefinitionKind::Function(parent)
     | DefinitionKind::NestedFunction(parent)
     | DefinitionKind::Method(parent) = definition.kind
@@ -1377,7 +1382,7 @@ fn args_section(checker: &mut Checker, definition: &Definition, context: &Sectio
         checker,
         definition,
         // Collect the list of arguments documented in the docstring.
-        &BTreeSet::from_iter(args_sections.iter().filter_map(|section| {
+        &FnvHashSet::from_iter(args_sections.iter().filter_map(|section| {
             match GOOGLE_ARGS_REGEX.captures(section.as_str()) {
                 Some(caps) => caps.get(1).map(|arg_name| arg_name.as_str()),
                 None => None,
@@ -1388,7 +1393,7 @@ fn args_section(checker: &mut Checker, definition: &Definition, context: &Sectio
 
 fn parameters_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
     // Collect the list of arguments documented in the docstring.
-    let mut docstring_args: BTreeSet<&str> = Default::default();
+    let mut docstring_args: FnvHashSet<&str> = FnvHashSet::default();
     let section_level_indent = helpers::leading_space(context.line);
     for i in 1..context.following_lines.len() {
         let current_line = context.following_lines[i - 1];
