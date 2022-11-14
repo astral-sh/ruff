@@ -452,6 +452,14 @@ where
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::B024)
+                    || self.settings.enabled.contains(&CheckCode::B027)
+                {
+                    flake8_bugbear::plugins::abstract_base_class(
+                        self, stmt, name, bases, keywords, body,
+                    );
+                }
+
                 self.check_builtin_shadowing(name, Range::from_located(stmt), false);
 
                 for expr in bases {

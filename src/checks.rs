@@ -97,8 +97,10 @@ pub enum CheckCode {
     B019,
     B021,
     B022,
+    B024,
     B025,
     B026,
+    B027,
     // flake8-comprehensions
     C400,
     C401,
@@ -399,8 +401,10 @@ pub enum CheckKind {
     CachedInstanceMethod,
     FStringDocstring,
     UselessContextlibSuppress,
+    AbstractBaseClassWithoutAbstractMethod(String),
     DuplicateTryBlockException(String),
     StarArgUnpackingAfterKeywordArg,
+    EmptyMethodWithoutAbstractDecorator(String),
     // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
@@ -643,8 +647,10 @@ impl CheckCode {
             CheckCode::B019 => CheckKind::CachedInstanceMethod,
             CheckCode::B021 => CheckKind::FStringDocstring,
             CheckCode::B022 => CheckKind::UselessContextlibSuppress,
+            CheckCode::B024 => CheckKind::AbstractBaseClassWithoutAbstractMethod("...".to_string()),
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
             CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
+            CheckCode::B027 => CheckKind::EmptyMethodWithoutAbstractDecorator("...".to_string()),
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
             CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
@@ -886,8 +892,10 @@ impl CheckCode {
             CheckCode::B019 => CheckCategory::Flake8Bugbear,
             CheckCode::B021 => CheckCategory::Flake8Bugbear,
             CheckCode::B022 => CheckCategory::Flake8Bugbear,
+            CheckCode::B024 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
+            CheckCode::B027 => CheckCategory::Flake8Bugbear,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
             CheckCode::C402 => CheckCategory::Flake8Comprehensions,
@@ -1092,8 +1100,10 @@ impl CheckKind {
             CheckKind::CachedInstanceMethod => &CheckCode::B019,
             CheckKind::FStringDocstring => &CheckCode::B021,
             CheckKind::UselessContextlibSuppress => &CheckCode::B022,
+            CheckKind::AbstractBaseClassWithoutAbstractMethod(_) => &CheckCode::B024,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
             CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
+            CheckKind::EmptyMethodWithoutAbstractDecorator(_) => &CheckCode::B027,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
             CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,
@@ -1470,6 +1480,9 @@ impl CheckKind {
                  and therefore this context manager is redundant"
                     .to_string()
             }
+            CheckKind::AbstractBaseClassWithoutAbstractMethod(name) => {
+                format!("`{name}` is an abstract base class, but it has no abstract methods")
+            }
             CheckKind::DuplicateTryBlockException(name) => {
                 format!("try-except block with duplicate exception `{name}`")
             }
@@ -1478,6 +1491,12 @@ impl CheckKind {
                  works when the keyword parameter is declared after all parameters supplied by the \
                  unpacked sequence, and this change of ordering can surprise and mislead readers."
                     .to_string()
+            }
+            CheckKind::EmptyMethodWithoutAbstractDecorator(name) => {
+                format!(
+                    "`{name}` is an empty method in an abstract base class, but has no abstract \
+                     decorator"
+                )
             }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {
