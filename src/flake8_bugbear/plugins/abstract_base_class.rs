@@ -18,11 +18,9 @@ fn is_abc_class(
             .as_ref()
             .map(|a| a == "metaclass")
             .unwrap_or(false)
-            && match_call_path(
-                &compose_call_path(&keyword.node.value).unwrap(),
-                "abc.ABCMeta",
-                from_imports,
-            )
+            && compose_call_path(&keyword.node.value)
+                .map(|call_path| match_call_path(&call_path, "abc.ABCMeta", from_imports))
+                .unwrap_or(false)
     }) || bases.iter().any(|base| {
         compose_call_path(base)
             .map(|call_path| match_call_path(&call_path, "abc.ABC", from_imports))
