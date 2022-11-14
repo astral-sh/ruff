@@ -1,3 +1,4 @@
+pub use abstract_base_class::abstract_base_class;
 pub use assert_false::assert_false;
 pub use assert_raises_exception::assert_raises_exception;
 pub use assignment_to_os_environ::assignment_to_os_environ;
@@ -20,6 +21,7 @@ pub use useless_comparison::useless_comparison;
 pub use useless_contextlib_suppress::useless_contextlib_suppress;
 pub use useless_expression::useless_expression;
 
+mod abstract_base_class;
 mod assert_false;
 mod assert_raises_exception;
 mod assignment_to_os_environ;
