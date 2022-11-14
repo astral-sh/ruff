@@ -1493,7 +1493,10 @@ impl CheckKind {
                     .to_string()
             }
             CheckKind::EmptyMethodWithoutAbstractDecorator(name) => {
-                format!("{name} is an empty method in an abstract base class, but has no abstract decorator")
+                format!(
+                    "{name} is an empty method in an abstract base class, but has no abstract \
+                     decorator"
+                )
             }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {
