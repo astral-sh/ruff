@@ -114,6 +114,7 @@ impl Hash for Settings {
         self.target_version.hash(state);
         // Add plugin properties in alphabetical order.
         self.flake8_annotations.hash(state);
+        self.flake8_bugbear.hash(state);
         self.flake8_quotes.hash(state);
         self.isort.hash(state);
         self.pep8_naming.hash(state);
