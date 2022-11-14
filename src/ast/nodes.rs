@@ -18,13 +18,15 @@ pub trait Ident {
 }
 
 pub trait Alias {
-    fn name(&self) -> &dyn Ident;
-    fn asname(&self) -> Option<&dyn Ident>;
+    type Ident: Ident;
+    fn name(&self) -> &Self::Ident;
+    fn asname(&self) -> Option<&Self::Ident>;
 }
 
 pub trait Arg<'a>: Located {
     type Expr: Expr<'a>;
-    fn arg(&self) -> &dyn Ident;
+    type Ident: Ident;
+    fn arg(&self) -> &Self::Ident;
     fn annotation(&self) -> Option<&Self::Expr>;
     fn type_comment(&self) -> Option<&str>;
 }
@@ -42,8 +44,9 @@ pub trait Arguments<'a> {
 }
 
 pub trait Keyword<'a> {
+    type Ident: Ident;
     type Expr: Expr<'a>;
-    fn arg(&self) -> Option<&dyn Ident>;
+    fn arg(&self) -> Option<&Self::Ident>;
     fn value(&self) -> &Self::Expr;
 }
 
@@ -255,9 +258,10 @@ pub trait ConstantExpr<'a> {
 }
 
 pub trait Attribute<'a> {
+    type Ident: Ident;
     type Expr: Expr<'a>;
     fn value(&self) -> &Self::Expr;
-    fn attr(&self) -> &dyn Ident;
+    fn attr(&self) -> &Self::Ident;
     fn ctx(&self) -> ExprContext;
 }
 
@@ -275,7 +279,8 @@ pub trait Starred<'a> {
 }
 
 pub trait Name {
-    fn id(&self) -> &dyn Ident;
+    type Ident: Ident;
+    fn id(&self) -> &Self::Ident;
     fn ctx(&self) -> ExprContext;
 }
 
@@ -421,10 +426,11 @@ pub trait Expr<'a>: Located {
 }
 
 pub trait ExceptHandler<'a>: Located {
+    type Ident: Ident;
     type Expr: Expr<'a>;
     type Stmt: Stmt<'a>;
     fn type_(&self) -> Option<&Self::Expr>;
-    fn name(&self) -> Option<&dyn Ident>;
+    fn name(&self) -> Option<&Self::Ident>;
     fn body(&self) -> &[Self::Stmt];
 }
 
@@ -444,11 +450,12 @@ pub trait MatchSequence<'a> {
 }
 
 pub trait MatchMapping<'a> {
+    type Ident: Ident;
     type Expr: Expr<'a>;
     type Pattern: Pattern<'a>;
     fn keys(&self) -> &[Self::Expr];
     fn patterns(&self) -> &[Self::Pattern];
-    fn rest(&self) -> Option<&dyn Ident>;
+    fn rest(&self) -> Option<&Self::Ident>;
 }
 
 pub trait MatchClass<'a> {
@@ -462,13 +469,15 @@ pub trait MatchClass<'a> {
 }
 
 pub trait MatchStar {
-    fn name(&self) -> Option<&dyn Ident>;
+    type Ident: Ident;
+    fn name(&self) -> Option<&Self::Ident>;
 }
 
 pub trait MatchAs<'a> {
+    type Ident: Ident;
     type Pattern: Pattern<'a>;
     fn pattern(&self) -> Option<&Self::Pattern>;
-    fn name(&self) -> Option<&dyn Ident>;
+    fn name(&self) -> Option<&String>;
 }
 
 pub trait MatchOr<'a> {
@@ -545,10 +554,11 @@ pub trait MatchCase<'a> {
 }
 
 pub trait FunctionDef<'a> {
+    type Ident: Ident;
     type Arguments: Arguments<'a>;
     type Expr: Expr<'a>;
     type Stmt: Stmt<'a>;
-    fn name(&self) -> &dyn Ident;
+    fn name(&self) -> &Self::Ident;
     fn args(&self) -> &Self::Arguments;
     fn body(&self) -> &[Self::Stmt];
     fn decorator_list(&self) -> &[Self::Expr];
@@ -557,10 +567,11 @@ pub trait FunctionDef<'a> {
 }
 
 pub trait AsyncFunctionDef<'a> {
+    type Ident: Ident;
     type Arguments: Arguments<'a>;
     type Stmt: Stmt<'a>;
     type Expr: Expr<'a>;
-    fn name(&self) -> &dyn Ident;
+    fn name(&self) -> &Self::Ident;
     fn args(&self) -> &Self::Arguments;
     fn body(&self) -> &[Self::Stmt];
     fn decorator_list(&self) -> &[Self::Expr];
@@ -569,10 +580,11 @@ pub trait AsyncFunctionDef<'a> {
 }
 
 pub trait ClassDef<'a> {
+    type Ident: Ident;
     type Stmt: Stmt<'a>;
     type Expr: Expr<'a>;
     type Keyword: Keyword<'a>;
-    fn name(&self) -> &dyn Ident;
+    fn name(&self) -> &Self::Ident;
     fn bases(&self) -> &[Self::Expr];
     fn keywords(&self) -> &[Self::Keyword];
     fn body(&self) -> &[Self::Stmt];
@@ -697,8 +709,9 @@ pub trait Import {
 }
 
 pub trait ImportFrom {
-    type Alias: Alias;
-    fn module(&self) -> Option<&dyn Ident>;
+    type Alias: Alias<Ident = Self::Ident>;
+    type Ident: Ident;
+    fn module(&self) -> Option<&Self::Ident>;
     fn names(&self) -> &[Self::Alias];
     fn level(&self) -> Option<usize>;
 }
@@ -826,15 +839,15 @@ pub trait Stmt<'a>: Located {
 
 pub trait Ast<'a> {
     type Ident: Ident;
-    type Alias: Alias;
-    type Arg: Arg<'a, Expr = Self::Expr>;
-    type Arguments: Arguments<'a, Expr = Self::Expr>;
-    type Keyword: Keyword<'a, Expr = Self::Expr>;
+    type Alias: Alias<Ident = Self::Ident>;
+    type Arg: Arg<'a, Ident = Self::Ident, Expr = Self::Expr>;
+    type Arguments: Arguments<'a, Arg = Self::Arg, Expr = Self::Expr>;
+    type Keyword: Keyword<'a, Expr = Self::Expr, Ident = Self::Ident>;
     type BigInt: BigInt;
     type Constant: Constant<'a, Constant = Self::Constant, BigInt = Self::BigInt>;
     type Comprehension: Comprehension<'a, Expr = Self::Expr>;
     type BoolOp: BoolOp<'a, Expr = Self::Expr>;
-    type NamedExpr: NamedExpr<'a, Expr = Self::NamedExpr>;
+    type NamedExpr: NamedExpr<'a, Expr = Self::Expr>;
     type BinOp: BinOp<'a, Expr = Self::Expr>;
     type UnaryOp: UnaryOp<'a, Expr = Self::Expr>;
     type Lambda: Lambda<'a, Arguments = Self::Arguments, Expr = Self::Expr>;
@@ -853,10 +866,10 @@ pub trait Ast<'a> {
     type FormattedValue: FormattedValue<'a, Expr = Self::Expr>;
     type JoinedStr: JoinedStr<'a, Expr = Self::Expr>;
     type ConstantExpr: ConstantExpr<'a, Constant = Self::Constant>;
-    type Attribute: Attribute<'a, Expr = Self::Expr>;
+    type Attribute: Attribute<'a, Ident = Self::Ident, Expr = Self::Expr>;
     type Subscript: Subscript<'a, Expr = Self::Expr>;
     type Starred: Starred<'a, Expr = Self::Expr>;
-    type Name: Name;
+    type Name: Name<Ident = Self::Ident>;
     type List: List<'a, Expr = Self::Expr>;
     type Tuple: Tuple<'a, Expr = Self::Expr>;
     type Slice: Slice<'a, Expr = Self::Expr>;
@@ -890,14 +903,19 @@ pub trait Ast<'a> {
         Tuple = Self::Tuple,
         Slice = Self::Slice,
     >;
-    type ExceptHandler: ExceptHandler<'a, Expr = Self::Expr, Stmt = Self::Stmt>;
+    type ExceptHandler: ExceptHandler<'a, Ident = Self::Ident, Expr = Self::Expr, Stmt = Self::Stmt>;
     type MatchValue: MatchValue<'a, Expr = Self::Expr>;
     type MatchSingleton: MatchSingleton<'a, Constant = Self::Constant>;
     type MatchSequence: MatchSequence<'a, Pattern = Self::Pattern>;
-    type MatchMapping: MatchMapping<'a, Expr = Self::Expr, Pattern = Self::Pattern>;
+    type MatchMapping: MatchMapping<
+        'a,
+        Ident = Self::Ident,
+        Expr = Self::Expr,
+        Pattern = Self::Pattern,
+    >;
     type MatchClass: MatchClass<'a, Expr = Self::Expr, Pattern = Self::Pattern, Ident = Self::Ident>;
-    type MatchStar: MatchStar;
-    type MatchAs: MatchAs<'a, Pattern = Self::Pattern>;
+    type MatchStar: MatchStar<Ident = Self::Ident>;
+    type MatchAs: MatchAs<'a, Ident = Self::Ident, Pattern = Self::Pattern>;
     type MatchOr: MatchOr<'a, Pattern = Self::Pattern>;
     type Pattern: Pattern<
         'a,
@@ -914,17 +932,25 @@ pub trait Ast<'a> {
     type MatchCase: MatchCase<'a, Expr = Self::Expr, Pattern = Self::Pattern, Stmt = Self::Stmt>;
     type FunctionDef: FunctionDef<
         'a,
+        Ident = Self::Ident,
         Arguments = Self::Arguments,
         Expr = Self::Expr,
         Stmt = Self::Stmt,
     >;
     type AsyncFunctionDef: AsyncFunctionDef<
         'a,
+        Ident = Self::Ident,
         Arguments = Self::Arguments,
         Stmt = Self::Stmt,
         Expr = Self::Expr,
     >;
-    type ClassDef: ClassDef<'a, Stmt = Self::Stmt, Expr = Self::Expr, Keyword = Self::Keyword>;
+    type ClassDef: ClassDef<
+        'a,
+        Ident = Self::Ident,
+        Stmt = Self::Stmt,
+        Expr = Self::Expr,
+        Keyword = Self::Keyword,
+    >;
     type Return: Return<'a, Expr = Self::Expr>;
     type Delete: Delete<'a, Expr = Self::Expr>;
     type Assign: Assign<'a, Expr = Self::Expr>;
@@ -1015,20 +1041,23 @@ mod rs_python_impls {
     }
 
     impl<U> Alias for rspy_ast::Alias<U> {
+        type Ident = String;
+
         #[inline]
-        fn name(&self) -> &dyn Ident {
+        fn name(&self) -> &Self::Ident {
             &self.node.name
         }
         #[inline]
-        fn asname(&self) -> Option<&dyn Ident> {
-            self.node.asname.as_ref().map(|x| x as &dyn Ident)
+        fn asname(&self) -> Option<&Self::Ident> {
+            self.node.asname.as_ref()
         }
     }
 
     impl<'a, U> Arg<'a> for rspy_ast::Arg<U> {
+        type Ident = String;
         type Expr = rspy_ast::Expr<U>;
         #[inline]
-        fn arg(&self) -> &dyn Ident {
+        fn arg(&self) -> &Self::Ident {
             &self.node.arg
         }
         #[inline]
@@ -1075,11 +1104,12 @@ mod rs_python_impls {
     }
 
     impl<'a, U> Keyword<'a> for rspy_ast::Keyword<U> {
+        type Ident = String;
         rspy_types!(U, Expr);
 
         #[inline]
-        fn arg(&self) -> Option<&dyn Ident> {
-            self.node.arg.as_ref().map(|x| x as &dyn Ident)
+        fn arg(&self) -> Option<&Self::Ident> {
+            self.node.arg.as_ref()
         }
         #[inline]
         fn value(&self) -> &Self::Expr {
@@ -1555,6 +1585,7 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Attribute<'a> for rspy_ast::ExprKind<U> {
+        type Ident = String;
         rspy_types!(U, Expr);
 
         #[inline]
@@ -1565,7 +1596,7 @@ mod rs_python_impls {
             }
         }
         #[inline]
-        fn attr(&self) -> &dyn Ident {
+        fn attr(&self) -> &Self::Ident {
             match self {
                 Self::Attribute { attr, .. } => attr,
                 _ => unreachable!(),
@@ -1623,8 +1654,9 @@ mod rs_python_impls {
         }
     }
     impl<U> Name for rspy_ast::ExprKind<U> {
+        type Ident = String;
         #[inline]
-        fn id(&self) -> &dyn Ident {
+        fn id(&self) -> &Self::Ident {
             match self {
                 Self::Name { id, .. } => id,
                 _ => unreachable!(),
@@ -1793,6 +1825,7 @@ mod rs_python_impls {
     }
 
     impl<'a, U> ExceptHandler<'a> for rspy_ast::Excepthandler<U> {
+        type Ident = String;
         rspy_types!(U, Expr, Stmt);
 
         #[inline]
@@ -1802,11 +1835,9 @@ mod rs_python_impls {
             }
         }
         #[inline]
-        fn name(&self) -> Option<&dyn Ident> {
+        fn name(&self) -> Option<&Self::Ident> {
             match &self.node {
-                rspy_ast::ExcepthandlerKind::ExceptHandler { name, .. } => {
-                    name.as_ref().map(|x| x as &dyn Ident)
-                }
+                rspy_ast::ExcepthandlerKind::ExceptHandler { name, .. } => name.as_ref(),
             }
         }
         #[inline]
@@ -1850,6 +1881,7 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> MatchMapping<'a> for rspy_ast::PatternKind<U> {
+        type Ident = String;
         rspy_types!(U, Expr, Pattern);
 
         #[inline]
@@ -1867,9 +1899,9 @@ mod rs_python_impls {
             }
         }
         #[inline]
-        fn rest(&self) -> Option<&dyn Ident> {
+        fn rest(&self) -> Option<&Self::Ident> {
             match self {
-                Self::MatchMapping { rest, .. } => rest.as_ref().map(|x| x as &dyn Ident),
+                Self::MatchMapping { rest, .. } => rest.as_ref(),
                 _ => unreachable!(),
             }
         }
@@ -1908,15 +1940,18 @@ mod rs_python_impls {
         }
     }
     impl<U> MatchStar for rspy_ast::PatternKind<U> {
+        type Ident = String;
+
         #[inline]
-        fn name(&self) -> Option<&dyn Ident> {
+        fn name(&self) -> Option<&Self::Ident> {
             match self {
-                Self::MatchStar { name } => name.as_ref().map(|x| x as &dyn Ident),
+                Self::MatchStar { name } => name.as_ref(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> MatchAs<'a> for rspy_ast::PatternKind<U> {
+        type Ident = String;
         rspy_types!(U, Pattern);
 
         #[inline]
@@ -1927,9 +1962,9 @@ mod rs_python_impls {
             }
         }
         #[inline]
-        fn name(&self) -> Option<&dyn Ident> {
+        fn name(&self) -> Option<&Self::Ident> {
             match self {
-                Self::MatchAs { name, .. } => name.as_ref().map(|x| x as &dyn Ident),
+                Self::MatchAs { name, .. } => name.as_ref(),
                 _ => unreachable!(),
             }
         }
@@ -2012,10 +2047,11 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> FunctionDef<'a> for rspy_ast::StmtKind<U> {
+        type Ident = String;
         rspy_types!(U, Arguments, Expr, Stmt);
 
         #[inline]
-        fn name(&self) -> &dyn Ident {
+        fn name(&self) -> &Self::Ident {
             match self {
                 Self::FunctionDef { name, .. } => name,
                 _ => unreachable!(),
@@ -2058,10 +2094,11 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> AsyncFunctionDef<'a> for rspy_ast::StmtKind<U> {
+        type Ident = String;
         rspy_types!(U, Arguments, Expr, Stmt);
 
         #[inline]
-        fn name(&self) -> &dyn Ident {
+        fn name(&self) -> &Self::Ident {
             match self {
                 Self::AsyncFunctionDef { name, .. } => name,
                 _ => unreachable!(),
@@ -2104,10 +2141,11 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> ClassDef<'a> for rspy_ast::StmtKind<U> {
+        type Ident = String;
         rspy_types!(U, Keyword, Expr, Stmt);
 
         #[inline]
-        fn name(&self) -> &dyn Ident {
+        fn name(&self) -> &Self::Ident {
             match self {
                 Self::ClassDef { name, .. } => name,
                 _ => unreachable!(),
@@ -2522,12 +2560,13 @@ mod rs_python_impls {
         }
     }
     impl<U> ImportFrom for rspy_ast::StmtKind<U> {
+        type Ident = String;
         rspy_types!(U, Alias);
 
         #[inline]
-        fn module(&self) -> Option<&dyn Ident> {
+        fn module(&self) -> Option<&Self::Ident> {
             match self {
-                Self::ImportFrom { module, .. } => module.as_ref().map(|x| x as &dyn Ident),
+                Self::ImportFrom { module, .. } => module.as_ref(),
                 _ => unreachable!(),
             }
         }
