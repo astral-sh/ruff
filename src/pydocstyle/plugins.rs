@@ -697,7 +697,7 @@ pub fn ends_with_period(checker: &mut Checker, definition: &Definition) {
             ..
         } = &docstring.node
         {
-            if let Some(string) = string.lines().next() {
+            if let Some(string) = string.trim().lines().next() {
                 if !string.ends_with('.') {
                     checker.add_check(Check::new(
                         CheckKind::EndsInPeriod,
@@ -807,7 +807,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, definition: &Definition) {
             ..
         } = &docstring.node
         {
-            if let Some(string) = string.lines().next() {
+            if let Some(string) = string.trim().lines().next() {
                 if !(string.ends_with('.') || string.ends_with('!') || string.ends_with('?')) {
                     checker.add_check(Check::new(
                         CheckKind::EndsInPunctuation,

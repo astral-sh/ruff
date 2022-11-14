@@ -4,30 +4,6 @@ expression: checks
 ---
 - kind: EndsInPeriod
   location:
-    row: 124
-    column: 4
-  end_location:
-    row: 126
-    column: 7
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 283
-    column: 4
-  end_location:
-    row: 283
-    column: 33
-  fix: ~
-- kind: EndsInPeriod
-  location:
-    row: 288
-    column: 4
-  end_location:
-    row: 288
-    column: 37
-  fix: ~
-- kind: EndsInPeriod
-  location:
     row: 350
     column: 4
   end_location:
