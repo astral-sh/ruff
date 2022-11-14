@@ -516,7 +516,26 @@ where
                                     full_name.to_string(),
                                     self.binding_context(),
                                 ),
-                                used: None,
+                                // Treat explicit re-export as usage (e.g., `import applications
+                                // as applications`).
+                                used: if alias
+                                    .node
+                                    .asname
+                                    .as_ref()
+                                    .map(|asname| asname == &alias.node.name)
+                                    .unwrap_or(false)
+                                {
+                                    Some((
+                                        self.scopes[*(self
+                                            .scope_stack
+                                            .last()
+                                            .expect("No current scope found."))]
+                                        .id,
+                                        Range::from_located(stmt),
+                                    ))
+                                } else {
+                                    None
+                                },
                                 range: Range::from_located(stmt),
                             },
                         )
