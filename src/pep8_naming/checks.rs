@@ -1,11 +1,26 @@
-use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
+use fnv::{FnvHashMap, FnvHashSet};
+use rustpython_ast::{Arguments, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::types::{FunctionScope, Range, Scope, ScopeKind};
+use crate::ast::helpers::{compose_call_path, match_call_path};
+use crate::ast::types::{Range, Scope, ScopeKind};
+use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::pep8_naming::helpers;
 use crate::pep8_naming::helpers::FunctionType;
 use crate::pep8_naming::settings::Settings;
-use crate::python::string;
+use crate::python::string::{self};
+
+fn is_namedtuple_assignment(
+    stmt: &Stmt,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+) -> bool {
+    if let StmtKind::Assign { value, .. } = &stmt.node {
+        return compose_call_path(value)
+            .map(|call_path| match_call_path(&call_path, "collections.namedtuple", from_imports))
+            .unwrap_or(false);
+    }
+    false
+}
 
 /// N801
 pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
@@ -101,17 +116,18 @@ pub fn invalid_first_argument_name_for_method(
 }
 
 /// N806
-pub fn non_lowercase_variable_in_function(scope: &Scope, expr: &Expr, name: &str) -> Option<Check> {
-    if !matches!(scope.kind, ScopeKind::Function(FunctionScope { .. })) {
-        return None;
-    }
-    if name.to_lowercase() != name {
-        return Some(Check::new(
+pub fn non_lowercase_variable_in_function(
+    checker: &mut Checker,
+    expr: &Expr,
+    stmt: &Stmt,
+    name: &str,
+) {
+    if !is_namedtuple_assignment(stmt, &checker.from_imports) && name.to_lowercase() != name {
+        checker.add_check(Check::new(
             CheckKind::NonLowercaseVariableInFunction(name.to_string()),
             Range::from_located(expr),
         ));
     }
-    None
 }
 
 /// N807
@@ -193,35 +209,33 @@ pub fn camelcase_imported_as_constant(
 }
 
 /// N815
-pub fn mixed_case_variable_in_class_scope(scope: &Scope, expr: &Expr, name: &str) -> Option<Check> {
-    if !matches!(scope.kind, ScopeKind::Class(_)) {
-        return None;
-    }
-    if helpers::is_mixed_case(name) {
-        return Some(Check::new(
+pub fn mixed_case_variable_in_class_scope(
+    checker: &mut Checker,
+    expr: &Expr,
+    stmt: &Stmt,
+    name: &str,
+) {
+    if !is_namedtuple_assignment(stmt, &checker.from_imports) && helpers::is_mixed_case(name) {
+        checker.add_check(Check::new(
             CheckKind::MixedCaseVariableInClassScope(name.to_string()),
             Range::from_located(expr),
         ));
     }
-    None
 }
 
 /// N816
 pub fn mixed_case_variable_in_global_scope(
-    scope: &Scope,
+    checker: &mut Checker,
     expr: &Expr,
+    stmt: &Stmt,
     name: &str,
-) -> Option<Check> {
-    if !matches!(scope.kind, ScopeKind::Module) {
-        return None;
-    }
-    if helpers::is_mixed_case(name) {
-        return Some(Check::new(
+) {
+    if !is_namedtuple_assignment(stmt, &checker.from_imports) && helpers::is_mixed_case(name) {
+        checker.add_check(Check::new(
             CheckKind::MixedCaseVariableInGlobalScope(name.to_string()),
             Range::from_located(expr),
         ));
     }
-    None
 }
 
 /// N817

@@ -5,19 +5,19 @@ expression: checks
 - kind:
     NonLowercaseVariableInFunction: Camel
   location:
-    row: 3
+    row: 7
     column: 4
   end_location:
-    row: 3
+    row: 7
     column: 9
   fix: ~
 - kind:
     NonLowercaseVariableInFunction: CONSTANT
   location:
-    row: 4
+    row: 8
     column: 4
   end_location:
-    row: 4
+    row: 8
     column: 12
   fix: ~
 
