@@ -1,11 +1,7 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
-<<<<<<< HEAD
-use crate::ast::helpers::{collect_call_paths, compose_call_path, match_call_path};
-=======
-use crate::ast::helpers::{compose_call_path, dealias, match_call_path};
->>>>>>> 4b06237 (Track aliases)
+use crate::ast::helpers::{collect_call_paths,dealias, compose_call_path, match_call_path};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -29,7 +25,6 @@ fn is_immutable_func(
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
     import_aliases: &FnvHashMap<&str, &str>,
 ) -> bool {
-<<<<<<< HEAD
     let call_path = collect_call_paths(expr);
     IMMUTABLE_FUNCS
         .iter()
@@ -45,7 +40,6 @@ fn is_immutable_func(
                 .any(|target| match_call_path(&call_path, target, from_imports))
         })
         .unwrap_or(false)
->>>>>>> 4b06237 (Track aliases)
 }
 
 struct ArgumentDefaultVisitor<'a> {

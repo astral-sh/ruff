@@ -2768,7 +2768,7 @@ pub fn check_ast(
 
     // Check docstrings.
     checker.check_definitions();
-    println!("{:?}", checker.import_aliases);
+    // println!("{:?}", checker.import_aliases);
 
     checker.checks
 }

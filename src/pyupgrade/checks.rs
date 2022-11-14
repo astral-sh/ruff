@@ -174,16 +174,13 @@ pub fn unnecessary_lru_cache_params(
         } = &expr.node
         {
             if args.is_empty()
-<<<<<<< HEAD
-                && helpers::match_module_member(func, "functools", "lru_cache", imports)
-=======
                 && helpers::match_module_member(
                     func,
-                    "functools.lru_cache",
+                    "functools",
+                    "lru_cache",
                     from_imports,
                     import_aliases,
                 )
->>>>>>> 4b06237 (Track aliases)
             {
                 // Ex) `functools.lru_cache()`
                 if keywords.is_empty() {
