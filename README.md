@@ -36,8 +36,8 @@ faster than any individual tool.
 automatically convert your existing configuration.)
 
 Ruff is actively developed and used in major open-source projects
-like [Zulip](https://github.com/zulip/zulip), [pydantic](https://github.com/pydantic/pydantic),
-and [Saleor](https://github.com/saleor/saleor).
+like [FastAPI](https://github.com/tiangolo/fastapi), [Zulip](https://github.com/zulip/zulip),
+[pydantic](https://github.com/pydantic/pydantic), and [Saleor](https://github.com/saleor/saleor).
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
