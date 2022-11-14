@@ -1,0 +1,22 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 27
+    column: 0
+  fix:
+    patch:
+      content: "import A\nimport a\nimport B\nimport b\nimport x\nimport x as A\nimport x as Y\nimport x as a\nimport x as y\nfrom a import BAD as DEF\nfrom a import B, b\nfrom a import B as A\nfrom a import B as Abc\nfrom a import B as DEF\nfrom a import Boo as DEF\nfrom a import b as a\nfrom a import b as c\nfrom a import b as d\nfrom a import b as x\nfrom a import b as y\nfrom b import C, c\nfrom b import c as d\n"
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 27
+        column: 0
+    applied: false
+

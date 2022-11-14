@@ -8,16 +8,22 @@ pub enum Prefix {
     Variables,
 }
 
-pub fn module_key(module_name: &str) -> String {
-    module_name.to_lowercase()
+pub fn module_key<'a>(
+    name: &'a str,
+    asname: &'a Option<String>,
+) -> (String, &'a str, &'a Option<String>) {
+    (name.to_lowercase(), name, asname)
 }
 
-pub fn member_key(member_name: &str) -> (Prefix, String) {
+pub fn member_key<'a>(
+    name: &'a str,
+    asname: &'a Option<String>,
+) -> (Prefix, String, &'a Option<String>) {
     (
-        if member_name.len() > 1 && string::is_upper(member_name) {
+        if name.len() > 1 && string::is_upper(name) {
             // Ex) `CONSTANT`
             Prefix::Constants
-        } else if member_name
+        } else if name
             .chars()
             .next()
             .map(|char| char.is_uppercase())
@@ -29,6 +35,7 @@ pub fn member_key(member_name: &str) -> (Prefix, String) {
             // Ex) `variable`
             Prefix::Variables
         },
-        member_name.to_lowercase(),
+        name.to_lowercase(),
+        asname,
     )
 }

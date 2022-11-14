@@ -753,9 +753,8 @@ project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
 
 ### How does Ruff's import sorting compare to [`isort`](https://pypi.org/project/isort/)?
 
-Ruff's import sorting is intended to be equivalent to `isort` when used `profile = "black"`, and a
-few other settings (`combine_as_imports = true`, `order_by_type = false`, and
-`case_sensitive = true`).
+Ruff's import sorting is intended to be nearly equivalent to `isort` when used `profile = "black"`.
+(There are some minor differences in how Ruff and isort break ties between similar imports.)
 
 Like `isort`, Ruff's import sorting is compatible with Black.
 
