@@ -1157,6 +1157,9 @@ where
                         flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::B022) {
+                    flake8_bugbear::plugins::useless_contextlib_suppress(self, expr, args);
+                }
                 if self.settings.enabled.contains(&CheckCode::B026) {
                     flake8_bugbear::plugins::star_arg_unpacking_after_keyword_arg(
                         self, args, keywords,

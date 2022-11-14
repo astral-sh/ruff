@@ -17,6 +17,7 @@ pub use unary_prefix_increment::unary_prefix_increment;
 pub use unreliable_callable_check::unreliable_callable_check;
 pub use unused_loop_control_variable::unused_loop_control_variable;
 pub use useless_comparison::useless_comparison;
+pub use useless_contextlib_suppress::useless_contextlib_suppress;
 pub use useless_expression::useless_expression;
 
 mod assert_false;
@@ -38,4 +39,5 @@ mod unary_prefix_increment;
 mod unreliable_callable_check;
 mod unused_loop_control_variable;
 mod useless_comparison;
+mod useless_contextlib_suppress;
 mod useless_expression;
