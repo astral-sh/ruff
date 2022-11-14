@@ -2164,19 +2164,21 @@ impl<'a> Checker<'a> {
 
             if self.settings.enabled.contains(&CheckCode::N806) {
                 if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
-                    pep8_naming::checks::non_lowercase_variable_in_function(self, expr, parent, id)
+                    pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
                 }
             }
 
             if self.settings.enabled.contains(&CheckCode::N815) {
                 if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
-                    pep8_naming::checks::mixed_case_variable_in_class_scope(self, expr, parent, id)
+                    pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id)
                 }
             }
 
             if self.settings.enabled.contains(&CheckCode::N816) {
                 if matches!(self.current_scope().kind, ScopeKind::Module) {
-                    pep8_naming::checks::mixed_case_variable_in_global_scope(self, expr, parent, id)
+                    pep8_naming::plugins::mixed_case_variable_in_global_scope(
+                        self, expr, parent, id,
+                    )
                 }
             }
 
