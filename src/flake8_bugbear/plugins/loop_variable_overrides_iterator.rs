@@ -48,7 +48,7 @@ where
 }
 
 /// B020
-pub fn for_loop_target_overrides_iter(checker: &mut Checker, target: &Expr, iter: &Expr) {
+pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
     let target_names = {
         let mut target_finder = NameFinder::new();
         target_finder.visit_expr(target);
@@ -63,7 +63,7 @@ pub fn for_loop_target_overrides_iter(checker: &mut Checker, target: &Expr, iter
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
             checker.add_check(Check::new(
-                CheckKind::ForLoopTargetOverridesIter(name.to_string()),
+                CheckKind::LoopVariableOverridesIterator(name.to_string()),
                 Range::from_located(expr),
             ));
         }

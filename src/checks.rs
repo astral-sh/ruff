@@ -400,7 +400,7 @@ pub enum CheckKind {
     NoAssertRaisesException,
     UselessExpression,
     CachedInstanceMethod,
-    ForLoopTargetOverridesIter(String),
+    LoopVariableOverridesIterator(String),
     FStringDocstring,
     UselessContextlibSuppress,
     AbstractBaseClassWithoutAbstractMethod(String),
@@ -647,7 +647,7 @@ impl CheckCode {
             CheckCode::B017 => CheckKind::NoAssertRaisesException,
             CheckCode::B018 => CheckKind::UselessExpression,
             CheckCode::B019 => CheckKind::CachedInstanceMethod,
-            CheckCode::B020 => CheckKind::ForLoopTargetOverridesIter("...".to_string()),
+            CheckCode::B020 => CheckKind::LoopVariableOverridesIterator("...".to_string()),
             CheckCode::B021 => CheckKind::FStringDocstring,
             CheckCode::B022 => CheckKind::UselessContextlibSuppress,
             CheckCode::B024 => CheckKind::AbstractBaseClassWithoutAbstractMethod("...".to_string()),
@@ -1102,7 +1102,7 @@ impl CheckKind {
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::UselessExpression => &CheckCode::B018,
             CheckKind::CachedInstanceMethod => &CheckCode::B019,
-            CheckKind::ForLoopTargetOverridesIter(_) => &CheckCode::B020,
+            CheckKind::LoopVariableOverridesIterator(_) => &CheckCode::B020,
             CheckKind::FStringDocstring => &CheckCode::B021,
             CheckKind::UselessContextlibSuppress => &CheckCode::B022,
             CheckKind::AbstractBaseClassWithoutAbstractMethod(_) => &CheckCode::B024,
@@ -1477,7 +1477,7 @@ impl CheckKind {
             CheckKind::CachedInstanceMethod => "Use of `functools.lru_cache` or `functools.cache` \
                                                 on methods can lead to memory leaks"
                 .to_string(),
-            CheckKind::ForLoopTargetOverridesIter(name) => {
+            CheckKind::LoopVariableOverridesIterator(name) => {
                 format!("Loop control variable `{name}` overrides iterable it iterates")
             }
             CheckKind::FStringDocstring => "f-string used as docstring. This will be interpreted \

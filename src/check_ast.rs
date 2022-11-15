@@ -880,7 +880,7 @@ where
                     flake8_bugbear::plugins::unused_loop_control_variable(self, target, body);
                 }
                 if self.settings.enabled.contains(&CheckCode::B020) {
-                    flake8_bugbear::plugins::for_loop_target_overrides_iter(self, target, iter);
+                    flake8_bugbear::plugins::loop_variable_overrides_iterator(self, target, iter);
                 }
             }
             StmtKind::Try { handlers, .. } => {
