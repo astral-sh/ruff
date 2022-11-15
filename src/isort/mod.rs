@@ -1,7 +1,7 @@
-use fnv::FnvHashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
+use fnv::FnvHashMap;
 use itertools::Itertools;
 use ropey::RopeBuilder;
 use rustpython_ast::{Stmt, StmtKind};
@@ -15,22 +15,21 @@ use crate::isort::types::{
 
 mod categorize;
 mod comments;
+pub mod format;
 pub mod plugins;
 pub mod settings;
 mod sorting;
 pub mod track;
 mod types;
 
-// Hard-code four-space indentation for the imports themselves, to match Black.
-const INDENT: &str = "    ";
-
+#[derive(Debug)]
 pub struct AnnotatedAliasData<'a> {
     pub name: &'a str,
     pub asname: &'a Option<String>,
     pub atop: Vec<Comment<'a>>,
     pub inline: Vec<Comment<'a>>,
 }
-
+#[derive(Debug)]
 pub enum AnnotatedImport<'a> {
     Import {
         names: Vec<AliasData<'a>>,
@@ -100,17 +99,13 @@ fn annotate_imports<'a>(
                 //   from module import (  # Comment
                 //     ...
                 //   )
-                // That is, the members have to be on the next line (otherwise those comments will
-                // be associated with the members).
+                // That is, the members have to be on the next line (otherwise those comments
+                // will be associated with the members).
                 let mut inline = vec![];
-                if let Some(alias) = names.first() {
-                    if alias.location.row() > import.location.row() {
-                        while let Some(comment) = comments_iter
-                            .next_if(|comment| comment.location.row() == import.location.row())
-                        {
-                            inline.push(comment);
-                        }
-                    }
+                while let Some(comment) =
+                    comments_iter.next_if(|comment| comment.location.row() == import.location.row())
+                {
+                    inline.push(comment);
                 }
 
                 // Capture names.
@@ -119,7 +114,7 @@ fn annotate_imports<'a>(
                     // Find comments above.
                     let mut alias_atop = vec![];
                     while let Some(comment) = comments_iter
-                        .next_if(|comment| comment.location.row() < import.location.row())
+                        .next_if(|comment| comment.location.row() < alias.location.row())
                     {
                         alias_atop.push(comment);
                     }
@@ -127,7 +122,7 @@ fn annotate_imports<'a>(
                     // Find comments inline.
                     let mut alias_inline = vec![];
                     while let Some(comment) = comments_iter.next_if(|comment| {
-                        comment.end_location.row() == import.end_location.unwrap().row()
+                        comment.end_location.row() == alias.end_location.unwrap().row()
                     }) {
                         alias_inline.push(comment);
                     }
@@ -147,7 +142,6 @@ fn annotate_imports<'a>(
                     atop,
                     inline,
                 });
-                // Repeat for each member.
             }
             _ => unreachable!("Expected StmtKind::Import | StmtKind::ImportFrom"),
         }
@@ -155,7 +149,7 @@ fn annotate_imports<'a>(
     annotated
 }
 
-fn normalize_imports<'a>(imports: Vec<AnnotatedImport<'a>>) -> ImportBlock<'a> {
+fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
     let mut block: ImportBlock = Default::default();
     for import in imports {
         match import {
@@ -166,11 +160,11 @@ fn normalize_imports<'a>(imports: Vec<AnnotatedImport<'a>>) -> ImportBlock<'a> {
             } => {
                 // Associate the comments with the first alias (best effort).
                 if let Some(name) = names.first() {
-                    let mut entry = block
+                    let entry = block
                         .import
                         .entry(AliasData {
-                            name: &name.name,
-                            asname: &name.asname,
+                            name: name.name,
+                            asname: name.asname,
                         })
                         .or_default();
                     for comment in atop {
@@ -202,12 +196,9 @@ fn normalize_imports<'a>(imports: Vec<AnnotatedImport<'a>>) -> ImportBlock<'a> {
                 // Associate the comments with the first alias (best effort).
                 if let Some(alias) = names.first() {
                     if alias.asname.is_none() {
-                        let mut entry = &mut block
+                        let entry = &mut block
                             .import_from
-                            .entry(ImportFromData {
-                                module: &module,
-                                level: &level,
-                            })
+                            .entry(ImportFromData { module, level })
                             .or_default()
                             .0;
                         for comment in atop {
@@ -217,16 +208,13 @@ fn normalize_imports<'a>(imports: Vec<AnnotatedImport<'a>>) -> ImportBlock<'a> {
                             entry.inline.insert(comment.value);
                         }
                     } else {
-                        let mut entry = &mut block
+                        let entry = &mut block
                             .import_from_as
                             .entry((
-                                ImportFromData {
-                                    module: &module,
-                                    level: &level,
-                                },
+                                ImportFromData { module, level },
                                 AliasData {
-                                    name: &alias.name,
-                                    asname: &alias.asname,
+                                    name: alias.name,
+                                    asname: alias.asname,
                                 },
                             ))
                             .or_default();
@@ -242,17 +230,14 @@ fn normalize_imports<'a>(imports: Vec<AnnotatedImport<'a>>) -> ImportBlock<'a> {
                 // Create an entry for every alias.
                 for alias in names {
                     if alias.asname.is_none() {
-                        let mut entry = block
+                        let entry = block
                             .import_from
-                            .entry(ImportFromData {
-                                module: &module,
-                                level: &level,
-                            })
+                            .entry(ImportFromData { module, level })
                             .or_default()
                             .1
                             .entry(AliasData {
-                                name: &alias.name,
-                                asname: &alias.asname,
+                                name: alias.name,
+                                asname: alias.asname,
                             })
                             .or_default();
                         for comment in alias.atop {
@@ -262,16 +247,13 @@ fn normalize_imports<'a>(imports: Vec<AnnotatedImport<'a>>) -> ImportBlock<'a> {
                             entry.inline.insert(comment.value);
                         }
                     } else {
-                        let mut entry = block
+                        let entry = block
                             .import_from_as
                             .entry((
-                                ImportFromData {
-                                    module: &module,
-                                    level: &level,
-                                },
+                                ImportFromData { module, level },
                                 AliasData {
-                                    name: &alias.name,
-                                    asname: &alias.asname,
+                                    name: alias.name,
+                                    asname: alias.asname,
                                 },
                             ))
                             .or_default();
@@ -365,21 +347,30 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
         block
             .import_from
             .into_iter()
-            // .chain(
-            //     // Include all re-exports.
-            //     block
-            //         .import_from_as
-            //         .into_iter()
-            //         .map(|((import_from, alias), comments)| {
-            //             (
-            //                 import_from,
-            //                 (
-            //                     comments,
-            //                     FnvHashSet::from_iter([(alias, CommentSet::default())]),
-            //                 ),
-            //             )
-            //         }),
-            // )
+            .chain(
+                // Include all re-exports.
+                block
+                    .import_from_as
+                    .into_iter()
+                    .map(|((import_from, alias), comments)| {
+                        (
+                            import_from,
+                            (
+                                CommentSet {
+                                    atop: comments.atop,
+                                    inline: Default::default(),
+                                },
+                                FnvHashMap::from_iter([(
+                                    alias,
+                                    CommentSet {
+                                        atop: Default::default(),
+                                        inline: comments.inline,
+                                    },
+                                )]),
+                            ),
+                        )
+                    }),
+            )
             .map(|(import_from, (comments, aliases))| {
                 // Within each `StmtKind::ImportFrom`, sort the members.
                 (
@@ -418,10 +409,7 @@ pub fn format_imports(
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
 ) -> String {
-    println!("comments = {:?}", comments);
-    println!("block = {:?}", block);
-
-    let block = annotate_imports(&block, comments);
+    let block = annotate_imports(block, comments);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block);
@@ -449,76 +437,13 @@ pub fn format_imports(
         }
 
         // Format `StmtKind::Import` statements.
-        for (AliasData { name, asname }, comments) in import_block.import.iter() {
-            for comment in &comments.atop {
-                output.append(&format!("{}\n", comment));
-            }
-            if let Some(asname) = asname {
-                output.append(&format!("import {} as {}", name, asname));
-            } else {
-                output.append(&format!("import {}", name));
-            }
-            for comment in &comments.inline {
-                output.append(&format!("  {}", comment));
-            }
-            output.append("\n");
+        for (alias, comments) in import_block.import.iter() {
+            format::format_import(&mut output, alias, comments);
         }
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, aliases) in import_block.import_from.iter() {
-            // STOPSHIP: comments
-            let prelude: String = format!("from {} import ", import_from.module_name());
-            let members: Vec<String> = aliases
-                .iter()
-                .map(|(AliasData { name, asname }, comments)| {
-                    // STOPSHIP: comments
-                    if let Some(asname) = asname {
-                        format!("{} as {}", name, asname)
-                    } else {
-                        name.to_string()
-                    }
-                })
-                .collect();
-
-            // Can we fit the import on a single line?
-            let expected_len: usize =
-                // `from base import `
-                prelude.len()
-                    // `member( as alias)?`
-                    + members.iter().map(|part| part.len()).sum::<usize>()
-                    // `, `
-                    + 2 * (members.len() - 1);
-
-            if expected_len <= *line_length {
-                // `from base import `
-                output.append(&prelude);
-                // `member( as alias)?(, )?`
-                for (index, part) in members.into_iter().enumerate() {
-                    if index > 0 {
-                        output.append(", ");
-                    }
-                    output.append(&part);
-                }
-                // `\n`
-                output.append("\n");
-            } else {
-                // `from base import (\n`
-                output.append(&prelude);
-                output.append("(");
-                output.append("\n");
-
-                // `    member( as alias)?,\n`
-                for part in members {
-                    output.append(INDENT);
-                    output.append(&part);
-                    output.append(",");
-                    output.append("\n");
-                }
-
-                // `)\n`
-                output.append(")");
-                output.append("\n");
-            }
+            format::format_import_from(&mut output, import_from, comments, aliases, line_length);
         }
     }
     output.finish().to_string()
@@ -537,6 +462,7 @@ mod tests {
     use crate::Settings;
 
     #[test_case(Path::new("combine_import_froms.py"))]
+    #[test_case(Path::new("comments.py"))]
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
@@ -552,6 +478,7 @@ mod tests {
     #[test_case(Path::new("skip.py"))]
     #[test_case(Path::new("sort_similar_imports.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
+    #[test_case(Path::new("type_comments.py"))]
     fn isort(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let mut checks = test_path(

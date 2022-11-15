@@ -1,9 +1,7 @@
-use crate::isort::comments::Comment;
-use fnv::{FnvHashMap, FnvHashSet};
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
-// pub struct A
+use fnv::FnvHashMap;
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ImportFromData<'a> {
@@ -71,12 +69,14 @@ pub struct ImportBlock<'a> {
     pub import_from_as: FnvHashMap<(ImportFromData<'a>, AliasData<'a>), CommentSet<'a>>,
 }
 
+type AliasDataWithComments<'a> = (AliasData<'a>, CommentSet<'a>);
+
 #[derive(Debug, Default)]
 pub struct OrderedImportBlock<'a> {
-    pub import: Vec<(AliasData<'a>, CommentSet<'a>)>,
+    pub import: Vec<AliasDataWithComments<'a>>,
     pub import_from: Vec<(
         ImportFromData<'a>,
         CommentSet<'a>,
-        Vec<(AliasData<'a>, CommentSet<'a>)>,
+        Vec<AliasDataWithComments<'a>>,
     )>,
 }

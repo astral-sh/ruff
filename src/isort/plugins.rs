@@ -44,7 +44,15 @@ fn match_trailing_content(body: &[&Stmt], locator: &SourceCodeLocator) -> bool {
         end_location: Location::new(end_location.row() + 1, 0),
     };
     let suffix = locator.slice_source_code_range(&range);
-    suffix.chars().any(|char| !char.is_whitespace())
+    for char in suffix.chars() {
+        if char == '#' {
+            return false;
+        }
+        if !char.is_whitespace() {
+            return true;
+        }
+    }
+    false
 }
 
 /// I001

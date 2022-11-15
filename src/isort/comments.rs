@@ -17,12 +17,10 @@ pub struct Comment<'a> {
 
 /// Collect all comments in an import block.
 pub fn collect_comments<'a>(range: &Range, locator: &'a SourceCodeLocator) -> Vec<Comment<'a>> {
-    let contents = locator.slice_source_code_range(&range);
-    println!("conents = '{}'", contents);
+    let contents = locator.slice_source_code_range(range);
     lexer::make_tokenizer(&contents)
         .flatten()
         .filter_map(|(start, tok, end)| {
-            println!("{:?} {:?} {:?}", start, tok, end);
             if matches!(tok, Tok::Comment) {
                 let start = helpers::to_absolute(&start, &range.location);
                 let end = helpers::to_absolute(&end, &range.location);
@@ -41,5 +39,5 @@ pub fn collect_comments<'a>(range: &Range, locator: &'a SourceCodeLocator) -> Ve
         .collect()
 }
 
-// We have to assign each comment to a node. Then when we collect, we merge nodes, or something.
-// Comments can either be above, or to the right of a node.
+// We have to assign each comment to a node. Then when we collect, we merge
+// nodes, or something. Comments can either be above, or to the right of a node.
