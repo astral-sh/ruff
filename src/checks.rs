@@ -119,6 +119,8 @@ pub enum CheckCode {
     C415,
     C416,
     C417,
+    // mccabe
+    C901,
     // flake8-print
     T201,
     T203,
@@ -257,6 +259,7 @@ pub enum CheckCategory {
     Flake8Quotes,
     Flake8Annotations,
     Flake82020,
+    McCabe,
     Ruff,
     Meta,
 }
@@ -278,6 +281,7 @@ impl CheckCategory {
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Pydocstyle => "pydocstyle",
             CheckCategory::PEP8Naming => "pep8-naming",
+            CheckCategory::McCabe => "mccabe",
             CheckCategory::Ruff => "Ruff-specific rules",
             CheckCategory::Meta => "Meta rules",
         }
@@ -307,6 +311,7 @@ impl CheckCategory {
             CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
             CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
             CheckCategory::Flake8Bandit => Some("https://pypi.org/project/flake8-bandit/4.1.1/"),
+            CheckCategory::McCabe => Some("https://pypi.org/project/mccabe/0.7.0/"),
             CheckCategory::Ruff => None,
             CheckCategory::Meta => None,
         }
@@ -538,6 +543,8 @@ pub enum CheckKind {
     HardcodedPasswordString(String),
     HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
+    // mccabe
+    CyclomaticComplexity(String, isize),
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -817,6 +824,7 @@ impl CheckCode {
             CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
+            CheckCode::C901 => CheckKind::CyclomaticComplexity("...".to_string(), 0),
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1021,6 +1029,7 @@ impl CheckCode {
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
+            CheckCode::C901 => CheckCategory::McCabe,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
@@ -1240,6 +1249,8 @@ impl CheckKind {
             CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
+            // McCabe
+            CheckKind::CyclomaticComplexity(..) => &CheckCode::C901,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -1887,6 +1898,10 @@ impl CheckKind {
             }
             CheckKind::HardcodedPasswordDefault(string) => {
                 format!("Possible hardcoded password: `\"{string}\"`")
+            }
+            // McCabe
+            CheckKind::CyclomaticComplexity(name, complexity) => {
+                format!("`{name}` is too complex ({complexity})")
             }
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {

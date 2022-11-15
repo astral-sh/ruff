@@ -268,6 +268,9 @@ fn inner_main() -> Result<ExitCode> {
     if let Some(line_length) = cli.line_length {
         configuration.line_length = line_length;
     }
+    if let Some(max_complexity) = cli.max_complexity {
+        configuration.mccabe.max_complexity = max_complexity;
+    }
     if let Some(target_version) = cli.target_version {
         configuration.target_version = target_version;
     }

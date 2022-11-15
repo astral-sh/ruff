@@ -40,6 +40,7 @@ mod isort;
 mod lex;
 pub mod linter;
 pub mod logging;
+pub mod mccabe;
 pub mod message;
 mod noqa;
 pub mod pep8_naming;

@@ -239,6 +239,8 @@ Options:
           The minimum Python version that should be supported
       --line-length <LINE_LENGTH>
           Set the line-length for length-associated checks and automatic formatting
+      --max-complexity <MAX_COMPLEXITY>
+          Set the maximum cyclomatic complexity for complexity-associated checks
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
   -h, --help
@@ -603,6 +605,14 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 | YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
 | YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
 | YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
+
+### mccabe
+
+For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| C901 | CyclomaticComplexity | `...` is too complex (0) |  |
 
 ### Ruff-specific rules
 

@@ -12,7 +12,7 @@ use regex::Regex;
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
-use crate::{flake8_annotations, flake8_bugbear, flake8_quotes, fs, isort, pep8_naming};
+use crate::{flake8_annotations, flake8_bugbear, flake8_quotes, fs, isort, mccabe, pep8_naming};
 
 #[derive(Debug)]
 pub struct Configuration {
@@ -33,6 +33,7 @@ pub struct Configuration {
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub isort: isort::settings::Settings,
+    pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
 }
 
@@ -145,6 +146,10 @@ impl Configuration {
             isort: options
                 .isort
                 .map(isort::settings::Settings::from_options)
+                .unwrap_or_default(),
+            mccabe: options
+                .mccabe
+                .map(mccabe::settings::Settings::from_options)
                 .unwrap_or_default(),
             pep8_naming: options
                 .pep8_naming

@@ -16,6 +16,9 @@ multiline-quotes = "double"
 docstring-quotes = "double"
 avoid-escape = true
 
+[tool.ruff.mccabe]
+max-complexity = 10
+
 [tool.ruff.pep8-naming]
 ignore-names = [
   "setUp",
