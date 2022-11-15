@@ -1832,7 +1832,8 @@ where
                 args,
                 keywords,
             } => {
-                let call_path = dealias_call_path(collect_call_paths(&**func), &self.import_aliases);
+                let call_path =
+                    dealias_call_path(collect_call_paths(&**func), &self.import_aliases);
                 if self.match_typing_module(&call_path, "ForwardRef") {
                     self.visit_expr(func);
                     for expr in args {
