@@ -124,6 +124,8 @@ pub fn extract_log_level(cli: &Cli) -> LogLevel {
         LogLevel::Quiet
     } else if cli.verbose {
         LogLevel::Verbose
+    } else if matches!(cli.format, SerializationFormat::Json) {
+        LogLevel::Quiet
     } else {
         LogLevel::Default
     }
