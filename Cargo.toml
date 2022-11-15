@@ -14,6 +14,7 @@ name = "ruff"
 
 [dependencies]
 anyhow = { version = "1.0.66" }
+atty = { version = "0.2.14" }
 bincode = { version = "1.3.3" }
 bitflags = { version = "1.3.2" }
 chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
