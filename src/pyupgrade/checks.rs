@@ -163,7 +163,8 @@ pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<
 pub fn unnecessary_lru_cache_params(
     decorator_list: &[Expr],
     target_version: PythonVersion,
-    imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
 ) -> Option<Check> {
     for expr in decorator_list.iter() {
         if let ExprKind::Call {
@@ -173,7 +174,13 @@ pub fn unnecessary_lru_cache_params(
         } = &expr.node
         {
             if args.is_empty()
-                && helpers::match_module_member(func, "functools", "lru_cache", imports)
+                && helpers::match_module_member(
+                    func,
+                    "functools",
+                    "lru_cache",
+                    from_imports,
+                    import_aliases,
+                )
             {
                 // Ex) `functools.lru_cache()`
                 if keywords.is_empty() {

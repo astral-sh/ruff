@@ -12,7 +12,9 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast::helpers::{collect_call_paths, extract_handler_names, match_call_path};
+use crate::ast::helpers::{
+    collect_call_paths, dealias_call_path, extract_handler_names, match_call_path,
+};
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -54,6 +56,7 @@ pub struct Checker<'a> {
     pub(crate) deletions: FnvHashSet<usize>,
     // Import tracking.
     pub(crate) from_imports: FnvHashMap<&'a str, FnvHashSet<&'a str>>,
+    pub(crate) import_aliases: FnvHashMap<&'a str, &'a str>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
     // at various points in time.
     pub(crate) parents: Vec<&'a Stmt>,
@@ -94,6 +97,7 @@ impl<'a> Checker<'a> {
             definitions: Default::default(),
             deletions: Default::default(),
             from_imports: Default::default(),
+            import_aliases: Default::default(),
             parents: Default::default(),
             parent_stack: Default::default(),
             scopes: Default::default(),
@@ -546,6 +550,12 @@ where
                     }
 
                     if let Some(asname) = &alias.node.asname {
+                        for alias in names {
+                            if let Some(asname) = &alias.node.asname {
+                                self.import_aliases.insert(asname, &alias.node.name);
+                            }
+                        }
+
                         let name = alias.node.name.split('.').last().unwrap();
                         if self.settings.enabled.contains(&CheckCode::N811) {
                             if let Some(check) =
@@ -613,6 +623,11 @@ where
                                     .filter(|alias| alias.node.asname.is_none())
                                     .map(|alias| alias.node.name.as_str()),
                             )
+                    }
+                    for alias in names {
+                        if let Some(asname) = &alias.node.asname {
+                            self.import_aliases.insert(asname, &alias.node.name);
+                        }
                     }
                 }
 
@@ -1076,7 +1091,11 @@ where
                         // Ex) List[...]
                         if self.settings.enabled.contains(&CheckCode::U006)
                             && self.settings.target_version >= PythonVersion::Py39
-                            && typing::is_pep585_builtin(expr, &self.from_imports)
+                            && typing::is_pep585_builtin(
+                                expr,
+                                &self.from_imports,
+                                &self.import_aliases,
+                            )
                         {
                             pyupgrade::plugins::use_pep585_annotation(self, expr, id);
                         }
@@ -1108,7 +1127,7 @@ where
                 // Ex) typing.List[...]
                 if self.settings.enabled.contains(&CheckCode::U006)
                     && self.settings.target_version >= PythonVersion::Py39
-                    && typing::is_pep585_builtin(expr, &self.from_imports)
+                    && typing::is_pep585_builtin(expr, &self.from_imports, &self.import_aliases)
                 {
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
@@ -1625,7 +1644,7 @@ where
                 args,
                 keywords,
             } => {
-                let call_path = collect_call_paths(func);
+                let call_path = dealias_call_path(collect_call_paths(func), &self.import_aliases);
                 if self.match_typing_module(&call_path, "ForwardRef") {
                     self.visit_expr(func);
                     for expr in args {
@@ -1732,7 +1751,11 @@ where
                     visitor::walk_expr(self, expr);
                 } else {
                     self.in_subscript = true;
-                    match typing::match_annotated_subscript(value, &self.from_imports) {
+                    match typing::match_annotated_subscript(
+                        value,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
                         Some(subscript) => {
                             match subscript {
                                 // Ex) Optional[int]
@@ -2731,9 +2754,6 @@ pub fn check_ast(
 
     // Check docstrings.
     checker.check_definitions();
-
-    // Check import blocks.
-    // checker.check_import_blocks();
 
     checker.checks
 }

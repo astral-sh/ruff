@@ -50,10 +50,13 @@ fn is_none_returning(body: &[Stmt]) -> bool {
 }
 
 /// ANN401
-fn check_dynamically_typed(checker: &mut Checker, annotation: &Expr, name: &str) {
+fn check_dynamically_typed<F>(checker: &mut Checker, annotation: &Expr, func: F)
+where
+    F: FnOnce() -> String,
+{
     if checker.match_typing_module(&collect_call_paths(annotation), "Any") {
         checker.add_check(Check::new(
-            CheckKind::DynamicallyTypedExpression(name.to_string()),
+            CheckKind::DynamicallyTypedExpression(func()),
             Range::from_located(annotation),
         ));
     };
@@ -101,7 +104,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             {
                 if let Some(expr) = &arg.node.annotation {
                     if checker.settings.enabled.contains(&CheckCode::ANN401) {
-                        check_dynamically_typed(checker, expr, &arg.node.arg);
+                        check_dynamically_typed(checker, expr, || arg.node.arg.to_string());
                     };
                 } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
@@ -123,7 +126,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
                         if checker.settings.enabled.contains(&CheckCode::ANN401) {
                             let name = arg.node.arg.to_string();
-                            check_dynamically_typed(checker, expr, &format!("*{name}"));
+                            check_dynamically_typed(checker, expr, || format!("*{name}"));
                         }
                     }
                 } else {
@@ -146,7 +149,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
                         if checker.settings.enabled.contains(&CheckCode::ANN401) {
                             let name = arg.node.arg.to_string();
-                            check_dynamically_typed(checker, expr, &format!("**{name}"));
+                            check_dynamically_typed(checker, expr, || format!("**{name}"));
                         }
                     }
                 } else {
@@ -166,7 +169,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             // ANN201, ANN202, ANN401
             if let Some(expr) = &returns {
                 if checker.settings.enabled.contains(&CheckCode::ANN401) {
-                    check_dynamically_typed(checker, expr, name);
+                    check_dynamically_typed(checker, expr, || name.to_string());
                 };
             } else {
                 // Allow omission of return annotation in `__init__` functions, if the function
@@ -216,7 +219,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 if let Some(annotation) = &arg.node.annotation {
                     has_any_typed_arg = true;
                     if checker.settings.enabled.contains(&CheckCode::ANN401) {
-                        check_dynamically_typed(checker, annotation, &arg.node.arg);
+                        check_dynamically_typed(checker, annotation, || arg.node.arg.to_string());
                     }
                 } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
@@ -239,7 +242,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
                         if checker.settings.enabled.contains(&CheckCode::ANN401) {
                             let name = arg.node.arg.to_string();
-                            check_dynamically_typed(checker, expr, &format!("*{name}"));
+                            check_dynamically_typed(checker, expr, || format!("*{name}"));
                         }
                     }
                 } else {
@@ -263,7 +266,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
                         if checker.settings.enabled.contains(&CheckCode::ANN401) {
                             let name = arg.node.arg.to_string();
-                            check_dynamically_typed(checker, expr, &format!("**{name}"));
+                            check_dynamically_typed(checker, expr, || format!("**{name}"));
                         }
                     }
                 } else {
@@ -306,7 +309,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             // ANN201, ANN202
             if let Some(expr) = &returns {
                 if checker.settings.enabled.contains(&CheckCode::ANN401) {
-                    check_dynamically_typed(checker, expr, name);
+                    check_dynamically_typed(checker, expr, || name.to_string());
                 }
             } else {
                 // Allow omission of return annotation in `__init__` functions, if the function

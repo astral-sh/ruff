@@ -1,7 +1,9 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
-use crate::ast::helpers::{collect_call_paths, compose_call_path, match_call_path};
+use crate::ast::helpers::{
+    collect_call_paths, compose_call_path, dealias_call_path, match_call_path,
+};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -23,8 +25,9 @@ fn is_immutable_func(
     expr: &Expr,
     extend_immutable_calls: &[(&str, &str)],
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
 ) -> bool {
-    let call_path = collect_call_paths(expr);
+    let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
     IMMUTABLE_FUNCS
         .iter()
         .chain(extend_immutable_calls)
@@ -35,6 +38,7 @@ struct ArgumentDefaultVisitor<'a> {
     checks: Vec<(CheckKind, Range)>,
     extend_immutable_calls: &'a [(&'a str, &'a str)],
     from_imports: &'a FnvHashMap<&'a str, FnvHashSet<&'a str>>,
+    import_aliases: &'a FnvHashMap<&'a str, &'a str>,
 }
 
 impl<'a, 'b> Visitor<'b> for ArgumentDefaultVisitor<'b>
@@ -44,8 +48,13 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
             ExprKind::Call { func, args, .. } => {
-                if !is_mutable_func(func, self.from_imports)
-                    && !is_immutable_func(func, self.extend_immutable_calls, self.from_imports)
+                if !is_mutable_func(func, self.from_imports, self.import_aliases)
+                    && !is_immutable_func(
+                        func,
+                        self.extend_immutable_calls,
+                        self.from_imports,
+                        self.import_aliases,
+                    )
                     && !is_nan_or_infinity(func, args)
                 {
                     self.checks.push((
@@ -108,6 +117,7 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
         checks: vec![],
         extend_immutable_calls: &extend_immutable_cells,
         from_imports: &checker.from_imports,
+        import_aliases: &checker.import_aliases,
     };
     for expr in arguments
         .defaults

@@ -39,12 +39,120 @@ pub fn collect_call_paths(expr: &Expr) -> Vec<&str> {
     segments
 }
 
+/// Rewrite any import aliases on a call path.
+pub fn dealias_call_path<'a>(
+    call_path: Vec<&'a str>,
+    import_aliases: &FnvHashMap<&str, &'a str>,
+) -> Vec<&'a str> {
+    if let Some(head) = call_path.first() {
+        if let Some(origin) = import_aliases.get(head) {
+            let tail = &call_path[1..];
+            let mut call_path: Vec<&str> = vec![];
+            call_path.extend(origin.split('.'));
+            call_path.extend(tail);
+            call_path
+        } else {
+            call_path
+        }
+    } else {
+        call_path
+    }
+}
+
 /// Return `true` if the `Expr` is a name or attribute reference to `${target}`.
 pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
     match &expr.node {
         ExprKind::Attribute { attr, .. } => target == attr,
         ExprKind::Name { id, .. } => target == id,
         _ => false,
+    }
+}
+
+/// Return `true` if the `Expr` is a reference to `${module}.${target}`.
+///
+/// Useful for, e.g., ensuring that a `Union` reference represents
+/// `typing.Union`.
+pub fn match_module_member(
+    expr: &Expr,
+    module: &str,
+    member: &str,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
+) -> bool {
+    match_call_path(
+        &dealias_call_path(collect_call_paths(expr), import_aliases),
+        module,
+        member,
+        from_imports,
+    )
+}
+
+/// Return `true` if the `call_path` is a reference to `${module}.${target}`.
+///
+/// Optimized version of `match_module_member` for pre-computed call paths.
+pub fn match_call_path(
+    call_path: &[&str],
+    module: &str,
+    member: &str,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+) -> bool {
+    // If we have no segments, we can't ever match.
+    let num_segments = call_path.len();
+    if num_segments == 0 {
+        return false;
+    }
+
+    // If the last segment doesn't match the member, we can't ever match.
+    if call_path[num_segments - 1] != member {
+        return false;
+    }
+
+    // We now only need the module path, so throw out the member name.
+    let call_path = &call_path[..num_segments - 1];
+    let num_segments = call_path.len();
+
+    // Case (1): It's a builtin (like `list`).
+    // Case (2a): We imported from the parent (`from typing.re import Match`,
+    // `Match`).
+    // Case (2b): We imported star from the parent (`from typing.re import *`,
+    // `Match`).
+    if num_segments == 0 {
+        module.is_empty()
+            || from_imports
+                .get(module)
+                .map(|imports| imports.contains(member) || imports.contains("*"))
+                .unwrap_or(false)
+    } else {
+        let components: Vec<&str> = module.split('.').collect();
+
+        // Case (3a): it's a fully qualified call path (`import typing`,
+        // `typing.re.Match`). Case (3b): it's a fully qualified call path (`import
+        // typing.re`, `typing.re.Match`).
+        if components == call_path {
+            return true;
+        }
+
+        // Case (4): We imported from the grandparent (`from typing import re`,
+        // `re.Match`)
+        let num_matches = (0..components.len())
+            .take(num_segments)
+            .take_while(|i| components[components.len() - 1 - i] == call_path[num_segments - 1 - i])
+            .count();
+        if num_matches > 0 {
+            let cut = components.len() - num_matches;
+            // TODO(charlie): Rewrite to avoid this allocation.
+            let module = components[..cut].join(".");
+            let member = components[cut];
+            if from_imports
+                .get(&module.as_str())
+                .map(|imports| imports.contains(member))
+                .unwrap_or(false)
+            {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
@@ -130,100 +238,6 @@ pub fn to_absolute(relative: &Location, base: &Location) -> Location {
     }
 }
 
-/// Return `true` if the `Expr` is a reference to `${module}.${target}`.
-///
-/// Useful for, e.g., ensuring that a `Union` reference represents
-/// `typing.Union`.
-pub fn match_module_member(
-    expr: &Expr,
-    module: &str,
-    member: &str,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-) -> bool {
-    match_call_path(&collect_call_paths(expr), module, member, from_imports)
-}
-
-/// Return `true` if the `call_path` is a reference to `${module}.${target}`.
-///
-/// Optimized version of `match_module_member` for pre-computed call paths.
-pub fn match_call_path(
-    call_path: &[&str],
-    module: &str,
-    member: &str,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-) -> bool {
-    // If we have no segments, we can't ever match.
-    let num_segments = call_path.len();
-    if num_segments == 0 {
-        return false;
-    }
-
-    // If the last segment doesn't match the member, we can't ever match.
-    if call_path[num_segments - 1] != member {
-        return false;
-    }
-
-    // We now only need the module path, so throw out the member name.
-    let call_path = &call_path[..num_segments - 1];
-    let num_segments = call_path.len();
-
-    // Case (1a): We imported star from the parent (`from typing.re import *`,
-    // `Match`).
-    // Case (1b): We imported from the parent (`from typing.re import Match`,
-    // `Match`).
-    // Case (2): It's a builtin (like `list`).
-    if num_segments == 0
-        && (module.is_empty()
-            || from_imports
-                .get(module)
-                .map(|imports| imports.contains(member) || imports.contains("*"))
-                .unwrap_or(false))
-    {
-        return true;
-    }
-
-    // Case (3a): it's a fully qualified call path (`import typing`,
-    // `typing.re.Match`). Case (3b): it's a fully qualified call path (`import
-    // typing.re`, `typing.re.Match`).
-    if num_segments > 0
-        && module
-            .split('.')
-            .enumerate()
-            .all(|(index, segment)| index < num_segments && call_path[index] == segment)
-    {
-        return true;
-    }
-
-    // Case (4): We imported from the grandparent (`from typing import re`,
-    // `re.Match`)
-    if num_segments > 0 {
-        // Find the number of common segments.
-        // TODO(charlie): Rewrite to avoid this allocation.
-        let parts: Vec<&str> = module.split('.').collect();
-        let num_matches = (0..parts.len())
-            .take(num_segments)
-            .take_while(|i| parts[parts.len() - 1 - i] == call_path[num_segments - 1 - i])
-            .count();
-        if num_matches > 0 {
-            // Verify that we have an import of the final common segment, from the remaining
-            // parent.
-            let cut = parts.len() - num_matches;
-            // TODO(charlie): Rewrite to avoid this allocation.
-            let module = parts[..cut].join(".");
-            let member = parts[cut];
-            if from_imports
-                .get(&module.as_str())
-                .map(|imports| imports.contains(member))
-                .unwrap_or(false)
-            {
-                return true;
-            }
-        }
-    }
-
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
@@ -239,7 +253,8 @@ mod tests {
             &expr,
             "",
             "list",
-            &FnvHashMap::default()
+            &FnvHashMap::default(),
+            &FnvHashMap::default(),
         ));
         Ok(())
     }
@@ -251,7 +266,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::default()
+            &FnvHashMap::default(),
+            &FnvHashMap::default(),
         ));
         Ok(())
     }
@@ -264,12 +280,14 @@ mod tests {
             "typing.re",
             "Match",
             &FnvHashMap::default(),
+            &FnvHashMap::default(),
         ));
         let expr = parser::parse_expression("re.Match", "<filename>")?;
         assert!(!match_module_member(
             &expr,
             "typing.re",
             "Match",
+            &FnvHashMap::default(),
             &FnvHashMap::default(),
         ));
         Ok(())
@@ -282,7 +300,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["*"]))])
+            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["*"]))]),
+            &FnvHashMap::default()
         ));
         Ok(())
     }
@@ -294,7 +313,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["Match"]))])
+            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["Match"]))]),
+            &FnvHashMap::default()
         ));
         Ok(())
     }
@@ -306,7 +326,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))])
+            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))]),
+            &FnvHashMap::default()
         ));
 
         let expr = parser::parse_expression("match.Match", "<filename>")?;
@@ -314,7 +335,8 @@ mod tests {
             &expr,
             "typing.re.match",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["match"]))])
+            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["match"]))]),
+            &FnvHashMap::default()
         ));
 
         let expr = parser::parse_expression("re.match.Match", "<filename>")?;
@@ -322,7 +344,47 @@ mod tests {
             &expr,
             "typing.re.match",
             "Match",
-            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))])
+            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))]),
+            &FnvHashMap::default()
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn from_alias() -> Result<()> {
+        let expr = parser::parse_expression("IMatch", "<filename>")?;
+        assert!(match_module_member(
+            &expr,
+            "typing.re",
+            "Match",
+            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["Match"]))]),
+            &FnvHashMap::from_iter([("IMatch", "Match")]),
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn from_aliased_parent() -> Result<()> {
+        let expr = parser::parse_expression("t.Match", "<filename>")?;
+        assert!(match_module_member(
+            &expr,
+            "typing.re",
+            "Match",
+            &FnvHashMap::default(),
+            &FnvHashMap::from_iter([("t", "typing.re")]),
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn from_aliased_grandparent() -> Result<()> {
+        let expr = parser::parse_expression("t.re.Match", "<filename>")?;
+        assert!(match_module_member(
+            &expr,
+            "typing.re",
+            "Match",
+            &FnvHashMap::default(),
+            &FnvHashMap::from_iter([("t", "typing")]),
         ));
         Ok(())
     }

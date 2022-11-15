@@ -1,6 +1,6 @@
 """
 Should emit:
-B024 - on lines 17, 34, 52, 58, 69, 74, 84, 89
+B024 - on lines 17, 34, 52, 58, 69, 74, 79, 84, 89
 """
 
 import abc
@@ -76,7 +76,7 @@ class abc_Base_2(metaclass=abc.ABCMeta):  # error
         foo()
 
 
-class notabc_Base_1(notabc.ABC):  # safe
+class notabc_Base_1(notabc.ABC):  # error
     def method(self):
         foo()
 

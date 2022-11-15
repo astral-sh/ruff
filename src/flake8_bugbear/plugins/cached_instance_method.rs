@@ -1,12 +1,12 @@
 use rustpython_ast::{Expr, ExprKind};
 
-use crate::ast::helpers::{collect_call_paths, match_call_path};
+use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::{Range, ScopeKind};
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
-    let call_path = collect_call_paths(expr);
+    let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
     match_call_path(&call_path, "functools", "lru_cache", &checker.from_imports)
         || match_call_path(&call_path, "functools", "cache", &checker.from_imports)
 }
