@@ -52,6 +52,8 @@ mod pyupgrade;
 mod rules;
 pub mod settings;
 pub mod source_code_locator;
+#[cfg(feature = "update-informer")]
+pub mod updates;
 pub mod visibility;
 
 /// Run Ruff over Python source code directly.

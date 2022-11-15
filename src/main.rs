@@ -17,6 +17,8 @@ use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::FilePattern;
 use ::ruff::settings::user::UserConfiguration;
 use ::ruff::settings::{pyproject, Settings};
+#[cfg(feature = "update-informer")]
+use ::ruff::updates;
 use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
@@ -25,11 +27,6 @@ use notify::{raw_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use walkdir::DirEntry;
-
-#[cfg(feature = "update-informer")]
-const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
-#[cfg(feature = "update-informer")]
-const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Shim that calls par_iter except for wasm because there's no wasm support in
 /// rayon yet (there is a shim to be used for the web, but it requires js
@@ -43,30 +40,6 @@ fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl ParallelIterator<Item = &T> {
 #[cfg(target_family = "wasm")]
 fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl Iterator<Item = &T> {
     iterable.iter()
-}
-
-#[cfg(feature = "update-informer")]
-fn check_for_updates() {
-    use update_informer::{registry, Check};
-
-    let informer = update_informer::new(registry::PyPI, CARGO_PKG_NAME, CARGO_PKG_VERSION);
-
-    if let Some(new_version) = informer.check_version().ok().flatten() {
-        let msg = format!(
-            "A new version of {pkg_name} is available: v{pkg_version} -> {new_version}",
-            pkg_name = CARGO_PKG_NAME.italic().cyan(),
-            pkg_version = CARGO_PKG_VERSION,
-            new_version = new_version.to_string().green()
-        );
-
-        let cmd = format!(
-            "Run to update: {cmd} {pkg_name}",
-            cmd = "pip3 install --upgrade".green(),
-            pkg_name = CARGO_PKG_NAME.green()
-        );
-
-        println!("\n{msg}\n{cmd}");
-    }
 }
 
 fn show_settings(
@@ -406,7 +379,7 @@ fn inner_main() -> Result<ExitCode> {
         // Check for updates if we're in a non-silent log level.
         #[cfg(feature = "update-informer")]
         if !is_stdin && log_level >= LogLevel::Default && atty::is(atty::Stream::Stdout) {
-            check_for_updates();
+            updates::check_for_updates();
         }
 
         if messages.iter().any(|message| !message.fixed) && !cli.exit_zero {
