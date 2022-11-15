@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
 jobs:
   cargo_build:
     name: "cargo build"
