@@ -102,7 +102,8 @@ pub enum ExprContext {
     Del,
 }
 
-// TODO if there's internal requirements of BigInt an interface should be required
+// TODO if there's internal requirements of BigInt an interface should be
+// required
 pub trait BigInt {}
 
 pub enum ConstantKind<'a, CONSTANT, BIGINT> {
@@ -1002,9 +1003,10 @@ pub trait Ast<'a> {
 // RustPython ast impls
 // TODO(Seamooo) make below a compilation feature
 mod rs_python_impls {
-    use super::*;
     use num_bigint::BigInt as RspyBigInt;
     use rustpython_parser::ast as rspy_ast;
+
+    use super::*;
 
     macro_rules! rspy_types {
         ($generic_name:ident, $($ty_name:ident),*) => {
@@ -1019,14 +1021,17 @@ mod rs_python_impls {
         fn start_row(&self) -> usize {
             self.location.row()
         }
+
         #[inline]
         fn start_col(&self) -> usize {
             self.location.column()
         }
+
         #[inline]
         fn end_row(&self) -> usize {
             self.end_location.as_ref().unwrap().row()
         }
+
         #[inline]
         fn end_col(&self) -> usize {
             self.end_location.as_ref().unwrap().column()
@@ -1047,6 +1052,7 @@ mod rs_python_impls {
         fn name(&self) -> &Self::Ident {
             &self.node.name
         }
+
         #[inline]
         fn asname(&self) -> Option<&Self::Ident> {
             self.node.asname.as_ref()
@@ -1054,16 +1060,19 @@ mod rs_python_impls {
     }
 
     impl<'a, U> Arg<'a> for rspy_ast::Arg<U> {
-        type Ident = String;
         type Expr = rspy_ast::Expr<U>;
+        type Ident = String;
+
         #[inline]
         fn arg(&self) -> &Self::Ident {
             &self.node.arg
         }
+
         #[inline]
         fn annotation(&self) -> Option<&Self::Expr> {
             self.node.annotation.as_deref()
         }
+
         #[inline]
         fn type_comment(&self) -> Option<&str> {
             self.node.type_comment.as_deref()
@@ -1077,26 +1086,32 @@ mod rs_python_impls {
         fn posonlyargs(&self) -> &[Self::Arg] {
             &self.posonlyargs
         }
+
         #[inline]
         fn args(&self) -> &[Self::Arg] {
             &self.args
         }
+
         #[inline]
         fn vararg(&self) -> Option<&Self::Arg> {
             self.vararg.as_deref()
         }
+
         #[inline]
         fn kwonlyargs(&self) -> &[Self::Arg] {
             &self.kwonlyargs
         }
+
         #[inline]
         fn kw_defaults(&self) -> &[Self::Expr] {
             &self.kw_defaults
         }
+
         #[inline]
         fn kwarg(&self) -> Option<&Self::Arg> {
             self.kwarg.as_deref()
         }
+
         #[inline]
         fn defaults(&self) -> &[Self::Expr] {
             &self.defaults
@@ -1105,12 +1120,14 @@ mod rs_python_impls {
 
     impl<'a, U> Keyword<'a> for rspy_ast::Keyword<U> {
         type Ident = String;
+
         rspy_types!(U, Expr);
 
         #[inline]
         fn arg(&self) -> Option<&Self::Ident> {
             self.node.arg.as_ref()
         }
+
         #[inline]
         fn value(&self) -> &Self::Expr {
             &self.node.value
@@ -1120,8 +1137,8 @@ mod rs_python_impls {
     impl BigInt for RspyBigInt {}
 
     impl<'a> Constant<'a> for rspy_ast::Constant {
-        type Constant = Self;
         type BigInt = RspyBigInt;
+        type Constant = Self;
 
         fn value(&'a self) -> ConstantKind<'a, Self, Self::BigInt> {
             match self {
@@ -1145,14 +1162,17 @@ mod rs_python_impls {
         fn target(&self) -> &Self::Expr {
             &self.target
         }
+
         #[inline]
         fn iter(&self) -> &Self::Expr {
             &self.iter
         }
+
         #[inline]
         fn ifs(&self) -> &[Self::Expr] {
             &self.ifs
         }
+
         #[inline]
         fn is_async(&self) -> usize {
             self.is_async
@@ -1178,6 +1198,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn values(&self) -> &[Self::Expr] {
             match self {
@@ -1189,6 +1210,7 @@ mod rs_python_impls {
 
     impl<'a, U> NamedExpr<'a> for rspy_ast::ExprKind<U> {
         type Expr = rspy_ast::Expr<U>;
+
         #[inline]
         fn target(&self) -> &Self::Expr {
             match self {
@@ -1196,6 +1218,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn value(&self) -> &Self::Expr {
             match self {
@@ -1227,6 +1250,7 @@ mod rs_python_impls {
 
     impl<'a, U> BinOp<'a> for rspy_ast::ExprKind<U> {
         type Expr = rspy_ast::Expr<U>;
+
         #[inline]
         fn left(&self) -> &Self::Expr {
             match self {
@@ -1234,6 +1258,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn op(&self) -> Operator {
             match self {
@@ -1241,6 +1266,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn right(&self) -> &Self::Expr {
             match self {
@@ -1263,6 +1289,7 @@ mod rs_python_impls {
 
     impl<'a, U> UnaryOp<'a> for rspy_ast::ExprKind<U> {
         type Expr = rspy_ast::Expr<U>;
+
         #[inline]
         fn op(&self) -> Unaryop {
             match self {
@@ -1270,6 +1297,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn operand(&self) -> &Self::Expr {
             match self {
@@ -1288,6 +1316,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &Self::Expr {
             match self {
@@ -1306,6 +1335,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &Self::Expr {
             match self {
@@ -1313,6 +1343,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn orelse(&self) -> &Self::Expr {
             match self {
@@ -1331,6 +1362,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn values(&self) -> &[Self::Expr] {
             match self {
@@ -1360,6 +1392,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn generators(&self) -> &[Self::Comprehension] {
             match self {
@@ -1378,6 +1411,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn generators(&self) -> &[Self::Comprehension] {
             match self {
@@ -1396,6 +1430,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn value(&self) -> &Self::Expr {
             match self {
@@ -1403,6 +1438,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn generators(&self) -> &[Self::Comprehension] {
             match self {
@@ -1421,6 +1457,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn generators(&self) -> &[Self::Comprehension] {
             match self {
@@ -1488,6 +1525,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn ops(&self) -> Vec<Cmpop> {
             match self {
@@ -1506,6 +1544,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn args(&self) -> &[Self::Expr] {
             match self {
@@ -1513,6 +1552,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn keywords(&self) -> &[Self::Keyword] {
             match self {
@@ -1531,6 +1571,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn conversion(&self) -> usize {
             match self {
@@ -1538,6 +1579,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn format_spec(&self) -> Option<&Self::Expr> {
             match self {
@@ -1567,6 +1609,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn kind(&self) -> Option<&str> {
             match self {
@@ -1586,6 +1629,7 @@ mod rs_python_impls {
     }
     impl<'a, U> Attribute<'a> for rspy_ast::ExprKind<U> {
         type Ident = String;
+
         rspy_types!(U, Expr);
 
         #[inline]
@@ -1595,6 +1639,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn attr(&self) -> &Self::Ident {
             match self {
@@ -1602,6 +1647,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn ctx(&self) -> ExprContext {
             match self {
@@ -1620,6 +1666,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn slice(&self) -> &Self::Expr {
             match self {
@@ -1627,6 +1674,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn ctx(&self) -> ExprContext {
             match self {
@@ -1645,6 +1693,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn ctx(&self) -> ExprContext {
             match self {
@@ -1655,6 +1704,7 @@ mod rs_python_impls {
     }
     impl<U> Name for rspy_ast::ExprKind<U> {
         type Ident = String;
+
         #[inline]
         fn id(&self) -> &Self::Ident {
             match self {
@@ -1662,6 +1712,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn ctx(&self) -> ExprContext {
             match self {
@@ -1680,6 +1731,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn ctx(&self) -> ExprContext {
             match self {
@@ -1698,6 +1750,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn ctx(&self) -> ExprContext {
             match self {
@@ -1716,6 +1769,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn upper(&self) -> Option<&Self::Expr> {
             match self {
@@ -1723,6 +1777,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn step(&self) -> Option<&Self::Expr> {
             match self {
@@ -1732,33 +1787,34 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Expr<'a> for rspy_ast::Expr<U> {
-        type BoolOp = rspy_ast::ExprKind<U>;
-        type NamedExpr = rspy_ast::ExprKind<U>;
-        type BinOp = rspy_ast::ExprKind<U>;
-        type UnaryOp = rspy_ast::ExprKind<U>;
-        type Lambda = rspy_ast::ExprKind<U>;
-        type IfExp = rspy_ast::ExprKind<U>;
-        type Dict = rspy_ast::ExprKind<U>;
-        type Set = rspy_ast::ExprKind<U>;
-        type ListComp = rspy_ast::ExprKind<U>;
-        type SetComp = rspy_ast::ExprKind<U>;
-        type DictComp = rspy_ast::ExprKind<U>;
-        type GeneratorExp = rspy_ast::ExprKind<U>;
+        type Attribute = rspy_ast::ExprKind<U>;
         type Await = rspy_ast::ExprKind<U>;
+        type BinOp = rspy_ast::ExprKind<U>;
+        type BoolOp = rspy_ast::ExprKind<U>;
+        type Call = rspy_ast::ExprKind<U>;
+        type Compare = rspy_ast::ExprKind<U>;
+        type ConstantExpr = rspy_ast::ExprKind<U>;
+        type Dict = rspy_ast::ExprKind<U>;
+        type DictComp = rspy_ast::ExprKind<U>;
+        type FormattedValue = rspy_ast::ExprKind<U>;
+        type GeneratorExp = rspy_ast::ExprKind<U>;
+        type IfExp = rspy_ast::ExprKind<U>;
+        type JoinedStr = rspy_ast::ExprKind<U>;
+        type Lambda = rspy_ast::ExprKind<U>;
+        type List = rspy_ast::ExprKind<U>;
+        type ListComp = rspy_ast::ExprKind<U>;
+        type Name = rspy_ast::ExprKind<U>;
+        type NamedExpr = rspy_ast::ExprKind<U>;
+        type Set = rspy_ast::ExprKind<U>;
+        type SetComp = rspy_ast::ExprKind<U>;
+        type Slice = rspy_ast::ExprKind<U>;
+        type Starred = rspy_ast::ExprKind<U>;
+        type Subscript = rspy_ast::ExprKind<U>;
+        type Tuple = rspy_ast::ExprKind<U>;
+        type UnaryOp = rspy_ast::ExprKind<U>;
         type Yield = rspy_ast::ExprKind<U>;
         type YieldFrom = rspy_ast::ExprKind<U>;
-        type Compare = rspy_ast::ExprKind<U>;
-        type Call = rspy_ast::ExprKind<U>;
-        type FormattedValue = rspy_ast::ExprKind<U>;
-        type JoinedStr = rspy_ast::ExprKind<U>;
-        type ConstantExpr = rspy_ast::ExprKind<U>;
-        type Attribute = rspy_ast::ExprKind<U>;
-        type Subscript = rspy_ast::ExprKind<U>;
-        type Starred = rspy_ast::ExprKind<U>;
-        type Name = rspy_ast::ExprKind<U>;
-        type List = rspy_ast::ExprKind<U>;
-        type Tuple = rspy_ast::ExprKind<U>;
-        type Slice = rspy_ast::ExprKind<U>;
+
         #[inline]
         fn expr(
             &'a self,
@@ -1826,6 +1882,7 @@ mod rs_python_impls {
 
     impl<'a, U> ExceptHandler<'a> for rspy_ast::Excepthandler<U> {
         type Ident = String;
+
         rspy_types!(U, Expr, Stmt);
 
         #[inline]
@@ -1834,12 +1891,14 @@ mod rs_python_impls {
                 rspy_ast::ExcepthandlerKind::ExceptHandler { type_, .. } => type_.as_deref(),
             }
         }
+
         #[inline]
         fn name(&self) -> Option<&Self::Ident> {
             match &self.node {
                 rspy_ast::ExcepthandlerKind::ExceptHandler { name, .. } => name.as_ref(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match &self.node {
@@ -1882,6 +1941,7 @@ mod rs_python_impls {
     }
     impl<'a, U> MatchMapping<'a> for rspy_ast::PatternKind<U> {
         type Ident = String;
+
         rspy_types!(U, Expr, Pattern);
 
         #[inline]
@@ -1891,6 +1951,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn patterns(&self) -> &[Self::Pattern] {
             match self {
@@ -1898,6 +1959,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn rest(&self) -> Option<&Self::Ident> {
             match self {
@@ -1907,8 +1969,9 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> MatchClass<'a> for rspy_ast::PatternKind<U> {
-        rspy_types!(U, Expr, Pattern);
         type Ident = String;
+
+        rspy_types!(U, Expr, Pattern);
 
         #[inline]
         fn cls(&self) -> &Self::Expr {
@@ -1917,6 +1980,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn patterns(&self) -> &[Self::Pattern] {
             match self {
@@ -1924,6 +1988,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn kwd_attrs(&self) -> &[Self::Ident] {
             match self {
@@ -1931,6 +1996,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn kwd_patterns(&self) -> &[Self::Pattern] {
             match self {
@@ -1952,6 +2018,7 @@ mod rs_python_impls {
     }
     impl<'a, U> MatchAs<'a> for rspy_ast::PatternKind<U> {
         type Ident = String;
+
         rspy_types!(U, Pattern);
 
         #[inline]
@@ -1961,6 +2028,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn name(&self) -> Option<&Self::Ident> {
             match self {
@@ -1981,14 +2049,15 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Pattern<'a> for rspy_ast::Pattern<U> {
-        type MatchValue = rspy_ast::PatternKind<U>;
-        type MatchSingleton = rspy_ast::PatternKind<U>;
-        type MatchSequence = rspy_ast::PatternKind<U>;
-        type MatchMapping = rspy_ast::PatternKind<U>;
-        type MatchClass = rspy_ast::PatternKind<U>;
-        type MatchStar = rspy_ast::PatternKind<U>;
         type MatchAs = rspy_ast::PatternKind<U>;
+        type MatchClass = rspy_ast::PatternKind<U>;
+        type MatchMapping = rspy_ast::PatternKind<U>;
         type MatchOr = rspy_ast::PatternKind<U>;
+        type MatchSequence = rspy_ast::PatternKind<U>;
+        type MatchSingleton = rspy_ast::PatternKind<U>;
+        type MatchStar = rspy_ast::PatternKind<U>;
+        type MatchValue = rspy_ast::PatternKind<U>;
+
         #[inline]
         fn pattern(
             &'a self,
@@ -2021,10 +2090,12 @@ mod rs_python_impls {
     }
     impl<'a, U> Withitem<'a> for rspy_ast::Withitem<U> {
         type Expr = rspy_ast::Expr<U>;
+
         #[inline]
         fn context_expr(&self) -> &Self::Expr {
             &self.context_expr
         }
+
         #[inline]
         fn optional_vars(&self) -> Option<&Self::Expr> {
             self.optional_vars.as_deref()
@@ -2037,10 +2108,12 @@ mod rs_python_impls {
         fn pattern(&self) -> &Self::Pattern {
             &self.pattern
         }
+
         #[inline]
         fn guard(&self) -> Option<&Self::Expr> {
             self.guard.as_deref()
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             &self.body
@@ -2048,6 +2121,7 @@ mod rs_python_impls {
     }
     impl<'a, U> FunctionDef<'a> for rspy_ast::StmtKind<U> {
         type Ident = String;
+
         rspy_types!(U, Arguments, Expr, Stmt);
 
         #[inline]
@@ -2057,6 +2131,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn args(&self) -> &Self::Arguments {
             match self {
@@ -2064,6 +2139,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match self {
@@ -2071,6 +2147,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn decorator_list(&self) -> &[<Self as FunctionDef>::Expr] {
             match self {
@@ -2078,6 +2155,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn returns(&self) -> Option<&<Self as FunctionDef>::Expr> {
             match self {
@@ -2085,6 +2163,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn type_comment(&self) -> Option<&str> {
             match self {
@@ -2095,6 +2174,7 @@ mod rs_python_impls {
     }
     impl<'a, U> AsyncFunctionDef<'a> for rspy_ast::StmtKind<U> {
         type Ident = String;
+
         rspy_types!(U, Arguments, Expr, Stmt);
 
         #[inline]
@@ -2104,6 +2184,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn args(&self) -> &Self::Arguments {
             match self {
@@ -2111,6 +2192,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match self {
@@ -2118,6 +2200,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn decorator_list(&self) -> &[<Self as AsyncFunctionDef>::Expr] {
             match self {
@@ -2125,6 +2208,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn returns(&self) -> Option<&<Self as AsyncFunctionDef>::Expr> {
             match self {
@@ -2132,6 +2216,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn type_comment(&self) -> Option<&str> {
             match self {
@@ -2142,6 +2227,7 @@ mod rs_python_impls {
     }
     impl<'a, U> ClassDef<'a> for rspy_ast::StmtKind<U> {
         type Ident = String;
+
         rspy_types!(U, Keyword, Expr, Stmt);
 
         #[inline]
@@ -2151,6 +2237,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn bases(&self) -> &[<Self as ClassDef>::Expr] {
             match self {
@@ -2158,6 +2245,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn keywords(&self) -> &[Self::Keyword] {
             match self {
@@ -2165,6 +2253,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match self {
@@ -2172,6 +2261,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn decorator_list(&self) -> &[<Self as ClassDef>::Expr] {
             match self {
@@ -2212,6 +2302,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn value(&self) -> &<Self as Assign>::Expr {
             match self {
@@ -2219,6 +2310,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn type_comment(&self) -> Option<&str> {
             match self {
@@ -2237,6 +2329,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn op(&self) -> Operator {
             match self {
@@ -2244,6 +2337,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn value(&self) -> &<Self as AugAssign>::Expr {
             match self {
@@ -2254,6 +2348,7 @@ mod rs_python_impls {
     }
     impl<'a, U> AnnAssign<'a> for rspy_ast::StmtKind<U> {
         rspy_types!(U, Expr);
+
         #[inline]
         fn target(&self) -> &<Self as AnnAssign>::Expr {
             match self {
@@ -2261,6 +2356,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn annotation(&self) -> &<Self as AnnAssign>::Expr {
             match self {
@@ -2268,6 +2364,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn value(&self) -> Option<&<Self as AnnAssign>::Expr> {
             match self {
@@ -2275,6 +2372,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn simple(&self) -> usize {
             match self {
@@ -2293,6 +2391,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn iter(&self) -> &<Self as For>::Expr {
             match self {
@@ -2300,6 +2399,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match self {
@@ -2307,6 +2407,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn orelse(&self) -> &[Self::Stmt] {
             match self {
@@ -2314,6 +2415,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn type_comment(&self) -> Option<&str> {
             match self {
@@ -2332,6 +2434,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn iter(&self) -> &<Self as AsyncFor>::Expr {
             match self {
@@ -2339,6 +2442,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match self {
@@ -2346,6 +2450,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn orelse(&self) -> &[Self::Stmt] {
             match self {
@@ -2353,6 +2458,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn type_comment(&self) -> Option<&str> {
             match self {
@@ -2371,6 +2477,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match self {
@@ -2378,6 +2485,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn orelse(&self) -> &[Self::Stmt] {
             match self {
@@ -2396,6 +2504,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match self {
@@ -2403,6 +2512,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn orelse(&self) -> &[Self::Stmt] {
             match self {
@@ -2421,6 +2531,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match self {
@@ -2428,6 +2539,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn type_comment(&self) -> Option<&str> {
             match self {
@@ -2446,6 +2558,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
             match self {
@@ -2453,6 +2566,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn type_comment(&self) -> Option<&str> {
             match self {
@@ -2471,6 +2585,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn cases(&self) -> &[Self::MatchCase] {
             match self {
@@ -2489,6 +2604,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn cause(&self) -> Option<&<Self as Raise>::Expr> {
             match self {
@@ -2498,8 +2614,9 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Try<'a> for rspy_ast::StmtKind<U> {
-        rspy_types!(U, Stmt);
         type ExceptHandler = rspy_ast::Excepthandler<U>;
+
+        rspy_types!(U, Stmt);
 
         #[inline]
         fn body(&self) -> &[Self::Stmt] {
@@ -2508,6 +2625,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn handlers(&self) -> &[Self::ExceptHandler] {
             match self {
@@ -2515,6 +2633,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn orelse(&self) -> &[Self::Stmt] {
             match self {
@@ -2522,6 +2641,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn finalbody(&self) -> &[Self::Stmt] {
             match self {
@@ -2540,6 +2660,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn msg(&self) -> Option<&<Self as Assert>::Expr> {
             match self {
@@ -2561,6 +2682,7 @@ mod rs_python_impls {
     }
     impl<U> ImportFrom for rspy_ast::StmtKind<U> {
         type Ident = String;
+
         rspy_types!(U, Alias);
 
         #[inline]
@@ -2570,6 +2692,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn names(&self) -> &[Self::Alias] {
             match self {
@@ -2577,6 +2700,7 @@ mod rs_python_impls {
                 _ => unreachable!(),
             }
         }
+
         #[inline]
         fn level(&self) -> Option<usize> {
             match self {
@@ -2608,29 +2732,29 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Stmt<'a> for rspy_ast::Stmt<U> {
-        type FunctionDef = rspy_ast::StmtKind<U>;
-        type AsyncFunctionDef = rspy_ast::StmtKind<U>;
-        type ClassDef = rspy_ast::StmtKind<U>;
-        type Return = rspy_ast::StmtKind<U>;
-        type Delete = rspy_ast::StmtKind<U>;
-        type Assign = rspy_ast::StmtKind<U>;
-        type AugAssign = rspy_ast::StmtKind<U>;
         type AnnAssign = rspy_ast::StmtKind<U>;
-        type For = rspy_ast::StmtKind<U>;
-        type AsyncFor = rspy_ast::StmtKind<U>;
-        type While = rspy_ast::StmtKind<U>;
-        type If = rspy_ast::StmtKind<U>;
-        type With = rspy_ast::StmtKind<U>;
-        type AsyncWith = rspy_ast::StmtKind<U>;
-        type Match = rspy_ast::StmtKind<U>;
-        type Raise = rspy_ast::StmtKind<U>;
-        type Try = rspy_ast::StmtKind<U>;
         type Assert = rspy_ast::StmtKind<U>;
+        type Assign = rspy_ast::StmtKind<U>;
+        type AsyncFor = rspy_ast::StmtKind<U>;
+        type AsyncFunctionDef = rspy_ast::StmtKind<U>;
+        type AsyncWith = rspy_ast::StmtKind<U>;
+        type AugAssign = rspy_ast::StmtKind<U>;
+        type ClassDef = rspy_ast::StmtKind<U>;
+        type Delete = rspy_ast::StmtKind<U>;
+        type Expr = rspy_ast::Expr<U>;
+        type For = rspy_ast::StmtKind<U>;
+        type FunctionDef = rspy_ast::StmtKind<U>;
+        type Global = rspy_ast::StmtKind<U>;
+        type If = rspy_ast::StmtKind<U>;
         type Import = rspy_ast::StmtKind<U>;
         type ImportFrom = rspy_ast::StmtKind<U>;
-        type Global = rspy_ast::StmtKind<U>;
+        type Match = rspy_ast::StmtKind<U>;
         type Nonlocal = rspy_ast::StmtKind<U>;
-        type Expr = rspy_ast::Expr<U>;
+        type Raise = rspy_ast::StmtKind<U>;
+        type Return = rspy_ast::StmtKind<U>;
+        type Try = rspy_ast::StmtKind<U>;
+        type While = rspy_ast::StmtKind<U>;
+        type With = rspy_ast::StmtKind<U>;
 
         fn stmt(
             &'a self,
@@ -2694,77 +2818,77 @@ mod rs_python_impls {
     }
 
     impl<'a, U> Ast<'a> for rspy_ast::Suite<U> {
-        type Ident = String;
         type Alias = rspy_ast::Alias<U>;
+        type AnnAssign = rspy_ast::StmtKind<U>;
         type Arg = rspy_ast::Arg<U>;
         type Arguments = rspy_ast::Arguments<U>;
-        type Keyword = rspy_ast::Keyword<U>;
-        type BigInt = RspyBigInt;
-        type Constant = rspy_ast::Constant;
-        type Comprehension = rspy_ast::Comprehension<U>;
-        type BoolOp = rspy_ast::ExprKind<U>;
-        type NamedExpr = rspy_ast::ExprKind<U>;
-        type BinOp = rspy_ast::ExprKind<U>;
-        type UnaryOp = rspy_ast::ExprKind<U>;
-        type Lambda = rspy_ast::ExprKind<U>;
-        type IfExp = rspy_ast::ExprKind<U>;
-        type Dict = rspy_ast::ExprKind<U>;
-        type Set = rspy_ast::ExprKind<U>;
-        type ListComp = rspy_ast::ExprKind<U>;
-        type SetComp = rspy_ast::ExprKind<U>;
-        type DictComp = rspy_ast::ExprKind<U>;
-        type GeneratorExp = rspy_ast::ExprKind<U>;
-        type Await = rspy_ast::ExprKind<U>;
-        type Yield = rspy_ast::ExprKind<U>;
-        type YieldFrom = rspy_ast::ExprKind<U>;
-        type Compare = rspy_ast::ExprKind<U>;
-        type Call = rspy_ast::ExprKind<U>;
-        type FormattedValue = rspy_ast::ExprKind<U>;
-        type JoinedStr = rspy_ast::ExprKind<U>;
-        type ConstantExpr = rspy_ast::ExprKind<U>;
-        type Attribute = rspy_ast::ExprKind<U>;
-        type Subscript = rspy_ast::ExprKind<U>;
-        type Starred = rspy_ast::ExprKind<U>;
-        type Name = rspy_ast::ExprKind<U>;
-        type List = rspy_ast::ExprKind<U>;
-        type Tuple = rspy_ast::ExprKind<U>;
-        type Slice = rspy_ast::ExprKind<U>;
-        type Expr = rspy_ast::Expr<U>;
-        type ExceptHandler = rspy_ast::Excepthandler<U>;
-        type MatchValue = rspy_ast::PatternKind<U>;
-        type MatchSingleton = rspy_ast::PatternKind<U>;
-        type MatchSequence = rspy_ast::PatternKind<U>;
-        type MatchMapping = rspy_ast::PatternKind<U>;
-        type MatchClass = rspy_ast::PatternKind<U>;
-        type MatchStar = rspy_ast::PatternKind<U>;
-        type MatchAs = rspy_ast::PatternKind<U>;
-        type MatchOr = rspy_ast::PatternKind<U>;
-        type Pattern = rspy_ast::Pattern<U>;
-        type Withitem = rspy_ast::Withitem<U>;
-        type MatchCase = rspy_ast::MatchCase<U>;
-        type FunctionDef = rspy_ast::StmtKind<U>;
-        type AsyncFunctionDef = rspy_ast::StmtKind<U>;
-        type ClassDef = rspy_ast::StmtKind<U>;
-        type Return = rspy_ast::StmtKind<U>;
-        type Delete = rspy_ast::StmtKind<U>;
-        type Assign = rspy_ast::StmtKind<U>;
-        type AugAssign = rspy_ast::StmtKind<U>;
-        type AnnAssign = rspy_ast::StmtKind<U>;
-        type For = rspy_ast::StmtKind<U>;
-        type AsyncFor = rspy_ast::StmtKind<U>;
-        type While = rspy_ast::StmtKind<U>;
-        type If = rspy_ast::StmtKind<U>;
-        type With = rspy_ast::StmtKind<U>;
-        type AsyncWith = rspy_ast::StmtKind<U>;
-        type Match = rspy_ast::StmtKind<U>;
-        type Raise = rspy_ast::StmtKind<U>;
-        type Try = rspy_ast::StmtKind<U>;
         type Assert = rspy_ast::StmtKind<U>;
+        type Assign = rspy_ast::StmtKind<U>;
+        type AsyncFor = rspy_ast::StmtKind<U>;
+        type AsyncFunctionDef = rspy_ast::StmtKind<U>;
+        type AsyncWith = rspy_ast::StmtKind<U>;
+        type Attribute = rspy_ast::ExprKind<U>;
+        type AugAssign = rspy_ast::StmtKind<U>;
+        type Await = rspy_ast::ExprKind<U>;
+        type BigInt = RspyBigInt;
+        type BinOp = rspy_ast::ExprKind<U>;
+        type BoolOp = rspy_ast::ExprKind<U>;
+        type Call = rspy_ast::ExprKind<U>;
+        type ClassDef = rspy_ast::StmtKind<U>;
+        type Compare = rspy_ast::ExprKind<U>;
+        type Comprehension = rspy_ast::Comprehension<U>;
+        type Constant = rspy_ast::Constant;
+        type ConstantExpr = rspy_ast::ExprKind<U>;
+        type Delete = rspy_ast::StmtKind<U>;
+        type Dict = rspy_ast::ExprKind<U>;
+        type DictComp = rspy_ast::ExprKind<U>;
+        type ExceptHandler = rspy_ast::Excepthandler<U>;
+        type Expr = rspy_ast::Expr<U>;
+        type For = rspy_ast::StmtKind<U>;
+        type FormattedValue = rspy_ast::ExprKind<U>;
+        type FunctionDef = rspy_ast::StmtKind<U>;
+        type GeneratorExp = rspy_ast::ExprKind<U>;
+        type Global = rspy_ast::StmtKind<U>;
+        type Ident = String;
+        type If = rspy_ast::StmtKind<U>;
+        type IfExp = rspy_ast::ExprKind<U>;
         type Import = rspy_ast::StmtKind<U>;
         type ImportFrom = rspy_ast::StmtKind<U>;
-        type Global = rspy_ast::StmtKind<U>;
+        type JoinedStr = rspy_ast::ExprKind<U>;
+        type Keyword = rspy_ast::Keyword<U>;
+        type Lambda = rspy_ast::ExprKind<U>;
+        type List = rspy_ast::ExprKind<U>;
+        type ListComp = rspy_ast::ExprKind<U>;
+        type Match = rspy_ast::StmtKind<U>;
+        type MatchAs = rspy_ast::PatternKind<U>;
+        type MatchCase = rspy_ast::MatchCase<U>;
+        type MatchClass = rspy_ast::PatternKind<U>;
+        type MatchMapping = rspy_ast::PatternKind<U>;
+        type MatchOr = rspy_ast::PatternKind<U>;
+        type MatchSequence = rspy_ast::PatternKind<U>;
+        type MatchSingleton = rspy_ast::PatternKind<U>;
+        type MatchStar = rspy_ast::PatternKind<U>;
+        type MatchValue = rspy_ast::PatternKind<U>;
+        type Name = rspy_ast::ExprKind<U>;
+        type NamedExpr = rspy_ast::ExprKind<U>;
         type Nonlocal = rspy_ast::StmtKind<U>;
+        type Pattern = rspy_ast::Pattern<U>;
+        type Raise = rspy_ast::StmtKind<U>;
+        type Return = rspy_ast::StmtKind<U>;
+        type Set = rspy_ast::ExprKind<U>;
+        type SetComp = rspy_ast::ExprKind<U>;
+        type Slice = rspy_ast::ExprKind<U>;
+        type Starred = rspy_ast::ExprKind<U>;
         type Stmt = rspy_ast::Stmt<U>;
+        type Subscript = rspy_ast::ExprKind<U>;
+        type Try = rspy_ast::StmtKind<U>;
+        type Tuple = rspy_ast::ExprKind<U>;
+        type UnaryOp = rspy_ast::ExprKind<U>;
+        type While = rspy_ast::StmtKind<U>;
+        type With = rspy_ast::StmtKind<U>;
+        type Withitem = rspy_ast::Withitem<U>;
+        type Yield = rspy_ast::ExprKind<U>;
+        type YieldFrom = rspy_ast::ExprKind<U>;
 
         #[inline]
         fn stmts(&self) -> &[Self::Stmt] {
