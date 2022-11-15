@@ -1,6 +1,6 @@
-use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use fnv::FnvHashMap;
 use rustpython_ast::{Expr, Keyword};
 use rustpython_parser::ast::{Located, Location};
 
@@ -54,7 +54,7 @@ pub struct Scope<'a> {
     pub id: usize,
     pub kind: ScopeKind<'a>,
     pub import_starred: bool,
-    pub values: BTreeMap<String, Binding>,
+    pub values: FnvHashMap<String, Binding>,
 }
 
 impl<'a> Scope<'a> {
@@ -63,7 +63,7 @@ impl<'a> Scope<'a> {
             id: id(),
             kind,
             import_starred: false,
-            values: BTreeMap::new(),
+            values: FnvHashMap::default(),
         }
     }
 }
