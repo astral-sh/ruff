@@ -237,6 +237,8 @@ Options:
           Regular expression matching the name of dummy variables
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported
+      --line-length <LINE_LENGTH>
+          Set the line-length for length-associated checks and automatic formatting
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
   -h, --help
