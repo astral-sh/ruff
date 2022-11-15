@@ -10,6 +10,9 @@ env:
   PACKAGE_NAME: flake8-to-ruff
   CRATE_NAME: flake8_to_ruff
   PYTHON_VERSION: "3.7" # to build abi3 wheels
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
 
 jobs:
   macos-x86_64:
