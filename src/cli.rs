@@ -87,6 +87,10 @@ pub struct Cli {
     /// The minimum Python version that should be supported.
     #[arg(long)]
     pub target_version: Option<PythonVersion>,
+    /// Set the line-length for length-associated checks and automatic
+    /// formatting.
+    #[arg(long)]
+    pub line_length: Option<usize>,
     /// Round-trip auto-formatting.
     // TODO(charlie): This should be a sub-command.
     #[arg(long, hide = true)]

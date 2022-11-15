@@ -292,6 +292,9 @@ fn inner_main() -> Result<ExitCode> {
     if !cli.extend_ignore.is_empty() {
         configuration.extend_ignore = cli.extend_ignore;
     }
+    if let Some(line_length) = cli.line_length {
+        configuration.line_length = line_length;
+    }
     if let Some(target_version) = cli.target_version {
         configuration.target_version = target_version;
     }
