@@ -5,6 +5,7 @@ use std::ops::Deref;
 use std::path::Path;
 
 use fnv::{FnvHashMap, FnvHashSet};
+use itertools::Itertools;
 use log::error;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
@@ -2486,7 +2487,7 @@ impl<'a> Checker<'a> {
                 let mut unused: BTreeMap<(ImportKind, usize, Option<usize>), Vec<&str>> =
                     BTreeMap::new();
 
-                for (name, binding) in scope.values.iter().rev() {
+                for (name, binding) in scope.values.iter() {
                     let used = binding.used.is_some()
                         || all_names
                             .map(|names| names.contains(name))
@@ -2495,25 +2496,25 @@ impl<'a> Checker<'a> {
                     if !used {
                         match &binding.kind {
                             BindingKind::FromImportation(_, full_name, context) => {
-                                let full_names = unused
+                                unused
                                     .entry((
                                         ImportKind::ImportFrom,
                                         context.defined_by,
                                         context.defined_in,
                                     ))
-                                    .or_default();
-                                full_names.push(full_name);
+                                    .or_default()
+                                    .push(full_name);
                             }
                             BindingKind::Importation(_, full_name, context)
                             | BindingKind::SubmoduleImportation(_, full_name, context) => {
-                                let full_names = unused
+                                unused
                                     .entry((
                                         ImportKind::Import,
                                         context.defined_by,
                                         context.defined_in,
                                     ))
-                                    .or_default();
-                                full_names.push(full_name);
+                                    .or_default()
+                                    .push(full_name);
                             }
                             _ => {}
                         }
@@ -2554,7 +2555,7 @@ impl<'a> Checker<'a> {
                     if self.path.ends_with("__init__.py") {
                         checks.push(Check::new(
                             CheckKind::UnusedImport(
-                                full_names.into_iter().map(String::from).collect(),
+                                full_names.into_iter().sorted().map(String::from).collect(),
                                 true,
                             ),
                             Range::from_located(child),
@@ -2562,7 +2563,7 @@ impl<'a> Checker<'a> {
                     } else {
                         let mut check = Check::new(
                             CheckKind::UnusedImport(
-                                full_names.into_iter().map(String::from).collect(),
+                                full_names.into_iter().sorted().map(String::from).collect(),
                                 false,
                             ),
                             Range::from_located(child),
