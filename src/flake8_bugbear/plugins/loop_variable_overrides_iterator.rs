@@ -7,16 +7,9 @@ use crate::ast::visitor::Visitor;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+#[derive(Default)]
 struct NameFinder<'a> {
     names: FnvHashMap<&'a str, &'a Expr>,
-}
-
-impl NameFinder<'_> {
-    fn new() -> Self {
-        NameFinder {
-            names: Default::default(),
-        }
-    }
 }
 
 impl<'a, 'b> Visitor<'b> for NameFinder<'a>
@@ -50,12 +43,12 @@ where
 /// B020
 pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
     let target_names = {
-        let mut target_finder = NameFinder::new();
+        let mut target_finder = NameFinder::default();
         target_finder.visit_expr(target);
         target_finder.names
     };
     let iter_names = {
-        let mut iter_finder = NameFinder::new();
+        let mut iter_finder = NameFinder::default();
         iter_finder.visit_expr(iter);
         iter_finder.names
     };
