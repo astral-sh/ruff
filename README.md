@@ -529,7 +529,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B017 | NoAssertRaisesException | `assertRaises(Exception)` should be considered evil |  |
 | B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B019 | CachedInstanceMethod | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
-| B020 | ForLoopTargetOverridesIter | Loop control variable `...` overrides iterable it iterates |  |
+| B020 | LoopVariableOverridesIterator | Loop control variable `...` overrides iterable it iterates |  |
 | B021 | FStringDocstring | f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring. |  |
 | B022 | UselessContextlibSuppress | No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant |  |
 | B024 | AbstractBaseClassWithoutAbstractMethod | `...` is an abstract base class, but it has no abstract methods |  |
