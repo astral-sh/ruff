@@ -40,10 +40,11 @@ pub fn format_import_from(
             .skip(1)
             .all(|(_, CommentSet { inline, .. })| inline.is_empty())
     {
-        let single_line = format_single_line(import_from, comments, aliases);
+        // STOPSHIP(charlie): This includes the length of the comments...
+        let (single_line, import_length) = format_single_line(import_from, comments, aliases);
         // If the import fits on a single line (excluding the newline character at the
         // end, which doesn't count towards the line length), return it.
-        if single_line.len() <= *line_length + 1 {
+        if import_length <= *line_length {
             output.append(&single_line);
             return;
         }
@@ -59,8 +60,9 @@ fn format_single_line(
     import_from: &ImportFromData,
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
-) -> String {
+) -> (String, usize) {
     let mut output = String::new();
+    let mut import_length = 0;
 
     for comment in &comments.atop {
         output.push_str(comment);
