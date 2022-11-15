@@ -1158,7 +1158,7 @@ where
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
 
-                if self.match_typing_expr(value, "Literal") {
+                if self.match_typing_module(&collect_call_paths(&**value), "Literal") {
                     self.in_literal = true;
                 }
 
@@ -1832,8 +1832,8 @@ where
                 args,
                 keywords,
             } => {
-                let call_path = dealias_call_path(collect_call_paths(func), &self.import_aliases);
-                if self.match_typing_call_path(&call_path, "ForwardRef") {
+                let call_path = dealias_call_path(collect_call_paths(&**func), &self.import_aliases);
+                if self.match_typing_module(&call_path, "ForwardRef") {
                     self.visit_expr(func);
                     for expr in args {
                         self.visit_annotation(expr);

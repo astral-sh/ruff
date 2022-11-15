@@ -91,7 +91,7 @@ pub fn is_namedtuple_assignment(
 ) -> bool {
     if let StmtKind::Assign { value, .. } = &stmt.node {
         match_call_path(
-            &collect_call_paths(value),
+            &collect_call_paths(&**value),
             "collections",
             "namedtuple",
             from_imports,

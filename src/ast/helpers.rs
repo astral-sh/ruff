@@ -25,7 +25,7 @@ fn collect_call_path_inner<'a, E: nodes::Expr<'a>>(expr: &E, parts: &mut Vec<&'a
 
 /// Convert an `Expr` to its call path (like `List`, or `typing.List`).
 #[inline(always)]
-pub fn compose_call_path<'a, E: nodes::Expr<'a>>(expr: &E) -> Option<String> {
+pub fn compose_call_path<'a, E: nodes::Expr<'a>>(expr: &'a E) -> Option<String> {
     let segments = collect_call_paths(expr);
     if segments.is_empty() {
         None
@@ -36,7 +36,7 @@ pub fn compose_call_path<'a, E: nodes::Expr<'a>>(expr: &E) -> Option<String> {
 
 /// Convert an `Expr` to its call path segments (like ["typing", "List"]).
 #[inline(always)]
-pub fn collect_call_paths<'a, E: nodes::Expr<'a>>(expr: &E) -> Vec<&str> {
+pub fn collect_call_paths<'a, E: nodes::Expr<'a>>(expr: &'a E) -> Vec<&str> {
     let mut segments = vec![];
     collect_call_path_inner(expr, &mut segments);
     segments
