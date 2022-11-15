@@ -1059,7 +1059,7 @@ where
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) typing.List[...]
                 if self.settings.enabled.contains(&CheckCode::U007)
-                    && self.settings.target_version >= PythonVersion::Py39
+                    && self.settings.target_version >= PythonVersion::Py310
                 {
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
