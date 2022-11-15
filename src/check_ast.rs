@@ -65,7 +65,7 @@ pub struct Checker<'a> {
     scopes: Vec<Scope<'a>>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
-    deferred_string_annotations: Vec<(Range, &'a str)>,
+    deferred_string_annotations: Vec<(Range, &'a str, Vec<usize>, Vec<usize>)>,
     deferred_annotations: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
@@ -1042,8 +1042,12 @@ where
                 ..
             } = &expr.node
             {
-                self.deferred_string_annotations
-                    .push((Range::from_located(expr), value));
+                self.deferred_string_annotations.push((
+                    Range::from_located(expr),
+                    value,
+                    self.scope_stack.clone(),
+                    self.parent_stack.clone(),
+                ));
             } else {
                 self.deferred_annotations.push((
                     expr,
@@ -1569,8 +1573,12 @@ where
                 ..
             } => {
                 if self.in_annotation && !self.in_literal {
-                    self.deferred_string_annotations
-                        .push((Range::from_located(expr), value));
+                    self.deferred_string_annotations.push((
+                        Range::from_located(expr),
+                        value,
+                        self.scope_stack.clone(),
+                        self.parent_stack.clone(),
+                    ));
                 }
                 if self.settings.enabled.contains(&CheckCode::S104) {
                     if let Some(check) = flake8_bandit::plugins::hardcoded_bind_all_interfaces(
@@ -2128,6 +2136,7 @@ impl<'a> Checker<'a> {
             let mut import_starred = false;
             for scope_index in self.scope_stack.iter().rev() {
                 let scope = &mut self.scopes[*scope_index];
+
                 if matches!(scope.kind, ScopeKind::Class(_)) {
                     if id == "__class__" {
                         return;
@@ -2344,8 +2353,8 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_annotations(&mut self) {
         while let Some((expr, scopes, parents)) = self.deferred_annotations.pop() {
-            self.parent_stack = parents;
             self.scope_stack = scopes;
+            self.parent_stack = parents;
             self.visit_expr(expr);
         }
     }
@@ -2354,10 +2363,14 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        while let Some((range, expression)) = self.deferred_string_annotations.pop() {
+        let mut stacks = vec![];
+        while let Some((range, expression, scopes, parents)) =
+            self.deferred_string_annotations.pop()
+        {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 relocate_expr(&mut expr, range);
                 allocator.push(expr);
+                stacks.push((scopes, parents));
             } else {
                 if self.settings.enabled.contains(&CheckCode::F722) {
                     self.add_check(Check::new(
@@ -2367,7 +2380,9 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        for expr in allocator {
+        for (expr, (scopes, parents)) in allocator.iter().zip(stacks) {
+            self.scope_stack = scopes;
+            self.parent_stack = parents;
             self.visit_expr(expr);
         }
     }
