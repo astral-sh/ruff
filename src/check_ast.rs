@@ -159,7 +159,13 @@ impl<'a> Checker<'a> {
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
-    pub fn match_typing_module(&self, call_path: &[&str], target: &str) -> bool {
+    pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
+        let call_path = dealias_call_path(collect_call_paths(expr), &self.import_aliases);
+        self.match_typing_call_path(&call_path, target)
+    }
+
+    /// Return `true` if the call path is a reference to `typing.${target}`.
+    pub fn match_typing_call_path(&self, call_path: &[&str], target: &str) -> bool {
         match_call_path(call_path, "typing", target, &self.from_imports)
             || (typing::in_extensions(target)
                 && match_call_path(call_path, "typing_extensions", target, &self.from_imports))
@@ -1058,7 +1064,7 @@ where
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
 
-                if self.match_typing_module(&collect_call_paths(value), "Literal") {
+                if self.match_typing_expr(value, "Literal") {
                     self.in_literal = true;
                 }
 
@@ -1646,12 +1652,12 @@ where
                 keywords,
             } => {
                 let call_path = dealias_call_path(collect_call_paths(func), &self.import_aliases);
-                if self.match_typing_module(&call_path, "ForwardRef") {
+                if self.match_typing_call_path(&call_path, "ForwardRef") {
                     self.visit_expr(func);
                     for expr in args {
                         self.visit_annotation(expr);
                     }
-                } else if self.match_typing_module(&call_path, "cast") {
+                } else if self.match_typing_call_path(&call_path, "cast") {
                     self.visit_expr(func);
                     if !args.is_empty() {
                         self.visit_annotation(&args[0]);
@@ -1659,12 +1665,12 @@ where
                     for expr in args.iter().skip(1) {
                         self.visit_expr(expr);
                     }
-                } else if self.match_typing_module(&call_path, "NewType") {
+                } else if self.match_typing_call_path(&call_path, "NewType") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.visit_annotation(expr);
                     }
-                } else if self.match_typing_module(&call_path, "TypeVar") {
+                } else if self.match_typing_call_path(&call_path, "TypeVar") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.visit_annotation(expr);
@@ -1681,7 +1687,7 @@ where
                             }
                         }
                     }
-                } else if self.match_typing_module(&call_path, "NamedTuple") {
+                } else if self.match_typing_call_path(&call_path, "NamedTuple") {
                     self.visit_expr(func);
 
                     // Ex) NamedTuple("a", [("a", int)])
@@ -1713,7 +1719,7 @@ where
                         let KeywordData { value, .. } = &keyword.node;
                         self.visit_annotation(value);
                     }
-                } else if self.match_typing_module(&call_path, "TypedDict") {
+                } else if self.match_typing_call_path(&call_path, "TypedDict") {
                     self.visit_expr(func);
 
                     // Ex) TypedDict("a", {"a": int})
