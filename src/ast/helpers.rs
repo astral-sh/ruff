@@ -39,20 +39,23 @@ pub fn collect_call_paths(expr: &Expr) -> Vec<&str> {
     segments
 }
 
-/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
-pub fn dealias(call_path: String, import_aliases: &FnvHashMap<&str, &str>) -> String {
-    if let Some((head, tail)) = call_path.split_once('.') {
-        if let Some(head) = import_aliases.get(head) {
-            format!("{head}.{tail}")
+/// Rewrite any import aliases on a call path.
+pub fn dealias_call_path<'a>(
+    call_path: Vec<&'a str>,
+    import_aliases: &FnvHashMap<&str, &'a str>,
+) -> Vec<&'a str> {
+    if let Some(head) = call_path.first() {
+        if let Some(origin) = import_aliases.get(head) {
+            let tail = &call_path[1..];
+            let mut call_path: Vec<&str> = vec![];
+            call_path.extend(origin.split('.'));
+            call_path.extend(tail);
+            call_path
         } else {
             call_path
         }
     } else {
-        if let Some(call_path) = import_aliases.get(&call_path.as_str()) {
-            call_path.to_string()
-        } else {
-            call_path
-        }
+        call_path
     }
 }
 
@@ -62,6 +65,94 @@ pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
         ExprKind::Attribute { attr, .. } => target == attr,
         ExprKind::Name { id, .. } => target == id,
         _ => false,
+    }
+}
+
+/// Return `true` if the `Expr` is a reference to `${module}.${target}`.
+///
+/// Useful for, e.g., ensuring that a `Union` reference represents
+/// `typing.Union`.
+pub fn match_module_member(
+    expr: &Expr,
+    module: &str,
+    member: &str,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
+) -> bool {
+    match_call_path(
+        &dealias_call_path(collect_call_paths(expr), import_aliases),
+        module,
+        member,
+        from_imports,
+    )
+}
+
+/// Return `true` if the `call_path` is a reference to `${module}.${target}`.
+///
+/// Optimized version of `match_module_member` for pre-computed call paths.
+pub fn match_call_path(
+    call_path: &[&str],
+    module: &str,
+    member: &str,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+) -> bool {
+    // If we have no segments, we can't ever match.
+    let num_segments = call_path.len();
+    if num_segments == 0 {
+        return false;
+    }
+
+    // If the last segment doesn't match the member, we can't ever match.
+    if call_path[num_segments - 1] != member {
+        return false;
+    }
+
+    // We now only need the module path, so throw out the member name.
+    let call_path = &call_path[..num_segments - 1];
+    let num_segments = call_path.len();
+
+    // Case (1): It's a builtin (like `list`).
+    // Case (2a): We imported from the parent (`from typing.re import Match`,
+    // `Match`).
+    // Case (2b): We imported star from the parent (`from typing.re import *`,
+    // `Match`).
+    if num_segments == 0 {
+        module.is_empty()
+            || from_imports
+                .get(module)
+                .map(|imports| imports.contains(member) || imports.contains("*"))
+                .unwrap_or(false)
+    } else {
+        let components: Vec<&str> = module.split('.').collect();
+
+        // Case (3a): it's a fully qualified call path (`import typing`,
+        // `typing.re.Match`). Case (3b): it's a fully qualified call path (`import
+        // typing.re`, `typing.re.Match`).
+        if components == call_path {
+            return true;
+        }
+
+        // Case (4): We imported from the grandparent (`from typing import re`,
+        // `re.Match`)
+        let num_matches = (0..components.len())
+            .take(num_segments)
+            .take_while(|i| components[components.len() - 1 - i] == call_path[num_segments - 1 - i])
+            .count();
+        if num_matches > 0 {
+            let cut = components.len() - num_matches;
+            // TODO(charlie): Rewrite to avoid this allocation.
+            let module = components[..cut].join(".");
+            let member = components[cut];
+            if from_imports
+                .get(&module.as_str())
+                .map(|imports| imports.contains(member))
+                .unwrap_or(false)
+            {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
@@ -145,102 +236,6 @@ pub fn to_absolute(relative: &Location, base: &Location) -> Location {
     } else {
         Location::new(relative.row() + base.row() - 1, relative.column())
     }
-}
-
-/// Return `true` if the `Expr` is a reference to `${module}.${target}`.
-///
-/// Useful for, e.g., ensuring that a `Union` reference represents
-/// `typing.Union`.
-pub fn match_module_member(
-    expr: &Expr,
-    module: &str,
-    member: &str,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
-) -> bool {
-    // map(|call_path| dealias(call_path, import_aliases))
-    match_call_path(&collect_call_paths(expr), module, member, from_imports)
-}
-
-/// Return `true` if the `call_path` is a reference to `${module}.${target}`.
-///
-/// Optimized version of `match_module_member` for pre-computed call paths.
-pub fn match_call_path(
-    call_path: &[&str],
-    module: &str,
-    member: &str,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-) -> bool {
-    // If we have no segments, we can't ever match.
-    let num_segments = call_path.len();
-    if num_segments == 0 {
-        return false;
-    }
-
-    // If the last segment doesn't match the member, we can't ever match.
-    if call_path[num_segments - 1] != member {
-        return false;
-    }
-
-    // We now only need the module path, so throw out the member name.
-    let call_path = &call_path[..num_segments - 1];
-    let num_segments = call_path.len();
-
-    // Case (1a): We imported star from the parent (`from typing.re import *`,
-    // `Match`).
-    // Case (1b): We imported from the parent (`from typing.re import Match`,
-    // `Match`).
-    // Case (2): It's a builtin (like `list`).
-    if num_segments == 0
-        && (module.is_empty()
-            || from_imports
-                .get(module)
-                .map(|imports| imports.contains(member) || imports.contains("*"))
-                .unwrap_or(false))
-    {
-        return true;
-    }
-
-    // Case (3a): it's a fully qualified call path (`import typing`,
-    // `typing.re.Match`). Case (3b): it's a fully qualified call path (`import
-    // typing.re`, `typing.re.Match`).
-    if num_segments > 0
-        && module
-            .split('.')
-            .enumerate()
-            .all(|(index, segment)| index < num_segments && call_path[index] == segment)
-    {
-        return true;
-    }
-
-    // Case (4): We imported from the grandparent (`from typing import re`,
-    // `re.Match`)
-    if num_segments > 0 {
-        // Find the number of common segments.
-        // TODO(charlie): Rewrite to avoid this allocation.
-        let parts: Vec<&str> = module.split('.').collect();
-        let num_matches = (0..parts.len())
-            .take(num_segments)
-            .take_while(|i| parts[parts.len() - 1 - i] == call_path[num_segments - 1 - i])
-            .count();
-        if num_matches > 0 {
-            // Verify that we have an import of the final common segment, from the remaining
-            // parent.
-            let cut = parts.len() - num_matches;
-            // TODO(charlie): Rewrite to avoid this allocation.
-            let module = parts[..cut].join(".");
-            let member = parts[cut];
-            if from_imports
-                .get(&module.as_str())
-                .map(|imports| imports.contains(member))
-                .unwrap_or(false)
-            {
-                return true;
-            }
-        }
-    }
-
-    false
 }
 
 #[cfg(test)]

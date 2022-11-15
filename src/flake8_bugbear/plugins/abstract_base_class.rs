@@ -1,15 +1,16 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
-use crate::ast::helpers::{collect_call_paths, match_call_path};
+use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind};
 
 fn is_abc_class(
     bases: &[Expr],
     keywords: &[Keyword],
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
 ) -> bool {
     keywords.iter().any(|keyword| {
         keyword
@@ -18,15 +19,16 @@ fn is_abc_class(
             .as_ref()
             .map(|a| a == "metaclass")
             .unwrap_or(false)
-            && match_call_path(
-                &collect_call_paths(&keyword.node.value),
+            && match_module_member(
+                &keyword.node.value,
                 "abc",
                 "ABCMeta",
                 from_imports,
+                import_aliases,
             )
     }) || bases
         .iter()
-        .any(|base| match_call_path(&collect_call_paths(base), "abc", "ABC", from_imports))
+        .any(|base| match_module_member(base, "abc", "ABC", from_imports, import_aliases))
 }
 
 fn is_empty_body(body: &[Stmt]) -> bool {
@@ -42,22 +44,20 @@ fn is_empty_body(body: &[Stmt]) -> bool {
     })
 }
 
-fn is_abstractmethod(expr: &Expr, from_imports: &FnvHashMap<&str, FnvHashSet<&str>>) -> bool {
-    match_call_path(
-        &collect_call_paths(expr),
-        "abc",
-        "abstractmethod",
-        from_imports,
-    )
+fn is_abstractmethod(
+    expr: &Expr,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
+) -> bool {
+    match_module_member(expr, "abc", "abstractmethod", from_imports, import_aliases)
 }
 
-fn is_overload(expr: &Expr, from_imports: &FnvHashMap<&str, FnvHashSet<&str>>) -> bool {
-    match_call_path(
-        &collect_call_paths(expr),
-        "typing",
-        "overload",
-        from_imports,
-    )
+fn is_overload(
+    expr: &Expr,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
+) -> bool {
+    match_module_member(expr, "typing", "overload", from_imports, import_aliases)
 }
 
 pub fn abstract_base_class(
@@ -68,7 +68,14 @@ pub fn abstract_base_class(
     keywords: &[Keyword],
     body: &[Stmt],
 ) {
-    if bases.len() + keywords.len() == 1 && is_abc_class(bases, keywords, &checker.from_imports) {
+    if bases.len() + keywords.len() == 1
+        && is_abc_class(
+            bases,
+            keywords,
+            &checker.from_imports,
+            &checker.import_aliases,
+        )
+    {
         let mut has_abstract_method = false;
         for stmt in body {
             // https://github.com/PyCQA/flake8-bugbear/issues/293
@@ -91,28 +98,32 @@ pub fn abstract_base_class(
             {
                 let has_abstract_decorator = decorator_list
                     .iter()
-                    .any(|d| is_abstractmethod(d, &checker.from_imports));
+                    .any(|d| is_abstractmethod(d, &checker.from_imports, &checker.import_aliases));
 
                 has_abstract_method |= has_abstract_decorator;
 
-                if !has_abstract_decorator
-                    && is_empty_body(body)
-                    && !decorator_list
-                        .iter()
-                        .any(|d| is_overload(d, &checker.from_imports))
-                {
-                    checker.add_check(Check::new(
-                        CheckKind::EmptyMethodWithoutAbstractDecorator(name.to_string()),
-                        Range::from_located(stmt),
-                    ));
+                if checker.settings.enabled.contains(&CheckCode::B027) {
+                    if !has_abstract_decorator
+                        && is_empty_body(body)
+                        && !decorator_list
+                            .iter()
+                            .any(|d| is_overload(d, &checker.from_imports, &checker.import_aliases))
+                    {
+                        checker.add_check(Check::new(
+                            CheckKind::EmptyMethodWithoutAbstractDecorator(name.to_string()),
+                            Range::from_located(stmt),
+                        ));
+                    }
                 }
             }
         }
-        if !has_abstract_method {
-            checker.add_check(Check::new(
-                CheckKind::AbstractBaseClassWithoutAbstractMethod(name.to_string()),
-                Range::from_located(stmt),
-            ));
+        if checker.settings.enabled.contains(&CheckCode::B024) {
+            if !has_abstract_method {
+                checker.add_check(Check::new(
+                    CheckKind::AbstractBaseClassWithoutAbstractMethod(name.to_string()),
+                    Range::from_located(stmt),
+                ));
+            }
         }
     }
 }

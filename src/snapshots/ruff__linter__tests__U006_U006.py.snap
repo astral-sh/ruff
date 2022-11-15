@@ -9,7 +9,7 @@ expression: checks
     column: 9
   end_location:
     row: 4
-    column: 13
+    column: 20
   fix:
     patch:
       content: list
@@ -18,7 +18,7 @@ expression: checks
         column: 9
       end_location:
         row: 4
-        column: 13
+        column: 20
     applied: false
 - kind:
     UsePEP585Annotation: List
@@ -27,7 +27,7 @@ expression: checks
     column: 9
   end_location:
     row: 11
-    column: 20
+    column: 13
   fix:
     patch:
       content: list
@@ -36,6 +36,42 @@ expression: checks
         column: 9
       end_location:
         row: 11
-        column: 20
+        column: 13
+    applied: false
+- kind:
+    UsePEP585Annotation: List
+  location:
+    row: 18
+    column: 9
+  end_location:
+    row: 18
+    column: 15
+  fix:
+    patch:
+      content: list
+      location:
+        row: 18
+        column: 9
+      end_location:
+        row: 18
+        column: 15
+    applied: false
+- kind:
+    UsePEP585Annotation: List
+  location:
+    row: 25
+    column: 9
+  end_location:
+    row: 25
+    column: 14
+  fix:
+    patch:
+      content: list
+      location:
+        row: 25
+        column: 9
+      end_location:
+        row: 25
+        column: 14
     applied: false
 

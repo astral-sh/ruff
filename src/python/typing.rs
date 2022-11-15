@@ -2,7 +2,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use once_cell::sync::Lazy;
 use rustpython_ast::Expr;
 
-use crate::ast::helpers::{compose_call_path, dealias, match_call_path};
+use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 
 // See: https://pypi.org/project/typing-extensions/
 static TYPING_EXTENSIONS: Lazy<FnvHashSet<&'static str>> = Lazy::new(|| {
@@ -65,143 +65,143 @@ pub fn in_extensions(name: &str) -> bool {
 }
 
 // See: https://docs.python.org/3/library/typing.html
-const SUBSCRIPTS: &[&str] = &[
+const SUBSCRIPTS: &[(&str, &str)] = &[
     // builtins
-    "dict",
-    "frozenset",
-    "list",
-    "set",
-    "tuple",
-    "type",
+    ("", "dict"),
+    ("", "frozenset"),
+    ("", "list"),
+    ("", "set"),
+    ("", "tuple"),
+    ("", "type"),
     // `collections`
-    "collections.ChainMap",
-    "collections.Counter",
-    "collections.OrderedDict",
-    "collections.defaultdict",
-    "collections.deque",
+    ("collections", "ChainMap"),
+    ("collections", "Counter"),
+    ("collections", "OrderedDict"),
+    ("collections", "defaultdict"),
+    ("collections", "deque"),
     // `collections.abc`
-    "collections.abc.AsyncGenerator",
-    "collections.abc.AsyncIterable",
-    "collections.abc.AsyncIterator",
-    "collections.abc.Awaitable",
-    "collections.abc.ByteString",
-    "collections.abc.Callable",
-    "collections.abc.Collection",
-    "collections.abc.Container",
-    "collections.abc.Coroutine",
-    "collections.abc.Generator",
-    "collections.abc.ItemsView",
-    "collections.abc.Iterable",
-    "collections.abc.Iterator",
-    "collections.abc.KeysView",
-    "collections.abc.Mapping",
-    "collections.abc.MappingView",
-    "collections.abc.MutableMapping",
-    "collections.abc.MutableSequence",
-    "collections.abc.MutableSet",
-    "collections.abc.Reversible",
-    "collections.abc.Sequence",
-    "collections.abc.Set",
-    "collections.abc.ValuesView",
+    ("collections.abc", "AsyncGenerator"),
+    ("collections.abc", "AsyncIterable"),
+    ("collections.abc", "AsyncIterator"),
+    ("collections.abc", "Awaitable"),
+    ("collections.abc", "ByteString"),
+    ("collections.abc", "Callable"),
+    ("collections.abc", "Collection"),
+    ("collections.abc", "Container"),
+    ("collections.abc", "Coroutine"),
+    ("collections.abc", "Generator"),
+    ("collections.abc", "ItemsView"),
+    ("collections.abc", "Iterable"),
+    ("collections.abc", "Iterator"),
+    ("collections.abc", "KeysView"),
+    ("collections.abc", "Mapping"),
+    ("collections.abc", "MappingView"),
+    ("collections.abc", "MutableMapping"),
+    ("collections.abc", "MutableSequence"),
+    ("collections.abc", "MutableSet"),
+    ("collections.abc", "Reversible"),
+    ("collections.abc", "Sequence"),
+    ("collections.abc", "Set"),
+    ("collections.abc", "ValuesView"),
     // `contextlib`
-    "contextlib.AbstractAsyncContextManager",
-    "contextlib.AbstractContextManager",
+    ("contextlib", "AbstractAsyncContextManager"),
+    ("contextlib", "AbstractContextManager"),
     // `re`
-    "re.Match",
-    "re.Pattern",
+    ("re", "Match"),
+    ("re", "Pattern"),
     // `typing`
-    "typing.AbstractSet",
-    "typing.AsyncContextManager",
-    "typing.AsyncGenerator",
-    "typing.AsyncIterator",
-    "typing.Awaitable",
-    "typing.BinaryIO",
-    "typing.ByteString",
-    "typing.Callable",
-    "typing.ChainMap",
-    "typing.ClassVar",
-    "typing.Collection",
-    "typing.Concatenate",
-    "typing.Container",
-    "typing.ContextManager",
-    "typing.Coroutine",
-    "typing.Counter",
-    "typing.DefaultDict",
-    "typing.Deque",
-    "typing.Dict",
-    "typing.Final",
-    "typing.FrozenSet",
-    "typing.Generator",
-    "typing.Generic",
-    "typing.IO",
-    "typing.ItemsView",
-    "typing.Iterable",
-    "typing.Iterator",
-    "typing.KeysView",
-    "typing.List",
-    "typing.Mapping",
-    "typing.Match",
-    "typing.MutableMapping",
-    "typing.MutableSequence",
-    "typing.MutableSet",
-    "typing.Optional",
-    "typing.OrderedDict",
-    "typing.Pattern",
-    "typing.Reversible",
-    "typing.Sequence",
-    "typing.Set",
-    "typing.TextIO",
-    "typing.Tuple",
-    "typing.Type",
-    "typing.TypeGuard",
-    "typing.Union",
-    "typing.Unpack",
-    "typing.ValuesView",
+    ("typing", "AbstractSet"),
+    ("typing", "AsyncContextManager"),
+    ("typing", "AsyncGenerator"),
+    ("typing", "AsyncIterator"),
+    ("typing", "Awaitable"),
+    ("typing", "BinaryIO"),
+    ("typing", "ByteString"),
+    ("typing", "Callable"),
+    ("typing", "ChainMap"),
+    ("typing", "ClassVar"),
+    ("typing", "Collection"),
+    ("typing", "Concatenate"),
+    ("typing", "Container"),
+    ("typing", "ContextManager"),
+    ("typing", "Coroutine"),
+    ("typing", "Counter"),
+    ("typing", "DefaultDict"),
+    ("typing", "Deque"),
+    ("typing", "Dict"),
+    ("typing", "Final"),
+    ("typing", "FrozenSet"),
+    ("typing", "Generator"),
+    ("typing", "Generic"),
+    ("typing", "IO"),
+    ("typing", "ItemsView"),
+    ("typing", "Iterable"),
+    ("typing", "Iterator"),
+    ("typing", "KeysView"),
+    ("typing", "List"),
+    ("typing", "Mapping"),
+    ("typing", "Match"),
+    ("typing", "MutableMapping"),
+    ("typing", "MutableSequence"),
+    ("typing", "MutableSet"),
+    ("typing", "Optional"),
+    ("typing", "OrderedDict"),
+    ("typing", "Pattern"),
+    ("typing", "Reversible"),
+    ("typing", "Sequence"),
+    ("typing", "Set"),
+    ("typing", "TextIO"),
+    ("typing", "Tuple"),
+    ("typing", "Type"),
+    ("typing", "TypeGuard"),
+    ("typing", "Union"),
+    ("typing", "Unpack"),
+    ("typing", "ValuesView"),
     // `typing.io`
-    "typing.io.BinaryIO",
-    "typing.io.IO",
-    "typing.io.TextIO",
+    ("typing.io", "BinaryIO"),
+    ("typing.io", "IO"),
+    ("typing.io", "TextIO"),
     // `typing.re`
-    "typing.re.Match",
-    "typing.re.Pattern",
+    ("typing.re", "Match"),
+    ("typing.re", "Pattern"),
     // `typing_extensions`
-    "typing_extensions.AsyncContextManager",
-    "typing_extensions.AsyncGenerator",
-    "typing_extensions.AsyncIterable",
-    "typing_extensions.AsyncIterator",
-    "typing_extensions.Awaitable",
-    "typing_extensions.ChainMap",
-    "typing_extensions.ClassVar",
-    "typing_extensions.Concatenate",
-    "typing_extensions.ContextManager",
-    "typing_extensions.Coroutine",
-    "typing_extensions.Counter",
-    "typing_extensions.DefaultDict",
-    "typing_extensions.Deque",
-    "typing_extensions.Type",
+    ("typing_extensions", "AsyncContextManager"),
+    ("typing_extensions", "AsyncGenerator"),
+    ("typing_extensions", "AsyncIterable"),
+    ("typing_extensions", "AsyncIterator"),
+    ("typing_extensions", "Awaitable"),
+    ("typing_extensions", "ChainMap"),
+    ("typing_extensions", "ClassVar"),
+    ("typing_extensions", "Concatenate"),
+    ("typing_extensions", "ContextManager"),
+    ("typing_extensions", "Coroutine"),
+    ("typing_extensions", "Counter"),
+    ("typing_extensions", "DefaultDict"),
+    ("typing_extensions", "Deque"),
+    ("typing_extensions", "Type"),
     // `weakref`
-    "weakref.WeakKeyDictionary",
-    "weakref.WeakSet",
-    "weakref.WeakValueDictionary",
+    ("weakref", "WeakKeyDictionary"),
+    ("weakref", "WeakSet"),
+    ("weakref", "WeakValueDictionary"),
 ];
 
 // See: https://docs.python.org/3/library/typing.html
-const PEP_583_SUBSCRIPTS: &[&str] = &[
+const PEP_583_SUBSCRIPTS: &[(&str, &str)] = &[
     // `typing`
-    "typing.Annotated",
+    ("typing", "Annotated"),
     // `typing_extensions`
-    "typing_extensions.Annotated",
+    ("typing_extensions", "Annotated"),
 ];
 
 // See: https://peps.python.org/pep-0585/
-const PEP_585_BUILTINS_ELIGIBLE: &[&str] = &[
-    "typing.Dict",
-    "typing.FrozenSet",
-    "typing.List",
-    "typing.Set",
-    "typing.Tuple",
-    "typing.Type",
-    "typing_extensions.Type",
+const PEP_585_BUILTINS_ELIGIBLE: &[(&str, &str)] = &[
+    ("typing", "Dict"),
+    ("typing", "FrozenSet"),
+    ("typing", "List"),
+    ("typing", "Set"),
+    ("typing", "Tuple"),
+    ("typing", "Type"),
+    ("typing_extensions", "Type"),
 ];
 
 pub enum SubscriptKind {
@@ -214,15 +214,15 @@ pub fn match_annotated_subscript(
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
     import_aliases: &FnvHashMap<&str, &str>,
 ) -> Option<SubscriptKind> {
-    if let Some(call_path) = compose_call_path(expr) {
-        let call_path = dealias(call_path, import_aliases);
-        for target in SUBSCRIPTS {
-            if match_call_path(&call_path, target, from_imports) {
+    let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
+    if !call_path.is_empty() {
+        for (module, member) in SUBSCRIPTS {
+            if match_call_path(&call_path, module, member, from_imports) {
                 return Some(SubscriptKind::AnnotatedSubscript);
             }
         }
-        for target in PEP_583_SUBSCRIPTS {
-            if match_call_path(&call_path, target, from_imports) {
+        for (module, member) in PEP_583_SUBSCRIPTS {
+            if match_call_path(&call_path, module, member, from_imports) {
                 return Some(SubscriptKind::PEP593AnnotatedSubscript);
             }
         }
@@ -231,17 +231,16 @@ pub fn match_annotated_subscript(
 }
 
 /// Returns `true` if `Expr` represents a reference to a typing object with a
-/// PEP 585 built-in. Note that none of the PEP 585 built-ins are in
-/// `typing_extensions`.
+/// PEP 585 built-in.
 pub fn is_pep585_builtin(
     expr: &Expr,
     from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
     import_aliases: &FnvHashMap<&str, &str>,
 ) -> bool {
-    if let Some(call_path) = compose_call_path(expr) {
-        let call_path = dealias(call_path, import_aliases);
-        for target in PEP_585_BUILTINS_ELIGIBLE {
-            if match_call_path(&call_path, target, from_imports) {
+    let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
+    if !call_path.is_empty() {
+        for (module, member) in PEP_585_BUILTINS_ELIGIBLE {
+            if match_call_path(&call_path, module, member, from_imports) {
                 return true;
             }
         }

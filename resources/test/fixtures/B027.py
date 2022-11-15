@@ -2,7 +2,6 @@
 Should emit:
 B027 - on lines 12, 15, 18, 22, 30
 """
-
 import abc
 from abc import ABC
 from abc import abstractmethod
@@ -28,7 +27,7 @@ class AbstractClass(ABC):
         pass
 
     @notabstract
-    def empty_5(self):  # error
+    def abstract_0(self):
         ...
 
     @abstractmethod

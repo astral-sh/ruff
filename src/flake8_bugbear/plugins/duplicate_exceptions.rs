@@ -21,20 +21,21 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
     )
 }
 
-pub fn duplicate_handler_exceptions(
+fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
-    expr: &Expr,
-    elts: &[Expr],
-) -> BTreeSet<String> {
-    let mut seen: BTreeSet<String> = Default::default();
-    let mut duplicates: BTreeSet<String> = Default::default();
+    expr: &'a Expr,
+    elts: &'a [Expr],
+) -> BTreeSet<Vec<&'a str>> {
+    let mut seen: BTreeSet<Vec<&str>> = Default::default();
+    let mut duplicates: BTreeSet<Vec<&str>> = Default::default();
     let mut unique_elts: Vec<&Expr> = Default::default();
     for type_ in elts {
-        if let Some(name) = helpers::compose_call_path(type_) {
-            if seen.contains(&name) {
-                duplicates.insert(name);
+        let call_path = helpers::collect_call_paths(type_);
+        if !call_path.is_empty() {
+            if seen.contains(&call_path) {
+                duplicates.insert(call_path);
             } else {
-                seen.insert(name);
+                seen.insert(call_path);
                 unique_elts.push(type_);
             }
         }
@@ -45,7 +46,11 @@ pub fn duplicate_handler_exceptions(
         if !duplicates.is_empty() {
             let mut check = Check::new(
                 CheckKind::DuplicateHandlerException(
-                    duplicates.into_iter().sorted().collect::<Vec<String>>(),
+                    duplicates
+                        .into_iter()
+                        .map(|call_path| call_path.join("."))
+                        .sorted()
+                        .collect::<Vec<String>>(),
                 ),
                 Range::from_located(expr),
             );
@@ -70,19 +75,20 @@ pub fn duplicate_handler_exceptions(
 }
 
 pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Excepthandler]) {
-    let mut seen: BTreeSet<String> = Default::default();
-    let mut duplicates: BTreeSet<String> = Default::default();
+    let mut seen: BTreeSet<Vec<&str>> = Default::default();
+    let mut duplicates: BTreeSet<Vec<&str>> = Default::default();
     for handler in handlers {
         match &handler.node {
             ExcepthandlerKind::ExceptHandler { type_, .. } => {
                 if let Some(type_) = type_ {
                     match &type_.node {
                         ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
-                            if let Some(name) = helpers::compose_call_path(type_) {
-                                if seen.contains(&name) {
-                                    duplicates.insert(name);
+                            let call_path = helpers::collect_call_paths(type_);
+                            if !call_path.is_empty() {
+                                if seen.contains(&call_path) {
+                                    duplicates.insert(call_path);
                                 } else {
-                                    seen.insert(name);
+                                    seen.insert(call_path);
                                 }
                             }
                         }
@@ -105,7 +111,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Exce
     if checker.settings.enabled.contains(&CheckCode::B025) {
         for duplicate in duplicates.into_iter().sorted() {
             checker.add_check(Check::new(
-                CheckKind::DuplicateTryBlockException(duplicate),
+                CheckKind::DuplicateTryBlockException(duplicate.join(".")),
                 Range::from_located(stmt),
             ));
         }

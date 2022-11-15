@@ -12,7 +12,9 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast::helpers::{collect_call_paths, extract_handler_names, match_call_path};
+use crate::ast::helpers::{
+    collect_call_paths, dealias_call_path, extract_handler_names, match_call_path,
+};
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -156,26 +158,10 @@ impl<'a> Checker<'a> {
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
-<<<<<<< HEAD
     pub fn match_typing_module(&self, call_path: &[&str], target: &str) -> bool {
         match_call_path(call_path, "typing", target, &self.from_imports)
             || (typing::in_extensions(target)
                 && match_call_path(call_path, "typing_extensions", target, &self.from_imports))
-=======
-    pub fn match_typing_module(&self, expr: &Expr, target: &str) -> bool {
-        match_module_member(
-            expr,
-            &format!("typing.{target}"),
-            &self.from_imports,
-            &self.import_aliases,
-        ) || (typing::in_extensions(target)
-            && match_module_member(
-                expr,
-                &format!("typing_extensions.{target}"),
-                &self.from_imports,
-                &self.import_aliases,
-            ))
->>>>>>> 4b06237 (Track aliases)
     }
 }
 
@@ -1658,7 +1644,7 @@ where
                 args,
                 keywords,
             } => {
-                let call_path = collect_call_paths(func);
+                let call_path = dealias_call_path(collect_call_paths(func), &self.import_aliases);
                 if self.match_typing_module(&call_path, "ForwardRef") {
                     self.visit_expr(func);
                     for expr in args {
@@ -2768,7 +2754,6 @@ pub fn check_ast(
 
     // Check docstrings.
     checker.check_definitions();
-    // println!("{:?}", checker.import_aliases);
 
     checker.checks
 }

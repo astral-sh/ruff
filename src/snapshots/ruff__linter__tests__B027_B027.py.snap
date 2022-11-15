@@ -5,64 +5,37 @@ expression: checks
 - kind:
     EmptyMethodWithoutAbstractDecorator: AbstractClass
   location:
-    row: 13
+    row: 12
     column: 4
   end_location:
-    row: 16
+    row: 15
     column: 4
   fix: ~
 - kind:
     EmptyMethodWithoutAbstractDecorator: AbstractClass
   location:
-    row: 16
+    row: 15
     column: 4
   end_location:
-    row: 19
+    row: 18
     column: 4
   fix: ~
 - kind:
     EmptyMethodWithoutAbstractDecorator: AbstractClass
   location:
-    row: 19
+    row: 18
     column: 4
   end_location:
-    row: 23
+    row: 22
     column: 4
   fix: ~
 - kind:
     EmptyMethodWithoutAbstractDecorator: AbstractClass
   location:
-    row: 23
+    row: 22
     column: 4
   end_location:
-    row: 30
-    column: 4
-  fix: ~
-- kind:
-    EmptyMethodWithoutAbstractDecorator: AbstractClass
-  location:
-    row: 31
-    column: 4
-  end_location:
-    row: 34
-    column: 4
-  fix: ~
-- kind:
-    EmptyMethodWithoutAbstractDecorator: AbstractClass
-  location:
-    row: 80
-    column: 4
-  end_location:
-    row: 83
-    column: 4
-  fix: ~
-- kind:
-    EmptyMethodWithoutAbstractDecorator: AbstractClass
-  location:
-    row: 84
-    column: 4
-  end_location:
-    row: 87
+    row: 29
     column: 4
   fix: ~
 
