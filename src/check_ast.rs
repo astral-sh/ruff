@@ -873,9 +873,14 @@ where
                     flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
                 }
             }
-            StmtKind::For { target, body, .. } => {
+            StmtKind::For {
+                target, body, iter, ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::B007) {
                     flake8_bugbear::plugins::unused_loop_control_variable(self, target, body);
+                }
+                if self.settings.enabled.contains(&CheckCode::B020) {
+                    flake8_bugbear::plugins::loop_variable_overrides_iterator(self, target, iter);
                 }
             }
             StmtKind::Try { handlers, .. } => {
