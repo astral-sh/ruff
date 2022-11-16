@@ -382,7 +382,10 @@ other-attribute = 1
                         "longMessage".to_string(),
                         "maxDiff".to_string(),
                     ]),
-                    classmethod_decorators: Some(vec!["classmethod".to_string()]),
+                    classmethod_decorators: Some(vec![
+                        "classmethod".to_string(),
+                        "pydantic.validator".to_string()
+                    ]),
                     staticmethod_decorators: Some(vec!["staticmethod".to_string()]),
                 }),
             }
