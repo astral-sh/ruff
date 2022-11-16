@@ -2,7 +2,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
 use crate::ast::helpers::{
-    collect_call_paths, compose_call_path, dealias_call_path, match_call_path,
+    collect_call_paths, compose_call_path, dealias_call_path, match_call_path, to_module_and_member,
 };
 use crate::ast::types::Range;
 use crate::ast::visitor;
@@ -104,14 +104,7 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
-        .map(|s| {
-            let s = s.as_str();
-            if let Some(index) = s.rfind('.') {
-                (&s[..index], &s[index + 1..])
-            } else {
-                ("", s)
-            }
-        })
+        .map(|target| to_module_and_member(target))
         .collect();
     let mut visitor = ArgumentDefaultVisitor {
         checks: vec![],

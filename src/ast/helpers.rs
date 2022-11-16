@@ -239,6 +239,15 @@ pub fn format_import_from(level: Option<&usize>, module: Option<&String>) -> Str
     module_name
 }
 
+/// Split a target string (like `typing.List`) into (`typing`, `List`).
+pub fn to_module_and_member(target: &str) -> (&str, &str) {
+    if let Some(index) = target.rfind('.') {
+        (&target[..index], &target[index + 1..])
+    } else {
+        ("", target)
+    }
+}
+
 /// Convert a location within a file (relative to `base`) to an absolute
 /// position.
 pub fn to_absolute(relative: &Location, base: &Location) -> Location {

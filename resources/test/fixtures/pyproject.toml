@@ -33,6 +33,7 @@ ignore-names = [
 ]
 classmethod-decorators = [
   "classmethod",
+  "pydantic.validator",
 ]
 staticmethod-decorators = [
   "staticmethod",
