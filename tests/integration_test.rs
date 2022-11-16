@@ -83,7 +83,7 @@ fn test_stdin_autofix_when_no_issues_should_still_print_contents() -> Result<()>
 fn test_show_source() -> Result<()> {
     let mut cmd = Command::cargo_bin(crate_name!())?;
     let output = cmd
-        .args(&["-", "--show-source"])
+        .args(["-", "--show-source"])
         .write_stdin("l = 1")
         .assert()
         .failure();
