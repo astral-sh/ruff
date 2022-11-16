@@ -88,18 +88,22 @@ impl fmt::Display for Message {
             self.kind.code().as_ref().red().bold(),
             self.kind.body(),
         );
-        let slices = if self.show_source && self.source.is_some() && self.range.is_some() {
-            vec![Slice {
-                source: self.source.as_ref().unwrap(),
-                line_start: self.location.row(),
-                origin: None,
-                fold: false,
-                annotations: vec![SourceAnnotation {
-                    label: "",
-                    annotation_type: AnnotationType::Error,
-                    range: self.range.unwrap(),
-                }],
-            }]
+        let slices = if self.show_source {
+            if let (Some(source), Some(range)) = (&self.source, self.range) {
+                vec![Slice {
+                    source,
+                    line_start: self.location.row(),
+                    origin: None,
+                    fold: false,
+                    annotations: vec![SourceAnnotation {
+                        label: "",
+                        annotation_type: AnnotationType::Error,
+                        range,
+                    }],
+                }]
+            } else {
+                vec![]
+            }
         } else {
             vec![]
         };
