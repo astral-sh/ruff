@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use crate::ast;
 use fnv::FnvHashMap;
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -37,16 +38,7 @@ impl Importable for AliasData<'_> {
 
 impl Importable for ImportFromData<'_> {
     fn module_name(&self) -> String {
-        let mut module_name = String::new();
-        if let Some(level) = self.level {
-            if level > &0 {
-                module_name.push_str(&".".repeat(*level));
-            }
-        }
-        if let Some(module) = self.module {
-            module_name.push_str(module);
-        }
-        module_name
+        ast::helpers::format_import_from(self.level, self.module)
     }
 
     fn module_base(&self) -> String {

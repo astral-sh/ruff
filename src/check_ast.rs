@@ -222,7 +222,7 @@ where
                     for name in names {
                         for scope in self.scopes.iter_mut().skip(GLOBAL_SCOPE_INDEX + 1) {
                             scope.values.insert(
-                                name.to_string(),
+                                name,
                                 Binding {
                                     kind: BindingKind::Assignment,
                                     used: Some((global_scope_id, Range::from_located(stmt))),
@@ -397,7 +397,7 @@ where
                     self.visit_expr(expr);
                 }
                 self.add_binding(
-                    name.to_string(),
+                    name,
                     Binding {
                         kind: BindingKind::Definition,
                         used: None,
@@ -502,7 +502,7 @@ where
                         let name = alias.node.name.split('.').next().unwrap();
                         let full_name = &alias.node.name;
                         self.add_binding(
-                            name.to_string(),
+                            name,
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(
                                     name.to_string(),
@@ -524,7 +524,7 @@ where
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         let full_name = &alias.node.name;
                         self.add_binding(
-                            name.to_string(),
+                            name,
                             Binding {
                                 kind: BindingKind::Importation(
                                     name.to_string(),
@@ -657,7 +657,7 @@ where
                     if let Some("__future__") = module.as_deref() {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         self.add_binding(
-                            name.to_string(),
+                            name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
                                 // Always mark `__future__` imports as used.
@@ -694,16 +694,10 @@ where
                             ));
                         }
                     } else if alias.node.name == "*" {
-                        let module_name = format!(
-                            "{}{}",
-                            ".".repeat(level.unwrap_or_default()),
-                            module.clone().unwrap_or_else(|| "module".to_string()),
-                        );
-
                         self.add_binding(
-                            module_name.to_string(),
+                            "*",
                             Binding {
-                                kind: BindingKind::StarImportation,
+                                kind: BindingKind::StarImportation(*level, module.clone()),
                                 used: None,
                                 range: Range::from_located(stmt),
                             },
@@ -714,7 +708,9 @@ where
                                 [*(self.scope_stack.last().expect("No current scope found."))];
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.add_check(Check::new(
-                                    CheckKind::ImportStarNotPermitted(module_name.to_string()),
+                                    CheckKind::ImportStarNotPermitted(helpers::format_import_from(
+                                        level, module,
+                                    )),
                                     Range::from_located(stmt),
                                 ));
                             }
@@ -722,7 +718,9 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::F403) {
                             self.add_check(Check::new(
-                                CheckKind::ImportStarUsed(module_name.to_string()),
+                                CheckKind::ImportStarUsed(helpers::format_import_from(
+                                    level, module,
+                                )),
                                 Range::from_located(stmt),
                             ));
                         }
@@ -746,7 +744,7 @@ where
                             Some(parent) => format!("{}.{}", parent, alias.node.name),
                         };
                         self.add_binding(
-                            name.to_string(),
+                            name,
                             Binding {
                                 kind: BindingKind::FromImportation(
                                     name.to_string(),
@@ -1017,7 +1015,7 @@ where
         if let StmtKind::ClassDef { name, .. } = &stmt.node {
             self.pop_scope();
             self.add_binding(
-                name.to_string(),
+                name,
                 Binding {
                     kind: BindingKind::ClassDefinition,
                     used: None,
@@ -1130,7 +1128,7 @@ where
 
                         self.check_builtin_shadowing(id, Range::from_located(expr), true);
 
-                        self.handle_node_store(expr, self.current_parent());
+                        self.handle_node_store(id, expr, self.current_parent());
                     }
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
@@ -1860,8 +1858,9 @@ where
                             false,
                         );
 
-                        if self.current_scope().values.contains_key(name) {
+                        if self.current_scope().values.contains_key(&name.as_str()) {
                             self.handle_node_store(
+                                name,
                                 &Expr::new(
                                     excepthandler.location,
                                     excepthandler.end_location.unwrap(),
@@ -1874,8 +1873,9 @@ where
                             );
                         }
 
-                        let definition = self.current_scope().values.get(name).cloned();
+                        let definition = self.current_scope().values.get(&name.as_str()).cloned();
                         self.handle_node_store(
+                            name,
                             &Expr::new(
                                 excepthandler.location,
                                 excepthandler.end_location.unwrap(),
@@ -1892,7 +1892,7 @@ where
                         if let Some(binding) = {
                             let scope = &mut self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found."))];
-                            &scope.values.remove(name)
+                            &scope.values.remove(&name.as_str())
                         } {
                             if binding.used.is_none() {
                                 if self.settings.enabled.contains(&CheckCode::F841) {
@@ -1907,7 +1907,7 @@ where
                         if let Some(binding) = definition {
                             let scope = &mut self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found."))];
-                            scope.values.insert(name.to_string(), binding);
+                            scope.values.insert(name, binding);
                         }
                     }
                     None => walk_excepthandler(self, excepthandler),
@@ -1951,7 +1951,7 @@ where
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
         self.add_binding(
-            arg.node.arg.to_string(),
+            &arg.node.arg,
             Binding {
                 kind: BindingKind::Argument,
                 used: None,
@@ -2016,7 +2016,7 @@ fn try_mark_used(scope: &mut Scope, scope_id: usize, id: &str, expr: &Expr) -> b
     };
 
     // Mark the sub-importation as used.
-    if let Some(binding) = scope.values.get_mut(&alias) {
+    if let Some(binding) = scope.values.get_mut(alias.as_str()) {
         binding.used = Some((scope_id, Range::from_located(expr)));
     }
     true
@@ -2052,7 +2052,7 @@ impl<'a> Checker<'a> {
 
         for builtin in BUILTINS {
             scope.values.insert(
-                (*builtin).to_string(),
+                builtin,
                 Binding {
                     kind: BindingKind::Builtin,
                     range: Default::default(),
@@ -2062,7 +2062,7 @@ impl<'a> Checker<'a> {
         }
         for builtin in MAGIC_GLOBALS {
             scope.values.insert(
-                (*builtin).to_string(),
+                builtin,
                 Binding {
                     kind: BindingKind::Builtin,
                     range: Default::default(),
@@ -2090,23 +2090,26 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn add_binding(&mut self, name: String, binding: Binding) {
+    fn add_binding<'b>(&mut self, name: &'b str, binding: Binding)
+    where
+        'b: 'a,
+    {
         if self.settings.enabled.contains(&CheckCode::F402) {
             let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if let Some(existing) = scope.values.get(&name) {
                 if matches!(binding.kind, BindingKind::LoopVar)
                     && matches!(
                         existing.kind,
-                        BindingKind::Importation(_, _, _)
-                            | BindingKind::FromImportation(_, _, _)
-                            | BindingKind::SubmoduleImportation(_, _, _)
-                            | BindingKind::StarImportation
+                        BindingKind::Importation(..)
+                            | BindingKind::FromImportation(..)
+                            | BindingKind::SubmoduleImportation(..)
+                            | BindingKind::StarImportation(..)
                             | BindingKind::FutureImportation
                     )
                 {
                     self.add_check(Check::new(
                         CheckKind::ImportShadowedByLoopVar(
-                            name.clone(),
+                            name.to_string(),
                             existing.range.location.row(),
                         ),
                         binding.range,
@@ -2164,16 +2167,16 @@ impl<'a> Checker<'a> {
                     let mut from_list = vec![];
                     for scope_index in self.scope_stack.iter().rev() {
                         let scope = &self.scopes[*scope_index];
-                        for (name, binding) in scope.values.iter() {
-                            if matches!(binding.kind, BindingKind::StarImportation) {
-                                from_list.push(name.to_string());
+                        for binding in scope.values.values() {
+                            if let BindingKind::StarImportation(level, module) = &binding.kind {
+                                from_list.push(helpers::format_import_from(level, module));
                             }
                         }
                     }
                     from_list.sort();
 
                     self.add_check(Check::new(
-                        CheckKind::ImportStarUsage(id.clone(), from_list),
+                        CheckKind::ImportStarUsage(id.to_string(), from_list),
                         Range::from_located(expr),
                     ));
                 }
@@ -2204,113 +2207,112 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn handle_node_store(&mut self, expr: &Expr, parent: &Stmt) {
-        if let ExprKind::Name { id, .. } = &expr.node {
-            if self.settings.enabled.contains(&CheckCode::F823) {
-                let scopes: Vec<&Scope> = self
-                    .scope_stack
-                    .iter()
-                    .map(|index| &self.scopes[*index])
-                    .collect();
-                if let Some(check) = pyflakes::checks::undefined_local(&scopes, id) {
-                    self.add_check(check);
-                }
+    fn handle_node_store<'b>(&mut self, id: &'b str, expr: &Expr, parent: &Stmt)
+    where
+        'b: 'a,
+    {
+        if self.settings.enabled.contains(&CheckCode::F823) {
+            let scopes: Vec<&Scope> = self
+                .scope_stack
+                .iter()
+                .map(|index| &self.scopes[*index])
+                .collect();
+            if let Some(check) = pyflakes::checks::undefined_local(&scopes, id) {
+                self.add_check(check);
             }
+        }
 
-            if self.settings.enabled.contains(&CheckCode::N806) {
-                if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
-                    pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
-                }
+        if self.settings.enabled.contains(&CheckCode::N806) {
+            if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
+                pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
             }
+        }
 
-            if self.settings.enabled.contains(&CheckCode::N815) {
-                if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
-                    pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id)
-                }
+        if self.settings.enabled.contains(&CheckCode::N815) {
+            if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
+                pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id)
             }
+        }
 
-            if self.settings.enabled.contains(&CheckCode::N816) {
-                if matches!(self.current_scope().kind, ScopeKind::Module) {
-                    pep8_naming::plugins::mixed_case_variable_in_global_scope(
-                        self, expr, parent, id,
-                    )
-                }
+        if self.settings.enabled.contains(&CheckCode::N816) {
+            if matches!(self.current_scope().kind, ScopeKind::Module) {
+                pep8_naming::plugins::mixed_case_variable_in_global_scope(self, expr, parent, id)
             }
+        }
 
-            if matches!(parent.node, StmtKind::AnnAssign { value: None, .. }) {
-                self.add_binding(
-                    id.to_string(),
-                    Binding {
-                        kind: BindingKind::Annotation,
-                        used: None,
-                        range: Range::from_located(expr),
-                    },
-                );
-                return;
-            }
-
-            // TODO(charlie): Include comprehensions here.
-            if matches!(
-                parent.node,
-                StmtKind::For { .. } | StmtKind::AsyncFor { .. }
-            ) {
-                self.add_binding(
-                    id.to_string(),
-                    Binding {
-                        kind: BindingKind::LoopVar,
-                        used: None,
-                        range: Range::from_located(expr),
-                    },
-                );
-                return;
-            }
-
-            if operations::is_unpacking_assignment(parent) {
-                self.add_binding(
-                    id.to_string(),
-                    Binding {
-                        kind: BindingKind::Binding,
-                        used: None,
-                        range: Range::from_located(expr),
-                    },
-                );
-                return;
-            }
-
-            let current =
-                &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-            if id == "__all__"
-                && matches!(current.kind, ScopeKind::Module)
-                && matches!(
-                    parent.node,
-                    StmtKind::Assign { .. }
-                        | StmtKind::AugAssign { .. }
-                        | StmtKind::AnnAssign { .. }
-                )
-            {
-                self.add_binding(
-                    id.to_string(),
-                    Binding {
-                        kind: BindingKind::Export(extract_all_names(parent, current)),
-                        used: None,
-                        range: Range::from_located(expr),
-                    },
-                );
-                return;
-            }
-
+        if matches!(parent.node, StmtKind::AnnAssign { value: None, .. }) {
             self.add_binding(
-                id.to_string(),
+                id,
                 Binding {
-                    kind: BindingKind::Assignment,
+                    kind: BindingKind::Annotation,
                     used: None,
                     range: Range::from_located(expr),
                 },
             );
+            return;
         }
+
+        // TODO(charlie): Include comprehensions here.
+        if matches!(
+            parent.node,
+            StmtKind::For { .. } | StmtKind::AsyncFor { .. }
+        ) {
+            self.add_binding(
+                id,
+                Binding {
+                    kind: BindingKind::LoopVar,
+                    used: None,
+                    range: Range::from_located(expr),
+                },
+            );
+            return;
+        }
+
+        if operations::is_unpacking_assignment(parent) {
+            self.add_binding(
+                id,
+                Binding {
+                    kind: BindingKind::Binding,
+                    used: None,
+                    range: Range::from_located(expr),
+                },
+            );
+            return;
+        }
+
+        let current = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        if id == "__all__"
+            && matches!(current.kind, ScopeKind::Module)
+            && matches!(
+                parent.node,
+                StmtKind::Assign { .. } | StmtKind::AugAssign { .. } | StmtKind::AnnAssign { .. }
+            )
+        {
+            self.add_binding(
+                id,
+                Binding {
+                    kind: BindingKind::Export(extract_all_names(parent, current)),
+                    used: None,
+                    range: Range::from_located(expr),
+                },
+            );
+            return;
+        }
+
+        self.add_binding(
+            id,
+            Binding {
+                kind: BindingKind::Assignment,
+                used: None,
+                range: Range::from_located(expr),
+            },
+        );
     }
 
-    fn handle_node_delete(&mut self, expr: &Expr) {
+    fn handle_node_delete<'b>(&mut self, expr: &'b Expr)
+    where
+        'b: 'a,
+    {
         if let ExprKind::Name { id, .. } = &expr.node {
             if operations::on_conditional_branch(
                 &mut self
@@ -2324,10 +2326,11 @@ impl<'a> Checker<'a> {
 
             let scope =
                 &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-            if scope.values.remove(id).is_none() && self.settings.enabled.contains(&CheckCode::F821)
+            if scope.values.remove(&id.as_str()).is_none()
+                && self.settings.enabled.contains(&CheckCode::F821)
             {
                 self.add_check(Check::new(
-                    CheckKind::UndefinedName(id.clone()),
+                    CheckKind::UndefinedName(id.to_string()),
                     Range::from_located(expr),
                 ))
             }
@@ -2459,16 +2462,19 @@ impl<'a> Checker<'a> {
 
         let mut checks: Vec<Check> = vec![];
         for scope in self.dead_scopes.iter().map(|index| &self.scopes[*index]) {
-            let all_binding = scope.values.get("__all__");
-            let all_names = all_binding.and_then(|binding| match &binding.kind {
-                BindingKind::Export(names) => Some(names),
-                _ => None,
-            });
+            let all_binding: Option<&Binding> = scope.values.get("__all__");
+            let all_names: Option<Vec<&str>> =
+                all_binding.and_then(|binding| match &binding.kind {
+                    BindingKind::Export(names) => {
+                        Some(names.iter().map(|name| name.as_str()).collect())
+                    }
+                    _ => None,
+                });
 
             if self.settings.enabled.contains(&CheckCode::F822) {
                 if !scope.import_starred && !self.path.ends_with("__init__.py") {
                     if let Some(all_binding) = all_binding {
-                        if let Some(names) = all_names {
+                        if let Some(names) = &all_names {
                             for name in names {
                                 if !scope.values.contains_key(name) {
                                     checks.push(Check::new(
@@ -2485,11 +2491,11 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::F405) {
                 if scope.import_starred {
                     if let Some(all_binding) = all_binding {
-                        if let Some(names) = all_names {
+                        if let Some(names) = &all_names {
                             let mut from_list = vec![];
-                            for (name, binding) in scope.values.iter() {
-                                if matches!(binding.kind, BindingKind::StarImportation) {
-                                    from_list.push(name.to_string());
+                            for binding in scope.values.values() {
+                                if let BindingKind::StarImportation(level, module) = &binding.kind {
+                                    from_list.push(helpers::format_import_from(level, module));
                                 }
                             }
                             from_list.sort();
@@ -2497,7 +2503,10 @@ impl<'a> Checker<'a> {
                             for name in names {
                                 if !scope.values.contains_key(name) {
                                     checks.push(Check::new(
-                                        CheckKind::ImportStarUsage(name.clone(), from_list.clone()),
+                                        CheckKind::ImportStarUsage(
+                                            name.to_string(),
+                                            from_list.clone(),
+                                        ),
                                         all_binding.range,
                                     ));
                                 }
@@ -2514,8 +2523,18 @@ impl<'a> Checker<'a> {
                     BTreeMap::new();
 
                 for (name, binding) in scope.values.iter() {
+                    if !matches!(
+                        binding.kind,
+                        BindingKind::Importation(..)
+                            | BindingKind::SubmoduleImportation(..)
+                            | BindingKind::FromImportation(..)
+                    ) {
+                        continue;
+                    }
+
                     let used = binding.used.is_some()
                         || all_names
+                            .as_ref()
                             .map(|names| names.contains(name))
                             .unwrap_or_default();
 
@@ -2542,7 +2561,7 @@ impl<'a> Checker<'a> {
                                     .or_default()
                                     .push(full_name);
                             }
-                            _ => {}
+                            _ => unreachable!("Already filtered on BindingKind."),
                         }
                     }
                 }

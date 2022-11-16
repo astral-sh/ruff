@@ -115,7 +115,7 @@ pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> 
     for expr in bases {
         if let ExprKind::Name { id, .. } = &expr.node {
             if id == "object" {
-                match scope.values.get(id) {
+                match scope.values.get(&id.as_str()) {
                     None
                     | Some(Binding {
                         kind: BindingKind::Builtin,
