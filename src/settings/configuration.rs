@@ -65,8 +65,8 @@ static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
 
 impl Configuration {
     pub fn from_pyproject(
-        pyproject: &Option<PathBuf>,
-        project_root: &Option<PathBuf>,
+        pyproject: Option<&PathBuf>,
+        project_root: Option<&PathBuf>,
     ) -> Result<Self> {
         let options = load_options(pyproject)?;
         Ok(Configuration {

@@ -1,18 +1,19 @@
 use std::borrow::Cow;
 
-use crate::ast;
 use fnv::FnvHashMap;
+
+use crate::ast;
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ImportFromData<'a> {
-    pub module: &'a Option<String>,
-    pub level: &'a Option<usize>,
+    pub module: Option<&'a String>,
+    pub level: Option<&'a usize>,
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct AliasData<'a> {
     pub name: &'a str,
-    pub asname: &'a Option<String>,
+    pub asname: Option<&'a String>,
 }
 
 #[derive(Debug, Default)]

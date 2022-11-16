@@ -36,7 +36,7 @@ fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
     toml::from_str(&contents).map_err(|e| e.into())
 }
 
-pub fn find_pyproject_toml(path: &Option<PathBuf>) -> Option<PathBuf> {
+pub fn find_pyproject_toml(path: Option<&PathBuf>) -> Option<PathBuf> {
     if let Some(path) = path {
         let path_pyproject_toml = path.join("pyproject.toml");
         if path_pyproject_toml.is_file() {
@@ -80,7 +80,7 @@ pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
     None
 }
 
-pub fn load_options(pyproject: &Option<PathBuf>) -> Result<Options> {
+pub fn load_options(pyproject: Option<&PathBuf>) -> Result<Options> {
     match pyproject {
         Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
             .tool
@@ -323,7 +323,7 @@ other-attribute = 1
         assert_eq!(project_root, cwd.join("resources/test/fixtures"));
 
         let path =
-            find_pyproject_toml(&Some(project_root)).expect("Unable to find pyproject.toml.");
+            find_pyproject_toml(Some(&project_root)).expect("Unable to find pyproject.toml.");
         assert_eq!(path, cwd.join("resources/test/fixtures/pyproject.toml"));
 
         let pyproject = parse_pyproject_toml(&path)?;

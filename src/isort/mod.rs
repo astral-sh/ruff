@@ -25,7 +25,7 @@ mod types;
 #[derive(Debug)]
 pub struct AnnotatedAliasData<'a> {
     pub name: &'a str,
-    pub asname: &'a Option<String>,
+    pub asname: Option<&'a String>,
     pub atop: Vec<Comment<'a>>,
     pub inline: Vec<Comment<'a>>,
 }
@@ -37,9 +37,9 @@ pub enum AnnotatedImport<'a> {
         inline: Vec<Comment<'a>>,
     },
     ImportFrom {
-        module: &'a Option<String>,
+        module: Option<&'a String>,
         names: Vec<AnnotatedAliasData<'a>>,
-        level: &'a Option<usize>,
+        level: Option<&'a usize>,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
     },
@@ -75,7 +75,7 @@ fn annotate_imports<'a>(
                         .iter()
                         .map(|alias| AliasData {
                             name: &alias.node.name,
-                            asname: &alias.node.asname,
+                            asname: alias.node.asname.as_ref(),
                         })
                         .collect(),
                     atop,
@@ -124,16 +124,16 @@ fn annotate_imports<'a>(
 
                     aliases.push(AnnotatedAliasData {
                         name: &alias.node.name,
-                        asname: &alias.node.asname,
+                        asname: alias.node.asname.as_ref(),
                         atop: alias_atop,
                         inline: alias_inline,
                     })
                 }
 
                 annotated.push(AnnotatedImport::ImportFrom {
-                    module,
+                    module: module.as_ref(),
                     names: aliases,
-                    level,
+                    level: level.as_ref(),
                     atop,
                     inline,
                 });
@@ -278,7 +278,7 @@ fn categorize_imports<'a>(
     for (alias, comments) in block.import {
         let import_type = categorize(
             &alias.module_base(),
-            &None,
+            None,
             src,
             known_first_party,
             known_third_party,
@@ -384,7 +384,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                     import_from
                         .module
                         .as_ref()
-                        .map(|module| module_key(module, &None)),
+                        .map(|module| module_key(module, None)),
                     aliases
                         .first()
                         .map(|(alias, _)| member_key(alias.name, alias.asname)),

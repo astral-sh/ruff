@@ -10,15 +10,15 @@ pub enum Prefix {
 
 pub fn module_key<'a>(
     name: &'a str,
-    asname: &'a Option<String>,
-) -> (String, &'a str, &'a Option<String>) {
+    asname: Option<&'a String>,
+) -> (String, &'a str, Option<&'a String>) {
     (name.to_lowercase(), name, asname)
 }
 
 pub fn member_key<'a>(
     name: &'a str,
-    asname: &'a Option<String>,
-) -> (Prefix, String, &'a Option<String>) {
+    asname: Option<&'a String>,
+) -> (Prefix, String, Option<&'a String>) {
     (
         if name.len() > 1 && string::is_upper(name) {
             // Ex) `CONSTANT`

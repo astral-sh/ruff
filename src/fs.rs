@@ -202,7 +202,7 @@ mod tests {
         let path = Path::new("foo").absolutize_from(project_root).unwrap();
         let exclude = vec![FilePattern::from_user(
             "foo",
-            &Some(project_root.to_path_buf()),
+            Some(&project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, exclude.iter()));
@@ -210,7 +210,7 @@ mod tests {
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
         let exclude = vec![FilePattern::from_user(
             "bar",
-            &Some(project_root.to_path_buf()),
+            Some(&project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, exclude.iter()));
@@ -220,7 +220,7 @@ mod tests {
             .unwrap();
         let exclude = vec![FilePattern::from_user(
             "baz.py",
-            &Some(project_root.to_path_buf()),
+            Some(&project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, exclude.iter()));
@@ -228,7 +228,7 @@ mod tests {
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
         let exclude = vec![FilePattern::from_user(
             "foo/bar",
-            &Some(project_root.to_path_buf()),
+            Some(&project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, exclude.iter()));
@@ -238,7 +238,7 @@ mod tests {
             .unwrap();
         let exclude = vec![FilePattern::from_user(
             "foo/bar/baz.py",
-            &Some(project_root.to_path_buf()),
+            Some(&project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, exclude.iter()));
@@ -248,7 +248,7 @@ mod tests {
             .unwrap();
         let exclude = vec![FilePattern::from_user(
             "foo/bar/*.py",
-            &Some(project_root.to_path_buf()),
+            Some(&project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, exclude.iter()));
@@ -258,7 +258,7 @@ mod tests {
             .unwrap();
         let exclude = vec![FilePattern::from_user(
             "baz",
-            &Some(project_root.to_path_buf()),
+            Some(&project_root.to_path_buf()),
         )];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(!is_excluded(file_path, file_basename, exclude.iter()));

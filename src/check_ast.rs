@@ -709,7 +709,8 @@ where
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.add_check(Check::new(
                                     CheckKind::ImportStarNotPermitted(helpers::format_import_from(
-                                        level, module,
+                                        level.as_ref(),
+                                        module.as_ref(),
                                     )),
                                     Range::from_located(stmt),
                                 ));
@@ -719,7 +720,8 @@ where
                         if self.settings.enabled.contains(&CheckCode::F403) {
                             self.add_check(Check::new(
                                 CheckKind::ImportStarUsed(helpers::format_import_from(
-                                    level, module,
+                                    level.as_ref(),
+                                    module.as_ref(),
                                 )),
                                 Range::from_located(stmt),
                             ));
@@ -860,7 +862,12 @@ where
                     pyflakes::plugins::assert_tuple(self, stmt, test);
                 }
                 if self.settings.enabled.contains(&CheckCode::B011) {
-                    flake8_bugbear::plugins::assert_false(self, stmt, test, msg);
+                    flake8_bugbear::plugins::assert_false(
+                        self,
+                        stmt,
+                        test,
+                        msg.as_ref().map(|expr| expr.deref()),
+                    );
                 }
                 if self.settings.enabled.contains(&CheckCode::S101) {
                     self.add_check(flake8_bandit::plugins::assert_used(stmt));
@@ -2169,7 +2176,10 @@ impl<'a> Checker<'a> {
                         let scope = &self.scopes[*scope_index];
                         for binding in scope.values.values() {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
-                                from_list.push(helpers::format_import_from(level, module));
+                                from_list.push(helpers::format_import_from(
+                                    level.as_ref(),
+                                    module.as_ref(),
+                                ));
                             }
                         }
                     }
@@ -2495,7 +2505,10 @@ impl<'a> Checker<'a> {
                             let mut from_list = vec![];
                             for binding in scope.values.values() {
                                 if let BindingKind::StarImportation(level, module) = &binding.kind {
-                                    from_list.push(helpers::format_import_from(level, module));
+                                    from_list.push(helpers::format_import_from(
+                                        level.as_ref(),
+                                        module.as_ref(),
+                                    ));
                                 }
                             }
                             from_list.sort();
