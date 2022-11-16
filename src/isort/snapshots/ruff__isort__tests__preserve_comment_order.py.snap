@@ -1,0 +1,22 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 12
+    column: 0
+  fix:
+    patch:
+      content: "import abc\nimport io\n\n# Old MacDonald had a farm,\n# EIEIO\n# And on his farm he had a cow,\n# EIEIO\n# With a moo-moo here and a moo-moo there\n# Here a moo, there a moo, everywhere moo-moo\n# Old MacDonald had a farm,\n# EIEIO\nfrom errno import EIO\n"
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 12
+        column: 0
+    applied: false
+

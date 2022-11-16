@@ -17,6 +17,7 @@ pub struct Comment<'a> {
 
 /// Collect all comments in an import block.
 pub fn collect_comments<'a>(range: &Range, locator: &'a SourceCodeLocator) -> Vec<Comment<'a>> {
+    return vec![];
     let contents = locator.slice_source_code_range(range);
     lexer::make_tokenizer(&contents)
         .flatten()
@@ -38,6 +39,3 @@ pub fn collect_comments<'a>(range: &Range, locator: &'a SourceCodeLocator) -> Ve
         })
         .collect()
 }
-
-// We have to assign each comment to a node. Then when we collect, we merge
-// nodes, or something. Comments can either be above, or to the right of a node.

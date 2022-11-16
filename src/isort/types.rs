@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::BTreeSet;
 
 use fnv::FnvHashMap;
 
@@ -15,10 +14,10 @@ pub struct AliasData<'a> {
     pub asname: &'a Option<String>,
 }
 
-#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Default)]
+#[derive(Debug, Default)]
 pub struct CommentSet<'a> {
-    pub atop: BTreeSet<Cow<'a, str>>,
-    pub inline: BTreeSet<Cow<'a, str>>,
+    pub atop: Vec<Cow<'a, str>>,
+    pub inline: Vec<Cow<'a, str>>,
 }
 
 pub trait Importable {

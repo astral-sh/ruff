@@ -95,12 +95,7 @@ fn annotate_imports<'a>(
                     atop.push(comment);
                 }
 
-                // Find comments inline. In this case, we're looking for structures like:
-                //   from module import (  # Comment
-                //     ...
-                //   )
-                // That is, the members have to be on the next line (otherwise those comments
-                // will be associated with the members).
+                // Find comments inline.
                 let mut inline = vec![];
                 while let Some(comment) =
                     comments_iter.next_if(|comment| comment.location.row() == import.location.row())
@@ -168,10 +163,10 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
                         })
                         .or_default();
                     for comment in atop {
-                        entry.atop.insert(comment.value);
+                        entry.atop.push(comment.value);
                     }
                     for comment in inline {
-                        entry.inline.insert(comment.value);
+                        entry.inline.push(comment.value);
                     }
                 }
 
@@ -202,10 +197,10 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
                             .or_default()
                             .0;
                         for comment in atop {
-                            entry.atop.insert(comment.value);
+                            entry.atop.push(comment.value);
                         }
                         for comment in inline {
-                            entry.inline.insert(comment.value);
+                            entry.inline.push(comment.value);
                         }
                     } else {
                         let entry = &mut block
@@ -219,10 +214,10 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
                             ))
                             .or_default();
                         for comment in atop {
-                            entry.atop.insert(comment.value);
+                            entry.atop.push(comment.value);
                         }
                         for comment in inline {
-                            entry.inline.insert(comment.value);
+                            entry.inline.push(comment.value);
                         }
                     }
                 }
@@ -241,10 +236,10 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
                             })
                             .or_default();
                         for comment in alias.atop {
-                            entry.atop.insert(comment.value);
+                            entry.atop.push(comment.value);
                         }
                         for comment in alias.inline {
-                            entry.inline.insert(comment.value);
+                            entry.inline.push(comment.value);
                         }
                     } else {
                         let entry = block
@@ -257,11 +252,11 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
                                 },
                             ))
                             .or_default();
-                        for comment in alias.atop {
-                            entry.atop.insert(comment.value);
-                        }
+                        entry
+                            .atop
+                            .extend(alias.atop.into_iter().map(|comment| comment.value));
                         for comment in alias.inline {
-                            entry.inline.insert(comment.value);
+                            entry.inline.push(comment.value);
                         }
                     }
                 }
@@ -414,8 +409,6 @@ pub fn format_imports(
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block);
 
-    println!("block = {:?}", block);
-
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
         block,
@@ -425,27 +418,39 @@ pub fn format_imports(
         extra_standard_library,
     );
 
-    // Generate replacement source code.
     let mut output = RopeBuilder::new();
-    let mut first_block = true;
+
+    // Generate replacement source code.
+    let mut is_first_block = true;
     for import_block in block_by_type.into_values() {
         let import_block = sort_imports(import_block);
 
         // Add a blank line between every section.
-        if !first_block {
+        if !is_first_block {
             output.append("\n");
         } else {
-            first_block = false;
+            is_first_block = false;
         }
+
+        let mut is_first_statement = true;
 
         // Format `StmtKind::Import` statements.
         for (alias, comments) in import_block.import.iter() {
-            format::format_import(&mut output, alias, comments);
+            format::format_import(&mut output, alias, comments, is_first_statement);
+            is_first_statement = false;
         }
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, aliases) in import_block.import_from.iter() {
-            format::format_import_from(&mut output, import_from, comments, aliases, line_length);
+            format::format_import_from(
+                &mut output,
+                import_from,
+                comments,
+                aliases,
+                line_length,
+                is_first_statement,
+            );
+            is_first_statement = false;
         }
     }
     output.finish().to_string()
@@ -463,14 +468,17 @@ mod tests {
     use crate::linter::test_path;
     use crate::Settings;
 
+    #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_import_froms.py"))]
     #[test_case(Path::new("comments.py"))]
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
+    #[test_case(Path::new("fit_line_length_comment.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
     #[test_case(Path::new("order_by_type.py"))]
+    #[test_case(Path::new("preserve_comment_order.py"))]
     #[test_case(Path::new("preserve_indentation.py"))]
     #[test_case(Path::new("reorder_within_section.py"))]
     #[test_case(Path::new("separate_first_party_imports.py"))]
