@@ -898,10 +898,12 @@ where
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
-                    if let Some(check) =
-                        pycodestyle::checks::do_not_assign_lambda(value, Range::from_located(stmt))
-                    {
-                        self.add_check(check);
+                    if let [target] = &targets[..] {
+                        if let Some(check) =
+                            pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
+                        {
+                            self.add_check(check);
+                        }
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::U001) {
@@ -918,13 +920,12 @@ where
                     }
                 }
             }
-            StmtKind::AnnAssign { value, .. } => {
+            StmtKind::AnnAssign { target, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
                     if let Some(value) = value {
-                        if let Some(check) = pycodestyle::checks::do_not_assign_lambda(
-                            value,
-                            Range::from_located(stmt),
-                        ) {
+                        if let Some(check) =
+                            pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
+                        {
                             self.add_check(check);
                         }
                     }
