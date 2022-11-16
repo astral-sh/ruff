@@ -309,6 +309,8 @@ where
                             name,
                             decorator_list,
                             args,
+                            &self.from_imports,
+                            &self.import_aliases,
                             &self.settings.pep8_naming,
                         )
                     {
@@ -322,6 +324,8 @@ where
                         name,
                         decorator_list,
                         args,
+                        &self.from_imports,
+                        &self.import_aliases,
                         &self.settings.pep8_naming,
                     ) {
                         self.add_check(check);

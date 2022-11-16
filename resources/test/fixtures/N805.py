@@ -1,5 +1,7 @@
 from abc import ABCMeta
 
+import pydantic
+
 
 class Class:
     def bad_method(this):
@@ -20,6 +22,14 @@ class Class:
     @staticmethod
     def static_method(x):
         return x
+
+    @pydantic.validator
+    def lower(cls, my_field: str) -> str:
+        pass
+
+    @pydantic.validator("my_field")
+    def lower(cls, my_field: str) -> str:
+        pass
 
     def __init__(self):
         ...

@@ -1,3 +1,4 @@
+use fnv::{FnvHashMap, FnvHashSet};
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -58,10 +59,19 @@ pub fn invalid_first_argument_name_for_class_method(
     name: &str,
     decorator_list: &[Expr],
     args: &Arguments,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
     settings: &Settings,
 ) -> Option<Check> {
     if matches!(
-        helpers::function_type(scope, name, decorator_list, settings),
+        helpers::function_type(
+            scope,
+            name,
+            decorator_list,
+            from_imports,
+            import_aliases,
+            settings,
+        ),
         FunctionType::ClassMethod
     ) {
         if let Some(arg) = args.args.first() {
@@ -82,10 +92,19 @@ pub fn invalid_first_argument_name_for_method(
     name: &str,
     decorator_list: &[Expr],
     args: &Arguments,
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
     settings: &Settings,
 ) -> Option<Check> {
     if matches!(
-        helpers::function_type(scope, name, decorator_list, settings),
+        helpers::function_type(
+            scope,
+            name,
+            decorator_list,
+            from_imports,
+            import_aliases,
+            settings,
+        ),
         FunctionType::Method
     ) {
         if let Some(arg) = args.args.first() {
