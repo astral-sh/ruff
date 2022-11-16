@@ -436,20 +436,19 @@ pub fn format_imports(
 
         // Format `StmtKind::Import` statements.
         for (alias, comments) in import_block.import.iter() {
-            format::format_import(&mut output, alias, comments, is_first_statement);
+            output.append(&format::format_import(alias, comments, is_first_statement));
             is_first_statement = false;
         }
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, aliases) in import_block.import_from.iter() {
-            format::format_import_from(
-                &mut output,
+            output.append(&format::format_import_from(
                 import_from,
                 comments,
                 aliases,
                 line_length,
                 is_first_statement,
-            );
+            ));
             is_first_statement = false;
         }
     }

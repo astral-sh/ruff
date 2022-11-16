@@ -1,49 +1,46 @@
-use ropey::RopeBuilder;
-
 use crate::isort::types::{AliasData, CommentSet, ImportFromData, Importable};
 
 // Hard-code four-space indentation for the imports themselves, to match Black.
 const INDENT: &str = "    ";
 
+// Guess a capacity to use for string allocation.
+const CAPACITY: usize = 200;
+
 /// Add a plain import statement to the `RopeBuilder`.
-pub fn format_import(
-    output: &mut RopeBuilder,
-    alias: &AliasData,
-    comments: &CommentSet,
-    is_first: bool,
-) {
+pub fn format_import(alias: &AliasData, comments: &CommentSet, is_first: bool) -> String {
+    let mut output = String::with_capacity(CAPACITY);
     if !is_first && !comments.atop.is_empty() {
-        output.append("\n");
+        output.push('\n');
     }
     for comment in &comments.atop {
-        output.append(comment);
-        output.append("\n");
+        output.push_str(comment);
+        output.push('\n');
     }
     if let Some(asname) = alias.asname {
-        output.append("import ");
-        output.append(alias.name);
-        output.append(" as ");
-        output.append(asname);
+        output.push_str("import ");
+        output.push_str(alias.name);
+        output.push_str(" as ");
+        output.push_str(asname);
     } else {
-        output.append("import ");
-        output.append(alias.name);
+        output.push_str("import ");
+        output.push_str(alias.name);
     }
     for comment in &comments.inline {
-        output.append("  ");
-        output.append(comment);
+        output.push_str("  ");
+        output.push_str(comment);
     }
-    output.append("\n");
+    output.push('\n');
+    output
 }
 
 /// Add an import-from statement to the `RopeBuilder`.
 pub fn format_import_from(
-    output: &mut RopeBuilder,
     import_from: &ImportFromData,
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
     line_length: &usize,
     is_first: bool,
-) {
+) -> String {
     // We can only inline if: (1) none of the aliases have atop comments, and (3)
     // only the last alias (if any) has inline comments.
     if aliases
@@ -58,12 +55,11 @@ pub fn format_import_from(
         let (single_line, import_length) =
             format_single_line(import_from, comments, aliases, is_first);
         if import_length <= *line_length {
-            output.append(&single_line);
-            return;
+            return single_line;
         }
     }
 
-    output.append(&format_multi_line(import_from, comments, aliases, is_first));
+    format_multi_line(import_from, comments, aliases, is_first)
 }
 
 /// Format an import-from statement in single-line format.
@@ -75,7 +71,7 @@ fn format_single_line(
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
 ) -> (String, usize) {
-    let mut output = String::new();
+    let mut output = String::with_capacity(CAPACITY);
     let mut line_length = 0;
 
     if !is_first && !comments.atop.is_empty() {
@@ -90,8 +86,7 @@ fn format_single_line(
     output.push_str("from ");
     output.push_str(&module_name);
     output.push_str(" import ");
-    output.push_str(&content);
-    line_length += 5 + content.len() + 8;
+    line_length += 5 + module_name.len() + 8;
 
     for (index, (AliasData { name, asname }, comments)) in aliases.iter().enumerate() {
         if let Some(asname) = asname {
@@ -135,7 +130,7 @@ fn format_multi_line(
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
 ) -> String {
-    let mut output = String::new();
+    let mut output = String::with_capacity(CAPACITY);
 
     if !is_first && !comments.atop.is_empty() {
         output.push('\n');

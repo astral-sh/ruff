@@ -17,7 +17,6 @@ pub struct Comment<'a> {
 
 /// Collect all comments in an import block.
 pub fn collect_comments<'a>(range: &Range, locator: &'a SourceCodeLocator) -> Vec<Comment<'a>> {
-    return vec![];
     let contents = locator.slice_source_code_range(range);
     lexer::make_tokenizer(&contents)
         .flatten()
