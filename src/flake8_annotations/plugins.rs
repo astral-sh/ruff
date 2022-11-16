@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
@@ -11,7 +13,7 @@ use crate::{visibility, Check};
 
 #[derive(Default)]
 struct ReturnStatementVisitor<'a> {
-    returns: Vec<&'a Option<Box<Expr>>>,
+    returns: Vec<Option<&'a Expr>>,
 }
 
 impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
@@ -23,7 +25,9 @@ where
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
                 // No recurse.
             }
-            StmtKind::Return { value } => self.returns.push(value),
+            StmtKind::Return { value } => {
+                self.returns.push(value.as_ref().map(|expr| expr.deref()))
+            }
             _ => visitor::walk_stmt(self, stmt),
         }
     }
