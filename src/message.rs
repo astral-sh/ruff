@@ -41,7 +41,8 @@ impl Message {
                 location: check.location,
                 end_location: check.end_location,
             })
-            .len();
+            .chars()
+            .count();
         Self {
             kind: check.kind,
             fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
