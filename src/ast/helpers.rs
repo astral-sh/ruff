@@ -225,6 +225,18 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
     }
 }
 
+/// Format the module name for a relative import.
+pub fn format_import_from(level: &Option<usize>, module: &Option<String>) -> String {
+    let mut module_name = String::with_capacity(16);
+    for _ in 0..level.unwrap_or_default() {
+        module_name.push('.');
+    }
+    if let Some(m) = module {
+        module_name.push_str(m);
+    }
+    module_name
+}
+
 /// Convert a location within a file (relative to `base`) to an absolute
 /// position.
 pub fn to_absolute(relative: &Location, base: &Location) -> Location {
