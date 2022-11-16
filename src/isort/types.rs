@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
-use crate::ast;
 use fnv::FnvHashMap;
+
+use crate::ast;
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ImportFromData<'a> {
