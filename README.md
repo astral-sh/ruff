@@ -612,7 +612,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C901 | CyclomaticComplexity | `...` is too complex (0) |  |
+| C901 | FunctionIsTooComplex | `...` is too complex (0) |  |
 
 ### Ruff-specific rules
 

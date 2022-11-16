@@ -3,7 +3,7 @@ source: src/linter.rs
 expression: checks
 ---
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - trivial
       - 1
   location:
@@ -14,7 +14,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - expr_as_statement
       - 1
   location:
@@ -25,7 +25,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - sequential
       - 1
   location:
@@ -36,7 +36,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - if_elif_else_dead_path
       - 3
   location:
@@ -47,7 +47,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - nested_ifs
       - 3
   location:
@@ -58,7 +58,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - for_loop
       - 2
   location:
@@ -69,7 +69,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - for_else
       - 2
   location:
@@ -80,7 +80,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - recursive
       - 2
   location:
@@ -91,7 +91,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - nested_functions
       - 3
   location:
@@ -102,7 +102,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - a
       - 2
   location:
@@ -113,7 +113,7 @@ expression: checks
     column: 4
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - b
       - 1
   location:
@@ -124,7 +124,7 @@ expression: checks
     column: 8
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - try_else
       - 4
   location:
@@ -135,7 +135,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - nested_try_finally
       - 3
   location:
@@ -146,7 +146,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - foobar
       - 3
   location:
@@ -157,7 +157,7 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    CyclomaticComplexity:
+    FunctionIsTooComplex:
       - annotated_assign
       - 1
   location:

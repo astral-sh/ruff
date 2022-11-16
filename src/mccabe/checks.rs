@@ -62,7 +62,7 @@ pub fn function_is_too_complex(checker: &mut Checker, stmt: &Stmt, name: &str, b
     let complexity = get_complexity_number(body) + 1;
     if complexity > checker.settings.mccabe.max_complexity {
         checker.add_check(Check::new(
-            CheckKind::CyclomaticComplexity(name.to_string(), complexity),
+            CheckKind::FunctionIsTooComplex(name.to_string(), complexity),
             Range::from_located(stmt),
         ));
     }

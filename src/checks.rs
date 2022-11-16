@@ -544,7 +544,7 @@ pub enum CheckKind {
     HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
     // mccabe
-    CyclomaticComplexity(String, isize),
+    FunctionIsTooComplex(String, isize),
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -824,7 +824,7 @@ impl CheckCode {
             CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
-            CheckCode::C901 => CheckKind::CyclomaticComplexity("...".to_string(), 0),
+            CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 0),
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1250,7 +1250,7 @@ impl CheckKind {
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
             // McCabe
-            CheckKind::CyclomaticComplexity(..) => &CheckCode::C901,
+            CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -1900,7 +1900,7 @@ impl CheckKind {
                 format!("Possible hardcoded password: `\"{string}\"`")
             }
             // McCabe
-            CheckKind::CyclomaticComplexity(name, complexity) => {
+            CheckKind::FunctionIsTooComplex(name, complexity) => {
                 format!("`{name}` is too complex ({complexity})")
             }
             // Ruff
