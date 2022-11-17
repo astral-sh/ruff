@@ -223,8 +223,11 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                         if checker.patch() {
                             // Delete the blank line after the docstring.
                             check.amend(Fix::deletion(
-                                Location::new(docstring.location.row() + 1, 0),
-                                Location::new(docstring.location.row() + 1 + blank_lines_after, 0),
+                                Location::new(docstring.end_location.unwrap().row() + 1, 0),
+                                Location::new(
+                                    docstring.end_location.unwrap().row() + 1 + blank_lines_after,
+                                    0,
+                                ),
                             ));
                         }
                         checker.add_check(check);

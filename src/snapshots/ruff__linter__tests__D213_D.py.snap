@@ -130,4 +130,28 @@ expression: checks
     row: 527
     column: 7
   fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 541
+    column: 4
+  end_location:
+    row: 544
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 550
+    column: 4
+  end_location:
+    row: 553
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 563
+    column: 4
+  end_location:
+    row: 566
+    column: 7
+  fix: ~
 
