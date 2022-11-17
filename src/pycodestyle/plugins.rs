@@ -1,3 +1,4 @@
+use fnv::FnvHashMap;
 use itertools::izip;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 
@@ -6,7 +7,6 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind, RejectedCmpop};
 use crate::code_gen::SourceGenerator;
-use fnv::FnvHashMap;
 
 fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr]) -> Option<String> {
     let cmp = Expr::new(
