@@ -105,11 +105,12 @@ mod tests {
 
     use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes::settings::Quote;
+    use crate::flake8_tidy_imports::settings::Strictness;
     use crate::settings::pyproject::{
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
-    use crate::{flake8_bugbear, flake8_quotes, pep8_naming};
+    use crate::{flake8_bugbear, flake8_quotes, flake8_tidy_imports, pep8_naming};
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -148,6 +149,7 @@ mod tests {
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     pep8_naming: None,
                 })
@@ -180,6 +182,7 @@ line-length = 79
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     pep8_naming: None,
                 })
@@ -212,6 +215,7 @@ exclude = ["foo.py"]
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     pep8_naming: None,
                 })
@@ -244,6 +248,7 @@ select = ["E501"]
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     pep8_naming: None,
                 })
@@ -277,6 +282,7 @@ ignore = ["E501"]
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     pep8_naming: None,
                 })
@@ -365,6 +371,9 @@ other-attribute = 1
                     multiline_quotes: Some(Quote::Double),
                     docstring_quotes: Some(Quote::Double),
                     avoid_escape: Some(true),
+                }),
+                flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
+                    ban_relative_imports: Some(Strictness::Parents)
                 }),
                 isort: None,
                 pep8_naming: Some(pep8_naming::settings::Options {

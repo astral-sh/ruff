@@ -8,6 +8,7 @@ use strum_macros::{AsRefStr, EnumIter, EnumString};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::flake8_quotes::settings::Quote;
+use crate::flake8_tidy_imports::settings::Strictness;
 use crate::pyupgrade::types::Primitive;
 
 #[derive(
@@ -119,6 +120,8 @@ pub enum CheckCode {
     C415,
     C416,
     C417,
+    // flake8-tidy-imports
+    I252,
     // flake8-print
     T201,
     T203,
@@ -253,6 +256,7 @@ pub enum CheckCategory {
     Flake8Comprehensions,
     Flake8Bugbear,
     Flake8Builtins,
+    Flake8TidyImports,
     Flake8Print,
     Flake8Quotes,
     Flake8Annotations,
@@ -271,6 +275,7 @@ impl CheckCategory {
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
+            CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Flake8Annotations => "flake8-annotations",
@@ -296,6 +301,9 @@ impl CheckCategory {
             }
             CheckCategory::Flake8Comprehensions => {
                 Some("https://pypi.org/project/flake8-comprehensions/3.10.1/")
+            }
+            CheckCategory::Flake8TidyImports => {
+                Some("https://pypi.org/project/flake8-tidy-imports/4.8.0/")
             }
             CheckCategory::Flake8Print => Some("https://pypi.org/project/flake8-print/5.0.0/"),
             CheckCategory::Flake8Quotes => Some("https://pypi.org/project/flake8-quotes/3.3.1/"),
@@ -424,6 +432,8 @@ pub enum CheckKind {
     UnnecessarySubscriptReversal(String),
     UnnecessaryComprehension(String),
     UnnecessaryMap(String),
+    // flake8-tidy-imports
+    BannedRelativeImport(Strictness),
     // flake8-print
     PrintFound,
     PPrintFound,
@@ -684,6 +694,8 @@ impl CheckCode {
             }
             CheckCode::C416 => CheckKind::UnnecessaryComprehension("(list|set)".to_string()),
             CheckCode::C417 => CheckKind::UnnecessaryMap("(list|set|dict)".to_string()),
+            // flake8-tidy-imports
+            CheckCode::I252 => CheckKind::BannedRelativeImport(Strictness::All),
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
@@ -916,6 +928,7 @@ impl CheckCode {
             CheckCode::C415 => CheckCategory::Flake8Comprehensions,
             CheckCode::C416 => CheckCategory::Flake8Comprehensions,
             CheckCode::C417 => CheckCategory::Flake8Comprehensions,
+            CheckCode::I252 => CheckCategory::Flake8TidyImports,
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
@@ -1126,6 +1139,8 @@ impl CheckKind {
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
             CheckKind::UnnecessaryComprehension(..) => &CheckCode::C416,
             CheckKind::UnnecessaryMap(_) => &CheckCode::C417,
+            // flake8-tidy-imports
+            CheckKind::BannedRelativeImport(_) => &CheckCode::I252,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
@@ -1579,6 +1594,13 @@ impl CheckKind {
                     format!("Unnecessary `map` usage (rewrite using a `{obj_type}` comprehension)")
                 }
             }
+            // flake8-tidy-imports
+            CheckKind::BannedRelativeImport(strictness) => match strictness {
+                Strictness::Parents => {
+                    "Relative imports from parent modules are banned".to_string()
+                }
+                Strictness::All => "Relative imports are banned".to_string(),
+            },
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),

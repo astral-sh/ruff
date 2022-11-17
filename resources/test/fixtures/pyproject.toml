@@ -38,3 +38,6 @@ classmethod-decorators = [
 staticmethod-decorators = [
   "staticmethod",
 ]
+
+[tool.ruff.flake8-tidy-imports]
+ban-relative-imports = "parents"
