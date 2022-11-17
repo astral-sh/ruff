@@ -59,7 +59,7 @@ pub fn literal_comparisons(
                 Range::from_located(comparator),
             );
             if checker.patch() {
-                // Dummy fix
+                // Dummy replacement
                 check.amend(Fix::replacement(
                     "".to_string(),
                     expr.location,
@@ -217,7 +217,7 @@ pub fn literal_comparisons(
             .collect::<Vec<_>>();
         if let Some(new_compare) = compare(left, &ops, comparators) {
             if let Some(check) = checks.last_mut() {
-                // Fix the entire compare expression
+                // Replace the entire compare expression
                 check.fix = Some(Fix::replacement(
                     new_compare,
                     expr.location,
