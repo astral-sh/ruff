@@ -224,7 +224,7 @@ pub fn error_suffix_on_exception_name(
 ) -> Option<Check> {
     if bases.iter().any(|base| {
         if let ExprKind::Name { id, .. } = &base.node {
-            id == "Exception"
+            id.ends_with("Exception") || id.ends_with("Error")
         } else {
             false
         }
