@@ -653,6 +653,44 @@ for coc.nvim.
 Ruff can also be integrated via [efm](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm)
 in just a [few lines](https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20).
 
+For neovim users using [`null-ls`](https://github.com/jose-elias-alvarez/null-ls.nvim), this is already [integrated](https://github.com/jose-elias-alvarez/null-ls.nvim).
+
+<details>
+<summary>However, to enable ruff in null-ls for both diagnostics and formatting:</summary>
+<br>
+
+```lua
+local null_ls = require("null-ls")
+local methods = require("null-ls.methods")
+local helpers = require("null-ls.helpers")
+
+local function ruff_fix()
+    return helpers.make_builtin({
+        name = "ruff",
+        meta = {
+            url = "https://github.com/charliermarsh/ruff/",
+            description = "An extremely fast Python linter, written in Rust.",
+        },
+        method = methods.internal.FORMATTING,
+        filetypes = { "python" },
+        generator_opts = {
+            command = "ruff",
+            args = { "--fix", "-e", "-n", "--stdin-filename", "$FILENAME", "-" },
+            to_stdin = true
+        },
+        factory = helpers.formatter_factory
+    })
+end
+
+null_ls.setup({
+    sources = {
+        ruff_fix(),
+        null_ls.builtins.diagnostics.ruff,
+    }
+})
+```
+</details>
+
 ### Language Server Protocol (Unofficial)
 
 [`ruffd`](https://github.com/Seamooo/ruffd) is a Rust-based language server for Ruff that implements
