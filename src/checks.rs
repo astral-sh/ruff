@@ -152,7 +152,6 @@ pub enum CheckCode {
     YTT303,
     // pyupgrade
     U001,
-    U002,
     U003,
     U004,
     U005,
@@ -457,7 +456,6 @@ pub enum CheckKind {
     SysVersionSlice1Referenced,
     // pyupgrade
     TypeOfPrimitive(Primitive),
-    UnnecessaryAbspath,
     UselessMetaclassType,
     DeprecatedUnittestAlias(String, String),
     UselessObjectInheritance(String),
@@ -717,7 +715,6 @@ impl CheckCode {
             CheckCode::YTT303 => CheckKind::SysVersionSlice1Referenced,
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
-            CheckCode::U002 => CheckKind::UnnecessaryAbspath,
             CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
             CheckCode::U004 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::U005 => CheckKind::DeprecatedUnittestAlias(
@@ -944,7 +941,6 @@ impl CheckCode {
             CheckCode::YTT302 => CheckCategory::Flake82020,
             CheckCode::YTT303 => CheckCategory::Flake82020,
             CheckCode::U001 => CheckCategory::Pyupgrade,
-            CheckCode::U002 => CheckCategory::Pyupgrade,
             CheckCode::U003 => CheckCategory::Pyupgrade,
             CheckCode::U004 => CheckCategory::Pyupgrade,
             CheckCode::U005 => CheckCategory::Pyupgrade,
@@ -1159,7 +1155,6 @@ impl CheckKind {
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // pyupgrade
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
-            CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
             CheckKind::DeprecatedUnittestAlias(..) => &CheckCode::U005,
             CheckKind::UsePEP585Annotation(_) => &CheckCode::U006,
@@ -1674,9 +1669,6 @@ impl CheckKind {
             CheckKind::TypeOfPrimitive(primitive) => {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
             }
-            CheckKind::UnnecessaryAbspath => {
-                "`abspath(__file__)` is unnecessary in Python 3.9 and later".to_string()
-            }
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
             CheckKind::DeprecatedUnittestAlias(alias, target) => {
                 format!("`{alias}` is deprecated, use `{target}` instead")
@@ -1986,7 +1978,6 @@ impl CheckKind {
                 | CheckKind::SectionUnderlineNotOverIndented(_)
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::TypeOfPrimitive(_)
-                | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnnecessaryCollectionCall(_)
                 | CheckKind::UnnecessaryComprehension(_)
                 | CheckKind::UnnecessaryEncodeUTF8

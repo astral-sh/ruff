@@ -269,7 +269,6 @@ pub enum CheckCodePrefix {
     U0,
     U00,
     U001,
-    U002,
     U003,
     U004,
     U005,
@@ -1067,7 +1066,6 @@ impl CheckCodePrefix {
             CheckCodePrefix::T203 => vec![CheckCode::T203],
             CheckCodePrefix::U => vec![
                 CheckCode::U001,
-                CheckCode::U002,
                 CheckCode::U003,
                 CheckCode::U004,
                 CheckCode::U005,
@@ -1081,7 +1079,6 @@ impl CheckCodePrefix {
             ],
             CheckCodePrefix::U0 => vec![
                 CheckCode::U001,
-                CheckCode::U002,
                 CheckCode::U003,
                 CheckCode::U004,
                 CheckCode::U005,
@@ -1095,7 +1092,6 @@ impl CheckCodePrefix {
             ],
             CheckCodePrefix::U00 => vec![
                 CheckCode::U001,
-                CheckCode::U002,
                 CheckCode::U003,
                 CheckCode::U004,
                 CheckCode::U005,
@@ -1105,7 +1101,6 @@ impl CheckCodePrefix {
                 CheckCode::U009,
             ],
             CheckCodePrefix::U001 => vec![CheckCode::U001],
-            CheckCodePrefix::U002 => vec![CheckCode::U002],
             CheckCodePrefix::U003 => vec![CheckCode::U003],
             CheckCodePrefix::U004 => vec![CheckCode::U004],
             CheckCodePrefix::U005 => vec![CheckCode::U005],
@@ -1431,7 +1426,6 @@ impl CheckCodePrefix {
             CheckCodePrefix::U0 => PrefixSpecificity::Hundreds,
             CheckCodePrefix::U00 => PrefixSpecificity::Tens,
             CheckCodePrefix::U001 => PrefixSpecificity::Explicit,
-            CheckCodePrefix::U002 => PrefixSpecificity::Explicit,
             CheckCodePrefix::U003 => PrefixSpecificity::Explicit,
             CheckCodePrefix::U004 => PrefixSpecificity::Explicit,
             CheckCodePrefix::U005 => PrefixSpecificity::Explicit,

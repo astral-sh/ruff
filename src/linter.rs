@@ -487,7 +487,6 @@ mod tests {
     #[test_case(CheckCode::T201, Path::new("T201.py"); "T201")]
     #[test_case(CheckCode::T203, Path::new("T203.py"); "T203")]
     #[test_case(CheckCode::U001, Path::new("U001.py"); "U001")]
-    #[test_case(CheckCode::U002, Path::new("U002.py"); "U002")]
     #[test_case(CheckCode::U003, Path::new("U003.py"); "U003")]
     #[test_case(CheckCode::U004, Path::new("U004.py"); "U004")]
     #[test_case(CheckCode::U005, Path::new("U005.py"); "U005")]
