@@ -51,7 +51,7 @@ pub enum FilePattern {
 }
 
 impl FilePattern {
-    pub fn from_user(pattern: &str, project_root: &Option<PathBuf>) -> Self {
+    pub fn from_user(pattern: &str, project_root: Option<&PathBuf>) -> Self {
         let path = Path::new(pattern);
         let absolute_path = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),
@@ -79,7 +79,7 @@ impl PerFileIgnore {
     pub fn new(
         pattern: &str,
         prefixes: &[CheckCodePrefix],
-        project_root: &Option<PathBuf>,
+        project_root: Option<&PathBuf>,
     ) -> Self {
         let pattern = FilePattern::from_user(pattern, project_root);
         let codes = BTreeSet::from_iter(prefixes.iter().flat_map(|prefix| prefix.codes()));

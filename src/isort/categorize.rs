@@ -15,13 +15,13 @@ pub enum ImportType {
 
 pub fn categorize(
     module_base: &str,
-    level: &Option<usize>,
+    level: Option<&usize>,
     src: &[PathBuf],
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
 ) -> ImportType {
-    if level.map(|level| level > 0).unwrap_or(false) {
+    if level.map(|level| *level > 0).unwrap_or(false) {
         ImportType::LocalFolder
     } else if known_first_party.contains(module_base) {
         ImportType::FirstParty

@@ -22,6 +22,9 @@ var = 1 if cond == True else -1 if cond == False else cond
 if (True) == TrueElement or x == TrueElement:
     pass
 
+if res == True != False:
+    pass
+
 #: Okay
 if x not in y:
     pass

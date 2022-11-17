@@ -36,7 +36,11 @@ ignore-names = [
 ]
 classmethod-decorators = [
   "classmethod",
+  "pydantic.validator",
 ]
 staticmethod-decorators = [
   "staticmethod",
 ]
+
+[tool.ruff.flake8-tidy-imports]
+ban-relative-imports = "parents"

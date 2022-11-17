@@ -208,7 +208,7 @@ fn inner_main() -> Result<ExitCode> {
     };
     let pyproject = cli
         .config
-        .or_else(|| pyproject::find_pyproject_toml(&project_root));
+        .or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
     match &pyproject {
         Some(path) => debug!("Found pyproject.toml at: {:?}", path),
         None => debug!("Unable to find pyproject.toml; using default settings..."),
@@ -218,15 +218,16 @@ fn inner_main() -> Result<ExitCode> {
     let exclude: Vec<FilePattern> = cli
         .exclude
         .iter()
-        .map(|path| FilePattern::from_user(path, &project_root))
+        .map(|path| FilePattern::from_user(path, project_root.as_ref()))
         .collect();
     let extend_exclude: Vec<FilePattern> = cli
         .extend_exclude
         .iter()
-        .map(|path| FilePattern::from_user(path, &project_root))
+        .map(|path| FilePattern::from_user(path, project_root.as_ref()))
         .collect();
 
-    let mut configuration = Configuration::from_pyproject(&pyproject, &project_root)?;
+    let mut configuration =
+        Configuration::from_pyproject(pyproject.as_ref(), project_root.as_ref())?;
     if !exclude.is_empty() {
         configuration.exclude = exclude;
     }
@@ -235,7 +236,7 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !cli.per_file_ignores.is_empty() {
         configuration.per_file_ignores =
-            collect_per_file_ignores(cli.per_file_ignores, &project_root);
+            collect_per_file_ignores(cli.per_file_ignores, project_root.as_ref());
     }
     if !cli.select.is_empty() {
         warn_on(
@@ -244,7 +245,7 @@ fn inner_main() -> Result<ExitCode> {
             &cli.ignore,
             &cli.extend_ignore,
             &configuration,
-            &pyproject,
+            pyproject.as_ref(),
         );
         configuration.select = cli.select;
     }
@@ -255,7 +256,7 @@ fn inner_main() -> Result<ExitCode> {
             &cli.ignore,
             &cli.extend_ignore,
             &configuration,
-            &pyproject,
+            pyproject.as_ref(),
         );
         configuration.extend_select = cli.extend_select;
     }

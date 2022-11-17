@@ -26,20 +26,4 @@ expression: checks
     row: 7
     column: 29
   fix: ~
-- kind: DoNotAssignLambda
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 27
-  fix: ~
-- kind: DoNotAssignLambda
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 25
-  fix: ~
 

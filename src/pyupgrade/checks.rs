@@ -90,32 +90,12 @@ pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -
     None
 }
 
-/// U002
-pub fn unnecessary_abspath(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
-    // Validate the arguments.
-    if args.len() == 1 {
-        if let ExprKind::Name { id, .. } = &args[0].node {
-            if id == "__file__" {
-                match &func.node {
-                    ExprKind::Attribute { attr: id, .. } | ExprKind::Name { id, .. } => {
-                        if id == "abspath" {
-                            return Some(Check::new(CheckKind::UnnecessaryAbspath, location));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-    None
-}
-
 /// U004
 pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> Option<Check> {
     for expr in bases {
         if let ExprKind::Name { id, .. } = &expr.node {
             if id == "object" {
-                match scope.values.get(id) {
+                match scope.values.get(&id.as_str()) {
                     None
                     | Some(Binding {
                         kind: BindingKind::Builtin,

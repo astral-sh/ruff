@@ -58,10 +58,7 @@ pub fn check_lines(
         // Grab the noqa (logical) line number for the current (physical) line.
         // If there are newlines at the end of the file, they won't be represented in
         // `noqa_line_for`, so fallback to the current line.
-        let noqa_lineno = noqa_line_for
-            .get(&lineno)
-            .map(|lineno| lineno - 1)
-            .unwrap_or(lineno);
+        let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
 
         // Enforce unnecessary coding comments (U009).
         if enforce_unnecessary_coding_comment {
@@ -155,10 +152,7 @@ pub fn check_lines(
         // want to raise W292 anyway).
         if let Some(line) = lines.last() {
             let lineno = lines.len() - 1;
-            let noqa_lineno = noqa_line_for
-                .get(&lineno)
-                .map(|lineno| lineno - 1)
-                .unwrap_or(lineno);
+            let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
 
             let noqa = noqa_directives
                 .entry(noqa_lineno)

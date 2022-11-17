@@ -1,9 +1,9 @@
 use itertools::izip;
 use rustpython_ast::Location;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Stmt, Unaryop};
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind, RejectedCmpop};
+use crate::checks::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 fn is_ambiguous_name(name: &str) -> bool {
@@ -47,12 +47,16 @@ pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
 }
 
 /// E731
-pub fn do_not_assign_lambda(value: &Expr, location: Range) -> Option<Check> {
-    if let ExprKind::Lambda { .. } = &value.node {
-        Some(Check::new(CheckKind::DoNotAssignLambda, location))
-    } else {
-        None
+pub fn do_not_assign_lambda(target: &Expr, value: &Expr, stmt: &Stmt) -> Option<Check> {
+    if let ExprKind::Name { .. } = &target.node {
+        if let ExprKind::Lambda { .. } = &value.node {
+            return Some(Check::new(
+                CheckKind::DoNotAssignLambda,
+                Range::from_located(stmt),
+            ));
+        }
     }
+    None
 }
 
 /// E713, E714
@@ -85,114 +89,6 @@ pub fn not_tests(
                         }
                     }
                     _ => {}
-                }
-            }
-        }
-    }
-
-    checks
-}
-
-/// E711, E712
-pub fn literal_comparisons(
-    left: &Expr,
-    ops: &[Cmpop],
-    comparators: &[Expr],
-    check_none_comparisons: bool,
-    check_true_false_comparisons: bool,
-) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
-
-    let op = ops.first().unwrap();
-    let comparator = left;
-
-    // Check `left`.
-    if check_none_comparisons
-        && matches!(
-            comparator.node,
-            ExprKind::Constant {
-                value: Constant::None,
-                kind: None
-            }
-        )
-    {
-        if matches!(op, Cmpop::Eq) {
-            checks.push(Check::new(
-                CheckKind::NoneComparison(RejectedCmpop::Eq),
-                Range::from_located(comparator),
-            ));
-        }
-        if matches!(op, Cmpop::NotEq) {
-            checks.push(Check::new(
-                CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                Range::from_located(comparator),
-            ));
-        }
-    }
-
-    if check_true_false_comparisons {
-        if let ExprKind::Constant {
-            value: Constant::Bool(value),
-            kind: None,
-        } = comparator.node
-        {
-            if matches!(op, Cmpop::Eq) {
-                checks.push(Check::new(
-                    CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                    Range::from_located(comparator),
-                ));
-            }
-            if matches!(op, Cmpop::NotEq) {
-                checks.push(Check::new(
-                    CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                    Range::from_located(comparator),
-                ));
-            }
-        }
-    }
-
-    // Check each comparator in order.
-    for (op, comparator) in izip!(ops, comparators) {
-        if check_none_comparisons
-            && matches!(
-                comparator.node,
-                ExprKind::Constant {
-                    value: Constant::None,
-                    kind: None
-                }
-            )
-        {
-            if matches!(op, Cmpop::Eq) {
-                checks.push(Check::new(
-                    CheckKind::NoneComparison(RejectedCmpop::Eq),
-                    Range::from_located(comparator),
-                ));
-            }
-            if matches!(op, Cmpop::NotEq) {
-                checks.push(Check::new(
-                    CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                    Range::from_located(comparator),
-                ));
-            }
-        }
-
-        if check_true_false_comparisons {
-            if let ExprKind::Constant {
-                value: Constant::Bool(value),
-                kind: None,
-            } = comparator.node
-            {
-                if matches!(op, Cmpop::Eq) {
-                    checks.push(Check::new(
-                        CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                        Range::from_located(comparator),
-                    ));
-                }
-                if matches!(op, Cmpop::NotEq) {
-                    checks.push(Check::new(
-                        CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                        Range::from_located(comparator),
-                    ));
                 }
             }
         }

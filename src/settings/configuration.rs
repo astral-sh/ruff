@@ -12,7 +12,10 @@ use regex::Regex;
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
-use crate::{flake8_annotations, flake8_bugbear, flake8_quotes, fs, isort, mccabe, pep8_naming};
+use crate::{
+    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
+    pep8_naming,
+};
 
 #[derive(Debug)]
 pub struct Configuration {
@@ -32,6 +35,7 @@ pub struct Configuration {
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
+    pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
@@ -66,8 +70,8 @@ static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
 
 impl Configuration {
     pub fn from_pyproject(
-        pyproject: &Option<PathBuf>,
-        project_root: &Option<PathBuf>,
+        pyproject: Option<&PathBuf>,
+        project_root: Option<&PathBuf>,
     ) -> Result<Self> {
         let options = load_options(pyproject)?;
         Ok(Configuration {
@@ -142,6 +146,10 @@ impl Configuration {
             flake8_quotes: options
                 .flake8_quotes
                 .map(flake8_quotes::settings::Settings::from_options)
+                .unwrap_or_default(),
+            flake8_tidy_imports: options
+                .flake8_tidy_imports
+                .map(flake8_tidy_imports::settings::Settings::from_options)
                 .unwrap_or_default(),
             isort: options
                 .isort

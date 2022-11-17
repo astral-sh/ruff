@@ -36,7 +36,7 @@ fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
     toml::from_str(&contents).map_err(|e| e.into())
 }
 
-pub fn find_pyproject_toml(path: &Option<PathBuf>) -> Option<PathBuf> {
+pub fn find_pyproject_toml(path: Option<&PathBuf>) -> Option<PathBuf> {
     if let Some(path) = path {
         let path_pyproject_toml = path.join("pyproject.toml");
         if path_pyproject_toml.is_file() {
@@ -80,7 +80,7 @@ pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
     None
 }
 
-pub fn load_options(pyproject: &Option<PathBuf>) -> Result<Options> {
+pub fn load_options(pyproject: Option<&PathBuf>) -> Result<Options> {
     match pyproject {
         Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
             .tool
@@ -105,11 +105,12 @@ mod tests {
 
     use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes::settings::Quote;
+    use crate::flake8_tidy_imports::settings::Strictness;
     use crate::settings::pyproject::{
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
-    use crate::{flake8_bugbear, flake8_quotes, mccabe, pep8_naming};
+    use crate::{flake8_bugbear, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming};
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -148,6 +149,7 @@ mod tests {
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -181,6 +183,7 @@ line-length = 79
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -214,6 +217,7 @@ exclude = ["foo.py"]
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -247,6 +251,7 @@ select = ["E501"]
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -281,6 +286,7 @@ ignore = ["E501"]
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
+                    flake8_tidy_imports: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -328,7 +334,7 @@ other-attribute = 1
         assert_eq!(project_root, cwd.join("resources/test/fixtures"));
 
         let path =
-            find_pyproject_toml(&Some(project_root)).expect("Unable to find pyproject.toml.");
+            find_pyproject_toml(Some(&project_root)).expect("Unable to find pyproject.toml.");
         assert_eq!(path, cwd.join("resources/test/fixtures/pyproject.toml"));
 
         let pyproject = parse_pyproject_toml(&path)?;
@@ -371,6 +377,9 @@ other-attribute = 1
                     docstring_quotes: Some(Quote::Double),
                     avoid_escape: Some(true),
                 }),
+                flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
+                    ban_relative_imports: Some(Strictness::Parents)
+                }),
                 isort: None,
                 mccabe: Some(mccabe::settings::Options {
                     max_complexity: Some(10),
@@ -390,7 +399,10 @@ other-attribute = 1
                         "longMessage".to_string(),
                         "maxDiff".to_string(),
                     ]),
-                    classmethod_decorators: Some(vec!["classmethod".to_string()]),
+                    classmethod_decorators: Some(vec![
+                        "classmethod".to_string(),
+                        "pydantic.validator".to_string()
+                    ]),
                     staticmethod_decorators: Some(vec!["staticmethod".to_string()]),
                 }),
             }

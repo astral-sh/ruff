@@ -8,6 +8,7 @@ use strum_macros::{AsRefStr, EnumIter, EnumString};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::flake8_quotes::settings::Quote;
+use crate::flake8_tidy_imports::settings::Strictness;
 use crate::pyupgrade::types::Primitive;
 
 #[derive(
@@ -121,6 +122,8 @@ pub enum CheckCode {
     C417,
     // mccabe
     C901,
+    // flake8-tidy-imports
+    I252,
     // flake8-print
     T201,
     T203,
@@ -154,7 +157,6 @@ pub enum CheckCode {
     YTT303,
     // pyupgrade
     U001,
-    U002,
     U003,
     U004,
     U005,
@@ -255,6 +257,7 @@ pub enum CheckCategory {
     Flake8Comprehensions,
     Flake8Bugbear,
     Flake8Builtins,
+    Flake8TidyImports,
     Flake8Print,
     Flake8Quotes,
     Flake8Annotations,
@@ -274,6 +277,7 @@ impl CheckCategory {
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
+            CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Flake8Annotations => "flake8-annotations",
@@ -300,6 +304,9 @@ impl CheckCategory {
             }
             CheckCategory::Flake8Comprehensions => {
                 Some("https://pypi.org/project/flake8-comprehensions/3.10.1/")
+            }
+            CheckCategory::Flake8TidyImports => {
+                Some("https://pypi.org/project/flake8-tidy-imports/4.8.0/")
             }
             CheckCategory::Flake8Print => Some("https://pypi.org/project/flake8-print/5.0.0/"),
             CheckCategory::Flake8Quotes => Some("https://pypi.org/project/flake8-quotes/3.3.1/"),
@@ -429,6 +436,8 @@ pub enum CheckKind {
     UnnecessarySubscriptReversal(String),
     UnnecessaryComprehension(String),
     UnnecessaryMap(String),
+    // flake8-tidy-imports
+    BannedRelativeImport(Strictness),
     // flake8-print
     PrintFound,
     PPrintFound,
@@ -462,7 +471,6 @@ pub enum CheckKind {
     SysVersionSlice1Referenced,
     // pyupgrade
     TypeOfPrimitive(Primitive),
-    UnnecessaryAbspath,
     UselessMetaclassType,
     DeprecatedUnittestAlias(String, String),
     UselessObjectInheritance(String),
@@ -691,6 +699,8 @@ impl CheckCode {
             }
             CheckCode::C416 => CheckKind::UnnecessaryComprehension("(list|set)".to_string()),
             CheckCode::C417 => CheckKind::UnnecessaryMap("(list|set|dict)".to_string()),
+            // flake8-tidy-imports
+            CheckCode::I252 => CheckKind::BannedRelativeImport(Strictness::All),
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
@@ -724,7 +734,6 @@ impl CheckCode {
             CheckCode::YTT303 => CheckKind::SysVersionSlice1Referenced,
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
-            CheckCode::U002 => CheckKind::UnnecessaryAbspath,
             CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
             CheckCode::U004 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::U005 => CheckKind::DeprecatedUnittestAlias(
@@ -924,6 +933,7 @@ impl CheckCode {
             CheckCode::C415 => CheckCategory::Flake8Comprehensions,
             CheckCode::C416 => CheckCategory::Flake8Comprehensions,
             CheckCode::C417 => CheckCategory::Flake8Comprehensions,
+            CheckCode::I252 => CheckCategory::Flake8TidyImports,
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
@@ -952,7 +962,6 @@ impl CheckCode {
             CheckCode::YTT302 => CheckCategory::Flake82020,
             CheckCode::YTT303 => CheckCategory::Flake82020,
             CheckCode::U001 => CheckCategory::Pyupgrade,
-            CheckCode::U002 => CheckCategory::Pyupgrade,
             CheckCode::U003 => CheckCategory::Pyupgrade,
             CheckCode::U004 => CheckCategory::Pyupgrade,
             CheckCode::U005 => CheckCategory::Pyupgrade,
@@ -1135,6 +1144,8 @@ impl CheckKind {
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
             CheckKind::UnnecessaryComprehension(..) => &CheckCode::C416,
             CheckKind::UnnecessaryMap(_) => &CheckCode::C417,
+            // flake8-tidy-imports
+            CheckKind::BannedRelativeImport(_) => &CheckCode::I252,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
@@ -1168,7 +1179,6 @@ impl CheckKind {
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // pyupgrade
             CheckKind::TypeOfPrimitive(_) => &CheckCode::U003,
-            CheckKind::UnnecessaryAbspath => &CheckCode::U002,
             CheckKind::UselessMetaclassType => &CheckCode::U001,
             CheckKind::DeprecatedUnittestAlias(..) => &CheckCode::U005,
             CheckKind::UsePEP585Annotation(_) => &CheckCode::U006,
@@ -1590,6 +1600,13 @@ impl CheckKind {
                     format!("Unnecessary `map` usage (rewrite using a `{obj_type}` comprehension)")
                 }
             }
+            // flake8-tidy-imports
+            CheckKind::BannedRelativeImport(strictness) => match strictness {
+                Strictness::Parents => {
+                    "Relative imports from parent modules are banned".to_string()
+                }
+                Strictness::All => "Relative imports are banned".to_string(),
+            },
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),
@@ -1684,9 +1701,6 @@ impl CheckKind {
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
-            }
-            CheckKind::UnnecessaryAbspath => {
-                "`abspath(__file__)` is unnecessary in Python 3.9 and later".to_string()
             }
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
             CheckKind::DeprecatedUnittestAlias(alias, target) => {
@@ -2001,7 +2015,6 @@ impl CheckKind {
                 | CheckKind::SectionUnderlineNotOverIndented(_)
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::TypeOfPrimitive(_)
-                | CheckKind::UnnecessaryAbspath
                 | CheckKind::UnnecessaryCollectionCall(_)
                 | CheckKind::UnnecessaryComprehension(_)
                 | CheckKind::UnnecessaryEncodeUTF8

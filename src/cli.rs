@@ -155,7 +155,7 @@ pub fn warn_on(
     cli_ignore: &[CheckCodePrefix],
     cli_extend_ignore: &[CheckCodePrefix],
     pyproject_configuration: &Configuration,
-    pyproject_path: &Option<PathBuf>,
+    pyproject_path: Option<&PathBuf>,
 ) {
     for code in codes {
         if !cli_ignore.is_empty() {
@@ -195,7 +195,7 @@ pub fn warn_on(
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
 pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
-    project_root: &Option<PathBuf>,
+    project_root: Option<&PathBuf>,
 ) -> Vec<PerFileIgnore> {
     let mut per_file_ignores: FnvHashMap<String, Vec<CheckCodePrefix>> = FnvHashMap::default();
     for pair in pairs {

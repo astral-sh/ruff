@@ -1,14 +1,16 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use itertools::Itertools;
-use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Expr, Stmt, StmtKind};
 
-use crate::ast::helpers::{collect_call_paths, match_call_path, match_name_or_attr};
+use crate::ast::helpers::{
+    collect_call_paths, dealias_call_path, match_call_path, to_module_and_member,
+};
 use crate::ast::types::{Scope, ScopeKind};
 use crate::pep8_naming::settings::Settings;
 use crate::python::string::{is_lower, is_upper};
 
 const CLASS_METHODS: [&str; 3] = ["__new__", "__init_subclass__", "__class_getitem__"];
-const METACLASS_BASES: [&str; 2] = ["type", "ABCMeta"];
+const METACLASS_BASES: [(&str, &str); 2] = [("", "type"), ("abc", "ABCMeta")];
 
 pub enum FunctionType {
     Function,
@@ -22,35 +24,39 @@ pub fn function_type(
     scope: &Scope,
     name: &str,
     decorator_list: &[Expr],
+    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    import_aliases: &FnvHashMap<&str, &str>,
     settings: &Settings,
 ) -> FunctionType {
     if let ScopeKind::Class(scope) = &scope.kind {
         // Special-case class method, like `__new__`.
         if CLASS_METHODS.contains(&name)
-            // The class itself extends a known metaclass, so all methods are class methods.
             || scope.bases.iter().any(|expr| {
-                METACLASS_BASES
-                    .iter()
-                    .any(|target| match_name_or_attr(expr, target))
+                // The class itself extends a known metaclass, so all methods are class methods.
+                let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
+                METACLASS_BASES.iter().any(|(module, member)| {
+                    match_call_path(&call_path, module, member, from_imports)
+                })
             })
-            // The method is decorated with a class method decorator (like `@classmethod`).
             || decorator_list.iter().any(|expr| {
-            if let ExprKind::Name { id, .. } = &expr.node {
-                settings.classmethod_decorators.contains(id)
-            } else {
-                false
-            }
-        }) {
+                // The method is decorated with a class method decorator (like `@classmethod`).
+                let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
+                settings.classmethod_decorators.iter().any(|decorator| {
+                    let (module, member) = to_module_and_member(decorator);
+                    match_call_path(&call_path, module, member, from_imports)
+                })
+            })
+        {
             FunctionType::ClassMethod
         } else if decorator_list.iter().any(|expr| {
-            if let ExprKind::Name { id, .. } = &expr.node {
-                settings.staticmethod_decorators.contains(id)
-            } else {
-                false
-            }
-        }) {
             // The method is decorated with a static method decorator (like
             // `@staticmethod`).
+            let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
+            settings.staticmethod_decorators.iter().any(|decorator| {
+                let (module, member) = to_module_and_member(decorator);
+                match_call_path(&call_path, module, member, from_imports)
+            })
+        }) {
             FunctionType::StaticMethod
         } else {
             // It's an instance method.

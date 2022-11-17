@@ -35,6 +35,7 @@ mod flake8_builtins;
 mod flake8_comprehensions;
 mod flake8_print;
 pub mod flake8_quotes;
+pub mod flake8_tidy_imports;
 pub mod fs;
 mod isort;
 mod lex;
@@ -65,14 +66,16 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         Some(path) => debug!("Found project root at: {:?}", path),
         None => debug!("Unable to identify project root; assuming current directory..."),
     };
-    let pyproject = pyproject::find_pyproject_toml(&project_root);
+    let pyproject = pyproject::find_pyproject_toml(project_root.as_ref());
     match &pyproject {
         Some(path) => debug!("Found pyproject.toml at: {:?}", path),
         None => debug!("Unable to find pyproject.toml; using default settings..."),
     };
 
-    let settings =
-        Settings::from_configuration(Configuration::from_pyproject(&pyproject, &project_root)?);
+    let settings = Settings::from_configuration(Configuration::from_pyproject(
+        pyproject.as_ref(),
+        project_root.as_ref(),
+    )?);
 
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);

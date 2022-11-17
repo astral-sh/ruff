@@ -5,7 +5,7 @@ use crate::ast::types::Range;
 use crate::autofix::{fixer, Fix};
 use crate::checks::CheckKind;
 use crate::docstrings::helpers::leading_space;
-use crate::isort::format_imports;
+use crate::isort::{comments, format_imports};
 use crate::{Check, Settings, SourceCodeLocator};
 
 fn extract_range(body: &[&Stmt]) -> Range {
@@ -44,7 +44,15 @@ fn match_trailing_content(body: &[&Stmt], locator: &SourceCodeLocator) -> bool {
         end_location: Location::new(end_location.row() + 1, 0),
     };
     let suffix = locator.slice_source_code_range(&range);
-    suffix.chars().any(|char| !char.is_whitespace())
+    for char in suffix.chars() {
+        if char == '#' {
+            return false;
+        }
+        if !char.is_whitespace() {
+            return true;
+        }
+    }
+    false
 }
 
 /// I001
@@ -57,13 +65,23 @@ pub fn check_imports(
     let range = extract_range(&body);
     let indentation = extract_indentation(&body, locator);
 
+    // Extract comments. Take care to grab any inline comments from the last line.
+    let comments = comments::collect_comments(
+        &Range {
+            location: range.location,
+            end_location: Location::new(range.end_location.row() + 1, 0),
+        },
+        locator,
+    );
+
     // Special-cases: there's leading or trailing content in the import block.
     let has_leading_content = match_leading_content(&body, locator);
     let has_trailing_content = match_trailing_content(&body, locator);
 
     // Generate the sorted import block.
     let expected = format_imports(
-        body,
+        &body,
+        comments,
         &(settings.line_length - indentation.len()),
         &settings.src,
         &settings.isort.known_first_party,

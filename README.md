@@ -44,31 +44,32 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
 ## Table of Contents
 
 1. [Installation and Usage](#installation-and-usage)
-2. [Configuration](#configuration)
-3. [Supported Rules](#supported-rules)
-   1. [Pyflakes](#pyflakes)
-   2. [pycodestyle](#pycodestyle)
-   3. [isort](#isort)
-   4. [pydocstyle](#pydocstyle)
-   5. [pyupgrade](#pyupgrade)
-   6. [pep8-naming](#pep8-naming)
-   7. [flake8-bandit](#flake8-bandit)
-   8. [flake8-comprehensions](#flake8-comprehensions)
-   9. [flake8-bugbear](#flake8-bugbear)
-   10. [flake8-builtins](#flake8-builtins)
-   11. [flake8-print](#flake8-print)
-   12. [flake8-quotes](#flake8-quotes)
-   13. [flake8-annotations](#flake8-annotations)
-   14. [flake8-2020](#flake8-2020)
-   15. [Ruff-specific rules](#ruff-specific-rules)
-   16. [Meta rules](#meta-rules)
-5. [Editor Integrations](#editor-integrations)
-6. [FAQ](#faq)
-7. [Development](#development)
-8. [Releases](#releases)
-9. [Benchmarks](#benchmarks)
-10. [License](#license)
-11. [Contributing](#contributing)
+1. [Configuration](#configuration)
+1. [Supported Rules](#supported-rules)
+   1. [Pyflakes (F)](#pyflakes)
+   1. [pycodestyle (E)](#pycodestyle)
+   1. [isort (I)](#isort)
+   1. [pydocstyle (D)](#pydocstyle)
+   1. [pyupgrade (U)](#pyupgrade)
+   1. [pep8-naming (N)](#pep8-naming)
+   1. [flake8-bandit (S)](#flake8-bandit)
+   1. [flake8-comprehensions (C)](#flake8-comprehensions)
+   1. [flake8-bugbear (B)](#flake8-bugbear)
+   1. [flake8-builtins (A)](#flake8-builtins)
+   1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
+   1. [flake8-print (T)](#flake8-print)
+   1. [flake8-quotes (Q)](#flake8-quotes)
+   1. [flake8-annotations (ANN)](#flake8-annotations)
+   1. [flake8-2020 (YTT)](#flake8-2020)
+   1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
+   1. [Meta rules (M)](#meta-rules)
+1. [Editor Integrations](#editor-integrations)
+1. [FAQ](#faq)
+1. [Development](#development)
+1. [Releases](#releases)
+1. [Benchmarks](#benchmarks)
+1. [License](#license)
+1. [Contributing](#contributing)
 
 ## Installation and Usage
 
@@ -358,8 +359,8 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | ---- | ---- | ------- | --- |
 | E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |  |
 | E501 | LineTooLong | Line too long (89 > 88 characters) |  |
-| E711 | NoneComparison | Comparison to `None` should be `cond is None` |  |
-| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |  |
+| E711 | NoneComparison | Comparison to `None` should be `cond is None` | 🛠 |
+| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` | 🛠 |
 | E713 | NotInTest | Test for membership should be `not in` |  |
 | E714 | NotIsTest | Test for object identity should be `is not` |  |
 | E721 | TypeComparison | Do not compare types, use `isinstance()` |  |
@@ -439,7 +440,6 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | U001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
-| U002 | UnnecessaryAbspath | `abspath(__file__)` is unnecessary in Python 3.9 and later | 🛠 |
 | U003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
 | U004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
 | U005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead | 🛠 |
@@ -551,6 +551,14 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/)
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |
 
+### flake8-tidy-imports
+
+For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| I252 | BannedRelativeImport | Relative imports are banned |  |
+
 ### flake8-print
 
 For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on PyPI.
@@ -653,8 +661,57 @@ Ruff should then appear as a runnable action:
 Ruff is available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright) extension
 for coc.nvim.
 
-Ruff can also be integrated via [efm](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm)
-in just a [few lines](https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20).
+<details>
+<summary>Ruff can also be integrated via <a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm"><code>efm</code></a> in just a <a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">few lines</a>.</summary>
+<br>
+
+```yaml
+tools:
+  python-ruff: &python-ruff
+    lint-command: 'ruff --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}'
+    lint-stdin: true
+    lint-formats:
+      - '%f:%l:%c: %m'
+    format-command: 'ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -'
+    format-stdin: true
+```
+</details>
+
+<details>
+<summary>For neovim users using <a href="https://github.com/jose-elias-alvarez/null-ls.nvim"><code>null-ls</code></a>, Ruff is already <a href="https://github.com/jose-elias-alvarez/null-ls.nvim">integrated</a>.</summary>
+<br>
+
+```lua
+local null_ls = require("null-ls")
+local methods = require("null-ls.methods")
+local helpers = require("null-ls.helpers")
+
+local function ruff_fix()
+    return helpers.make_builtin({
+        name = "ruff",
+        meta = {
+            url = "https://github.com/charliermarsh/ruff/",
+            description = "An extremely fast Python linter, written in Rust.",
+        },
+        method = methods.internal.FORMATTING,
+        filetypes = { "python" },
+        generator_opts = {
+            command = "ruff",
+            args = { "--fix", "-e", "-n", "--stdin-filename", "$FILENAME", "-" },
+            to_stdin = true
+        },
+        factory = helpers.formatter_factory
+    })
+end
+
+null_ls.setup({
+    sources = {
+        ruff_fix(),
+        null_ls.builtins.diagnostics.ruff,
+    }
+})
+```
+</details>
 
 ### Language Server Protocol (Unofficial)
 
@@ -715,6 +772,7 @@ including:
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
+- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
@@ -722,7 +780,7 @@ including:
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (25/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/34)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
 Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
@@ -740,6 +798,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
+- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
@@ -749,7 +808,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
-and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/34).
+and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 

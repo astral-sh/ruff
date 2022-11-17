@@ -13,7 +13,10 @@ use crate::checks::CheckCode;
 use crate::checks_gen::{CheckCodePrefix, PrefixSpecificity};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
-use crate::{flake8_annotations, flake8_bugbear, flake8_quotes, isort, mccabe, pep8_naming};
+use crate::{
+    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, isort, mccabe,
+    pep8_naming,
+};
 
 pub mod configuration;
 pub mod options;
@@ -35,6 +38,7 @@ pub struct Settings {
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
+    pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
@@ -55,6 +59,7 @@ impl Settings {
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
             flake8_quotes: config.flake8_quotes,
+            flake8_tidy_imports: config.flake8_tidy_imports,
             isort: config.isort,
             mccabe: config.mccabe,
             line_length: config.line_length,
@@ -78,6 +83,7 @@ impl Settings {
             flake8_annotations: Default::default(),
             flake8_bugbear: Default::default(),
             flake8_quotes: Default::default(),
+            flake8_tidy_imports: Default::default(),
             isort: Default::default(),
             mccabe: Default::default(),
             pep8_naming: Default::default(),
@@ -97,6 +103,7 @@ impl Settings {
             flake8_annotations: Default::default(),
             flake8_bugbear: Default::default(),
             flake8_quotes: Default::default(),
+            flake8_tidy_imports: Default::default(),
             isort: Default::default(),
             mccabe: Default::default(),
             pep8_naming: Default::default(),

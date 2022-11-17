@@ -1,0 +1,41 @@
+---
+source: src/flake8_tidy_imports/mod.rs
+expression: checks
+---
+- kind:
+    BannedRelativeImport: parents
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 21
+  fix: ~
+- kind:
+    BannedRelativeImport: parents
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 28
+  fix: ~
+- kind:
+    BannedRelativeImport: parents
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 27
+  fix: ~
+- kind:
+    BannedRelativeImport: parents
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 34
+  fix: ~
+
