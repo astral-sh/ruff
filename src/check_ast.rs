@@ -1531,16 +1531,15 @@ where
                 let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
                 let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
                 if check_none_comparisons || check_true_false_comparisons {
-                    self.add_checks(
-                        pycodestyle::checks::literal_comparisons(
-                            left,
-                            ops,
-                            comparators,
-                            check_none_comparisons,
-                            check_true_false_comparisons,
-                        )
-                        .into_iter(),
-                    );
+                    pycodestyle::plugins::literal_comparisons(
+                        self,
+                        expr,
+                        left,
+                        ops,
+                        comparators,
+                        check_none_comparisons,
+                        check_true_false_comparisons,
+                    )
                 }
 
                 if self.settings.enabled.contains(&CheckCode::F632) {
