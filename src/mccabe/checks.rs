@@ -1,7 +1,6 @@
 use rustpython_ast::{ExcepthandlerKind, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 fn get_complexity_number(stmts: &[Stmt]) -> isize {
@@ -58,12 +57,19 @@ fn get_complexity_number(stmts: &[Stmt]) -> isize {
     complexity
 }
 
-pub fn function_is_too_complex(checker: &mut Checker, stmt: &Stmt, name: &str, body: &[Stmt]) {
+pub fn function_is_too_complex(
+    stmt: &Stmt,
+    name: &str,
+    body: &[Stmt],
+    max_complexity: isize,
+) -> Option<Check> {
     let complexity = get_complexity_number(body) + 1;
-    if complexity > checker.settings.mccabe.max_complexity {
-        checker.add_check(Check::new(
+    if complexity > max_complexity {
+        Some(Check::new(
             CheckKind::FunctionIsTooComplex(name.to_string(), complexity),
             Range::from_located(stmt),
-        ));
+        ))
+    } else {
+        None
     }
 }

@@ -356,7 +356,14 @@ where
                 if self.settings.enabled.contains(&CheckCode::C901)
                     || self.settings.mccabe.max_complexity > -1
                 {
-                    mccabe::checks::function_is_too_complex(self, stmt, name, body);
+                    if let Some(check) = mccabe::checks::function_is_too_complex(
+                        stmt,
+                        name,
+                        body,
+                        self.settings.mccabe.max_complexity,
+                    ) {
+                        self.add_check(check);
+                    }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
