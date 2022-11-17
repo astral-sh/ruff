@@ -10,5 +10,9 @@ class C(Exception):
     pass
 
 
-class D(AnotherError):
+class D(BaseException):
+    pass
+
+
+class E(AnotherError):
     pass
