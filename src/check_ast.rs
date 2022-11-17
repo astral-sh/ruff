@@ -36,8 +36,8 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_print, flake8_tidy_imports, pep8_naming, pycodestyle, pydocstyle,
-    pyflakes, pyupgrade,
+    flake8_comprehensions, flake8_print, flake8_tidy_imports, mccabe, pep8_naming, pycodestyle,
+    pydocstyle, pyflakes, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -348,6 +348,16 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B019) {
                     flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
+                }
+                if self.settings.enabled.contains(&CheckCode::C901) {
+                    if let Some(check) = mccabe::checks::function_is_too_complex(
+                        stmt,
+                        name,
+                        body,
+                        self.settings.mccabe.max_complexity,
+                    ) {
+                        self.add_check(check);
+                    }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::S107) {

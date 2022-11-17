@@ -98,6 +98,13 @@ _and_ a `pyproject.toml` parameter to `src/pyproject.rs`. If you want to pattern
 existing example, grep for `dummy_variable_rgx`, which defines a regular expression to match against
 acceptable unused variables (e.g., `_`).
 
+If the new plugin's configuration should be cached between runs, you'll need to add it to the
+`Hash` implementation for `Settings` in `src/settings/mod.rs`.
+
+You may also want to add the new configuration option to the `flake8-to-ruff` tool, which is
+responsible for converting `flake8` configuration files to Ruff's TOML format. This logic
+lives in `flake8_to_ruff/src/converter.rs`.
+
 ## Release process
 
 As of now, Ruff has an ad hoc release process: releases are cut with high frequency via GitHub

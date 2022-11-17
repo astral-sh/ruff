@@ -110,7 +110,7 @@ mod tests {
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
-    use crate::{flake8_bugbear, flake8_quotes, flake8_tidy_imports, pep8_naming};
+    use crate::{flake8_bugbear, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming};
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -151,6 +151,7 @@ mod tests {
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     isort: None,
+                    mccabe: None,
                     pep8_naming: None,
                 })
             })
@@ -184,6 +185,7 @@ line-length = 79
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     isort: None,
+                    mccabe: None,
                     pep8_naming: None,
                 })
             })
@@ -217,6 +219,7 @@ exclude = ["foo.py"]
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     isort: None,
+                    mccabe: None,
                     pep8_naming: None,
                 })
             })
@@ -250,6 +253,7 @@ select = ["E501"]
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     isort: None,
+                    mccabe: None,
                     pep8_naming: None,
                 })
             })
@@ -284,6 +288,7 @@ ignore = ["E501"]
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     isort: None,
+                    mccabe: None,
                     pep8_naming: None,
                 })
             })
@@ -376,6 +381,9 @@ other-attribute = 1
                     ban_relative_imports: Some(Strictness::Parents)
                 }),
                 isort: None,
+                mccabe: Some(mccabe::settings::Options {
+                    max_complexity: Some(10),
+                }),
                 pep8_naming: Some(pep8_naming::settings::Options {
                     ignore_names: Some(vec![
                         "setUp".to_string(),

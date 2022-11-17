@@ -240,6 +240,8 @@ Options:
           The minimum Python version that should be supported
       --line-length <LINE_LENGTH>
           Set the line-length for length-associated checks and automatic formatting
+      --max-complexity <MAX_COMPLEXITY>
+          Set the maximum cyclomatic complexity for complexity-associated checks
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
   -h, --help
@@ -357,8 +359,8 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | ---- | ---- | ------- | --- |
 | E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |  |
 | E501 | LineTooLong | Line too long (89 > 88 characters) |  |
-| E711 | NoneComparison | Comparison to `None` should be `cond is None` | 🛠 |
-| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` | 🛠 |
+| E711 | NoneComparison | Comparison to `None` should be `cond is None` |  |
+| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |  |
 | E713 | NotInTest | Test for membership should be `not in` |  |
 | E714 | NotIsTest | Test for object identity should be `is not` |  |
 | E721 | TypeComparison | Do not compare types, use `isinstance()` |  |
@@ -611,6 +613,14 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 | YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
 | YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
 | YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
+
+### mccabe
+
+For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
 
 ### Ruff-specific rules
 
