@@ -37,10 +37,8 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(finalbody);
                 for handler in handlers {
                     complexity += 1;
-                    let h = match &handler.node {
-                        ExcepthandlerKind::ExceptHandler { body, .. } => body,
-                    };
-                    complexity += get_complexity_number(h);
+                    let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
+                    complexity += get_complexity_number(body);
                 }
             }
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
