@@ -437,7 +437,6 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | U001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
-| U002 | UnnecessaryAbspath | `abspath(__file__)` is unnecessary in Python 3.9 and later | 🛠 |
 | U003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
 | U004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
 | U005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead | 🛠 |

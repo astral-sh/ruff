@@ -1435,12 +1435,6 @@ where
                 }
 
                 // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::U002)
-                    && self.settings.target_version >= PythonVersion::Py310
-                {
-                    pyupgrade::plugins::unnecessary_abspath(self, expr, func, args);
-                }
-
                 if self.settings.enabled.contains(&CheckCode::U003) {
                     pyupgrade::plugins::type_of_primitive(self, expr, func, args);
                 }
