@@ -12,12 +12,12 @@ expression: checks
     column: 0
   fix: ~
 - kind:
-    ErrorSuffixOnExceptionName: D
+    ErrorSuffixOnExceptionName: E
   location:
-    row: 13
+    row: 17
     column: 0
   end_location:
-    row: 15
+    row: 19
     column: 0
   fix: ~
 
