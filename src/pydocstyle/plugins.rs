@@ -1359,7 +1359,10 @@ static GOOGLE_ARGS_REGEX: Lazy<Regex> =
 
 fn args_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
     let mut args_sections: Vec<String> = vec![];
-    for line in textwrap::dedent(&context.following_lines.join("\n")).lines() {
+    for line in textwrap::dedent(&context.following_lines.join("\n"))
+        .trim()
+        .lines()
+    {
         if line
             .chars()
             .next()
