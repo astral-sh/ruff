@@ -14,6 +14,7 @@ pub enum Plugin {
     Flake8Print,
     Flake8Quotes,
     Flake8Annotations,
+    McCabe,
     PEP8Naming,
     Pyupgrade,
 }
@@ -31,6 +32,7 @@ impl FromStr for Plugin {
             "flake8-print" => Ok(Plugin::Flake8Print),
             "flake8-quotes" => Ok(Plugin::Flake8Quotes),
             "flake8-annotations" => Ok(Plugin::Flake8Annotations),
+            "mccabe" => Ok(Plugin::McCabe),
             "pep8-naming" => Ok(Plugin::PEP8Naming),
             "pyupgrade" => Ok(Plugin::Pyupgrade),
             _ => Err(anyhow!("Unknown plugin: {}", string)),
@@ -49,6 +51,7 @@ impl Plugin {
             Plugin::Flake8Print => CheckCodePrefix::T,
             Plugin::Flake8Quotes => CheckCodePrefix::Q,
             Plugin::Flake8Annotations => CheckCodePrefix::ANN,
+            Plugin::McCabe => CheckCodePrefix::C9,
             Plugin::PEP8Naming => CheckCodePrefix::N,
             Plugin::Pyupgrade => CheckCodePrefix::U,
         }
@@ -79,6 +82,7 @@ impl Plugin {
             Plugin::Flake8Print => vec![CheckCodePrefix::T],
             Plugin::Flake8Quotes => vec![CheckCodePrefix::Q],
             Plugin::Flake8Annotations => vec![CheckCodePrefix::ANN],
+            Plugin::McCabe => vec![CheckCodePrefix::C9],
             Plugin::PEP8Naming => vec![CheckCodePrefix::N],
             Plugin::Pyupgrade => vec![CheckCodePrefix::U],
         }
@@ -314,6 +318,10 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
             }
             "allow-star-arg-any" | "allow_star_arg_any" => {
                 plugins.insert(Plugin::Flake8Annotations);
+            }
+            // mccabe
+            "max-complexity" | "max_complexity" => {
+                plugins.insert(Plugin::McCabe);
             }
             // pep8-naming
             "ignore-names" | "ignore_names" => {
