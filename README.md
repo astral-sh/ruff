@@ -650,13 +650,24 @@ Ruff should then appear as a runnable action:
 Ruff is available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright) extension
 for coc.nvim.
 
-Ruff can also be integrated via [efm](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm)
-in just a [few lines](https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20).
+<details>
+<summary>Ruff can also be integrated via <a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm"><code>efm</code></a> in just a <a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">few lines</a>.</summary>
+<br>
 
-For neovim users using [`null-ls`](https://github.com/jose-elias-alvarez/null-ls.nvim), this is already [integrated](https://github.com/jose-elias-alvarez/null-ls.nvim).
+```yaml
+tools:
+  python-ruff: &python-ruff
+    lint-command: 'ruff --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}'
+    lint-stdin: true
+    lint-formats:
+      - '%f:%l:%c: %m'
+    format-command: 'ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -'
+    format-stdin: true
+```
+</details>
 
 <details>
-<summary>However, to enable ruff in null-ls for both diagnostics and formatting:</summary>
+<summary>For neovim users using <a href="https://github.com/jose-elias-alvarez/null-ls.nvim"><code>null-ls</code></a>, Ruff is already <a href="https://github.com/jose-elias-alvarez/null-ls.nvim">integrated</a>.</summary>
 <br>
 
 ```lua
