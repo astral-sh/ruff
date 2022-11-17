@@ -8,3 +8,7 @@ class AnotherError(Exception):
 
 class C(Exception):
     pass
+
+
+class D(AnotherError):
+    pass
