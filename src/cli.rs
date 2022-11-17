@@ -93,7 +93,7 @@ pub struct Cli {
     pub line_length: Option<usize>,
     /// Max McCabe complexity allowed for a function.
     #[arg(long)]
-    pub max_complexity: Option<isize>,
+    pub max_complexity: Option<usize>,
     /// Round-trip auto-formatting.
     // TODO(charlie): This should be a sub-command.
     #[arg(long, hide = true)]

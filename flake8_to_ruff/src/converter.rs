@@ -190,7 +190,7 @@ pub fn convert(
                     // No-op (handled above).
                 }
                 // mccabe
-                "max-complexity" | "max_complexity" => match value.clone().parse::<isize>() {
+                "max-complexity" | "max_complexity" => match value.clone().parse::<usize>() {
                     Ok(max_complexity) => mccabe.max_complexity = Some(max_complexity),
                     Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                 },

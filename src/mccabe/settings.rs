@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
-    pub max_complexity: Option<isize>,
+    pub max_complexity: Option<usize>,
 }
 
 #[derive(Debug, Hash)]
 pub struct Settings {
-    pub max_complexity: isize,
+    pub max_complexity: usize,
 }
 
 impl Settings {
@@ -23,6 +23,6 @@ impl Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { max_complexity: -1 }
+        Self { max_complexity: 10 }
     }
 }

@@ -1,5 +1,5 @@
 ---
-source: src/linter.rs
+source: src/mccabe/mod.rs
 expression: checks
 ---
 - kind:

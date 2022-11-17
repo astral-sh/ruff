@@ -353,9 +353,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::B019) {
                     flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
                 }
-                if self.settings.enabled.contains(&CheckCode::C901)
-                    || self.settings.mccabe.max_complexity > -1
-                {
+                if self.settings.enabled.contains(&CheckCode::C901) {
                     if let Some(check) = mccabe::checks::function_is_too_complex(
                         stmt,
                         name,

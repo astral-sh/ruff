@@ -552,7 +552,7 @@ pub enum CheckKind {
     HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
     // mccabe
-    FunctionIsTooComplex(String, isize),
+    FunctionIsTooComplex(String, usize),
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),

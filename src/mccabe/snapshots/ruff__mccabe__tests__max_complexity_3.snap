@@ -1,0 +1,16 @@
+---
+source: src/mccabe/mod.rs
+expression: checks
+---
+- kind:
+    FunctionIsTooComplex:
+      - try_else
+      - 4
+  location:
+    row: 61
+    column: 0
+  end_location:
+    row: 72
+    column: 0
+  fix: ~
+
