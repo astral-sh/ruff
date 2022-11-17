@@ -519,6 +519,9 @@ mod tests {
     #[test_case(CheckCode::YTT301, Path::new("YTT301.py"); "YTT301")]
     #[test_case(CheckCode::YTT302, Path::new("YTT302.py"); "YTT302")]
     #[test_case(CheckCode::YTT303, Path::new("YTT303.py"); "YTT303")]
+    #[test_case(CheckCode::FBT001, Path::new("FBT.py"); "FBT001")]
+    #[test_case(CheckCode::FBT002, Path::new("FBT.py"); "FBT002")]
+    #[test_case(CheckCode::FBT003, Path::new("FBT.py"); "FBT003")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let mut checks = test_path(

@@ -237,6 +237,10 @@ pub enum CheckCode {
     S105,
     S106,
     S107,
+    // flake8-boolean-trap
+    FBT001,
+    FBT002,
+    FBT003,
     // Ruff
     RUF001,
     RUF002,
@@ -255,6 +259,7 @@ pub enum CheckCategory {
     PEP8Naming,
     Flake8Bandit,
     Flake8Comprehensions,
+    Flake8BooleanTrap,
     Flake8Bugbear,
     Flake8Builtins,
     Flake8TidyImports,
@@ -274,6 +279,7 @@ impl CheckCategory {
             CheckCategory::Pyflakes => "Pyflakes",
             CheckCategory::Isort => "isort",
             CheckCategory::Flake8Bandit => "flake8-bandit",
+            CheckCategory::Flake8BooleanTrap => "flake8-boolean-trap",
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
@@ -319,6 +325,9 @@ impl CheckCategory {
             CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
             CheckCategory::Flake8Bandit => Some("https://pypi.org/project/flake8-bandit/4.1.1/"),
             CheckCategory::McCabe => Some("https://pypi.org/project/mccabe/0.7.0/"),
+            CheckCategory::Flake8BooleanTrap => {
+                Some("https://pypi.org/project/flake8-boolean-trap/0.1.0/")
+            }
             CheckCategory::Ruff => None,
             CheckCategory::Meta => None,
         }
@@ -553,6 +562,10 @@ pub enum CheckKind {
     HardcodedPasswordDefault(String),
     // mccabe
     FunctionIsTooComplex(String, usize),
+    // flake8-boolean-trap
+    BooleanPositionalArgInFunctionDefinition,
+    BooleanDefaultValueInFunctionDefinition,
+    BooleanPositionalValueInFunctionCall,
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -834,6 +847,10 @@ impl CheckCode {
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
+            // flake8-boolean-trap
+            CheckCode::FBT001 => CheckKind::BooleanPositionalArgInFunctionDefinition,
+            CheckCode::FBT002 => CheckKind::BooleanDefaultValueInFunctionDefinition,
+            CheckCode::FBT003 => CheckKind::BooleanPositionalValueInFunctionCall,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1039,6 +1056,9 @@ impl CheckCode {
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::C901 => CheckCategory::McCabe,
+            CheckCode::FBT001 => CheckCategory::Flake8BooleanTrap,
+            CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
+            CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
@@ -1261,6 +1281,10 @@ impl CheckKind {
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
             // McCabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
+            // flake8-boolean-trap
+            CheckKind::BooleanPositionalArgInFunctionDefinition => &CheckCode::FBT001,
+            CheckKind::BooleanDefaultValueInFunctionDefinition => &CheckCode::FBT002,
+            CheckKind::BooleanPositionalValueInFunctionCall => &CheckCode::FBT003,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -1916,6 +1940,16 @@ impl CheckKind {
             // McCabe
             CheckKind::FunctionIsTooComplex(name, complexity) => {
                 format!("`{name}` is too complex ({complexity})")
+            }
+            // flake8-boolean-trap
+            CheckKind::BooleanPositionalArgInFunctionDefinition => {
+                "Boolean positional arg in function definition".to_string()
+            }
+            CheckKind::BooleanDefaultValueInFunctionDefinition => {
+                "Boolean default value in function definition".to_string()
+            }
+            CheckKind::BooleanPositionalValueInFunctionCall => {
+                "Boolean positional value in function call".to_string()
             }
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {

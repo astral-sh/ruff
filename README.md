@@ -509,6 +509,16 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C416 | UnnecessaryComprehension | Unnecessary `(list\|set)` comprehension (rewrite using `(list\|set)()`) | 🛠 |
 | C417 | UnnecessaryMap | Unnecessary `map` usage (rewrite using a `(list\|set\|dict)` comprehension) |  |
 
+### flake8-boolean-trap
+
+For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/0.1.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| FBT001 | BooleanPositionalArgInFunctionDefinition | Boolean positional arg in function definition |  |
+| FBT002 | BooleanDefaultValueInFunctionDefinition | Boolean default value in function definition |  |
+| FBT003 | BooleanPositionalValueInFunctionCall | Boolean positional value in function call |  |
+
 ### flake8-bugbear
 
 For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/) on PyPI.
