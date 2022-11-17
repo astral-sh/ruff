@@ -55,7 +55,10 @@ pub fn unused_variables(scope: &Scope, dummy_variable_rgx: &Regex) -> Vec<Check>
 
     if matches!(
         scope.kind,
-        ScopeKind::Function(FunctionScope { uses_locals: true })
+        ScopeKind::Function(FunctionScope {
+            uses_locals: true,
+            ..
+        })
     ) {
         return checks;
     }
