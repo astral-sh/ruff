@@ -1,17 +1,21 @@
+# Complexity = 1
 def trivial():
     pass
 
 
+# Complexity = 1
 def expr_as_statement():
     0xF00D
 
 
+# Complexity = 1
 def sequential(n):
     k = n + 4
     s = k + n
     return s
 
 
+# Complexity = 3
 def if_elif_else_dead_path(n):
     if n > 3:
         return "bigger than three"
@@ -21,6 +25,7 @@ def if_elif_else_dead_path(n):
         return "smaller than or equal to three"
 
 
+# Complexity = 3
 def nested_ifs():
     if n > 3:
         if n > 4:
@@ -31,11 +36,13 @@ def nested_ifs():
         return "smaller than or equal to three"
 
 
+# Complexity = 2
 def for_loop():
     for i in range(10):
         print(i)
 
 
+# Complexity = 2
 def for_else(mylist):
     for i in mylist:
         print(i)
@@ -43,6 +50,7 @@ def for_else(mylist):
         print(None)
 
 
+# Complexity = 2
 def recursive(n):
     if n > 4:
         return f(n - 1)
@@ -50,14 +58,18 @@ def recursive(n):
         return n
 
 
+# Complexity = 3
 def nested_functions():
     def a():
         def b():
             pass
+
         b()
+
     a()
 
 
+# Complexity = 4
 def try_else():
     try:
         print(1)
@@ -69,6 +81,7 @@ def try_else():
         print(4)
 
 
+# Complexity = 3
 def nested_try_finally():
     try:
         try:
@@ -79,6 +92,7 @@ def nested_try_finally():
         print(3)
 
 
+# Complexity = 3
 async def foobar(a, b, c):
     await whatever(a, b, c)
     if await b:
@@ -89,5 +103,6 @@ async def foobar(a, b, c):
         pass
 
 
+# Complexity = 1
 def annotated_assign():
     x: Any = None

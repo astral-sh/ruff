@@ -48,7 +48,7 @@ impl Plugin {
             Plugin::Flake8Bandit => CheckCodePrefix::S,
             Plugin::Flake8Bugbear => CheckCodePrefix::B,
             Plugin::Flake8Builtins => CheckCodePrefix::A,
-            Plugin::Flake8Comprehensions => CheckCodePrefix::C,
+            Plugin::Flake8Comprehensions => CheckCodePrefix::C4,
             Plugin::Flake8Docstrings => CheckCodePrefix::D,
             Plugin::Flake8TidyImports => CheckCodePrefix::I25,
             Plugin::Flake8Print => CheckCodePrefix::T,
@@ -65,7 +65,7 @@ impl Plugin {
             Plugin::Flake8Bandit => vec![CheckCodePrefix::S],
             Plugin::Flake8Bugbear => vec![CheckCodePrefix::B],
             Plugin::Flake8Builtins => vec![CheckCodePrefix::A],
-            Plugin::Flake8Comprehensions => vec![CheckCodePrefix::C],
+            Plugin::Flake8Comprehensions => vec![CheckCodePrefix::C4],
             Plugin::Flake8Docstrings => {
                 // Use the user-provided docstring.
                 for key in ["docstring-convention", "docstring_convention"] {
