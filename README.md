@@ -647,9 +647,12 @@ Ruff can also be integrated via [efm](https://github.com/neovim/nvim-lspconfig/b
 in just a [few lines](https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20).
 
 For neovim users using [`null-ls`](https://github.com/jose-elias-alvarez/null-ls.nvim), this is already [integrated](https://github.com/jose-elias-alvarez/null-ls.nvim).
-<details open>
-<summary>To enable ruff for both diagnostics and using `--fix` as a formatter:</summary>
+
+<details>
+<summary>However, to enable ruff in null-ls for both diagnostics and formatting:</summary>
 <br>
+
+```lua
 local null_ls = require("null-ls")
 local methods = require("null-ls.methods")
 local helpers = require("null-ls.helpers")
@@ -678,6 +681,7 @@ null_ls.setup({
         null_ls.builtins.diagnostics.ruff,
     }
 })
+```
 </details>
 
 ### Language Server Protocol (Unofficial)
