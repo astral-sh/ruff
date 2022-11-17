@@ -19,8 +19,7 @@ use crate::ast::helpers::{
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, ImportKind, Range, Scope,
-    ScopeKind,
+    Binding, BindingContext, BindingKind, ClassScope, ImportKind, Range, Scope, ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
@@ -216,21 +215,18 @@ where
         match &stmt.node {
             StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
                 let global_scope_id = self.scopes[GLOBAL_SCOPE_INDEX].id;
-
-                let current_scope = self.current_scope();
-                let current_scope_id = current_scope.id;
-                if current_scope_id != global_scope_id {
+                let scope =
+                    &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+                if scope.id != global_scope_id {
                     for name in names {
-                        for scope in self.scopes.iter_mut().skip(GLOBAL_SCOPE_INDEX + 1) {
-                            scope.values.insert(
-                                name,
-                                Binding {
-                                    kind: BindingKind::Assignment,
-                                    used: Some((global_scope_id, Range::from_located(stmt))),
-                                    range: Range::from_located(stmt),
-                                },
-                            );
-                        }
+                        scope.values.insert(
+                            name,
+                            Binding {
+                                kind: BindingKind::Global,
+                                used: Some((global_scope_id, Range::from_located(stmt))),
+                                range: Range::from_located(stmt),
+                            },
+                        );
                     }
                 }
 
@@ -732,10 +728,8 @@ where
                             ));
                         }
 
-                        let scope = &mut self.scopes[*(self
-                            .scope_stack
-                            .last_mut()
-                            .expect("No current scope found."))];
+                        let scope = &mut self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
                         scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
@@ -1452,15 +1446,10 @@ where
 
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
-                        let scope = &mut self.scopes[*(self
-                            .scope_stack
-                            .last_mut()
-                            .expect("No current scope found."))];
-                        if matches!(
-                            scope.kind,
-                            ScopeKind::Function(FunctionScope { uses_locals: false })
-                        ) {
-                            scope.kind = ScopeKind::Function(FunctionScope { uses_locals: true });
+                        let scope = &mut self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
+                        if let ScopeKind::Function(inner) = &mut scope.kind {
+                            inner.uses_locals = true;
                         }
                     }
                 }
@@ -2243,7 +2232,16 @@ impl<'a> Checker<'a> {
 
         if self.settings.enabled.contains(&CheckCode::N806) {
             if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
-                pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
+                // Ignore globals.
+                if !self
+                    .current_scope()
+                    .values
+                    .get(id)
+                    .map(|binding| matches!(binding.kind, BindingKind::Global))
+                    .unwrap_or(false)
+                {
+                    pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
+                }
             }
         }
 

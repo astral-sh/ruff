@@ -1,8 +1,12 @@
 import collections
 from collections import namedtuple
 
+GLOBAL: str = "foo"
+
 
 def f():
+    global GLOBAL
+    GLOBAL = "bar"
     lower = 0
     Camel = 0
     CONSTANT = 0

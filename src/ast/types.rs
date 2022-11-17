@@ -79,8 +79,10 @@ pub enum BindingKind {
     Annotation,
     Argument,
     Assignment,
+    // TODO(charlie): This seems to be a catch-all.
     Binding,
     LoopVar,
+    Global,
     Builtin,
     ClassDefinition,
     Definition,
