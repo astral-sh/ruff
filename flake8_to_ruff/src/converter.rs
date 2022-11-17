@@ -3,9 +3,10 @@ use std::collections::{BTreeSet, HashMap};
 use anyhow::Result;
 use ruff::checks_gen::CheckCodePrefix;
 use ruff::flake8_quotes::settings::Quote;
+use ruff::flake8_tidy_imports::settings::Strictness;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
-use ruff::{flake8_annotations, flake8_bugbear, flake8_quotes, pep8_naming};
+use ruff::{flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, pep8_naming};
 
 use crate::plugin::Plugin;
 use crate::{parser, plugin};
@@ -71,6 +72,7 @@ pub fn convert(
     let mut flake8_annotations: flake8_annotations::settings::Options = Default::default();
     let mut flake8_bugbear: flake8_bugbear::settings::Options = Default::default();
     let mut flake8_quotes: flake8_quotes::settings::Options = Default::default();
+    let mut flake8_tidy_imports: flake8_tidy_imports::settings::Options = Default::default();
     let mut pep8_naming: pep8_naming::settings::Options = Default::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
@@ -172,6 +174,14 @@ pub fn convert(
                     pep8_naming.staticmethod_decorators =
                         Some(parser::parse_strings(value.as_ref()));
                 }
+                // flake8-tidy-imports
+                "ban-relative-imports" | "ban_relative_imports" => match value.trim() {
+                    "true" => flake8_tidy_imports.ban_relative_imports = Some(Strictness::All),
+                    "parents" => {
+                        flake8_tidy_imports.ban_relative_imports = Some(Strictness::Parents)
+                    }
+                    _ => eprintln!("Unexpected '{key}' value: {value}"),
+                },
                 // flake8-docstrings
                 "docstring-convention" => {
                     // No-op (handled above).
@@ -193,6 +203,9 @@ pub fn convert(
     }
     if flake8_quotes != Default::default() {
         options.flake8_quotes = Some(flake8_quotes);
+    }
+    if flake8_tidy_imports != Default::default() {
+        options.flake8_tidy_imports = Some(flake8_tidy_imports);
     }
     if pep8_naming != Default::default() {
         options.pep8_naming = Some(pep8_naming);
@@ -238,6 +251,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
             pep8_naming: None,
         });
@@ -272,6 +286,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
             pep8_naming: None,
         });
@@ -306,6 +321,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
             pep8_naming: None,
         });
@@ -340,6 +356,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
             pep8_naming: None,
         });
@@ -379,6 +396,7 @@ mod tests {
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
+            flake8_tidy_imports: None,
             isort: None,
             pep8_naming: None,
         });
@@ -451,6 +469,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
             pep8_naming: None,
         });
@@ -491,6 +510,7 @@ mod tests {
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
+            flake8_tidy_imports: None,
             isort: None,
             pep8_naming: None,
         });

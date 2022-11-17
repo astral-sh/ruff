@@ -37,7 +37,8 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_print, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    flake8_comprehensions, flake8_print, flake8_tidy_imports, pep8_naming, pycodestyle, pydocstyle,
+    pyflakes, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -780,6 +781,16 @@ where
                                 range: Range::from_located(stmt),
                             },
                         )
+                    }
+
+                    if self.settings.enabled.contains(&CheckCode::I252) {
+                        if let Some(check) = flake8_tidy_imports::checks::banned_relative_import(
+                            stmt,
+                            level.as_ref(),
+                            &self.settings.flake8_tidy_imports.ban_relative_imports,
+                        ) {
+                            self.add_check(check);
+                        }
                     }
 
                     if let Some(asname) = &alias.node.asname {

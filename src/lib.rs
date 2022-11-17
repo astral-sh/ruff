@@ -35,6 +35,7 @@ mod flake8_builtins;
 mod flake8_comprehensions;
 mod flake8_print;
 pub mod flake8_quotes;
+pub mod flake8_tidy_imports;
 pub mod fs;
 mod isort;
 mod lex;

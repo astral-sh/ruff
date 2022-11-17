@@ -1,4 +1,4 @@
-//! Settings for the `flake-quotes` plugin.
+//! Settings for the `flake8-quotes` plugin.
 
 use serde::{Deserialize, Serialize};
 

@@ -548,6 +548,14 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/)
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |
 
+### flake8-tidy-imports
+
+For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| I252 | BannedRelativeImport | Relative imports are banned |  |
+
 ### flake8-print
 
 For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on PyPI.
