@@ -37,11 +37,15 @@ pub fn literal_comparisons(
     check_none_comparisons: bool,
     check_true_false_comparisons: bool,
 ) {
+    // Mapping from (bad operator index) to (replacement operator). As we iterate
+    // through the list of operators, we apply "dummy" fixes for each error,
+    // then replace the entire expression at the end with one "real" fix, to
+    // avoid conflicts.
+    let mut bad_ops: FnvHashMap<usize, Cmpop> = FnvHashMap::default();
+    let mut checks: Vec<Check> = vec![];
+
     let op = ops.first().unwrap();
     let comparator = left;
-    let mut checks: Vec<Check> = vec![];
-    // Mapping of bad operator index -> good operator
-    let mut bad_ops: FnvHashMap<usize, Cmpop> = FnvHashMap::default();
 
     // Check `left`.
     if check_none_comparisons
@@ -60,11 +64,7 @@ pub fn literal_comparisons(
             );
             if checker.patch() {
                 // Dummy replacement
-                check.amend(Fix::replacement(
-                    "".to_string(),
-                    expr.location,
-                    expr.location,
-                ));
+                check.amend(Fix::dummy(expr.location));
                 bad_ops.insert(0, Cmpop::Is);
             }
             checks.push(check);
@@ -75,11 +75,7 @@ pub fn literal_comparisons(
                 Range::from_located(comparator),
             );
             if checker.patch() {
-                check.amend(Fix::replacement(
-                    "".to_string(),
-                    expr.location,
-                    expr.location,
-                ));
+                check.amend(Fix::dummy(expr.location));
                 bad_ops.insert(0, Cmpop::IsNot);
             }
             checks.push(check);
@@ -98,11 +94,7 @@ pub fn literal_comparisons(
                     Range::from_located(comparator),
                 );
                 if checker.patch() {
-                    check.amend(Fix::replacement(
-                        "".to_string(),
-                        expr.location,
-                        expr.location,
-                    ));
+                    check.amend(Fix::dummy(expr.location));
                     bad_ops.insert(0, Cmpop::Is);
                 }
                 checks.push(check);
@@ -113,11 +105,7 @@ pub fn literal_comparisons(
                     Range::from_located(comparator),
                 );
                 if checker.patch() {
-                    check.amend(Fix::replacement(
-                        "".to_string(),
-                        expr.location,
-                        expr.location,
-                    ));
+                    check.amend(Fix::dummy(expr.location));
                     bad_ops.insert(0, Cmpop::IsNot);
                 }
                 checks.push(check);
@@ -142,11 +130,7 @@ pub fn literal_comparisons(
                     Range::from_located(comparator),
                 );
                 if checker.patch() {
-                    check.amend(Fix::replacement(
-                        "".to_string(),
-                        expr.location,
-                        expr.location,
-                    ));
+                    check.amend(Fix::dummy(expr.location));
                     bad_ops.insert(idx, Cmpop::Is);
                 }
                 checks.push(check);
@@ -157,11 +141,7 @@ pub fn literal_comparisons(
                     Range::from_located(comparator),
                 );
                 if checker.patch() {
-                    check.amend(Fix::replacement(
-                        "".to_string(),
-                        expr.location,
-                        expr.location,
-                    ));
+                    check.amend(Fix::dummy(expr.location));
                     bad_ops.insert(idx, Cmpop::IsNot);
                 }
                 checks.push(check);
@@ -180,11 +160,7 @@ pub fn literal_comparisons(
                         Range::from_located(comparator),
                     );
                     if checker.patch() {
-                        check.amend(Fix::replacement(
-                            "".to_string(),
-                            expr.location,
-                            expr.location,
-                        ));
+                        check.amend(Fix::dummy(expr.location));
                         bad_ops.insert(idx, Cmpop::Is);
                     }
                     checks.push(check);
@@ -195,11 +171,7 @@ pub fn literal_comparisons(
                         Range::from_located(comparator),
                     );
                     if checker.patch() {
-                        check.amend(Fix::replacement(
-                            "".to_string(),
-                            expr.location,
-                            expr.location,
-                        ));
+                        check.amend(Fix::dummy(expr.location));
                         bad_ops.insert(idx, Cmpop::IsNot);
                     }
                     checks.push(check);
@@ -209,17 +181,17 @@ pub fn literal_comparisons(
     }
 
     if !bad_ops.is_empty() {
+        // Replace the entire comparison expression.
         let ops = ops
             .iter()
             .enumerate()
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .cloned()
             .collect::<Vec<_>>();
-        if let Some(new_compare) = compare(left, &ops, comparators) {
+        if let Some(content) = compare(left, &ops, comparators) {
             if let Some(check) = checks.last_mut() {
-                // Replace the entire compare expression
                 check.fix = Some(Fix::replacement(
-                    new_compare,
+                    content,
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
@@ -227,7 +199,5 @@ pub fn literal_comparisons(
         }
     }
 
-    for check in checks {
-        checker.add_check(check);
-    }
+    checker.add_checks(checks.into_iter());
 }

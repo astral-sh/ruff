@@ -50,4 +50,15 @@ impl Fix {
             applied: false,
         }
     }
+
+    pub fn dummy(location: Location) -> Self {
+        Self {
+            patch: Patch {
+                content: "".to_string(),
+                location,
+                end_location: location,
+            },
+            applied: false,
+        }
+    }
 }
