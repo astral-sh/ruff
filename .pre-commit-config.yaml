@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.126
+    rev: v0.0.127
     hooks:
       - id: ruff
 
