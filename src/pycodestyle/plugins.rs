@@ -241,7 +241,7 @@ pub fn not_tests(
                     Cmpop::Is => {
                         if check_not_is {
                             let mut check =
-                                Check::new(CheckKind::NotInTest, Range::from_located(operand));
+                                Check::new(CheckKind::NotIsTest, Range::from_located(operand));
                             if checker.patch() && should_fix {
                                 if let Some(content) = compare(left, &[Cmpop::IsNot], comparators) {
                                     check.amend(Fix::replacement(
