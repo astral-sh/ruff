@@ -61,7 +61,8 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    1. [flake8-quotes (Q)](#flake8-quotes)
    1. [flake8-annotations (ANN)](#flake8-annotations)
    1. [flake8-2020 (YTT)](#flake8-2020)
-   1. [flake8-blind-except](#flake8-blind-except)
+   1. [flake8-blind-except (B90)](#flake8-blind-except)
+   1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
    1. [mccabe (C90)](#mccabe)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
    1. [Meta rules (M)](#meta-rules)
@@ -804,6 +805,7 @@ including:
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (25/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/) (1/2)
+- [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`isort`](https://pypi.org/project/isort/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33)
@@ -834,6 +836,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (26/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/) (1/2)
+- [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
