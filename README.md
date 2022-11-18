@@ -61,6 +61,7 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    1. [flake8-quotes (Q)](#flake8-quotes)
    1. [flake8-annotations (ANN)](#flake8-annotations)
    1. [flake8-2020 (YTT)](#flake8-2020)
+   1. [mccabe (C90)](#mccabe)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
    1. [Meta rules (M)](#meta-rules)
 1. [Editor Integrations](#editor-integrations)
@@ -780,6 +781,8 @@ including:
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (25/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
+- [`mccabe`](https://pypi.org/project/mccabe/)
+- [`isort`](https://pypi.org/project/isort/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
@@ -794,6 +797,7 @@ Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis F
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
 
+- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
@@ -806,6 +810,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (26/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
+- [`mccabe`](https://pypi.org/project/mccabe/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33).
