@@ -36,8 +36,8 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
-    flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print, flake8_tidy_imports,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print,
+    flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -1462,6 +1462,12 @@ where
                     pyupgrade::plugins::type_of_primitive(self, expr, func, args);
                 }
 
+                // flake8-boolean-trap
+                if self.settings.enabled.contains(&CheckCode::FBT003) {
+                    flake8_boolean_trap::plugins::check_boolean_positional_value_in_function_call(
+                        self, args,
+                    );
+                }
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = &mut self.scopes
@@ -1953,6 +1959,16 @@ where
         }
         if self.settings.enabled.contains(&CheckCode::B008) {
             flake8_bugbear::plugins::function_call_argument_default(self, arguments)
+        }
+
+        // flake8-boolean-trap
+        if self.settings.enabled.contains(&CheckCode::FBT001) {
+            flake8_boolean_trap::plugins::check_positional_boolean_in_def(self, arguments);
+        }
+        if self.settings.enabled.contains(&CheckCode::FBT002) {
+            flake8_boolean_trap::plugins::check_boolean_default_value_in_function_definition(
+                self, arguments,
+            );
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them

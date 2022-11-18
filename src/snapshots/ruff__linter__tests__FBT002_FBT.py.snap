@@ -1,0 +1,37 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: BooleanDefaultValueInFunctionDefinition
+  location:
+    row: 12
+    column: 30
+  end_location:
+    row: 12
+    column: 34
+  fix: ~
+- kind: BooleanDefaultValueInFunctionDefinition
+  location:
+    row: 13
+    column: 42
+  end_location:
+    row: 13
+    column: 46
+  fix: ~
+- kind: BooleanDefaultValueInFunctionDefinition
+  location:
+    row: 14
+    column: 40
+  end_location:
+    row: 14
+    column: 44
+  fix: ~
+- kind: BooleanDefaultValueInFunctionDefinition
+  location:
+    row: 15
+    column: 45
+  end_location:
+    row: 15
+    column: 49
+  fix: ~
+
