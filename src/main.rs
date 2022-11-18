@@ -7,7 +7,7 @@ use std::time::Instant;
 #[cfg(not(target_family = "wasm"))]
 use ::ruff::cache;
 use ::ruff::checks::{CheckCode, CheckKind};
-use ::ruff::cli::{collect_per_file_ignores, extract_log_level, warn_on, Cli, Warnable};
+use ::ruff::cli::{collect_per_file_ignores, extract_log_level, Cli};
 use ::ruff::fs::iter_python_files;
 use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin};
 use ::ruff::logging::{set_up_logging, LogLevel};
@@ -240,25 +240,9 @@ fn inner_main() -> Result<ExitCode> {
             collect_per_file_ignores(cli.per_file_ignores, project_root.as_ref());
     }
     if !cli.select.is_empty() {
-        warn_on(
-            Warnable::Select,
-            &cli.select,
-            &cli.ignore,
-            &cli.extend_ignore,
-            &configuration,
-            pyproject.as_ref(),
-        );
         configuration.select = cli.select;
     }
     if !cli.extend_select.is_empty() {
-        warn_on(
-            Warnable::ExtendSelect,
-            &cli.extend_select,
-            &cli.ignore,
-            &cli.extend_ignore,
-            &configuration,
-            pyproject.as_ref(),
-        );
         configuration.extend_select = cli.extend_select;
     }
     if !cli.ignore.is_empty() {
