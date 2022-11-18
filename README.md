@@ -61,7 +61,7 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    1. [flake8-quotes (Q)](#flake8-quotes)
    1. [flake8-annotations (ANN)](#flake8-annotations)
    1. [flake8-2020 (YTT)](#flake8-2020)
-   1. [flake8-blind-except (B90)](#flake8-blind-except)
+   1. [flake8-blind-except (BLE)](#flake8-blind-except)
    1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
    1. [mccabe (C90)](#mccabe)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
@@ -634,7 +634,7 @@ For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| B902 | BlindExcept | Blind except Exception: statement |  |
+| BLE001 | BlindExcept | Blind except Exception: statement |  |
 
 ### mccabe
 
@@ -804,7 +804,7 @@ including:
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (25/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
-- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/) (1/2)
+- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`isort`](https://pypi.org/project/isort/)
@@ -835,7 +835,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (26/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
-- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/) (1/2)
+- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 
