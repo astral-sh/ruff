@@ -126,6 +126,7 @@ impl Hash for Settings {
         for value in self.per_file_ignores.iter() {
             value.hash(state);
         }
+        self.show_source.hash(state);
         self.target_version.hash(state);
         // Add plugin properties in alphabetical order.
         self.flake8_annotations.hash(state);
