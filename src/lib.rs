@@ -30,6 +30,7 @@ mod docstrings;
 mod flake8_2020;
 pub mod flake8_annotations;
 pub mod flake8_bandit;
+mod flake8_blind_except;
 pub mod flake8_bugbear;
 mod flake8_builtins;
 mod flake8_comprehensions;

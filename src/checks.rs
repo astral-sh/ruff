@@ -103,6 +103,8 @@ pub enum CheckCode {
     B025,
     B026,
     B027,
+    // flake8-blind-except
+    B902,
     // flake8-comprehensions
     C400,
     C401,
@@ -262,6 +264,7 @@ pub enum CheckCategory {
     Flake8Quotes,
     Flake8Annotations,
     Flake82020,
+    Flake8BlindExcept,
     McCabe,
     Ruff,
     Meta,
@@ -282,6 +285,7 @@ impl CheckCategory {
             CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Flake8Annotations => "flake8-annotations",
             CheckCategory::Flake82020 => "flake8-2020",
+            CheckCategory::Flake8BlindExcept => "flake8-blind-except",
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Pydocstyle => "pydocstyle",
             CheckCategory::PEP8Naming => "pep8-naming",
@@ -318,6 +322,9 @@ impl CheckCategory {
             CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
             CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
             CheckCategory::Flake8Bandit => Some("https://pypi.org/project/flake8-bandit/4.1.1/"),
+            CheckCategory::Flake8BlindExcept => {
+                Some("https://pypi.org/project/flake8-blind-except/0.2.1/")
+            }
             CheckCategory::McCabe => Some("https://pypi.org/project/mccabe/0.7.0/"),
             CheckCategory::Ruff => None,
             CheckCategory::Meta => None,
@@ -393,6 +400,8 @@ pub enum CheckKind {
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
     BuiltinAttributeShadowing(String),
+    // flake8-blind-except
+    BlindExcept,
     // flake8-bugbear
     UnaryPrefixIncrement,
     AssignmentToOsEnviron,
@@ -732,6 +741,8 @@ impl CheckCode {
             CheckCode::YTT301 => CheckKind::SysVersion0Referenced,
             CheckCode::YTT302 => CheckKind::SysVersionCmpStr10,
             CheckCode::YTT303 => CheckKind::SysVersionSlice1Referenced,
+            // flake8-blind-except
+            CheckCode::B902 => CheckKind::BlindExcept,
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
@@ -917,6 +928,7 @@ impl CheckCode {
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::B027 => CheckCategory::Flake8Bugbear,
+            CheckCode::B902 => CheckCategory::Flake8BlindExcept,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
             CheckCode::C402 => CheckCategory::Flake8Comprehensions,
@@ -1127,6 +1139,8 @@ impl CheckKind {
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
             CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             CheckKind::EmptyMethodWithoutAbstractDecorator(_) => &CheckCode::B027,
+            // flake8-blind-except
+            CheckKind::BlindExcept => &CheckCode::B902,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
             CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,
@@ -1913,6 +1927,8 @@ impl CheckKind {
             CheckKind::HardcodedPasswordDefault(string) => {
                 format!("Possible hardcoded password: `\"{string}\"`")
             }
+            // flake8-blind-except
+            CheckKind::BlindExcept => "Blind except Exception: statement".to_string(),
             // McCabe
             CheckKind::FunctionIsTooComplex(name, complexity) => {
                 format!("`{name}` is too complex ({complexity})")
