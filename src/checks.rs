@@ -104,7 +104,7 @@ pub enum CheckCode {
     B026,
     B027,
     // flake8-blind-except
-    B902,
+    BLE001,
     // flake8-comprehensions
     C400,
     C401,
@@ -757,7 +757,7 @@ impl CheckCode {
             CheckCode::YTT302 => CheckKind::SysVersionCmpStr10,
             CheckCode::YTT303 => CheckKind::SysVersionSlice1Referenced,
             // flake8-blind-except
-            CheckCode::B902 => CheckKind::BlindExcept,
+            CheckCode::BLE001 => CheckKind::BlindExcept,
             // pyupgrade
             CheckCode::U001 => CheckKind::UselessMetaclassType,
             CheckCode::U003 => CheckKind::TypeOfPrimitive(Primitive::Str),
@@ -948,7 +948,7 @@ impl CheckCode {
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::B027 => CheckCategory::Flake8Bugbear,
-            CheckCode::B902 => CheckCategory::Flake8BlindExcept,
+            CheckCode::BLE001 => CheckCategory::Flake8BlindExcept,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
             CheckCode::C402 => CheckCategory::Flake8Comprehensions,
@@ -1164,7 +1164,7 @@ impl CheckKind {
             CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             CheckKind::EmptyMethodWithoutAbstractDecorator(_) => &CheckCode::B027,
             // flake8-blind-except
-            CheckKind::BlindExcept => &CheckCode::B902,
+            CheckKind::BlindExcept => &CheckCode::BLE001,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
             CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,

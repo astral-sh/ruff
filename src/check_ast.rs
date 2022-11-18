@@ -921,7 +921,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
                 }
-                if self.settings.enabled.contains(&CheckCode::B902) {
+                if self.settings.enabled.contains(&CheckCode::BLE001) {
                     flake8_blind_except::plugins::blind_except(self, handlers);
                 }
             }
