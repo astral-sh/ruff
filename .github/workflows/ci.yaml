@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - "**.py"
+      - "**.rs"
   pull_request:
     branches: [main]
+    paths:
+      - "**.py"
+      - "**.rs"
 
 env:
   CARGO_INCREMENTAL: 0
