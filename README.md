@@ -61,6 +61,7 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    1. [flake8-quotes (Q)](#flake8-quotes)
    1. [flake8-annotations (ANN)](#flake8-annotations)
    1. [flake8-2020 (YTT)](#flake8-2020)
+   1. [flake8-blind-except](#flake8-blind-except)
    1. [mccabe (C90)](#mccabe)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
    1. [Meta rules (M)](#meta-rules)
@@ -616,6 +617,14 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 | YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
 | YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
 
+### flake8-blind-except
+
+For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except/0.2.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| B902 | BlindExcept | Blind except Exception: statement |  |
+
 ### mccabe
 
 For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
@@ -677,6 +686,7 @@ tools:
     format-command: 'ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -'
     format-stdin: true
 ```
+
 </details>
 
 <details>
@@ -713,6 +723,7 @@ null_ls.setup({
     }
 })
 ```
+
 </details>
 
 ### Language Server Protocol (Unofficial)
@@ -782,6 +793,7 @@ including:
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (25/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
+- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/) (1/2)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`isort`](https://pypi.org/project/isort/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33)
@@ -811,6 +823,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (26/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
+- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/) (1/2)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),

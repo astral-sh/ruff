@@ -35,9 +35,9 @@ use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_print, flake8_tidy_imports, mccabe, pep8_naming, pycodestyle,
-    pydocstyle, pyflakes, pyupgrade,
+    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
+    flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print, flake8_tidy_imports,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -920,6 +920,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
+                }
+                if self.settings.enabled.contains(&CheckCode::B902) {
+                    flake8_blind_except::plugins::blind_except(self, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
