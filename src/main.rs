@@ -118,8 +118,6 @@ fn run_once(
                             end_location: Default::default(),
                             filename: path.to_string_lossy().to_string(),
                             source: None,
-                            range: None,
-                            show_source: false,
                         }]
                     } else {
                         error!("Failed to check {}: {message}", path.to_string_lossy());

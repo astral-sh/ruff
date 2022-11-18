@@ -20,41 +20,18 @@ pub struct Message {
     pub location: Location,
     pub end_location: Location,
     pub filename: String,
-    pub source: Option<String>,
-    pub range: Option<(usize, usize)>,
-    pub show_source: bool,
+    pub source: Option<Source>,
 }
 
 impl Message {
-    pub fn from_check(
-        filename: String,
-        check: Check,
-        locator: &SourceCodeLocator,
-        show_source: bool,
-    ) -> Self {
-        let source = locator.slice_source_code_range(&Range {
-            location: Location::new(check.location.row(), 0),
-            end_location: Location::new(check.end_location.row() + 1, 0),
-        });
-        let num_chars_in_range = locator
-            .slice_source_code_range(&Range {
-                location: check.location,
-                end_location: check.end_location,
-            })
-            .chars()
-            .count();
+    pub fn from_check(check: Check, filename: String, source: Option<Source>) -> Self {
         Self {
             kind: check.kind,
             fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
             location: Location::new(check.location.row(), check.location.column() + 1),
             end_location: Location::new(check.end_location.row(), check.end_location.column() + 1),
             filename,
-            source: Some(source.to_string()),
-            range: Some((
-                check.location.column(),
-                check.location.column() + num_chars_in_range,
-            )),
-            show_source,
+            source,
         }
     }
 }
@@ -88,25 +65,7 @@ impl fmt::Display for Message {
             self.kind.code().as_ref().red().bold(),
             self.kind.body(),
         );
-        let slices = if self.show_source {
-            if let (Some(source), Some(range)) = (&self.source, self.range) {
-                vec![Slice {
-                    source,
-                    line_start: self.location.row(),
-                    origin: None,
-                    fold: false,
-                    annotations: vec![SourceAnnotation {
-                        label: "",
-                        annotation_type: AnnotationType::Error,
-                        range,
-                    }],
-                }]
-            } else {
-                vec![]
-            }
-        } else {
-            vec![]
-        };
+
         let snippet = Snippet {
             title: Some(Annotation {
                 label: Some(&label),
@@ -114,18 +73,63 @@ impl fmt::Display for Message {
                 annotation_type: AnnotationType::Error,
             }),
             footer: vec![],
-            slices,
+            slices: if let Some(source) = &self.source {
+                vec![Slice {
+                    source: &source.contents,
+                    line_start: self.location.row(),
+                    origin: None,
+                    fold: false,
+                    annotations: vec![SourceAnnotation {
+                        label: "",
+                        annotation_type: AnnotationType::Error,
+                        range: source.range,
+                    }],
+                }]
+            } else {
+                vec![]
+            },
             opt: FormatOptions {
                 color: true,
                 ..Default::default()
             },
         };
-        let mut message = DisplayList::from(snippet).to_string();
-        if self.show_source {
-            message.push('\n');
-        }
+
+        let mut message = DisplayList::from(snippet);
+        // if self.show_source {
+        //     message.push('\n');
+        // }
         // `split_once(' ').unwrap().1` stirps "error: " from `message`.
         // Note `message` contains ANSI color codes.
-        write!(f, "{}", message.split_once(' ').unwrap().1)
+        // write!(f, "{}", message.split_once(' ').unwrap().1)
+        write!(f, "{}", message)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Source {
+    pub contents: String,
+    pub range: (usize, usize),
+}
+
+impl Source {
+    pub fn from_check(check: &Check, locator: &SourceCodeLocator) -> Self {
+        let source = locator.slice_source_code_range(&Range {
+            location: Location::new(check.location.row(), 0),
+            end_location: Location::new(check.end_location.row() + 1, 0),
+        });
+        let num_chars_in_range = locator
+            .slice_source_code_range(&Range {
+                location: check.location,
+                end_location: check.end_location,
+            })
+            .chars()
+            .count();
+        Source {
+            contents: source.to_string(),
+            range: (
+                check.location.column(),
+                check.location.column() + num_chars_in_range,
+            ),
+        }
     }
 }
