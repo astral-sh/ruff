@@ -219,14 +219,14 @@ pub fn not_tests(
             ..
         } = &operand.node
         {
-            let auto_fixable = ops.len() == 1;
+            let should_fix = ops.len() == 1;
             for op in ops.iter() {
                 match op {
                     Cmpop::In => {
                         if check_not_in {
                             let mut check =
                                 Check::new(CheckKind::NotInTest, Range::from_located(operand));
-                            if checker.patch() && auto_fixable {
+                            if checker.patch() && should_fix {
                                 if let Some(content) = compare(left, &[Cmpop::NotIn], comparators) {
                                     check.amend(Fix::replacement(
                                         content,
@@ -242,7 +242,7 @@ pub fn not_tests(
                         if check_not_is {
                             let mut check =
                                 Check::new(CheckKind::NotInTest, Range::from_located(operand));
-                            if checker.patch() && auto_fixable {
+                            if checker.patch() && should_fix {
                                 if let Some(content) = compare(left, &[Cmpop::IsNot], comparators) {
                                     check.amend(Fix::replacement(
                                         content,
