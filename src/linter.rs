@@ -22,7 +22,7 @@ use crate::check_tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::code_gen::SourceGenerator;
 use crate::directives::Directives;
-use crate::message::Message;
+use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
@@ -176,7 +176,15 @@ pub fn lint_stdin(
     // Convert to messages.
     Ok(checks
         .into_iter()
-        .map(|check| Message::from_check(path.to_string_lossy().to_string(), check))
+        .map(|check| {
+            let filename = path.to_string_lossy().to_string();
+            let source = if settings.show_source {
+                Some(Source::from_check(&check, &locator))
+            } else {
+                None
+            };
+            Message::from_check(check, filename, source)
+        })
         .collect())
 }
 
@@ -233,7 +241,15 @@ pub fn lint_path(
     // Convert to messages.
     let messages: Vec<Message> = checks
         .into_iter()
-        .map(|check| Message::from_check(path.to_string_lossy().to_string(), check))
+        .map(|check| {
+            let filename = path.to_string_lossy().to_string();
+            let source = if settings.show_source {
+                Some(Source::from_check(&check, &locator))
+            } else {
+                None
+            };
+            Message::from_check(check, filename, source)
+        })
         .collect();
     #[cfg(not(target_family = "wasm"))]
     cache::set(path, &metadata, settings, autofix, &messages, mode);

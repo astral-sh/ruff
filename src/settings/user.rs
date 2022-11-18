@@ -49,6 +49,7 @@ pub struct UserConfiguration {
     pub select: Vec<CheckCodePrefix>,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+    pub show_source: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
@@ -96,6 +97,7 @@ impl UserConfiguration {
             select: configuration.select,
             src: configuration.src,
             target_version: configuration.target_version,
+            show_source: configuration.show_source,
             flake8_annotations: configuration.flake8_annotations,
             flake8_quotes: configuration.flake8_quotes,
             flake8_tidy_imports: configuration.flake8_tidy_imports,

@@ -117,6 +117,7 @@ fn run_once(
                             location: Default::default(),
                             end_location: Default::default(),
                             filename: path.to_string_lossy().to_string(),
+                            source: None,
                         }]
                     } else {
                         error!("Failed to check {}: {message}", path.to_string_lossy());
@@ -280,6 +281,9 @@ fn inner_main() -> Result<ExitCode> {
     }
     if let Some(fix) = fix {
         configuration.fix = fix;
+    }
+    if cli.show_source {
+        configuration.show_source = true;
     }
 
     if cli.show_settings && cli.show_files {

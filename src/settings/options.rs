@@ -24,6 +24,7 @@ pub struct Options {
     pub select: Option<Vec<CheckCodePrefix>>,
     pub src: Option<Vec<String>>,
     pub target_version: Option<PythonVersion>,
+    pub show_source: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,

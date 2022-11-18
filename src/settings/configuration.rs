@@ -31,6 +31,7 @@ pub struct Configuration {
     pub select: Vec<CheckCodePrefix>,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+    pub show_source: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
@@ -134,6 +135,7 @@ impl Configuration {
                         .collect()
                 })
                 .unwrap_or_default(),
+            show_source: options.show_source.unwrap_or_default(),
             // Plugins
             flake8_annotations: options
                 .flake8_annotations
