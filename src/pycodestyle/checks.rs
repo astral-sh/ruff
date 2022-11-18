@@ -1,6 +1,6 @@
 use itertools::izip;
 use rustpython_ast::Location;
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Stmt, Unaryop};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
@@ -57,44 +57,6 @@ pub fn do_not_assign_lambda(target: &Expr, value: &Expr, stmt: &Stmt) -> Option<
         }
     }
     None
-}
-
-/// E713, E714
-pub fn not_tests(
-    op: &Unaryop,
-    operand: &Expr,
-    check_not_in: bool,
-    check_not_is: bool,
-) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
-
-    if matches!(op, Unaryop::Not) {
-        if let ExprKind::Compare { ops, .. } = &operand.node {
-            for op in ops {
-                match op {
-                    Cmpop::In => {
-                        if check_not_in {
-                            checks.push(Check::new(
-                                CheckKind::NotInTest,
-                                Range::from_located(operand),
-                            ));
-                        }
-                    }
-                    Cmpop::Is => {
-                        if check_not_is {
-                            checks.push(Check::new(
-                                CheckKind::NotIsTest,
-                                Range::from_located(operand),
-                            ));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    checks
 }
 
 /// E721
