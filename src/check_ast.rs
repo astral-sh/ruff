@@ -1517,9 +1517,13 @@ where
                 let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
                 let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
                 if check_not_in || check_not_is {
-                    self.add_checks(
-                        pycodestyle::checks::not_tests(op, operand, check_not_in, check_not_is)
-                            .into_iter(),
+                    pycodestyle::plugins::not_tests(
+                        self,
+                        expr,
+                        op,
+                        operand,
+                        check_not_in,
+                        check_not_is,
                     );
                 }
 
