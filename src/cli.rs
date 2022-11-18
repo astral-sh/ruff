@@ -63,6 +63,14 @@ pub struct Cli {
     /// excluded ones.
     #[arg(long, value_delimiter = ',')]
     pub extend_exclude: Vec<String>,
+    /// List of error codes to treat as eligible for autofix. Only applicable
+    /// when autofix itself is enabled (e.g., via `--fix`).
+    #[arg(long, value_delimiter = ',')]
+    pub fixable: Vec<CheckCodePrefix>,
+    /// List of error codes to treat as ineligible for autofix. Only applicable
+    /// when autofix itself is enabled (e.g., via `--fix`).
+    #[arg(long, value_delimiter = ',')]
+    pub unfixable: Vec<CheckCodePrefix>,
     /// List of mappings from file pattern to code to exclude
     #[arg(long, value_delimiter = ',')]
     pub per_file_ignores: Vec<PatternPrefixPair>,

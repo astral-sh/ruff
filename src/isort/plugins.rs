@@ -91,7 +91,7 @@ pub fn check_imports(
 
     if has_leading_content || has_trailing_content {
         let mut check = Check::new(CheckKind::UnsortedImports, range);
-        if autofix.patch() {
+        if autofix.patch() && settings.fixable.contains(check.kind.code()) {
             let mut content = String::new();
             if has_leading_content {
                 content.push('\n');
@@ -119,7 +119,7 @@ pub fn check_imports(
         let actual = dedent(&locator.slice_source_code_range(&range));
         if actual != expected {
             let mut check = Check::new(CheckKind::UnsortedImports, range);
-            if autofix.patch() {
+            if autofix.patch() && settings.fixable.contains(check.kind.code()) {
                 check.amend(Fix::replacement(
                     indent(&expected, &indentation),
                     range.location,

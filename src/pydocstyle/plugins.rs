@@ -179,7 +179,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                             CheckKind::NoBlankLineBeforeFunction(blank_lines_before),
                             Range::from_located(docstring),
                         );
-                        if checker.patch() {
+                        if checker.patch(check.kind.code()) {
                             // Delete the blank line before the docstring.
                             check.amend(Fix::deletion(
                                 Location::new(docstring.location.row() - blank_lines_before, 0),
@@ -220,7 +220,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                             CheckKind::NoBlankLineAfterFunction(blank_lines_after),
                             Range::from_located(docstring),
                         );
-                        if checker.patch() {
+                        if checker.patch(check.kind.code()) {
                             // Delete the blank line after the docstring.
                             check.amend(Fix::deletion(
                                 Location::new(docstring.end_location.unwrap().row() + 1, 0),
@@ -269,7 +269,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                                 CheckKind::NoBlankLineBeforeClass(blank_lines_before),
                                 Range::from_located(docstring),
                             );
-                            if checker.patch() {
+                            if checker.patch(check.kind.code()) {
                                 // Delete the blank line before the class.
                                 check.amend(Fix::deletion(
                                     Location::new(docstring.location.row() - blank_lines_before, 0),
@@ -285,7 +285,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                                 CheckKind::OneBlankLineBeforeClass(blank_lines_before),
                                 Range::from_located(docstring),
                             );
-                            if checker.patch() {
+                            if checker.patch(check.kind.code()) {
                                 // Insert one blank line before the class.
                                 check.amend(Fix::replacement(
                                     "\n".to_string(),
@@ -322,7 +322,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                             CheckKind::OneBlankLineAfterClass(blank_lines_after),
                             Range::from_located(docstring),
                         );
-                        if checker.patch() {
+                        if checker.patch(check.kind.code()) {
                             // Insert a blank line before the class (replacing any existing lines).
                             check.amend(Fix::replacement(
                                 "\n".to_string(),
@@ -364,7 +364,7 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
                     CheckKind::BlankLineAfterSummary,
                     Range::from_located(docstring),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     // Insert one blank line after the summary (replacing any existing lines).
                     check.amend(Fix::replacement(
                         "\n".to_string(),
@@ -425,7 +425,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                                 end_location: Location::new(docstring.location.row() + i, 0),
                             },
                         );
-                        if checker.patch() {
+                        if checker.patch(check.kind.code()) {
                             check.amend(Fix::replacement(
                                 helpers::clean(&docstring_indent),
                                 Location::new(docstring.location.row() + i, 0),
@@ -475,7 +475,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                                     end_location: Location::new(docstring.location.row() + i, 0),
                                 },
                             );
-                            if checker.patch() {
+                            if checker.patch(check.kind.code()) {
                                 check.amend(Fix::replacement(
                                     helpers::clean(&docstring_indent),
                                     Location::new(docstring.location.row() + i, 0),
@@ -499,7 +499,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                                 end_location: Location::new(docstring.location.row() + i, 0),
                             },
                         );
-                        if checker.patch() {
+                        if checker.patch(check.kind.code()) {
                             check.amend(Fix::replacement(
                                 helpers::clean(&docstring_indent),
                                 Location::new(docstring.location.row() + i, 0),
@@ -537,7 +537,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                                 CheckKind::NewLineAfterLastParagraph,
                                 Range::from_located(docstring),
                             );
-                            if checker.patch() {
+                            if checker.patch(check.kind.code()) {
                                 // Insert a newline just before the end-quote(s).
                                 let content = format!(
                                     "\n{}",
@@ -580,7 +580,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
                         CheckKind::NoSurroundingWhitespace,
                         Range::from_located(docstring),
                     );
-                    if checker.patch() {
+                    if checker.patch(check.kind.code()) {
                         if let Some(first_line) = checker
                             .locator
                             .slice_source_code_range(&Range::from_located(docstring))
@@ -916,7 +916,7 @@ fn blanks_and_section_underline(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring),
             );
-            if checker.patch() {
+            if checker.patch(check.kind.code()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
@@ -950,7 +950,7 @@ fn blanks_and_section_underline(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring),
             );
-            if checker.patch() {
+            if checker.patch(check.kind.code()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
@@ -972,7 +972,7 @@ fn blanks_and_section_underline(
                     ),
                     Range::from_located(docstring),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     // Delete any blank lines between the header and content.
                     check.amend(Fix::deletion(
                         Location::new(docstring.location.row() + context.original_index + 1, 0),
@@ -995,7 +995,7 @@ fn blanks_and_section_underline(
                     CheckKind::SectionUnderlineAfterName(context.section_name.to_string()),
                     Range::from_located(docstring),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     // Delete any blank lines between the header and the underline.
                     check.amend(Fix::deletion(
                         Location::new(docstring.location.row() + context.original_index + 1, 0),
@@ -1026,7 +1026,7 @@ fn blanks_and_section_underline(
                     ),
                     Range::from_located(docstring),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     // Replace the existing underline with a line of the appropriate length.
                     let content = format!(
                         "{}{}\n",
@@ -1064,7 +1064,7 @@ fn blanks_and_section_underline(
                     CheckKind::SectionUnderlineNotOverIndented(context.section_name.to_string()),
                     Range::from_located(docstring),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     // Replace the existing indentation with whitespace of the appropriate length.
                     check.amend(Fix::replacement(
                         helpers::clean(&indentation),
@@ -1113,7 +1113,7 @@ fn blanks_and_section_underline(
                             ),
                             Range::from_located(docstring),
                         );
-                        if checker.patch() {
+                        if checker.patch(check.kind.code()) {
                             // Delete any blank lines between the header and content.
                             check.amend(Fix::deletion(
                                 Location::new(
@@ -1172,7 +1172,7 @@ fn common_section(
                     CheckKind::CapitalizeSectionName(context.section_name.to_string()),
                     Range::from_located(docstring),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     // Replace the section title with the capitalized variant. This requires
                     // locating the start and end of the section name.
                     if let Some(index) = context.line.find(&context.section_name) {
@@ -1205,7 +1205,7 @@ fn common_section(
                 CheckKind::SectionNotOverIndented(context.section_name.to_string()),
                 Range::from_located(docstring),
             );
-            if checker.patch() {
+            if checker.patch(check.kind.code()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
                 check.amend(Fix::replacement(
                     helpers::clean(&indentation),
@@ -1232,7 +1232,7 @@ fn common_section(
                     CheckKind::BlankLineAfterLastSection(context.section_name.to_string()),
                     Range::from_located(docstring),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     // Add a newline after the section.
                     check.amend(Fix::insertion(
                         "\n".to_string(),
@@ -1253,7 +1253,7 @@ fn common_section(
                     CheckKind::BlankLineAfterSection(context.section_name.to_string()),
                     Range::from_located(docstring),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     // Add a newline after the section.
                     check.amend(Fix::insertion(
                         "\n".to_string(),
@@ -1277,7 +1277,7 @@ fn common_section(
                 CheckKind::BlankLineBeforeSection(context.section_name.to_string()),
                 Range::from_located(docstring),
             );
-            if checker.patch() {
+            if checker.patch(check.kind.code()) {
                 // Add a blank line before the section.
                 check.amend(Fix::insertion(
                     "\n".to_string(),
@@ -1444,7 +1444,7 @@ fn numpy_section(checker: &mut Checker, definition: &Definition, context: &Secti
                 CheckKind::NewLineAfterSectionName(context.section_name.to_string()),
                 Range::from_located(docstring),
             );
-            if checker.patch() {
+            if checker.patch(check.kind.code()) {
                 // Delete the suffix. This requires locating the end of the section name.
                 if let Some(index) = context.line.find(&context.section_name) {
                     // Map from bytes to characters.
@@ -1493,7 +1493,7 @@ fn google_section(checker: &mut Checker, definition: &Definition, context: &Sect
                 CheckKind::SectionNameEndsInColon(context.section_name.to_string()),
                 Range::from_located(docstring),
             );
-            if checker.patch() {
+            if checker.patch(check.kind.code()) {
                 // Replace the suffix. This requires locating the end of the section name.
                 if let Some(index) = context.line.find(&context.section_name) {
                     // Map from bytes to characters.

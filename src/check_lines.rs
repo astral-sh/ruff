@@ -73,7 +73,7 @@ pub fn check_lines(
                             end_location: Location::new(lineno + 1, line_length + 1),
                         },
                     );
-                    if autofix.patch() {
+                    if autofix.patch() && settings.fixable.contains(check.kind.code()) {
                         check.amend(Fix::deletion(
                             Location::new(lineno + 1, 0),
                             Location::new(lineno + 1, line_length + 1),
@@ -195,7 +195,7 @@ pub fn check_lines(
                                 end_location: Location::new(row + 1, end),
                             },
                         );
-                        if autofix.patch() {
+                        if autofix.patch() && settings.fixable.contains(check.kind.code()) {
                             check.amend(Fix::deletion(
                                 Location::new(row + 1, start),
                                 Location::new(row + 1, lines[row].chars().count()),
@@ -223,7 +223,7 @@ pub fn check_lines(
                                 end_location: Location::new(row + 1, end),
                             },
                         );
-                        if autofix.patch() {
+                        if autofix.patch() && settings.fixable.contains(check.kind.code()) {
                             if valid_codes.is_empty() {
                                 check.amend(Fix::deletion(
                                     Location::new(row + 1, start),

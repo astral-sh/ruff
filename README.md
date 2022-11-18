@@ -122,7 +122,7 @@ default configuration is equivalent to:
 [tool.ruff]
 line-length = 88
 
-# Enable Flake's "E" and "F" codes by default.
+# Enable Pyflakes `E` and `F` codes by default.
 select = ["E", "F"]
 ignore = []
 
@@ -157,18 +157,24 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py310"
 ```
 
-As an example, the following would configure Ruff to (1) avoid checking for line-length
-violations (`E501`) and (2) ignore unused import rules in `__init__.py` files:
+As an example, the following would configure Ruff to: (1) avoid checking for line-length
+violations (`E501`); (2), always autofix, but never remove unused imports (`F401`); and (3) ignore
+import-at-top-of-file errors (`E402`) in `__init__.py` files:
 
 ```toml
 [tool.ruff]
+# Enable Pyflakes and pycodestyle rules.
 select = ["E", "F"]
 
-# Never enforce `E501`.
+# Never enforce `E501` (line length violations).
 ignore = ["E501"]
 
-# Ignore `F401` violations in any `__init__.py` file, and in `path/to/file.py`.
-per-file-ignores = {"__init__.py" = ["F401"], "path/to/file.py" = ["F401"]}
+# Always autofix, but never try to fix `F401` (unused imports).
+fix = true
+unfixable = ["F401"]
+
+# Ignore `E402` (import violations in any `__init__.py` file, and in `path/to/file.py`.
+per-file-ignores = {"__init__.py" = ["E402"], "path/to/file.py" = ["E402"]}
 ```
 
 Plugin configurations should be expressed as subsections, e.g.:
@@ -227,6 +233,10 @@ Options:
           List of paths, used to exclude files and/or directories from checks
       --extend-exclude <EXTEND_EXCLUDE>
           Like --exclude, but adds additional files and directories on top of the excluded ones
+      --fixable <FIXABLE>
+          List of error codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+      --unfixable <UNFIXABLE>
+          List of error codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>

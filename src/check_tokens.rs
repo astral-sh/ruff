@@ -36,7 +36,7 @@ pub fn check_tokens(
         // RUF001, RUF002, RUF003
         if enforce_ambiguous_unicode_character {
             if matches!(tok, Tok::String { .. } | Tok::Comment) {
-                for check in rules::checks::ambiguous_unicode_character(
+                checks.extend(rules::checks::ambiguous_unicode_character(
                     locator,
                     start,
                     end,
@@ -49,12 +49,9 @@ pub fn check_tokens(
                     } else {
                         Context::Comment
                     },
-                    autofix.patch(),
-                ) {
-                    if settings.enabled.contains(check.kind.code()) {
-                        checks.push(check);
-                    }
-                }
+                    settings,
+                    autofix,
+                ));
             }
         }
 

@@ -12,7 +12,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr, id: &str) {
         CheckKind::UsePEP585Annotation(replacement.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch() {
+    if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             replacement.to_lowercase(),
             expr.location,

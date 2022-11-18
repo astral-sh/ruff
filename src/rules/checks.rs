@@ -3,10 +3,10 @@ use once_cell::sync::Lazy;
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
+use crate::autofix::{fixer, Fix};
 use crate::checks::CheckKind;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::Check;
+use crate::{Check, Settings};
 
 /// See: https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094
 static CONFUSABLES: Lazy<FnvHashMap<u32, u32>> = Lazy::new(|| {
@@ -1606,7 +1606,8 @@ pub fn ambiguous_unicode_character(
     start: &Location,
     end: &Location,
     context: Context,
-    fix: bool,
+    settings: &Settings,
+    autofix: &fixer::Mode,
 ) -> Vec<Check> {
     let mut checks = vec![];
 
@@ -1645,14 +1646,16 @@ pub fn ambiguous_unicode_character(
                         end_location,
                     },
                 );
-                if fix {
-                    check.amend(Fix::replacement(
-                        representant.to_string(),
-                        location,
-                        end_location,
-                    ));
+                if settings.enabled.contains(check.kind.code()) {
+                    if autofix.patch() && settings.fixable.contains(check.kind.code()) {
+                        check.amend(Fix::replacement(
+                            representant.to_string(),
+                            location,
+                            end_location,
+                        ));
+                    }
+                    checks.push(check);
                 }
-                checks.push(check);
             }
         }
 

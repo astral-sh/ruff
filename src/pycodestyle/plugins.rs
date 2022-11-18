@@ -62,7 +62,7 @@ pub fn literal_comparisons(
                 CheckKind::NoneComparison(RejectedCmpop::Eq),
                 Range::from_located(comparator),
             );
-            if checker.patch() {
+            if checker.patch(check.kind.code()) {
                 // Dummy replacement
                 check.amend(Fix::dummy(expr.location));
                 bad_ops.insert(0, Cmpop::Is);
@@ -74,7 +74,7 @@ pub fn literal_comparisons(
                 CheckKind::NoneComparison(RejectedCmpop::NotEq),
                 Range::from_located(comparator),
             );
-            if checker.patch() {
+            if checker.patch(check.kind.code()) {
                 check.amend(Fix::dummy(expr.location));
                 bad_ops.insert(0, Cmpop::IsNot);
             }
@@ -93,7 +93,7 @@ pub fn literal_comparisons(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
                     Range::from_located(comparator),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     check.amend(Fix::dummy(expr.location));
                     bad_ops.insert(0, Cmpop::Is);
                 }
@@ -104,7 +104,7 @@ pub fn literal_comparisons(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
                     Range::from_located(comparator),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     check.amend(Fix::dummy(expr.location));
                     bad_ops.insert(0, Cmpop::IsNot);
                 }
@@ -129,7 +129,7 @@ pub fn literal_comparisons(
                     CheckKind::NoneComparison(RejectedCmpop::Eq),
                     Range::from_located(comparator),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     check.amend(Fix::dummy(expr.location));
                     bad_ops.insert(idx, Cmpop::Is);
                 }
@@ -140,7 +140,7 @@ pub fn literal_comparisons(
                     CheckKind::NoneComparison(RejectedCmpop::NotEq),
                     Range::from_located(comparator),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     check.amend(Fix::dummy(expr.location));
                     bad_ops.insert(idx, Cmpop::IsNot);
                 }
@@ -159,7 +159,7 @@ pub fn literal_comparisons(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
                         Range::from_located(comparator),
                     );
-                    if checker.patch() {
+                    if checker.patch(check.kind.code()) {
                         check.amend(Fix::dummy(expr.location));
                         bad_ops.insert(idx, Cmpop::Is);
                     }
@@ -170,7 +170,7 @@ pub fn literal_comparisons(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
                         Range::from_located(comparator),
                     );
-                    if checker.patch() {
+                    if checker.patch(check.kind.code()) {
                         check.amend(Fix::dummy(expr.location));
                         bad_ops.insert(idx, Cmpop::IsNot);
                     }
@@ -226,7 +226,7 @@ pub fn not_tests(
                         if check_not_in {
                             let mut check =
                                 Check::new(CheckKind::NotInTest, Range::from_located(operand));
-                            if checker.patch() && should_fix {
+                            if checker.patch(check.kind.code()) && should_fix {
                                 if let Some(content) = compare(left, &[Cmpop::NotIn], comparators) {
                                     check.amend(Fix::replacement(
                                         content,
@@ -242,7 +242,7 @@ pub fn not_tests(
                         if check_not_is {
                             let mut check =
                                 Check::new(CheckKind::NotIsTest, Range::from_located(operand));
-                            if checker.patch() && should_fix {
+                            if checker.patch(check.kind.code()) && should_fix {
                                 if let Some(content) = compare(left, &[Cmpop::IsNot], comparators) {
                                     check.amend(Fix::replacement(
                                         content,

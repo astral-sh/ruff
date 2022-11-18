@@ -47,7 +47,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
     let call_path = dealias_call_path(collect_call_paths(value), &checker.import_aliases);
     if checker.match_typing_call_path(&call_path, "Optional") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
-        if checker.patch() {
+        if checker.patch(check.kind.code()) {
             let mut generator = SourceGenerator::new();
             if let Ok(()) = generator.unparse_expr(&optional(slice), 0) {
                 if let Ok(content) = generator.generate() {
@@ -62,7 +62,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         checker.add_check(check);
     } else if checker.match_typing_call_path(&call_path, "Union") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
-        if checker.patch() {
+        if checker.patch(check.kind.code()) {
             match &slice.node {
                 ExprKind::Slice { .. } => {
                     // Invalid type annotation.

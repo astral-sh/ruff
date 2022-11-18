@@ -56,7 +56,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
             ),
             Range::from_located(stmt),
         );
-        if checker.patch() {
+        if checker.patch(check.kind.code()) {
             let context = checker.binding_context();
             let deleted: Vec<&Stmt> = checker
                 .deletions
