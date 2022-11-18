@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use log::error;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, KeywordData, Stmt, StmtKind};
 
@@ -10,7 +10,7 @@ use crate::code_gen::SourceGenerator;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 
-// Returns (class_name, args, keywords)
+/// Return the class name, arguments, and keywords for a `TypedDict` assignment.
 fn match_typed_dict_assign<'a>(
     targets: &'a [Expr],
     value: &'a Expr,
@@ -34,7 +34,9 @@ fn match_typed_dict_assign<'a>(
     None
 }
 
-fn create_property_assignment_stmt(property: &String, type_ann: &ExprKind) -> Stmt {
+/// Generate a `StmtKind::AnnAssign` representing the provided property
+/// definition.
+fn create_property_assignment_stmt(property: &str, annotation: &ExprKind) -> Stmt {
     Stmt::new(
         Default::default(),
         Default::default(),
@@ -50,7 +52,7 @@ fn create_property_assignment_stmt(property: &String, type_ann: &ExprKind) -> St
             annotation: Box::new(Expr::new(
                 Default::default(),
                 Default::default(),
-                type_ann.clone(),
+                annotation.clone(),
             )),
             value: None,
             simple: 1,
@@ -58,11 +60,14 @@ fn create_property_assignment_stmt(property: &String, type_ann: &ExprKind) -> St
     )
 }
 
+/// Generate a `StmtKind::Pass` statement.
 fn create_pass_stmt() -> Stmt {
     Stmt::new(Default::default(), Default::default(), StmtKind::Pass)
 }
 
-fn create_classdef_stmt(
+/// Generate a `StmtKind:ClassDef` statement bsaed on the provided body and
+/// keywords.
+fn create_class_def_stmt(
     class_name: &str,
     body: Vec<Stmt>,
     total_keyword: Option<KeywordData>,
@@ -109,45 +114,41 @@ fn get_properties_from_dict_literal(keys: &[Expr], values: &[Expr]) -> Result<Ve
                     bail!("Invalid property name: {}", property)
                 }
             }
-            _ => bail!("key is not a Str"),
+            _ => bail!("Expected `key` to be `Constant::Str`"),
         })
         .collect()
 }
 
 fn get_properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<Stmt>> {
-    match &func.node {
-        ExprKind::Name { id: func_name, .. } => match func_name.as_str() {
-            "dict" => keywords
-                .iter()
-                .map(|keyword| {
-                    let property = &keyword.node.arg.clone().ok_or_else(|| anyhow!("no arg"))?;
-                    Ok(create_property_assignment_stmt(
-                        property,
-                        &keyword.node.value.node,
-                    ))
-                })
-                .collect(),
-            _ => bail!("func is not dict"),
-        },
-        _ => bail!("func is not a Name"),
+    if let ExprKind::Name { id, .. } = &func.node {
+        if id == "dict" {
+            get_properties_from_keywords(keywords)
+        } else {
+            bail!("Expected `id` to be `\"dict\"`")
+        }
+    } else {
+        bail!("Expected `func` to be `ExprKind::Name`")
     }
 }
 
-// Deprecated in Python 3.11, Removed in Python 3.13?
+// Deprecated in Python 3.11, removed in Python 3.13.
 fn get_properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
     keywords
         .iter()
         .map(|keyword| {
-            let property = &keyword.node.arg.clone().ok_or_else(|| anyhow!("no arg"))?;
-            Ok(create_property_assignment_stmt(
-                property,
-                &keyword.node.value.node,
-            ))
+            if let Some(property) = &keyword.node.arg {
+                Ok(create_property_assignment_stmt(
+                    property,
+                    &keyword.node.value.node,
+                ))
+            } else {
+                bail!("Expected `arg` to be `Some`")
+            }
         })
         .collect()
 }
 
-// The only way to have total keyword is to use the arg version
+// The only way to have the `total` keyword is to use the args version, like:
 // (`TypedDict('name', {'a': int}, total=True)`)
 fn get_total_from_only_keyword(keywords: &[Keyword]) -> Option<KeywordData> {
     match keywords.get(0) {
@@ -166,6 +167,9 @@ fn get_properties_and_total(
     args: &[Expr],
     keywords: &[Keyword],
 ) -> Result<(Vec<Stmt>, Option<KeywordData>)> {
+    // We don't have to manage the hybrid case because it's not possible to have a
+    // dict and keywords. For example, the following is illegal:
+    //   MyType = TypedDict('MyType', {'a': int, 'b': str}, a=int, b=str)
     if let Some(dict) = args.get(1) {
         let total = get_total_from_only_keyword(keywords);
         match &dict.node {
@@ -184,18 +188,15 @@ fn get_properties_and_total(
     }
 }
 
-fn try_to_fix(
+/// Generate a `Fix` to convert a `TypedDict` to a functional class.
+fn convert_to_functional_class(
     stmt: &Stmt,
     class_name: &str,
     body: Vec<Stmt>,
     total_keyword: Option<KeywordData>,
 ) -> Result<Fix> {
-    // We don't have to manage an hybrid case because it's not possible to have a
-    // dict and keywords Illegal: `MyType = TypedDict('MyType', {'a': int, 'b':
-    // str}, a=int, b=str)`
-    let classdef_stmt = create_classdef_stmt(class_name, body, total_keyword);
     let mut generator = SourceGenerator::new();
-    generator.unparse_stmt(&classdef_stmt)?;
+    generator.unparse_stmt(&create_class_def_stmt(class_name, body, total_keyword))?;
     let content = generator.generate()?;
     Ok(Fix::replacement(
         content,
@@ -220,7 +221,7 @@ pub fn convert_typed_dict_functional_to_class(
                     Range::from_located(stmt),
                 );
                 if checker.patch() {
-                    match try_to_fix(stmt, class_name, body, total_keyword) {
+                    match convert_to_functional_class(stmt, class_name, body, total_keyword) {
                         Ok(fix) => check.amend(fix),
                         Err(err) => error!("Failed to convert TypedDict: {}", err),
                     };
