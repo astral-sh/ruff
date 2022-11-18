@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use itertools::izip;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Unaryop};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -200,4 +200,63 @@ pub fn literal_comparisons(
     }
 
     checker.add_checks(checks.into_iter());
+}
+
+/// E713, E714
+pub fn not_tests(
+    checker: &mut Checker,
+    expr: &Expr,
+    op: &Unaryop,
+    operand: &Expr,
+    check_not_in: bool,
+    check_not_is: bool,
+) {
+    if matches!(op, Unaryop::Not) {
+        if let ExprKind::Compare {
+            left,
+            ops,
+            comparators,
+            ..
+        } = &operand.node
+        {
+            let should_fix = ops.len() == 1;
+            for op in ops.iter() {
+                match op {
+                    Cmpop::In => {
+                        if check_not_in {
+                            let mut check =
+                                Check::new(CheckKind::NotInTest, Range::from_located(operand));
+                            if checker.patch() && should_fix {
+                                if let Some(content) = compare(left, &[Cmpop::NotIn], comparators) {
+                                    check.amend(Fix::replacement(
+                                        content,
+                                        expr.location,
+                                        expr.end_location.unwrap(),
+                                    ));
+                                }
+                            }
+                            checker.add_check(check);
+                        }
+                    }
+                    Cmpop::Is => {
+                        if check_not_is {
+                            let mut check =
+                                Check::new(CheckKind::NotInTest, Range::from_located(operand));
+                            if checker.patch() && should_fix {
+                                if let Some(content) = compare(left, &[Cmpop::IsNot], comparators) {
+                                    check.amend(Fix::replacement(
+                                        content,
+                                        expr.location,
+                                        expr.end_location.unwrap(),
+                                    ));
+                                }
+                            }
+                            checker.add_check(check);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
 }

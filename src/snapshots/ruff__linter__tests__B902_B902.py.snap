@@ -1,0 +1,85 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: BlindExcept
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 16
+  fix: ~
+- kind: BlindExcept
+  location:
+    row: 13
+    column: 7
+  end_location:
+    row: 13
+    column: 20
+  fix: ~
+- kind: BlindExcept
+  location:
+    row: 23
+    column: 7
+  end_location:
+    row: 23
+    column: 16
+  fix: ~
+- kind: BlindExcept
+  location:
+    row: 25
+    column: 7
+  end_location:
+    row: 25
+    column: 20
+  fix: ~
+- kind: BlindExcept
+  location:
+    row: 31
+    column: 7
+  end_location:
+    row: 31
+    column: 16
+  fix: ~
+- kind: BlindExcept
+  location:
+    row: 36
+    column: 11
+  end_location:
+    row: 36
+    column: 24
+  fix: ~
+- kind: BlindExcept
+  location:
+    row: 42
+    column: 7
+  end_location:
+    row: 42
+    column: 16
+  fix: ~
+- kind: BlindExcept
+  location:
+    row: 45
+    column: 11
+  end_location:
+    row: 45
+    column: 24
+  fix: ~
+- kind: BlindExcept
+  location:
+    row: 52
+    column: 11
+  end_location:
+    row: 52
+    column: 24
+  fix: ~
+- kind: BlindExcept
+  location:
+    row: 54
+    column: 7
+  end_location:
+    row: 54
+    column: 16
+  fix: ~
+

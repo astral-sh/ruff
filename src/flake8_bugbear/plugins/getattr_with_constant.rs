@@ -5,7 +5,7 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::code_gen::SourceGenerator;
-use crate::flake8_bugbear::constants::IDENTIFIER_REGEX;
+use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 
 fn attribute(value: &Expr, attr: &str) -> Expr {

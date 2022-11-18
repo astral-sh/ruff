@@ -35,9 +35,9 @@ use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_boolean_trap,
-    flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print, flake8_tidy_imports,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
+    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print,
+    flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -921,6 +921,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
                 }
+                if self.settings.enabled.contains(&CheckCode::B902) {
+                    flake8_blind_except::plugins::blind_except(self, handlers);
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
@@ -944,6 +947,11 @@ where
                     {
                         self.add_check(check);
                     }
+                }
+                if self.settings.enabled.contains(&CheckCode::U013) {
+                    pyupgrade::plugins::convert_typed_dict_functional_to_class(
+                        self, stmt, targets, value,
+                    );
                 }
             }
             StmtKind::AnnAssign { target, value, .. } => {
@@ -1523,9 +1531,13 @@ where
                 let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
                 let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
                 if check_not_in || check_not_is {
-                    self.add_checks(
-                        pycodestyle::checks::not_tests(op, operand, check_not_in, check_not_is)
-                            .into_iter(),
+                    pycodestyle::plugins::not_tests(
+                        self,
+                        expr,
+                        op,
+                        operand,
+                        check_not_in,
+                        check_not_is,
                     );
                 }
 

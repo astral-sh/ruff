@@ -55,18 +55,14 @@ impl SourceGenerator {
     }
 
     fn newline(&mut self) -> fmt::Result {
-        if self.initial {
-            self.initial = false;
-        } else {
+        if !self.initial {
             self.new_lines = std::cmp::max(self.new_lines, 1);
         }
         Ok(())
     }
 
     fn newlines(&mut self, extra: usize) -> fmt::Result {
-        if self.initial {
-            self.initial = false;
-        } else {
+        if !self.initial {
             self.new_lines = std::cmp::max(self.new_lines, 1 + extra);
         }
         Ok(())
@@ -121,6 +117,7 @@ impl SourceGenerator {
                 self.newline()?;
                 self.p(&"    ".repeat(self.indentation))?;
                 $body
+                self.initial = false;
             }};
         }
 
@@ -145,12 +142,11 @@ impl SourceGenerator {
                         self.unparse_expr(returns, precedence::EXPR)?;
                     }
                     self.p(":")?;
-                    self.body(body)?;
-
-                    if self.indentation == 0 {
-                        self.newlines(2)?;
-                    }
-                })
+                });
+                self.body(body)?;
+                if self.indentation == 0 {
+                    self.newlines(2)?;
+                }
             }
             StmtKind::AsyncFunctionDef {
                 name,
@@ -172,11 +168,11 @@ impl SourceGenerator {
                         self.unparse_expr(returns, precedence::EXPR)?;
                     }
                     self.p(":")?;
-                    self.body(body)?;
-                    if self.indentation == 0 {
-                        self.newlines(2)?;
-                    }
-                })
+                });
+                self.body(body)?;
+                if self.indentation == 0 {
+                    self.newlines(2)?;
+                }
             }
             StmtKind::ClassDef {
                 name,
@@ -209,11 +205,11 @@ impl SourceGenerator {
                     }
                     self.p_if(!first, ")")?;
                     self.p(":")?;
-                    self.body(body)?;
-                    if self.indentation == 0 {
-                        self.newlines(2)?;
-                    }
-                })
+                });
+                self.body(body)?;
+                if self.indentation == 0 {
+                    self.newlines(2)?;
+                }
             }
             StmtKind::Return { value } => {
                 statement!({
@@ -299,14 +295,14 @@ impl SourceGenerator {
                     self.p(" in ")?;
                     self.unparse_expr(iter, precedence::TEST)?;
                     self.p(":")?;
-                    self.body(body)?;
-                    if !orelse.is_empty() {
-                        statement!({
-                            self.p("else:")?;
-                            self.body(orelse)?;
-                        });
-                    }
-                })
+                });
+                self.body(body)?;
+                if !orelse.is_empty() {
+                    statement!({
+                        self.p("else:")?;
+                    });
+                    self.body(orelse)?;
+                }
             }
             StmtKind::AsyncFor {
                 target,
@@ -321,59 +317,59 @@ impl SourceGenerator {
                     self.p(" in ")?;
                     self.unparse_expr(iter, precedence::TEST)?;
                     self.p(":")?;
-                    self.body(body)?;
-                    if !orelse.is_empty() {
-                        statement!({
-                            self.p("else:")?;
-                            self.body(orelse)?;
-                        });
-                    }
-                })
+                });
+                self.body(body)?;
+                if !orelse.is_empty() {
+                    statement!({
+                        self.p("else:")?;
+                    });
+                    self.body(orelse)?;
+                }
             }
             StmtKind::While { test, body, orelse } => {
                 statement!({
                     self.p("while ")?;
                     self.unparse_expr(test, precedence::TEST)?;
                     self.p(":")?;
-                    self.body(body)?;
-                    if !orelse.is_empty() {
-                        statement!({
-                            self.p("else:")?;
-                            self.body(orelse)?;
-                        });
-                    }
-                })
+                });
+                self.body(body)?;
+                if !orelse.is_empty() {
+                    statement!({
+                        self.p("else:")?;
+                    });
+                    self.body(orelse)?;
+                }
             }
             StmtKind::If { test, body, orelse } => {
                 statement!({
                     self.p("if ")?;
                     self.unparse_expr(test, precedence::TEST)?;
                     self.p(":")?;
-                    self.body(body)?;
-
-                    let mut orelse_: &Vec<Stmt<U>> = orelse;
-                    loop {
-                        if orelse_.len() == 1 && matches!(orelse_[0].node, StmtKind::If { .. }) {
-                            if let StmtKind::If { body, test, orelse } = &orelse_[0].node {
-                                statement!({
-                                    self.p("elif ")?;
-                                    self.unparse_expr(test, precedence::TEST)?;
-                                    self.p(":")?;
-                                    self.body(body)?;
-                                });
-                                orelse_ = orelse;
-                            }
-                        } else {
-                            if !orelse_.is_empty() {
-                                statement!({
-                                    self.p("else:")?;
-                                    self.body(orelse_)?;
-                                });
-                            }
-                            break;
-                        }
-                    }
                 });
+                self.body(body)?;
+
+                let mut orelse_: &Vec<Stmt<U>> = orelse;
+                loop {
+                    if orelse_.len() == 1 && matches!(orelse_[0].node, StmtKind::If { .. }) {
+                        if let StmtKind::If { body, test, orelse } = &orelse_[0].node {
+                            statement!({
+                                self.p("elif ")?;
+                                self.unparse_expr(test, precedence::TEST)?;
+                                self.p(":")?;
+                            });
+                            self.body(body)?;
+                            orelse_ = orelse;
+                        }
+                    } else {
+                        if !orelse_.is_empty() {
+                            statement!({
+                                self.p("else:")?;
+                            });
+                            self.body(orelse_)?;
+                        }
+                        break;
+                    }
+                }
             }
             StmtKind::With { items, body, .. } => {
                 statement!({
@@ -384,8 +380,8 @@ impl SourceGenerator {
                         self.unparse_withitem(item)?;
                     }
                     self.p(":")?;
-                    self.body(body)?;
-                })
+                });
+                self.body(body)?;
             }
             StmtKind::AsyncWith { items, body, .. } => {
                 statement!({
@@ -396,8 +392,8 @@ impl SourceGenerator {
                         self.unparse_withitem(item)?;
                     }
                     self.p(":")?;
-                    self.body(body)?;
-                })
+                });
+                self.body(body)?;
             }
             StmtKind::Match { .. } => {}
             StmtKind::Raise { exc, cause } => {
@@ -421,27 +417,27 @@ impl SourceGenerator {
             } => {
                 statement!({
                     self.p("try:")?;
-                    self.body(body)?;
+                });
+                self.body(body)?;
 
-                    for handler in handlers {
-                        statement!({
-                            self.unparse_excepthandler(handler)?;
-                        });
-                    }
+                for handler in handlers {
+                    statement!({
+                        self.unparse_excepthandler(handler)?;
+                    });
+                }
 
-                    if !orelse.is_empty() {
-                        statement!({
-                            self.p("else:")?;
-                            self.body(orelse)?;
-                        });
-                    }
-                    if !finalbody.is_empty() {
-                        statement!({
-                            self.p("finally:")?;
-                            self.body(finalbody)?;
-                        });
-                    }
-                })
+                if !orelse.is_empty() {
+                    statement!({
+                        self.p("else:")?;
+                    });
+                    self.body(orelse)?;
+                }
+                if !finalbody.is_empty() {
+                    statement!({
+                        self.p("finally:")?;
+                    });
+                    self.body(finalbody)?;
+                }
             }
             StmtKind::Assert { test, msg } => {
                 statement!({

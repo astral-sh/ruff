@@ -61,6 +61,8 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    1. [flake8-quotes (Q)](#flake8-quotes)
    1. [flake8-annotations (ANN)](#flake8-annotations)
    1. [flake8-2020 (YTT)](#flake8-2020)
+   1. [flake8-blind-except](#flake8-blind-except)
+   1. [mccabe (C90)](#mccabe)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
    1. [Meta rules (M)](#meta-rules)
 1. [Editor Integrations](#editor-integrations)
@@ -359,10 +361,10 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | ---- | ---- | ------- | --- |
 | E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |  |
 | E501 | LineTooLong | Line too long (89 > 88 characters) |  |
-| E711 | NoneComparison | Comparison to `None` should be `cond is None` |  |
-| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |  |
-| E713 | NotInTest | Test for membership should be `not in` |  |
-| E714 | NotIsTest | Test for object identity should be `is not` |  |
+| E711 | NoneComparison | Comparison to `None` should be `cond is None` | 🛠 |
+| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` | 🛠 |
+| E713 | NotInTest | Test for membership should be `not in` | 🛠 |
+| E714 | NotIsTest | Test for object identity should be `is not` | 🛠 |
 | E721 | TypeComparison | Do not compare types, use `isinstance()` |  |
 | E722 | DoNotUseBareExcept | Do not use bare `except` |  |
 | E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |  |
@@ -450,6 +452,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
 | U011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
 | U012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
+| U013 | ConvertTypedDictFunctionalToClass | Convert `TypedDict` functional syntax to class syntax | 🛠 |
 
 ### pep8-naming
 
@@ -624,6 +627,14 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 | YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
 | YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
 
+### flake8-blind-except
+
+For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except/0.2.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| B902 | BlindExcept | Blind except Exception: statement |  |
+
 ### mccabe
 
 For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
@@ -685,6 +696,7 @@ tools:
     format-command: 'ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -'
     format-stdin: true
 ```
+
 </details>
 
 <details>
@@ -721,6 +733,7 @@ null_ls.setup({
     }
 })
 ```
+
 </details>
 
 ### Language Server Protocol (Unofficial)
@@ -790,6 +803,9 @@ including:
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (25/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
+- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/) (1/2)
+- [`mccabe`](https://pypi.org/project/mccabe/)
+- [`isort`](https://pypi.org/project/isort/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
@@ -804,6 +820,7 @@ Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis F
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
 
+- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
@@ -816,6 +833,8 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (26/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
+- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/) (1/2)
+- [`mccabe`](https://pypi.org/project/mccabe/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
 and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33).
