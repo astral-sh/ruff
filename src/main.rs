@@ -267,6 +267,12 @@ fn inner_main() -> Result<ExitCode> {
     if !cli.extend_ignore.is_empty() {
         configuration.extend_ignore = cli.extend_ignore;
     }
+    if !cli.fixable.is_empty() {
+        configuration.fixable = cli.fixable;
+    }
+    if !cli.unfixable.is_empty() {
+        configuration.unfixable = cli.unfixable;
+    }
     if let Some(line_length) = cli.line_length {
         configuration.line_length = line_length;
     }

@@ -152,10 +152,10 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
-    pub fn patch(&self) -> bool {
+    pub fn patch(&self, code: &CheckCode) -> bool {
         // TODO(charlie): We can't fix errors in f-strings until RustPython adds
         // location data.
-        self.autofix.patch() && self.in_f_string.is_none()
+        self.autofix.patch() && self.in_f_string.is_none() && self.settings.fixable.contains(code)
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -1256,7 +1256,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C400),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1270,7 +1270,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C401),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1284,7 +1284,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C402),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1299,7 +1299,7 @@ where
                             args,
                             keywords,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C403),
                             Range::from_located(expr),
                         )
                     {
@@ -1315,7 +1315,7 @@ where
                             args,
                             keywords,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C404),
                             Range::from_located(expr),
                         )
                     {
@@ -1330,7 +1330,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C405),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1344,7 +1344,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C406),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1358,7 +1358,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C408),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1372,7 +1372,7 @@ where
                             func,
                             args,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C409),
                             Range::from_located(expr),
                         )
                     {
@@ -1387,7 +1387,7 @@ where
                             func,
                             args,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C410),
                             Range::from_located(expr),
                         )
                     {
@@ -1401,7 +1401,7 @@ where
                         func,
                         args,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C411),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1415,7 +1415,7 @@ where
                             func,
                             args,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C413),
                             Range::from_located(expr),
                         )
                     {
@@ -1667,7 +1667,7 @@ where
                         elt,
                         generators,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C416),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -2628,7 +2628,7 @@ impl<'a> Checker<'a> {
                     let child = self.parents[defined_by];
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
-                    let fix = if self.patch() {
+                    let fix = if self.patch(&CheckCode::F401) {
                         let deleted: Vec<&Stmt> = self
                             .deletions
                             .iter()

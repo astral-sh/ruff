@@ -30,11 +30,12 @@ pub struct Settings {
     pub enabled: FnvHashSet<CheckCode>,
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
+    pub fixable: FnvHashSet<CheckCode>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
+    pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
-    pub show_source: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
@@ -50,13 +51,20 @@ impl Settings {
         Self {
             dummy_variable_rgx: config.dummy_variable_rgx,
             enabled: resolve_codes(
-                &config.select,
-                &config.extend_select,
-                &config.ignore,
-                &config.extend_ignore,
+                &config
+                    .select
+                    .into_iter()
+                    .chain(config.extend_select.into_iter())
+                    .collect::<Vec<_>>(),
+                &config
+                    .ignore
+                    .into_iter()
+                    .chain(config.extend_ignore.into_iter())
+                    .collect::<Vec<_>>(),
             ),
             exclude: config.exclude,
             extend_exclude: config.extend_exclude,
+            fixable: resolve_codes(&config.fixable, &config.unfixable),
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
             flake8_quotes: config.flake8_quotes,
@@ -75,7 +83,8 @@ impl Settings {
     pub fn for_rule(check_code: CheckCode) -> Self {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FnvHashSet::from_iter([check_code]),
+            enabled: FnvHashSet::from_iter([check_code.clone()]),
+            fixable: FnvHashSet::from_iter([check_code]),
             exclude: Default::default(),
             extend_exclude: Default::default(),
             line_length: 88,
@@ -96,7 +105,8 @@ impl Settings {
     pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FnvHashSet::from_iter(check_codes),
+            enabled: FnvHashSet::from_iter(check_codes.clone()),
+            fixable: FnvHashSet::from_iter(check_codes),
             exclude: Default::default(),
             extend_exclude: Default::default(),
             line_length: 88,
@@ -122,6 +132,9 @@ impl Hash for Settings {
         for value in self.enabled.iter() {
             value.hash(state);
         }
+        for value in self.fixable.iter() {
+            value.hash(state);
+        }
         self.line_length.hash(state);
         for value in self.per_file_ignores.iter() {
             value.hash(state);
@@ -141,12 +154,7 @@ impl Hash for Settings {
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// error codes.
-fn resolve_codes(
-    select: &[CheckCodePrefix],
-    extend_select: &[CheckCodePrefix],
-    ignore: &[CheckCodePrefix],
-    extend_ignore: &[CheckCodePrefix],
-) -> FnvHashSet<CheckCode> {
+fn resolve_codes(select: &[CheckCodePrefix], ignore: &[CheckCodePrefix]) -> FnvHashSet<CheckCode> {
     let mut codes: FnvHashSet<CheckCode> = FnvHashSet::default();
     for specificity in [
         PrefixSpecificity::Category,
@@ -159,19 +167,7 @@ fn resolve_codes(
                 codes.extend(prefix.codes());
             }
         }
-        for prefix in extend_select {
-            if prefix.specificity() == specificity {
-                codes.extend(prefix.codes());
-            }
-        }
         for prefix in ignore {
-            if prefix.specificity() == specificity {
-                for code in prefix.codes() {
-                    codes.remove(&code);
-                }
-            }
-        }
-        for prefix in extend_ignore {
             if prefix.specificity() == specificity {
                 for code in prefix.codes() {
                     codes.remove(&code);
@@ -192,19 +188,19 @@ mod tests {
 
     #[test]
     fn resolver() {
-        let actual = resolve_codes(&[CheckCodePrefix::W], &[], &[], &[]);
+        let actual = resolve_codes(&[CheckCodePrefix::W], &[]);
         let expected = FnvHashSet::from_iter([CheckCode::W292, CheckCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(&[CheckCodePrefix::W6], &[], &[], &[]);
+        let actual = resolve_codes(&[CheckCodePrefix::W6], &[]);
         let expected = FnvHashSet::from_iter([CheckCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(&[CheckCodePrefix::W], &[], &[CheckCodePrefix::W292], &[]);
+        let actual = resolve_codes(&[CheckCodePrefix::W], &[CheckCodePrefix::W292]);
         let expected = FnvHashSet::from_iter([CheckCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(&[CheckCodePrefix::W605], &[], &[CheckCodePrefix::W605], &[]);
+        let actual = resolve_codes(&[CheckCodePrefix::W605], &[CheckCodePrefix::W605]);
         let expected = FnvHashSet::from_iter([]);
         assert_eq!(actual, expected);
     }

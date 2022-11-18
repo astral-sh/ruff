@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
@@ -124,13 +124,16 @@ pub fn unnecessary_encode_utf8(
                             expr,
                             variable,
                             checker.locator,
-                            checker.patch(),
+                            checker.patch(&CheckCode::U012),
                         ));
                     } else {
                         // "unicode text©".encode("utf-8")
-                        if let Some(check) =
-                            delete_default_encode_arg_or_kwarg(expr, args, kwargs, checker.patch())
-                        {
+                        if let Some(check) = delete_default_encode_arg_or_kwarg(
+                            expr,
+                            args,
+                            kwargs,
+                            checker.patch(&CheckCode::U012),
+                        ) {
                             checker.add_check(check);
                         }
                     }
@@ -139,9 +142,12 @@ pub fn unnecessary_encode_utf8(
             // f"foo{bar}".encode(*args, **kwargs)
             ExprKind::JoinedStr { .. } => {
                 if is_default_encode(args, kwargs) {
-                    if let Some(check) =
-                        delete_default_encode_arg_or_kwarg(expr, args, kwargs, checker.patch())
-                    {
+                    if let Some(check) = delete_default_encode_arg_or_kwarg(
+                        expr,
+                        args,
+                        kwargs,
+                        checker.patch(&CheckCode::U012),
+                    ) {
                         checker.add_check(check);
                     }
                 }

@@ -220,7 +220,7 @@ pub fn convert_typed_dict_functional_to_class(
                     CheckKind::ConvertTypedDictFunctionalToClass,
                     Range::from_located(stmt),
                 );
-                if checker.patch() {
+                if checker.patch(check.kind.code()) {
                     match convert_to_functional_class(stmt, class_name, body, total_keyword) {
                         Ok(fix) => check.amend(fix),
                         Err(err) => error!("Failed to convert TypedDict: {}", err),

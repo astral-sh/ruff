@@ -11,7 +11,7 @@ pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Exp
         &checker.from_imports,
         &checker.import_aliases,
     ) {
-        if checker.patch() {
+        if checker.patch(check.kind.code()) {
             if let Some(fix) =
                 fixes::remove_unnecessary_lru_cache_params(checker.locator, &check.location)
             {

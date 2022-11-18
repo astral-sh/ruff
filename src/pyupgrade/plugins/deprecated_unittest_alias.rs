@@ -37,7 +37,7 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
                         CheckKind::DeprecatedUnittestAlias(attr.to_string(), target.to_string()),
                         Range::from_located(expr),
                     );
-                    if checker.patch() {
+                    if checker.patch(check.kind.code()) {
                         check.amend(Fix::replacement(
                             format!("self.{}", target),
                             expr.location,

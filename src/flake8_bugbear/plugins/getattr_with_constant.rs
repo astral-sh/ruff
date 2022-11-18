@@ -20,6 +20,7 @@ fn attribute(value: &Expr, attr: &str) -> Expr {
     )
 }
 
+/// B009
 pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if let ExprKind::Name { id, .. } = &func.node {
         if id == "getattr" {
@@ -32,7 +33,7 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                     if IDENTIFIER_REGEX.is_match(value) && !KWLIST.contains(&value.as_str()) {
                         let mut check =
                             Check::new(CheckKind::GetAttrWithConstant, Range::from_located(expr));
-                        if checker.patch() {
+                        if checker.patch(check.kind.code()) {
                             let mut generator = SourceGenerator::new();
                             if let Ok(()) = generator.unparse_expr(&attribute(obj, value), 0) {
                                 if let Ok(content) = generator.generate() {

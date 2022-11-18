@@ -28,7 +28,7 @@ fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
 pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     if let Some(expr) = match_not_implemented(expr) {
         let mut check = Check::new(CheckKind::RaiseNotImplemented, Range::from_located(expr));
-        if checker.patch() {
+        if checker.patch(check.kind.code()) {
             check.amend(Fix::replacement(
                 "NotImplementedError".to_string(),
                 expr.location,
