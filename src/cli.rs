@@ -1,15 +1,12 @@
-use std::fmt;
 use std::path::PathBuf;
 
 use clap::{command, Parser};
 use fnv::FnvHashMap;
-use log::warn;
 use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::logging::LogLevel;
 use crate::printer::SerializationFormat;
-use crate::settings::configuration::Configuration;
 use crate::settings::types::{PatternPrefixPair, PerFileIgnore, PythonVersion};
 
 #[derive(Debug, Parser)]
@@ -134,64 +131,6 @@ pub fn extract_log_level(cli: &Cli) -> LogLevel {
         LogLevel::Quiet
     } else {
         LogLevel::Default
-    }
-}
-
-pub enum Warnable {
-    Select,
-    ExtendSelect,
-}
-
-impl fmt::Display for Warnable {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Warnable::Select => fmt.write_str("--select"),
-            Warnable::ExtendSelect => fmt.write_str("--extend-select"),
-        }
-    }
-}
-
-/// Warn the user if they attempt to enable a code that won't be respected.
-pub fn warn_on(
-    flag: Warnable,
-    codes: &[CheckCodePrefix],
-    cli_ignore: &[CheckCodePrefix],
-    cli_extend_ignore: &[CheckCodePrefix],
-    pyproject_configuration: &Configuration,
-    pyproject_path: Option<&PathBuf>,
-) {
-    for code in codes {
-        if !cli_ignore.is_empty() {
-            if cli_ignore.contains(code) {
-                warn!("{code:?} was passed to {flag}, but ignored via --ignore")
-            }
-        } else if pyproject_configuration.ignore.contains(code) {
-            if let Some(path) = pyproject_path {
-                warn!(
-                    "{code:?} was passed to {flag}, but ignored by the `ignore` field in {}",
-                    path.to_string_lossy()
-                )
-            } else {
-                warn!("{code:?} was passed to {flag}, but ignored by the default `ignore` field",)
-            }
-        }
-        if !cli_extend_ignore.is_empty() {
-            if cli_extend_ignore.contains(code) {
-                warn!("{code:?} was passed to {flag}, but ignored via --extend-ignore")
-            }
-        } else if pyproject_configuration.extend_ignore.contains(code) {
-            if let Some(path) = pyproject_path {
-                warn!(
-                    "{code:?} was passed to {flag}, but ignored by the `extend_ignore` field in {}",
-                    path.to_string_lossy()
-                )
-            } else {
-                warn!(
-                    "{code:?} was passed to {flag}, but ignored by the default `extend_ignore` \
-                     field"
-                )
-            }
-        }
     }
 }
 
