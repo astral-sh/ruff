@@ -30,16 +30,20 @@ mod docstrings;
 mod flake8_2020;
 pub mod flake8_annotations;
 pub mod flake8_bandit;
+mod flake8_blind_except;
+pub mod flake8_boolean_trap;
 pub mod flake8_bugbear;
 mod flake8_builtins;
 mod flake8_comprehensions;
 mod flake8_print;
 pub mod flake8_quotes;
+pub mod flake8_tidy_imports;
 pub mod fs;
 mod isort;
 mod lex;
 pub mod linter;
 pub mod logging;
+pub mod mccabe;
 pub mod message;
 mod noqa;
 pub mod pep8_naming;
@@ -52,6 +56,8 @@ mod pyupgrade;
 mod rules;
 pub mod settings;
 pub mod source_code_locator;
+#[cfg(feature = "update-informer")]
+pub mod updates;
 pub mod visibility;
 
 /// Run Ruff over Python source code directly.
@@ -62,14 +68,16 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         Some(path) => debug!("Found project root at: {:?}", path),
         None => debug!("Unable to identify project root; assuming current directory..."),
     };
-    let pyproject = pyproject::find_pyproject_toml(&project_root);
+    let pyproject = pyproject::find_pyproject_toml(project_root.as_ref());
     match &pyproject {
         Some(path) => debug!("Found pyproject.toml at: {:?}", path),
         None => debug!("Unable to find pyproject.toml; using default settings..."),
     };
 
-    let settings =
-        Settings::from_configuration(Configuration::from_pyproject(&pyproject, &project_root)?);
+    let settings = Settings::from_configuration(Configuration::from_pyproject(
+        pyproject.as_ref(),
+        project_root.as_ref(),
+    )?);
 
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);

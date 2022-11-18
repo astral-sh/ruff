@@ -223,8 +223,11 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                         if checker.patch() {
                             // Delete the blank line after the docstring.
                             check.amend(Fix::deletion(
-                                Location::new(docstring.location.row() + 1, 0),
-                                Location::new(docstring.location.row() + 1 + blank_lines_after, 0),
+                                Location::new(docstring.end_location.unwrap().row() + 1, 0),
+                                Location::new(
+                                    docstring.end_location.unwrap().row() + 1 + blank_lines_after,
+                                    0,
+                                ),
                             ));
                         }
                         checker.add_check(check);
@@ -1359,7 +1362,10 @@ static GOOGLE_ARGS_REGEX: Lazy<Regex> =
 
 fn args_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
     let mut args_sections: Vec<String> = vec![];
-    for line in textwrap::dedent(&context.following_lines.join("\n")).lines() {
+    for line in textwrap::dedent(&context.following_lines.join("\n"))
+        .trim()
+        .lines()
+    {
         if line
             .chars()
             .next()

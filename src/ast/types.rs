@@ -54,7 +54,7 @@ pub struct Scope<'a> {
     pub id: usize,
     pub kind: ScopeKind<'a>,
     pub import_starred: bool,
-    pub values: FnvHashMap<String, Binding>,
+    pub values: FnvHashMap<&'a str, Binding>,
 }
 
 impl<'a> Scope<'a> {
@@ -79,14 +79,16 @@ pub enum BindingKind {
     Annotation,
     Argument,
     Assignment,
+    // TODO(charlie): This seems to be a catch-all.
     Binding,
     LoopVar,
+    Global,
     Builtin,
     ClassDefinition,
     Definition,
     Export(Vec<String>),
     FutureImportation,
-    StarImportation,
+    StarImportation(Option<usize>, Option<String>),
     Importation(String, String, BindingContext),
     FromImportation(String, String, BindingContext),
     SubmoduleImportation(String, String, BindingContext),

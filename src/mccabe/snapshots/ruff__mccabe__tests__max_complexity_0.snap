@@ -1,0 +1,170 @@
+---
+source: src/mccabe/mod.rs
+expression: checks
+---
+- kind:
+    FunctionIsTooComplex:
+      - trivial
+      - 1
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 7
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - expr_as_statement
+      - 1
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 12
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - sequential
+      - 1
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 19
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - if_elif_else_dead_path
+      - 3
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 29
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - nested_ifs
+      - 3
+  location:
+    row: 29
+    column: 0
+  end_location:
+    row: 40
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - for_loop
+      - 2
+  location:
+    row: 40
+    column: 0
+  end_location:
+    row: 46
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - for_else
+      - 2
+  location:
+    row: 46
+    column: 0
+  end_location:
+    row: 54
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - recursive
+      - 2
+  location:
+    row: 54
+    column: 0
+  end_location:
+    row: 62
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - nested_functions
+      - 3
+  location:
+    row: 62
+    column: 0
+  end_location:
+    row: 73
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - a
+      - 2
+  location:
+    row: 63
+    column: 4
+  end_location:
+    row: 69
+    column: 4
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - b
+      - 1
+  location:
+    row: 64
+    column: 8
+  end_location:
+    row: 67
+    column: 8
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - try_else
+      - 4
+  location:
+    row: 73
+    column: 0
+  end_location:
+    row: 85
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - nested_try_finally
+      - 3
+  location:
+    row: 85
+    column: 0
+  end_location:
+    row: 96
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - foobar
+      - 3
+  location:
+    row: 96
+    column: 0
+  end_location:
+    row: 107
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - annotated_assign
+      - 1
+  location:
+    row: 107
+    column: 0
+  end_location:
+    row: 109
+    column: 0
+  fix: ~
+

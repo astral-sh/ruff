@@ -1,0 +1,22 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 26
+    column: 0
+  fix:
+    patch:
+      content: "import B  # Comment 4\n\n# Comment 3a\n# Comment 3b\nimport C\nimport D\n\n# Comment 5\n# Comment 6\nfrom A import (\n    a,  # Comment 7  # Comment 9\n    b,  # Comment 10\n    c,  # Comment 8  # Comment 11\n)\n"
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 26
+        column: 0
+    applied: false
+

@@ -17,6 +17,8 @@ use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::FilePattern;
 use ::ruff::settings::user::UserConfiguration;
 use ::ruff::settings::{pyproject, Settings};
+#[cfg(feature = "update-informer")]
+use ::ruff::updates;
 use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
@@ -25,11 +27,6 @@ use notify::{raw_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use walkdir::DirEntry;
-
-#[cfg(feature = "update-informer")]
-const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
-#[cfg(feature = "update-informer")]
-const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Shim that calls par_iter except for wasm because there's no wasm support in
 /// rayon yet (there is a shim to be used for the web, but it requires js
@@ -43,30 +40,6 @@ fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl ParallelIterator<Item = &T> {
 #[cfg(target_family = "wasm")]
 fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl Iterator<Item = &T> {
     iterable.iter()
-}
-
-#[cfg(feature = "update-informer")]
-fn check_for_updates() {
-    use update_informer::{registry, Check};
-
-    let informer = update_informer::new(registry::PyPI, CARGO_PKG_NAME, CARGO_PKG_VERSION);
-
-    if let Some(new_version) = informer.check_version().ok().flatten() {
-        let msg = format!(
-            "A new version of {pkg_name} is available: v{pkg_version} -> {new_version}",
-            pkg_name = CARGO_PKG_NAME.italic().cyan(),
-            pkg_version = CARGO_PKG_VERSION,
-            new_version = new_version.to_string().green()
-        );
-
-        let cmd = format!(
-            "Run to update: {cmd} {pkg_name}",
-            cmd = "pip3 install --upgrade".green(),
-            pkg_name = CARGO_PKG_NAME.green()
-        );
-
-        println!("\n{msg}\n{cmd}");
-    }
 }
 
 fn show_settings(
@@ -238,7 +211,7 @@ fn inner_main() -> Result<ExitCode> {
     };
     let pyproject = cli
         .config
-        .or_else(|| pyproject::find_pyproject_toml(&project_root));
+        .or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
     match &pyproject {
         Some(path) => debug!("Found pyproject.toml at: {:?}", path),
         None => debug!("Unable to find pyproject.toml; using default settings..."),
@@ -248,15 +221,16 @@ fn inner_main() -> Result<ExitCode> {
     let exclude: Vec<FilePattern> = cli
         .exclude
         .iter()
-        .map(|path| FilePattern::from_user(path, &project_root))
+        .map(|path| FilePattern::from_user(path, project_root.as_ref()))
         .collect();
     let extend_exclude: Vec<FilePattern> = cli
         .extend_exclude
         .iter()
-        .map(|path| FilePattern::from_user(path, &project_root))
+        .map(|path| FilePattern::from_user(path, project_root.as_ref()))
         .collect();
 
-    let mut configuration = Configuration::from_pyproject(&pyproject, &project_root)?;
+    let mut configuration =
+        Configuration::from_pyproject(pyproject.as_ref(), project_root.as_ref())?;
     if !exclude.is_empty() {
         configuration.exclude = exclude;
     }
@@ -265,7 +239,7 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !cli.per_file_ignores.is_empty() {
         configuration.per_file_ignores =
-            collect_per_file_ignores(cli.per_file_ignores, &project_root);
+            collect_per_file_ignores(cli.per_file_ignores, project_root.as_ref());
     }
     if !cli.select.is_empty() {
         warn_on(
@@ -274,7 +248,7 @@ fn inner_main() -> Result<ExitCode> {
             &cli.ignore,
             &cli.extend_ignore,
             &configuration,
-            &pyproject,
+            pyproject.as_ref(),
         );
         configuration.select = cli.select;
     }
@@ -285,7 +259,7 @@ fn inner_main() -> Result<ExitCode> {
             &cli.ignore,
             &cli.extend_ignore,
             &configuration,
-            &pyproject,
+            pyproject.as_ref(),
         );
         configuration.extend_select = cli.extend_select;
     }
@@ -294,6 +268,12 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !cli.extend_ignore.is_empty() {
         configuration.extend_ignore = cli.extend_ignore;
+    }
+    if let Some(line_length) = cli.line_length {
+        configuration.line_length = line_length;
+    }
+    if let Some(max_complexity) = cli.max_complexity {
+        configuration.mccabe.max_complexity = max_complexity;
     }
     if let Some(target_version) = cli.target_version {
         configuration.target_version = target_version;
@@ -408,8 +388,8 @@ fn inner_main() -> Result<ExitCode> {
 
         // Check for updates if we're in a non-silent log level.
         #[cfg(feature = "update-informer")]
-        if !is_stdin && log_level >= LogLevel::Default {
-            check_for_updates();
+        if !is_stdin && log_level >= LogLevel::Default && atty::is(atty::Stream::Stdout) {
+            let _ = updates::check_for_updates();
         }
 
         if messages.iter().any(|message| !message.fixed) && !cli.exit_zero {

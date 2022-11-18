@@ -2,23 +2,41 @@
 source: src/linter.rs
 expression: checks
 ---
-- kind: NotIsTest
+- kind: NotInTest
   location:
     row: 2
     column: 7
   end_location:
     row: 2
     column: 13
-  fix: ~
-- kind: NotIsTest
+  fix:
+    patch:
+      content: X is not Y
+      location:
+        row: 2
+        column: 3
+      end_location:
+        row: 2
+        column: 13
+    applied: false
+- kind: NotInTest
   location:
     row: 5
     column: 7
   end_location:
     row: 5
     column: 15
-  fix: ~
-- kind: NotIsTest
+  fix:
+    patch:
+      content: X.B is not Y
+      location:
+        row: 5
+        column: 3
+      end_location:
+        row: 5
+        column: 15
+    applied: false
+- kind: NotInTest
   location:
     row: 8
     column: 7

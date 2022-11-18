@@ -23,6 +23,9 @@ if None != res[1]:
 if None == res[1]:
     pass
 
+if x == None != None:
+    pass
+
 #: Okay
 if x not in y:
     pass

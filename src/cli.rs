@@ -87,6 +87,13 @@ pub struct Cli {
     /// The minimum Python version that should be supported.
     #[arg(long)]
     pub target_version: Option<PythonVersion>,
+    /// Set the line-length for length-associated checks and automatic
+    /// formatting.
+    #[arg(long)]
+    pub line_length: Option<usize>,
+    /// Max McCabe complexity allowed for a function.
+    #[arg(long)]
+    pub max_complexity: Option<usize>,
     /// Round-trip auto-formatting.
     // TODO(charlie): This should be a sub-command.
     #[arg(long, hide = true)]
@@ -123,6 +130,8 @@ pub fn extract_log_level(cli: &Cli) -> LogLevel {
         LogLevel::Quiet
     } else if cli.verbose {
         LogLevel::Verbose
+    } else if matches!(cli.format, SerializationFormat::Json) {
+        LogLevel::Quiet
     } else {
         LogLevel::Default
     }
@@ -149,7 +158,7 @@ pub fn warn_on(
     cli_ignore: &[CheckCodePrefix],
     cli_extend_ignore: &[CheckCodePrefix],
     pyproject_configuration: &Configuration,
-    pyproject_path: &Option<PathBuf>,
+    pyproject_path: Option<&PathBuf>,
 ) {
     for code in codes {
         if !cli_ignore.is_empty() {
@@ -189,7 +198,7 @@ pub fn warn_on(
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
 pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
-    project_root: &Option<PathBuf>,
+    project_root: Option<&PathBuf>,
 ) -> Vec<PerFileIgnore> {
     let mut per_file_ignores: FnvHashMap<String, Vec<CheckCodePrefix>> = FnvHashMap::default();
     for pair in pairs {

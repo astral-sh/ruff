@@ -23,7 +23,7 @@ use crate::autofix::fixer;
 use crate::message::Message;
 use crate::settings::Settings;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize, Deserialize)]
 struct CacheMetadata {
@@ -89,7 +89,7 @@ fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> String 
     format!(
         "{}@{}@{}",
         path.absolutize().unwrap().to_string_lossy(),
-        VERSION,
+        CARGO_PKG_VERSION,
         hasher.finish()
     )
 }

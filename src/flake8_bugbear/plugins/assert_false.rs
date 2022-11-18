@@ -6,7 +6,7 @@ use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::code_gen::SourceGenerator;
 
-fn assertion_error(msg: &Option<Box<Expr>>) -> Stmt {
+fn assertion_error(msg: Option<&Expr>) -> Stmt {
     Stmt::new(
         Default::default(),
         Default::default(),
@@ -24,7 +24,7 @@ fn assertion_error(msg: &Option<Box<Expr>>) -> Stmt {
                         },
                     )),
                     args: if let Some(msg) = msg {
-                        vec![*msg.clone()]
+                        vec![msg.clone()]
                     } else {
                         vec![]
                     },
@@ -36,7 +36,7 @@ fn assertion_error(msg: &Option<Box<Expr>>) -> Stmt {
     )
 }
 
-pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: &Option<Box<Expr>>) {
+pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     if let ExprKind::Constant {
         value: Constant::Bool(false),
         ..

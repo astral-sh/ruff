@@ -10,7 +10,16 @@ expression: checks
   end_location:
     row: 2
     column: 14
-  fix: ~
+  fix:
+    patch:
+      content: res is None
+      location:
+        row: 2
+        column: 3
+      end_location:
+        row: 2
+        column: 14
+    applied: false
 - kind:
     NoneComparison: NotEq
   location:
@@ -19,7 +28,16 @@ expression: checks
   end_location:
     row: 5
     column: 14
-  fix: ~
+  fix:
+    patch:
+      content: res is not None
+      location:
+        row: 5
+        column: 3
+      end_location:
+        row: 5
+        column: 14
+    applied: false
 - kind:
     NoneComparison: Eq
   location:
@@ -28,7 +46,16 @@ expression: checks
   end_location:
     row: 8
     column: 7
-  fix: ~
+  fix:
+    patch:
+      content: None is res
+      location:
+        row: 8
+        column: 3
+      end_location:
+        row: 8
+        column: 14
+    applied: false
 - kind:
     NoneComparison: NotEq
   location:
@@ -37,7 +64,16 @@ expression: checks
   end_location:
     row: 11
     column: 7
-  fix: ~
+  fix:
+    patch:
+      content: None is not res
+      location:
+        row: 11
+        column: 3
+      end_location:
+        row: 11
+        column: 14
+    applied: false
 - kind:
     NoneComparison: Eq
   location:
@@ -46,7 +82,16 @@ expression: checks
   end_location:
     row: 14
     column: 17
-  fix: ~
+  fix:
+    patch:
+      content: "res[1] is None"
+      location:
+        row: 14
+        column: 3
+      end_location:
+        row: 14
+        column: 17
+    applied: false
 - kind:
     NoneComparison: NotEq
   location:
@@ -55,7 +100,16 @@ expression: checks
   end_location:
     row: 17
     column: 17
-  fix: ~
+  fix:
+    patch:
+      content: "res[1] is not None"
+      location:
+        row: 17
+        column: 3
+      end_location:
+        row: 17
+        column: 17
+    applied: false
 - kind:
     NoneComparison: NotEq
   location:
@@ -64,7 +118,16 @@ expression: checks
   end_location:
     row: 20
     column: 7
-  fix: ~
+  fix:
+    patch:
+      content: "None is not res[1]"
+      location:
+        row: 20
+        column: 3
+      end_location:
+        row: 20
+        column: 17
+    applied: false
 - kind:
     NoneComparison: Eq
   location:
@@ -73,5 +136,50 @@ expression: checks
   end_location:
     row: 23
     column: 7
-  fix: ~
+  fix:
+    patch:
+      content: "None is res[1]"
+      location:
+        row: 23
+        column: 3
+      end_location:
+        row: 23
+        column: 17
+    applied: false
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 26
+    column: 8
+  end_location:
+    row: 26
+    column: 12
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 26
+        column: 3
+      end_location:
+        row: 26
+        column: 3
+    applied: false
+- kind:
+    NoneComparison: NotEq
+  location:
+    row: 26
+    column: 16
+  end_location:
+    row: 26
+    column: 20
+  fix:
+    patch:
+      content: x is None is not None
+      location:
+        row: 26
+        column: 3
+      end_location:
+        row: 26
+        column: 20
+    applied: false
 

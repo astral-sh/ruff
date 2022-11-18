@@ -16,6 +16,9 @@ multiline-quotes = "double"
 docstring-quotes = "double"
 avoid-escape = true
 
+[tool.ruff.mccabe]
+max-complexity = 10
+
 [tool.ruff.pep8-naming]
 ignore-names = [
   "setUp",
@@ -33,7 +36,11 @@ ignore-names = [
 ]
 classmethod-decorators = [
   "classmethod",
+  "pydantic.validator",
 ]
 staticmethod-decorators = [
   "staticmethod",
 ]
+
+[tool.ruff.flake8-tidy-imports]
+ban-relative-imports = "parents"

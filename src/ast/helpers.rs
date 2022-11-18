@@ -225,6 +225,29 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
     }
 }
 
+/// Format the module name for a relative import.
+pub fn format_import_from(level: Option<&usize>, module: Option<&String>) -> String {
+    let mut module_name = String::with_capacity(16);
+    if let Some(level) = level {
+        for _ in 0..*level {
+            module_name.push('.');
+        }
+    }
+    if let Some(module) = module {
+        module_name.push_str(module);
+    }
+    module_name
+}
+
+/// Split a target string (like `typing.List`) into (`typing`, `List`).
+pub fn to_module_and_member(target: &str) -> (&str, &str) {
+    if let Some(index) = target.rfind('.') {
+        (&target[..index], &target[index + 1..])
+    } else {
+        ("", target)
+    }
+}
+
 /// Convert a location within a file (relative to `base`) to an absolute
 /// position.
 pub fn to_absolute(relative: &Location, base: &Location) -> Location {

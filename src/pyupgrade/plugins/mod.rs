@@ -1,7 +1,7 @@
+pub use convert_typed_dict_functional_to_class::convert_typed_dict_functional_to_class;
 pub use deprecated_unittest_alias::deprecated_unittest_alias;
 pub use super_call_with_parameters::super_call_with_parameters;
 pub use type_of_primitive::type_of_primitive;
-pub use unnecessary_abspath::unnecessary_abspath;
 pub use unnecessary_encode_utf8::unnecessary_encode_utf8;
 pub use unnecessary_future_import::unnecessary_future_import;
 pub use unnecessary_lru_cache_params::unnecessary_lru_cache_params;
@@ -10,10 +10,10 @@ pub use use_pep604_annotation::use_pep604_annotation;
 pub use useless_metaclass_type::useless_metaclass_type;
 pub use useless_object_inheritance::useless_object_inheritance;
 
+mod convert_typed_dict_functional_to_class;
 mod deprecated_unittest_alias;
 mod super_call_with_parameters;
 mod type_of_primitive;
-mod unnecessary_abspath;
 mod unnecessary_encode_utf8;
 mod unnecessary_future_import;
 mod unnecessary_lru_cache_params;

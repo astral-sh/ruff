@@ -19,8 +19,7 @@ use crate::ast::helpers::{
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, ImportKind, Range, Scope,
-    ScopeKind,
+    Binding, BindingContext, BindingKind, ClassScope, ImportKind, Range, Scope, ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
@@ -36,8 +35,9 @@ use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_print, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
+    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print,
+    flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -65,7 +65,7 @@ pub struct Checker<'a> {
     scopes: Vec<Scope<'a>>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
-    deferred_string_annotations: Vec<(Range, &'a str)>,
+    deferred_string_annotations: Vec<(Range, &'a str, Vec<usize>, Vec<usize>)>,
     deferred_annotations: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
     deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
@@ -215,21 +215,18 @@ where
         match &stmt.node {
             StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
                 let global_scope_id = self.scopes[GLOBAL_SCOPE_INDEX].id;
-
-                let current_scope = self.current_scope();
-                let current_scope_id = current_scope.id;
-                if current_scope_id != global_scope_id {
+                let scope =
+                    &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+                if scope.id != global_scope_id {
                     for name in names {
-                        for scope in self.scopes.iter_mut().skip(GLOBAL_SCOPE_INDEX + 1) {
-                            scope.values.insert(
-                                name.to_string(),
-                                Binding {
-                                    kind: BindingKind::Assignment,
-                                    used: Some((global_scope_id, Range::from_located(stmt))),
-                                    range: Range::from_located(stmt),
-                                },
-                            );
-                        }
+                        scope.values.insert(
+                            name,
+                            Binding {
+                                kind: BindingKind::Global,
+                                used: Some((global_scope_id, Range::from_located(stmt))),
+                                range: Range::from_located(stmt),
+                            },
+                        );
                     }
                 }
 
@@ -309,6 +306,8 @@ where
                             name,
                             decorator_list,
                             args,
+                            &self.from_imports,
+                            &self.import_aliases,
                             &self.settings.pep8_naming,
                         )
                     {
@@ -322,6 +321,8 @@ where
                         name,
                         decorator_list,
                         args,
+                        &self.from_imports,
+                        &self.import_aliases,
                         &self.settings.pep8_naming,
                     ) {
                         self.add_check(check);
@@ -347,6 +348,16 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B019) {
                     flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
+                }
+                if self.settings.enabled.contains(&CheckCode::C901) {
+                    if let Some(check) = mccabe::checks::function_is_too_complex(
+                        stmt,
+                        name,
+                        body,
+                        self.settings.mccabe.max_complexity,
+                    ) {
+                        self.add_check(check);
+                    }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
@@ -397,7 +408,7 @@ where
                     self.visit_expr(expr);
                 }
                 self.add_binding(
-                    name.to_string(),
+                    name,
                     Binding {
                         kind: BindingKind::Definition,
                         used: None,
@@ -502,7 +513,7 @@ where
                         let name = alias.node.name.split('.').next().unwrap();
                         let full_name = &alias.node.name;
                         self.add_binding(
-                            name.to_string(),
+                            name,
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(
                                     name.to_string(),
@@ -524,7 +535,7 @@ where
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         let full_name = &alias.node.name;
                         self.add_binding(
-                            name.to_string(),
+                            name,
                             Binding {
                                 kind: BindingKind::Importation(
                                     name.to_string(),
@@ -657,7 +668,7 @@ where
                     if let Some("__future__") = module.as_deref() {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         self.add_binding(
-                            name.to_string(),
+                            name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
                                 // Always mark `__future__` imports as used.
@@ -694,16 +705,10 @@ where
                             ));
                         }
                     } else if alias.node.name == "*" {
-                        let module_name = format!(
-                            "{}{}",
-                            ".".repeat(level.unwrap_or_default()),
-                            module.clone().unwrap_or_else(|| "module".to_string()),
-                        );
-
                         self.add_binding(
-                            module_name.to_string(),
+                            "*",
                             Binding {
-                                kind: BindingKind::StarImportation,
+                                kind: BindingKind::StarImportation(*level, module.clone()),
                                 used: None,
                                 range: Range::from_located(stmt),
                             },
@@ -714,7 +719,10 @@ where
                                 [*(self.scope_stack.last().expect("No current scope found."))];
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.add_check(Check::new(
-                                    CheckKind::ImportStarNotPermitted(module_name.to_string()),
+                                    CheckKind::ImportStarNotPermitted(helpers::format_import_from(
+                                        level.as_ref(),
+                                        module.as_ref(),
+                                    )),
                                     Range::from_located(stmt),
                                 ));
                             }
@@ -722,15 +730,16 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::F403) {
                             self.add_check(Check::new(
-                                CheckKind::ImportStarUsed(module_name.to_string()),
+                                CheckKind::ImportStarUsed(helpers::format_import_from(
+                                    level.as_ref(),
+                                    module.as_ref(),
+                                )),
                                 Range::from_located(stmt),
                             ));
                         }
 
-                        let scope = &mut self.scopes[*(self
-                            .scope_stack
-                            .last_mut()
-                            .expect("No current scope found."))];
+                        let scope = &mut self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
                         scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
@@ -746,7 +755,7 @@ where
                             Some(parent) => format!("{}.{}", parent, alias.node.name),
                         };
                         self.add_binding(
-                            name.to_string(),
+                            name,
                             Binding {
                                 kind: BindingKind::FromImportation(
                                     name.to_string(),
@@ -776,6 +785,16 @@ where
                                 range: Range::from_located(stmt),
                             },
                         )
+                    }
+
+                    if self.settings.enabled.contains(&CheckCode::I252) {
+                        if let Some(check) = flake8_tidy_imports::checks::banned_relative_import(
+                            stmt,
+                            level.as_ref(),
+                            &self.settings.flake8_tidy_imports.ban_relative_imports,
+                        ) {
+                            self.add_check(check);
+                        }
                     }
 
                     if let Some(asname) = &alias.node.asname {
@@ -862,7 +881,12 @@ where
                     pyflakes::plugins::assert_tuple(self, stmt, test);
                 }
                 if self.settings.enabled.contains(&CheckCode::B011) {
-                    flake8_bugbear::plugins::assert_false(self, stmt, test, msg);
+                    flake8_bugbear::plugins::assert_false(
+                        self,
+                        stmt,
+                        test,
+                        msg.as_ref().map(|expr| expr.deref()),
+                    );
                 }
                 if self.settings.enabled.contains(&CheckCode::S101) {
                     self.add_check(flake8_bandit::plugins::assert_used(stmt));
@@ -873,9 +897,14 @@ where
                     flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
                 }
             }
-            StmtKind::For { target, body, .. } => {
+            StmtKind::For {
+                target, body, iter, ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::B007) {
                     flake8_bugbear::plugins::unused_loop_control_variable(self, target, body);
+                }
+                if self.settings.enabled.contains(&CheckCode::B020) {
+                    flake8_bugbear::plugins::loop_variable_overrides_iterator(self, target, iter);
                 }
             }
             StmtKind::Try { handlers, .. } => {
@@ -892,13 +921,18 @@ where
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
                 }
+                if self.settings.enabled.contains(&CheckCode::B902) {
+                    flake8_blind_except::plugins::blind_except(self, handlers);
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
-                    if let Some(check) =
-                        pycodestyle::checks::do_not_assign_lambda(value, Range::from_located(stmt))
-                    {
-                        self.add_check(check);
+                    if let [target] = &targets[..] {
+                        if let Some(check) =
+                            pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
+                        {
+                            self.add_check(check);
+                        }
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::U001) {
@@ -914,14 +948,18 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::U013) {
+                    pyupgrade::plugins::convert_typed_dict_functional_to_class(
+                        self, stmt, targets, value,
+                    );
+                }
             }
-            StmtKind::AnnAssign { value, .. } => {
+            StmtKind::AnnAssign { target, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
                     if let Some(value) = value {
-                        if let Some(check) = pycodestyle::checks::do_not_assign_lambda(
-                            value,
-                            Range::from_located(stmt),
-                        ) {
+                        if let Some(check) =
+                            pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
+                        {
                             self.add_check(check);
                         }
                     }
@@ -1012,7 +1050,7 @@ where
         if let StmtKind::ClassDef { name, .. } = &stmt.node {
             self.pop_scope();
             self.add_binding(
-                name.to_string(),
+                name,
                 Binding {
                     kind: BindingKind::ClassDefinition,
                     used: None,
@@ -1042,8 +1080,12 @@ where
                 ..
             } = &expr.node
             {
-                self.deferred_string_annotations
-                    .push((Range::from_located(expr), value));
+                self.deferred_string_annotations.push((
+                    Range::from_located(expr),
+                    value,
+                    self.scope_stack.clone(),
+                    self.parent_stack.clone(),
+                ));
             } else {
                 self.deferred_annotations.push((
                     expr,
@@ -1059,7 +1101,7 @@ where
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) typing.List[...]
                 if self.settings.enabled.contains(&CheckCode::U007)
-                    && self.settings.target_version >= PythonVersion::Py39
+                    && self.settings.target_version >= PythonVersion::Py310
                 {
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
@@ -1121,7 +1163,7 @@ where
 
                         self.check_builtin_shadowing(id, Range::from_located(expr), true);
 
-                        self.handle_node_store(expr, self.current_parent());
+                        self.handle_node_store(id, expr, self.current_parent());
                     }
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
@@ -1416,27 +1458,22 @@ where
                 }
 
                 // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::U002)
-                    && self.settings.target_version >= PythonVersion::Py310
-                {
-                    pyupgrade::plugins::unnecessary_abspath(self, expr, func, args);
-                }
-
                 if self.settings.enabled.contains(&CheckCode::U003) {
                     pyupgrade::plugins::type_of_primitive(self, expr, func, args);
                 }
 
+                // flake8-boolean-trap
+                if self.settings.enabled.contains(&CheckCode::FBT003) {
+                    flake8_boolean_trap::plugins::check_boolean_positional_value_in_function_call(
+                        self, args,
+                    );
+                }
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
-                        let scope = &mut self.scopes[*(self
-                            .scope_stack
-                            .last_mut()
-                            .expect("No current scope found."))];
-                        if matches!(
-                            scope.kind,
-                            ScopeKind::Function(FunctionScope { uses_locals: false })
-                        ) {
-                            scope.kind = ScopeKind::Function(FunctionScope { uses_locals: true });
+                        let scope = &mut self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
+                        if let ScopeKind::Function(inner) = &mut scope.kind {
+                            inner.uses_locals = true;
                         }
                     }
                 }
@@ -1494,9 +1531,13 @@ where
                 let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
                 let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
                 if check_not_in || check_not_is {
-                    self.add_checks(
-                        pycodestyle::checks::not_tests(op, operand, check_not_in, check_not_is)
-                            .into_iter(),
+                    pycodestyle::plugins::not_tests(
+                        self,
+                        expr,
+                        op,
+                        operand,
+                        check_not_in,
+                        check_not_is,
                     );
                 }
 
@@ -1512,16 +1553,15 @@ where
                 let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
                 let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
                 if check_none_comparisons || check_true_false_comparisons {
-                    self.add_checks(
-                        pycodestyle::checks::literal_comparisons(
-                            left,
-                            ops,
-                            comparators,
-                            check_none_comparisons,
-                            check_true_false_comparisons,
-                        )
-                        .into_iter(),
-                    );
+                    pycodestyle::plugins::literal_comparisons(
+                        self,
+                        expr,
+                        left,
+                        ops,
+                        comparators,
+                        check_none_comparisons,
+                        check_true_false_comparisons,
+                    )
                 }
 
                 if self.settings.enabled.contains(&CheckCode::F632) {
@@ -1569,8 +1609,12 @@ where
                 ..
             } => {
                 if self.in_annotation && !self.in_literal {
-                    self.deferred_string_annotations
-                        .push((Range::from_located(expr), value));
+                    self.deferred_string_annotations.push((
+                        Range::from_located(expr),
+                        value,
+                        self.scope_stack.clone(),
+                        self.parent_stack.clone(),
+                    ));
                 }
                 if self.settings.enabled.contains(&CheckCode::S104) {
                     if let Some(check) = flake8_bandit::plugins::hardcoded_bind_all_interfaces(
@@ -1847,8 +1891,9 @@ where
                             false,
                         );
 
-                        if self.current_scope().values.contains_key(name) {
+                        if self.current_scope().values.contains_key(&name.as_str()) {
                             self.handle_node_store(
+                                name,
                                 &Expr::new(
                                     excepthandler.location,
                                     excepthandler.end_location.unwrap(),
@@ -1861,8 +1906,9 @@ where
                             );
                         }
 
-                        let definition = self.current_scope().values.get(name).cloned();
+                        let definition = self.current_scope().values.get(&name.as_str()).cloned();
                         self.handle_node_store(
+                            name,
                             &Expr::new(
                                 excepthandler.location,
                                 excepthandler.end_location.unwrap(),
@@ -1879,7 +1925,7 @@ where
                         if let Some(binding) = {
                             let scope = &mut self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found."))];
-                            &scope.values.remove(name)
+                            &scope.values.remove(&name.as_str())
                         } {
                             if binding.used.is_none() {
                                 if self.settings.enabled.contains(&CheckCode::F841) {
@@ -1894,7 +1940,7 @@ where
                         if let Some(binding) = definition {
                             let scope = &mut self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found."))];
-                            scope.values.insert(name.to_string(), binding);
+                            scope.values.insert(name, binding);
                         }
                     }
                     None => walk_excepthandler(self, excepthandler),
@@ -1913,6 +1959,16 @@ where
         }
         if self.settings.enabled.contains(&CheckCode::B008) {
             flake8_bugbear::plugins::function_call_argument_default(self, arguments)
+        }
+
+        // flake8-boolean-trap
+        if self.settings.enabled.contains(&CheckCode::FBT001) {
+            flake8_boolean_trap::plugins::check_positional_boolean_in_def(self, arguments);
+        }
+        if self.settings.enabled.contains(&CheckCode::FBT002) {
+            flake8_boolean_trap::plugins::check_boolean_default_value_in_function_definition(
+                self, arguments,
+            );
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
@@ -1938,7 +1994,7 @@ where
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
         self.add_binding(
-            arg.node.arg.to_string(),
+            &arg.node.arg,
             Binding {
                 kind: BindingKind::Argument,
                 used: None,
@@ -2003,7 +2059,7 @@ fn try_mark_used(scope: &mut Scope, scope_id: usize, id: &str, expr: &Expr) -> b
     };
 
     // Mark the sub-importation as used.
-    if let Some(binding) = scope.values.get_mut(&alias) {
+    if let Some(binding) = scope.values.get_mut(alias.as_str()) {
         binding.used = Some((scope_id, Range::from_located(expr)));
     }
     true
@@ -2039,7 +2095,7 @@ impl<'a> Checker<'a> {
 
         for builtin in BUILTINS {
             scope.values.insert(
-                (*builtin).to_string(),
+                builtin,
                 Binding {
                     kind: BindingKind::Builtin,
                     range: Default::default(),
@@ -2049,7 +2105,7 @@ impl<'a> Checker<'a> {
         }
         for builtin in MAGIC_GLOBALS {
             scope.values.insert(
-                (*builtin).to_string(),
+                builtin,
                 Binding {
                     kind: BindingKind::Builtin,
                     range: Default::default(),
@@ -2077,23 +2133,26 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn add_binding(&mut self, name: String, binding: Binding) {
+    fn add_binding<'b>(&mut self, name: &'b str, binding: Binding)
+    where
+        'b: 'a,
+    {
         if self.settings.enabled.contains(&CheckCode::F402) {
             let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if let Some(existing) = scope.values.get(&name) {
                 if matches!(binding.kind, BindingKind::LoopVar)
                     && matches!(
                         existing.kind,
-                        BindingKind::Importation(_, _, _)
-                            | BindingKind::FromImportation(_, _, _)
-                            | BindingKind::SubmoduleImportation(_, _, _)
-                            | BindingKind::StarImportation
+                        BindingKind::Importation(..)
+                            | BindingKind::FromImportation(..)
+                            | BindingKind::SubmoduleImportation(..)
+                            | BindingKind::StarImportation(..)
                             | BindingKind::FutureImportation
                     )
                 {
                     self.add_check(Check::new(
                         CheckKind::ImportShadowedByLoopVar(
-                            name.clone(),
+                            name.to_string(),
                             existing.range.location.row(),
                         ),
                         binding.range,
@@ -2128,6 +2187,7 @@ impl<'a> Checker<'a> {
             let mut import_starred = false;
             for scope_index in self.scope_stack.iter().rev() {
                 let scope = &mut self.scopes[*scope_index];
+
                 if matches!(scope.kind, ScopeKind::Class(_)) {
                     if id == "__class__" {
                         return;
@@ -2150,16 +2210,19 @@ impl<'a> Checker<'a> {
                     let mut from_list = vec![];
                     for scope_index in self.scope_stack.iter().rev() {
                         let scope = &self.scopes[*scope_index];
-                        for (name, binding) in scope.values.iter() {
-                            if matches!(binding.kind, BindingKind::StarImportation) {
-                                from_list.push(name.to_string());
+                        for binding in scope.values.values() {
+                            if let BindingKind::StarImportation(level, module) = &binding.kind {
+                                from_list.push(helpers::format_import_from(
+                                    level.as_ref(),
+                                    module.as_ref(),
+                                ));
                             }
                         }
                     }
                     from_list.sort();
 
                     self.add_check(Check::new(
-                        CheckKind::ImportStarUsage(id.clone(), from_list),
+                        CheckKind::ImportStarUsage(id.to_string(), from_list),
                         Range::from_located(expr),
                     ));
                 }
@@ -2190,113 +2253,121 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn handle_node_store(&mut self, expr: &Expr, parent: &Stmt) {
-        if let ExprKind::Name { id, .. } = &expr.node {
-            if self.settings.enabled.contains(&CheckCode::F823) {
-                let scopes: Vec<&Scope> = self
-                    .scope_stack
-                    .iter()
-                    .map(|index| &self.scopes[*index])
-                    .collect();
-                if let Some(check) = pyflakes::checks::undefined_local(&scopes, id) {
-                    self.add_check(check);
-                }
+    fn handle_node_store<'b>(&mut self, id: &'b str, expr: &Expr, parent: &Stmt)
+    where
+        'b: 'a,
+    {
+        if self.settings.enabled.contains(&CheckCode::F823) {
+            let scopes: Vec<&Scope> = self
+                .scope_stack
+                .iter()
+                .map(|index| &self.scopes[*index])
+                .collect();
+            if let Some(check) = pyflakes::checks::undefined_local(&scopes, id) {
+                self.add_check(check);
             }
+        }
 
-            if self.settings.enabled.contains(&CheckCode::N806) {
-                if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
+        if self.settings.enabled.contains(&CheckCode::N806) {
+            if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
+                // Ignore globals.
+                if !self
+                    .current_scope()
+                    .values
+                    .get(id)
+                    .map(|binding| matches!(binding.kind, BindingKind::Global))
+                    .unwrap_or(false)
+                {
                     pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
                 }
             }
+        }
 
-            if self.settings.enabled.contains(&CheckCode::N815) {
-                if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
-                    pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id)
-                }
+        if self.settings.enabled.contains(&CheckCode::N815) {
+            if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
+                pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id)
             }
+        }
 
-            if self.settings.enabled.contains(&CheckCode::N816) {
-                if matches!(self.current_scope().kind, ScopeKind::Module) {
-                    pep8_naming::plugins::mixed_case_variable_in_global_scope(
-                        self, expr, parent, id,
-                    )
-                }
+        if self.settings.enabled.contains(&CheckCode::N816) {
+            if matches!(self.current_scope().kind, ScopeKind::Module) {
+                pep8_naming::plugins::mixed_case_variable_in_global_scope(self, expr, parent, id)
             }
+        }
 
-            if matches!(parent.node, StmtKind::AnnAssign { value: None, .. }) {
-                self.add_binding(
-                    id.to_string(),
-                    Binding {
-                        kind: BindingKind::Annotation,
-                        used: None,
-                        range: Range::from_located(expr),
-                    },
-                );
-                return;
-            }
-
-            // TODO(charlie): Include comprehensions here.
-            if matches!(
-                parent.node,
-                StmtKind::For { .. } | StmtKind::AsyncFor { .. }
-            ) {
-                self.add_binding(
-                    id.to_string(),
-                    Binding {
-                        kind: BindingKind::LoopVar,
-                        used: None,
-                        range: Range::from_located(expr),
-                    },
-                );
-                return;
-            }
-
-            if operations::is_unpacking_assignment(parent) {
-                self.add_binding(
-                    id.to_string(),
-                    Binding {
-                        kind: BindingKind::Binding,
-                        used: None,
-                        range: Range::from_located(expr),
-                    },
-                );
-                return;
-            }
-
-            let current =
-                &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-            if id == "__all__"
-                && matches!(current.kind, ScopeKind::Module)
-                && matches!(
-                    parent.node,
-                    StmtKind::Assign { .. }
-                        | StmtKind::AugAssign { .. }
-                        | StmtKind::AnnAssign { .. }
-                )
-            {
-                self.add_binding(
-                    id.to_string(),
-                    Binding {
-                        kind: BindingKind::Export(extract_all_names(parent, current)),
-                        used: None,
-                        range: Range::from_located(expr),
-                    },
-                );
-                return;
-            }
-
+        if matches!(parent.node, StmtKind::AnnAssign { value: None, .. }) {
             self.add_binding(
-                id.to_string(),
+                id,
                 Binding {
-                    kind: BindingKind::Assignment,
+                    kind: BindingKind::Annotation,
                     used: None,
                     range: Range::from_located(expr),
                 },
             );
+            return;
         }
+
+        // TODO(charlie): Include comprehensions here.
+        if matches!(
+            parent.node,
+            StmtKind::For { .. } | StmtKind::AsyncFor { .. }
+        ) {
+            self.add_binding(
+                id,
+                Binding {
+                    kind: BindingKind::LoopVar,
+                    used: None,
+                    range: Range::from_located(expr),
+                },
+            );
+            return;
+        }
+
+        if operations::is_unpacking_assignment(parent) {
+            self.add_binding(
+                id,
+                Binding {
+                    kind: BindingKind::Binding,
+                    used: None,
+                    range: Range::from_located(expr),
+                },
+            );
+            return;
+        }
+
+        let current = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        if id == "__all__"
+            && matches!(current.kind, ScopeKind::Module)
+            && matches!(
+                parent.node,
+                StmtKind::Assign { .. } | StmtKind::AugAssign { .. } | StmtKind::AnnAssign { .. }
+            )
+        {
+            self.add_binding(
+                id,
+                Binding {
+                    kind: BindingKind::Export(extract_all_names(parent, current)),
+                    used: None,
+                    range: Range::from_located(expr),
+                },
+            );
+            return;
+        }
+
+        self.add_binding(
+            id,
+            Binding {
+                kind: BindingKind::Assignment,
+                used: None,
+                range: Range::from_located(expr),
+            },
+        );
     }
 
-    fn handle_node_delete(&mut self, expr: &Expr) {
+    fn handle_node_delete<'b>(&mut self, expr: &'b Expr)
+    where
+        'b: 'a,
+    {
         if let ExprKind::Name { id, .. } = &expr.node {
             if operations::on_conditional_branch(
                 &mut self
@@ -2310,10 +2381,11 @@ impl<'a> Checker<'a> {
 
             let scope =
                 &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-            if scope.values.remove(id).is_none() && self.settings.enabled.contains(&CheckCode::F821)
+            if scope.values.remove(&id.as_str()).is_none()
+                && self.settings.enabled.contains(&CheckCode::F821)
             {
                 self.add_check(Check::new(
-                    CheckKind::UndefinedName(id.clone()),
+                    CheckKind::UndefinedName(id.to_string()),
                     Range::from_located(expr),
                 ))
             }
@@ -2344,8 +2416,8 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_annotations(&mut self) {
         while let Some((expr, scopes, parents)) = self.deferred_annotations.pop() {
-            self.parent_stack = parents;
             self.scope_stack = scopes;
+            self.parent_stack = parents;
             self.visit_expr(expr);
         }
     }
@@ -2354,10 +2426,14 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        while let Some((range, expression)) = self.deferred_string_annotations.pop() {
+        let mut stacks = vec![];
+        while let Some((range, expression, scopes, parents)) =
+            self.deferred_string_annotations.pop()
+        {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 relocate_expr(&mut expr, range);
                 allocator.push(expr);
+                stacks.push((scopes, parents));
             } else {
                 if self.settings.enabled.contains(&CheckCode::F722) {
                     self.add_check(Check::new(
@@ -2367,7 +2443,9 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        for expr in allocator {
+        for (expr, (scopes, parents)) in allocator.iter().zip(stacks) {
+            self.scope_stack = scopes;
+            self.parent_stack = parents;
             self.visit_expr(expr);
         }
     }
@@ -2439,16 +2517,19 @@ impl<'a> Checker<'a> {
 
         let mut checks: Vec<Check> = vec![];
         for scope in self.dead_scopes.iter().map(|index| &self.scopes[*index]) {
-            let all_binding = scope.values.get("__all__");
-            let all_names = all_binding.and_then(|binding| match &binding.kind {
-                BindingKind::Export(names) => Some(names),
-                _ => None,
-            });
+            let all_binding: Option<&Binding> = scope.values.get("__all__");
+            let all_names: Option<Vec<&str>> =
+                all_binding.and_then(|binding| match &binding.kind {
+                    BindingKind::Export(names) => {
+                        Some(names.iter().map(|name| name.as_str()).collect())
+                    }
+                    _ => None,
+                });
 
             if self.settings.enabled.contains(&CheckCode::F822) {
                 if !scope.import_starred && !self.path.ends_with("__init__.py") {
                     if let Some(all_binding) = all_binding {
-                        if let Some(names) = all_names {
+                        if let Some(names) = &all_names {
                             for name in names {
                                 if !scope.values.contains_key(name) {
                                     checks.push(Check::new(
@@ -2465,11 +2546,14 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::F405) {
                 if scope.import_starred {
                     if let Some(all_binding) = all_binding {
-                        if let Some(names) = all_names {
+                        if let Some(names) = &all_names {
                             let mut from_list = vec![];
-                            for (name, binding) in scope.values.iter() {
-                                if matches!(binding.kind, BindingKind::StarImportation) {
-                                    from_list.push(name.to_string());
+                            for binding in scope.values.values() {
+                                if let BindingKind::StarImportation(level, module) = &binding.kind {
+                                    from_list.push(helpers::format_import_from(
+                                        level.as_ref(),
+                                        module.as_ref(),
+                                    ));
                                 }
                             }
                             from_list.sort();
@@ -2477,7 +2561,10 @@ impl<'a> Checker<'a> {
                             for name in names {
                                 if !scope.values.contains_key(name) {
                                     checks.push(Check::new(
-                                        CheckKind::ImportStarUsage(name.clone(), from_list.clone()),
+                                        CheckKind::ImportStarUsage(
+                                            name.to_string(),
+                                            from_list.clone(),
+                                        ),
                                         all_binding.range,
                                     ));
                                 }
@@ -2494,8 +2581,18 @@ impl<'a> Checker<'a> {
                     BTreeMap::new();
 
                 for (name, binding) in scope.values.iter() {
+                    if !matches!(
+                        binding.kind,
+                        BindingKind::Importation(..)
+                            | BindingKind::SubmoduleImportation(..)
+                            | BindingKind::FromImportation(..)
+                    ) {
+                        continue;
+                    }
+
                     let used = binding.used.is_some()
                         || all_names
+                            .as_ref()
                             .map(|names| names.contains(name))
                             .unwrap_or_default();
 
@@ -2522,7 +2619,7 @@ impl<'a> Checker<'a> {
                                     .or_default()
                                     .push(full_name);
                             }
-                            _ => {}
+                            _ => unreachable!("Already filtered on BindingKind."),
                         }
                     }
                 }

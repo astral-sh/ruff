@@ -1,0 +1,14 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    UndefinedName: InnerClass
+  location:
+    row: 5
+    column: 29
+  end_location:
+    row: 5
+    column: 41
+  fix: ~
+
