@@ -65,43 +65,41 @@ impl fmt::Display for Message {
             self.kind.code().as_ref().red().bold(),
             self.kind.body(),
         );
-
-        let snippet = Snippet {
-            title: Some(Annotation {
-                label: Some(&label),
-                id: None,
-                annotation_type: AnnotationType::Error,
-            }),
-            footer: vec![],
-            slices: if let Some(source) = &self.source {
-                vec![Slice {
-                    source: &source.contents,
-                    line_start: self.location.row(),
-                    origin: None,
-                    fold: false,
-                    annotations: vec![SourceAnnotation {
-                        label: "",
+        match &self.source {
+            None => write!(f, "{}", label),
+            Some(source) => {
+                let snippet = Snippet {
+                    title: Some(Annotation {
+                        label: Some(&label),
                         annotation_type: AnnotationType::Error,
-                        range: source.range,
+                        // The ID (error number) is already encoded in the `label`.
+                        id: None,
+                    }),
+                    footer: vec![],
+                    slices: vec![Slice {
+                        source: &source.contents,
+                        line_start: self.location.row(),
+                        annotations: vec![SourceAnnotation {
+                            label: self.kind.code().as_ref(),
+                            annotation_type: AnnotationType::Error,
+                            range: source.range,
+                        }],
+                        // The origin (file name, line number, and column number) is already encoded
+                        // in the `label`.
+                        origin: None,
+                        fold: false,
                     }],
-                }]
-            } else {
-                vec![]
-            },
-            opt: FormatOptions {
-                color: true,
-                ..Default::default()
-            },
-        };
-
-        let mut message = DisplayList::from(snippet);
-        // if self.show_source {
-        //     message.push('\n');
-        // }
-        // `split_once(' ').unwrap().1` stirps "error: " from `message`.
-        // Note `message` contains ANSI color codes.
-        // write!(f, "{}", message.split_once(' ').unwrap().1)
-        write!(f, "{}", message)
+                    opt: FormatOptions {
+                        color: true,
+                        ..Default::default()
+                    },
+                };
+                // `split_once(' ')` strips "error: " from `message`.
+                let message = DisplayList::from(snippet).to_string();
+                let (_, message) = message.split_once(' ').unwrap();
+                write!(f, "{}", message)
+            }
+        }
     }
 }
 
