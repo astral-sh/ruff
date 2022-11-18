@@ -191,7 +191,7 @@ ruff path/to/code/ --select F401 --select F403
 See `ruff --help` for more:
 
 ```shell
-ruff: An extremely fast Python linter.
+Ruff: An extremely fast Python linter.
 
 Usage: ruff [OPTIONS] <FILES>...
 
@@ -231,10 +231,12 @@ Options:
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
           Output serialization format for error messages [default: text] [possible values: text, json]
+      --show-source
+          Show violations with source code
       --show-files
-          See the files ruff will be run against with the current settings
+          See the files Ruff will be run against with the current settings
       --show-settings
-          See ruff's settings
+          See Ruff's settings
       --add-noqa
           Enable automatic additions of noqa directives to failing lines
       --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
@@ -244,7 +246,7 @@ Options:
       --line-length <LINE_LENGTH>
           Set the line-length for length-associated checks and automatic formatting
       --max-complexity <MAX_COMPLEXITY>
-          Set the maximum cyclomatic complexity for complexity-associated checks
+          Max McCabe complexity allowed for a function
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
   -h, --help

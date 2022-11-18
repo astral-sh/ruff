@@ -13,7 +13,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::types::{PatternPrefixPair, PerFileIgnore, PythonVersion};
 
 #[derive(Debug, Parser)]
-#[command(author, about = "ruff: An extremely fast Python linter.")]
+#[command(author, about = "Ruff: An extremely fast Python linter.")]
 #[command(version)]
 pub struct Cli {
     #[arg(required = true)]
@@ -72,10 +72,13 @@ pub struct Cli {
     /// Output serialization format for error messages.
     #[arg(long, value_enum, default_value_t=SerializationFormat::Text)]
     pub format: SerializationFormat,
-    /// See the files ruff will be run against with the current settings.
+    /// Show violations with source code.
+    #[arg(long)]
+    pub show_source: bool,
+    /// See the files Ruff will be run against with the current settings.
     #[arg(long)]
     pub show_files: bool,
-    /// See ruff's settings.
+    /// See Ruff's settings.
     #[arg(long)]
     pub show_settings: bool,
     /// Enable automatic additions of noqa directives to failing lines.
@@ -101,9 +104,6 @@ pub struct Cli {
     /// The name of the file when passing it through stdin.
     #[arg(long)]
     pub stdin_filename: Option<String>,
-    /// Show violations with source code.
-    #[arg(long)]
-    pub show_source: bool,
 }
 
 impl Cli {
