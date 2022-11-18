@@ -953,6 +953,11 @@ where
                         self, stmt, targets, value,
                     );
                 }
+                if self.settings.enabled.contains(&CheckCode::U014) {
+                    pyupgrade::plugins::convert_named_tuple_functional_to_class(
+                        self, stmt, targets, value,
+                    );
+                }
             }
             StmtKind::AnnAssign { target, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
