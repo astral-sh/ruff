@@ -12,36 +12,53 @@ expression: checks
   fix: ~
 - kind: ConvertExitToSysExit
   location:
-    row: 6
+    row: 10
     column: 0
   end_location:
-    row: 6
+    row: 10
     column: 4
   fix:
     patch:
       content: sys.exit
       location:
-        row: 6
+        row: 10
         column: 0
       end_location:
-        row: 6
+        row: 10
         column: 4
     applied: false
 - kind: ConvertExitToSysExit
   location:
-    row: 19
+    row: 23
     column: 0
   end_location:
-    row: 19
+    row: 23
     column: 4
   fix:
     patch:
       content: sys2.exit
       location:
-        row: 19
+        row: 23
         column: 0
       end_location:
-        row: 19
+        row: 23
+        column: 4
+    applied: false
+- kind: ConvertExitToSysExit
+  location:
+    row: 35
+    column: 0
+  end_location:
+    row: 35
+    column: 4
+  fix:
+    patch:
+      content: exit2
+      location:
+        row: 35
+        column: 0
+      end_location:
+        row: 35
         column: 4
     applied: false
 
