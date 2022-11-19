@@ -185,3 +185,23 @@ def nested_b008(a=random.randint(0, dt.datetime.now().year)):
 # Ignore lambda contents since they are evaluated at call time.
 def foo(f=lambda x: print(x)):
     f(1)
+
+
+from collections import abc
+from typing import Annotated, Dict, Optional, Sequence, Union, Set
+
+
+def immutable_annotations(
+    a: Sequence[int] | None = [],
+    b: Optional[abc.Mapping[int, int]] = {},
+    c: Annotated[Union[abc.Set[str], abc.Sized], "annotation"] = set(),
+):
+    pass
+
+
+def mutable_annotations(
+    a: list[int] | None = [],
+    b: Optional[Dict[int, int]] = {},
+    c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+):
+    pass
