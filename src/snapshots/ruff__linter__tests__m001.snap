@@ -137,10 +137,10 @@ expression: checks
     column: 23
   fix:
     patch:
-      content: "  # noqa: E501"
+      content: "# noqa: E501"
       location:
         row: 52
-        column: 3
+        column: 5
       end_location:
         row: 52
         column: 23
