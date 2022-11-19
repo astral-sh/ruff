@@ -11,6 +11,8 @@ use num_traits::identities::Zero;
 use num_traits::Num;
 use std::char;
 use std::cmp::Ordering;
+use std::ops::Index;
+use std::slice::SliceIndex;
 use std::str::FromStr;
 use unic_emoji_char::is_emoji_presentation;
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
@@ -56,15 +58,90 @@ impl IndentationLevel {
     }
 }
 
+#[derive(Debug)]
+struct Indentations {
+    indent_stack: Vec<IndentationLevel>,
+}
+
+impl Indentations {
+    fn is_empty(&self) -> bool {
+        self.indent_stack.len() == 1
+    }
+
+    fn push(&mut self, indent: IndentationLevel) {
+        self.indent_stack.push(indent);
+    }
+
+    fn pop(&mut self) -> Option<IndentationLevel> {
+        if self.is_empty() {
+            return None;
+        }
+        self.indent_stack.pop()
+    }
+
+    fn current(&self) -> &IndentationLevel {
+        self.indent_stack
+            .last()
+            .expect("Indetations must have at least one level")
+    }
+}
+
+impl Default for Indentations {
+    fn default() -> Self {
+        Self {
+            indent_stack: vec![IndentationLevel::default()],
+        }
+    }
+}
+
+struct CharWindow<T: Iterator<Item = char>, const N: usize> {
+    source: T,
+    window: [Option<char>; N],
+}
+
+impl<T, const N: usize> CharWindow<T, N>
+where
+    T: Iterator<Item = char>,
+{
+    fn new(source: T) -> Self {
+        Self {
+            source,
+            window: [None; N],
+        }
+    }
+
+    fn slide(&mut self) -> Option<char> {
+        self.window.rotate_left(1);
+        let next = self.source.next();
+        *self.window.last_mut().expect("never empty") = next;
+        next
+    }
+
+    fn change_first(&mut self, ch: char) {
+        *self.window.first_mut().expect("never empty") = Some(ch);
+    }
+}
+
+impl<T, const N: usize, Idx> Index<Idx> for CharWindow<T, N>
+where
+    T: Iterator<Item = char>,
+    Idx: SliceIndex<[Option<char>], Output = Option<char>>,
+{
+    type Output = Option<char>;
+
+    fn index(&self, index: Idx) -> &Self::Output {
+        self.window.index(index)
+    }
+}
+
 pub struct Lexer<T: Iterator<Item = char>> {
-    chars: T,
+    window: CharWindow<T, 3>,
+
     at_begin_of_line: bool,
     nesting: usize, // Amount of parenthesis
-    indentation_stack: Vec<IndentationLevel>,
+    indentations: Indentations,
+
     pending: Vec<Spanned>,
-    chr0: Option<char>,
-    chr1: Option<char>,
-    chr2: Option<char>,
     location: Location,
 }
 
@@ -91,9 +168,7 @@ pub fn make_tokenizer_located(
 // The newline handler is an iterator which collapses different newline
 // types into \n always.
 pub struct NewlineHandler<T: Iterator<Item = char>> {
-    source: T,
-    chr0: Option<char>,
-    chr1: Option<char>,
+    window: CharWindow<T, 2>,
 }
 
 impl<T> NewlineHandler<T>
@@ -102,9 +177,7 @@ where
 {
     pub fn new(source: T) -> Self {
         let mut nlh = NewlineHandler {
-            source,
-            chr0: None,
-            chr1: None,
+            window: CharWindow::new(source),
         };
         nlh.shift();
         nlh.shift();
@@ -112,9 +185,8 @@ where
     }
 
     fn shift(&mut self) -> Option<char> {
-        let result = self.chr0;
-        self.chr0 = self.chr1;
-        self.chr1 = self.source.next();
+        let result = self.window[0];
+        self.window.slide();
         result
     }
 }
@@ -128,16 +200,16 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         // Collapse \r\n into \n
         loop {
-            if self.chr0 == Some('\r') {
-                if self.chr1 == Some('\n') {
-                    // Transform windows EOL into \n
+            match (self.window[0], self.window[1]) {
+                (Some('\r'), Some('\n')) => {
+                    // Windows EOL into \n
                     self.shift();
-                } else {
-                    // Transform MAC EOL into \n
-                    self.chr0 = Some('\n')
                 }
-            } else {
-                break;
+                (Some('\r'), _) => {
+                    // MAC EOL into \n
+                    self.window.change_first('\n');
+                }
+                _ => break,
             }
         }
 
@@ -154,19 +226,16 @@ where
 {
     pub fn new(input: T, start: Location) -> Self {
         let mut lxr = Lexer {
-            chars: input,
             at_begin_of_line: true,
             nesting: 0,
-            indentation_stack: vec![Default::default()],
+            indentations: Indentations::default(),
             pending: Vec::new(),
-            chr0: None,
             location: start,
-            chr1: None,
-            chr2: None,
+            window: CharWindow::new(input),
         };
-        lxr.next_char();
-        lxr.next_char();
-        lxr.next_char();
+        lxr.window.slide();
+        lxr.window.slide();
+        lxr.window.slide();
         // Start at top row (=1) left column (=1)
         lxr.location.reset();
         lxr
@@ -184,17 +253,15 @@ where
         let mut saw_f = false;
         loop {
             // Detect r"", f"", b"" and u""
-            if !(saw_b || saw_u || saw_f) && matches!(self.chr0, Some('b') | Some('B')) {
+            if !(saw_b || saw_u || saw_f) && matches!(self.window[0], Some('b' | 'B')) {
                 saw_b = true;
             } else if !(saw_b || saw_r || saw_u || saw_f)
-                && matches!(self.chr0, Some('u') | Some('U'))
+                && matches!(self.window[0], Some('u' | 'U'))
             {
                 saw_u = true;
-            } else if !(saw_r || saw_u) && (self.chr0 == Some('r') || self.chr0 == Some('R')) {
+            } else if !(saw_r || saw_u) && matches!(self.window[0], Some('r' | 'R')) {
                 saw_r = true;
-            } else if !(saw_b || saw_u || saw_f)
-                && (self.chr0 == Some('f') || self.chr0 == Some('F'))
-            {
+            } else if !(saw_b || saw_u || saw_f) && matches!(self.window[0], Some('f' | 'F')) {
                 saw_f = true;
             } else {
                 break;
@@ -204,7 +271,7 @@ where
             name.push(self.next_char().unwrap());
 
             // Check if we have a string:
-            if self.chr0 == Some('"') || self.chr0 == Some('\'') {
+            if matches!(self.window[0], Some('"' | '\'')) {
                 return self
                     .lex_string(saw_b, saw_r, saw_u, saw_f)
                     .map(|(_, tok, end_pos)| (start_pos, tok, end_pos));
@@ -226,19 +293,19 @@ where
     /// Numeric lexing. The feast can start!
     fn lex_number(&mut self) -> LexResult {
         let start_pos = self.get_pos();
-        if self.chr0 == Some('0') {
-            if self.chr1 == Some('x') || self.chr1 == Some('X') {
-                // Hex!
+        if self.window[0] == Some('0') {
+            if matches!(self.window[1], Some('x' | 'X')) {
+                // Hex! (0xdeadbeef)
                 self.next_char();
                 self.next_char();
                 self.lex_number_radix(start_pos, 16)
-            } else if self.chr1 == Some('o') || self.chr1 == Some('O') {
-                // Octal style!
+            } else if matches!(self.window[1], Some('o' | 'O')) {
+                // Octal style! (0o377)
                 self.next_char();
                 self.next_char();
                 self.lex_number_radix(start_pos, 8)
-            } else if self.chr1 == Some('b') || self.chr1 == Some('B') {
-                // Binary!
+            } else if matches!(self.window[1], Some('b' | 'B')) {
+                // Binary! (0b_1110_0101)
                 self.next_char();
                 self.next_char();
                 self.lex_number_radix(start_pos, 2)
@@ -264,15 +331,15 @@ where
     /// Lex a normal number, that is, no octal, hex or binary number.
     fn lex_normal_number(&mut self) -> LexResult {
         let start_pos = self.get_pos();
-        let start_is_zero = self.chr0 == Some('0');
+        let start_is_zero = self.window[0] == Some('0');
         // Normal number:
         let mut value_text = self.radix_run(10);
 
         // If float:
-        if self.chr0 == Some('.') || self.at_exponent() {
+        if self.window[0] == Some('.') || self.at_exponent() {
             // Take '.':
-            if self.chr0 == Some('.') {
-                if self.chr1 == Some('_') {
+            if self.window[0] == Some('.') {
+                if self.window[1] == Some('_') {
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
                         location: self.get_pos(),
@@ -283,8 +350,8 @@ where
             }
 
             // 1e6 for example:
-            if self.chr0 == Some('e') || self.chr0 == Some('E') {
-                if self.chr1 == Some('_') {
+            if let Some('e' | 'E') = self.window[0] {
+                if self.window[1] == Some('_') {
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
                         location: self.get_pos(),
@@ -292,8 +359,8 @@ where
                 }
                 value_text.push(self.next_char().unwrap().to_ascii_lowercase());
                 // Optional +/-
-                if self.chr0 == Some('-') || self.chr0 == Some('+') {
-                    if self.chr1 == Some('_') {
+                if matches!(self.window[0], Some('-' | '+')) {
+                    if self.window[1] == Some('_') {
                         return Err(LexicalError {
                             error: LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
                             location: self.get_pos(),
@@ -309,8 +376,9 @@ where
                 error: LexicalErrorType::OtherError("Invalid decimal literal".to_owned()),
                 location: self.get_pos(),
             })?;
+
             // Parse trailing 'j':
-            if self.chr0 == Some('j') || self.chr0 == Some('J') {
+            if matches!(self.window[0], Some('j' | 'J')) {
                 self.next_char();
                 let end_pos = self.get_pos();
                 Ok((
@@ -327,7 +395,7 @@ where
             }
         } else {
             // Parse trailing 'j':
-            if self.chr0 == Some('j') || self.chr0 == Some('J') {
+            if matches!(self.window[0], Some('j' | 'J')) {
                 self.next_char();
                 let end_pos = self.get_pos();
                 let imag = f64::from_str(&value_text).unwrap();
@@ -336,6 +404,7 @@ where
                 let end_pos = self.get_pos();
                 let value = value_text.parse::<BigInt>().unwrap();
                 if start_is_zero && !value.is_zero() {
+                    // leading zeros in decimal integer literals are not permitted
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
                         location: self.get_pos(),
@@ -355,7 +424,9 @@ where
         loop {
             if let Some(c) = self.take_number(radix) {
                 value_text.push(c);
-            } else if self.chr0 == Some('_') && Lexer::<T>::is_digit_of_radix(self.chr1, radix) {
+            } else if self.window[0] == Some('_')
+                && Lexer::<T>::is_digit_of_radix(self.window[1], radix)
+            {
                 self.next_char();
             } else {
                 break;
@@ -366,7 +437,7 @@ where
 
     /// Consume a single character with the given radix.
     fn take_number(&mut self, radix: u32) -> Option<char> {
-        let take_char = Lexer::<T>::is_digit_of_radix(self.chr0, radix);
+        let take_char = Lexer::<T>::is_digit_of_radix(self.window[0], radix);
 
         if take_char {
             Some(self.next_char().unwrap())
@@ -388,9 +459,9 @@ where
 
     /// Test if we face '[eE][-+]?[0-9]+'
     fn at_exponent(&self) -> bool {
-        match self.chr0 {
-            Some('e') | Some('E') => match self.chr1 {
-                Some('+') | Some('-') => matches!(self.chr2, Some('0'..='9')),
+        match self.window[0] {
+            Some('e' | 'E') => match self.window[1] {
+                Some('+' | '-') => matches!(self.window[2], Some('0'..='9')),
                 Some('0'..='9') => true,
                 _ => false,
             },
@@ -403,7 +474,7 @@ where
         let start_pos = self.get_pos();
         self.next_char();
         loop {
-            match self.chr0 {
+            match self.window[0] {
                 Some('\n') | None => {
                     let end_pos = self.get_pos();
                     return Ok((start_pos, Tok::Comment, end_pos));
@@ -439,7 +510,7 @@ where
         let mut octet_content = String::new();
         octet_content.push(first);
         while octet_content.len() < 3 {
-            if let Some('0'..='7') = self.chr0 {
+            if let Some('0'..='7') = self.window[0] {
                 octet_content.push(self.next_char().unwrap())
             } else {
                 break;
@@ -501,18 +572,19 @@ where
 
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close
-        let triple_quoted = if self.chr0 == Some(quote_char) && self.chr1 == Some(quote_char) {
-            self.next_char();
-            self.next_char();
-            true
-        } else {
-            false
-        };
+        let triple_quoted =
+            if self.window[0] == Some(quote_char) && self.window[1] == Some(quote_char) {
+                self.next_char();
+                self.next_char();
+                true
+            } else {
+                false
+            };
 
         loop {
             match self.next_char() {
                 Some('\\') => {
-                    if self.chr0 == Some(quote_char) && !is_raw {
+                    if self.window[0] == Some(quote_char) && !is_raw {
                         string_content.push(quote_char);
                         self.next_char();
                     } else if is_raw {
@@ -572,7 +644,9 @@ where
                             // Look ahead at the next two characters; if we have two more
                             // quote_chars, it's the end of the string; consume the remaining
                             // closing quotes and break the loop
-                            if self.chr0 == Some(quote_char) && self.chr1 == Some(quote_char) {
+                            if self.window[0] == Some(quote_char)
+                                && self.window[1] == Some(quote_char)
+                            {
                                 self.next_char();
                                 self.next_char();
                                 break;
@@ -631,7 +705,7 @@ where
     }
 
     fn is_identifier_continuation(&self) -> bool {
-        if let Some(c) = self.chr0 {
+        if let Some(c) = self.window[0] {
             match c {
                 '_' | '0'..='9' => true,
                 c => is_xid_continue(c),
@@ -663,7 +737,7 @@ where
         let mut spaces: usize = 0;
         let mut tabs: usize = 0;
         loop {
-            match self.chr0 {
+            match self.window[0] {
                 Some(' ') => {
                     /*
                     if tabs != 0 {
@@ -729,44 +803,46 @@ where
     fn handle_indentations(&mut self) -> Result<(), LexicalError> {
         let indentation_level = self.eat_indentation()?;
 
-        if self.nesting == 0 {
-            // Determine indent or dedent:
-            let current_indentation = self.indentation_stack.last().unwrap();
-            let ordering = indentation_level.compare_strict(current_indentation, self.get_pos())?;
-            match ordering {
-                Ordering::Equal => {
-                    // Same same
-                }
-                Ordering::Greater => {
-                    // New indentation level:
-                    self.indentation_stack.push(indentation_level);
-                    let tok_pos = self.get_pos();
-                    self.emit((tok_pos, Tok::Indent, tok_pos));
-                }
-                Ordering::Less => {
-                    // One or more dedentations
-                    // Pop off other levels until col is found:
+        if self.nesting != 0 {
+            return Ok(());
+        }
 
-                    loop {
-                        let current_indentation = self.indentation_stack.last().unwrap();
-                        let ordering = indentation_level
-                            .compare_strict(current_indentation, self.get_pos())?;
-                        match ordering {
-                            Ordering::Less => {
-                                self.indentation_stack.pop();
-                                let tok_pos = self.get_pos();
-                                self.emit((tok_pos, Tok::Dedent, tok_pos));
-                            }
-                            Ordering::Equal => {
-                                // We arrived at proper level of indentation.
-                                break;
-                            }
-                            Ordering::Greater => {
-                                return Err(LexicalError {
-                                    error: LexicalErrorType::IndentationError,
-                                    location: self.get_pos(),
-                                });
-                            }
+        // Determine indent or dedent:
+        let current_indentation = self.indentations.current();
+        let ordering = indentation_level.compare_strict(current_indentation, self.get_pos())?;
+        match ordering {
+            Ordering::Equal => {
+                // Same same
+            }
+            Ordering::Greater => {
+                // New indentation level:
+                self.indentations.push(indentation_level);
+                let tok_pos = self.get_pos();
+                self.emit((tok_pos, Tok::Indent, tok_pos));
+            }
+            Ordering::Less => {
+                // One or more dedentations
+                // Pop off other levels until col is found:
+
+                loop {
+                    let current_indentation = self.indentations.current();
+                    let ordering =
+                        indentation_level.compare_strict(current_indentation, self.get_pos())?;
+                    match ordering {
+                        Ordering::Less => {
+                            self.indentations.pop();
+                            let tok_pos = self.get_pos();
+                            self.emit((tok_pos, Tok::Dedent, tok_pos));
+                        }
+                        Ordering::Equal => {
+                            // We arrived at proper level of indentation.
+                            break;
+                        }
+                        Ordering::Greater => {
+                            return Err(LexicalError {
+                                error: LexicalErrorType::IndentationError,
+                                location: self.get_pos(),
+                            });
                         }
                     }
                 }
@@ -779,7 +855,7 @@ where
     /// Take a look at the next character, if any, and decide upon the next steps.
     fn consume_normal(&mut self) -> Result<(), LexicalError> {
         // Check if we have some character:
-        if let Some(c) = self.chr0 {
+        if let Some(c) = self.window[0] {
             // First check identifier:
             if self.is_identifier_start(c) {
                 let identifier = self.lex_identifier()?;
@@ -817,8 +893,8 @@ where
             }
 
             // Next, flush the indentation stack to zero.
-            while self.indentation_stack.len() > 1 {
-                self.indentation_stack.pop();
+            while !self.indentations.is_empty() {
+                self.indentations.pop();
                 self.emit((tok_pos, Tok::Dedent, tok_pos));
             }
 
@@ -846,7 +922,7 @@ where
             '=' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                match self.chr0 {
+                match self.window[0] {
                     Some('=') => {
                         self.next_char();
                         let tok_end = self.get_pos();
@@ -861,7 +937,7 @@ where
             '+' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                if let Some('=') = self.chr0 {
+                if let Some('=') = self.window[0] {
                     self.next_char();
                     let tok_end = self.get_pos();
                     self.emit((tok_start, Tok::PlusEqual, tok_end));
@@ -873,7 +949,7 @@ where
             '*' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                match self.chr0 {
+                match self.window[0] {
                     Some('=') => {
                         self.next_char();
                         let tok_end = self.get_pos();
@@ -881,7 +957,7 @@ where
                     }
                     Some('*') => {
                         self.next_char();
-                        match self.chr0 {
+                        match self.window[0] {
                             Some('=') => {
                                 self.next_char();
                                 let tok_end = self.get_pos();
@@ -902,7 +978,7 @@ where
             '/' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                match self.chr0 {
+                match self.window[0] {
                     Some('=') => {
                         self.next_char();
                         let tok_end = self.get_pos();
@@ -910,7 +986,7 @@ where
                     }
                     Some('/') => {
                         self.next_char();
-                        match self.chr0 {
+                        match self.window[0] {
                             Some('=') => {
                                 self.next_char();
                                 let tok_end = self.get_pos();
@@ -931,7 +1007,7 @@ where
             '%' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                if let Some('=') = self.chr0 {
+                if let Some('=') = self.window[0] {
                     self.next_char();
                     let tok_end = self.get_pos();
                     self.emit((tok_start, Tok::PercentEqual, tok_end));
@@ -943,7 +1019,7 @@ where
             '|' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                if let Some('=') = self.chr0 {
+                if let Some('=') = self.window[0] {
                     self.next_char();
                     let tok_end = self.get_pos();
                     self.emit((tok_start, Tok::VbarEqual, tok_end));
@@ -955,7 +1031,7 @@ where
             '^' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                if let Some('=') = self.chr0 {
+                if let Some('=') = self.window[0] {
                     self.next_char();
                     let tok_end = self.get_pos();
                     self.emit((tok_start, Tok::CircumflexEqual, tok_end));
@@ -967,7 +1043,7 @@ where
             '&' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                if let Some('=') = self.chr0 {
+                if let Some('=') = self.window[0] {
                     self.next_char();
                     let tok_end = self.get_pos();
                     self.emit((tok_start, Tok::AmperEqual, tok_end));
@@ -979,7 +1055,7 @@ where
             '-' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                match self.chr0 {
+                match self.window[0] {
                     Some('=') => {
                         self.next_char();
                         let tok_end = self.get_pos();
@@ -999,7 +1075,7 @@ where
             '@' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                if let Some('=') = self.chr0 {
+                if let Some('=') = self.window[0] {
                     self.next_char();
                     let tok_end = self.get_pos();
                     self.emit((tok_start, Tok::AtEqual, tok_end));
@@ -1011,7 +1087,7 @@ where
             '!' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                if let Some('=') = self.chr0 {
+                if let Some('=') = self.window[0] {
                     self.next_char();
                     let tok_end = self.get_pos();
                     self.emit((tok_start, Tok::NotEqual, tok_end));
@@ -1070,7 +1146,7 @@ where
             ':' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                if let Some('=') = self.chr0 {
+                if let Some('=') = self.window[0] {
                     self.next_char();
                     let tok_end = self.get_pos();
                     self.emit((tok_start, Tok::ColonEqual, tok_end));
@@ -1085,10 +1161,10 @@ where
             '<' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                match self.chr0 {
+                match self.window[0] {
                     Some('<') => {
                         self.next_char();
-                        match self.chr0 {
+                        match self.window[0] {
                             Some('=') => {
                                 self.next_char();
                                 let tok_end = self.get_pos();
@@ -1114,10 +1190,10 @@ where
             '>' => {
                 let tok_start = self.get_pos();
                 self.next_char();
-                match self.chr0 {
+                match self.window[0] {
                     Some('>') => {
                         self.next_char();
-                        match self.chr0 {
+                        match self.window[0] {
                             Some('=') => {
                                 self.next_char();
                                 let tok_end = self.get_pos();
@@ -1147,13 +1223,13 @@ where
                 self.emit((tok_start, Tok::Comma, tok_end));
             }
             '.' => {
-                if let Some('0'..='9') = self.chr1 {
+                if let Some('0'..='9') = self.window[1] {
                     let number = self.lex_number()?;
                     self.emit(number);
                 } else {
                     let tok_start = self.get_pos();
                     self.next_char();
-                    if let (Some('.'), Some('.')) = (&self.chr0, &self.chr1) {
+                    if let (Some('.'), Some('.')) = (&self.window[0], &self.window[1]) {
                         self.next_char();
                         self.next_char();
                         let tok_end = self.get_pos();
@@ -1178,14 +1254,13 @@ where
             ' ' | '\t' | '\x0C' => {
                 // Skip whitespaces
                 self.next_char();
-                while self.chr0 == Some(' ') || self.chr0 == Some('\t') || self.chr0 == Some('\x0C')
-                {
+                while let Some(' ' | '\t' | '\x0C') = self.window[0] {
                     self.next_char();
                 }
             }
             '\\' => {
                 self.next_char();
-                if let Some('\n') = self.chr0 {
+                if let Some('\n') = self.window[0] {
                     self.next_char();
                 } else {
                     return Err(LexicalError {
@@ -1194,7 +1269,7 @@ where
                     });
                 }
 
-                if self.chr0.is_none() {
+                if self.window[0].is_none() {
                     return Err(LexicalError {
                         error: LexicalErrorType::Eof,
                         location: self.get_pos(),
@@ -1223,11 +1298,8 @@ where
 
     /// Helper function to go to the next character coming up.
     fn next_char(&mut self) -> Option<char> {
-        let c = self.chr0;
-        let nxt = self.chars.next();
-        self.chr0 = self.chr1;
-        self.chr1 = self.chr2;
-        self.chr2 = nxt;
+        let c = self.window[0];
+        self.window.slide();
         if c == Some('\n') {
             self.location.newline();
         } else {
@@ -1267,7 +1339,7 @@ where
             "Lex token {:?}, nesting={:?}, indent stack: {:?}",
             token,
             self.nesting,
-            self.indentation_stack
+            self.indentations,
         );
 
         match token {
@@ -1317,7 +1389,7 @@ mod tests {
 
     #[test]
     fn test_numbers() {
-        let source = "0x2f 0b1101 0 123 0.2 2j 2.2j";
+        let source = "0x2f 0b1101 0 123 123_45_67_890 0.2 2j 2.2j";
         let tokens = lex_source(source);
         assert_eq!(
             tokens,
@@ -1333,6 +1405,9 @@ mod tests {
                 },
                 Tok::Int {
                     value: BigInt::from(123),
+                },
+                Tok::Int {
+                    value: BigInt::from(1234567890),
                 },
                 Tok::Float { value: 0.2 },
                 Tok::Complex {
