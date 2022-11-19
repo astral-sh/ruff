@@ -37,7 +37,7 @@ use crate::visibility::{module_visibility, transition_scope, Modifier, Visibilit
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print,
-    flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade, rules,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -1526,6 +1526,11 @@ where
                             inner.uses_locals = true;
                         }
                     }
+                }
+
+                // Ruff
+                if self.settings.enabled.contains(&CheckCode::RUF101) {
+                    rules::plugins::convert_sys_to_sys_exit(self, func);
                 }
             }
             ExprKind::Dict { keys, .. } => {
