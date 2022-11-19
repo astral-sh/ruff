@@ -139,6 +139,7 @@ mod tests {
         assert!(NO_QA_REGEX.is_match("# noqa:F401"));
         assert!(NO_QA_REGEX.is_match("# NoQA:F401"));
         assert!(NO_QA_REGEX.is_match("# noqa:F401, E501"));
+        assert!(NO_QA_REGEX.is_match("# noqa:F401, E501    "));
         assert!(!NO_QA_REGEX.is_match("\"# noqa:F401, E501\""));
     }
 
