@@ -380,7 +380,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E714 | NotIsTest | Test for object identity should be `is not` | 🛠 |
 | E721 | TypeComparison | Do not compare types, use `isinstance()` |  |
 | E722 | DoNotUseBareExcept | Do not use bare `except` |  |
-| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |  |
+| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def | 🛠 |
 | E741 | AmbiguousVariableName | Ambiguous variable name: `...` |  |
 | E742 | AmbiguousClassName | Ambiguous class name: `...` |  |
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
