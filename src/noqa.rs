@@ -101,8 +101,8 @@ fn add_noqa_inner(
                     Directive::None => {
                         output.push_str(line);
                     }
-                    Directive::All(_, start, _) => output.push_str(&line[..(start)]),
-                    Directive::Codes(_, start, ..) => output.push_str(&line[..(start)]),
+                    Directive::All(_, start, _) => output.push_str(&line[..start]),
+                    Directive::Codes(_, start, ..) => output.push_str(&line[..start]),
                 };
                 let codes: Vec<&str> = codes.iter().map(|code| code.as_ref()).collect();
                 output.push_str("# noqa: ");
