@@ -10,32 +10,40 @@ use regex::Regex;
 use crate::checks::{Check, CheckCode};
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?P<noqa>\s*(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)")
-        .expect("Invalid regex")
+    Regex::new(
+        r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)",
+    )
+    .expect("Invalid regex")
 });
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").expect("Invalid regex"));
 
 #[derive(Debug)]
 pub enum Directive<'a> {
     None,
-    All(usize, usize),
-    Codes(usize, usize, Vec<&'a str>),
+    All(usize, usize, usize),
+    Codes(usize, usize, usize, Vec<&'a str>),
 }
 
 pub fn extract_noqa_directive(line: &str) -> Directive {
     match NO_QA_REGEX.captures(line) {
-        Some(caps) => match caps.name("noqa") {
-            Some(noqa) => match caps.name("codes") {
-                Some(codes) => Directive::Codes(
-                    noqa.start(),
-                    noqa.end(),
-                    SPLIT_COMMA_REGEX
-                        .split(codes.as_str())
-                        .map(|code| code.trim())
-                        .filter(|code| !code.is_empty())
-                        .collect(),
-                ),
-                None => Directive::All(noqa.start(), noqa.end()),
+        Some(caps) => match caps.name("spaces") {
+            Some(spaces) => match caps.name("noqa") {
+                Some(noqa) => match caps.name("codes") {
+                    Some(codes) => Directive::Codes(
+                        spaces.as_str().chars().count(),
+                        noqa.start(),
+                        noqa.end(),
+                        SPLIT_COMMA_REGEX
+                            .split(codes.as_str())
+                            .map(|code| code.trim())
+                            .filter(|code| !code.is_empty())
+                            .collect(),
+                    ),
+                    None => {
+                        Directive::All(spaces.as_str().chars().count(), noqa.start(), noqa.end())
+                    }
+                },
+                None => Directive::None,
             },
             None => Directive::None,
         },
@@ -92,12 +100,14 @@ fn add_noqa_inner(
                 match extract_noqa_directive(line) {
                     Directive::None => {
                         output.push_str(line);
+                        output.push_str("  # noqa: ");
                     }
-                    Directive::All(start, _) => output.push_str(&line[..start]),
-                    Directive::Codes(start, ..) => output.push_str(&line[..start]),
+                    Directive::All(_, start, _) | Directive::Codes(_, start, ..) => {
+                        output.push_str(&line[..start]);
+                        output.push_str("# noqa: ");
+                    }
                 };
                 let codes: Vec<&str> = codes.iter().map(|code| code.as_ref()).collect();
-                output.push_str("  # noqa: ");
                 output.push_str(&codes.join(", "));
                 output.push('\n');
                 count += 1;

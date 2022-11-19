@@ -103,7 +103,7 @@ pub fn check_lines(
                     matches.push(check.kind.code().as_ref());
                     ignored.push(index)
                 }
-                (Directive::Codes(_, _, codes), matches) => {
+                (Directive::Codes(.., codes), matches) => {
                     if codes.contains(&check.kind.code().as_ref()) {
                         matches.push(check.kind.code().as_ref());
                         ignored.push(index);
@@ -133,7 +133,7 @@ pub fn check_lines(
                     (Directive::All(..), matches) => {
                         matches.push(check.kind.code().as_ref());
                     }
-                    (Directive::Codes(_, _, codes), matches) => {
+                    (Directive::Codes(.., codes), matches) => {
                         if codes.contains(&check.kind.code().as_ref()) {
                             matches.push(check.kind.code().as_ref());
                         } else {
@@ -170,7 +170,7 @@ pub fn check_lines(
                 (Directive::All(..), matches) => {
                     matches.push(check.kind.code().as_ref());
                 }
-                (Directive::Codes(_, _, codes), matches) => {
+                (Directive::Codes(.., codes), matches) => {
                     if codes.contains(&check.kind.code().as_ref()) {
                         matches.push(check.kind.code().as_ref());
                     } else {
@@ -186,7 +186,7 @@ pub fn check_lines(
     if enforce_noqa {
         for (row, (directive, matches)) in noqa_directives {
             match directive {
-                Directive::All(start, end) => {
+                Directive::All(spaces, start, end) => {
                     if matches.is_empty() {
                         let mut check = Check::new(
                             CheckKind::UnusedNOQA(None),
@@ -197,14 +197,14 @@ pub fn check_lines(
                         );
                         if autofix.patch() && settings.fixable.contains(check.kind.code()) {
                             check.amend(Fix::deletion(
-                                Location::new(row + 1, start),
+                                Location::new(row + 1, start - spaces),
                                 Location::new(row + 1, lines[row].chars().count()),
                             ));
                         }
                         line_checks.push(check);
                     }
                 }
-                Directive::Codes(start, end, codes) => {
+                Directive::Codes(spaces, start, end, codes) => {
                     let mut invalid_codes = vec![];
                     let mut valid_codes = vec![];
                     for code in codes {
@@ -226,12 +226,12 @@ pub fn check_lines(
                         if autofix.patch() && settings.fixable.contains(check.kind.code()) {
                             if valid_codes.is_empty() {
                                 check.amend(Fix::deletion(
-                                    Location::new(row + 1, start),
+                                    Location::new(row + 1, start - spaces),
                                     Location::new(row + 1, lines[row].chars().count()),
                                 ));
                             } else {
                                 check.amend(Fix::replacement(
-                                    format!("  # noqa: {}", valid_codes.join(", ")),
+                                    format!("# noqa: {}", valid_codes.join(", ")),
                                     Location::new(row + 1, start),
                                     Location::new(row + 1, lines[row].chars().count()),
                                 ));
