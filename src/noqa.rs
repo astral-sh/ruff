@@ -11,7 +11,7 @@ use crate::checks::{Check, CheckCode};
 
 static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)",
+        r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)\s*$",
     )
     .expect("Invalid regex")
 });
@@ -139,6 +139,7 @@ mod tests {
         assert!(NO_QA_REGEX.is_match("# noqa:F401"));
         assert!(NO_QA_REGEX.is_match("# NoQA:F401"));
         assert!(NO_QA_REGEX.is_match("# noqa:F401, E501"));
+        assert!(!NO_QA_REGEX.is_match("\"# noqa:F401, E501\""));
     }
 
     #[test]
