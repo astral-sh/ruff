@@ -18,6 +18,14 @@ def f() -> None:
     # Invalid (and unimplemented)
     d = 1  # noqa: F841, W191
 
+    # fmt: off
+    # Invalid - no space before #
+    d = 1# noqa: E501
+
+    # Invalid - many spaces before #
+    d = 1                       # noqa: E501
+    # fmt: on
+
 
 # Valid
 _ = """Lorem ipsum dolor sit amet.
