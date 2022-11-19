@@ -27,7 +27,7 @@ pub mod user;
 #[derive(Debug)]
 pub struct Settings {
     pub dummy_variable_rgx: Regex,
-    pub enabled: FnvHashSet<CheckCode>,
+    pub enabled: Vec<bool>,
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
     pub fixable: FnvHashSet<CheckCode>,
@@ -64,7 +64,7 @@ impl Settings {
             ),
             exclude: config.exclude,
             extend_exclude: config.extend_exclude,
-            fixable: resolve_codes(&config.fixable, &config.unfixable),
+            fixable: FnvHashSet::default(), //  resolve_codes(&config.fixable, &config.unfixable),
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
             flake8_quotes: config.flake8_quotes,
@@ -83,7 +83,7 @@ impl Settings {
     pub fn for_rule(check_code: CheckCode) -> Self {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FnvHashSet::from_iter([check_code.clone()]),
+            enabled: vec![], // FnvHashSet::from_iter([check_code.clone()]),
             fixable: FnvHashSet::from_iter([check_code]),
             exclude: Default::default(),
             extend_exclude: Default::default(),
@@ -105,7 +105,7 @@ impl Settings {
     pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FnvHashSet::from_iter(check_codes.clone()),
+            enabled: vec![], // FnvHashSet::from_iter(check_codes.clone()),
             fixable: FnvHashSet::from_iter(check_codes),
             exclude: Default::default(),
             extend_exclude: Default::default(),
@@ -154,8 +154,8 @@ impl Hash for Settings {
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// error codes.
-fn resolve_codes(select: &[CheckCodePrefix], ignore: &[CheckCodePrefix]) -> FnvHashSet<CheckCode> {
-    let mut codes: FnvHashSet<CheckCode> = FnvHashSet::default();
+fn resolve_codes(select: &[CheckCodePrefix], ignore: &[CheckCodePrefix]) -> Vec<bool> {
+    let mut codes = vec![false; 203];
     for specificity in [
         PrefixSpecificity::Category,
         PrefixSpecificity::Hundreds,
@@ -164,13 +164,15 @@ fn resolve_codes(select: &[CheckCodePrefix], ignore: &[CheckCodePrefix]) -> FnvH
     ] {
         for prefix in select {
             if prefix.specificity() == specificity {
-                codes.extend(prefix.codes());
+                for code in prefix.codes() {
+                    codes[code as usize] = true;
+                }
             }
         }
         for prefix in ignore {
             if prefix.specificity() == specificity {
                 for code in prefix.codes() {
-                    codes.remove(&code);
+                    codes[code as usize] = false;
                 }
             }
         }

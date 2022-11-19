@@ -41,7 +41,7 @@ fn duplicate_handler_exceptions<'a>(
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::B014) {
+    if checker.settings.enabled[CheckCode::B014 as usize] {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut check = Check::new(
@@ -108,7 +108,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Exce
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::B025) {
+    if checker.settings.enabled[CheckCode::B025 as usize] {
         for duplicate in duplicates.into_iter().sorted() {
             checker.add_check(Check::new(
                 CheckKind::DuplicateTryBlockException(duplicate.join(".")),

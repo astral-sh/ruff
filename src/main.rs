@@ -110,7 +110,7 @@ fn run_once(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = path {
-                    if settings.enabled.contains(&CheckCode::E902) {
+                    if settings.enabled[CheckCode::E902 as usize] {
                         vec![Message {
                             kind: CheckKind::IOError(message),
                             fixed: false,

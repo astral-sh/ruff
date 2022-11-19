@@ -39,9 +39,9 @@ pub fn check_lines(
     settings: &Settings,
     autofix: &fixer::Mode,
 ) {
-    let enforce_unnecessary_coding_comment = settings.enabled.contains(&CheckCode::U009);
-    let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
-    let enforce_noqa = settings.enabled.contains(&CheckCode::M001);
+    let enforce_unnecessary_coding_comment = settings.enabled[CheckCode::U009 as usize];
+    let enforce_line_too_long = settings.enabled[CheckCode::E501 as usize];
+    let enforce_noqa = settings.enabled[CheckCode::M001 as usize];
 
     let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut line_checks = vec![];
@@ -147,7 +147,7 @@ pub fn check_lines(
     }
 
     // Enforce newlines at end of files.
-    if settings.enabled.contains(&CheckCode::W292) && !contents.ends_with('\n') {
+    if settings.enabled[CheckCode::W292 as usize] && !contents.ends_with('\n') {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
         if let Some(line) = lines.last() {

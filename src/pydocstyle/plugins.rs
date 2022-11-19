@@ -32,7 +32,7 @@ pub fn not_missing(
 
     match definition.kind {
         DefinitionKind::Module => {
-            if checker.settings.enabled.contains(&CheckCode::D100) {
+            if checker.settings.enabled[CheckCode::D100 as usize] {
                 checker.add_check(Check::new(
                     CheckKind::PublicModule,
                     Range {
@@ -44,7 +44,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Package => {
-            if checker.settings.enabled.contains(&CheckCode::D104) {
+            if checker.settings.enabled[CheckCode::D104 as usize] {
                 checker.add_check(Check::new(
                     CheckKind::PublicPackage,
                     Range {
@@ -56,7 +56,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Class(stmt) => {
-            if checker.settings.enabled.contains(&CheckCode::D101) {
+            if checker.settings.enabled[CheckCode::D101 as usize] {
                 checker.add_check(Check::new(
                     CheckKind::PublicClass,
                     Range::from_located(stmt),
@@ -65,7 +65,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::NestedClass(stmt) => {
-            if checker.settings.enabled.contains(&CheckCode::D106) {
+            if checker.settings.enabled[CheckCode::D106 as usize] {
                 checker.add_check(Check::new(
                     CheckKind::PublicNestedClass,
                     Range::from_located(stmt),
@@ -77,7 +77,7 @@ pub fn not_missing(
             if is_overload(stmt) {
                 true
             } else {
-                if checker.settings.enabled.contains(&CheckCode::D103) {
+                if checker.settings.enabled[CheckCode::D103 as usize] {
                     checker.add_check(Check::new(
                         CheckKind::PublicFunction,
                         Range::from_located(stmt),
@@ -90,7 +90,7 @@ pub fn not_missing(
             if is_overload(stmt) {
                 true
             } else if is_magic(stmt) {
-                if checker.settings.enabled.contains(&CheckCode::D105) {
+                if checker.settings.enabled[CheckCode::D105 as usize] {
                     checker.add_check(Check::new(
                         CheckKind::MagicMethod,
                         Range::from_located(stmt),
@@ -98,12 +98,12 @@ pub fn not_missing(
                 }
                 true
             } else if is_init(stmt) {
-                if checker.settings.enabled.contains(&CheckCode::D107) {
+                if checker.settings.enabled[CheckCode::D107 as usize] {
                     checker.add_check(Check::new(CheckKind::PublicInit, Range::from_located(stmt)));
                 }
                 true
             } else {
-                if checker.settings.enabled.contains(&CheckCode::D102) {
+                if checker.settings.enabled[CheckCode::D102 as usize] {
                     checker.add_check(Check::new(
                         CheckKind::PublicMethod,
                         Range::from_located(stmt),
@@ -162,7 +162,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                 ..
             } = &docstring.node
             {
-                if checker.settings.enabled.contains(&CheckCode::D201) {
+                if checker.settings.enabled[CheckCode::D201 as usize] {
                     let (before, ..) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
                         &Range::from_located(docstring),
@@ -190,7 +190,7 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
                     }
                 }
 
-                if checker.settings.enabled.contains(&CheckCode::D202) {
+                if checker.settings.enabled[CheckCode::D202 as usize] {
                     let (_, _, after) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
                         &Range::from_located(docstring),
@@ -249,8 +249,8 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                 ..
             } = &docstring.node
             {
-                if checker.settings.enabled.contains(&CheckCode::D203)
-                    || checker.settings.enabled.contains(&CheckCode::D211)
+                if checker.settings.enabled[CheckCode::D203 as usize]
+                    || checker.settings.enabled[CheckCode::D211 as usize]
                 {
                     let (before, ..) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
@@ -263,7 +263,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                         .skip(1)
                         .take_while(|line| line.trim().is_empty())
                         .count();
-                    if checker.settings.enabled.contains(&CheckCode::D211) {
+                    if checker.settings.enabled[CheckCode::D211 as usize] {
                         if blank_lines_before != 0 {
                             let mut check = Check::new(
                                 CheckKind::NoBlankLineBeforeClass(blank_lines_before),
@@ -279,7 +279,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                             checker.add_check(check);
                         }
                     }
-                    if checker.settings.enabled.contains(&CheckCode::D203) {
+                    if checker.settings.enabled[CheckCode::D203 as usize] {
                         if blank_lines_before != 1 {
                             let mut check = Check::new(
                                 CheckKind::OneBlankLineBeforeClass(blank_lines_before),
@@ -298,7 +298,7 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
                     }
                 }
 
-                if checker.settings.enabled.contains(&CheckCode::D204) {
+                if checker.settings.enabled[CheckCode::D204 as usize] {
                     let (_, _, after) = checker.locator.partition_source_code_at(
                         &Range::from_located(parent),
                         &Range::from_located(docstring),
@@ -414,7 +414,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 // yet.
                 has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-                if checker.settings.enabled.contains(&CheckCode::D207) {
+                if checker.settings.enabled[CheckCode::D207 as usize] {
                     // We report under-indentation on every line. This isn't great, but enables
                     // autofix.
                     if !is_blank && line_indent.len() < docstring_indent.len() {
@@ -451,7 +451,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 }
             }
 
-            if checker.settings.enabled.contains(&CheckCode::D206) {
+            if checker.settings.enabled[CheckCode::D206 as usize] {
                 if has_seen_tab {
                     checker.add_check(Check::new(
                         CheckKind::IndentWithSpaces,
@@ -460,7 +460,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 }
             }
 
-            if checker.settings.enabled.contains(&CheckCode::D208) {
+            if checker.settings.enabled[CheckCode::D208 as usize] {
                 // If every line (except the last) is over-indented...
                 if is_over_indented {
                     for i in over_indented_lines {
@@ -635,14 +635,14 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
                     .map(|line| line.to_lowercase())
                 {
                     if helpers::TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
-                        if checker.settings.enabled.contains(&CheckCode::D212) {
+                        if checker.settings.enabled[CheckCode::D212 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MultiLineSummaryFirstLine,
                                 Range::from_located(docstring),
                             ));
                         }
                     } else {
-                        if checker.settings.enabled.contains(&CheckCode::D213) {
+                        if checker.settings.enabled[CheckCode::D213 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MultiLineSummarySecondLine,
                                 Range::from_located(docstring),
@@ -848,7 +848,7 @@ pub fn not_empty(checker: &mut Checker, definition: &Definition) -> bool {
         } = &docstring.node
         {
             if string.trim().is_empty() {
-                if checker.settings.enabled.contains(&CheckCode::D419) {
+                if checker.settings.enabled[CheckCode::D419 as usize] {
                     checker.add_check(Check::new(
                         CheckKind::NonEmpty,
                         Range::from_located(docstring),
@@ -911,7 +911,7 @@ fn blanks_and_section_underline(
 
     // Nothing but blank lines after the section header.
     if blank_lines_after_header == context.following_lines.len() {
-        if checker.settings.enabled.contains(&CheckCode::D407) {
+        if checker.settings.enabled[CheckCode::D407 as usize] {
             let mut check = Check::new(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring),
@@ -930,7 +930,7 @@ fn blanks_and_section_underline(
             }
             checker.add_check(check);
         }
-        if checker.settings.enabled.contains(&CheckCode::D414) {
+        if checker.settings.enabled[CheckCode::D414 as usize] {
             checker.add_check(Check::new(
                 CheckKind::NonEmptySection(context.section_name.to_string()),
                 Range::from_located(docstring),
@@ -945,7 +945,7 @@ fn blanks_and_section_underline(
         .all(|char| char.is_whitespace() || char == '-');
 
     if !dash_line_found {
-        if checker.settings.enabled.contains(&CheckCode::D407) {
+        if checker.settings.enabled[CheckCode::D407 as usize] {
             let mut check = Check::new(
                 CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring),
@@ -965,7 +965,7 @@ fn blanks_and_section_underline(
             checker.add_check(check);
         }
         if blank_lines_after_header > 0 {
-            if checker.settings.enabled.contains(&CheckCode::D412) {
+            if checker.settings.enabled[CheckCode::D412 as usize] {
                 let mut check = Check::new(
                     CheckKind::NoBlankLinesBetweenHeaderAndContent(
                         context.section_name.to_string(),
@@ -990,7 +990,7 @@ fn blanks_and_section_underline(
         }
     } else {
         if blank_lines_after_header > 0 {
-            if checker.settings.enabled.contains(&CheckCode::D408) {
+            if checker.settings.enabled[CheckCode::D408 as usize] {
                 let mut check = Check::new(
                     CheckKind::SectionUnderlineAfterName(context.section_name.to_string()),
                     Range::from_located(docstring),
@@ -1019,7 +1019,7 @@ fn blanks_and_section_underline(
             .count()
             != context.section_name.len()
         {
-            if checker.settings.enabled.contains(&CheckCode::D409) {
+            if checker.settings.enabled[CheckCode::D409 as usize] {
                 let mut check = Check::new(
                     CheckKind::SectionUnderlineMatchesSectionLength(
                         context.section_name.to_string(),
@@ -1056,7 +1056,7 @@ fn blanks_and_section_underline(
             }
         }
 
-        if checker.settings.enabled.contains(&CheckCode::D215) {
+        if checker.settings.enabled[CheckCode::D215 as usize] {
             let leading_space = helpers::leading_space(non_empty_line);
             let indentation = helpers::indentation(checker, docstring);
             if leading_space.len() > indentation.len() {
@@ -1099,14 +1099,14 @@ fn blanks_and_section_underline(
                     .take_while(|line| line.trim().is_empty())
                     .count();
                 if blank_lines_after_dashes == rest_of_lines.len() {
-                    if checker.settings.enabled.contains(&CheckCode::D414) {
+                    if checker.settings.enabled[CheckCode::D414 as usize] {
                         checker.add_check(Check::new(
                             CheckKind::NonEmptySection(context.section_name.to_string()),
                             Range::from_located(docstring),
                         ));
                     }
                 } else {
-                    if checker.settings.enabled.contains(&CheckCode::D412) {
+                    if checker.settings.enabled[CheckCode::D412 as usize] {
                         let mut check = Check::new(
                             CheckKind::NoBlankLinesBetweenHeaderAndContent(
                                 context.section_name.to_string(),
@@ -1138,7 +1138,7 @@ fn blanks_and_section_underline(
                 }
             }
         } else {
-            if checker.settings.enabled.contains(&CheckCode::D414) {
+            if checker.settings.enabled[CheckCode::D414 as usize] {
                 checker.add_check(Check::new(
                     CheckKind::NonEmptySection(context.section_name.to_string()),
                     Range::from_located(docstring),
@@ -1158,7 +1158,7 @@ fn common_section(
         .docstring
         .expect("Sections are only available for docstrings.");
 
-    if checker.settings.enabled.contains(&CheckCode::D405) {
+    if checker.settings.enabled[CheckCode::D405 as usize] {
         if !style
             .section_names()
             .contains(&context.section_name.as_str())
@@ -1197,7 +1197,7 @@ fn common_section(
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::D214) {
+    if checker.settings.enabled[CheckCode::D214 as usize] {
         let leading_space = helpers::leading_space(context.line);
         let indentation = helpers::indentation(checker, docstring);
         if leading_space.len() > indentation.len() {
@@ -1227,7 +1227,7 @@ fn common_section(
         .unwrap_or(true)
     {
         if context.is_last_section {
-            if checker.settings.enabled.contains(&CheckCode::D413) {
+            if checker.settings.enabled[CheckCode::D413 as usize] {
                 let mut check = Check::new(
                     CheckKind::BlankLineAfterLastSection(context.section_name.to_string()),
                     Range::from_located(docstring),
@@ -1248,7 +1248,7 @@ fn common_section(
                 checker.add_check(check);
             }
         } else {
-            if checker.settings.enabled.contains(&CheckCode::D410) {
+            if checker.settings.enabled[CheckCode::D410 as usize] {
                 let mut check = Check::new(
                     CheckKind::BlankLineAfterSection(context.section_name.to_string()),
                     Range::from_located(docstring),
@@ -1271,7 +1271,7 @@ fn common_section(
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::D411) {
+    if checker.settings.enabled[CheckCode::D411 as usize] {
         if !context.previous_line.is_empty() {
             let mut check = Check::new(
                 CheckKind::BlankLineBeforeSection(context.section_name.to_string()),
@@ -1430,7 +1430,7 @@ fn parameters_section(checker: &mut Checker, definition: &Definition, context: &
 fn numpy_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
     common_section(checker, definition, context, &SectionStyle::NumPy);
 
-    if checker.settings.enabled.contains(&CheckCode::D406) {
+    if checker.settings.enabled[CheckCode::D406 as usize] {
         let suffix = context
             .line
             .trim()
@@ -1468,7 +1468,7 @@ fn numpy_section(checker: &mut Checker, definition: &Definition, context: &Secti
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::D417) {
+    if checker.settings.enabled[CheckCode::D417 as usize] {
         let capitalized_section_name = titlecase::titlecase(&context.section_name);
         if capitalized_section_name == "Parameters" {
             parameters_section(checker, definition, context);
@@ -1479,7 +1479,7 @@ fn numpy_section(checker: &mut Checker, definition: &Definition, context: &Secti
 fn google_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
     common_section(checker, definition, context, &SectionStyle::Google);
 
-    if checker.settings.enabled.contains(&CheckCode::D416) {
+    if checker.settings.enabled[CheckCode::D416 as usize] {
         let suffix = context
             .line
             .trim()
@@ -1518,7 +1518,7 @@ fn google_section(checker: &mut Checker, definition: &Definition, context: &Sect
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::D417) {
+    if checker.settings.enabled[CheckCode::D417 as usize] {
         let capitalized_section_name = titlecase::titlecase(&context.section_name);
         if capitalized_section_name == "Args" || capitalized_section_name == "Arguments" {
             args_section(checker, definition, context);

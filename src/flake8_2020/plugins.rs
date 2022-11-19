@@ -31,15 +31,14 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                     ..
                 } = &upper.node
                 {
-                    if *i == BigInt::from(1)
-                        && checker.settings.enabled.contains(&CheckCode::YTT303)
+                    if *i == BigInt::from(1) && checker.settings.enabled[CheckCode::YTT303 as usize]
                     {
                         checker.add_check(Check::new(
                             CheckKind::SysVersionSlice1Referenced,
                             Range::from_located(value),
                         ));
                     } else if *i == BigInt::from(3)
-                        && checker.settings.enabled.contains(&CheckCode::YTT101)
+                        && checker.settings.enabled[CheckCode::YTT101 as usize]
                     {
                         checker.add_check(Check::new(
                             CheckKind::SysVersionSlice3Referenced,
@@ -53,13 +52,13 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 value: Constant::Int(i),
                 ..
             } => {
-                if *i == BigInt::from(2) && checker.settings.enabled.contains(&CheckCode::YTT102) {
+                if *i == BigInt::from(2) && checker.settings.enabled[CheckCode::YTT102 as usize] {
                     checker.add_check(Check::new(
                         CheckKind::SysVersion2Referenced,
                         Range::from_located(value),
                     ));
                 } else if *i == BigInt::from(0)
-                    && checker.settings.enabled.contains(&CheckCode::YTT301)
+                    && checker.settings.enabled[CheckCode::YTT301 as usize]
                 {
                     checker.add_check(Check::new(
                         CheckKind::SysVersion0Referenced,
@@ -96,7 +95,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     ) = (ops, comparators)
                     {
                         if *n == BigInt::from(3)
-                            && checker.settings.enabled.contains(&CheckCode::YTT201)
+                            && checker.settings.enabled[CheckCode::YTT201 as usize]
                         {
                             checker.add_check(Check::new(
                                 CheckKind::SysVersionInfo0Eq3Referenced,
@@ -117,7 +116,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                         }],
                     ) = (ops, comparators)
                     {
-                        if checker.settings.enabled.contains(&CheckCode::YTT203) {
+                        if checker.settings.enabled[CheckCode::YTT203 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::SysVersionInfo1CmpInt,
                                 Range::from_located(left),
@@ -143,7 +142,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                 }],
             ) = (ops, comparators)
             {
-                if checker.settings.enabled.contains(&CheckCode::YTT204) {
+                if checker.settings.enabled[CheckCode::YTT204 as usize] {
                     checker.add_check(Check::new(
                         CheckKind::SysVersionInfoMinorCmpInt,
                         Range::from_located(left),
@@ -169,13 +168,13 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
         ) = (ops, comparators)
         {
             if s.len() == 1 {
-                if checker.settings.enabled.contains(&CheckCode::YTT302) {
+                if checker.settings.enabled[CheckCode::YTT302 as usize] {
                     checker.add_check(Check::new(
                         CheckKind::SysVersionCmpStr10,
                         Range::from_located(left),
                     ));
                 }
-            } else if checker.settings.enabled.contains(&CheckCode::YTT103) {
+            } else if checker.settings.enabled[CheckCode::YTT103 as usize] {
                 checker.add_check(Check::new(
                     CheckKind::SysVersionCmpStr3,
                     Range::from_located(left),

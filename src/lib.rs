@@ -15,6 +15,7 @@ use crate::source_code_locator::SourceCodeLocator;
 
 mod ast;
 pub mod autofix;
+mod bits;
 pub mod cache;
 pub mod check_ast;
 mod check_imports;

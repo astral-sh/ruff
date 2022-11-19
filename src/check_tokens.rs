@@ -16,14 +16,14 @@ pub fn check_tokens(
     settings: &Settings,
     autofix: &fixer::Mode,
 ) {
-    let enforce_ambiguous_unicode_character = settings.enabled.contains(&CheckCode::RUF001)
-        || settings.enabled.contains(&CheckCode::RUF002)
-        || settings.enabled.contains(&CheckCode::RUF003);
-    let enforce_quotes = settings.enabled.contains(&CheckCode::Q000)
-        || settings.enabled.contains(&CheckCode::Q001)
-        || settings.enabled.contains(&CheckCode::Q002)
-        || settings.enabled.contains(&CheckCode::Q003);
-    let enforce_invalid_escape_sequence = settings.enabled.contains(&CheckCode::W605);
+    let enforce_ambiguous_unicode_character = settings.enabled[CheckCode::RUF001 as usize]
+        || settings.enabled[CheckCode::RUF002 as usize]
+        || settings.enabled[CheckCode::RUF003 as usize];
+    let enforce_quotes = settings.enabled[CheckCode::Q000 as usize]
+        || settings.enabled[CheckCode::Q001 as usize]
+        || settings.enabled[CheckCode::Q002 as usize]
+        || settings.enabled[CheckCode::Q003 as usize];
+    let enforce_invalid_escape_sequence = settings.enabled[CheckCode::W605 as usize];
 
     let mut state_machine: StateMachine = Default::default();
     for (start, tok, end) in tokens.iter().flatten() {
@@ -65,7 +65,7 @@ pub fn check_tokens(
                     is_docstring,
                     &settings.flake8_quotes,
                 ) {
-                    if settings.enabled.contains(check.kind.code()) {
+                    if settings.enabled[check.kind.code().clone() as usize] {
                         checks.push(check);
                     }
                 }

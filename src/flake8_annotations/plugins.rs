@@ -106,14 +106,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 .chain(args.kwonlyargs.iter())
             {
                 if let Some(expr) = &arg.node.annotation {
-                    if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                    if checker.settings.enabled[CheckCode::ANN401 as usize] {
                         check_dynamically_typed(checker, expr, || arg.node.arg.to_string());
                     };
                 } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.enabled.contains(&CheckCode::ANN001) {
+                        if checker.settings.enabled[CheckCode::ANN001 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MissingTypeFunctionArgument(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -127,7 +127,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             if let Some(arg) = &args.vararg {
                 if let Some(expr) = &arg.node.annotation {
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                        if checker.settings.enabled[CheckCode::ANN401 as usize] {
                             let name = arg.node.arg.to_string();
                             check_dynamically_typed(checker, expr, || format!("*{name}"));
                         }
@@ -136,7 +136,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.enabled.contains(&CheckCode::ANN002) {
+                        if checker.settings.enabled[CheckCode::ANN002 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MissingTypeArgs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -150,7 +150,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             if let Some(arg) = &args.kwarg {
                 if let Some(expr) = &arg.node.annotation {
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                        if checker.settings.enabled[CheckCode::ANN401 as usize] {
                             let name = arg.node.arg.to_string();
                             check_dynamically_typed(checker, expr, || format!("**{name}"));
                         }
@@ -159,7 +159,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.enabled.contains(&CheckCode::ANN003) {
+                        if checker.settings.enabled[CheckCode::ANN003 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MissingTypeKwargs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -171,7 +171,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
             // ANN201, ANN202, ANN401
             if let Some(expr) = &returns {
-                if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                if checker.settings.enabled[CheckCode::ANN401 as usize] {
                     check_dynamically_typed(checker, expr, || name.to_string());
                 };
             } else {
@@ -185,7 +185,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
                 match visibility {
                     Visibility::Public => {
-                        if checker.settings.enabled.contains(&CheckCode::ANN201) {
+                        if checker.settings.enabled[CheckCode::ANN201 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MissingReturnTypePublicFunction(name.to_string()),
                                 Range::from_located(stmt),
@@ -193,7 +193,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         }
                     }
                     Visibility::Private => {
-                        if checker.settings.enabled.contains(&CheckCode::ANN202) {
+                        if checker.settings.enabled[CheckCode::ANN202 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MissingReturnTypePrivateFunction(name.to_string()),
                                 Range::from_located(stmt),
@@ -221,14 +221,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 // ANN401 for dynamically typed arguments
                 if let Some(annotation) = &arg.node.annotation {
                     has_any_typed_arg = true;
-                    if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                    if checker.settings.enabled[CheckCode::ANN401 as usize] {
                         check_dynamically_typed(checker, annotation, || arg.node.arg.to_string());
                     }
                 } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.enabled.contains(&CheckCode::ANN001) {
+                        if checker.settings.enabled[CheckCode::ANN001 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MissingTypeFunctionArgument(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -243,7 +243,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 has_any_typed_arg = true;
                 if let Some(expr) = &arg.node.annotation {
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                        if checker.settings.enabled[CheckCode::ANN401 as usize] {
                             let name = arg.node.arg.to_string();
                             check_dynamically_typed(checker, expr, || format!("*{name}"));
                         }
@@ -252,7 +252,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.enabled.contains(&CheckCode::ANN002) {
+                        if checker.settings.enabled[CheckCode::ANN002 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MissingTypeArgs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -267,7 +267,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 has_any_typed_arg = true;
                 if let Some(expr) = &arg.node.annotation {
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                        if checker.settings.enabled[CheckCode::ANN401 as usize] {
                             let name = arg.node.arg.to_string();
                             check_dynamically_typed(checker, expr, || format!("**{name}"));
                         }
@@ -276,7 +276,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.enabled.contains(&CheckCode::ANN003) {
+                        if checker.settings.enabled[CheckCode::ANN003 as usize] {
                             checker.add_check(Check::new(
                                 CheckKind::MissingTypeKwargs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -291,14 +291,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 if let Some(arg) = args.args.first() {
                     if arg.node.annotation.is_none() {
                         if visibility::is_classmethod(stmt) {
-                            if checker.settings.enabled.contains(&CheckCode::ANN102) {
+                            if checker.settings.enabled[CheckCode::ANN102 as usize] {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingTypeCls(arg.node.arg.to_string()),
                                     Range::from_located(arg),
                                 ));
                             }
                         } else {
-                            if checker.settings.enabled.contains(&CheckCode::ANN101) {
+                            if checker.settings.enabled[CheckCode::ANN101 as usize] {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingTypeSelf(arg.node.arg.to_string()),
                                     Range::from_located(arg),
@@ -311,7 +311,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
             // ANN201, ANN202
             if let Some(expr) = &returns {
-                if checker.settings.enabled.contains(&CheckCode::ANN401) {
+                if checker.settings.enabled[CheckCode::ANN401 as usize] {
                     check_dynamically_typed(checker, expr, || name.to_string());
                 }
             } else {
@@ -324,21 +324,21 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 }
 
                 if visibility::is_classmethod(stmt) {
-                    if checker.settings.enabled.contains(&CheckCode::ANN206) {
+                    if checker.settings.enabled[CheckCode::ANN206 as usize] {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeClassMethod(name.to_string()),
                             Range::from_located(stmt),
                         ));
                     }
                 } else if visibility::is_staticmethod(stmt) {
-                    if checker.settings.enabled.contains(&CheckCode::ANN205) {
+                    if checker.settings.enabled[CheckCode::ANN205 as usize] {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeStaticMethod(name.to_string()),
                             Range::from_located(stmt),
                         ));
                     }
                 } else if visibility::is_magic(stmt) {
-                    if checker.settings.enabled.contains(&CheckCode::ANN204) {
+                    if checker.settings.enabled[CheckCode::ANN204 as usize] {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeMagicMethod(name.to_string()),
                             Range::from_located(stmt),
@@ -347,7 +347,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 } else if visibility::is_init(stmt) {
                     // Allow omission of return annotation in `__init__` functions, as long as at
                     // least one argument is typed.
-                    if checker.settings.enabled.contains(&CheckCode::ANN204) {
+                    if checker.settings.enabled[CheckCode::ANN204 as usize] {
                         if !(checker.settings.flake8_annotations.mypy_init_return
                             && has_any_typed_arg)
                         {
@@ -360,7 +360,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 } else {
                     match visibility {
                         Visibility::Public => {
-                            if checker.settings.enabled.contains(&CheckCode::ANN201) {
+                            if checker.settings.enabled[CheckCode::ANN201 as usize] {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingReturnTypePublicFunction(name.to_string()),
                                     Range::from_located(stmt),
@@ -368,7 +368,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             }
                         }
                         Visibility::Private => {
-                            if checker.settings.enabled.contains(&CheckCode::ANN202) {
+                            if checker.settings.enabled[CheckCode::ANN202 as usize] {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingReturnTypePrivateFunction(name.to_string()),
                                     Range::from_located(stmt),

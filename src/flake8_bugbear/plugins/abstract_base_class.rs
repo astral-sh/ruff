@@ -102,7 +102,7 @@ pub fn abstract_base_class(
 
                 has_abstract_method |= has_abstract_decorator;
 
-                if checker.settings.enabled.contains(&CheckCode::B027) {
+                if checker.settings.enabled[CheckCode::B027 as usize] {
                     if !has_abstract_decorator
                         && is_empty_body(body)
                         && !decorator_list
@@ -117,7 +117,7 @@ pub fn abstract_base_class(
                 }
             }
         }
-        if checker.settings.enabled.contains(&CheckCode::B024) {
+        if checker.settings.enabled[CheckCode::B024 as usize] {
             if !has_abstract_method {
                 checker.add_check(Check::new(
                     CheckKind::AbstractBaseClassWithoutAbstractMethod(name.to_string()),

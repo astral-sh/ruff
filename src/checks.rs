@@ -25,6 +25,7 @@ use crate::pyupgrade::types::Primitive;
     PartialOrd,
     Ord,
 )]
+#[repr(u8)]
 pub enum CheckCode {
     // pycodestyle errors
     E402,

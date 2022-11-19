@@ -18,15 +18,16 @@ bitflags! {
 
 impl Flags {
     pub fn from_settings(settings: &Settings) -> Self {
-        if settings
-            .enabled
-            .iter()
-            .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports))
-        {
-            Flags::NOQA | Flags::ISORT
-        } else {
-            Flags::NOQA
-        }
+        Flags::NOQA
+        // if settings
+        //     .enabled
+        //     .iter()
+        //     .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports))
+        // {
+        //     Flags::NOQA | Flags::ISORT
+        // } else {
+        //     Flags::NOQA
+        // }
     }
 }
 

@@ -65,23 +65,26 @@ pub(crate) fn check_path(
     let mut checks: Vec<Check> = vec![];
 
     // Run the token-based checks.
-    let use_tokens = settings
-        .enabled
-        .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens));
+    let use_tokens = false;
+    // settings
+    //     .enabled
+    //     .iter()
+    //     .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens));
     if use_tokens {
         check_tokens(&mut checks, locator, &tokens, settings, autofix);
     }
 
     // Run the AST-based checks.
-    let use_ast = settings
-        .enabled
-        .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::AST));
-    let use_imports = settings
-        .enabled
-        .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports));
+    let use_ast = true;
+    // settings
+    //     .enabled
+    //     .iter()
+    //     .any(|check_code| matches!(check_code.lint_source(), LintSource::AST));
+    let use_imports = false;
+    // settings
+    //     .enabled
+    //     .iter()
+    //     .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports));
     if use_ast || use_imports {
         match parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
@@ -99,7 +102,7 @@ pub(crate) fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.enabled.contains(&CheckCode::E999) {
+                if settings.enabled[CheckCode::E999 as usize] {
                     checks.push(Check::new(
                         CheckKind::SyntaxError(parse_error.error.to_string()),
                         Range {

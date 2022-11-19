@@ -230,7 +230,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E741) {
+                if self.settings.enabled[CheckCode::E741 as usize] {
                     let location = Range::from_located(stmt);
                     self.add_checks(
                         names
@@ -243,7 +243,7 @@ where
                 }
             }
             StmtKind::Break => {
-                if self.settings.enabled.contains(&CheckCode::F701) {
+                if self.settings.enabled[CheckCode::F701 as usize] {
                     if let Some(check) = pyflakes::checks::break_outside_loop(
                         stmt,
                         &self.parents,
@@ -254,7 +254,7 @@ where
                 }
             }
             StmtKind::Continue => {
-                if self.settings.enabled.contains(&CheckCode::F702) {
+                if self.settings.enabled[CheckCode::F702 as usize] {
                     if let Some(check) = pyflakes::checks::continue_outside_loop(
                         stmt,
                         &self.parents,
@@ -280,7 +280,7 @@ where
                 body,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::E743) {
+                if self.settings.enabled[CheckCode::E743 as usize] {
                     if let Some(check) = pycodestyle::checks::ambiguous_function_name(
                         name,
                         Range::from_located(stmt),
@@ -289,7 +289,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N802) {
+                if self.settings.enabled[CheckCode::N802 as usize] {
                     if let Some(check) = pep8_naming::checks::invalid_function_name(
                         stmt,
                         name,
@@ -299,7 +299,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N804) {
+                if self.settings.enabled[CheckCode::N804 as usize] {
                     if let Some(check) =
                         pep8_naming::checks::invalid_first_argument_name_for_class_method(
                             self.current_scope(),
@@ -315,7 +315,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N805) {
+                if self.settings.enabled[CheckCode::N805 as usize] {
                     if let Some(check) = pep8_naming::checks::invalid_first_argument_name_for_method(
                         self.current_scope(),
                         name,
@@ -329,7 +329,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N807) {
+                if self.settings.enabled[CheckCode::N807 as usize] {
                     if let Some(check) =
                         pep8_naming::checks::dunder_function_name(self.current_scope(), stmt, name)
                     {
@@ -337,19 +337,19 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::U011)
+                if self.settings.enabled[CheckCode::U011 as usize]
                     && self.settings.target_version >= PythonVersion::Py38
                 {
                     pyupgrade::plugins::unnecessary_lru_cache_params(self, decorator_list);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B018) {
+                if self.settings.enabled[CheckCode::B018 as usize] {
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
-                if self.settings.enabled.contains(&CheckCode::B019) {
+                if self.settings.enabled[CheckCode::B019 as usize] {
                     flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
                 }
-                if self.settings.enabled.contains(&CheckCode::C901) {
+                if self.settings.enabled[CheckCode::C901 as usize] {
                     if let Some(check) = mccabe::checks::function_is_too_complex(
                         stmt,
                         name,
@@ -360,7 +360,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::S107) {
+                if self.settings.enabled[CheckCode::S107 as usize] {
                     self.add_checks(
                         flake8_bandit::plugins::hardcoded_password_default(args).into_iter(),
                     );
@@ -417,7 +417,7 @@ where
                 );
             }
             StmtKind::Return { .. } => {
-                if self.settings.enabled.contains(&CheckCode::F706) {
+                if self.settings.enabled[CheckCode::F706 as usize] {
                     if let Some(index) = self.scope_stack.last().cloned() {
                         if matches!(
                             self.scopes[index].kind,
@@ -438,13 +438,13 @@ where
                 decorator_list,
                 body,
             } => {
-                if self.settings.enabled.contains(&CheckCode::U004) {
+                if self.settings.enabled[CheckCode::U004 as usize] {
                     pyupgrade::plugins::useless_object_inheritance(
                         self, stmt, name, bases, keywords,
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E742) {
+                if self.settings.enabled[CheckCode::E742 as usize] {
                     if let Some(check) =
                         pycodestyle::checks::ambiguous_class_name(name, Range::from_located(stmt))
                     {
@@ -452,13 +452,13 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N801) {
+                if self.settings.enabled[CheckCode::N801 as usize] {
                     if let Some(check) = pep8_naming::checks::invalid_class_name(stmt, name) {
                         self.add_check(check);
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N818) {
+                if self.settings.enabled[CheckCode::N818 as usize] {
                     if let Some(check) =
                         pep8_naming::checks::error_suffix_on_exception_name(stmt, bases, name)
                     {
@@ -466,12 +466,12 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B018) {
+                if self.settings.enabled[CheckCode::B018 as usize] {
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B024)
-                    || self.settings.enabled.contains(&CheckCode::B027)
+                if self.settings.enabled[CheckCode::B024 as usize]
+                    || self.settings.enabled[CheckCode::B027 as usize]
                 {
                     flake8_bugbear::plugins::abstract_base_class(
                         self, stmt, name, bases, keywords, body,
@@ -497,7 +497,7 @@ where
                 })))
             }
             StmtKind::Import { names } => {
-                if self.settings.enabled.contains(&CheckCode::E402) {
+                if self.settings.enabled[CheckCode::E402 as usize] {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
                         self.add_check(Check::new(
                             CheckKind::ModuleImportNotAtTopOfFile,
@@ -575,7 +575,7 @@ where
                         }
 
                         let name = alias.node.name.split('.').last().unwrap();
-                        if self.settings.enabled.contains(&CheckCode::N811) {
+                        if self.settings.enabled[CheckCode::N811 as usize] {
                             if let Some(check) =
                                 pep8_naming::checks::constant_imported_as_non_constant(
                                     stmt, name, asname,
@@ -585,7 +585,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N812) {
+                        if self.settings.enabled[CheckCode::N812 as usize] {
                             if let Some(check) =
                                 pep8_naming::checks::lowercase_imported_as_non_lowercase(
                                     stmt, name, asname,
@@ -595,7 +595,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N813) {
+                        if self.settings.enabled[CheckCode::N813 as usize] {
                             if let Some(check) =
                                 pep8_naming::checks::camelcase_imported_as_lowercase(
                                     stmt, name, asname,
@@ -605,7 +605,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N814) {
+                        if self.settings.enabled[CheckCode::N814 as usize] {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
                                 stmt, name, asname,
                             ) {
@@ -613,7 +613,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N817) {
+                        if self.settings.enabled[CheckCode::N817 as usize] {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
                                 stmt, name, asname,
                             ) {
@@ -649,7 +649,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E402) {
+                if self.settings.enabled[CheckCode::E402 as usize] {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
                         self.add_check(Check::new(
                             CheckKind::ModuleImportNotAtTopOfFile,
@@ -659,7 +659,7 @@ where
                 }
 
                 if let Some("__future__") = module.as_deref() {
-                    if self.settings.enabled.contains(&CheckCode::U010) {
+                    if self.settings.enabled[CheckCode::U010 as usize] {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
                     }
                 }
@@ -688,7 +688,7 @@ where
                             self.annotations_future_enabled = true;
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::F407) {
+                        if self.settings.enabled[CheckCode::F407 as usize] {
                             if !ALL_FEATURE_NAMES.contains(&alias.node.name.deref()) {
                                 self.add_check(Check::new(
                                     CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
@@ -697,7 +697,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
+                        if self.settings.enabled[CheckCode::F404 as usize] && !self.futures_allowed
                         {
                             self.add_check(Check::new(
                                 CheckKind::LateFutureImport,
@@ -714,7 +714,7 @@ where
                             },
                         );
 
-                        if self.settings.enabled.contains(&CheckCode::F406) {
+                        if self.settings.enabled[CheckCode::F406 as usize] {
                             let scope = &self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found."))];
                             if !matches!(scope.kind, ScopeKind::Module) {
@@ -728,7 +728,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::F403) {
+                        if self.settings.enabled[CheckCode::F403 as usize] {
                             self.add_check(Check::new(
                                 CheckKind::ImportStarUsed(helpers::format_import_from(
                                     level.as_ref(),
@@ -787,7 +787,7 @@ where
                         )
                     }
 
-                    if self.settings.enabled.contains(&CheckCode::I252) {
+                    if self.settings.enabled[CheckCode::I252 as usize] {
                         if let Some(check) = flake8_tidy_imports::checks::banned_relative_import(
                             stmt,
                             level.as_ref(),
@@ -798,7 +798,7 @@ where
                     }
 
                     if let Some(asname) = &alias.node.asname {
-                        if self.settings.enabled.contains(&CheckCode::N811) {
+                        if self.settings.enabled[CheckCode::N811 as usize] {
                             if let Some(check) =
                                 pep8_naming::checks::constant_imported_as_non_constant(
                                     stmt,
@@ -810,7 +810,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N812) {
+                        if self.settings.enabled[CheckCode::N812 as usize] {
                             if let Some(check) =
                                 pep8_naming::checks::lowercase_imported_as_non_lowercase(
                                     stmt,
@@ -822,7 +822,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N813) {
+                        if self.settings.enabled[CheckCode::N813 as usize] {
                             if let Some(check) =
                                 pep8_naming::checks::camelcase_imported_as_lowercase(
                                     stmt,
@@ -834,7 +834,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N814) {
+                        if self.settings.enabled[CheckCode::N814 as usize] {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
                                 stmt,
                                 &alias.node.name,
@@ -844,7 +844,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N817) {
+                        if self.settings.enabled[CheckCode::N817 as usize] {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
                                 stmt,
                                 &alias.node.name,
@@ -857,12 +857,12 @@ where
                 }
             }
             StmtKind::Raise { exc, .. } => {
-                if self.settings.enabled.contains(&CheckCode::F901) {
+                if self.settings.enabled[CheckCode::F901 as usize] {
                     if let Some(expr) = exc {
                         pyflakes::plugins::raise_not_implemented(self, expr);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::B016) {
+                if self.settings.enabled[CheckCode::B016 as usize] {
                     if let Some(exc) = exc {
                         flake8_bugbear::plugins::cannot_raise_literal(self, exc);
                     }
@@ -872,15 +872,15 @@ where
                 self.handle_node_load(target);
             }
             StmtKind::If { test, .. } => {
-                if self.settings.enabled.contains(&CheckCode::F634) {
+                if self.settings.enabled[CheckCode::F634 as usize] {
                     pyflakes::plugins::if_tuple(self, stmt, test);
                 }
             }
             StmtKind::Assert { test, msg } => {
-                if self.settings.enabled.contains(&CheckCode::F631) {
+                if self.settings.enabled[CheckCode::F631 as usize] {
                     pyflakes::plugins::assert_tuple(self, stmt, test);
                 }
-                if self.settings.enabled.contains(&CheckCode::B011) {
+                if self.settings.enabled[CheckCode::B011 as usize] {
                     flake8_bugbear::plugins::assert_false(
                         self,
                         stmt,
@@ -888,45 +888,45 @@ where
                         msg.as_ref().map(|expr| expr.deref()),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::S101) {
+                if self.settings.enabled[CheckCode::S101 as usize] {
                     self.add_check(flake8_bandit::plugins::assert_used(stmt));
                 }
             }
             StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
-                if self.settings.enabled.contains(&CheckCode::B017) {
+                if self.settings.enabled[CheckCode::B017 as usize] {
                     flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
                 }
             }
             StmtKind::For {
                 target, body, iter, ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::B007) {
+                if self.settings.enabled[CheckCode::B007 as usize] {
                     flake8_bugbear::plugins::unused_loop_control_variable(self, target, body);
                 }
-                if self.settings.enabled.contains(&CheckCode::B020) {
+                if self.settings.enabled[CheckCode::B020 as usize] {
                     flake8_bugbear::plugins::loop_variable_overrides_iterator(self, target, iter);
                 }
             }
             StmtKind::Try { handlers, .. } => {
-                if self.settings.enabled.contains(&CheckCode::F707) {
+                if self.settings.enabled[CheckCode::F707 as usize] {
                     if let Some(check) = pyflakes::checks::default_except_not_last(handlers) {
                         self.add_check(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::B014)
-                    || self.settings.enabled.contains(&CheckCode::B025)
+                if self.settings.enabled[CheckCode::B014 as usize]
+                    || self.settings.enabled[CheckCode::B025 as usize]
                 {
                     flake8_bugbear::plugins::duplicate_exceptions(self, stmt, handlers);
                 }
-                if self.settings.enabled.contains(&CheckCode::B013) {
+                if self.settings.enabled[CheckCode::B013 as usize] {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
                 }
-                if self.settings.enabled.contains(&CheckCode::BLE001) {
+                if self.settings.enabled[CheckCode::BLE001 as usize] {
                     flake8_blind_except::plugins::blind_except(self, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
-                if self.settings.enabled.contains(&CheckCode::E731) {
+                if self.settings.enabled[CheckCode::E731 as usize] {
                     if let [target] = &targets[..] {
                         if let Some(check) =
                             pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
@@ -935,27 +935,27 @@ where
                         }
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::U001) {
+                if self.settings.enabled[CheckCode::U001 as usize] {
                     pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
                 }
-                if self.settings.enabled.contains(&CheckCode::B003) {
+                if self.settings.enabled[CheckCode::B003 as usize] {
                     flake8_bugbear::plugins::assignment_to_os_environ(self, targets);
                 }
-                if self.settings.enabled.contains(&CheckCode::S105) {
+                if self.settings.enabled[CheckCode::S105 as usize] {
                     if let Some(check) =
                         flake8_bandit::plugins::assign_hardcoded_password_string(value, targets)
                     {
                         self.add_check(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::U013) {
+                if self.settings.enabled[CheckCode::U013 as usize] {
                     pyupgrade::plugins::convert_typed_dict_functional_to_class(
                         self, stmt, targets, value,
                     );
                 }
             }
             StmtKind::AnnAssign { target, value, .. } => {
-                if self.settings.enabled.contains(&CheckCode::E731) {
+                if self.settings.enabled[CheckCode::E731 as usize] {
                     if let Some(value) = value {
                         if let Some(check) =
                             pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
@@ -967,7 +967,7 @@ where
             }
             StmtKind::Delete { .. } => {}
             StmtKind::Expr { value, .. } => {
-                if self.settings.enabled.contains(&CheckCode::B015) {
+                if self.settings.enabled[CheckCode::B015 as usize] {
                     flake8_bugbear::plugins::useless_comparison(self, value)
                 }
             }
@@ -978,7 +978,7 @@ where
         let prev_visible_scope = self.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
-                if self.settings.enabled.contains(&CheckCode::B021) {
+                if self.settings.enabled[CheckCode::B021 as usize] {
                     flake8_bugbear::plugins::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
@@ -1000,7 +1000,7 @@ where
                 ));
             }
             StmtKind::ClassDef { body, .. } => {
-                if self.settings.enabled.contains(&CheckCode::B021) {
+                if self.settings.enabled[CheckCode::B021 as usize] {
                     flake8_bugbear::plugins::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
@@ -1025,7 +1025,7 @@ where
                 finalbody,
             } => {
                 self.except_handlers.push(extract_handler_names(handlers));
-                if self.settings.enabled.contains(&CheckCode::B012) {
+                if self.settings.enabled[CheckCode::B012 as usize] {
                     flake8_bugbear::plugins::jump_statement_in_finally(self, finalbody);
                 }
                 for stmt in body {
@@ -1100,7 +1100,7 @@ where
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) typing.List[...]
-                if self.settings.enabled.contains(&CheckCode::U007)
+                if self.settings.enabled[CheckCode::U007 as usize]
                     && self.settings.target_version >= PythonVersion::Py310
                 {
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
@@ -1110,10 +1110,10 @@ where
                     self.in_literal = true;
                 }
 
-                if self.settings.enabled.contains(&CheckCode::YTT101)
-                    || self.settings.enabled.contains(&CheckCode::YTT102)
-                    || self.settings.enabled.contains(&CheckCode::YTT301)
-                    || self.settings.enabled.contains(&CheckCode::YTT303)
+                if self.settings.enabled[CheckCode::YTT101 as usize]
+                    || self.settings.enabled[CheckCode::YTT102 as usize]
+                    || self.settings.enabled[CheckCode::YTT301 as usize]
+                    || self.settings.enabled[CheckCode::YTT303 as usize]
                 {
                     flake8_2020::plugins::subscript(self, value, slice);
                 }
@@ -1121,9 +1121,9 @@ where
             ExprKind::Tuple { elts, ctx } | ExprKind::List { elts, ctx } => {
                 if matches!(ctx, ExprContext::Store) {
                     let check_too_many_expressions =
-                        self.settings.enabled.contains(&CheckCode::F621);
+                        self.settings.enabled[CheckCode::F621 as usize];
                     let check_two_starred_expressions =
-                        self.settings.enabled.contains(&CheckCode::F622);
+                        self.settings.enabled[CheckCode::F622 as usize];
                     if let Some(check) = pyflakes::checks::starred_expressions(
                         elts,
                         check_too_many_expressions,
@@ -1138,7 +1138,7 @@ where
                 match ctx {
                     ExprContext::Load => {
                         // Ex) List[...]
-                        if self.settings.enabled.contains(&CheckCode::U006)
+                        if self.settings.enabled[CheckCode::U006 as usize]
                             && self.settings.target_version >= PythonVersion::Py39
                             && typing::is_pep585_builtin(
                                 expr,
@@ -1152,7 +1152,7 @@ where
                         self.handle_node_load(expr);
                     }
                     ExprContext::Store => {
-                        if self.settings.enabled.contains(&CheckCode::E741) {
+                        if self.settings.enabled[CheckCode::E741 as usize] {
                             if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                                 id,
                                 Range::from_located(expr),
@@ -1168,20 +1168,20 @@ where
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
 
-                if self.settings.enabled.contains(&CheckCode::YTT202) {
+                if self.settings.enabled[CheckCode::YTT202 as usize] {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
             }
             ExprKind::Attribute { attr, .. } => {
                 // Ex) typing.List[...]
-                if self.settings.enabled.contains(&CheckCode::U006)
+                if self.settings.enabled[CheckCode::U006 as usize]
                     && self.settings.target_version >= PythonVersion::Py39
                     && typing::is_pep585_builtin(expr, &self.from_imports, &self.import_aliases)
                 {
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::YTT202) {
+                if self.settings.enabled[CheckCode::YTT202 as usize] {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
             }
@@ -1190,36 +1190,36 @@ where
                 args,
                 keywords,
             } => {
-                if self.settings.enabled.contains(&CheckCode::U005) {
+                if self.settings.enabled[CheckCode::U005 as usize] {
                     pyupgrade::plugins::deprecated_unittest_alias(self, func);
                 }
 
                 // flake8-super
-                if self.settings.enabled.contains(&CheckCode::U008) {
+                if self.settings.enabled[CheckCode::U008 as usize] {
                     pyupgrade::plugins::super_call_with_parameters(self, expr, func, args);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::U012) {
+                if self.settings.enabled[CheckCode::U012 as usize] {
                     pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
                 }
 
                 // flake8-print
-                if self.settings.enabled.contains(&CheckCode::T201)
-                    || self.settings.enabled.contains(&CheckCode::T203)
+                if self.settings.enabled[CheckCode::T201 as usize]
+                    || self.settings.enabled[CheckCode::T203 as usize]
                 {
                     flake8_print::plugins::print_call(self, expr, func);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B004) {
+                if self.settings.enabled[CheckCode::B004 as usize] {
                     flake8_bugbear::plugins::unreliable_callable_check(self, expr, func, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::B005) {
+                if self.settings.enabled[CheckCode::B005 as usize] {
                     flake8_bugbear::plugins::strip_with_multi_characters(self, expr, func, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::B009) {
+                if self.settings.enabled[CheckCode::B009 as usize] {
                     flake8_bugbear::plugins::getattr_with_constant(self, expr, func, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::B010) {
+                if self.settings.enabled[CheckCode::B010 as usize] {
                     if !self
                         .scope_stack
                         .iter()
@@ -1229,27 +1229,27 @@ where
                         flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::B022) {
+                if self.settings.enabled[CheckCode::B022 as usize] {
                     flake8_bugbear::plugins::useless_contextlib_suppress(self, expr, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::B026) {
+                if self.settings.enabled[CheckCode::B026 as usize] {
                     flake8_bugbear::plugins::star_arg_unpacking_after_keyword_arg(
                         self, args, keywords,
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::S102) {
+                if self.settings.enabled[CheckCode::S102 as usize] {
                     if let Some(check) = flake8_bandit::plugins::exec_used(expr, func) {
                         self.add_check(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::S106) {
+                if self.settings.enabled[CheckCode::S106 as usize] {
                     self.add_checks(
                         flake8_bandit::plugins::hardcoded_password_func_arg(keywords).into_iter(),
                     );
                 }
 
                 // flake8-comprehensions
-                if self.settings.enabled.contains(&CheckCode::C400) {
+                if self.settings.enabled[CheckCode::C400 as usize] {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_list(
                         expr,
                         func,
@@ -1263,7 +1263,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C401) {
+                if self.settings.enabled[CheckCode::C401 as usize] {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_set(
                         expr,
                         func,
@@ -1277,7 +1277,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C402) {
+                if self.settings.enabled[CheckCode::C402 as usize] {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_dict(
                         expr,
                         func,
@@ -1291,7 +1291,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C403) {
+                if self.settings.enabled[CheckCode::C403 as usize] {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_set(
                             expr,
@@ -1307,7 +1307,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C404) {
+                if self.settings.enabled[CheckCode::C404 as usize] {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_dict(
                             expr,
@@ -1323,7 +1323,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C405) {
+                if self.settings.enabled[CheckCode::C405 as usize] {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_set(
                         expr,
                         func,
@@ -1337,7 +1337,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C406) {
+                if self.settings.enabled[CheckCode::C406 as usize] {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_dict(
                         expr,
                         func,
@@ -1351,7 +1351,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C408) {
+                if self.settings.enabled[CheckCode::C408 as usize] {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_collection_call(
                         expr,
                         func,
@@ -1365,7 +1365,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C409) {
+                if self.settings.enabled[CheckCode::C409 as usize] {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_literal_within_tuple_call(
                             expr,
@@ -1380,7 +1380,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C410) {
+                if self.settings.enabled[CheckCode::C410 as usize] {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_literal_within_list_call(
                             expr,
@@ -1395,7 +1395,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C411) {
+                if self.settings.enabled[CheckCode::C411 as usize] {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_list_call(
                         expr,
                         func,
@@ -1408,7 +1408,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C413) {
+                if self.settings.enabled[CheckCode::C413 as usize] {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_call_around_sorted(
                             expr,
@@ -1423,7 +1423,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C414) {
+                if self.settings.enabled[CheckCode::C414 as usize] {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_double_cast_or_process(
                             func,
@@ -1435,7 +1435,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C415) {
+                if self.settings.enabled[CheckCode::C415 as usize] {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_subscript_reversal(
                             func,
@@ -1447,7 +1447,7 @@ where
                     };
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C417) {
+                if self.settings.enabled[CheckCode::C417 as usize] {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_map(
                         func,
                         args,
@@ -1458,12 +1458,12 @@ where
                 }
 
                 // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::U003) {
+                if self.settings.enabled[CheckCode::U003 as usize] {
                     pyupgrade::plugins::type_of_primitive(self, expr, func, args);
                 }
 
                 // flake8-boolean-trap
-                if self.settings.enabled.contains(&CheckCode::FBT003) {
+                if self.settings.enabled[CheckCode::FBT003 as usize] {
                     flake8_boolean_trap::plugins::check_boolean_positional_value_in_function_call(
                         self, args,
                     );
@@ -1479,8 +1479,8 @@ where
                 }
             }
             ExprKind::Dict { keys, .. } => {
-                let check_repeated_literals = self.settings.enabled.contains(&CheckCode::F601);
-                let check_repeated_variables = self.settings.enabled.contains(&CheckCode::F602);
+                let check_repeated_literals = self.settings.enabled[CheckCode::F601 as usize];
+                let check_repeated_variables = self.settings.enabled[CheckCode::F602 as usize];
                 if check_repeated_literals || check_repeated_variables {
                     self.add_checks(
                         pyflakes::checks::repeated_keys(
@@ -1494,7 +1494,7 @@ where
             }
             ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. } => {
                 let scope = self.current_scope();
-                if self.settings.enabled.contains(&CheckCode::F704) {
+                if self.settings.enabled[CheckCode::F704 as usize] {
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.add_check(Check::new(
                             CheckKind::YieldOutsideFunction,
@@ -1504,7 +1504,7 @@ where
                 }
             }
             ExprKind::JoinedStr { values } => {
-                if self.settings.enabled.contains(&CheckCode::F541) {
+                if self.settings.enabled[CheckCode::F541 as usize] {
                     if self.in_f_string.is_none()
                         && !values
                             .iter()
@@ -1523,13 +1523,13 @@ where
                 op: Operator::RShift,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::F633) {
+                if self.settings.enabled[CheckCode::F633 as usize] {
                     pyflakes::plugins::invalid_print_syntax(self, left);
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
-                let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
-                let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
+                let check_not_in = self.settings.enabled[CheckCode::E713 as usize];
+                let check_not_is = self.settings.enabled[CheckCode::E714 as usize];
                 if check_not_in || check_not_is {
                     pycodestyle::plugins::not_tests(
                         self,
@@ -1541,7 +1541,7 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B002) {
+                if self.settings.enabled[CheckCode::B002 as usize] {
                     flake8_bugbear::plugins::unary_prefix_increment(self, expr, op, operand);
                 }
             }
@@ -1550,8 +1550,8 @@ where
                 ops,
                 comparators,
             } => {
-                let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
-                let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
+                let check_none_comparisons = self.settings.enabled[CheckCode::E711 as usize];
+                let check_true_false_comparisons = self.settings.enabled[CheckCode::E712 as usize];
                 if check_none_comparisons || check_true_false_comparisons {
                     pycodestyle::plugins::literal_comparisons(
                         self,
@@ -1564,7 +1564,7 @@ where
                     )
                 }
 
-                if self.settings.enabled.contains(&CheckCode::F632) {
+                if self.settings.enabled[CheckCode::F632 as usize] {
                     pyflakes::plugins::invalid_literal_comparison(
                         self,
                         left,
@@ -1574,7 +1574,7 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E721) {
+                if self.settings.enabled[CheckCode::E721 as usize] {
                     self.add_checks(
                         pycodestyle::checks::type_comparison(
                             ops,
@@ -1585,16 +1585,16 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::YTT103)
-                    || self.settings.enabled.contains(&CheckCode::YTT201)
-                    || self.settings.enabled.contains(&CheckCode::YTT203)
-                    || self.settings.enabled.contains(&CheckCode::YTT204)
-                    || self.settings.enabled.contains(&CheckCode::YTT302)
+                if self.settings.enabled[CheckCode::YTT103 as usize]
+                    || self.settings.enabled[CheckCode::YTT201 as usize]
+                    || self.settings.enabled[CheckCode::YTT203 as usize]
+                    || self.settings.enabled[CheckCode::YTT204 as usize]
+                    || self.settings.enabled[CheckCode::YTT302 as usize]
                 {
                     flake8_2020::plugins::compare(self, left, ops, comparators);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::S105) {
+                if self.settings.enabled[CheckCode::S105 as usize] {
                     self.add_checks(
                         flake8_bandit::plugins::compare_to_hardcoded_password_string(
                             left,
@@ -1616,7 +1616,7 @@ where
                         self.parent_stack.clone(),
                     ));
                 }
-                if self.settings.enabled.contains(&CheckCode::S104) {
+                if self.settings.enabled[CheckCode::S104 as usize] {
                     if let Some(check) = flake8_bandit::plugins::hardcoded_bind_all_interfaces(
                         value,
                         &Range::from_located(expr),
@@ -1661,7 +1661,7 @@ where
                 self.push_scope(Scope::new(ScopeKind::Lambda))
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
-                if self.settings.enabled.contains(&CheckCode::C416) {
+                if self.settings.enabled[CheckCode::C416 as usize] {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_comprehension(
                         expr,
                         elt,
@@ -1868,7 +1868,7 @@ where
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         match &excepthandler.node {
             ExcepthandlerKind::ExceptHandler { type_, name, .. } => {
-                if self.settings.enabled.contains(&CheckCode::E722) && type_.is_none() {
+                if self.settings.enabled[CheckCode::E722 as usize] && type_.is_none() {
                     self.add_check(Check::new(
                         CheckKind::DoNotUseBareExcept,
                         Range::from_located(excepthandler),
@@ -1876,7 +1876,7 @@ where
                 }
                 match name {
                     Some(name) => {
-                        if self.settings.enabled.contains(&CheckCode::E741) {
+                        if self.settings.enabled[CheckCode::E741 as usize] {
                             if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                                 name,
                                 Range::from_located(excepthandler),
@@ -1928,7 +1928,7 @@ where
                             &scope.values.remove(&name.as_str())
                         } {
                             if binding.used.is_none() {
-                                if self.settings.enabled.contains(&CheckCode::F841) {
+                                if self.settings.enabled[CheckCode::F841 as usize] {
                                     self.add_check(Check::new(
                                         CheckKind::UnusedVariable(name.to_string()),
                                         Range::from_located(excepthandler),
@@ -1950,22 +1950,22 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        if self.settings.enabled.contains(&CheckCode::F831) {
+        if self.settings.enabled[CheckCode::F831 as usize] {
             self.checks
                 .extend(pyflakes::checks::duplicate_arguments(arguments));
         }
-        if self.settings.enabled.contains(&CheckCode::B006) {
+        if self.settings.enabled[CheckCode::B006 as usize] {
             flake8_bugbear::plugins::mutable_argument_default(self, arguments)
         }
-        if self.settings.enabled.contains(&CheckCode::B008) {
+        if self.settings.enabled[CheckCode::B008 as usize] {
             flake8_bugbear::plugins::function_call_argument_default(self, arguments)
         }
 
         // flake8-boolean-trap
-        if self.settings.enabled.contains(&CheckCode::FBT001) {
+        if self.settings.enabled[CheckCode::FBT001 as usize] {
             flake8_boolean_trap::plugins::check_positional_boolean_in_def(self, arguments);
         }
-        if self.settings.enabled.contains(&CheckCode::FBT002) {
+        if self.settings.enabled[CheckCode::FBT002 as usize] {
             flake8_boolean_trap::plugins::check_boolean_default_value_in_function_definition(
                 self, arguments,
             );
@@ -2002,7 +2002,7 @@ where
             },
         );
 
-        if self.settings.enabled.contains(&CheckCode::E741) {
+        if self.settings.enabled[CheckCode::E741 as usize] {
             if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                 &arg.node.arg,
                 Range::from_located(arg),
@@ -2011,7 +2011,7 @@ where
             }
         }
 
-        if self.settings.enabled.contains(&CheckCode::N803) {
+        if self.settings.enabled[CheckCode::N803 as usize] {
             if let Some(check) =
                 pep8_naming::checks::invalid_argument_name(&arg.node.arg, Range::from_located(arg))
             {
@@ -2137,7 +2137,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        if self.settings.enabled.contains(&CheckCode::F402) {
+        if self.settings.enabled[CheckCode::F402 as usize] {
             let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if let Some(existing) = scope.values.get(&name) {
                 if matches!(binding.kind, BindingKind::LoopVar)
@@ -2206,7 +2206,7 @@ impl<'a> Checker<'a> {
             }
 
             if import_starred {
-                if self.settings.enabled.contains(&CheckCode::F405) {
+                if self.settings.enabled[CheckCode::F405 as usize] {
                     let mut from_list = vec![];
                     for scope_index in self.scope_stack.iter().rev() {
                         let scope = &self.scopes[*scope_index];
@@ -2229,7 +2229,7 @@ impl<'a> Checker<'a> {
                 return;
             }
 
-            if self.settings.enabled.contains(&CheckCode::F821) {
+            if self.settings.enabled[CheckCode::F821 as usize] {
                 // Allow __path__.
                 if self.path.ends_with("__init__.py") && id == "__path__" {
                     return;
@@ -2257,7 +2257,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        if self.settings.enabled.contains(&CheckCode::F823) {
+        if self.settings.enabled[CheckCode::F823 as usize] {
             let scopes: Vec<&Scope> = self
                 .scope_stack
                 .iter()
@@ -2268,7 +2268,7 @@ impl<'a> Checker<'a> {
             }
         }
 
-        if self.settings.enabled.contains(&CheckCode::N806) {
+        if self.settings.enabled[CheckCode::N806 as usize] {
             if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
                 // Ignore globals.
                 if !self
@@ -2283,13 +2283,13 @@ impl<'a> Checker<'a> {
             }
         }
 
-        if self.settings.enabled.contains(&CheckCode::N815) {
+        if self.settings.enabled[CheckCode::N815 as usize] {
             if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
                 pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id)
             }
         }
 
-        if self.settings.enabled.contains(&CheckCode::N816) {
+        if self.settings.enabled[CheckCode::N816 as usize] {
             if matches!(self.current_scope().kind, ScopeKind::Module) {
                 pep8_naming::plugins::mixed_case_variable_in_global_scope(self, expr, parent, id)
             }
@@ -2382,7 +2382,7 @@ impl<'a> Checker<'a> {
             let scope =
                 &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
             if scope.values.remove(&id.as_str()).is_none()
-                && self.settings.enabled.contains(&CheckCode::F821)
+                && self.settings.enabled[CheckCode::F821 as usize]
             {
                 self.add_check(Check::new(
                     CheckKind::UndefinedName(id.to_string()),
@@ -2396,7 +2396,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        if self.settings.enabled.contains(&CheckCode::B021) {
+        if self.settings.enabled[CheckCode::B021 as usize] {
             flake8_bugbear::plugins::f_string_docstring(self, python_ast);
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);
@@ -2435,7 +2435,7 @@ impl<'a> Checker<'a> {
                 allocator.push(expr);
                 stacks.push((scopes, parents));
             } else {
-                if self.settings.enabled.contains(&CheckCode::F722) {
+                if self.settings.enabled[CheckCode::F722 as usize] {
                     self.add_check(Check::new(
                         CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
                         range,
@@ -2494,7 +2494,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_assignments(&mut self) {
-        if self.settings.enabled.contains(&CheckCode::F841) {
+        if self.settings.enabled[CheckCode::F841 as usize] {
             while let Some(index) = self.deferred_assignments.pop() {
                 self.add_checks(
                     pyflakes::checks::unused_variables(
@@ -2508,9 +2508,9 @@ impl<'a> Checker<'a> {
     }
 
     fn check_dead_scopes(&mut self) {
-        if !self.settings.enabled.contains(&CheckCode::F401)
-            && !self.settings.enabled.contains(&CheckCode::F405)
-            && !self.settings.enabled.contains(&CheckCode::F822)
+        if !self.settings.enabled[CheckCode::F401 as usize]
+            && !self.settings.enabled[CheckCode::F405 as usize]
+            && !self.settings.enabled[CheckCode::F822 as usize]
         {
             return;
         }
@@ -2526,7 +2526,7 @@ impl<'a> Checker<'a> {
                     _ => None,
                 });
 
-            if self.settings.enabled.contains(&CheckCode::F822) {
+            if self.settings.enabled[CheckCode::F822 as usize] {
                 if !scope.import_starred && !self.path.ends_with("__init__.py") {
                     if let Some(all_binding) = all_binding {
                         if let Some(names) = &all_names {
@@ -2543,7 +2543,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.enabled.contains(&CheckCode::F405) {
+            if self.settings.enabled[CheckCode::F405 as usize] {
                 if scope.import_starred {
                     if let Some(all_binding) = all_binding {
                         if let Some(names) = &all_names {
@@ -2574,7 +2574,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.enabled.contains(&CheckCode::F401) {
+            if self.settings.enabled[CheckCode::F401 as usize] {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
                 let mut unused: BTreeMap<(ImportKind, usize, Option<usize>), Vec<&str>> =
@@ -2685,17 +2685,17 @@ impl<'a> Checker<'a> {
     fn check_definitions(&mut self) {
         while let Some((definition, visibility)) = self.definitions.pop() {
             // flake8-annotations
-            if self.settings.enabled.contains(&CheckCode::ANN001)
-                || self.settings.enabled.contains(&CheckCode::ANN002)
-                || self.settings.enabled.contains(&CheckCode::ANN003)
-                || self.settings.enabled.contains(&CheckCode::ANN101)
-                || self.settings.enabled.contains(&CheckCode::ANN102)
-                || self.settings.enabled.contains(&CheckCode::ANN201)
-                || self.settings.enabled.contains(&CheckCode::ANN202)
-                || self.settings.enabled.contains(&CheckCode::ANN204)
-                || self.settings.enabled.contains(&CheckCode::ANN205)
-                || self.settings.enabled.contains(&CheckCode::ANN206)
-                || self.settings.enabled.contains(&CheckCode::ANN401)
+            if self.settings.enabled[CheckCode::ANN001 as usize]
+                || self.settings.enabled[CheckCode::ANN002 as usize]
+                || self.settings.enabled[CheckCode::ANN003 as usize]
+                || self.settings.enabled[CheckCode::ANN101 as usize]
+                || self.settings.enabled[CheckCode::ANN102 as usize]
+                || self.settings.enabled[CheckCode::ANN201 as usize]
+                || self.settings.enabled[CheckCode::ANN202 as usize]
+                || self.settings.enabled[CheckCode::ANN204 as usize]
+                || self.settings.enabled[CheckCode::ANN205 as usize]
+                || self.settings.enabled[CheckCode::ANN206 as usize]
+                || self.settings.enabled[CheckCode::ANN401 as usize]
             {
                 flake8_annotations::plugins::definition(self, &definition, &visibility);
             }
@@ -2707,76 +2707,76 @@ impl<'a> Checker<'a> {
             if !pydocstyle::plugins::not_missing(self, &definition, &visibility) {
                 continue;
             }
-            if self.settings.enabled.contains(&CheckCode::D200) {
+            if self.settings.enabled[CheckCode::D200 as usize] {
                 pydocstyle::plugins::one_liner(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D201)
-                || self.settings.enabled.contains(&CheckCode::D202)
+            if self.settings.enabled[CheckCode::D201 as usize]
+                || self.settings.enabled[CheckCode::D202 as usize]
             {
                 pydocstyle::plugins::blank_before_after_function(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D203)
-                || self.settings.enabled.contains(&CheckCode::D204)
-                || self.settings.enabled.contains(&CheckCode::D211)
+            if self.settings.enabled[CheckCode::D203 as usize]
+                || self.settings.enabled[CheckCode::D204 as usize]
+                || self.settings.enabled[CheckCode::D211 as usize]
             {
                 pydocstyle::plugins::blank_before_after_class(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D205) {
+            if self.settings.enabled[CheckCode::D205 as usize] {
                 pydocstyle::plugins::blank_after_summary(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D206)
-                || self.settings.enabled.contains(&CheckCode::D207)
-                || self.settings.enabled.contains(&CheckCode::D208)
+            if self.settings.enabled[CheckCode::D206 as usize]
+                || self.settings.enabled[CheckCode::D207 as usize]
+                || self.settings.enabled[CheckCode::D208 as usize]
             {
                 pydocstyle::plugins::indent(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D209) {
+            if self.settings.enabled[CheckCode::D209 as usize] {
                 pydocstyle::plugins::newline_after_last_paragraph(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D210) {
+            if self.settings.enabled[CheckCode::D210 as usize] {
                 pydocstyle::plugins::no_surrounding_whitespace(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D212)
-                || self.settings.enabled.contains(&CheckCode::D213)
+            if self.settings.enabled[CheckCode::D212 as usize]
+                || self.settings.enabled[CheckCode::D213 as usize]
             {
                 pydocstyle::plugins::multi_line_summary_start(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D300) {
+            if self.settings.enabled[CheckCode::D300 as usize] {
                 pydocstyle::plugins::triple_quotes(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D400) {
+            if self.settings.enabled[CheckCode::D400 as usize] {
                 pydocstyle::plugins::ends_with_period(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D402) {
+            if self.settings.enabled[CheckCode::D402 as usize] {
                 pydocstyle::plugins::no_signature(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D403) {
+            if self.settings.enabled[CheckCode::D403 as usize] {
                 pydocstyle::plugins::capitalized(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D404) {
+            if self.settings.enabled[CheckCode::D404 as usize] {
                 pydocstyle::plugins::starts_with_this(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D415) {
+            if self.settings.enabled[CheckCode::D415 as usize] {
                 pydocstyle::plugins::ends_with_punctuation(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D418) {
+            if self.settings.enabled[CheckCode::D418 as usize] {
                 pydocstyle::plugins::if_needed(self, &definition);
             }
-            if self.settings.enabled.contains(&CheckCode::D212)
-                || self.settings.enabled.contains(&CheckCode::D214)
-                || self.settings.enabled.contains(&CheckCode::D215)
-                || self.settings.enabled.contains(&CheckCode::D405)
-                || self.settings.enabled.contains(&CheckCode::D406)
-                || self.settings.enabled.contains(&CheckCode::D407)
-                || self.settings.enabled.contains(&CheckCode::D408)
-                || self.settings.enabled.contains(&CheckCode::D409)
-                || self.settings.enabled.contains(&CheckCode::D410)
-                || self.settings.enabled.contains(&CheckCode::D411)
-                || self.settings.enabled.contains(&CheckCode::D412)
-                || self.settings.enabled.contains(&CheckCode::D413)
-                || self.settings.enabled.contains(&CheckCode::D414)
-                || self.settings.enabled.contains(&CheckCode::D416)
-                || self.settings.enabled.contains(&CheckCode::D417)
+            if self.settings.enabled[CheckCode::D212 as usize]
+                || self.settings.enabled[CheckCode::D214 as usize]
+                || self.settings.enabled[CheckCode::D215 as usize]
+                || self.settings.enabled[CheckCode::D405 as usize]
+                || self.settings.enabled[CheckCode::D406 as usize]
+                || self.settings.enabled[CheckCode::D407 as usize]
+                || self.settings.enabled[CheckCode::D408 as usize]
+                || self.settings.enabled[CheckCode::D409 as usize]
+                || self.settings.enabled[CheckCode::D410 as usize]
+                || self.settings.enabled[CheckCode::D411 as usize]
+                || self.settings.enabled[CheckCode::D412 as usize]
+                || self.settings.enabled[CheckCode::D413 as usize]
+                || self.settings.enabled[CheckCode::D414 as usize]
+                || self.settings.enabled[CheckCode::D416 as usize]
+                || self.settings.enabled[CheckCode::D417 as usize]
             {
                 pydocstyle::plugins::sections(self, &definition);
             }
@@ -2785,7 +2785,7 @@ impl<'a> Checker<'a> {
 
     fn check_builtin_shadowing(&mut self, name: &str, location: Range, is_attribute: bool) {
         if is_attribute && matches!(self.current_scope().kind, ScopeKind::Class(_)) {
-            if self.settings.enabled.contains(&CheckCode::A003) {
+            if self.settings.enabled[CheckCode::A003 as usize] {
                 if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
                     location,
@@ -2795,7 +2795,7 @@ impl<'a> Checker<'a> {
                 }
             }
         } else {
-            if self.settings.enabled.contains(&CheckCode::A001) {
+            if self.settings.enabled[CheckCode::A001 as usize] {
                 if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
                     location,
@@ -2808,7 +2808,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_arg_shadowing(&mut self, name: &str, location: Range) {
-        if self.settings.enabled.contains(&CheckCode::A002) {
+        if self.settings.enabled[CheckCode::A002 as usize] {
             if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                 name,
                 location,

@@ -1646,7 +1646,7 @@ pub fn ambiguous_unicode_character(
                         end_location,
                     },
                 );
-                if settings.enabled.contains(check.kind.code()) {
+                if settings.enabled[check.kind.code().clone() as usize] {
                     if autofix.patch() && settings.fixable.contains(check.kind.code()) {
                         check.amend(Fix::replacement(
                             representant.to_string(),
