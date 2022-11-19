@@ -1,7 +1,6 @@
 use crate::ast;
 use crate::error::{LexicalError, LexicalErrorType};
-use ahash::RandomState;
-use std::collections::HashSet;
+use fnv::FnvHashSet;
 
 pub struct ArgumentList {
     pub args: Vec<ast::Expr>,
@@ -54,7 +53,8 @@ pub fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, Lexi
     let mut args = vec![];
     let mut keywords = vec![];
 
-    let mut keyword_names = HashSet::with_capacity_and_hasher(func_args.len(), RandomState::new());
+    let mut keyword_names =
+        FnvHashSet::with_capacity_and_hasher(func_args.len(), Default::default());
     for (name, value) in func_args {
         match name {
             Some((start, end, name)) => {

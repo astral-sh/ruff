@@ -14,6 +14,19 @@ pub fn parse_strings(
     let initial_end = values[0].2;
     let initial_kind = (values[0].1 .1 == StringKind::U).then(|| "u".to_owned());
 
+    // Optimization: fast-track the common case of a single string.
+    if values.len() == 1 && matches!(&values[0].1 .1, StringKind::Normal | StringKind::U) {
+        let value = values.into_iter().last().unwrap().1 .0;
+        return Ok(Expr::new(
+            initial_start,
+            initial_end,
+            ExprKind::Constant {
+                value: Constant::Str(value),
+                kind: initial_kind,
+            },
+        ));
+    }
+
     // Determine whether the list of values contains any f-strings. (If not, we can return a
     // single Constant at the end, rather than a JoinedStr.)
     let mut has_fstring = false;
