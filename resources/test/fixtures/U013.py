@@ -1,4 +1,5 @@
 from typing import TypedDict, NotRequired, Literal
+import typing
 
 # dict literal
 MyType1 = TypedDict("MyType1", {"a": int, "b": str})
@@ -27,3 +28,6 @@ MyType9 = TypedDict("MyType9", {"in": int, "x-y": int})
 
 # using Literal type
 MyType10 = TypedDict("MyType10", {"key": Literal["value"]})
+
+# using namespace TypedDict
+MyType11 = typing.TypedDict("MyType11", {"key": int})

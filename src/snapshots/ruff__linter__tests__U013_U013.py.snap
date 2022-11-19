@@ -4,155 +4,172 @@ expression: checks
 ---
 - kind: ConvertTypedDictFunctionalToClass
   location:
-    row: 4
+    row: 5
     column: 0
   end_location:
-    row: 4
+    row: 5
     column: 52
   fix:
     patch:
       content: "class MyType1(TypedDict):\n    a: int\n    b: str"
       location:
-        row: 4
+        row: 5
         column: 0
       end_location:
-        row: 4
+        row: 5
         column: 52
     applied: false
 - kind: ConvertTypedDictFunctionalToClass
   location:
-    row: 7
+    row: 8
     column: 0
   end_location:
-    row: 7
+    row: 8
     column: 50
   fix:
     patch:
       content: "class MyType2(TypedDict):\n    a: int\n    b: str"
       location:
-        row: 7
+        row: 8
         column: 0
       end_location:
-        row: 7
+        row: 8
         column: 50
     applied: false
 - kind: ConvertTypedDictFunctionalToClass
   location:
-    row: 10
+    row: 11
     column: 0
   end_location:
-    row: 10
+    row: 11
     column: 44
   fix:
     patch:
       content: "class MyType3(TypedDict):\n    a: int\n    b: str"
       location:
-        row: 10
+        row: 11
         column: 0
       end_location:
-        row: 10
+        row: 11
         column: 44
     applied: false
 - kind: ConvertTypedDictFunctionalToClass
   location:
-    row: 13
+    row: 14
     column: 0
   end_location:
-    row: 13
+    row: 14
     column: 30
   fix:
     patch:
       content: "class MyType4(TypedDict):\n    pass"
       location:
-        row: 13
+        row: 14
         column: 0
       end_location:
-        row: 13
+        row: 14
         column: 30
     applied: false
 - kind: ConvertTypedDictFunctionalToClass
   location:
-    row: 16
+    row: 17
     column: 0
   end_location:
-    row: 16
+    row: 17
     column: 46
   fix:
     patch:
       content: "class MyType5(TypedDict):\n    a: 'hello'"
       location:
-        row: 16
+        row: 17
         column: 0
       end_location:
-        row: 16
+        row: 17
         column: 46
     applied: false
 - kind: ConvertTypedDictFunctionalToClass
   location:
-    row: 17
+    row: 18
     column: 0
   end_location:
-    row: 17
+    row: 18
     column: 41
   fix:
     patch:
       content: "class MyType6(TypedDict):\n    a: 'hello'"
       location:
-        row: 17
+        row: 18
         column: 0
       end_location:
-        row: 17
+        row: 18
         column: 41
     applied: false
 - kind: ConvertTypedDictFunctionalToClass
   location:
-    row: 20
+    row: 21
     column: 0
   end_location:
-    row: 20
+    row: 21
     column: 56
   fix:
     patch:
       content: "class MyType7(TypedDict):\n    a: NotRequired[dict]"
       location:
-        row: 20
+        row: 21
         column: 0
       end_location:
-        row: 20
+        row: 21
         column: 56
     applied: false
 - kind: ConvertTypedDictFunctionalToClass
   location:
-    row: 23
+    row: 24
     column: 0
   end_location:
-    row: 23
+    row: 24
     column: 65
   fix:
     patch:
       content: "class MyType8(TypedDict, total=False):\n    x: int\n    y: int"
       location:
-        row: 23
+        row: 24
         column: 0
       end_location:
-        row: 23
+        row: 24
         column: 65
     applied: false
 - kind: ConvertTypedDictFunctionalToClass
   location:
-    row: 29
+    row: 30
     column: 0
   end_location:
-    row: 29
+    row: 30
     column: 59
   fix:
     patch:
       content: "class MyType10(TypedDict):\n    key: Literal['value']"
       location:
-        row: 29
+        row: 30
         column: 0
       end_location:
-        row: 29
+        row: 30
         column: 59
+    applied: false
+- kind: ConvertTypedDictFunctionalToClass
+  location:
+    row: 33
+    column: 0
+  end_location:
+    row: 33
+    column: 53
+  fix:
+    patch:
+      content: "class MyType11(typing.TypedDict):\n    key: int"
+      location:
+        row: 33
+        column: 0
+      end_location:
+        row: 33
+        column: 53
     applied: false
 

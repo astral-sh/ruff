@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use log::error;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, KeywordData, Stmt, StmtKind};
 
+use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
@@ -10,11 +11,13 @@ use crate::code_gen::SourceGenerator;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 
-/// Return the class name, arguments, and keywords for a `TypedDict` assignment.
+/// Return the class name, arguments, keywords and base class for a `TypedDict`
+/// assignment.
 fn match_typed_dict_assign<'a>(
+    checker: &Checker,
     targets: &'a [Expr],
     value: &'a Expr,
-) -> Option<(&'a str, &'a [Expr], &'a [Keyword])> {
+) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a ExprKind)> {
     if let Some(target) = targets.get(0) {
         if let ExprKind::Name { id: class_name, .. } = &target.node {
             if let ExprKind::Call {
@@ -23,10 +26,14 @@ fn match_typed_dict_assign<'a>(
                 keywords,
             } = &value.node
             {
-                if let ExprKind::Name { id: func_name, .. } = &func.node {
-                    if func_name == "TypedDict" {
-                        return Some((class_name, args, keywords));
-                    }
+                if match_module_member(
+                    func,
+                    "typing",
+                    "TypedDict",
+                    &checker.from_imports,
+                    &checker.import_aliases,
+                ) {
+                    return Some((class_name, args, keywords, &func.node));
                 }
             }
         }
@@ -65,12 +72,13 @@ fn create_pass_stmt() -> Stmt {
     Stmt::new(Default::default(), Default::default(), StmtKind::Pass)
 }
 
-/// Generate a `StmtKind:ClassDef` statement bsaed on the provided body and
-/// keywords.
+/// Generate a `StmtKind:ClassDef` statement based on the provided body,
+/// keywords and base class.
 fn create_class_def_stmt(
     class_name: &str,
     body: Vec<Stmt>,
     total_keyword: Option<KeywordData>,
+    base_class: &ExprKind,
 ) -> Stmt {
     let keywords = match total_keyword {
         Some(keyword) => vec![Keyword::new(
@@ -88,10 +96,7 @@ fn create_class_def_stmt(
             bases: vec![Expr::new(
                 Default::default(),
                 Default::default(),
-                ExprKind::Name {
-                    id: "TypedDict".to_string(),
-                    ctx: ExprContext::Load,
-                },
+                base_class.clone(),
             )],
             keywords,
             body,
@@ -150,11 +155,11 @@ fn get_properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
 
 // The only way to have the `total` keyword is to use the args version, like:
 // (`TypedDict('name', {'a': int}, total=True)`)
-fn get_total_from_only_keyword(keywords: &[Keyword]) -> Option<KeywordData> {
+fn get_total_from_only_keyword(keywords: &[Keyword]) -> Option<&KeywordData> {
     match keywords.get(0) {
         Some(keyword) => match &keyword.node.arg {
             Some(arg) => match arg.as_str() {
-                "total" => Some(keyword.node.clone()),
+                "total" => Some(&keyword.node),
                 _ => None,
             },
             None => None,
@@ -171,7 +176,7 @@ fn get_properties_and_total(
     // dict and keywords. For example, the following is illegal:
     //   MyType = TypedDict('MyType', {'a': int, 'b': str}, a=int, b=str)
     if let Some(dict) = args.get(1) {
-        let total = get_total_from_only_keyword(keywords);
+        let total = get_total_from_only_keyword(keywords).cloned();
         match &dict.node {
             ExprKind::Dict { keys, values } => {
                 Ok((get_properties_from_dict_literal(keys, values)?, total))
@@ -188,15 +193,21 @@ fn get_properties_and_total(
     }
 }
 
-/// Generate a `Fix` to convert a `TypedDict` to a functional class.
-fn convert_to_functional_class(
+/// Generate a `Fix` to convert a `TypedDict` from functional to class.
+fn convert_to_class(
     stmt: &Stmt,
     class_name: &str,
     body: Vec<Stmt>,
     total_keyword: Option<KeywordData>,
+    base_class: &ExprKind,
 ) -> Result<Fix> {
     let mut generator = SourceGenerator::new();
-    generator.unparse_stmt(&create_class_def_stmt(class_name, body, total_keyword))?;
+    generator.unparse_stmt(&create_class_def_stmt(
+        class_name,
+        body,
+        total_keyword,
+        base_class,
+    ))?;
     let content = generator.generate()?;
     Ok(Fix::replacement(
         content,
@@ -212,7 +223,9 @@ pub fn convert_typed_dict_functional_to_class(
     targets: &[Expr],
     value: &Expr,
 ) {
-    if let Some((class_name, args, keywords)) = match_typed_dict_assign(targets, value) {
+    if let Some((class_name, args, keywords, base_class)) =
+        match_typed_dict_assign(checker, targets, value)
+    {
         match get_properties_and_total(args, keywords) {
             Err(err) => error!("Failed to parse TypedDict: {}", err),
             Ok((body, total_keyword)) => {
@@ -221,7 +234,7 @@ pub fn convert_typed_dict_functional_to_class(
                     Range::from_located(stmt),
                 );
                 if checker.patch(check.kind.code()) {
-                    match convert_to_functional_class(stmt, class_name, body, total_keyword) {
+                    match convert_to_class(stmt, class_name, body, total_keyword, base_class) {
                         Ok(fix) => check.amend(fix),
                         Err(err) => error!("Failed to convert TypedDict: {}", err),
                     };
