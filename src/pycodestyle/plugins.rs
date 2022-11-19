@@ -1,6 +1,7 @@
 use fnv::FnvHashMap;
 use itertools::izip;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Unaryop};
+use rustpython_ast::{Arguments, StmtKind};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Stmt, Unaryop};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -257,6 +258,67 @@ pub fn not_tests(
                     _ => {}
                 }
             }
+        }
+    }
+}
+
+fn function(name: &str, args: &Arguments, body: &Expr) -> Option<String> {
+    let body = Stmt::new(
+        Default::default(),
+        Default::default(),
+        StmtKind::Return {
+            value: Some(Box::new(body.clone())),
+        },
+    );
+    let func = Stmt::new(
+        Default::default(),
+        Default::default(),
+        StmtKind::FunctionDef {
+            name: name.to_string(),
+            args: Box::new(args.clone()),
+            body: vec![body],
+            decorator_list: vec![],
+            returns: None,
+            type_comment: None,
+        },
+    );
+    let mut generator = SourceGenerator::new();
+    if let Ok(()) = generator.unparse_stmt(&func) {
+        if let Ok(content) = generator.generate() {
+            return Some(content);
+        }
+    }
+    None
+}
+
+/// E731
+pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, stmt: &Stmt) {
+    if let ExprKind::Name { id, .. } = &target.node {
+        if let ExprKind::Lambda { args, body } = &value.node {
+            let mut check = Check::new(CheckKind::DoNotAssignLambda, Range::from_located(stmt));
+            if checker.patch(check.kind.code()) {
+                if let Some(content) = function(id, args, body) {
+                    // Indent the function body
+                    let content = content
+                        .lines()
+                        .enumerate()
+                        .map(|(idx, line)| {
+                            if idx == 0 {
+                                line.to_string()
+                            } else {
+                                format!("{}{}", " ".repeat(stmt.location.column()), line)
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    check.amend(Fix::replacement(
+                        content,
+                        stmt.location,
+                        stmt.end_location.unwrap(),
+                    ));
+                }
+            }
+            checker.add_check(check);
         }
     }
 }

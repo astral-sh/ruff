@@ -9,7 +9,16 @@ expression: checks
   end_location:
     row: 2
     column: 19
-  fix: ~
+  fix:
+    patch:
+      content: "def f(x):\n    return (2 * x)"
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 2
+        column: 19
+    applied: false
 - kind: DoNotAssignLambda
   location:
     row: 4
@@ -17,7 +26,16 @@ expression: checks
   end_location:
     row: 4
     column: 19
-  fix: ~
+  fix:
+    patch:
+      content: "def f(x):\n    return (2 * x)"
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 4
+        column: 19
+    applied: false
 - kind: DoNotAssignLambda
   location:
     row: 7
@@ -25,5 +43,14 @@ expression: checks
   end_location:
     row: 7
     column: 29
-  fix: ~
+  fix:
+    patch:
+      content: "def this(y, z):\n        return (2 * x)"
+      location:
+        row: 7
+        column: 4
+      end_location:
+        row: 7
+        column: 29
+    applied: false
 

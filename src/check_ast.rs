@@ -928,11 +928,7 @@ where
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
                     if let [target] = &targets[..] {
-                        if let Some(check) =
-                            pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
-                        {
-                            self.add_check(check);
-                        }
+                        pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt)
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::U001) {
@@ -957,11 +953,7 @@ where
             StmtKind::AnnAssign { target, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
                     if let Some(value) = value {
-                        if let Some(check) =
-                            pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
-                        {
-                            self.add_check(check);
-                        }
+                        pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
             }
