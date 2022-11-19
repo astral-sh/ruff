@@ -231,12 +231,8 @@ pub fn check_lines(
                                 ));
                             } else {
                                 check.amend(Fix::replacement(
-                                    format!(
-                                        "{}# noqa: {}",
-                                        " ".repeat(spaces),
-                                        valid_codes.join(", ")
-                                    ),
-                                    Location::new(row + 1, start - spaces),
+                                    format!("# noqa: {}", valid_codes.join(", ")),
+                                    Location::new(row + 1, start),
                                     Location::new(row + 1, lines[row].chars().count()),
                                 ));
                             }
