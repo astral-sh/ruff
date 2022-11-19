@@ -34,13 +34,33 @@ pub trait Arg<'a>: Located {
 pub trait Arguments<'a> {
     type Arg: Arg<'a>;
     type Expr: Expr<'a>;
-    fn posonlyargs(&self) -> &[Self::Arg];
-    fn args(&self) -> &[Self::Arg];
+    type PosonlyargsIter<'b>: Iterator<Item = &'b Self::Arg>
+    where
+        Self: 'b,
+        Self::Arg: 'b;
+    type ArgsIter<'b>: Iterator<Item = &'b Self::Arg>
+    where
+        Self: 'b,
+        Self::Arg: 'b;
+    type KwonlyargsIter<'b>: Iterator<Item = &'b Self::Arg>
+    where
+        Self: 'b,
+        Self::Arg: 'b;
+    type KwDefaultsIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self: 'b,
+        Self::Expr: 'b;
+    type DefaultsIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self: 'b,
+        Self::Expr: 'b;
+    fn posonlyargs(&self) -> Self::PosonlyargsIter<'_>;
+    fn args(&self) -> Self::ArgsIter<'_>;
     fn vararg(&self) -> Option<&Self::Arg>;
-    fn kwonlyargs(&self) -> &[Self::Arg];
-    fn kw_defaults(&self) -> &[Self::Expr];
+    fn kwonlyargs(&self) -> Self::KwonlyargsIter<'_>;
+    fn kw_defaults(&self) -> Self::KwDefaultsIter<'_>;
     fn kwarg(&self) -> Option<&Self::Arg>;
-    fn defaults(&self) -> &[Self::Expr];
+    fn defaults(&self) -> Self::DefaultsIter<'_>;
 }
 
 pub trait Keyword<'a> {
@@ -126,16 +146,24 @@ pub trait Constant<'a> {
 
 pub trait Comprehension<'a> {
     type Expr: Expr<'a>;
+    type IfsIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
     fn target(&self) -> &Self::Expr;
     fn iter(&self) -> &Self::Expr;
-    fn ifs(&self) -> &[Self::Expr];
+    fn ifs(&self) -> Self::IfsIter<'_>;
     fn is_async(&self) -> usize;
 }
 
 pub trait BoolOp<'a> {
     type Expr: Expr<'a>;
+    type ValuesIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
     fn op(&self) -> Boolop;
-    fn values(&self) -> &[Self::Expr];
+    fn values(&self) -> Self::ValuesIter<'_>;
 }
 
 pub trait NamedExpr<'a> {
@@ -173,42 +201,70 @@ pub trait IfExp<'a> {
 
 pub trait Dict<'a> {
     type Expr: Expr<'a>;
-    fn keys(&self) -> &[Self::Expr];
-    fn values(&self) -> &[Self::Expr];
+    type KeysIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    type ValuesIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    fn keys(&self) -> Self::KeysIter<'_>;
+    fn values(&self) -> Self::ValuesIter<'_>;
 }
 
 pub trait Set<'a> {
     type Expr: Expr<'a>;
-    fn elts(&self) -> &[Self::Expr];
+    type EltsIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    fn elts(&self) -> Self::EltsIter<'_>;
 }
 
 pub trait ListComp<'a> {
     type Expr: Expr<'a>;
     type Comprehension: Comprehension<'a>;
+    type GeneratorsIter<'b>: Iterator<Item = &'b Self::Comprehension>
+    where
+        Self::Comprehension: 'b,
+        Self: 'b;
     fn elt(&self) -> &Self::Expr;
-    fn generators(&self) -> &[Self::Comprehension];
+    fn generators(&self) -> Self::GeneratorsIter<'_>;
 }
 
 pub trait SetComp<'a> {
     type Expr: Expr<'a>;
     type Comprehension: Comprehension<'a>;
+    type GeneratorsIter<'b>: Iterator<Item = &'b Self::Comprehension>
+    where
+        Self::Comprehension: 'b,
+        Self: 'b;
     fn elt(&self) -> &Self::Expr;
-    fn generators(&self) -> &[Self::Comprehension];
+    fn generators(&self) -> Self::GeneratorsIter<'_>;
 }
 
 pub trait DictComp<'a> {
     type Expr: Expr<'a>;
     type Comprehension: Comprehension<'a>;
+    type GeneratorsIter<'b>: Iterator<Item = &'b Self::Comprehension>
+    where
+        Self::Comprehension: 'b,
+        Self: 'b;
     fn key(&self) -> &Self::Expr;
     fn value(&self) -> &Self::Expr;
-    fn generators(&self) -> &[Self::Comprehension];
+    fn generators(&self) -> Self::GeneratorsIter<'_>;
 }
 
 pub trait GeneratorExp<'a> {
     type Expr: Expr<'a>;
     type Comprehension: Comprehension<'a>;
+    type GeneratorsIter<'b>: Iterator<Item = &'b Self::Comprehension>
+    where
+        Self::Comprehension: 'b,
+        Self: 'b;
     fn elt(&self) -> &Self::Expr;
-    fn generators(&self) -> &[Self::Comprehension];
+    fn generators(&self) -> Self::GeneratorsIter<'_>;
 }
 
 pub trait Await<'a> {
@@ -228,16 +284,27 @@ pub trait YieldFrom<'a> {
 
 pub trait Compare<'a> {
     type Expr: Expr<'a>;
+    type CmpopIter<'b>: Iterator<Item = Cmpop> + 'b
+    where
+        Self: 'b;
     fn left(&self) -> &Self::Expr;
-    fn ops(&self) -> Vec<Cmpop>;
+    fn ops(&self) -> Self::CmpopIter<'_>;
 }
 
 pub trait Call<'a> {
     type Expr: Expr<'a>;
     type Keyword: Keyword<'a>;
+    type ArgsIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    type KeywordsIter<'b>: Iterator<Item = &'b Self::Keyword>
+    where
+        Self::Keyword: 'b,
+        Self: 'b;
     fn func(&self) -> &Self::Expr;
-    fn args(&self) -> &[Self::Expr];
-    fn keywords(&self) -> &[Self::Keyword];
+    fn args(&self) -> Self::ArgsIter<'_>;
+    fn keywords(&self) -> Self::KeywordsIter<'_>;
 }
 
 pub trait FormattedValue<'a> {
@@ -249,7 +316,11 @@ pub trait FormattedValue<'a> {
 
 pub trait JoinedStr<'a> {
     type Expr: Expr<'a>;
-    fn values(&self) -> &[Self::Expr];
+    type ValuesIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    fn values(&self) -> Self::ValuesIter<'_>;
 }
 
 pub trait ConstantExpr<'a> {
@@ -287,13 +358,21 @@ pub trait Name {
 
 pub trait List<'a> {
     type Expr: Expr<'a>;
-    fn elts(&self) -> &[Self::Expr];
+    type EltsIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    fn elts(&self) -> Self::EltsIter<'_>;
     fn ctx(&self) -> ExprContext;
 }
 
 pub trait Tuple<'a> {
     type Expr: Expr<'a>;
-    fn elts(&self) -> &[Self::Expr];
+    type EltsIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    fn elts(&self) -> Self::EltsIter<'_>;
     fn ctx(&self) -> ExprContext;
 }
 
@@ -430,9 +509,13 @@ pub trait ExceptHandler<'a>: Located {
     type Ident: Ident;
     type Expr: Expr<'a>;
     type Stmt: Stmt<'a>;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
     fn type_(&self) -> Option<&Self::Expr>;
     fn name(&self) -> Option<&Self::Ident>;
-    fn body(&self) -> &[Self::Stmt];
+    fn body(&self) -> Self::BodyIter<'_>;
 }
 
 pub trait MatchValue<'a> {
@@ -447,15 +530,27 @@ pub trait MatchSingleton<'a> {
 
 pub trait MatchSequence<'a> {
     type Pattern: Pattern<'a>;
-    fn patterns(&self) -> &[Self::Pattern];
+    type PatternsIter<'b>: Iterator<Item = &'b Self::Pattern>
+    where
+        Self::Pattern: 'b,
+        Self: 'b;
+    fn patterns(&self) -> Self::PatternsIter<'_>;
 }
 
 pub trait MatchMapping<'a> {
     type Ident: Ident;
     type Expr: Expr<'a>;
     type Pattern: Pattern<'a>;
-    fn keys(&self) -> &[Self::Expr];
-    fn patterns(&self) -> &[Self::Pattern];
+    type KeysIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    type PatternsIter<'b>: Iterator<Item = &'b Self::Pattern>
+    where
+        Self::Pattern: 'b,
+        Self: 'b;
+    fn keys(&self) -> Self::KeysIter<'_>;
+    fn patterns(&self) -> Self::PatternsIter<'_>;
     fn rest(&self) -> Option<&Self::Ident>;
 }
 
@@ -463,10 +558,22 @@ pub trait MatchClass<'a> {
     type Expr: Expr<'a>;
     type Pattern: Pattern<'a>;
     type Ident: Ident;
+    type PatternsIter<'b>: Iterator<Item = &'b Self::Pattern>
+    where
+        Self::Pattern: 'b,
+        Self: 'b;
+    type KwdAttrsIter<'b>: Iterator<Item = &'b Self::Ident>
+    where
+        Self::Ident: 'b,
+        Self: 'b;
+    type KwdPatternsIter<'b>: Iterator<Item = &'b Self::Pattern>
+    where
+        Self::Pattern: 'b,
+        Self: 'b;
     fn cls(&self) -> &Self::Expr;
-    fn patterns(&self) -> &[Self::Pattern];
-    fn kwd_attrs(&self) -> &[Self::Ident];
-    fn kwd_patterns(&self) -> &[Self::Pattern];
+    fn patterns(&self) -> Self::PatternsIter<'_>;
+    fn kwd_attrs(&self) -> Self::KwdAttrsIter<'_>;
+    fn kwd_patterns(&self) -> Self::KwdPatternsIter<'_>;
 }
 
 pub trait MatchStar {
@@ -483,7 +590,11 @@ pub trait MatchAs<'a> {
 
 pub trait MatchOr<'a> {
     type Pattern: Pattern<'a>;
-    fn patterns(&self) -> &[Self::Pattern];
+    type PatternsIter<'b>: Iterator<Item = &'b Self::Pattern>
+    where
+        Self::Pattern: 'b,
+        Self: 'b;
+    fn patterns(&self) -> Self::PatternsIter<'_>;
 }
 
 // Type complexity required due to need to support circular
@@ -549,9 +660,13 @@ pub trait MatchCase<'a> {
     type Expr: Expr<'a>;
     type Pattern: Pattern<'a>;
     type Stmt: Stmt<'a>;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
     fn pattern(&self) -> &Self::Pattern;
     fn guard(&self) -> Option<&Self::Expr>;
-    fn body(&self) -> &[Self::Stmt];
+    fn body(&self) -> Self::BodyIter<'_>;
 }
 
 pub trait FunctionDef<'a> {
@@ -559,10 +674,18 @@ pub trait FunctionDef<'a> {
     type Arguments: Arguments<'a>;
     type Expr: Expr<'a>;
     type Stmt: Stmt<'a>;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    type DecoratorListIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
     fn name(&self) -> &Self::Ident;
     fn args(&self) -> &Self::Arguments;
-    fn body(&self) -> &[Self::Stmt];
-    fn decorator_list(&self) -> &[Self::Expr];
+    fn body(&self) -> Self::BodyIter<'_>;
+    fn decorator_list(&self) -> Self::DecoratorListIter<'_>;
     fn returns(&self) -> Option<&Self::Expr>;
     fn type_comment(&self) -> Option<&str>;
 }
@@ -572,10 +695,18 @@ pub trait AsyncFunctionDef<'a> {
     type Arguments: Arguments<'a>;
     type Stmt: Stmt<'a>;
     type Expr: Expr<'a>;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    type DecoratorListIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
     fn name(&self) -> &Self::Ident;
     fn args(&self) -> &Self::Arguments;
-    fn body(&self) -> &[Self::Stmt];
-    fn decorator_list(&self) -> &[Self::Expr];
+    fn body(&self) -> Self::BodyIter<'_>;
+    fn decorator_list(&self) -> Self::DecoratorListIter<'_>;
     fn returns(&self) -> Option<&Self::Expr>;
     fn type_comment(&self) -> Option<&str>;
 }
@@ -585,11 +716,27 @@ pub trait ClassDef<'a> {
     type Stmt: Stmt<'a>;
     type Expr: Expr<'a>;
     type Keyword: Keyword<'a>;
+    type BasesIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    type KeywordsIter<'b>: Iterator<Item = &'b Self::Keyword>
+    where
+        Self::Keyword: 'b,
+        Self: 'b;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    type DecoratorListIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
     fn name(&self) -> &Self::Ident;
-    fn bases(&self) -> &[Self::Expr];
-    fn keywords(&self) -> &[Self::Keyword];
-    fn body(&self) -> &[Self::Stmt];
-    fn decorator_list(&self) -> &[Self::Expr];
+    fn bases(&self) -> Self::BasesIter<'_>;
+    fn keywords(&self) -> Self::KeywordsIter<'_>;
+    fn body(&self) -> Self::BodyIter<'_>;
+    fn decorator_list(&self) -> Self::DecoratorListIter<'_>;
 }
 
 pub trait Return<'a> {
@@ -599,12 +746,20 @@ pub trait Return<'a> {
 
 pub trait Delete<'a> {
     type Expr: Expr<'a>;
-    fn targets(&self) -> &[Self::Expr];
+    type TargetsIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    fn targets(&self) -> Self::TargetsIter<'_>;
 }
 
 pub trait Assign<'a> {
     type Expr: Expr<'a>;
-    fn targets(&self) -> &[Self::Expr];
+    type TargetsIter<'b>: Iterator<Item = &'b Self::Expr>
+    where
+        Self::Expr: 'b,
+        Self: 'b;
+    fn targets(&self) -> Self::TargetsIter<'_>;
     fn value(&self) -> &Self::Expr;
     fn type_comment(&self) -> Option<&str>;
 }
@@ -627,60 +782,112 @@ pub trait AnnAssign<'a> {
 pub trait For<'a> {
     type Expr: Expr<'a>;
     type Stmt: Stmt<'a>;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    type OrelseIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
     fn target(&self) -> &Self::Expr;
     fn iter(&self) -> &Self::Expr;
-    fn body(&self) -> &[Self::Stmt];
-    fn orelse(&self) -> &[Self::Stmt];
+    fn body(&self) -> Self::BodyIter<'_>;
+    fn orelse(&self) -> Self::OrelseIter<'_>;
     fn type_comment(&self) -> Option<&str>;
 }
 
 pub trait AsyncFor<'a> {
     type Expr: Expr<'a>;
     type Stmt: Stmt<'a>;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    type OrelseIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
     fn target(&self) -> &Self::Expr;
     fn iter(&self) -> &Self::Expr;
-    fn body(&self) -> &[Self::Stmt];
-    fn orelse(&self) -> &[Self::Stmt];
+    fn body(&self) -> Self::BodyIter<'_>;
+    fn orelse(&self) -> Self::OrelseIter<'_>;
     fn type_comment(&self) -> Option<&str>;
 }
 
 pub trait While<'a> {
     type Expr: Expr<'a>;
     type Stmt: Stmt<'a>;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    type OrelseIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
     fn test(&self) -> &Self::Expr;
-    fn body(&self) -> &[Self::Stmt];
-    fn orelse(&self) -> &[Self::Stmt];
+    fn body(&self) -> Self::BodyIter<'_>;
+    fn orelse(&self) -> Self::OrelseIter<'_>;
 }
 
 pub trait If<'a> {
     type Expr: Expr<'a>;
     type Stmt: Stmt<'a>;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    type OrelseIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
     fn test(&self) -> &Self::Expr;
-    fn body(&self) -> &[Self::Stmt];
-    fn orelse(&self) -> &[Self::Stmt];
+    fn body(&self) -> Self::BodyIter<'_>;
+    fn orelse(&self) -> Self::OrelseIter<'_>;
 }
 
 pub trait With<'a> {
     type Withitem: Withitem<'a>;
     type Stmt: Stmt<'a>;
-    fn items(&self) -> &[Self::Withitem];
-    fn body(&self) -> &[Self::Stmt];
+    type ItemsIter<'b>: Iterator<Item = &'b Self::Withitem>
+    where
+        Self::Withitem: 'b,
+        Self: 'b;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    fn items(&self) -> Self::ItemsIter<'_>;
+    fn body(&self) -> Self::BodyIter<'_>;
     fn type_comment(&self) -> Option<&str>;
 }
 
 pub trait AsyncWith<'a> {
     type Withitem: Withitem<'a>;
     type Stmt: Stmt<'a>;
-    fn items(&self) -> &[Self::Withitem];
-    fn body(&self) -> &[Self::Stmt];
+    type ItemsIter<'b>: Iterator<Item = &'b Self::Withitem>
+    where
+        Self::Withitem: 'b,
+        Self: 'b;
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    fn items(&self) -> Self::ItemsIter<'_>;
+    fn body(&self) -> Self::BodyIter<'_>;
     fn type_comment(&self) -> Option<&str>;
 }
 
 pub trait Match<'a> {
     type Expr: Expr<'a>;
     type MatchCase: MatchCase<'a>;
+    type CasesIter<'b>: Iterator<Item = &'b Self::MatchCase>
+    where
+        Self::MatchCase: 'b,
+        Self: 'b;
     fn subject(&self) -> &Self::Expr;
-    fn cases(&self) -> &[Self::MatchCase];
+    fn cases(&self) -> Self::CasesIter<'_>;
 }
 
 pub trait Raise<'a> {
@@ -692,10 +899,26 @@ pub trait Raise<'a> {
 pub trait Try<'a> {
     type Stmt: Stmt<'a>;
     type ExceptHandler: ExceptHandler<'a>;
-    fn body(&self) -> &[Self::Stmt];
-    fn handlers(&self) -> &[Self::ExceptHandler];
-    fn orelse(&self) -> &[Self::Stmt];
-    fn finalbody(&self) -> &[Self::Stmt];
+    type BodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    type HandlersIter<'b>: Iterator<Item = &'b Self::ExceptHandler>
+    where
+        Self::ExceptHandler: 'b,
+        Self: 'b;
+    type OrelseIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    type FinalbodyIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    fn body(&self) -> Self::BodyIter<'_>;
+    fn handlers(&self) -> Self::HandlersIter<'_>;
+    fn orelse(&self) -> Self::OrelseIter<'_>;
+    fn finalbody(&self) -> Self::FinalbodyIter<'_>;
 }
 
 pub trait Assert<'a> {
@@ -706,25 +929,41 @@ pub trait Assert<'a> {
 
 pub trait Import {
     type Alias: Alias;
-    fn names(&self) -> &[Self::Alias];
+    type NamesIter<'b>: Iterator<Item = &'b Self::Alias>
+    where
+        Self::Alias: 'b,
+        Self: 'b;
+    fn names(&self) -> Self::NamesIter<'_>;
 }
 
 pub trait ImportFrom {
     type Alias: Alias<Ident = Self::Ident>;
     type Ident: Ident;
+    type NamesIter<'b>: Iterator<Item = &'b Self::Alias>
+    where
+        Self::Alias: 'b,
+        Self: 'b;
     fn module(&self) -> Option<&Self::Ident>;
-    fn names(&self) -> &[Self::Alias];
+    fn names(&self) -> Self::NamesIter<'_>;
     fn level(&self) -> Option<usize>;
 }
 
 pub trait Global {
     type Ident: Ident;
-    fn names(&self) -> &[Self::Ident];
+    type NamesIter<'b>: Iterator<Item = &'b Self::Ident>
+    where
+        Self::Ident: 'b,
+        Self: 'b;
+    fn names(&self) -> Self::NamesIter<'_>;
 }
 
 pub trait Nonlocal {
     type Ident: Ident;
-    fn names(&self) -> &[Self::Ident];
+    type NamesIter<'b>: Iterator<Item = &'b Self::Ident>
+    where
+        Self::Ident: 'b,
+        Self: 'b;
+    fn names(&self) -> Self::NamesIter<'_>;
 }
 
 pub enum StmtKind<
@@ -997,12 +1236,19 @@ pub trait Ast<'a> {
         Nonlocal = Self::Nonlocal,
         Expr = Self::Expr,
     >;
-    fn stmts(&self) -> &[Self::Stmt];
+    type StmtsIter<'b>: Iterator<Item = &'b Self::Stmt>
+    where
+        Self::Stmt: 'b,
+        Self: 'b;
+    fn stmts(&self) -> Self::StmtsIter<'_>;
 }
 
 // RustPython ast impls
 // TODO(Seamooo) make below a compilation feature
 mod rs_python_impls {
+    use std::iter::Map;
+    use std::slice::Iter;
+
     use num_bigint::BigInt as RspyBigInt;
     use rustpython_parser::ast as rspy_ast;
 
@@ -1080,16 +1326,27 @@ mod rs_python_impls {
     }
 
     impl<'a, U> Arguments<'a> for rspy_ast::Arguments<U> {
+        type ArgsIter<'b> = Iter<'b, Self::Arg>
+        where U: 'b;
+        type DefaultsIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+        type KwDefaultsIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+        type KwonlyargsIter<'b> = Iter<'b, Self::Arg>
+        where U: 'b;
+        type PosonlyargsIter<'b> = Iter<'b, Self::Arg>
+        where U: 'b;
+
         rspy_types!(U, Arg, Expr);
 
         #[inline]
-        fn posonlyargs(&self) -> &[Self::Arg] {
-            &self.posonlyargs
+        fn posonlyargs(&self) -> Self::PosonlyargsIter<'_> {
+            self.posonlyargs.iter()
         }
 
         #[inline]
-        fn args(&self) -> &[Self::Arg] {
-            &self.args
+        fn args(&self) -> Self::ArgsIter<'_> {
+            self.args.iter()
         }
 
         #[inline]
@@ -1098,13 +1355,13 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn kwonlyargs(&self) -> &[Self::Arg] {
-            &self.kwonlyargs
+        fn kwonlyargs(&self) -> Self::KwonlyargsIter<'_> {
+            self.kwonlyargs.iter()
         }
 
         #[inline]
-        fn kw_defaults(&self) -> &[Self::Expr] {
-            &self.kw_defaults
+        fn kw_defaults(&self) -> Self::KwDefaultsIter<'_> {
+            self.kw_defaults.iter()
         }
 
         #[inline]
@@ -1113,8 +1370,8 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn defaults(&self) -> &[Self::Expr] {
-            &self.defaults
+        fn defaults(&self) -> Self::DefaultsIter<'_> {
+            self.defaults.iter()
         }
     }
 
@@ -1156,6 +1413,10 @@ mod rs_python_impls {
     }
 
     impl<'a, U> Comprehension<'a> for rspy_ast::Comprehension<U> {
+        type IfsIter<'b> = Iter<'b, Self::Expr>
+        where
+            U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
@@ -1169,8 +1430,8 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn ifs(&self) -> &[Self::Expr] {
-            &self.ifs
+        fn ifs(&self) -> Self::IfsIter<'_> {
+            self.ifs.iter()
         }
 
         #[inline]
@@ -1189,6 +1450,9 @@ mod rs_python_impls {
     }
 
     impl<'a, U> BoolOp<'a> for rspy_ast::ExprKind<U> {
+        type ValuesIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
@@ -1200,9 +1464,9 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn values(&self) -> &[Self::Expr] {
+        fn values(&self) -> Self::ValuesIter<'_> {
             match self {
-                Self::BoolOp { values, .. } => values,
+                Self::BoolOp { values, .. } => values.iter(),
                 _ => unreachable!(),
             }
         }
@@ -1353,36 +1617,47 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Dict<'a> for rspy_ast::ExprKind<U> {
+        type KeysIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+        type ValuesIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
-        fn keys(&self) -> &[Self::Expr] {
+        fn keys(&self) -> Self::KeysIter<'_> {
             match self {
-                Self::Dict { keys, .. } => keys,
+                Self::Dict { keys, .. } => keys.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn values(&self) -> &[Self::Expr] {
+        fn values(&self) -> Self::ValuesIter<'_> {
             match self {
-                Self::Dict { values, .. } => values,
+                Self::Dict { values, .. } => values.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> Set<'a> for rspy_ast::ExprKind<U> {
+        type EltsIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
-        fn elts(&self) -> &[Self::Expr] {
+        fn elts(&self) -> Self::EltsIter<'_> {
             match self {
-                Self::Set { elts } => elts,
+                Self::Set { elts } => elts.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> ListComp<'a> for rspy_ast::ExprKind<U> {
+        type GeneratorsIter<'b> = Iter<'b, Self::Comprehension>
+        where U: 'b;
+
         rspy_types!(U, Expr, Comprehension);
 
         #[inline]
@@ -1394,14 +1669,17 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn generators(&self) -> &[Self::Comprehension] {
+        fn generators(&self) -> Self::GeneratorsIter<'_> {
             match self {
-                Self::ListComp { generators, .. } => generators,
+                Self::ListComp { generators, .. } => generators.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> SetComp<'a> for rspy_ast::ExprKind<U> {
+        type GeneratorsIter<'b> = Iter<'b, Self::Comprehension>
+        where U: 'b;
+
         rspy_types!(U, Expr, Comprehension);
 
         #[inline]
@@ -1413,14 +1691,17 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn generators(&self) -> &[Self::Comprehension] {
+        fn generators(&self) -> Self::GeneratorsIter<'_> {
             match self {
-                Self::SetComp { generators, .. } => generators,
+                Self::SetComp { generators, .. } => generators.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> DictComp<'a> for rspy_ast::ExprKind<U> {
+        type GeneratorsIter<'b> = Iter<'b, Self::Comprehension>
+        where U: 'b;
+
         rspy_types!(U, Expr, Comprehension);
 
         #[inline]
@@ -1440,14 +1721,17 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn generators(&self) -> &[Self::Comprehension] {
+        fn generators(&self) -> Self::GeneratorsIter<'_> {
             match self {
-                Self::DictComp { generators, .. } => generators,
+                Self::DictComp { generators, .. } => generators.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> GeneratorExp<'a> for rspy_ast::ExprKind<U> {
+        type GeneratorsIter<'b> = Iter<'b, Self::Comprehension>
+        where U: 'b;
+
         rspy_types!(U, Expr, Comprehension);
 
         #[inline]
@@ -1459,9 +1743,9 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn generators(&self) -> &[Self::Comprehension] {
+        fn generators(&self) -> Self::GeneratorsIter<'_> {
             match self {
-                Self::GeneratorExp { generators, .. } => generators,
+                Self::GeneratorExp { generators, .. } => generators.iter(),
                 _ => unreachable!(),
             }
         }
@@ -1499,8 +1783,8 @@ mod rs_python_impls {
             }
         }
     }
-    impl From<rspy_ast::Cmpop> for Cmpop {
-        fn from(val: rspy_ast::Cmpop) -> Self {
+    impl<'a> From<&'a rspy_ast::Cmpop> for Cmpop {
+        fn from(val: &'a rspy_ast::Cmpop) -> Self {
             match val {
                 rspy_ast::Cmpop::Eq => Self::Eq,
                 rspy_ast::Cmpop::NotEq => Self::NotEq,
@@ -1516,6 +1800,10 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Compare<'a> for rspy_ast::ExprKind<U> {
+        type CmpopIter<'b> =
+            Map<Iter<'b, rspy_ast::Cmpop>, fn(&'b rspy_ast::Cmpop) -> Cmpop>
+        where U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
@@ -1527,14 +1815,19 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn ops(&self) -> Vec<Cmpop> {
+        fn ops(&self) -> Self::CmpopIter<'_> {
             match self {
-                Self::Compare { ops, .. } => ops.iter().cloned().map(Cmpop::from).collect(),
+                Self::Compare { ops, .. } => ops.iter().map(Cmpop::from),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> Call<'a> for rspy_ast::ExprKind<U> {
+        type ArgsIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+        type KeywordsIter<'b> = Iter<'b, Self::Keyword>
+        where U: 'b;
+
         rspy_types!(U, Expr, Keyword);
 
         #[inline]
@@ -1546,17 +1839,17 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn args(&self) -> &[Self::Expr] {
+        fn args(&self) -> Self::ArgsIter<'_> {
             match self {
-                Self::Call { args, .. } => args,
+                Self::Call { args, .. } => args.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn keywords(&self) -> &[Self::Keyword] {
+        fn keywords(&self) -> Self::KeywordsIter<'_> {
             match self {
-                Self::Call { keywords, .. } => keywords,
+                Self::Call { keywords, .. } => keywords.iter(),
                 _ => unreachable!(),
             }
         }
@@ -1589,12 +1882,15 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> JoinedStr<'a> for rspy_ast::ExprKind<U> {
+        type ValuesIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
-        fn values(&self) -> &[Self::Expr] {
+        fn values(&self) -> Self::ValuesIter<'_> {
             match self {
-                Self::JoinedStr { values } => values,
+                Self::JoinedStr { values } => values.iter(),
                 _ => unreachable!(),
             }
         }
@@ -1722,12 +2018,15 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> List<'a> for rspy_ast::ExprKind<U> {
+        type EltsIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
-        fn elts(&self) -> &[Self::Expr] {
+        fn elts(&self) -> Self::EltsIter<'_> {
             match self {
-                Self::List { elts, .. } => elts,
+                Self::List { elts, .. } => elts.iter(),
                 _ => unreachable!(),
             }
         }
@@ -1741,12 +2040,15 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Tuple<'a> for rspy_ast::ExprKind<U> {
+        type EltsIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
-        fn elts(&self) -> &[Self::Expr] {
+        fn elts(&self) -> Self::EltsIter<'_> {
             match self {
-                Self::Tuple { elts, .. } => elts,
+                Self::Tuple { elts, .. } => elts.iter(),
                 _ => unreachable!(),
             }
         }
@@ -1881,6 +2183,8 @@ mod rs_python_impls {
     }
 
     impl<'a, U> ExceptHandler<'a> for rspy_ast::Excepthandler<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
         type Ident = String;
 
         rspy_types!(U, Expr, Stmt);
@@ -1900,9 +2204,9 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match &self.node {
-                rspy_ast::ExcepthandlerKind::ExceptHandler { body, .. } => body,
+                rspy_ast::ExcepthandlerKind::ExceptHandler { body, .. } => body.iter(),
             }
         }
     }
@@ -1929,33 +2233,40 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> MatchSequence<'a> for rspy_ast::PatternKind<U> {
+        type PatternsIter<'b> = Iter<'b, Self::Pattern>
+        where U: 'b;
+
         rspy_types!(U, Pattern);
 
         #[inline]
-        fn patterns(&self) -> &[Self::Pattern] {
+        fn patterns(&self) -> Self::PatternsIter<'_> {
             match self {
-                Self::MatchSequence { patterns } => patterns,
+                Self::MatchSequence { patterns } => patterns.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> MatchMapping<'a> for rspy_ast::PatternKind<U> {
         type Ident = String;
+        type KeysIter<'b> = Iter<'b, Self::Expr>
+        where U: 'b;
+        type PatternsIter<'b> = Iter<'b, Self::Pattern>
+        where U: 'b;
 
         rspy_types!(U, Expr, Pattern);
 
         #[inline]
-        fn keys(&self) -> &[Self::Expr] {
+        fn keys(&self) -> Self::KeysIter<'_> {
             match self {
-                Self::MatchMapping { keys, .. } => keys,
+                Self::MatchMapping { keys, .. } => keys.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn patterns(&self) -> &[Self::Pattern] {
+        fn patterns(&self) -> Self::PatternsIter<'_> {
             match self {
-                Self::MatchMapping { patterns, .. } => patterns,
+                Self::MatchMapping { patterns, .. } => patterns.iter(),
                 _ => unreachable!(),
             }
         }
@@ -1970,6 +2281,12 @@ mod rs_python_impls {
     }
     impl<'a, U> MatchClass<'a> for rspy_ast::PatternKind<U> {
         type Ident = String;
+        type KwdAttrsIter<'b> = Iter<'b, Self::Ident>
+        where U: 'b;
+        type KwdPatternsIter<'b> = Iter<'b, Self::Pattern>
+        where U: 'b;
+        type PatternsIter<'b> = Iter<'b, Self::Pattern>
+        where U: 'b;
 
         rspy_types!(U, Expr, Pattern);
 
@@ -1982,25 +2299,25 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn patterns(&self) -> &[Self::Pattern] {
+        fn patterns(&self) -> Self::PatternsIter<'_> {
             match self {
-                Self::MatchClass { patterns, .. } => patterns,
+                Self::MatchClass { patterns, .. } => patterns.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn kwd_attrs(&self) -> &[Self::Ident] {
+        fn kwd_attrs(&self) -> Self::KwdAttrsIter<'_> {
             match self {
-                Self::MatchClass { kwd_attrs, .. } => kwd_attrs,
+                Self::MatchClass { kwd_attrs, .. } => kwd_attrs.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn kwd_patterns(&self) -> &[Self::Pattern] {
+        fn kwd_patterns(&self) -> Self::KwdPatternsIter<'_> {
             match self {
-                Self::MatchClass { kwd_patterns, .. } => kwd_patterns,
+                Self::MatchClass { kwd_patterns, .. } => kwd_patterns.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2038,12 +2355,15 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> MatchOr<'a> for rspy_ast::PatternKind<U> {
+        type PatternsIter<'b> = Iter<'b, Self::Pattern>
+        where U: 'b;
+
         rspy_types!(U, Pattern);
 
         #[inline]
-        fn patterns(&self) -> &[Self::Pattern] {
+        fn patterns(&self) -> Self::PatternsIter<'_> {
             match self {
-                Self::MatchOr { patterns } => patterns,
+                Self::MatchOr { patterns } => patterns.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2102,6 +2422,9 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> MatchCase<'a> for rspy_ast::MatchCase<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+
         rspy_types!(U, Pattern, Expr, Stmt);
 
         #[inline]
@@ -2115,11 +2438,15 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
-            &self.body
+        fn body(&self) -> Self::BodyIter<'_> {
+            self.body.iter()
         }
     }
     impl<'a, U> FunctionDef<'a> for rspy_ast::StmtKind<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type DecoratorListIter<'b> = Iter<'b, <Self as FunctionDef<'a>>::Expr>
+        where U: 'b;
         type Ident = String;
 
         rspy_types!(U, Arguments, Expr, Stmt);
@@ -2141,17 +2468,17 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::FunctionDef { body, .. } => body,
+                Self::FunctionDef { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn decorator_list(&self) -> &[<Self as FunctionDef>::Expr] {
+        fn decorator_list(&self) -> Self::DecoratorListIter<'_> {
             match self {
-                Self::FunctionDef { decorator_list, .. } => decorator_list,
+                Self::FunctionDef { decorator_list, .. } => decorator_list.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2173,6 +2500,10 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> AsyncFunctionDef<'a> for rspy_ast::StmtKind<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type DecoratorListIter<'b> = Iter<'b, <Self as AsyncFunctionDef<'a>>::Expr>
+        where U: 'b;
         type Ident = String;
 
         rspy_types!(U, Arguments, Expr, Stmt);
@@ -2194,17 +2525,17 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::AsyncFunctionDef { body, .. } => body,
+                Self::AsyncFunctionDef { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn decorator_list(&self) -> &[<Self as AsyncFunctionDef>::Expr] {
+        fn decorator_list(&self) -> Self::DecoratorListIter<'_> {
             match self {
-                Self::AsyncFunctionDef { decorator_list, .. } => decorator_list,
+                Self::AsyncFunctionDef { decorator_list, .. } => decorator_list.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2226,7 +2557,15 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> ClassDef<'a> for rspy_ast::StmtKind<U> {
+        type BasesIter<'b> = Iter<'b, <Self as ClassDef<'a>>::Expr>
+        where U: 'b;
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type DecoratorListIter<'b> = Iter<'b, <Self as ClassDef<'a>>::Expr>
+        where U: 'b;
         type Ident = String;
+        type KeywordsIter<'b> = Iter<'b, Self::Keyword>
+        where U: 'b;
 
         rspy_types!(U, Keyword, Expr, Stmt);
 
@@ -2239,33 +2578,33 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn bases(&self) -> &[<Self as ClassDef>::Expr] {
+        fn bases(&self) -> Self::BasesIter<'_> {
             match self {
-                Self::ClassDef { bases, .. } => bases,
+                Self::ClassDef { bases, .. } => bases.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn keywords(&self) -> &[Self::Keyword] {
+        fn keywords(&self) -> Self::KeywordsIter<'_> {
             match self {
-                Self::ClassDef { keywords, .. } => keywords,
+                Self::ClassDef { keywords, .. } => keywords.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::ClassDef { body, .. } => body,
+                Self::ClassDef { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn decorator_list(&self) -> &[<Self as ClassDef>::Expr] {
+        fn decorator_list(&self) -> Self::DecoratorListIter<'_> {
             match self {
-                Self::ClassDef { decorator_list, .. } => decorator_list,
+                Self::ClassDef { decorator_list, .. } => decorator_list.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2282,23 +2621,29 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Delete<'a> for rspy_ast::StmtKind<U> {
+        type TargetsIter<'b> = Iter<'b, <Self as Delete<'a>>::Expr>
+        where U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
-        fn targets(&self) -> &[<Self as Delete>::Expr] {
+        fn targets(&self) -> Self::TargetsIter<'_> {
             match self {
-                Self::Delete { targets } => targets,
+                Self::Delete { targets } => targets.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> Assign<'a> for rspy_ast::StmtKind<U> {
+        type TargetsIter<'b> = Iter<'b, <Self as Assign<'a>>::Expr>
+        where U: 'b;
+
         rspy_types!(U, Expr);
 
         #[inline]
-        fn targets(&self) -> &[<Self as Assign>::Expr] {
+        fn targets(&self) -> Self::TargetsIter<'_> {
             match self {
-                Self::Assign { targets, .. } => targets,
+                Self::Assign { targets, .. } => targets.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2382,6 +2727,11 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> For<'a> for rspy_ast::StmtKind<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type OrelseIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+
         rspy_types!(U, Expr, Stmt);
 
         #[inline]
@@ -2401,17 +2751,17 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::For { body, .. } => body,
+                Self::For { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn orelse(&self) -> &[Self::Stmt] {
+        fn orelse(&self) -> Self::OrelseIter<'_> {
             match self {
-                Self::For { orelse, .. } => orelse,
+                Self::For { orelse, .. } => orelse.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2425,6 +2775,11 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> AsyncFor<'a> for rspy_ast::StmtKind<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type OrelseIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+
         rspy_types!(U, Expr, Stmt);
 
         #[inline]
@@ -2444,17 +2799,17 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::AsyncFor { body, .. } => body,
+                Self::AsyncFor { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn orelse(&self) -> &[Self::Stmt] {
+        fn orelse(&self) -> Self::OrelseIter<'_> {
             match self {
-                Self::AsyncFor { orelse, .. } => orelse,
+                Self::AsyncFor { orelse, .. } => orelse.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2468,6 +2823,11 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> While<'a> for rspy_ast::StmtKind<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type OrelseIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+
         rspy_types!(U, Stmt, Expr);
 
         #[inline]
@@ -2479,22 +2839,27 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::While { body, .. } => body,
+                Self::While { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn orelse(&self) -> &[Self::Stmt] {
+        fn orelse(&self) -> Self::OrelseIter<'_> {
             match self {
-                Self::While { orelse, .. } => orelse,
+                Self::While { orelse, .. } => orelse.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> If<'a> for rspy_ast::StmtKind<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type OrelseIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+
         rspy_types!(U, Stmt, Expr);
 
         #[inline]
@@ -2506,36 +2871,41 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::If { body, .. } => body,
+                Self::If { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn orelse(&self) -> &[Self::Stmt] {
+        fn orelse(&self) -> Self::OrelseIter<'_> {
             match self {
-                Self::If { orelse, .. } => orelse,
+                Self::If { orelse, .. } => orelse.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<'a, U> With<'a> for rspy_ast::StmtKind<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type ItemsIter<'b> = Iter<'b, Self::Withitem>
+        where U: 'b;
+
         rspy_types!(U, Withitem, Stmt);
 
         #[inline]
-        fn items(&self) -> &[Self::Withitem] {
+        fn items(&self) -> Self::ItemsIter<'_> {
             match self {
-                Self::With { items, .. } => items,
+                Self::With { items, .. } => items.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::With { body, .. } => body,
+                Self::With { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2549,20 +2919,25 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> AsyncWith<'a> for rspy_ast::StmtKind<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type ItemsIter<'b> = Iter<'b, Self::Withitem>
+        where U: 'b;
+
         rspy_types!(U, Withitem, Stmt);
 
         #[inline]
-        fn items(&self) -> &[Self::Withitem] {
+        fn items(&self) -> Self::ItemsIter<'_> {
             match self {
-                Self::AsyncWith { items, .. } => items,
+                Self::AsyncWith { items, .. } => items.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::AsyncWith { body, .. } => body,
+                Self::AsyncWith { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2576,6 +2951,9 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Match<'a> for rspy_ast::StmtKind<U> {
+        type CasesIter<'b> = Iter<'b, Self::MatchCase>
+        where U: 'b;
+
         rspy_types!(U, MatchCase, Expr);
 
         #[inline]
@@ -2587,9 +2965,9 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn cases(&self) -> &[Self::MatchCase] {
+        fn cases(&self) -> Self::CasesIter<'_> {
             match self {
-                Self::Match { cases, .. } => cases,
+                Self::Match { cases, .. } => cases.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2614,38 +2992,46 @@ mod rs_python_impls {
         }
     }
     impl<'a, U> Try<'a> for rspy_ast::StmtKind<U> {
+        type BodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
         type ExceptHandler = rspy_ast::Excepthandler<U>;
+        type FinalbodyIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
+        type HandlersIter<'b> = Iter<'b, Self::ExceptHandler>
+        where U: 'b;
+        type OrelseIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
 
         rspy_types!(U, Stmt);
 
         #[inline]
-        fn body(&self) -> &[Self::Stmt] {
+        fn body(&self) -> Self::BodyIter<'_> {
             match self {
-                Self::Try { body, .. } => body,
+                Self::Try { body, .. } => body.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn handlers(&self) -> &[Self::ExceptHandler] {
+        fn handlers(&self) -> Self::HandlersIter<'_> {
             match self {
-                Self::Try { handlers, .. } => handlers,
+                Self::Try { handlers, .. } => handlers.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn orelse(&self) -> &[Self::Stmt] {
+        fn orelse(&self) -> Self::OrelseIter<'_> {
             match self {
-                Self::Try { orelse, .. } => orelse,
+                Self::Try { orelse, .. } => orelse.iter(),
                 _ => unreachable!(),
             }
         }
 
         #[inline]
-        fn finalbody(&self) -> &[Self::Stmt] {
+        fn finalbody(&self) -> Self::FinalbodyIter<'_> {
             match self {
-                Self::Try { finalbody, .. } => finalbody,
+                Self::Try { finalbody, .. } => finalbody.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2670,18 +3056,23 @@ mod rs_python_impls {
         }
     }
     impl<U> Import for rspy_ast::StmtKind<U> {
+        type NamesIter<'b> = Iter<'b, Self::Alias>
+        where U: 'b;
+
         rspy_types!(U, Alias);
 
         #[inline]
-        fn names(&self) -> &[Self::Alias] {
+        fn names(&self) -> Self::NamesIter<'_> {
             match self {
-                Self::Import { names } => names,
+                Self::Import { names } => names.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<U> ImportFrom for rspy_ast::StmtKind<U> {
         type Ident = String;
+        type NamesIter<'b> = Iter<'b, Self::Alias>
+        where U: 'b;
 
         rspy_types!(U, Alias);
 
@@ -2694,9 +3085,9 @@ mod rs_python_impls {
         }
 
         #[inline]
-        fn names(&self) -> &[Self::Alias] {
+        fn names(&self) -> Self::NamesIter<'_> {
             match self {
-                Self::ImportFrom { names, .. } => names,
+                Self::ImportFrom { names, .. } => names.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2711,22 +3102,26 @@ mod rs_python_impls {
     }
     impl<U> Global for rspy_ast::StmtKind<U> {
         type Ident = String;
+        type NamesIter<'b> = Iter<'b, Self::Ident>
+        where U: 'b;
 
         #[inline]
-        fn names(&self) -> &[Self::Ident] {
+        fn names(&self) -> Self::NamesIter<'_> {
             match self {
-                Self::Global { names } => names,
+                Self::Global { names } => names.iter(),
                 _ => unreachable!(),
             }
         }
     }
     impl<U> Nonlocal for rspy_ast::StmtKind<U> {
         type Ident = String;
+        type NamesIter<'b> = Iter<'b, Self::Ident>
+        where U: 'b;
 
         #[inline]
-        fn names(&self) -> &[Self::Ident] {
+        fn names(&self) -> Self::NamesIter<'_> {
             match self {
-                Self::Nonlocal { names } => names,
+                Self::Nonlocal { names } => names.iter(),
                 _ => unreachable!(),
             }
         }
@@ -2880,6 +3275,8 @@ mod rs_python_impls {
         type Slice = rspy_ast::ExprKind<U>;
         type Starred = rspy_ast::ExprKind<U>;
         type Stmt = rspy_ast::Stmt<U>;
+        type StmtsIter<'b> = Iter<'b, Self::Stmt>
+        where U: 'b;
         type Subscript = rspy_ast::ExprKind<U>;
         type Try = rspy_ast::StmtKind<U>;
         type Tuple = rspy_ast::ExprKind<U>;
@@ -2891,8 +3288,8 @@ mod rs_python_impls {
         type YieldFrom = rspy_ast::ExprKind<U>;
 
         #[inline]
-        fn stmts(&self) -> &[Self::Stmt] {
-            self
+        fn stmts(&self) -> Self::StmtsIter<'_> {
+            self.iter()
         }
     }
 }
