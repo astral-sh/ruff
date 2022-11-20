@@ -2053,6 +2053,7 @@ impl CheckKind {
                 | CheckKind::BlankLineAfterSummary
                 | CheckKind::BlankLineBeforeSection(..)
                 | CheckKind::CapitalizeSectionName(..)
+                | CheckKind::ConvertNamedTupleFunctionalToClass
                 | CheckKind::ConvertTypedDictFunctionalToClass
                 | CheckKind::DashedUnderlineAfterSection(..)
                 | CheckKind::DeprecatedUnittestAlias(..)
