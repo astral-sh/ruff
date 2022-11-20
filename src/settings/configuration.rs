@@ -138,6 +138,7 @@ impl Configuration {
                     CheckCodePrefix::M,
                     CheckCodePrefix::N,
                     CheckCodePrefix::Q,
+                    CheckCodePrefix::RUF,
                     CheckCodePrefix::S,
                     CheckCodePrefix::T,
                     CheckCodePrefix::U,
