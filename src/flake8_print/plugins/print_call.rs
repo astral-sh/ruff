@@ -10,7 +10,6 @@ use crate::flake8_print::checks;
 /// T201, T203
 pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let Some(mut check) = checks::print_call(
-        expr,
         func,
         checker.settings.enabled.contains(&CheckCode::T201),
         checker.settings.enabled.contains(&CheckCode::T203),

@@ -37,7 +37,7 @@ use crate::visibility::{module_visibility, transition_scope, Modifier, Visibilit
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print,
-    flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade, rules,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -471,7 +471,7 @@ where
             }
             StmtKind::Return { .. } => {
                 if self.settings.enabled.contains(&CheckCode::F706) {
-                    if let Some(index) = self.scope_stack.last().cloned() {
+                    if let Some(&index) = self.scope_stack.last() {
                         if matches!(
                             self.scopes[index].kind,
                             ScopeKind::Class(_) | ScopeKind::Module
@@ -1527,6 +1527,11 @@ where
                         }
                     }
                 }
+
+                // Ruff
+                if self.settings.enabled.contains(&CheckCode::RUF101) {
+                    rules::plugins::convert_exit_to_sys_exit(self, func);
+                }
             }
             ExprKind::Dict { keys, .. } => {
                 let check_repeated_literals = self.settings.enabled.contains(&CheckCode::F601);
@@ -2169,6 +2174,10 @@ impl<'a> Checker<'a> {
         &self.scopes[*(self.scope_stack.last().expect("No current scope found."))]
     }
 
+    pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
+        self.scope_stack.iter().rev().map(|s| &self.scopes[*s])
+    }
+
     pub fn current_parent(&self) -> &'a Stmt {
         self.parents[*(self.parent_stack.last().expect("No parent found."))]
     }
@@ -2188,7 +2197,7 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         if self.settings.enabled.contains(&CheckCode::F402) {
-            let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+            let scope = self.current_scope();
             if let Some(existing) = scope.values.get(&name) {
                 if matches!(binding.kind, BindingKind::LoopVar)
                     && matches!(
@@ -2213,7 +2222,7 @@ impl<'a> Checker<'a> {
 
         // TODO(charlie): Don't treat annotations as assignments if there is an existing
         // value.
-        let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        let scope = self.current_scope();
         let binding = match scope.values.get(&name) {
             None => binding,
             Some(existing) => Binding {
@@ -2229,8 +2238,7 @@ impl<'a> Checker<'a> {
 
     fn handle_node_load(&mut self, expr: &Expr) {
         if let ExprKind::Name { id, .. } = &expr.node {
-            let scope_id =
-                self.scopes[*(self.scope_stack.last().expect("No current scope found."))].id;
+            let scope_id = self.current_scope().id;
 
             let mut first_iter = true;
             let mut in_generator = false;
@@ -2385,7 +2393,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let current = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        let current = self.current_scope();
         if id == "__all__"
             && matches!(current.kind, ScopeKind::Module)
             && matches!(

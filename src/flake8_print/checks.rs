@@ -5,7 +5,6 @@ use crate::checks::{Check, CheckKind};
 
 /// Check whether a function call is a `print` or `pprint` invocation
 pub fn print_call(
-    expr: &Expr,
     func: &Expr,
     check_print: bool,
     check_pprint: bool,
@@ -13,7 +12,7 @@ pub fn print_call(
 ) -> Option<Check> {
     if let ExprKind::Name { id, .. } = &func.node {
         if check_print && id == "print" {
-            return Some(Check::new(CheckKind::PrintFound, Range::from_located(expr)));
+            return Some(Check::new(CheckKind::PrintFound, location));
         } else if check_pprint && id == "pprint" {
             return Some(Check::new(CheckKind::PPrintFound, location));
         }

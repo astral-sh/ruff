@@ -249,6 +249,7 @@ pub enum CheckCode {
     RUF001,
     RUF002,
     RUF003,
+    RUF101,
     // Meta
     M001,
 }
@@ -583,6 +584,7 @@ pub enum CheckKind {
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
     AmbiguousUnicodeCharacterComment(char, char),
+    ConvertExitToSysExit,
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -872,6 +874,7 @@ impl CheckCode {
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
             CheckCode::RUF003 => CheckKind::AmbiguousUnicodeCharacterComment('𝐁', 'B'),
+            CheckCode::RUF101 => CheckKind::ConvertExitToSysExit,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -1082,6 +1085,7 @@ impl CheckCode {
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
+            CheckCode::RUF101 => CheckCategory::Ruff,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -1313,6 +1317,7 @@ impl CheckKind {
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
             CheckKind::AmbiguousUnicodeCharacterComment(..) => &CheckCode::RUF003,
+            CheckKind::ConvertExitToSysExit => &CheckCode::RUF101,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -2002,6 +2007,9 @@ impl CheckKind {
                      '{representant}'?)"
                 )
             }
+            CheckKind::ConvertExitToSysExit => "`exit()` is only available in the interpreter, \
+                                                use `sys.exit()` instead"
+                .to_string(),
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),
@@ -2048,6 +2056,7 @@ impl CheckKind {
             self,
             CheckKind::AmbiguousUnicodeCharacterString(..)
                 | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+                | CheckKind::ConvertExitToSysExit
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
                 | CheckKind::BlankLineAfterSummary
