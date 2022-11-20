@@ -1,11 +1,5 @@
-// cacache uses asyncd-std which has no wasm support, so currently no caching
-// support on wasm
-#![cfg_attr(
-    target_family = "wasm",
-    allow(unused_imports, unused_variables, dead_code)
-)]
-
 use std::collections::hash_map::DefaultHasher;
+use std::fs;
 use std::fs::{create_dir_all, File, Metadata};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
@@ -14,12 +8,10 @@ use std::path::Path;
 use anyhow::Result;
 use filetime::FileTime;
 use log::error;
-use path_absolutize::{path_dedot, Absolutize};
-use rustpython_common::vendored::ascii::AsciiChar::h;
+use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 
 use crate::autofix::fixer;
-use crate::cache;
 use crate::message::Message;
 use crate::settings::Settings;
 
@@ -82,10 +74,14 @@ fn cache_dir() -> &'static str {
     "./.ruff_cache"
 }
 
+fn content_dir() -> &'static str {
+    "content"
+}
+
 fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> u64 {
     let mut hasher = DefaultHasher::new();
     CARGO_PKG_VERSION.hash(&mut hasher);
-    path.hash(&mut hasher);
+    path.absolutize().unwrap().hash(&mut hasher);
     settings.hash(&mut hasher);
     autofix.hash(&mut hasher);
     hasher.finish()
@@ -95,8 +91,8 @@ fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> u64 {
 pub fn init() -> Result<()> {
     let path = Path::new(cache_dir());
 
-    // Create the directory.
-    create_dir_all(path)?;
+    // Create the cache directories.
+    create_dir_all(path.join(content_dir()))?;
 
     // Add the CACHEDIR.TAG.
     if !cachedir::is_tagged(path)? {
@@ -113,23 +109,21 @@ pub fn init() -> Result<()> {
     Ok(())
 }
 
-fn write_sync<T: serde::Serialize>(key: &u64, value: &T) -> Result<(), Box<bincode::ErrorKind>> {
-    // println!("{:?}", path_dedot::CWD);
-    // println!("{:?}", cache_dir());
-    // println!("{:?}", key);
-    // println!("{:?}", path_dedot::CWD.join(cache_dir()).join(key));
-    bincode::serialize_into(
-        File::create(Path::new(cache_dir()).join(key.to_string()))?,
+fn write_sync(key: &u64, value: &[u8]) -> Result<(), std::io::Error> {
+    fs::write(
+        Path::new(cache_dir())
+            .join(content_dir())
+            .join(format!("{key:x}")),
         value,
     )
 }
 
-fn read_sync<T: serde::de::DeserializeOwned>(key: &u64) -> Result<T, Box<bincode::ErrorKind>> {
-    // println!("{:?}", path_dedot::CWD);
-    // println!("{:?}", cache_dir());
-    // println!("{:?}", key);
-    // println!("{:?}", Path::new(cache_dir()).join(key));
-    bincode::deserialize_from(File::open(Path::new(cache_dir()).join(key.to_string()))?)
+fn read_sync(key: &u64) -> Result<Vec<u8>, std::io::Error> {
+    fs::read(
+        Path::new(cache_dir())
+            .join(content_dir())
+            .join(format!("{key:x}")),
+    )
 }
 
 /// Get a value from the cache.
@@ -144,17 +138,18 @@ pub fn get(
         return None;
     };
 
-    #[cfg(not(target_family = "wasm"))] // cacache needs async-std which doesn't support wasm
-    match read_sync::<CheckResult>(&cache_key(path, settings, autofix)) {
-        Ok(CheckResult {
-            metadata: CacheMetadata { mtime },
-            messages,
-        }) => {
-            if FileTime::from_last_modification_time(metadata).unix_seconds() == mtime {
-                return Some(messages);
+    if let Ok(encoded) = read_sync(&cache_key(path, settings, autofix)) {
+        match bincode::deserialize::<CheckResult>(&encoded[..]) {
+            Ok(CheckResult {
+                metadata: CacheMetadata { mtime },
+                messages,
+            }) => {
+                if FileTime::from_last_modification_time(metadata).unix_seconds() == mtime {
+                    return Some(messages);
+                }
             }
+            Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
         }
-        Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
     }
     None
 }
@@ -172,15 +167,16 @@ pub fn set(
         return;
     };
 
-    #[cfg(not(target_family = "wasm"))] // modification date not supported on wasm
     let check_result = CheckResultRef {
         metadata: &CacheMetadata {
             mtime: FileTime::from_last_modification_time(metadata).unix_seconds(),
         },
         messages,
     };
-    #[cfg(not(target_family = "wasm"))] // cacache needs async-std which doesn't support wasm
-    if let Err(e) = write_sync(&cache_key(path, settings, autofix), &check_result) {
+    if let Err(e) = write_sync(
+        &cache_key(path, settings, autofix),
+        &bincode::serialize(&check_result).unwrap(),
+    ) {
         error!("Failed to write to cache: {e:?}")
     }
 }
