@@ -2046,46 +2046,52 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            CheckKind::AmbiguousUnicodeCharacterString(_, _)
-                | CheckKind::AmbiguousUnicodeCharacterDocstring(_, _)
-                | CheckKind::BlankLineAfterLastSection(_)
-                | CheckKind::BlankLineAfterSection(_)
+            CheckKind::AmbiguousUnicodeCharacterString(..)
+                | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+                | CheckKind::BlankLineAfterLastSection(..)
+                | CheckKind::BlankLineAfterSection(..)
                 | CheckKind::BlankLineAfterSummary
-                | CheckKind::BlankLineBeforeSection(_)
-                | CheckKind::CapitalizeSectionName(_)
-                | CheckKind::DashedUnderlineAfterSection(_)
-                | CheckKind::DeprecatedUnittestAlias(_, _)
+                | CheckKind::BlankLineBeforeSection(..)
+                | CheckKind::CapitalizeSectionName(..)
+                | CheckKind::ConvertTypedDictFunctionalToClass
+                | CheckKind::DashedUnderlineAfterSection(..)
+                | CheckKind::DeprecatedUnittestAlias(..)
                 | CheckKind::DoNotAssertFalse
-                | CheckKind::DuplicateHandlerException(_)
+                | CheckKind::DoNotAssignLambda
+                | CheckKind::DuplicateHandlerException(..)
                 | CheckKind::GetAttrWithConstant
                 | CheckKind::IsLiteral
                 | CheckKind::NewLineAfterLastParagraph
-                | CheckKind::NewLineAfterSectionName(_)
-                | CheckKind::NoBlankLineAfterFunction(_)
-                | CheckKind::NoBlankLineBeforeClass(_)
-                | CheckKind::NoBlankLineBeforeFunction(_)
-                | CheckKind::NoBlankLinesBetweenHeaderAndContent(_)
+                | CheckKind::NewLineAfterSectionName(..)
+                | CheckKind::NoBlankLineAfterFunction(..)
+                | CheckKind::NoBlankLineBeforeClass(..)
+                | CheckKind::NoBlankLineBeforeFunction(..)
+                | CheckKind::NoBlankLinesBetweenHeaderAndContent(..)
                 | CheckKind::NoOverIndentation
                 | CheckKind::NoSurroundingWhitespace
                 | CheckKind::NoUnderIndentation
-                | CheckKind::OneBlankLineAfterClass(_)
-                | CheckKind::OneBlankLineBeforeClass(_)
+                | CheckKind::NoneComparison(..)
+                | CheckKind::NotInTest
+                | CheckKind::NotIsTest
+                | CheckKind::OneBlankLineAfterClass(..)
+                | CheckKind::OneBlankLineBeforeClass(..)
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::RaiseNotImplemented
-                | CheckKind::SectionNameEndsInColon(_)
-                | CheckKind::SectionNotOverIndented(_)
-                | CheckKind::SectionUnderlineAfterName(_)
-                | CheckKind::SectionUnderlineMatchesSectionLength(_)
-                | CheckKind::SectionUnderlineNotOverIndented(_)
+                | CheckKind::SectionNameEndsInColon(..)
+                | CheckKind::SectionNotOverIndented(..)
+                | CheckKind::SectionUnderlineAfterName(..)
+                | CheckKind::SectionUnderlineMatchesSectionLength(..)
+                | CheckKind::SectionUnderlineNotOverIndented(..)
+                | CheckKind::SetAttrWithConstant
                 | CheckKind::SuperCallWithParameters
-                | CheckKind::TypeOfPrimitive(_)
-                | CheckKind::UnnecessaryCollectionCall(_)
-                | CheckKind::UnnecessaryComprehension(_)
+                | CheckKind::TrueFalseComparison(..)
+                | CheckKind::TypeOfPrimitive(..)
+                | CheckKind::UnnecessaryCollectionCall(..)
+                | CheckKind::UnnecessaryComprehension(..)
                 | CheckKind::UnnecessaryEncodeUTF8
-                | CheckKind::ConvertTypedDictFunctionalToClass
-                | CheckKind::UnnecessaryFutureImport(_)
+                | CheckKind::UnnecessaryFutureImport(..)
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet
@@ -2093,18 +2099,18 @@ impl CheckKind {
                 | CheckKind::UnnecessaryListCall
                 | CheckKind::UnnecessaryListComprehensionDict
                 | CheckKind::UnnecessaryListComprehensionSet
-                | CheckKind::UnnecessaryLiteralDict(_)
-                | CheckKind::UnnecessaryLiteralSet(_)
-                | CheckKind::UnnecessaryLiteralWithinListCall(_)
-                | CheckKind::UnnecessaryLiteralWithinTupleCall(_)
+                | CheckKind::UnnecessaryLiteralDict(..)
+                | CheckKind::UnnecessaryLiteralSet(..)
+                | CheckKind::UnnecessaryLiteralWithinListCall(..)
+                | CheckKind::UnnecessaryLiteralWithinTupleCall(..)
                 | CheckKind::UnsortedImports
                 | CheckKind::UnusedImport(_, false)
-                | CheckKind::UnusedLoopControlVariable(_)
-                | CheckKind::UnusedNOQA(_)
-                | CheckKind::UsePEP585Annotation(_)
+                | CheckKind::UnusedLoopControlVariable(..)
+                | CheckKind::UnusedNOQA(..)
+                | CheckKind::UsePEP585Annotation(..)
                 | CheckKind::UsePEP604Annotation
                 | CheckKind::UselessMetaclassType
-                | CheckKind::UselessObjectInheritance(_)
+                | CheckKind::UselessObjectInheritance(..)
         )
     }
 }

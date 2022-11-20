@@ -380,7 +380,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E714 | NotIsTest | Test for object identity should be `is not` | 🛠 |
 | E721 | TypeComparison | Do not compare types, use `isinstance()` |  |
 | E722 | DoNotUseBareExcept | Do not use bare `except` |  |
-| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |  |
+| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def | 🛠 |
 | E741 | AmbiguousVariableName | Ambiguous variable name: `...` |  |
 | E742 | AmbiguousClassName | Ambiguous class name: `...` |  |
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
@@ -550,7 +550,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body | 🛠 |
 | B008 | FunctionCallArgumentDefault | Do not perform function call in argument defaults |  |
 | B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
-| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. |  |
+| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B012 | JumpStatementInFinally | `return/continue/break` inside finally blocks cause exceptions to be silenced |  |
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`. |  |

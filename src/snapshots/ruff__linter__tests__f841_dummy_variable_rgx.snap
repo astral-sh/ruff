@@ -65,4 +65,13 @@ expression: checks
     row: 37
     column: 14
   fix: ~
+- kind:
+    UnusedVariable: b
+  location:
+    row: 51
+    column: 8
+  end_location:
+    row: 51
+    column: 9
+  fix: ~
 
