@@ -4,7 +4,6 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
-#[cfg(not(target_family = "wasm"))]
 use ::ruff::cache;
 use ::ruff::checks::{CheckCode, CheckKind};
 use ::ruff::cli::{collect_per_file_ignores, extract_log_level, Cli};
@@ -296,8 +295,6 @@ fn inner_main() -> Result<ExitCode> {
 
     // Initialize the cache.
     let mut cache_enabled: bool = !cli.no_cache;
-
-    #[cfg(not(target_family = "wasm"))]
     if cache_enabled && cache::init().is_err() {
         eprintln!("Unable to initialize cache; disabling...");
         cache_enabled = false;

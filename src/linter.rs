@@ -188,7 +188,6 @@ pub fn lint_stdin(
         .collect())
 }
 
-#[cfg_attr(target_family = "wasm", allow(unused_variables))]
 pub fn lint_path(
     path: &Path,
     settings: &Settings,
@@ -198,7 +197,6 @@ pub fn lint_path(
     let metadata = path.metadata()?;
 
     // Check the cache.
-    #[cfg(not(target_family = "wasm"))]
     if let Some(messages) = cache::get(path, &metadata, settings, autofix, mode) {
         debug!("Cache hit for: {}", path.to_string_lossy());
         return Ok(messages);
@@ -251,7 +249,7 @@ pub fn lint_path(
             Message::from_check(check, filename, source)
         })
         .collect();
-    #[cfg(not(target_family = "wasm"))]
+
     cache::set(path, &metadata, settings, autofix, &messages, mode);
 
     Ok(messages)
