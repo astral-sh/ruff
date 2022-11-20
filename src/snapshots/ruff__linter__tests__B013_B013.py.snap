@@ -15,9 +15,9 @@ expression: checks
       content: ValueError
       location:
         row: 3
-        column: 8
+        column: 7
       end_location:
         row: 3
-        column: 19
+        column: 20
     applied: false
 
