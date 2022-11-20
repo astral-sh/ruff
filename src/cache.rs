@@ -94,16 +94,29 @@ fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> String 
     )
 }
 
+/// Initialize the cache directory.
 pub fn init() -> Result<()> {
-    let gitignore_path = Path::new(cache_dir()).join(".gitignore");
-    if gitignore_path.exists() {
-        return Ok(());
+    let path = Path::new(cache_dir());
+
+    // Create the directory.
+    create_dir_all(path)?;
+
+    // Add the CACHEDIR.TAG.
+    if !cachedir::is_tagged(path)? {
+        cachedir::add_tag(path)?;
     }
-    create_dir_all(cache_dir())?;
-    let mut file = File::create(gitignore_path)?;
-    file.write_all(b"*").map_err(|e| e.into())
+
+    // Add the .gitignore.
+    let gitignore_path = path.join(".gitignore");
+    if !gitignore_path.exists() {
+        let mut file = File::create(gitignore_path)?;
+        file.write_all(b"*")?;
+    }
+
+    Ok(())
 }
 
+/// Get a value from the cache.
 pub fn get(
     path: &Path,
     metadata: &Metadata,
@@ -134,6 +147,7 @@ pub fn get(
     None
 }
 
+/// Set a value in the cache.
 pub fn set(
     path: &Path,
     metadata: &Metadata,
