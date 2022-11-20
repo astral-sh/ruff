@@ -1,6 +1,6 @@
 use crate::ast;
 use crate::error::{LexicalError, LexicalErrorType};
-use fnv::FnvHashSet;
+use rustc_hash::FxHashSet;
 
 pub struct ArgumentList {
     pub args: Vec<ast::Expr>,
@@ -54,7 +54,7 @@ pub fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, Lexi
     let mut keywords = vec![];
 
     let mut keyword_names =
-        FnvHashSet::with_capacity_and_hasher(func_args.len(), Default::default());
+        FxHashSet::with_capacity_and_hasher(func_args.len(), Default::default());
     for (name, value) in func_args {
         match name {
             Some((start, end, name)) => {
