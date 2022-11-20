@@ -71,7 +71,8 @@ fn create_property_assignment_stmt(
     )
 }
 
-fn get_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
+/// Match the `defaults` keyword in a `NamedTuple(...)` call.
+fn match_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
     match keywords.iter().find(|keyword| {
         if let Some(arg) = &keyword.node.arg {
             arg.as_str() == "defaults"
@@ -82,57 +83,60 @@ fn get_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
         Some(defaults) => match &defaults.node.value.node {
             ExprKind::List { elts, .. } => Ok(elts),
             ExprKind::Tuple { elts, .. } => Ok(elts),
-            _ => bail!("defaults must be an iterable"),
+            _ => bail!("Expected defaults to be `ExprKind::List` | `ExprKind::Tuple`"),
         },
         None => Ok(&[]),
     }
 }
 
-fn get_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<Stmt>> {
-    match args.get(1) {
-        None => Ok(vec![]),
-        Some(fields) => match &fields.node {
-            ExprKind::List { elts, .. } => {
-                let padded_defaults = if elts.len() >= defaults.len() {
-                    std::iter::repeat(None)
-                        .take(elts.len() - defaults.len())
-                        .chain(defaults.iter().map(Some))
-                } else {
-                    bail!(
-                        "defaults must be None or an iterable of at least the same size as fields"
-                    )
-                };
-                elts.iter()
-                    .zip(padded_defaults)
-                    .map(|(field, default)| match &field.node {
-                        ExprKind::Tuple { elts, .. } => match elts.as_slice() {
-                            [field_name, annotation] => match &field_name.node {
-                                ExprKind::Constant {
-                                    value: Constant::Str(property),
-                                    ..
-                                } => {
-                                    if IDENTIFIER_REGEX.is_match(property)
-                                        && !KWLIST.contains(&property.as_str())
-                                    {
-                                        Ok(create_property_assignment_stmt(
-                                            property,
-                                            &annotation.node,
-                                            default.map(|d| &d.node),
-                                        ))
-                                    } else {
-                                        bail!("Invalid property name: {}", property)
-                                    }
+/// Create a list of property assignments from the `NamedTuple` arguments.
+fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<Stmt>> {
+    if let Some(fields) = args.get(1) {
+        if let ExprKind::List { elts, .. } = &fields.node {
+            let padded_defaults = if elts.len() >= defaults.len() {
+                std::iter::repeat(None)
+                    .take(elts.len() - defaults.len())
+                    .chain(defaults.iter().map(Some))
+            } else {
+                bail!("Defaults must be `None` or an iterable of at least the number of fields")
+            };
+            elts.iter()
+                .zip(padded_defaults)
+                .map(|(field, default)| {
+                    if let ExprKind::Tuple { elts, .. } = &field.node {
+                        if let [field_name, annotation] = elts.as_slice() {
+                            if let ExprKind::Constant {
+                                value: Constant::Str(property),
+                                ..
+                            } = &field_name.node
+                            {
+                                if IDENTIFIER_REGEX.is_match(property)
+                                    && !KWLIST.contains(&property.as_str())
+                                {
+                                    Ok(create_property_assignment_stmt(
+                                        property,
+                                        &annotation.node,
+                                        default.map(|d| &d.node),
+                                    ))
+                                } else {
+                                    bail!("Invalid property name: {}", property)
                                 }
-                                _ => bail!("Expected `field_name` to be `Constant::Str`"),
-                            },
-                            _ => bail!("Expected `elts` to have 2 elements"),
-                        },
-                        _ => bail!("Expected `field` to be `ExprKind::Tuple`"),
-                    })
-                    .collect()
-            }
-            _ => bail!("Expected `field_name` to be `ExprKind::List`"),
-        },
+                            } else {
+                                bail!("Expected `field_name` to be `Constant::Str`")
+                            }
+                        } else {
+                            bail!("Expected `elts` to have exactly two elements")
+                        }
+                    } else {
+                        bail!("Expected `field` to be `ExprKind::Tuple`")
+                    }
+                })
+                .collect()
+        } else {
+            bail!("Expected argument to be `ExprKind::List`")
+        }
+    } else {
+        Ok(vec![])
     }
 }
 
@@ -182,10 +186,9 @@ pub fn convert_named_tuple_functional_to_class(
     if let Some((typename, args, keywords, base_class)) =
         match_named_tuple_assign(checker, targets, value)
     {
-        match get_defaults(keywords) {
-            Err(err) => error!("Failed to parse defaults: {}", err),
+        match match_defaults(keywords) {
             Ok(defaults) => {
-                if let Ok(properties) = get_properties_from_args(args, defaults) {
+                if let Ok(properties) = create_properties_from_args(args, defaults) {
                     let mut check = Check::new(
                         CheckKind::ConvertNamedTupleFunctionalToClass,
                         Range::from_located(stmt),
@@ -199,6 +202,7 @@ pub fn convert_named_tuple_functional_to_class(
                     checker.add_check(check);
                 }
             }
+            Err(err) => error!("Failed to parse defaults: {}", err),
         }
     }
 }
