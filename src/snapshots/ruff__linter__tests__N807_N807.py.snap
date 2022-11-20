@@ -10,4 +10,12 @@ expression: checks
     row: 5
     column: 0
   fix: ~
+- kind: DunderFunctionName
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 17
+    column: 4
+  fix: ~
 

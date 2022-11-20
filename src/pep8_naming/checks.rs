@@ -132,6 +132,11 @@ pub fn dunder_function_name(scope: &Scope, stmt: &Stmt, name: &str) -> Option<Ch
         return None;
     }
     if name.starts_with("__") && name.ends_with("__") {
+        // Allowed under PEP 562 (https://peps.python.org/pep-0562/).
+        if matches!(scope.kind, ScopeKind::Module) && (name == "__getattr__" || name == "__dir__") {
+            return None;
+        }
+
         return Some(Check::new(
             CheckKind::DunderFunctionName,
             Range::from_located(stmt),
