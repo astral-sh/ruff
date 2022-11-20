@@ -1,10 +1,10 @@
 //! Abstractions for NumPy-style docstrings.
 
-use fnv::FnvHashSet;
 use once_cell::sync::Lazy;
+use rustc_hash::FxHashSet;
 
-pub(crate) static LOWERCASE_NUMPY_SECTION_NAMES: Lazy<FnvHashSet<&'static str>> = Lazy::new(|| {
-    FnvHashSet::from_iter([
+pub(crate) static LOWERCASE_NUMPY_SECTION_NAMES: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
+    FxHashSet::from_iter([
         "short summary",
         "extended summary",
         "parameters",
@@ -21,8 +21,8 @@ pub(crate) static LOWERCASE_NUMPY_SECTION_NAMES: Lazy<FnvHashSet<&'static str>> 
     ])
 });
 
-pub(crate) static NUMPY_SECTION_NAMES: Lazy<FnvHashSet<&'static str>> = Lazy::new(|| {
-    FnvHashSet::from_iter([
+pub(crate) static NUMPY_SECTION_NAMES: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
+    FxHashSet::from_iter([
         "Short Summary",
         "Extended Summary",
         "Parameters",

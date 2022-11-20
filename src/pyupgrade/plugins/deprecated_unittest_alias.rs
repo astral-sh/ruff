@@ -1,5 +1,5 @@
-use fnv::FnvHashMap;
 use once_cell::sync::Lazy;
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -7,8 +7,8 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-static DEPRECATED_ALIASES: Lazy<FnvHashMap<&'static str, &'static str>> = Lazy::new(|| {
-    FnvHashMap::from_iter([
+static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::new(|| {
+    FxHashMap::from_iter([
         ("failUnlessEqual", "assertEqual"),
         ("assertEquals", "assertEqual"),
         ("failIfEqual", "assertNotEqual"),

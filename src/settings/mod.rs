@@ -5,9 +5,9 @@
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
-use fnv::FnvHashSet;
 use path_absolutize::path_dedot;
 use regex::Regex;
+use rustc_hash::FxHashSet;
 
 use crate::checks::CheckCode;
 use crate::checks_gen::{CheckCodePrefix, PrefixSpecificity};
@@ -27,10 +27,10 @@ pub mod user;
 #[derive(Debug)]
 pub struct Settings {
     pub dummy_variable_rgx: Regex,
-    pub enabled: FnvHashSet<CheckCode>,
+    pub enabled: FxHashSet<CheckCode>,
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
-    pub fixable: FnvHashSet<CheckCode>,
+    pub fixable: FxHashSet<CheckCode>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub show_source: bool,
@@ -83,8 +83,8 @@ impl Settings {
     pub fn for_rule(check_code: CheckCode) -> Self {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FnvHashSet::from_iter([check_code.clone()]),
-            fixable: FnvHashSet::from_iter([check_code]),
+            enabled: FxHashSet::from_iter([check_code.clone()]),
+            fixable: FxHashSet::from_iter([check_code]),
             exclude: Default::default(),
             extend_exclude: Default::default(),
             line_length: 88,
@@ -105,8 +105,8 @@ impl Settings {
     pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FnvHashSet::from_iter(check_codes.clone()),
-            fixable: FnvHashSet::from_iter(check_codes),
+            enabled: FxHashSet::from_iter(check_codes.clone()),
+            fixable: FxHashSet::from_iter(check_codes),
             exclude: Default::default(),
             extend_exclude: Default::default(),
             line_length: 88,
@@ -154,8 +154,8 @@ impl Hash for Settings {
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// error codes.
-fn resolve_codes(select: &[CheckCodePrefix], ignore: &[CheckCodePrefix]) -> FnvHashSet<CheckCode> {
-    let mut codes: FnvHashSet<CheckCode> = FnvHashSet::default();
+fn resolve_codes(select: &[CheckCodePrefix], ignore: &[CheckCodePrefix]) -> FxHashSet<CheckCode> {
+    let mut codes: FxHashSet<CheckCode> = FxHashSet::default();
     for specificity in [
         PrefixSpecificity::Category,
         PrefixSpecificity::Hundreds,
@@ -180,7 +180,7 @@ fn resolve_codes(select: &[CheckCodePrefix], ignore: &[CheckCodePrefix]) -> FnvH
 
 #[cfg(test)]
 mod tests {
-    use fnv::FnvHashSet;
+    use rustc_hash::FxHashSet;
 
     use crate::checks::CheckCode;
     use crate::checks_gen::CheckCodePrefix;
@@ -189,19 +189,19 @@ mod tests {
     #[test]
     fn resolver() {
         let actual = resolve_codes(&[CheckCodePrefix::W], &[]);
-        let expected = FnvHashSet::from_iter([CheckCode::W292, CheckCode::W605]);
+        let expected = FxHashSet::from_iter([CheckCode::W292, CheckCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(&[CheckCodePrefix::W6], &[]);
-        let expected = FnvHashSet::from_iter([CheckCode::W605]);
+        let expected = FxHashSet::from_iter([CheckCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(&[CheckCodePrefix::W], &[CheckCodePrefix::W292]);
-        let expected = FnvHashSet::from_iter([CheckCode::W605]);
+        let expected = FxHashSet::from_iter([CheckCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(&[CheckCodePrefix::W605], &[CheckCodePrefix::W605]);
-        let expected = FnvHashSet::from_iter([]);
+        let expected = FxHashSet::from_iter([]);
         assert_eq!(actual, expected);
     }
 }

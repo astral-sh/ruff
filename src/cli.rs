@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use clap::{command, Parser};
-use fnv::FnvHashMap;
 use regex::Regex;
+use rustc_hash::FxHashMap;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::logging::LogLevel;
@@ -147,7 +147,7 @@ pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
     project_root: Option<&PathBuf>,
 ) -> Vec<PerFileIgnore> {
-    let mut per_file_ignores: FnvHashMap<String, Vec<CheckCodePrefix>> = FnvHashMap::default();
+    let mut per_file_ignores: FxHashMap<String, Vec<CheckCodePrefix>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
