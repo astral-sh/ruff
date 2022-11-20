@@ -12,10 +12,18 @@ expression: checks
   fix: ~
 - kind: InvalidFirstArgumentNameForClassMethod
   location:
-    row: 35
+    row: 38
+    column: 55
+  end_location:
+    row: 38
+    column: 59
+  fix: ~
+- kind: InvalidFirstArgumentNameForClassMethod
+  location:
+    row: 43
     column: 19
   end_location:
-    row: 35
+    row: 43
     column: 23
   fix: ~
 
