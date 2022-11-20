@@ -1,9 +1,13 @@
+use anyhow::Result;
 use fnv::FnvHashMap;
 use itertools::izip;
-use rustpython_ast::{Arguments, StmtKind};
+use log::error;
+use rustpython_ast::{Arguments, Location, StmtKind};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Stmt, Unaryop};
 
+use crate::ast::helpers::{match_leading_content, match_trailing_content};
 use crate::ast::types::Range;
+use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind, RejectedCmpop};
@@ -262,7 +266,7 @@ pub fn not_tests(
     }
 }
 
-fn function(name: &str, args: &Arguments, body: &Expr) -> Option<String> {
+fn function(name: &str, args: &Arguments, body: &Expr) -> Result<String> {
     let body = Stmt::new(
         Default::default(),
         Default::default(),
@@ -283,12 +287,8 @@ fn function(name: &str, args: &Arguments, body: &Expr) -> Option<String> {
         },
     );
     let mut generator = SourceGenerator::new();
-    if let Ok(()) = generator.unparse_stmt(&func) {
-        if let Ok(content) = generator.generate() {
-            return Some(content);
-        }
-    }
-    None
+    generator.unparse_stmt(&func)?;
+    generator.generate().map_err(|e| e.into())
 }
 
 /// E731
@@ -297,25 +297,34 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
         if let ExprKind::Lambda { args, body } = &value.node {
             let mut check = Check::new(CheckKind::DoNotAssignLambda, Range::from_located(stmt));
             if checker.patch(check.kind.code()) {
-                if let Some(content) = function(id, args, body) {
-                    // Indent the function body
-                    let content = content
-                        .lines()
-                        .enumerate()
-                        .map(|(idx, line)| {
-                            if idx == 0 {
-                                line.to_string()
-                            } else {
-                                format!("{}{}", " ".repeat(stmt.location.column()), line)
+                if !match_leading_content(stmt, checker.locator)
+                    && !match_trailing_content(stmt, checker.locator)
+                {
+                    match function(id, args, body) {
+                        Ok(content) => {
+                            let indentation =
+                                &leading_space(&checker.locator.slice_source_code_range(&Range {
+                                    location: Location::new(stmt.location.row(), 0),
+                                    end_location: Location::new(stmt.location.row() + 1, 0),
+                                }));
+                            let mut indented = String::new();
+                            for (idx, line) in content.lines().enumerate() {
+                                if idx == 0 {
+                                    indented.push_str(line);
+                                } else {
+                                    indented.push('\n');
+                                    indented.push_str(indentation);
+                                    indented.push_str(line);
+                                }
                             }
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    check.amend(Fix::replacement(
-                        content,
-                        stmt.location,
-                        stmt.end_location.unwrap(),
-                    ));
+                            check.amend(Fix::replacement(
+                                indented,
+                                stmt.location,
+                                stmt.end_location.unwrap(),
+                            ));
+                        }
+                        Err(e) => error!("Failed to generate fix: {}", e),
+                    }
                 }
             }
             checker.add_check(check);

@@ -7,11 +7,12 @@ use regex::Regex;
 use rustpython_ast::{Arg, Constant, ExprKind, Location, StmtKind};
 
 use crate::ast::types::Range;
+use crate::ast::whitespace;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
+use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::docstrings::helpers;
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
 use crate::visibility::{is_init, is_magic, is_overload, is_staticmethod, Visibility};
@@ -391,7 +392,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 return;
             }
 
-            let docstring_indent = helpers::indentation(checker, docstring);
+            let docstring_indent = whitespace::indentation(checker, docstring);
             let mut has_seen_tab = docstring_indent.contains('\t');
             let mut is_over_indented = true;
             let mut over_indented_lines = vec![];
@@ -408,7 +409,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                     continue;
                 }
 
-                let line_indent = helpers::leading_space(lines[i]);
+                let line_indent = whitespace::leading_space(lines[i]);
 
                 // We only report tab indentation once, so only check if we haven't seen a tab
                 // yet.
@@ -427,7 +428,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                         );
                         if checker.patch(check.kind.code()) {
                             check.amend(Fix::replacement(
-                                helpers::clean(&docstring_indent),
+                                whitespace::clean(&docstring_indent),
                                 Location::new(docstring.location.row() + i, 0),
                                 Location::new(docstring.location.row() + i, line_indent.len()),
                             ));
@@ -464,7 +465,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 // If every line (except the last) is over-indented...
                 if is_over_indented {
                     for i in over_indented_lines {
-                        let line_indent = helpers::leading_space(lines[i]);
+                        let line_indent = whitespace::leading_space(lines[i]);
                         if line_indent.len() > docstring_indent.len() {
                             // We report over-indentation on every line. This isn't great, but
                             // enables autofix.
@@ -477,7 +478,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                             );
                             if checker.patch(check.kind.code()) {
                                 check.amend(Fix::replacement(
-                                    helpers::clean(&docstring_indent),
+                                    whitespace::clean(&docstring_indent),
                                     Location::new(docstring.location.row() + i, 0),
                                     Location::new(docstring.location.row() + i, line_indent.len()),
                                 ));
@@ -490,7 +491,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 // If the last line is over-indented...
                 if !lines.is_empty() {
                     let i = lines.len() - 1;
-                    let line_indent = helpers::leading_space(lines[i]);
+                    let line_indent = whitespace::leading_space(lines[i]);
                     if line_indent.len() > docstring_indent.len() {
                         let mut check = Check::new(
                             CheckKind::NoOverIndentation,
@@ -501,7 +502,7 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                         );
                         if checker.patch(check.kind.code()) {
                             check.amend(Fix::replacement(
-                                helpers::clean(&docstring_indent),
+                                whitespace::clean(&docstring_indent),
                                 Location::new(docstring.location.row() + i, 0),
                                 Location::new(docstring.location.row() + i, line_indent.len()),
                             ));
@@ -541,7 +542,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                                 // Insert a newline just before the end-quote(s).
                                 let content = format!(
                                     "\n{}",
-                                    helpers::clean(&helpers::indentation(checker, docstring))
+                                    whitespace::clean(&whitespace::indentation(checker, docstring))
                                 );
                                 check.amend(Fix::insertion(
                                     content,
@@ -588,9 +589,9 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
                             .next()
                             .map(|line| line.to_lowercase())
                         {
-                            for pattern in helpers::TRIPLE_QUOTE_PREFIXES
+                            for pattern in constants::TRIPLE_QUOTE_PREFIXES
                                 .iter()
-                                .chain(helpers::SINGLE_QUOTE_PREFIXES)
+                                .chain(constants::SINGLE_QUOTE_PREFIXES)
                             {
                                 if first_line.starts_with(pattern) {
                                     check.amend(Fix::replacement(
@@ -634,7 +635,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
                     .next()
                     .map(|line| line.to_lowercase())
                 {
-                    if helpers::TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
+                    if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
                         if checker.settings.enabled.contains(&CheckCode::D212) {
                             checker.add_check(Check::new(
                                 CheckKind::MultiLineSummaryFirstLine,
@@ -920,7 +921,7 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
-                    helpers::clean(&helpers::indentation(checker, docstring)),
+                    whitespace::clean(&whitespace::indentation(checker, docstring)),
                     "-".repeat(context.section_name.len())
                 );
                 check.amend(Fix::insertion(
@@ -954,7 +955,7 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
-                    helpers::clean(&helpers::indentation(checker, docstring)),
+                    whitespace::clean(&whitespace::indentation(checker, docstring)),
                     "-".repeat(context.section_name.len())
                 );
                 check.amend(Fix::insertion(
@@ -1030,7 +1031,7 @@ fn blanks_and_section_underline(
                     // Replace the existing underline with a line of the appropriate length.
                     let content = format!(
                         "{}{}\n",
-                        helpers::clean(&helpers::indentation(checker, docstring)),
+                        whitespace::clean(&whitespace::indentation(checker, docstring)),
                         "-".repeat(context.section_name.len())
                     );
                     check.amend(Fix::replacement(
@@ -1057,8 +1058,8 @@ fn blanks_and_section_underline(
         }
 
         if checker.settings.enabled.contains(&CheckCode::D215) {
-            let leading_space = helpers::leading_space(non_empty_line);
-            let indentation = helpers::indentation(checker, docstring);
+            let leading_space = whitespace::leading_space(non_empty_line);
+            let indentation = whitespace::indentation(checker, docstring);
             if leading_space.len() > indentation.len() {
                 let mut check = Check::new(
                     CheckKind::SectionUnderlineNotOverIndented(context.section_name.to_string()),
@@ -1067,7 +1068,7 @@ fn blanks_and_section_underline(
                 if checker.patch(check.kind.code()) {
                     // Replace the existing indentation with whitespace of the appropriate length.
                     check.amend(Fix::replacement(
-                        helpers::clean(&indentation),
+                        whitespace::clean(&indentation),
                         Location::new(
                             docstring.location.row()
                                 + context.original_index
@@ -1198,8 +1199,8 @@ fn common_section(
     }
 
     if checker.settings.enabled.contains(&CheckCode::D214) {
-        let leading_space = helpers::leading_space(context.line);
-        let indentation = helpers::indentation(checker, docstring);
+        let leading_space = whitespace::leading_space(context.line);
+        let indentation = whitespace::indentation(checker, docstring);
         if leading_space.len() > indentation.len() {
             let mut check = Check::new(
                 CheckKind::SectionNotOverIndented(context.section_name.to_string()),
@@ -1208,7 +1209,7 @@ fn common_section(
             if checker.patch(check.kind.code()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
                 check.amend(Fix::replacement(
-                    helpers::clean(&indentation),
+                    whitespace::clean(&indentation),
                     Location::new(docstring.location.row() + context.original_index, 0),
                     Location::new(
                         docstring.location.row() + context.original_index,
@@ -1400,13 +1401,13 @@ fn args_section(checker: &mut Checker, definition: &Definition, context: &Sectio
 fn parameters_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
     // Collect the list of arguments documented in the docstring.
     let mut docstring_args: FnvHashSet<&str> = FnvHashSet::default();
-    let section_level_indent = helpers::leading_space(context.line);
+    let section_level_indent = whitespace::leading_space(context.line);
     for i in 1..context.following_lines.len() {
         let current_line = context.following_lines[i - 1];
-        let current_leading_space = helpers::leading_space(current_line);
+        let current_leading_space = whitespace::leading_space(current_line);
         let next_line = context.following_lines[i];
         if current_leading_space == section_level_indent
-            && (helpers::leading_space(next_line).len() > current_leading_space.len())
+            && (whitespace::leading_space(next_line).len() > current_leading_space.len())
             && !next_line.trim().is_empty()
         {
             let parameters = if let Some(semi_index) = current_line.find(':') {
