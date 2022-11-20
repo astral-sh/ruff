@@ -35,3 +35,20 @@ def f4():
     _ = 1
     __ = 1
     _discarded = 1
+
+
+a = 1
+
+
+def f5():
+    global a
+
+    # Used in `f7` via `nonlocal`.
+    b = 1
+
+    def f6():
+        # F841
+        b = 1
+
+    def f7():
+        nonlocal b

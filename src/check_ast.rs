@@ -213,20 +213,73 @@ where
 
         // Pre-visit.
         match &stmt.node {
-            StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
-                let global_scope_id = self.scopes[GLOBAL_SCOPE_INDEX].id;
-                let scope =
-                    &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
-                if scope.id != global_scope_id {
+            StmtKind::Global { names } => {
+                let scope_index = *self.scope_stack.last().expect("No current scope found.");
+                if scope_index != GLOBAL_SCOPE_INDEX {
+                    let scope = &mut self.scopes[scope_index];
+                    let usage = Some((scope.id, Range::from_located(stmt)));
                     for name in names {
+                        // Add a binding to the current scope.
                         scope.values.insert(
                             name,
                             Binding {
                                 kind: BindingKind::Global,
-                                used: Some((global_scope_id, Range::from_located(stmt))),
+                                used: usage,
                                 range: Range::from_located(stmt),
                             },
                         );
+                    }
+
+                    // Mark the binding in the global scope as used.
+                    for name in names {
+                        if let Some(mut existing) = self.scopes[GLOBAL_SCOPE_INDEX]
+                            .values
+                            .get_mut(&name.as_str())
+                        {
+                            existing.used = usage;
+                        }
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::E741) {
+                    let location = Range::from_located(stmt);
+                    self.add_checks(
+                        names
+                            .iter()
+                            .filter_map(|name| {
+                                pycodestyle::checks::ambiguous_variable_name(name, location)
+                            })
+                            .into_iter(),
+                    );
+                }
+            }
+            StmtKind::Nonlocal { names } => {
+                let scope_index = *self.scope_stack.last().expect("No current scope found.");
+                if scope_index != GLOBAL_SCOPE_INDEX {
+                    let scope = &mut self.scopes[scope_index];
+                    let usage = Some((scope.id, Range::from_located(stmt)));
+                    for name in names {
+                        // Add a binding to the current scope.
+                        scope.values.insert(
+                            name,
+                            Binding {
+                                kind: BindingKind::Global,
+                                used: usage,
+                                range: Range::from_located(stmt),
+                            },
+                        );
+                    }
+
+                    // Mark the binding in the defining scopes as used too. (Skip the global scope
+                    // and the current scope.)
+                    for name in names {
+                        for index in self.scope_stack.iter().skip(1).rev().skip(1) {
+                            if let Some(mut existing) =
+                                self.scopes[*index].values.get_mut(&name.as_str())
+                            {
+                                existing.used = usage;
+                            }
+                        }
                     }
                 }
 
