@@ -30,6 +30,14 @@ class Class:
     def __init_subclass__(self, default_name, **kwargs):
         ...
 
+    @classmethod
+    def class_method_with_positional_only_argument(cls, x, /, other):
+        ...
+
+    @classmethod
+    def bad_class_method_with_positional_only_argument(self, x, /, other):
+        ...
+
 
 class MetaClass(ABCMeta):
     def bad_method(self):

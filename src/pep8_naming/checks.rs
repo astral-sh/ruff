@@ -74,7 +74,14 @@ pub fn invalid_first_argument_name_for_class_method(
         ),
         FunctionType::ClassMethod
     ) {
-        if let Some(arg) = args.args.first() {
+        if let Some(arg) = args.posonlyargs.first() {
+            if arg.node.arg != "cls" {
+                return Some(Check::new(
+                    CheckKind::InvalidFirstArgumentNameForClassMethod,
+                    Range::from_located(arg),
+                ));
+            }
+        } else if let Some(arg) = args.args.first() {
             if arg.node.arg != "cls" {
                 return Some(Check::new(
                     CheckKind::InvalidFirstArgumentNameForClassMethod,
