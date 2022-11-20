@@ -1,7 +1,10 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, StmtKind};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, Stmt, StmtKind};
+
+use crate::ast::types::Range;
+use crate::SourceCodeLocator;
 
 #[inline(always)]
 fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
@@ -259,6 +262,34 @@ pub fn to_absolute(relative: &Location, base: &Location) -> Location {
     } else {
         Location::new(relative.row() + base.row() - 1, relative.column())
     }
+}
+
+/// Return `true` if a `Stmt` has leading content.
+pub fn match_leading_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+    let range = Range {
+        location: Location::new(stmt.location.row(), 0),
+        end_location: stmt.location,
+    };
+    let prefix = locator.slice_source_code_range(&range);
+    prefix.chars().any(|char| !char.is_whitespace())
+}
+
+/// Return `true` if a `Stmt` has trailing content.
+pub fn match_trailing_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+    let range = Range {
+        location: stmt.end_location.unwrap(),
+        end_location: Location::new(stmt.end_location.unwrap().row() + 1, 0),
+    };
+    let suffix = locator.slice_source_code_range(&range);
+    for char in suffix.chars() {
+        if char == '#' {
+            return false;
+        }
+        if !char.is_whitespace() {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(test)]

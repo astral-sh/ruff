@@ -1,6 +1,6 @@
 use itertools::izip;
 use rustpython_ast::Location;
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
@@ -44,19 +44,6 @@ pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
     } else {
         None
     }
-}
-
-/// E731
-pub fn do_not_assign_lambda(target: &Expr, value: &Expr, stmt: &Stmt) -> Option<Check> {
-    if let ExprKind::Name { .. } = &target.node {
-        if let ExprKind::Lambda { .. } = &value.node {
-            return Some(Check::new(
-                CheckKind::DoNotAssignLambda,
-                Range::from_located(stmt),
-            ));
-        }
-    }
-    None
 }
 
 /// E721
