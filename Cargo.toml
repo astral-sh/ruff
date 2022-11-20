@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "ruff"
-version = "0.0.129"
+version = "0.0.130"
 edition = "2021"
 
 [lib]
