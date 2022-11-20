@@ -4,7 +4,6 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
-#[cfg(not(target_family = "wasm"))]
 use ::ruff::cache;
 use ::ruff::checks::{CheckCode, CheckKind};
 use ::ruff::cli::{collect_per_file_ignores, extract_log_level, Cli};
@@ -286,7 +285,7 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     // Extract settings for internal use.
-    let autofix = configuration.fix;
+    let fix_enabled: bool = configuration.fix;
     let settings = Settings::from_configuration(configuration);
 
     if cli.show_files {
@@ -294,12 +293,16 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    #[cfg(not(target_family = "wasm"))]
-    cache::init()?;
+    // Initialize the cache.
+    let mut cache_enabled: bool = !cli.no_cache;
+    if cache_enabled && cache::init().is_err() {
+        eprintln!("Unable to initialize cache; disabling...");
+        cache_enabled = false;
+    }
 
     let printer = Printer::new(&cli.format, &log_level);
     if cli.watch {
-        if autofix {
+        if fix_enabled {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
 
@@ -319,7 +322,7 @@ fn inner_main() -> Result<ExitCode> {
         printer.clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
+        let messages = run_once(&cli.files, &settings, cache_enabled, false)?;
         printer.write_continuously(&messages)?;
 
         // Configure the file watcher.
@@ -337,7 +340,7 @@ fn inner_main() -> Result<ExitCode> {
                             printer.clear_screen()?;
                             printer.write_to_user("File change detected...\n");
 
-                            let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
+                            let messages = run_once(&cli.files, &settings, cache_enabled, false)?;
                             printer.write_continuously(&messages)?;
                         }
                     }
@@ -362,15 +365,15 @@ fn inner_main() -> Result<ExitCode> {
         let messages = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            run_once_stdin(&settings, path, autofix)?
+            run_once_stdin(&settings, path, fix_enabled)?
         } else {
-            run_once(&cli.files, &settings, !cli.no_cache, autofix)?
+            run_once(&cli.files, &settings, cache_enabled, fix_enabled)?
         };
 
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && autofix) {
+        if !(is_stdin && fix_enabled) {
             printer.write_once(&messages)?;
         }
 

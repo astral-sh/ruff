@@ -1,4 +1,4 @@
-use fnv::{FnvHashMap, FnvHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Constant, KeywordData};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
@@ -143,8 +143,8 @@ pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<
 pub fn unnecessary_lru_cache_params(
     decorator_list: &[Expr],
     target_version: PythonVersion,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> Option<Check> {
     for expr in decorator_list.iter() {
         if let ExprKind::Call {
@@ -162,12 +162,13 @@ pub fn unnecessary_lru_cache_params(
                     import_aliases,
                 )
             {
+                let range = Range {
+                    location: func.end_location.unwrap(),
+                    end_location: expr.end_location.unwrap(),
+                };
                 // Ex) `functools.lru_cache()`
                 if keywords.is_empty() {
-                    return Some(Check::new(
-                        CheckKind::UnnecessaryLRUCacheParams,
-                        Range::from_located(expr),
-                    ));
+                    return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
                 }
                 // Ex) `functools.lru_cache(maxsize=None)`
                 if target_version >= PythonVersion::Py39 && keywords.len() == 1 {
@@ -181,10 +182,7 @@ pub fn unnecessary_lru_cache_params(
                             }
                         )
                     {
-                        return Some(Check::new(
-                            CheckKind::UnnecessaryLRUCacheParams,
-                            Range::from_located(expr),
-                        ));
+                        return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
                     }
                 }
             }

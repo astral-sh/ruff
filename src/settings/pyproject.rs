@@ -101,7 +101,7 @@ mod tests {
     use std::str::FromStr;
 
     use anyhow::Result;
-    use fnv::FnvHashMap;
+    use rustc_hash::FxHashMap;
 
     use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes::settings::Quote;
@@ -374,7 +374,7 @@ other-attribute = 1
                 extend_ignore: None,
                 fixable: None,
                 unfixable: None,
-                per_file_ignores: Some(FnvHashMap::from_iter([(
+                per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
                     vec![CheckCodePrefix::F401]
                 ),])),

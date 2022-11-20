@@ -1,5 +1,5 @@
-use fnv::{FnvHashMap, FnvHashSet};
 use itertools::Itertools;
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Expr, Stmt, StmtKind};
 
 use crate::ast::helpers::{
@@ -24,8 +24,8 @@ pub fn function_type(
     scope: &Scope,
     name: &str,
     decorator_list: &[Expr],
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
     settings: &Settings,
 ) -> FunctionType {
     if let ScopeKind::Class(scope) = &scope.kind {
@@ -87,7 +87,7 @@ pub fn is_acronym(name: &str, asname: &str) -> bool {
 
 pub fn is_namedtuple_assignment(
     stmt: &Stmt,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
 ) -> bool {
     if let StmtKind::Assign { value, .. } = &stmt.node {
         match_call_path(

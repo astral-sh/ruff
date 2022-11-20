@@ -1,4 +1,4 @@
-use fnv::{FnvHashMap, FnvHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Operator};
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
@@ -59,8 +59,8 @@ const IMMUTABLE_GENERIC_TYPES: &[(&str, &str)] = &[
 
 pub fn is_mutable_func(
     expr: &Expr,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
     MUTABLE_FUNCS
@@ -70,8 +70,8 @@ pub fn is_mutable_func(
 
 fn is_mutable_expr(
     expr: &Expr,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     match &expr.node {
         ExprKind::List { .. }
@@ -87,8 +87,8 @@ fn is_mutable_expr(
 
 fn is_immutable_annotation(
     expr: &Expr,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     match &expr.node {
         ExprKind::Name { .. } | ExprKind::Attribute { .. } => {

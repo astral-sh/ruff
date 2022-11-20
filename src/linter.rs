@@ -188,7 +188,6 @@ pub fn lint_stdin(
         .collect())
 }
 
-#[cfg_attr(target_family = "wasm", allow(unused_variables))]
 pub fn lint_path(
     path: &Path,
     settings: &Settings,
@@ -198,7 +197,6 @@ pub fn lint_path(
     let metadata = path.metadata()?;
 
     // Check the cache.
-    #[cfg(not(target_family = "wasm"))]
     if let Some(messages) = cache::get(path, &metadata, settings, autofix, mode) {
         debug!("Cache hit for: {}", path.to_string_lossy());
         return Ok(messages);
@@ -251,7 +249,7 @@ pub fn lint_path(
             Message::from_check(check, filename, source)
         })
         .collect();
-    #[cfg(not(target_family = "wasm"))]
+
     cache::set(path, &metadata, settings, autofix, &messages, mode);
 
     Ok(messages)
@@ -519,6 +517,7 @@ mod tests {
     #[test_case(CheckCode::U011, Path::new("U011_1.py"); "U011_1")]
     #[test_case(CheckCode::U012, Path::new("U012.py"); "U012")]
     #[test_case(CheckCode::U013, Path::new("U013.py"); "U013")]
+    #[test_case(CheckCode::U014, Path::new("U014.py"); "U014")]
     #[test_case(CheckCode::W292, Path::new("W292_0.py"); "W292_0")]
     #[test_case(CheckCode::W292, Path::new("W292_1.py"); "W292_1")]
     #[test_case(CheckCode::W292, Path::new("W292_2.py"); "W292_2")]
@@ -527,6 +526,13 @@ mod tests {
     #[test_case(CheckCode::RUF001, Path::new("RUF001.py"); "RUF001")]
     #[test_case(CheckCode::RUF002, Path::new("RUF002.py"); "RUF002")]
     #[test_case(CheckCode::RUF003, Path::new("RUF003.py"); "RUF003")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_0.py"); "RUF101_0")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_1.py"); "RUF101_1")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_2.py"); "RUF101_2")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_3.py"); "RUF101_3")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_4.py"); "RUF101_4")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_5.py"); "RUF101_5")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_6.py"); "RUF101_6")]
     #[test_case(CheckCode::YTT101, Path::new("YTT101.py"); "YTT101")]
     #[test_case(CheckCode::YTT102, Path::new("YTT102.py"); "YTT102")]
     #[test_case(CheckCode::YTT103, Path::new("YTT103.py"); "YTT103")]

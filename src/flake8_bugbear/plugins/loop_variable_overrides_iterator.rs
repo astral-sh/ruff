@@ -1,4 +1,4 @@
-use fnv::FnvHashMap;
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -9,7 +9,7 @@ use crate::checks::{Check, CheckKind};
 
 #[derive(Default)]
 struct NameFinder<'a> {
-    names: FnvHashMap<&'a str, &'a Expr>,
+    names: FxHashMap<&'a str, &'a Expr>,
 }
 
 impl<'a, 'b> Visitor<'b> for NameFinder<'a>

@@ -1,19 +1,11 @@
-// cacache uses asyncd-std which has no wasm support, so currently no caching
-// support on wasm
-#![cfg_attr(
-    target_family = "wasm",
-    allow(unused_imports, unused_variables, dead_code)
-)]
-
 use std::collections::hash_map::DefaultHasher;
+use std::fs;
 use std::fs::{create_dir_all, File, Metadata};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
-#[cfg(not(target_family = "wasm"))]
-use cacache::Error::EntryNotFound;
 use filetime::FileTime;
 use log::error;
 use path_absolutize::Absolutize;
@@ -82,28 +74,59 @@ fn cache_dir() -> &'static str {
     "./.ruff_cache"
 }
 
-fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> String {
+fn content_dir() -> &'static str {
+    "content"
+}
+
+fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> u64 {
     let mut hasher = DefaultHasher::new();
+    CARGO_PKG_VERSION.hash(&mut hasher);
+    path.absolutize().unwrap().hash(&mut hasher);
     settings.hash(&mut hasher);
     autofix.hash(&mut hasher);
-    format!(
-        "{}@{}@{}",
-        path.absolutize().unwrap().to_string_lossy(),
-        CARGO_PKG_VERSION,
-        hasher.finish()
+    hasher.finish()
+}
+
+/// Initialize the cache directory.
+pub fn init() -> Result<()> {
+    let path = Path::new(cache_dir());
+
+    // Create the cache directories.
+    create_dir_all(path.join(content_dir()))?;
+
+    // Add the CACHEDIR.TAG.
+    if !cachedir::is_tagged(path)? {
+        cachedir::add_tag(path)?;
+    }
+
+    // Add the .gitignore.
+    let gitignore_path = path.join(".gitignore");
+    if !gitignore_path.exists() {
+        let mut file = File::create(gitignore_path)?;
+        file.write_all(b"*")?;
+    }
+
+    Ok(())
+}
+
+fn write_sync(key: &u64, value: &[u8]) -> Result<(), std::io::Error> {
+    fs::write(
+        Path::new(cache_dir())
+            .join(content_dir())
+            .join(format!("{key:x}")),
+        value,
     )
 }
 
-pub fn init() -> Result<()> {
-    let gitignore_path = Path::new(cache_dir()).join(".gitignore");
-    if gitignore_path.exists() {
-        return Ok(());
-    }
-    create_dir_all(cache_dir())?;
-    let mut file = File::create(gitignore_path)?;
-    file.write_all(b"*").map_err(|e| e.into())
+fn read_sync(key: &u64) -> Result<Vec<u8>, std::io::Error> {
+    fs::read(
+        Path::new(cache_dir())
+            .join(content_dir())
+            .join(format!("{key:x}")),
+    )
 }
 
+/// Get a value from the cache.
 pub fn get(
     path: &Path,
     metadata: &Metadata,
@@ -115,9 +138,8 @@ pub fn get(
         return None;
     };
 
-    #[cfg(not(target_family = "wasm"))] // cacache needs async-std which doesn't support wasm
-    match cacache::read_sync(cache_dir(), cache_key(path, settings, autofix)) {
-        Ok(encoded) => match bincode::deserialize::<CheckResult>(&encoded[..]) {
+    if let Ok(encoded) = read_sync(&cache_key(path, settings, autofix)) {
+        match bincode::deserialize::<CheckResult>(&encoded[..]) {
             Ok(CheckResult {
                 metadata: CacheMetadata { mtime },
                 messages,
@@ -127,13 +149,12 @@ pub fn get(
                 }
             }
             Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
-        },
-        Err(EntryNotFound(..)) => {}
-        Err(e) => error!("Failed to read from cache: {e:?}"),
+        }
     }
     None
 }
 
+/// Set a value in the cache.
 pub fn set(
     path: &Path,
     metadata: &Metadata,
@@ -146,18 +167,15 @@ pub fn set(
         return;
     };
 
-    #[cfg(not(target_family = "wasm"))] // modification date not supported on wasm
     let check_result = CheckResultRef {
         metadata: &CacheMetadata {
             mtime: FileTime::from_last_modification_time(metadata).unix_seconds(),
         },
         messages,
     };
-    #[cfg(not(target_family = "wasm"))] // cacache needs async-std which doesn't support wasm
-    if let Err(e) = cacache::write_sync(
-        cache_dir(),
-        cache_key(path, settings, autofix),
-        bincode::serialize(&check_result).unwrap(),
+    if let Err(e) = write_sync(
+        &cache_key(path, settings, autofix),
+        &bincode::serialize(&check_result).unwrap(),
     ) {
         error!("Failed to write to cache: {e:?}")
     }

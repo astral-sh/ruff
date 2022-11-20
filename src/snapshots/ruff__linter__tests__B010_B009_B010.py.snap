@@ -9,7 +9,16 @@ expression: checks
   end_location:
     row: 33
     column: 25
-  fix: ~
+  fix:
+    patch:
+      content: foo.bar = None
+      location:
+        row: 33
+        column: 0
+      end_location:
+        row: 33
+        column: 25
+    applied: false
 - kind: SetAttrWithConstant
   location:
     row: 34
@@ -17,7 +26,16 @@ expression: checks
   end_location:
     row: 34
     column: 29
-  fix: ~
+  fix:
+    patch:
+      content: foo._123abc = None
+      location:
+        row: 34
+        column: 0
+      end_location:
+        row: 34
+        column: 29
+    applied: false
 - kind: SetAttrWithConstant
   location:
     row: 35
@@ -25,7 +43,16 @@ expression: checks
   end_location:
     row: 35
     column: 28
-  fix: ~
+  fix:
+    patch:
+      content: foo.abc123 = None
+      location:
+        row: 35
+        column: 0
+      end_location:
+        row: 35
+        column: 28
+    applied: false
 - kind: SetAttrWithConstant
   location:
     row: 36
@@ -33,5 +60,31 @@ expression: checks
   end_location:
     row: 36
     column: 29
-  fix: ~
+  fix:
+    patch:
+      content: foo.abc123 = None
+      location:
+        row: 36
+        column: 0
+      end_location:
+        row: 36
+        column: 29
+    applied: false
+- kind: SetAttrWithConstant
+  location:
+    row: 37
+    column: 0
+  end_location:
+    row: 37
+    column: 30
+  fix:
+    patch:
+      content: foo.bar.baz = None
+      location:
+        row: 37
+        column: 0
+      end_location:
+        row: 37
+        column: 30
+    applied: false
 

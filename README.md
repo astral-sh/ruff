@@ -465,7 +465,8 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
 | U011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
 | U012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
-| U013 | ConvertTypedDictFunctionalToClass | Convert `TypedDict` functional syntax to class syntax | 🛠 |
+| U013 | ConvertTypedDictFunctionalToClass | Convert `...` from `TypedDict` functional to class syntax | 🛠 |
+| U014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
 
 ### pep8-naming
 
@@ -549,7 +550,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body | 🛠 |
 | B008 | FunctionCallArgumentDefault | Do not perform function call in argument defaults |  |
 | B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
-| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. |  |
+| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B012 | JumpStatementInFinally | `return/continue/break` inside finally blocks cause exceptions to be silenced |  |
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`. | 🛠 |
@@ -663,6 +664,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
+| RUF101 | ConvertExitToSysExit | `exit()` is only available in the interpreter, use `sys.exit()` instead | 🛠 |
 
 ### Meta rules
 
@@ -820,7 +822,7 @@ including:
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`isort`](https://pypi.org/project/isort/)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/33)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
 Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
@@ -852,7 +854,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`mccabe`](https://pypi.org/project/mccabe/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
-and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (14/33).
+and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 

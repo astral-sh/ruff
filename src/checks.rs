@@ -170,6 +170,7 @@ pub enum CheckCode {
     U011,
     U012,
     U013,
+    U014,
     // pydocstyle
     D100,
     D101,
@@ -248,6 +249,7 @@ pub enum CheckCode {
     RUF001,
     RUF002,
     RUF003,
+    RUF101,
     // Meta
     M001,
 }
@@ -500,7 +502,8 @@ pub enum CheckKind {
     UnnecessaryFutureImport(Vec<String>),
     UnnecessaryLRUCacheParams,
     UnnecessaryEncodeUTF8,
-    ConvertTypedDictFunctionalToClass,
+    ConvertTypedDictFunctionalToClass(String),
+    ConvertNamedTupleFunctionalToClass(String),
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -581,6 +584,7 @@ pub enum CheckKind {
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
     AmbiguousUnicodeCharacterComment(char, char),
+    ConvertExitToSysExit,
     // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
@@ -773,7 +777,8 @@ impl CheckCode {
             CheckCode::U010 => CheckKind::UnnecessaryFutureImport(vec!["...".to_string()]),
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
             CheckCode::U012 => CheckKind::UnnecessaryEncodeUTF8,
-            CheckCode::U013 => CheckKind::ConvertTypedDictFunctionalToClass,
+            CheckCode::U013 => CheckKind::ConvertTypedDictFunctionalToClass("...".to_string()),
+            CheckCode::U014 => CheckKind::ConvertNamedTupleFunctionalToClass("...".to_string()),
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -869,6 +874,7 @@ impl CheckCode {
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
             CheckCode::RUF003 => CheckKind::AmbiguousUnicodeCharacterComment('𝐁', 'B'),
+            CheckCode::RUF101 => CheckKind::ConvertExitToSysExit,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -1005,6 +1011,7 @@ impl CheckCode {
             CheckCode::U011 => CheckCategory::Pyupgrade,
             CheckCode::U012 => CheckCategory::Pyupgrade,
             CheckCode::U013 => CheckCategory::Pyupgrade,
+            CheckCode::U014 => CheckCategory::Pyupgrade,
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -1078,6 +1085,7 @@ impl CheckCode {
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
+            CheckCode::RUF101 => CheckCategory::Ruff,
             CheckCode::M001 => CheckCategory::Meta,
         }
     }
@@ -1227,7 +1235,8 @@ impl CheckKind {
             CheckKind::UnnecessaryFutureImport(_) => &CheckCode::U010,
             CheckKind::UnnecessaryLRUCacheParams => &CheckCode::U011,
             CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::U012,
-            CheckKind::ConvertTypedDictFunctionalToClass => &CheckCode::U013,
+            CheckKind::ConvertTypedDictFunctionalToClass(_) => &CheckCode::U013,
+            CheckKind::ConvertNamedTupleFunctionalToClass(_) => &CheckCode::U014,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -1308,6 +1317,7 @@ impl CheckKind {
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
             CheckKind::AmbiguousUnicodeCharacterComment(..) => &CheckCode::RUF003,
+            CheckKind::ConvertExitToSysExit => &CheckCode::RUF101,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }
@@ -1776,8 +1786,11 @@ impl CheckKind {
                 "Unnecessary parameters to `functools.lru_cache`".to_string()
             }
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
-            CheckKind::ConvertTypedDictFunctionalToClass => {
-                "Convert `TypedDict` functional syntax to class syntax".to_string()
+            CheckKind::ConvertTypedDictFunctionalToClass(name) => {
+                format!("Convert `{name}` from `TypedDict` functional to class syntax")
+            }
+            CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
+                format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
@@ -1994,6 +2007,9 @@ impl CheckKind {
                      '{representant}'?)"
                 )
             }
+            CheckKind::ConvertExitToSysExit => "`exit()` is only available in the interpreter, \
+                                                use `sys.exit()` instead"
+                .to_string(),
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),
@@ -2040,12 +2056,14 @@ impl CheckKind {
             self,
             CheckKind::AmbiguousUnicodeCharacterString(..)
                 | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+                | CheckKind::ConvertExitToSysExit
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
                 | CheckKind::BlankLineAfterSummary
                 | CheckKind::BlankLineBeforeSection(..)
                 | CheckKind::CapitalizeSectionName(..)
-                | CheckKind::ConvertTypedDictFunctionalToClass
+                | CheckKind::ConvertNamedTupleFunctionalToClass(..)
+                | CheckKind::ConvertTypedDictFunctionalToClass(..)
                 | CheckKind::DashedUnderlineAfterSection(..)
                 | CheckKind::DeprecatedUnittestAlias(..)
                 | CheckKind::DoNotAssertFalse
@@ -2076,6 +2094,7 @@ impl CheckKind {
                 | CheckKind::SectionUnderlineAfterName(..)
                 | CheckKind::SectionUnderlineMatchesSectionLength(..)
                 | CheckKind::SectionUnderlineNotOverIndented(..)
+                | CheckKind::SetAttrWithConstant
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::TrueFalseComparison(..)
                 | CheckKind::TypeOfPrimitive(..)

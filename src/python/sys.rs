@@ -1,9 +1,9 @@
-use fnv::FnvHashSet;
 use once_cell::sync::Lazy;
+use rustc_hash::FxHashSet;
 
 // See: https://pycqa.github.io/isort/docs/configuration/options.html#known-standard-library
-pub static KNOWN_STANDARD_LIBRARY: Lazy<FnvHashSet<&'static str>> = Lazy::new(|| {
-    FnvHashSet::from_iter([
+pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
+    FxHashSet::from_iter([
         "_ast",
         "_dummy_thread",
         "_thread",

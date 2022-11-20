@@ -1,4 +1,4 @@
-use fnv::FnvHashMap;
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
@@ -11,7 +11,7 @@ use crate::checks::{Check, CheckKind};
 /// Identify all `ExprKind::Name` nodes in an AST.
 struct NameFinder<'a> {
     /// A map from identifier to defining expression.
-    names: FnvHashMap<&'a str, &'a Expr>,
+    names: FxHashMap<&'a str, &'a Expr>,
 }
 
 impl NameFinder<'_> {
