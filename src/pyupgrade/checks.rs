@@ -163,12 +163,8 @@ pub fn unnecessary_lru_cache_params(
                 )
             {
                 let range = Range {
-                    location: func
-                        .end_location
-                        .expect("AST nodes should have end_location."),
-                    end_location: expr
-                        .end_location
-                        .expect("AST nodes should have end_location."),
+                    location: func.end_location.unwrap(),
+                    end_location: expr.end_location.unwrap(),
                 };
                 // Ex) `functools.lru_cache()`
                 if keywords.is_empty() {
