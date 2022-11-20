@@ -2008,7 +2008,7 @@ impl CheckKind {
                 )
             }
             CheckKind::ConvertExitToSysExit => "`exit()` is only available in the interpreter, \
-                                                should use `sys.exit()` instead"
+                                                use `sys.exit()` instead"
                 .to_string(),
             // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
