@@ -83,6 +83,7 @@ pub enum BindingKind {
     Binding,
     LoopVar,
     Global,
+    Nonlocal,
     Builtin,
     ClassDefinition,
     Definition,
