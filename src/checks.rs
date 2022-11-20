@@ -2076,6 +2076,7 @@ impl CheckKind {
                 | CheckKind::SectionUnderlineAfterName(..)
                 | CheckKind::SectionUnderlineMatchesSectionLength(..)
                 | CheckKind::SectionUnderlineNotOverIndented(..)
+                | CheckKind::SetAttrWithConstant
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::TrueFalseComparison(..)
                 | CheckKind::TypeOfPrimitive(..)
