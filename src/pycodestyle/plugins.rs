@@ -1,7 +1,7 @@
 use anyhow::Result;
-use fnv::FnvHashMap;
 use itertools::izip;
 use log::error;
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Arguments, Location, StmtKind};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Stmt, Unaryop};
 
@@ -46,7 +46,7 @@ pub fn literal_comparisons(
     // through the list of operators, we apply "dummy" fixes for each error,
     // then replace the entire expression at the end with one "real" fix, to
     // avoid conflicts.
-    let mut bad_ops: FnvHashMap<usize, Cmpop> = FnvHashMap::default();
+    let mut bad_ops: FxHashMap<usize, Cmpop> = FxHashMap::default();
     let mut checks: Vec<Check> = vec![];
 
     let op = ops.first().unwrap();

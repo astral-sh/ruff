@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::Path;
 
-use fnv::{FnvHashMap, FnvHashSet};
 use itertools::Itertools;
 use log::error;
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -54,10 +54,10 @@ pub struct Checker<'a> {
     definitions: Vec<(Definition<'a>, Visibility)>,
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
-    pub(crate) deletions: FnvHashSet<usize>,
+    pub(crate) deletions: FxHashSet<usize>,
     // Import tracking.
-    pub(crate) from_imports: FnvHashMap<&'a str, FnvHashSet<&'a str>>,
-    pub(crate) import_aliases: FnvHashMap<&'a str, &'a str>,
+    pub(crate) from_imports: FxHashMap<&'a str, FxHashSet<&'a str>>,
+    pub(crate) import_aliases: FxHashMap<&'a str, &'a str>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
     // at various points in time.
     pub(crate) parents: Vec<&'a Stmt>,
@@ -687,7 +687,7 @@ where
                     if let Some(module) = module {
                         self.from_imports
                             .entry(module)
-                            .or_insert_with(FnvHashSet::default)
+                            .or_insert_with(FxHashSet::default)
                             .extend(
                                 names
                                     .iter()

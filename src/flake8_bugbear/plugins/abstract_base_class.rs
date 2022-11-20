@@ -1,4 +1,4 @@
-use fnv::{FnvHashMap, FnvHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::match_module_member;
@@ -9,8 +9,8 @@ use crate::checks::{Check, CheckCode, CheckKind};
 fn is_abc_class(
     bases: &[Expr],
     keywords: &[Keyword],
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     keywords.iter().any(|keyword| {
         keyword
@@ -46,16 +46,16 @@ fn is_empty_body(body: &[Stmt]) -> bool {
 
 fn is_abstractmethod(
     expr: &Expr,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     match_module_member(expr, "abc", "abstractmethod", from_imports, import_aliases)
 }
 
 fn is_overload(
     expr: &Expr,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     match_module_member(expr, "typing", "overload", from_imports, import_aliases)
 }

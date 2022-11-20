@@ -1,4 +1,4 @@
-use fnv::{FnvHashMap, FnvHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -59,8 +59,8 @@ pub fn invalid_first_argument_name_for_class_method(
     name: &str,
     decorator_list: &[Expr],
     args: &Arguments,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
     settings: &Settings,
 ) -> Option<Check> {
     if matches!(
@@ -74,7 +74,14 @@ pub fn invalid_first_argument_name_for_class_method(
         ),
         FunctionType::ClassMethod
     ) {
-        if let Some(arg) = args.args.first() {
+        if let Some(arg) = args.posonlyargs.first() {
+            if arg.node.arg != "cls" {
+                return Some(Check::new(
+                    CheckKind::InvalidFirstArgumentNameForClassMethod,
+                    Range::from_located(arg),
+                ));
+            }
+        } else if let Some(arg) = args.args.first() {
             if arg.node.arg != "cls" {
                 return Some(Check::new(
                     CheckKind::InvalidFirstArgumentNameForClassMethod,
@@ -92,8 +99,8 @@ pub fn invalid_first_argument_name_for_method(
     name: &str,
     decorator_list: &[Expr],
     args: &Arguments,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
     settings: &Settings,
 ) -> Option<Check> {
     if matches!(
@@ -125,6 +132,11 @@ pub fn dunder_function_name(scope: &Scope, stmt: &Stmt, name: &str) -> Option<Ch
         return None;
     }
     if name.starts_with("__") && name.ends_with("__") {
+        // Allowed under PEP 562 (https://peps.python.org/pep-0562/).
+        if matches!(scope.kind, ScopeKind::Module) && (name == "__getattr__" || name == "__dir__") {
+            return None;
+        }
+
         return Some(Check::new(
             CheckKind::DunderFunctionName,
             Range::from_located(stmt),

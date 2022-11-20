@@ -1,11 +1,11 @@
 use std::str::FromStr;
 
 use anyhow::Result;
-use fnv::FnvHashMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff::checks_gen::CheckCodePrefix;
 use ruff::settings::types::PatternPrefixPair;
+use rustc_hash::FxHashMap;
 
 static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
@@ -179,8 +179,8 @@ pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair
 /// Collect a list of `PatternPrefixPair` structs as a `BTreeMap`.
 pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
-) -> FnvHashMap<String, Vec<CheckCodePrefix>> {
-    let mut per_file_ignores: FnvHashMap<String, Vec<CheckCodePrefix>> = FnvHashMap::default();
+) -> FxHashMap<String, Vec<CheckCodePrefix>> {
+    let mut per_file_ignores: FxHashMap<String, Vec<CheckCodePrefix>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)

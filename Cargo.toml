@@ -26,7 +26,6 @@ common-path = { version = "1.0.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 filetime = { version = "0.2.17" }
-fnv = { version = "1.0.7" }
 glob = { version = "0.3.0" }
 itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "a13ec97dd4eb925bde4d426c6e422582793b260c" }
@@ -39,6 +38,7 @@ path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
+rustc-hash = { version = "1.1.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb" }

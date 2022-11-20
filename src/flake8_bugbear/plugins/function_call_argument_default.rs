@@ -1,4 +1,4 @@
-use fnv::{FnvHashMap, FnvHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
 use crate::ast::helpers::{
@@ -24,8 +24,8 @@ const IMMUTABLE_FUNCS: [(&str, &str); 7] = [
 fn is_immutable_func(
     expr: &Expr,
     extend_immutable_calls: &[(&str, &str)],
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
     IMMUTABLE_FUNCS
@@ -37,8 +37,8 @@ fn is_immutable_func(
 struct ArgumentDefaultVisitor<'a> {
     checks: Vec<(CheckKind, Range)>,
     extend_immutable_calls: &'a [(&'a str, &'a str)],
-    from_imports: &'a FnvHashMap<&'a str, FnvHashSet<&'a str>>,
-    import_aliases: &'a FnvHashMap<&'a str, &'a str>,
+    from_imports: &'a FxHashMap<&'a str, FxHashSet<&'a str>>,
+    import_aliases: &'a FxHashMap<&'a str, &'a str>,
 }
 
 impl<'a, 'b> Visitor<'b> for ArgumentDefaultVisitor<'b>
