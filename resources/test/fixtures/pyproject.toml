@@ -16,6 +16,9 @@ multiline-quotes = "double"
 docstring-quotes = "double"
 avoid-escape = true
 
+[tool.ruff.mccabe]
+max-complexity = 10
+
 [tool.ruff.pep8-naming]
 ignore-names = [
   "setUp",
@@ -38,3 +41,6 @@ classmethod-decorators = [
 staticmethod-decorators = [
   "staticmethod",
 ]
+
+[tool.ruff.flake8-tidy-imports]
+ban-relative-imports = "parents"

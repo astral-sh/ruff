@@ -1,0 +1,39 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: ConvertExitToSysExit
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 4
+  fix:
+    patch:
+      content: sys.exit
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 3
+        column: 4
+    applied: false
+- kind: ConvertExitToSysExit
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 7
+    column: 8
+  fix:
+    patch:
+      content: sys.exit
+      location:
+        row: 7
+        column: 4
+      end_location:
+        row: 7
+        column: 8
+    applied: false
+

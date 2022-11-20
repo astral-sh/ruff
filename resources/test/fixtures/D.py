@@ -532,3 +532,37 @@ class Blah:  # noqa: D203,D213
 
 expect(os.path.normcase(__file__ if __file__[-1] != 'c' else __file__[:-1]),
        'D100: Missing docstring in public module')
+
+
+@expect('D201: No blank lines allowed before function docstring (found 1)')
+@expect('D213: Multi-line docstring summary should start at the second line')
+def multiline_leading_space():
+
+    """Leading space.
+
+    More content.
+    """
+
+
+@expect('D202: No blank lines allowed after function docstring (found 1)')
+@expect('D213: Multi-line docstring summary should start at the second line')
+def multiline_trailing_space():
+    """Leading space.
+
+    More content.
+    """
+
+    pass
+
+
+@expect('D201: No blank lines allowed before function docstring (found 1)')
+@expect('D202: No blank lines allowed after function docstring (found 1)')
+@expect('D213: Multi-line docstring summary should start at the second line')
+def multiline_trailing_and_leading_space():
+
+    """Trailing and leading space.
+
+    More content.
+    """
+
+    pass

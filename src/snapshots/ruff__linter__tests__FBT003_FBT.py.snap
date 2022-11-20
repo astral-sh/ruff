@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: BooleanPositionalValueInFunctionCall
+  location:
+    row: 41
+    column: 10
+  end_location:
+    row: 41
+    column: 14
+  fix: ~
+

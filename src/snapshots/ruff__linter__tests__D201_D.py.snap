@@ -38,4 +38,40 @@ expression: checks
         row: 146
         column: 0
     applied: false
+- kind:
+    NoBlankLineBeforeFunction: 1
+  location:
+    row: 541
+    column: 4
+  end_location:
+    row: 544
+    column: 7
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 540
+        column: 0
+      end_location:
+        row: 541
+        column: 0
+    applied: false
+- kind:
+    NoBlankLineBeforeFunction: 1
+  location:
+    row: 563
+    column: 4
+  end_location:
+    row: 566
+    column: 7
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 562
+        column: 0
+      end_location:
+        row: 563
+        column: 0
+    applied: false
 

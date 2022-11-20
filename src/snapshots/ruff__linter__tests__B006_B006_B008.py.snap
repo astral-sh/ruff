@@ -90,4 +90,28 @@ expression: checks
     row: 170
     column: 48
   fix: ~
+- kind: MutableArgumentDefault
+  location:
+    row: 203
+    column: 26
+  end_location:
+    row: 203
+    column: 28
+  fix: ~
+- kind: MutableArgumentDefault
+  location:
+    row: 204
+    column: 34
+  end_location:
+    row: 204
+    column: 36
+  fix: ~
+- kind: MutableArgumentDefault
+  location:
+    row: 205
+    column: 61
+  end_location:
+    row: 205
+    column: 66
+  fix: ~
 

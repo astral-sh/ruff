@@ -3,9 +3,12 @@ use std::collections::{BTreeSet, HashMap};
 use anyhow::Result;
 use ruff::checks_gen::CheckCodePrefix;
 use ruff::flake8_quotes::settings::Quote;
+use ruff::flake8_tidy_imports::settings::Strictness;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
-use ruff::{flake8_annotations, flake8_bugbear, flake8_quotes, pep8_naming};
+use ruff::{
+    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
+};
 
 use crate::plugin::Plugin;
 use crate::{parser, plugin};
@@ -71,6 +74,8 @@ pub fn convert(
     let mut flake8_annotations: flake8_annotations::settings::Options = Default::default();
     let mut flake8_bugbear: flake8_bugbear::settings::Options = Default::default();
     let mut flake8_quotes: flake8_quotes::settings::Options = Default::default();
+    let mut flake8_tidy_imports: flake8_tidy_imports::settings::Options = Default::default();
+    let mut mccabe: mccabe::settings::Options = Default::default();
     let mut pep8_naming: pep8_naming::settings::Options = Default::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
@@ -172,10 +177,23 @@ pub fn convert(
                     pep8_naming.staticmethod_decorators =
                         Some(parser::parse_strings(value.as_ref()));
                 }
+                // flake8-tidy-imports
+                "ban-relative-imports" | "ban_relative_imports" => match value.trim() {
+                    "true" => flake8_tidy_imports.ban_relative_imports = Some(Strictness::All),
+                    "parents" => {
+                        flake8_tidy_imports.ban_relative_imports = Some(Strictness::Parents)
+                    }
+                    _ => eprintln!("Unexpected '{key}' value: {value}"),
+                },
                 // flake8-docstrings
                 "docstring-convention" => {
                     // No-op (handled above).
                 }
+                // mccabe
+                "max-complexity" | "max_complexity" => match value.clone().parse::<usize>() {
+                    Ok(max_complexity) => mccabe.max_complexity = Some(max_complexity),
+                    Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                },
                 // Unknown
                 _ => eprintln!("Skipping unsupported property: {key}"),
             }
@@ -193,6 +211,12 @@ pub fn convert(
     }
     if flake8_quotes != Default::default() {
         options.flake8_quotes = Some(flake8_quotes);
+    }
+    if flake8_tidy_imports != Default::default() {
+        options.flake8_tidy_imports = Some(flake8_tidy_imports);
+    }
+    if mccabe != Default::default() {
+        options.mccabe = Some(mccabe);
     }
     if pep8_naming != Default::default() {
         options.pep8_naming = Some(pep8_naming);
@@ -219,26 +243,31 @@ mod tests {
     fn it_converts_empty() -> Result<()> {
         let actual = convert(&HashMap::from([]), None)?;
         let expected = Pyproject::new(Options {
-            line_length: None,
-            src: None,
-            fix: None,
+            dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
+            extend_ignore: None,
+            extend_select: None,
+            fix: None,
+            fixable: None,
+            ignore: Some(vec![]),
+            line_length: None,
+            per_file_ignores: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::W,
             ]),
-            extend_select: None,
-            ignore: Some(vec![]),
-            extend_ignore: None,
-            per_file_ignores: None,
-            dummy_variable_rgx: None,
+            show_source: None,
+            src: None,
             target_version: None,
+            unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
+            mccabe: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -253,26 +282,31 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            line_length: Some(100),
-            src: None,
-            fix: None,
+            dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
+            extend_ignore: None,
+            extend_select: None,
+            fix: None,
+            fixable: None,
+            ignore: Some(vec![]),
+            line_length: Some(100),
+            per_file_ignores: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::W,
             ]),
-            extend_select: None,
-            ignore: Some(vec![]),
-            extend_ignore: None,
-            per_file_ignores: None,
-            dummy_variable_rgx: None,
+            show_source: None,
+            src: None,
             target_version: None,
+            unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
+            mccabe: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -287,26 +321,31 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            line_length: Some(100),
-            src: None,
-            fix: None,
+            dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
+            extend_ignore: None,
+            extend_select: None,
+            fix: None,
+            fixable: None,
+            ignore: Some(vec![]),
+            line_length: Some(100),
+            per_file_ignores: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::W,
             ]),
-            extend_select: None,
-            ignore: Some(vec![]),
-            extend_ignore: None,
-            per_file_ignores: None,
-            dummy_variable_rgx: None,
+            show_source: None,
+            src: None,
             target_version: None,
+            unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
+            mccabe: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -321,26 +360,31 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            line_length: None,
-            src: None,
-            fix: None,
+            dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
+            extend_ignore: None,
+            extend_select: None,
+            fix: None,
+            fixable: None,
+            ignore: Some(vec![]),
+            line_length: None,
+            per_file_ignores: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::W,
             ]),
-            extend_select: None,
-            ignore: Some(vec![]),
-            extend_ignore: None,
-            per_file_ignores: None,
-            dummy_variable_rgx: None,
+            show_source: None,
+            src: None,
             target_version: None,
+            unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
+            mccabe: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -355,22 +399,25 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            line_length: None,
-            src: None,
-            fix: None,
+            dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
+            extend_ignore: None,
+            extend_select: None,
+            fix: None,
+            fixable: None,
+            ignore: Some(vec![]),
+            line_length: None,
+            per_file_ignores: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::W,
             ]),
-            extend_select: None,
-            ignore: Some(vec![]),
-            extend_ignore: None,
-            per_file_ignores: None,
-            dummy_variable_rgx: None,
+            show_source: None,
+            src: None,
             target_version: None,
+            unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
@@ -379,7 +426,9 @@ mod tests {
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
+            flake8_tidy_imports: None,
             isort: None,
+            mccabe: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -397,11 +446,16 @@ mod tests {
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
-            line_length: None,
-            src: None,
-            fix: None,
+            dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
+            extend_ignore: None,
+            extend_select: None,
+            fix: None,
+            fixable: None,
+            ignore: Some(vec![]),
+            line_length: None,
+            per_file_ignores: None,
             select: Some(vec![
                 CheckCodePrefix::D100,
                 CheckCodePrefix::D101,
@@ -442,16 +496,16 @@ mod tests {
                 CheckCodePrefix::F,
                 CheckCodePrefix::W,
             ]),
-            extend_select: None,
-            ignore: Some(vec![]),
-            extend_ignore: None,
-            per_file_ignores: None,
-            dummy_variable_rgx: None,
+            show_source: None,
+            src: None,
             target_version: None,
+            unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: None,
+            flake8_tidy_imports: None,
             isort: None,
+            mccabe: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);
@@ -466,23 +520,26 @@ mod tests {
             None,
         )?;
         let expected = Pyproject::new(Options {
-            line_length: None,
-            src: None,
-            fix: None,
+            dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
+            extend_ignore: None,
+            extend_select: None,
+            fix: None,
+            fixable: None,
+            ignore: Some(vec![]),
+            line_length: None,
+            per_file_ignores: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::Q,
                 CheckCodePrefix::W,
             ]),
-            extend_select: None,
-            ignore: Some(vec![]),
-            extend_ignore: None,
-            per_file_ignores: None,
-            dummy_variable_rgx: None,
+            show_source: None,
+            src: None,
             target_version: None,
+            unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
@@ -491,7 +548,9 @@ mod tests {
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
+            flake8_tidy_imports: None,
             isort: None,
+            mccabe: None,
             pep8_naming: None,
         });
         assert_eq!(actual, expected);

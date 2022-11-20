@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::Path;
 
-use fnv::{FnvHashMap, FnvHashSet};
 use itertools::Itertools;
 use log::error;
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -19,8 +19,7 @@ use crate::ast::helpers::{
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, ImportKind, Range, Scope,
-    ScopeKind,
+    Binding, BindingContext, BindingKind, ClassScope, ImportKind, Range, Scope, ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
@@ -36,8 +35,9 @@ use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_print, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade,
+    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
+    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print,
+    flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade, rules,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -54,10 +54,10 @@ pub struct Checker<'a> {
     definitions: Vec<(Definition<'a>, Visibility)>,
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
-    pub(crate) deletions: FnvHashSet<usize>,
+    pub(crate) deletions: FxHashSet<usize>,
     // Import tracking.
-    pub(crate) from_imports: FnvHashMap<&'a str, FnvHashSet<&'a str>>,
-    pub(crate) import_aliases: FnvHashMap<&'a str, &'a str>,
+    pub(crate) from_imports: FxHashMap<&'a str, FxHashSet<&'a str>>,
+    pub(crate) import_aliases: FxHashMap<&'a str, &'a str>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
     // at various points in time.
     pub(crate) parents: Vec<&'a Stmt>,
@@ -152,10 +152,10 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
-    pub fn patch(&self) -> bool {
+    pub fn patch(&self, code: &CheckCode) -> bool {
         // TODO(charlie): We can't fix errors in f-strings until RustPython adds
         // location data.
-        self.autofix.patch() && self.in_f_string.is_none()
+        self.autofix.patch() && self.in_f_string.is_none() && self.settings.fixable.contains(code)
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -213,22 +213,72 @@ where
 
         // Pre-visit.
         match &stmt.node {
-            StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
-                let global_scope_id = self.scopes[GLOBAL_SCOPE_INDEX].id;
-
-                let current_scope = self.current_scope();
-                let current_scope_id = current_scope.id;
-                if current_scope_id != global_scope_id {
+            StmtKind::Global { names } => {
+                let scope_index = *self.scope_stack.last().expect("No current scope found.");
+                if scope_index != GLOBAL_SCOPE_INDEX {
+                    let scope = &mut self.scopes[scope_index];
+                    let usage = Some((scope.id, Range::from_located(stmt)));
                     for name in names {
-                        for scope in self.scopes.iter_mut().skip(GLOBAL_SCOPE_INDEX + 1) {
-                            scope.values.insert(
-                                name,
-                                Binding {
-                                    kind: BindingKind::Assignment,
-                                    used: Some((global_scope_id, Range::from_located(stmt))),
-                                    range: Range::from_located(stmt),
-                                },
-                            );
+                        // Add a binding to the current scope.
+                        scope.values.insert(
+                            name,
+                            Binding {
+                                kind: BindingKind::Global,
+                                used: usage,
+                                range: Range::from_located(stmt),
+                            },
+                        );
+                    }
+
+                    // Mark the binding in the global scope as used.
+                    for name in names {
+                        if let Some(mut existing) = self.scopes[GLOBAL_SCOPE_INDEX]
+                            .values
+                            .get_mut(&name.as_str())
+                        {
+                            existing.used = usage;
+                        }
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::E741) {
+                    let location = Range::from_located(stmt);
+                    self.add_checks(
+                        names
+                            .iter()
+                            .filter_map(|name| {
+                                pycodestyle::checks::ambiguous_variable_name(name, location)
+                            })
+                            .into_iter(),
+                    );
+                }
+            }
+            StmtKind::Nonlocal { names } => {
+                let scope_index = *self.scope_stack.last().expect("No current scope found.");
+                if scope_index != GLOBAL_SCOPE_INDEX {
+                    let scope = &mut self.scopes[scope_index];
+                    let usage = Some((scope.id, Range::from_located(stmt)));
+                    for name in names {
+                        // Add a binding to the current scope.
+                        scope.values.insert(
+                            name,
+                            Binding {
+                                kind: BindingKind::Global,
+                                used: usage,
+                                range: Range::from_located(stmt),
+                            },
+                        );
+                    }
+
+                    // Mark the binding in the defining scopes as used too. (Skip the global scope
+                    // and the current scope.)
+                    for name in names {
+                        for index in self.scope_stack.iter().skip(1).rev().skip(1) {
+                            if let Some(mut existing) =
+                                self.scopes[*index].values.get_mut(&name.as_str())
+                            {
+                                existing.used = usage;
+                            }
                         }
                     }
                 }
@@ -352,6 +402,16 @@ where
                 if self.settings.enabled.contains(&CheckCode::B019) {
                     flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
                 }
+                if self.settings.enabled.contains(&CheckCode::C901) {
+                    if let Some(check) = mccabe::checks::function_is_too_complex(
+                        stmt,
+                        name,
+                        body,
+                        self.settings.mccabe.max_complexity,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
                     self.add_checks(
@@ -411,7 +471,7 @@ where
             }
             StmtKind::Return { .. } => {
                 if self.settings.enabled.contains(&CheckCode::F706) {
-                    if let Some(index) = self.scope_stack.last().cloned() {
+                    if let Some(&index) = self.scope_stack.last() {
                         if matches!(
                             self.scopes[index].kind,
                             ScopeKind::Class(_) | ScopeKind::Module
@@ -627,7 +687,7 @@ where
                     if let Some(module) = module {
                         self.from_imports
                             .entry(module)
-                            .or_insert_with(FnvHashSet::default)
+                            .or_insert_with(FxHashSet::default)
                             .extend(
                                 names
                                     .iter()
@@ -731,10 +791,8 @@ where
                             ));
                         }
 
-                        let scope = &mut self.scopes[*(self
-                            .scope_stack
-                            .last_mut()
-                            .expect("No current scope found."))];
+                        let scope = &mut self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
                         scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
@@ -780,6 +838,16 @@ where
                                 range: Range::from_located(stmt),
                             },
                         )
+                    }
+
+                    if self.settings.enabled.contains(&CheckCode::I252) {
+                        if let Some(check) = flake8_tidy_imports::checks::banned_relative_import(
+                            stmt,
+                            level.as_ref(),
+                            &self.settings.flake8_tidy_imports.ban_relative_imports,
+                        ) {
+                            self.add_check(check);
+                        }
                     }
 
                     if let Some(asname) = &alias.node.asname {
@@ -906,15 +974,14 @@ where
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
                 }
+                if self.settings.enabled.contains(&CheckCode::BLE001) {
+                    flake8_blind_except::plugins::blind_except(self, handlers);
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
                     if let [target] = &targets[..] {
-                        if let Some(check) =
-                            pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
-                        {
-                            self.add_check(check);
-                        }
+                        pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt)
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::U001) {
@@ -930,15 +997,21 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::U013) {
+                    pyupgrade::plugins::convert_typed_dict_functional_to_class(
+                        self, stmt, targets, value,
+                    );
+                }
+                if self.settings.enabled.contains(&CheckCode::U014) {
+                    pyupgrade::plugins::convert_named_tuple_functional_to_class(
+                        self, stmt, targets, value,
+                    );
+                }
             }
             StmtKind::AnnAssign { target, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
                     if let Some(value) = value {
-                        if let Some(check) =
-                            pycodestyle::checks::do_not_assign_lambda(target, value, stmt)
-                        {
-                            self.add_check(check);
-                        }
+                        pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
             }
@@ -1233,7 +1306,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C400),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1247,7 +1320,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C401),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1261,7 +1334,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C402),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1276,7 +1349,7 @@ where
                             args,
                             keywords,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C403),
                             Range::from_located(expr),
                         )
                     {
@@ -1292,7 +1365,7 @@ where
                             args,
                             keywords,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C404),
                             Range::from_located(expr),
                         )
                     {
@@ -1307,7 +1380,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C405),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1321,7 +1394,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C406),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1335,7 +1408,7 @@ where
                         args,
                         keywords,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C408),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1349,7 +1422,7 @@ where
                             func,
                             args,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C409),
                             Range::from_located(expr),
                         )
                     {
@@ -1364,7 +1437,7 @@ where
                             func,
                             args,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C410),
                             Range::from_located(expr),
                         )
                     {
@@ -1378,7 +1451,7 @@ where
                         func,
                         args,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C411),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1392,7 +1465,7 @@ where
                             func,
                             args,
                             self.locator,
-                            self.patch(),
+                            self.patch(&CheckCode::C413),
                             Range::from_located(expr),
                         )
                     {
@@ -1435,33 +1508,33 @@ where
                 }
 
                 // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::U002)
-                    && self.settings.target_version >= PythonVersion::Py310
-                {
-                    pyupgrade::plugins::unnecessary_abspath(self, expr, func, args);
-                }
-
                 if self.settings.enabled.contains(&CheckCode::U003) {
                     pyupgrade::plugins::type_of_primitive(self, expr, func, args);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::U013) {
+                if self.settings.enabled.contains(&CheckCode::U015) {
                     pyupgrade::plugins::redundant_open_modes(self, expr);
                 }
 
+                // flake8-boolean-trap
+                if self.settings.enabled.contains(&CheckCode::FBT003) {
+                    flake8_boolean_trap::plugins::check_boolean_positional_value_in_function_call(
+                        self, args,
+                    );
+                }
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
-                        let scope = &mut self.scopes[*(self
-                            .scope_stack
-                            .last_mut()
-                            .expect("No current scope found."))];
-                        if matches!(
-                            scope.kind,
-                            ScopeKind::Function(FunctionScope { uses_locals: false })
-                        ) {
-                            scope.kind = ScopeKind::Function(FunctionScope { uses_locals: true });
+                        let scope = &mut self.scopes
+                            [*(self.scope_stack.last().expect("No current scope found."))];
+                        if let ScopeKind::Function(inner) = &mut scope.kind {
+                            inner.uses_locals = true;
                         }
                     }
+                }
+
+                // Ruff
+                if self.settings.enabled.contains(&CheckCode::RUF101) {
+                    rules::plugins::convert_exit_to_sys_exit(self, func);
                 }
             }
             ExprKind::Dict { keys, .. } => {
@@ -1517,9 +1590,13 @@ where
                 let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
                 let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
                 if check_not_in || check_not_is {
-                    self.add_checks(
-                        pycodestyle::checks::not_tests(op, operand, check_not_in, check_not_is)
-                            .into_iter(),
+                    pycodestyle::plugins::not_tests(
+                        self,
+                        expr,
+                        op,
+                        operand,
+                        check_not_in,
+                        check_not_is,
                     );
                 }
 
@@ -1535,16 +1612,15 @@ where
                 let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
                 let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
                 if check_none_comparisons || check_true_false_comparisons {
-                    self.add_checks(
-                        pycodestyle::checks::literal_comparisons(
-                            left,
-                            ops,
-                            comparators,
-                            check_none_comparisons,
-                            check_true_false_comparisons,
-                        )
-                        .into_iter(),
-                    );
+                    pycodestyle::plugins::literal_comparisons(
+                        self,
+                        expr,
+                        left,
+                        ops,
+                        comparators,
+                        check_none_comparisons,
+                        check_true_false_comparisons,
+                    )
                 }
 
                 if self.settings.enabled.contains(&CheckCode::F632) {
@@ -1650,7 +1726,7 @@ where
                         elt,
                         generators,
                         self.locator,
-                        self.patch(),
+                        self.patch(&CheckCode::C416),
                         Range::from_located(expr),
                     ) {
                         self.add_check(check);
@@ -1944,6 +2020,16 @@ where
             flake8_bugbear::plugins::function_call_argument_default(self, arguments)
         }
 
+        // flake8-boolean-trap
+        if self.settings.enabled.contains(&CheckCode::FBT001) {
+            flake8_boolean_trap::plugins::check_positional_boolean_in_def(self, arguments);
+        }
+        if self.settings.enabled.contains(&CheckCode::FBT002) {
+            flake8_boolean_trap::plugins::check_boolean_default_value_in_function_definition(
+                self, arguments,
+            );
+        }
+
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for arg in &arguments.posonlyargs {
@@ -2092,6 +2178,10 @@ impl<'a> Checker<'a> {
         &self.scopes[*(self.scope_stack.last().expect("No current scope found."))]
     }
 
+    pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
+        self.scope_stack.iter().rev().map(|s| &self.scopes[*s])
+    }
+
     pub fn current_parent(&self) -> &'a Stmt {
         self.parents[*(self.parent_stack.last().expect("No parent found."))]
     }
@@ -2111,7 +2201,7 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         if self.settings.enabled.contains(&CheckCode::F402) {
-            let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+            let scope = self.current_scope();
             if let Some(existing) = scope.values.get(&name) {
                 if matches!(binding.kind, BindingKind::LoopVar)
                     && matches!(
@@ -2136,7 +2226,7 @@ impl<'a> Checker<'a> {
 
         // TODO(charlie): Don't treat annotations as assignments if there is an existing
         // value.
-        let scope = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        let scope = self.current_scope();
         let binding = match scope.values.get(&name) {
             None => binding,
             Some(existing) => Binding {
@@ -2152,8 +2242,7 @@ impl<'a> Checker<'a> {
 
     fn handle_node_load(&mut self, expr: &Expr) {
         if let ExprKind::Name { id, .. } = &expr.node {
-            let scope_id =
-                self.scopes[*(self.scope_stack.last().expect("No current scope found."))].id;
+            let scope_id = self.current_scope().id;
 
             let mut first_iter = true;
             let mut in_generator = false;
@@ -2243,7 +2332,16 @@ impl<'a> Checker<'a> {
 
         if self.settings.enabled.contains(&CheckCode::N806) {
             if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
-                pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
+                // Ignore globals.
+                if !self
+                    .current_scope()
+                    .values
+                    .get(id)
+                    .map(|binding| matches!(binding.kind, BindingKind::Global))
+                    .unwrap_or(false)
+                {
+                    pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
+                }
             }
         }
 
@@ -2299,7 +2397,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let current = &self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        let current = self.current_scope();
         if id == "__all__"
             && matches!(current.kind, ScopeKind::Module)
             && matches!(
@@ -2592,7 +2690,7 @@ impl<'a> Checker<'a> {
                     let child = self.parents[defined_by];
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
-                    let fix = if self.patch() {
+                    let fix = if self.patch(&CheckCode::F401) {
                         let deleted: Vec<&Stmt> = self
                             .deletions
                             .iter()

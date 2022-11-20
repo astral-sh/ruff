@@ -22,7 +22,7 @@ use crate::check_tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::code_gen::SourceGenerator;
 use crate::directives::Directives;
-use crate::message::Message;
+use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
@@ -176,11 +176,18 @@ pub fn lint_stdin(
     // Convert to messages.
     Ok(checks
         .into_iter()
-        .map(|check| Message::from_check(path.to_string_lossy().to_string(), check))
+        .map(|check| {
+            let filename = path.to_string_lossy().to_string();
+            let source = if settings.show_source {
+                Some(Source::from_check(&check, &locator))
+            } else {
+                None
+            };
+            Message::from_check(check, filename, source)
+        })
         .collect())
 }
 
-#[cfg_attr(target_family = "wasm", allow(unused_variables))]
 pub fn lint_path(
     path: &Path,
     settings: &Settings,
@@ -190,7 +197,6 @@ pub fn lint_path(
     let metadata = path.metadata()?;
 
     // Check the cache.
-    #[cfg(not(target_family = "wasm"))]
     if let Some(messages) = cache::get(path, &metadata, settings, autofix, mode) {
         debug!("Cache hit for: {}", path.to_string_lossy());
         return Ok(messages);
@@ -233,9 +239,17 @@ pub fn lint_path(
     // Convert to messages.
     let messages: Vec<Message> = checks
         .into_iter()
-        .map(|check| Message::from_check(path.to_string_lossy().to_string(), check))
+        .map(|check| {
+            let filename = path.to_string_lossy().to_string();
+            let source = if settings.show_source {
+                Some(Source::from_check(&check, &locator))
+            } else {
+                None
+            };
+            Message::from_check(check, filename, source)
+        })
         .collect();
-    #[cfg(not(target_family = "wasm"))]
+
     cache::set(path, &metadata, settings, autofix, &messages, mode);
 
     Ok(messages)
@@ -351,6 +365,7 @@ mod tests {
     #[test_case(CheckCode::B025, Path::new("B025.py"); "B025")]
     #[test_case(CheckCode::B026, Path::new("B026.py"); "B026")]
     #[test_case(CheckCode::B027, Path::new("B027.py"); "B027")]
+    #[test_case(CheckCode::BLE001, Path::new("BLE.py"); "BLE001")]
     #[test_case(CheckCode::C400, Path::new("C400.py"); "C400")]
     #[test_case(CheckCode::C401, Path::new("C401.py"); "C401")]
     #[test_case(CheckCode::C402, Path::new("C402.py"); "C402")]
@@ -487,7 +502,6 @@ mod tests {
     #[test_case(CheckCode::T201, Path::new("T201.py"); "T201")]
     #[test_case(CheckCode::T203, Path::new("T203.py"); "T203")]
     #[test_case(CheckCode::U001, Path::new("U001.py"); "U001")]
-    #[test_case(CheckCode::U002, Path::new("U002.py"); "U002")]
     #[test_case(CheckCode::U003, Path::new("U003.py"); "U003")]
     #[test_case(CheckCode::U004, Path::new("U004.py"); "U004")]
     #[test_case(CheckCode::U005, Path::new("U005.py"); "U005")]
@@ -503,6 +517,8 @@ mod tests {
     #[test_case(CheckCode::U011, Path::new("U011_1.py"); "U011_1")]
     #[test_case(CheckCode::U012, Path::new("U012.py"); "U012")]
     #[test_case(CheckCode::U013, Path::new("U013.py"); "U013")]
+    #[test_case(CheckCode::U014, Path::new("U014.py"); "U014")]
+    #[test_case(CheckCode::U015, Path::new("U015.py"); "U015")]
     #[test_case(CheckCode::W292, Path::new("W292_0.py"); "W292_0")]
     #[test_case(CheckCode::W292, Path::new("W292_1.py"); "W292_1")]
     #[test_case(CheckCode::W292, Path::new("W292_2.py"); "W292_2")]
@@ -511,6 +527,13 @@ mod tests {
     #[test_case(CheckCode::RUF001, Path::new("RUF001.py"); "RUF001")]
     #[test_case(CheckCode::RUF002, Path::new("RUF002.py"); "RUF002")]
     #[test_case(CheckCode::RUF003, Path::new("RUF003.py"); "RUF003")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_0.py"); "RUF101_0")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_1.py"); "RUF101_1")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_2.py"); "RUF101_2")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_3.py"); "RUF101_3")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_4.py"); "RUF101_4")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_5.py"); "RUF101_5")]
+    #[test_case(CheckCode::RUF101, Path::new("RUF101_6.py"); "RUF101_6")]
     #[test_case(CheckCode::YTT101, Path::new("YTT101.py"); "YTT101")]
     #[test_case(CheckCode::YTT102, Path::new("YTT102.py"); "YTT102")]
     #[test_case(CheckCode::YTT103, Path::new("YTT103.py"); "YTT103")]
@@ -521,6 +544,9 @@ mod tests {
     #[test_case(CheckCode::YTT301, Path::new("YTT301.py"); "YTT301")]
     #[test_case(CheckCode::YTT302, Path::new("YTT302.py"); "YTT302")]
     #[test_case(CheckCode::YTT303, Path::new("YTT303.py"); "YTT303")]
+    #[test_case(CheckCode::FBT001, Path::new("FBT.py"); "FBT001")]
+    #[test_case(CheckCode::FBT002, Path::new("FBT.py"); "FBT002")]
+    #[test_case(CheckCode::FBT003, Path::new("FBT.py"); "FBT003")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let mut checks = test_path(

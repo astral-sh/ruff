@@ -44,31 +44,35 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
 ## Table of Contents
 
 1. [Installation and Usage](#installation-and-usage)
-2. [Configuration](#configuration)
-3. [Supported Rules](#supported-rules)
-   1. [Pyflakes](#pyflakes)
-   2. [pycodestyle](#pycodestyle)
-   3. [isort](#isort)
-   4. [pydocstyle](#pydocstyle)
-   5. [pyupgrade](#pyupgrade)
-   6. [pep8-naming](#pep8-naming)
-   7. [flake8-bandit](#flake8-bandit)
-   8. [flake8-comprehensions](#flake8-comprehensions)
-   9. [flake8-bugbear](#flake8-bugbear)
-   10. [flake8-builtins](#flake8-builtins)
-   11. [flake8-print](#flake8-print)
-   12. [flake8-quotes](#flake8-quotes)
-   13. [flake8-annotations](#flake8-annotations)
-   14. [flake8-2020](#flake8-2020)
-   15. [Ruff-specific rules](#ruff-specific-rules)
-   16. [Meta rules](#meta-rules)
-5. [Editor Integrations](#editor-integrations)
-6. [FAQ](#faq)
-7. [Development](#development)
-8. [Releases](#releases)
-9. [Benchmarks](#benchmarks)
-10. [License](#license)
-11. [Contributing](#contributing)
+1. [Configuration](#configuration)
+1. [Supported Rules](#supported-rules)
+   1. [Pyflakes (F)](#pyflakes)
+   1. [pycodestyle (E)](#pycodestyle)
+   1. [isort (I)](#isort)
+   1. [pydocstyle (D)](#pydocstyle)
+   1. [pyupgrade (U)](#pyupgrade)
+   1. [pep8-naming (N)](#pep8-naming)
+   1. [flake8-bandit (S)](#flake8-bandit)
+   1. [flake8-comprehensions (C)](#flake8-comprehensions)
+   1. [flake8-bugbear (B)](#flake8-bugbear)
+   1. [flake8-builtins (A)](#flake8-builtins)
+   1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
+   1. [flake8-print (T)](#flake8-print)
+   1. [flake8-quotes (Q)](#flake8-quotes)
+   1. [flake8-annotations (ANN)](#flake8-annotations)
+   1. [flake8-2020 (YTT)](#flake8-2020)
+   1. [flake8-blind-except (BLE)](#flake8-blind-except)
+   1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
+   1. [mccabe (C90)](#mccabe)
+   1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
+   1. [Meta rules (M)](#meta-rules)
+1. [Editor Integrations](#editor-integrations)
+1. [FAQ](#faq)
+1. [Development](#development)
+1. [Releases](#releases)
+1. [Benchmarks](#benchmarks)
+1. [License](#license)
+1. [Contributing](#contributing)
 
 ## Installation and Usage
 
@@ -118,7 +122,7 @@ default configuration is equivalent to:
 [tool.ruff]
 line-length = 88
 
-# Enable Flake's "E" and "F" codes by default.
+# Enable Pyflakes `E` and `F` codes by default.
 select = ["E", "F"]
 ignore = []
 
@@ -153,18 +157,24 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py310"
 ```
 
-As an example, the following would configure Ruff to (1) avoid checking for line-length
-violations (`E501`) and (2) ignore unused import rules in `__init__.py` files:
+As an example, the following would configure Ruff to: (1) avoid checking for line-length
+violations (`E501`); (2), always autofix, but never remove unused imports (`F401`); and (3) ignore
+import-at-top-of-file errors (`E402`) in `__init__.py` files:
 
 ```toml
 [tool.ruff]
+# Enable Pyflakes and pycodestyle rules.
 select = ["E", "F"]
 
-# Never enforce `E501`.
+# Never enforce `E501` (line length violations).
 ignore = ["E501"]
 
-# Ignore `F401` violations in any `__init__.py` file, and in `path/to/file.py`.
-per-file-ignores = {"__init__.py" = ["F401"], "path/to/file.py" = ["F401"]}
+# Always autofix, but never try to fix `F401` (unused imports).
+fix = true
+unfixable = ["F401"]
+
+# Ignore `E402` (import violations in any `__init__.py` file, and in `path/to/file.py`.
+per-file-ignores = {"__init__.py" = ["E402"], "path/to/file.py" = ["E402"]}
 ```
 
 Plugin configurations should be expressed as subsections, e.g.:
@@ -187,7 +197,7 @@ ruff path/to/code/ --select F401 --select F403
 See `ruff --help` for more:
 
 ```shell
-ruff: An extremely fast Python linter.
+Ruff: An extremely fast Python linter.
 
 Usage: ruff [OPTIONS] <FILES>...
 
@@ -223,14 +233,20 @@ Options:
           List of paths, used to exclude files and/or directories from checks
       --extend-exclude <EXTEND_EXCLUDE>
           Like --exclude, but adds additional files and directories on top of the excluded ones
+      --fixable <FIXABLE>
+          List of error codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+      --unfixable <UNFIXABLE>
+          List of error codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
           Output serialization format for error messages [default: text] [possible values: text, json]
+      --show-source
+          Show violations with source code
       --show-files
-          See the files ruff will be run against with the current settings
+          See the files Ruff will be run against with the current settings
       --show-settings
-          See ruff's settings
+          See Ruff's settings
       --add-noqa
           Enable automatic additions of noqa directives to failing lines
       --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
@@ -239,6 +255,8 @@ Options:
           The minimum Python version that should be supported
       --line-length <LINE_LENGTH>
           Set the line-length for length-associated checks and automatic formatting
+      --max-complexity <MAX_COMPLEXITY>
+          Max McCabe complexity allowed for a function
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
   -h, --help
@@ -356,13 +374,13 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | ---- | ---- | ------- | --- |
 | E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |  |
 | E501 | LineTooLong | Line too long (89 > 88 characters) |  |
-| E711 | NoneComparison | Comparison to `None` should be `cond is None` |  |
-| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` |  |
-| E713 | NotInTest | Test for membership should be `not in` |  |
-| E714 | NotIsTest | Test for object identity should be `is not` |  |
+| E711 | NoneComparison | Comparison to `None` should be `cond is None` | 🛠 |
+| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` | 🛠 |
+| E713 | NotInTest | Test for membership should be `not in` | 🛠 |
+| E714 | NotIsTest | Test for object identity should be `is not` | 🛠 |
 | E721 | TypeComparison | Do not compare types, use `isinstance()` |  |
 | E722 | DoNotUseBareExcept | Do not use bare `except` |  |
-| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def |  |
+| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def | 🛠 |
 | E741 | AmbiguousVariableName | Ambiguous variable name: `...` |  |
 | E742 | AmbiguousClassName | Ambiguous class name: `...` |  |
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
@@ -437,7 +455,6 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | U001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
-| U002 | UnnecessaryAbspath | `abspath(__file__)` is unnecessary in Python 3.9 and later | 🛠 |
 | U003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
 | U004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
 | U005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead | 🛠 |
@@ -448,7 +465,9 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
 | U011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
 | U012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
-| U013 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
+| U013 | ConvertTypedDictFunctionalToClass | Convert `...` from `TypedDict` functional to class syntax | 🛠 |
+| U014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
+| U015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
 
 ### pep8-naming
 
@@ -508,6 +527,16 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C416 | UnnecessaryComprehension | Unnecessary `(list\|set)` comprehension (rewrite using `(list\|set)()`) | 🛠 |
 | C417 | UnnecessaryMap | Unnecessary `map` usage (rewrite using a `(list\|set\|dict)` comprehension) |  |
 
+### flake8-boolean-trap
+
+For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/0.1.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| FBT001 | BooleanPositionalArgInFunctionDefinition | Boolean positional arg in function definition |  |
+| FBT002 | BooleanDefaultValueInFunctionDefinition | Boolean default value in function definition |  |
+| FBT003 | BooleanPositionalValueInFunctionCall | Boolean positional value in function call |  |
+
 ### flake8-bugbear
 
 For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/) on PyPI.
@@ -522,7 +551,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B007 | UnusedLoopControlVariable | Loop control variable `i` not used within the loop body | 🛠 |
 | B008 | FunctionCallArgumentDefault | Do not perform function call in argument defaults |  |
 | B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
-| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. |  |
+| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B012 | JumpStatementInFinally | `return/continue/break` inside finally blocks cause exceptions to be silenced |  |
 | B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`. |  |
@@ -549,6 +578,14 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/)
 | A001 | BuiltinVariableShadowing | Variable `...` is shadowing a python builtin |  |
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |
+
+### flake8-tidy-imports
+
+For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| I252 | BannedRelativeImport | Relative imports are banned |  |
 
 ### flake8-print
 
@@ -605,6 +642,22 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 | YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
 | YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
 
+### flake8-blind-except
+
+For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except/0.2.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| BLE001 | BlindExcept | Blind except Exception: statement |  |
+
+### mccabe
+
+For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
+
 ### Ruff-specific rules
 
 | Code | Name | Message | Fix |
@@ -612,6 +665,7 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
+| RUF101 | ConvertExitToSysExit | `exit()` is only available in the interpreter, use `sys.exit()` instead | 🛠 |
 
 ### Meta rules
 
@@ -644,8 +698,59 @@ Ruff should then appear as a runnable action:
 Ruff is available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright) extension
 for coc.nvim.
 
-Ruff can also be integrated via [efm](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm)
-in just a [few lines](https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20).
+<details>
+<summary>Ruff can also be integrated via <a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm"><code>efm</code></a> in just a <a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">few lines</a>.</summary>
+<br>
+
+```yaml
+tools:
+  python-ruff: &python-ruff
+    lint-command: 'ruff --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}'
+    lint-stdin: true
+    lint-formats:
+      - '%f:%l:%c: %m'
+    format-command: 'ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -'
+    format-stdin: true
+```
+
+</details>
+
+<details>
+<summary>For neovim users using <a href="https://github.com/jose-elias-alvarez/null-ls.nvim"><code>null-ls</code></a>, Ruff is already <a href="https://github.com/jose-elias-alvarez/null-ls.nvim">integrated</a>.</summary>
+<br>
+
+```lua
+local null_ls = require("null-ls")
+local methods = require("null-ls.methods")
+local helpers = require("null-ls.helpers")
+
+local function ruff_fix()
+    return helpers.make_builtin({
+        name = "ruff",
+        meta = {
+            url = "https://github.com/charliermarsh/ruff/",
+            description = "An extremely fast Python linter, written in Rust.",
+        },
+        method = methods.internal.FORMATTING,
+        filetypes = { "python" },
+        generator_opts = {
+            command = "ruff",
+            args = { "--fix", "-e", "-n", "--stdin-filename", "$FILENAME", "-" },
+            to_stdin = true
+        },
+        factory = helpers.formatter_factory
+    })
+end
+
+null_ls.setup({
+    sources = {
+        ruff_fix(),
+        null_ls.builtins.diagnostics.ruff,
+    }
+})
+```
+
+</details>
 
 ### Language Server Protocol (Unofficial)
 
@@ -706,6 +811,7 @@ including:
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
+- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
@@ -713,7 +819,11 @@ including:
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (25/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/34)
+- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
+- [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
+- [`mccabe`](https://pypi.org/project/mccabe/)
+- [`isort`](https://pypi.org/project/isort/)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/33)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
 Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
@@ -727,10 +837,12 @@ Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis F
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
 
+- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
+- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
@@ -738,9 +850,12 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (26/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
+- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
+- [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
+- [`mccabe`](https://pypi.org/project/mccabe/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
-and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/34).
+and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 

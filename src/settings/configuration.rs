@@ -12,7 +12,10 @@ use regex::Regex;
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
-use crate::{flake8_annotations, flake8_bugbear, flake8_quotes, fs, isort, pep8_naming};
+use crate::{
+    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
+    pep8_naming,
+};
 
 #[derive(Debug)]
 pub struct Configuration {
@@ -22,17 +25,22 @@ pub struct Configuration {
     pub extend_ignore: Vec<CheckCodePrefix>,
     pub extend_select: Vec<CheckCodePrefix>,
     pub fix: bool,
+    pub fixable: Vec<CheckCodePrefix>,
     pub ignore: Vec<CheckCodePrefix>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub select: Vec<CheckCodePrefix>,
+    pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+    pub unfixable: Vec<CheckCodePrefix>,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
+    pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub isort: isort::settings::Settings,
+    pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
 }
 
@@ -116,6 +124,29 @@ impl Configuration {
                 .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F]),
             extend_select: options.extend_select.unwrap_or_default(),
             fix: options.fix.unwrap_or_default(),
+            fixable: options.fixable.unwrap_or_else(|| {
+                // TODO(charlie): Autogenerate this list.
+                vec![
+                    CheckCodePrefix::A,
+                    CheckCodePrefix::B,
+                    CheckCodePrefix::BLE,
+                    CheckCodePrefix::C,
+                    CheckCodePrefix::D,
+                    CheckCodePrefix::E,
+                    CheckCodePrefix::F,
+                    CheckCodePrefix::I,
+                    CheckCodePrefix::M,
+                    CheckCodePrefix::N,
+                    CheckCodePrefix::Q,
+                    CheckCodePrefix::RUF,
+                    CheckCodePrefix::S,
+                    CheckCodePrefix::T,
+                    CheckCodePrefix::U,
+                    CheckCodePrefix::W,
+                    CheckCodePrefix::YTT,
+                ]
+            }),
+            unfixable: options.unfixable.unwrap_or_default(),
             ignore: options.ignore.unwrap_or_default(),
             line_length: options.line_length.unwrap_or(88),
             per_file_ignores: options
@@ -129,6 +160,7 @@ impl Configuration {
                         .collect()
                 })
                 .unwrap_or_default(),
+            show_source: options.show_source.unwrap_or_default(),
             // Plugins
             flake8_annotations: options
                 .flake8_annotations
@@ -142,9 +174,17 @@ impl Configuration {
                 .flake8_quotes
                 .map(flake8_quotes::settings::Settings::from_options)
                 .unwrap_or_default(),
+            flake8_tidy_imports: options
+                .flake8_tidy_imports
+                .map(flake8_tidy_imports::settings::Settings::from_options)
+                .unwrap_or_default(),
             isort: options
                 .isort
                 .map(isort::settings::Settings::from_options)
+                .unwrap_or_default(),
+            mccabe: options
+                .mccabe
+                .map(mccabe::settings::Settings::from_options)
                 .unwrap_or_default(),
             pep8_naming: options
                 .pep8_naming

@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use fnv::FnvHashMap;
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, Keyword};
 use rustpython_parser::ast::{Located, Location};
 
@@ -19,9 +19,7 @@ impl Range {
     pub fn from_located<T>(located: &Located<T>) -> Self {
         Range {
             location: located.location,
-            end_location: located
-                .end_location
-                .expect("AST nodes should have end_location."),
+            end_location: located.end_location.unwrap(),
         }
     }
 }
@@ -54,7 +52,7 @@ pub struct Scope<'a> {
     pub id: usize,
     pub kind: ScopeKind<'a>,
     pub import_starred: bool,
-    pub values: FnvHashMap<&'a str, Binding>,
+    pub values: FxHashMap<&'a str, Binding>,
 }
 
 impl<'a> Scope<'a> {
@@ -63,7 +61,7 @@ impl<'a> Scope<'a> {
             id: id(),
             kind,
             import_starred: false,
-            values: FnvHashMap::default(),
+            values: FxHashMap::default(),
         }
     }
 }
@@ -79,8 +77,11 @@ pub enum BindingKind {
     Annotation,
     Argument,
     Assignment,
+    // TODO(charlie): This seems to be a catch-all.
     Binding,
     LoopVar,
+    Global,
+    Nonlocal,
     Builtin,
     ClassDefinition,
     Definition,

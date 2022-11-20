@@ -9,7 +9,16 @@ expression: checks
   end_location:
     row: 2
     column: 13
-  fix: ~
+  fix:
+    patch:
+      content: X is not Y
+      location:
+        row: 2
+        column: 3
+      end_location:
+        row: 2
+        column: 13
+    applied: false
 - kind: NotIsTest
   location:
     row: 5
@@ -17,7 +26,16 @@ expression: checks
   end_location:
     row: 5
     column: 15
-  fix: ~
+  fix:
+    patch:
+      content: X.B is not Y
+      location:
+        row: 5
+        column: 3
+      end_location:
+        row: 5
+        column: 15
+    applied: false
 - kind: NotIsTest
   location:
     row: 8

@@ -43,7 +43,7 @@ pub fn invalid_literal_comparison(
             && (is_constant_non_singleton(left) || is_constant_non_singleton(right))
         {
             let mut check = Check::new(CheckKind::IsLiteral, location);
-            if checker.patch() {
+            if checker.patch(check.kind.code()) {
                 match fix_invalid_literal_comparison(
                     checker.locator,
                     Range {

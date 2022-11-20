@@ -1,5 +1,5 @@
-use fnv::FnvHashSet;
 use regex::Regex;
+use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
@@ -55,7 +55,10 @@ pub fn unused_variables(scope: &Scope, dummy_variable_rgx: &Regex) -> Vec<Check>
 
     if matches!(
         scope.kind,
-        ScopeKind::Function(FunctionScope { uses_locals: true })
+        ScopeKind::Function(FunctionScope {
+            uses_locals: true,
+            ..
+        })
     ) {
         return checks;
     }
@@ -112,7 +115,7 @@ pub fn duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
     }
 
     // Search for duplicates.
-    let mut idents: FnvHashSet<&str> = FnvHashSet::default();
+    let mut idents: FxHashSet<&str> = FxHashSet::default();
     for arg in all_arguments {
         let ident = &arg.node.arg;
         if idents.contains(ident.as_str()) {

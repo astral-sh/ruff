@@ -6,7 +6,7 @@ expression: checks
     UnusedNOQA: ~
   location:
     row: 9
-    column: 9
+    column: 11
   end_location:
     row: 9
     column: 17
@@ -25,7 +25,7 @@ expression: checks
       - E501
   location:
     row: 13
-    column: 9
+    column: 11
   end_location:
     row: 13
     column: 23
@@ -45,7 +45,7 @@ expression: checks
       - E501
   location:
     row: 16
-    column: 9
+    column: 11
   end_location:
     row: 16
     column: 29
@@ -61,16 +61,17 @@ expression: checks
     applied: false
 - kind:
     UnusedNOQA:
+      - F841
       - W191
   location:
     row: 19
-    column: 9
+    column: 11
   end_location:
     row: 19
     column: 29
   fix:
     patch:
-      content: "  # noqa: F841"
+      content: ""
       location:
         row: 19
         column: 9
@@ -80,58 +81,105 @@ expression: checks
     applied: false
 - kind:
     UnusedNOQA:
+      - E501
+  location:
+    row: 23
+    column: 9
+  end_location:
+    row: 23
+    column: 21
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 23
+        column: 9
+      end_location:
+        row: 23
+        column: 21
+    applied: false
+- kind:
+    UnusedVariable: d
+  location:
+    row: 26
+    column: 4
+  end_location:
+    row: 26
+    column: 5
+  fix: ~
+- kind:
+    UnusedNOQA:
+      - E501
+  location:
+    row: 26
+    column: 32
+  end_location:
+    row: 26
+    column: 44
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 26
+        column: 9
+      end_location:
+        row: 26
+        column: 44
+    applied: false
+- kind:
+    UnusedNOQA:
       - F841
   location:
-    row: 44
-    column: 3
+    row: 52
+    column: 5
   end_location:
-    row: 44
+    row: 52
     column: 23
   fix:
     patch:
-      content: "  # noqa: E501"
+      content: "# noqa: E501"
       location:
-        row: 44
-        column: 3
+        row: 52
+        column: 5
       end_location:
-        row: 44
+        row: 52
         column: 23
     applied: false
 - kind:
     UnusedNOQA:
       - E501
   location:
-    row: 52
-    column: 3
+    row: 60
+    column: 5
   end_location:
-    row: 52
+    row: 60
     column: 17
   fix:
     patch:
       content: ""
       location:
-        row: 52
+        row: 60
         column: 3
       end_location:
-        row: 52
+        row: 60
         column: 17
     applied: false
 - kind:
     UnusedNOQA: ~
   location:
-    row: 60
-    column: 3
+    row: 68
+    column: 5
   end_location:
-    row: 60
+    row: 68
     column: 11
   fix:
     patch:
       content: ""
       location:
-        row: 60
+        row: 68
         column: 3
       end_location:
-        row: 60
+        row: 68
         column: 11
     applied: false
 

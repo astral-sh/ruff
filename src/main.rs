@@ -4,10 +4,9 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
-#[cfg(not(target_family = "wasm"))]
 use ::ruff::cache;
 use ::ruff::checks::{CheckCode, CheckKind};
-use ::ruff::cli::{collect_per_file_ignores, extract_log_level, warn_on, Cli, Warnable};
+use ::ruff::cli::{collect_per_file_ignores, extract_log_level, Cli};
 use ::ruff::fs::iter_python_files;
 use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin};
 use ::ruff::logging::{set_up_logging, LogLevel};
@@ -117,6 +116,7 @@ fn run_once(
                             location: Default::default(),
                             end_location: Default::default(),
                             filename: path.to_string_lossy().to_string(),
+                            source: None,
                         }]
                     } else {
                         error!("Failed to check {}: {message}", path.to_string_lossy());
@@ -239,25 +239,9 @@ fn inner_main() -> Result<ExitCode> {
             collect_per_file_ignores(cli.per_file_ignores, project_root.as_ref());
     }
     if !cli.select.is_empty() {
-        warn_on(
-            Warnable::Select,
-            &cli.select,
-            &cli.ignore,
-            &cli.extend_ignore,
-            &configuration,
-            pyproject.as_ref(),
-        );
         configuration.select = cli.select;
     }
     if !cli.extend_select.is_empty() {
-        warn_on(
-            Warnable::ExtendSelect,
-            &cli.extend_select,
-            &cli.ignore,
-            &cli.extend_ignore,
-            &configuration,
-            pyproject.as_ref(),
-        );
         configuration.extend_select = cli.extend_select;
     }
     if !cli.ignore.is_empty() {
@@ -266,8 +250,17 @@ fn inner_main() -> Result<ExitCode> {
     if !cli.extend_ignore.is_empty() {
         configuration.extend_ignore = cli.extend_ignore;
     }
+    if !cli.fixable.is_empty() {
+        configuration.fixable = cli.fixable;
+    }
+    if !cli.unfixable.is_empty() {
+        configuration.unfixable = cli.unfixable;
+    }
     if let Some(line_length) = cli.line_length {
         configuration.line_length = line_length;
+    }
+    if let Some(max_complexity) = cli.max_complexity {
+        configuration.mccabe.max_complexity = max_complexity;
     }
     if let Some(target_version) = cli.target_version {
         configuration.target_version = target_version;
@@ -277,6 +270,9 @@ fn inner_main() -> Result<ExitCode> {
     }
     if let Some(fix) = fix {
         configuration.fix = fix;
+    }
+    if cli.show_source {
+        configuration.show_source = true;
     }
 
     if cli.show_settings && cli.show_files {
@@ -289,7 +285,7 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     // Extract settings for internal use.
-    let autofix = configuration.fix;
+    let fix_enabled: bool = configuration.fix;
     let settings = Settings::from_configuration(configuration);
 
     if cli.show_files {
@@ -297,12 +293,16 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    #[cfg(not(target_family = "wasm"))]
-    cache::init()?;
+    // Initialize the cache.
+    let mut cache_enabled: bool = !cli.no_cache;
+    if cache_enabled && cache::init().is_err() {
+        eprintln!("Unable to initialize cache; disabling...");
+        cache_enabled = false;
+    }
 
     let printer = Printer::new(&cli.format, &log_level);
     if cli.watch {
-        if autofix {
+        if fix_enabled {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
 
@@ -322,7 +322,7 @@ fn inner_main() -> Result<ExitCode> {
         printer.clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
+        let messages = run_once(&cli.files, &settings, cache_enabled, false)?;
         printer.write_continuously(&messages)?;
 
         // Configure the file watcher.
@@ -340,7 +340,7 @@ fn inner_main() -> Result<ExitCode> {
                             printer.clear_screen()?;
                             printer.write_to_user("File change detected...\n");
 
-                            let messages = run_once(&cli.files, &settings, !cli.no_cache, false)?;
+                            let messages = run_once(&cli.files, &settings, cache_enabled, false)?;
                             printer.write_continuously(&messages)?;
                         }
                     }
@@ -365,15 +365,15 @@ fn inner_main() -> Result<ExitCode> {
         let messages = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            run_once_stdin(&settings, path, autofix)?
+            run_once_stdin(&settings, path, fix_enabled)?
         } else {
-            run_once(&cli.files, &settings, !cli.no_cache, autofix)?
+            run_once(&cli.files, &settings, cache_enabled, fix_enabled)?
         };
 
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && autofix) {
+        if !(is_stdin && fix_enabled) {
             printer.write_once(&messages)?;
         }
 

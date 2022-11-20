@@ -1,7 +1,8 @@
 use rustpython_parser::ast::Expr;
 
+use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::pyupgrade::{checks, fixes};
+use crate::pyupgrade::checks;
 
 /// U011
 pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Expr]) {
@@ -11,12 +12,8 @@ pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Exp
         &checker.from_imports,
         &checker.import_aliases,
     ) {
-        if checker.patch() {
-            if let Some(fix) =
-                fixes::remove_unnecessary_lru_cache_params(checker.locator, &check.location)
-            {
-                check.amend(fix);
-            }
+        if checker.patch(check.kind.code()) {
+            check.amend(Fix::deletion(check.location, check.end_location));
         }
         checker.add_check(check);
     }

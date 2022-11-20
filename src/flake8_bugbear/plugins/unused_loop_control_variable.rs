@@ -1,4 +1,4 @@
-use fnv::FnvHashMap;
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
@@ -11,7 +11,7 @@ use crate::checks::{Check, CheckKind};
 /// Identify all `ExprKind::Name` nodes in an AST.
 struct NameFinder<'a> {
     /// A map from identifier to defining expression.
-    names: FnvHashMap<&'a str, &'a Expr>,
+    names: FxHashMap<&'a str, &'a Expr>,
 }
 
 impl NameFinder<'_> {
@@ -65,7 +65,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
             CheckKind::UnusedLoopControlVariable(name.to_string()),
             Range::from_located(expr),
         );
-        if checker.patch() {
+        if checker.patch(check.kind.code()) {
             // Prefix the variable name with an underscore.
             check.amend(Fix::replacement(
                 format!("_{name}"),

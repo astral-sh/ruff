@@ -1,10 +1,11 @@
 use rustpython_ast::{Location, Stmt};
 use textwrap::{dedent, indent};
 
+use crate::ast::helpers::{match_leading_content, match_trailing_content};
 use crate::ast::types::Range;
+use crate::ast::whitespace::leading_space;
 use crate::autofix::{fixer, Fix};
 use crate::checks::CheckKind;
-use crate::docstrings::helpers::leading_space;
 use crate::isort::{comments, format_imports};
 use crate::{Check, Settings, SourceCodeLocator};
 
@@ -27,34 +28,6 @@ fn extract_indentation(body: &[&Stmt], locator: &SourceCodeLocator) -> String {
     leading_space(&existing)
 }
 
-fn match_leading_content(body: &[&Stmt], locator: &SourceCodeLocator) -> bool {
-    let location = body.first().unwrap().location;
-    let range = Range {
-        location: Location::new(location.row(), 0),
-        end_location: location,
-    };
-    let prefix = locator.slice_source_code_range(&range);
-    prefix.chars().any(|char| !char.is_whitespace())
-}
-
-fn match_trailing_content(body: &[&Stmt], locator: &SourceCodeLocator) -> bool {
-    let end_location = body.last().unwrap().end_location.unwrap();
-    let range = Range {
-        location: end_location,
-        end_location: Location::new(end_location.row() + 1, 0),
-    };
-    let suffix = locator.slice_source_code_range(&range);
-    for char in suffix.chars() {
-        if char == '#' {
-            return false;
-        }
-        if !char.is_whitespace() {
-            return true;
-        }
-    }
-    false
-}
-
 /// I001
 pub fn check_imports(
     body: Vec<&Stmt>,
@@ -75,8 +48,8 @@ pub fn check_imports(
     );
 
     // Special-cases: there's leading or trailing content in the import block.
-    let has_leading_content = match_leading_content(&body, locator);
-    let has_trailing_content = match_trailing_content(&body, locator);
+    let has_leading_content = match_leading_content(body.first().unwrap(), locator);
+    let has_trailing_content = match_trailing_content(body.last().unwrap(), locator);
 
     // Generate the sorted import block.
     let expected = format_imports(
@@ -91,7 +64,7 @@ pub fn check_imports(
 
     if has_leading_content || has_trailing_content {
         let mut check = Check::new(CheckKind::UnsortedImports, range);
-        if autofix.patch() {
+        if autofix.patch() && settings.fixable.contains(check.kind.code()) {
             let mut content = String::new();
             if has_leading_content {
                 content.push('\n');
@@ -119,7 +92,7 @@ pub fn check_imports(
         let actual = dedent(&locator.slice_source_code_range(&range));
         if actual != expected {
             let mut check = Check::new(CheckKind::UnsortedImports, range);
-            if autofix.patch() {
+            if autofix.patch() && settings.fixable.contains(check.kind.code()) {
                 check.amend(Fix::replacement(
                     indent(&expected, &indentation),
                     range.location,

@@ -1,7 +1,10 @@
-use fnv::{FnvHashMap, FnvHashSet};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, StmtKind};
+use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, Stmt, StmtKind};
+
+use crate::ast::types::Range;
+use crate::SourceCodeLocator;
 
 #[inline(always)]
 fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
@@ -42,7 +45,7 @@ pub fn collect_call_paths(expr: &Expr) -> Vec<&str> {
 /// Rewrite any import aliases on a call path.
 pub fn dealias_call_path<'a>(
     call_path: Vec<&'a str>,
-    import_aliases: &FnvHashMap<&str, &'a str>,
+    import_aliases: &FxHashMap<&str, &'a str>,
 ) -> Vec<&'a str> {
     if let Some(head) = call_path.first() {
         if let Some(origin) = import_aliases.get(head) {
@@ -76,8 +79,8 @@ pub fn match_module_member(
     expr: &Expr,
     module: &str,
     member: &str,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     match_call_path(
         &dealias_call_path(collect_call_paths(expr), import_aliases),
@@ -94,7 +97,7 @@ pub fn match_call_path(
     call_path: &[&str],
     module: &str,
     member: &str,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
 ) -> bool {
     // If we have no segments, we can't ever match.
     let num_segments = call_path.len();
@@ -261,10 +264,38 @@ pub fn to_absolute(relative: &Location, base: &Location) -> Location {
     }
 }
 
+/// Return `true` if a `Stmt` has leading content.
+pub fn match_leading_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+    let range = Range {
+        location: Location::new(stmt.location.row(), 0),
+        end_location: stmt.location,
+    };
+    let prefix = locator.slice_source_code_range(&range);
+    prefix.chars().any(|char| !char.is_whitespace())
+}
+
+/// Return `true` if a `Stmt` has trailing content.
+pub fn match_trailing_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+    let range = Range {
+        location: stmt.end_location.unwrap(),
+        end_location: Location::new(stmt.end_location.unwrap().row() + 1, 0),
+    };
+    let suffix = locator.slice_source_code_range(&range);
+    for char in suffix.chars() {
+        if char == '#' {
+            return false;
+        }
+        if !char.is_whitespace() {
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use fnv::{FnvHashMap, FnvHashSet};
+    use rustc_hash::{FxHashMap, FxHashSet};
     use rustpython_parser::parser;
 
     use crate::ast::helpers::match_module_member;
@@ -276,8 +307,8 @@ mod tests {
             &expr,
             "",
             "list",
-            &FnvHashMap::default(),
-            &FnvHashMap::default(),
+            &FxHashMap::default(),
+            &FxHashMap::default(),
         ));
         Ok(())
     }
@@ -289,8 +320,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::default(),
-            &FnvHashMap::default(),
+            &FxHashMap::default(),
+            &FxHashMap::default(),
         ));
         Ok(())
     }
@@ -302,16 +333,16 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::default(),
-            &FnvHashMap::default(),
+            &FxHashMap::default(),
+            &FxHashMap::default(),
         ));
         let expr = parser::parse_expression("re.Match", "<filename>")?;
         assert!(!match_module_member(
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::default(),
-            &FnvHashMap::default(),
+            &FxHashMap::default(),
+            &FxHashMap::default(),
         ));
         Ok(())
     }
@@ -323,8 +354,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["*"]))]),
-            &FnvHashMap::default()
+            &FxHashMap::from_iter([("typing.re", FxHashSet::from_iter(["*"]))]),
+            &FxHashMap::default()
         ));
         Ok(())
     }
@@ -336,8 +367,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["Match"]))]),
-            &FnvHashMap::default()
+            &FxHashMap::from_iter([("typing.re", FxHashSet::from_iter(["Match"]))]),
+            &FxHashMap::default()
         ));
         Ok(())
     }
@@ -349,8 +380,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))]),
-            &FnvHashMap::default()
+            &FxHashMap::from_iter([("typing", FxHashSet::from_iter(["re"]))]),
+            &FxHashMap::default()
         ));
 
         let expr = parser::parse_expression("match.Match", "<filename>")?;
@@ -358,8 +389,8 @@ mod tests {
             &expr,
             "typing.re.match",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["match"]))]),
-            &FnvHashMap::default()
+            &FxHashMap::from_iter([("typing.re", FxHashSet::from_iter(["match"]))]),
+            &FxHashMap::default()
         ));
 
         let expr = parser::parse_expression("re.match.Match", "<filename>")?;
@@ -367,8 +398,8 @@ mod tests {
             &expr,
             "typing.re.match",
             "Match",
-            &FnvHashMap::from_iter([("typing", FnvHashSet::from_iter(["re"]))]),
-            &FnvHashMap::default()
+            &FxHashMap::from_iter([("typing", FxHashSet::from_iter(["re"]))]),
+            &FxHashMap::default()
         ));
         Ok(())
     }
@@ -380,8 +411,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::from_iter([("typing.re", FnvHashSet::from_iter(["Match"]))]),
-            &FnvHashMap::from_iter([("IMatch", "Match")]),
+            &FxHashMap::from_iter([("typing.re", FxHashSet::from_iter(["Match"]))]),
+            &FxHashMap::from_iter([("IMatch", "Match")]),
         ));
         Ok(())
     }
@@ -393,8 +424,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::default(),
-            &FnvHashMap::from_iter([("t", "typing.re")]),
+            &FxHashMap::default(),
+            &FxHashMap::from_iter([("t", "typing.re")]),
         ));
         Ok(())
     }
@@ -406,8 +437,8 @@ mod tests {
             &expr,
             "typing.re",
             "Match",
-            &FnvHashMap::default(),
-            &FnvHashMap::from_iter([("t", "typing")]),
+            &FxHashMap::default(),
+            &FxHashMap::from_iter([("t", "typing")]),
         ));
         Ok(())
     }

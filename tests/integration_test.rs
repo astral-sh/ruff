@@ -78,3 +78,15 @@ fn test_stdin_autofix_when_no_issues_should_still_print_contents() -> Result<()>
     );
     Ok(())
 }
+
+#[test]
+fn test_show_source() -> Result<()> {
+    let mut cmd = Command::cargo_bin(crate_name!())?;
+    let output = cmd
+        .args(["-", "--show-source"])
+        .write_stdin("l = 1")
+        .assert()
+        .failure();
+    assert!(str::from_utf8(&output.get_output().stdout)?.contains("l = 1"));
+    Ok(())
+}

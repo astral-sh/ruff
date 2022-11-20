@@ -11,7 +11,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
     if let Some(mut check) =
         checks::useless_metaclass_type(targets, value, Range::from_located(stmt))
     {
-        if checker.patch() {
+        if checker.patch(check.kind.code()) {
             let context = checker.binding_context();
             let deleted: Vec<&Stmt> = checker
                 .deletions

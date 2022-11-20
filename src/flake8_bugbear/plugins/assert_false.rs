@@ -36,6 +36,7 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
     )
 }
 
+/// B011
 pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     if let ExprKind::Constant {
         value: Constant::Bool(false),
@@ -43,7 +44,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
     } = &test.node
     {
         let mut check = Check::new(CheckKind::DoNotAssertFalse, Range::from_located(test));
-        if checker.patch() {
+        if checker.patch(check.kind.code()) {
             let mut generator = SourceGenerator::new();
             if let Ok(()) = generator.unparse_stmt(&assertion_error(msg)) {
                 if let Ok(content) = generator.generate() {

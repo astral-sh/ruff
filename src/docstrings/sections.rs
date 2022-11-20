@@ -1,4 +1,4 @@
-use crate::docstrings::helpers;
+use crate::ast::whitespace;
 use crate::docstrings::styles::SectionStyle;
 
 #[derive(Debug)]
@@ -14,7 +14,7 @@ pub(crate) struct SectionContext<'a> {
 fn suspected_as_section(line: &str, style: &SectionStyle) -> bool {
     style
         .lowercase_section_names()
-        .contains(&helpers::leading_words(line).to_lowercase().as_str())
+        .contains(&whitespace::leading_words(line).to_lowercase().as_str())
 }
 
 /// Check if the suspected context is really a section header.
@@ -64,7 +64,7 @@ pub(crate) fn section_contexts<'a>(
     let mut contexts = vec![];
     for lineno in suspected_section_indices {
         let context = SectionContext {
-            section_name: helpers::leading_words(lines[lineno]),
+            section_name: whitespace::leading_words(lines[lineno]),
             previous_line: lines[lineno - 1],
             line: lines[lineno],
             following_lines: &lines[lineno + 1..],

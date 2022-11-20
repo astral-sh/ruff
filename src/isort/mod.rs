@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use fnv::FnvHashMap;
 use itertools::Itertools;
 use ropey::RopeBuilder;
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Stmt, StmtKind};
 
 use crate::isort::categorize::{categorize, ImportType};
@@ -355,7 +355,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                     atop: comments.atop,
                                     inline: Default::default(),
                                 },
-                                FnvHashMap::from_iter([(
+                                FxHashMap::from_iter([(
                                     alias,
                                     CommentSet {
                                         atop: Default::default(),

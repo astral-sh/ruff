@@ -6,7 +6,7 @@ use crate::ast::helpers::{self, match_name_or_attr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 const OPEN_FUNC_NAME: &str = "open";
@@ -105,7 +105,7 @@ fn create_remove_param_fix(
     }
 }
 
-/// U013
+/// U015
 pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     if let Some(mode_param) = match_open(expr) {
         if let Located {
@@ -123,7 +123,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(),
+                    checker.patch(&CheckCode::U015),
                 ));
             }
         }

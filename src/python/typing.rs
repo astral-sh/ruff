@@ -1,12 +1,12 @@
-use fnv::{FnvHashMap, FnvHashSet};
 use once_cell::sync::Lazy;
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::Expr;
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 
 // See: https://pypi.org/project/typing-extensions/
-static TYPING_EXTENSIONS: Lazy<FnvHashSet<&'static str>> = Lazy::new(|| {
-    FnvHashSet::from_iter([
+static TYPING_EXTENSIONS: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
+    FxHashSet::from_iter([
         "Annotated",
         "Any",
         "AsyncContextManager",
@@ -211,8 +211,8 @@ pub enum SubscriptKind {
 
 pub fn match_annotated_subscript(
     expr: &Expr,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> Option<SubscriptKind> {
     let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
     if !call_path.is_empty() {
@@ -234,8 +234,8 @@ pub fn match_annotated_subscript(
 /// PEP 585 built-in.
 pub fn is_pep585_builtin(
     expr: &Expr,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> bool {
     let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
     if !call_path.is_empty() {
