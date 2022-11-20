@@ -162,12 +162,17 @@ pub fn unnecessary_lru_cache_params(
                     import_aliases,
                 )
             {
+                let range = Range {
+                    location: func
+                        .end_location
+                        .expect("AST nodes should have end_location."),
+                    end_location: expr
+                        .end_location
+                        .expect("AST nodes should have end_location."),
+                };
                 // Ex) `functools.lru_cache()`
                 if keywords.is_empty() {
-                    return Some(Check::new(
-                        CheckKind::UnnecessaryLRUCacheParams,
-                        Range::from_located(expr),
-                    ));
+                    return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
                 }
                 // Ex) `functools.lru_cache(maxsize=None)`
                 if target_version >= PythonVersion::Py39 && keywords.len() == 1 {
@@ -181,10 +186,7 @@ pub fn unnecessary_lru_cache_params(
                             }
                         )
                     {
-                        return Some(Check::new(
-                            CheckKind::UnnecessaryLRUCacheParams,
-                            Range::from_located(expr),
-                        ));
+                        return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
                     }
                 }
             }
