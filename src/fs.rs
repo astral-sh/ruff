@@ -5,9 +5,9 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use fnv::FnvHashSet;
 use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
+use rustc_hash::FxHashSet;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::checks::CheckCode;
@@ -121,7 +121,7 @@ pub fn iter_python_files<'a>(
 pub(crate) fn ignores_from_path<'a>(
     path: &Path,
     pattern_code_pairs: &'a [PerFileIgnore],
-) -> Result<FnvHashSet<&'a CheckCode>> {
+) -> Result<FxHashSet<&'a CheckCode>> {
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
         .iter()

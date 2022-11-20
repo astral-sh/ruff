@@ -675,10 +675,10 @@ dependencies = [
  "anyhow",
  "clap 4.0.22",
  "configparser",
- "fnv",
  "once_cell",
  "regex",
  "ruff",
+ "rustc-hash",
  "serde",
  "serde_json",
  "toml",
@@ -1786,7 +1786,6 @@ dependencies = [
  "dirs 4.0.0",
  "fern",
  "filetime",
- "fnv",
  "getrandom 0.2.8",
  "glob",
  "insta",
@@ -1801,6 +1800,7 @@ dependencies = [
  "rayon",
  "regex",
  "ropey",
+ "rustc-hash",
  "rustpython-ast",
  "rustpython-common",
  "rustpython-parser",
@@ -1832,6 +1832,12 @@ dependencies = [
  "strum",
  "strum_macros",
 ]
+
+[[package]]
+name = "rustc-hash"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustls"

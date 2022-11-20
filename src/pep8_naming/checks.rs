@@ -1,4 +1,4 @@
-use fnv::{FnvHashMap, FnvHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -59,8 +59,8 @@ pub fn invalid_first_argument_name_for_class_method(
     name: &str,
     decorator_list: &[Expr],
     args: &Arguments,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
     settings: &Settings,
 ) -> Option<Check> {
     if matches!(
@@ -92,8 +92,8 @@ pub fn invalid_first_argument_name_for_method(
     name: &str,
     decorator_list: &[Expr],
     args: &Arguments,
-    from_imports: &FnvHashMap<&str, FnvHashSet<&str>>,
-    import_aliases: &FnvHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
     settings: &Settings,
 ) -> Option<Check> {
     if matches!(

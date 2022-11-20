@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use fnv::FnvHashMap;
+use rustc_hash::FxHashMap;
 
 use crate::ast;
 
@@ -51,14 +51,14 @@ impl Importable for ImportFromData<'_> {
 pub struct ImportBlock<'a> {
     // Set of (name, asname), used to track regular imports.
     // Ex) `import module`
-    pub import: FnvHashMap<AliasData<'a>, CommentSet<'a>>,
+    pub import: FxHashMap<AliasData<'a>, CommentSet<'a>>,
     // Map from (module, level) to `AliasData`, used to track 'from' imports.
     // Ex) `from module import member`
     pub import_from:
-        FnvHashMap<ImportFromData<'a>, (CommentSet<'a>, FnvHashMap<AliasData<'a>, CommentSet<'a>>)>,
+        FxHashMap<ImportFromData<'a>, (CommentSet<'a>, FxHashMap<AliasData<'a>, CommentSet<'a>>)>,
     // Set of (module, level, name, asname), used to track re-exported 'from' imports.
     // Ex) `from module import member as member`
-    pub import_from_as: FnvHashMap<(ImportFromData<'a>, AliasData<'a>), CommentSet<'a>>,
+    pub import_from_as: FxHashMap<(ImportFromData<'a>, AliasData<'a>), CommentSet<'a>>,
 }
 
 type AliasDataWithComments<'a> = (AliasData<'a>, CommentSet<'a>);

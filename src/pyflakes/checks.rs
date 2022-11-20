@@ -1,5 +1,5 @@
-use fnv::FnvHashSet;
 use regex::Regex;
+use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
@@ -115,7 +115,7 @@ pub fn duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
     }
 
     // Search for duplicates.
-    let mut idents: FnvHashSet<&str> = FnvHashSet::default();
+    let mut idents: FxHashSet<&str> = FxHashSet::default();
     for arg in all_arguments {
         let ident = &arg.node.arg;
         if idents.contains(ident.as_str()) {

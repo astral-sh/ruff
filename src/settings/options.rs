@@ -1,6 +1,6 @@
 //! Options that the user can provide via pyproject.toml.
 
-use fnv::FnvHashMap;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::checks_gen::CheckCodePrefix;
@@ -36,5 +36,5 @@ pub struct Options {
     pub mccabe: Option<mccabe::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
     // Tables are required to go last.
-    pub per_file_ignores: Option<FnvHashMap<String, Vec<CheckCodePrefix>>>,
+    pub per_file_ignores: Option<FxHashMap<String, Vec<CheckCodePrefix>>>,
 }
