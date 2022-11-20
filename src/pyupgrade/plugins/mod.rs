@@ -1,3 +1,4 @@
+pub use convert_named_tuple_functional_to_class::convert_named_tuple_functional_to_class;
 pub use convert_typed_dict_functional_to_class::convert_typed_dict_functional_to_class;
 pub use deprecated_unittest_alias::deprecated_unittest_alias;
 pub use super_call_with_parameters::super_call_with_parameters;
@@ -10,6 +11,7 @@ pub use use_pep604_annotation::use_pep604_annotation;
 pub use useless_metaclass_type::useless_metaclass_type;
 pub use useless_object_inheritance::useless_object_inheritance;
 
+mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
 mod deprecated_unittest_alias;
 mod super_call_with_parameters;

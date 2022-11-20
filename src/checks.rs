@@ -170,6 +170,7 @@ pub enum CheckCode {
     U011,
     U012,
     U013,
+    U014,
     // pydocstyle
     D100,
     D101,
@@ -501,6 +502,7 @@ pub enum CheckKind {
     UnnecessaryLRUCacheParams,
     UnnecessaryEncodeUTF8,
     ConvertTypedDictFunctionalToClass,
+    ConvertNamedTupleFunctionalToClass,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -774,6 +776,7 @@ impl CheckCode {
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
             CheckCode::U012 => CheckKind::UnnecessaryEncodeUTF8,
             CheckCode::U013 => CheckKind::ConvertTypedDictFunctionalToClass,
+            CheckCode::U014 => CheckKind::ConvertNamedTupleFunctionalToClass,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1005,6 +1008,7 @@ impl CheckCode {
             CheckCode::U011 => CheckCategory::Pyupgrade,
             CheckCode::U012 => CheckCategory::Pyupgrade,
             CheckCode::U013 => CheckCategory::Pyupgrade,
+            CheckCode::U014 => CheckCategory::Pyupgrade,
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -1228,6 +1232,7 @@ impl CheckKind {
             CheckKind::UnnecessaryLRUCacheParams => &CheckCode::U011,
             CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::U012,
             CheckKind::ConvertTypedDictFunctionalToClass => &CheckCode::U013,
+            CheckKind::ConvertNamedTupleFunctionalToClass => &CheckCode::U014,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -1779,6 +1784,9 @@ impl CheckKind {
             CheckKind::ConvertTypedDictFunctionalToClass => {
                 "Convert `TypedDict` functional syntax to class syntax".to_string()
             }
+            CheckKind::ConvertNamedTupleFunctionalToClass => {
+                "Convert `NamedTuple` functional syntax to class syntax".to_string()
+            }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
@@ -2045,6 +2053,7 @@ impl CheckKind {
                 | CheckKind::BlankLineAfterSummary
                 | CheckKind::BlankLineBeforeSection(..)
                 | CheckKind::CapitalizeSectionName(..)
+                | CheckKind::ConvertNamedTupleFunctionalToClass
                 | CheckKind::ConvertTypedDictFunctionalToClass
                 | CheckKind::DashedUnderlineAfterSection(..)
                 | CheckKind::DeprecatedUnittestAlias(..)
