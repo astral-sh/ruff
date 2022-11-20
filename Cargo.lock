@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "abomonation"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56e72913c99b1f927aa7bd59a41518fdd9995f63ffc8760f211609e0241c4fb2"
+
+[[package]]
 name = "adler"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2259,6 +2265,7 @@ dependencies = [
 name = "ruff"
 version = "0.0.130"
 dependencies = [
+ "abomonation",
  "annotate-snippets 0.9.1",
  "anyhow",
  "assert_cmd",

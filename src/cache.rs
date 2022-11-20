@@ -12,14 +12,14 @@ use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
-#[cfg(not(target_family = "wasm"))]
-use cacache::Error::EntryNotFound;
 use filetime::FileTime;
 use log::error;
-use path_absolutize::Absolutize;
+use path_absolutize::{path_dedot, Absolutize};
+use rustpython_common::vendored::ascii::AsciiChar::h;
 use serde::{Deserialize, Serialize};
 
 use crate::autofix::fixer;
+use crate::cache;
 use crate::message::Message;
 use crate::settings::Settings;
 
@@ -82,16 +82,13 @@ fn cache_dir() -> &'static str {
     "./.ruff_cache"
 }
 
-fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> String {
+fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> u64 {
     let mut hasher = DefaultHasher::new();
+    CARGO_PKG_VERSION.hash(&mut hasher);
+    path.hash(&mut hasher);
     settings.hash(&mut hasher);
     autofix.hash(&mut hasher);
-    format!(
-        "{}@{}@{}",
-        path.absolutize().unwrap().to_string_lossy(),
-        CARGO_PKG_VERSION,
-        hasher.finish()
-    )
+    hasher.finish()
 }
 
 /// Initialize the cache directory.
@@ -116,6 +113,25 @@ pub fn init() -> Result<()> {
     Ok(())
 }
 
+fn write_sync<T: serde::Serialize>(key: &u64, value: &T) -> Result<(), Box<bincode::ErrorKind>> {
+    // println!("{:?}", path_dedot::CWD);
+    // println!("{:?}", cache_dir());
+    // println!("{:?}", key);
+    // println!("{:?}", path_dedot::CWD.join(cache_dir()).join(key));
+    bincode::serialize_into(
+        File::create(Path::new(cache_dir()).join(key.to_string()))?,
+        value,
+    )
+}
+
+fn read_sync<T: serde::de::DeserializeOwned>(key: &u64) -> Result<T, Box<bincode::ErrorKind>> {
+    // println!("{:?}", path_dedot::CWD);
+    // println!("{:?}", cache_dir());
+    // println!("{:?}", key);
+    // println!("{:?}", Path::new(cache_dir()).join(key));
+    bincode::deserialize_from(File::open(Path::new(cache_dir()).join(key.to_string()))?)
+}
+
 /// Get a value from the cache.
 pub fn get(
     path: &Path,
@@ -129,20 +145,16 @@ pub fn get(
     };
 
     #[cfg(not(target_family = "wasm"))] // cacache needs async-std which doesn't support wasm
-    match cacache::read_sync(cache_dir(), cache_key(path, settings, autofix)) {
-        Ok(encoded) => match bincode::deserialize::<CheckResult>(&encoded[..]) {
-            Ok(CheckResult {
-                metadata: CacheMetadata { mtime },
-                messages,
-            }) => {
-                if FileTime::from_last_modification_time(metadata).unix_seconds() == mtime {
-                    return Some(messages);
-                }
+    match read_sync::<CheckResult>(&cache_key(path, settings, autofix)) {
+        Ok(CheckResult {
+            metadata: CacheMetadata { mtime },
+            messages,
+        }) => {
+            if FileTime::from_last_modification_time(metadata).unix_seconds() == mtime {
+                return Some(messages);
             }
-            Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
-        },
-        Err(EntryNotFound(..)) => {}
-        Err(e) => error!("Failed to read from cache: {e:?}"),
+        }
+        Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
     }
     None
 }
@@ -168,11 +180,7 @@ pub fn set(
         messages,
     };
     #[cfg(not(target_family = "wasm"))] // cacache needs async-std which doesn't support wasm
-    if let Err(e) = cacache::write_sync(
-        cache_dir(),
-        cache_key(path, settings, autofix),
-        bincode::serialize(&check_result).unwrap(),
-    ) {
+    if let Err(e) = write_sync(&cache_key(path, settings, autofix), &check_result) {
         error!("Failed to write to cache: {e:?}")
     }
 }

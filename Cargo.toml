@@ -13,6 +13,7 @@ edition = "2021"
 name = "ruff"
 
 [dependencies]
+abomonation = "0.7.3"
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { version = "1.0.66" }
 atty = { version = "0.2.14" }
