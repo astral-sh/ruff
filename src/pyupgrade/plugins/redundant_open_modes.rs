@@ -2,7 +2,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Located, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
-use crate::ast::helpers;
+use crate::ast::helpers::{self, match_name_or_attr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
@@ -50,15 +50,9 @@ impl OpenMode {
 
 fn match_open(expr: &Expr) -> Option<&Located<ExprKind>> {
     if let ExprKind::Call { func, args, .. } = &expr.node {
-        if let Located {
-            node: ExprKind::Name { id: func_name, .. },
-            ..
-        } = func.as_ref()
-        {
-            if func_name == OPEN_FUNC_NAME {
-                // Return the "open mode" parameter.
-                return args.get(1);
-            }
+        if match_name_or_attr(func, OPEN_FUNC_NAME) {
+            // Return the "open mode" parameter.
+            return args.get(1);
         }
     }
     None
