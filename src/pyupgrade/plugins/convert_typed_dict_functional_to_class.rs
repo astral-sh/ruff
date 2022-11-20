@@ -230,7 +230,7 @@ pub fn convert_typed_dict_functional_to_class(
             Err(err) => error!("Failed to parse TypedDict: {}", err),
             Ok((body, total_keyword)) => {
                 let mut check = Check::new(
-                    CheckKind::ConvertTypedDictFunctionalToClass,
+                    CheckKind::ConvertTypedDictFunctionalToClass(class_name.to_string()),
                     Range::from_located(stmt),
                 );
                 if checker.patch(check.kind.code()) {

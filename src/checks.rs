@@ -501,8 +501,8 @@ pub enum CheckKind {
     UnnecessaryFutureImport(Vec<String>),
     UnnecessaryLRUCacheParams,
     UnnecessaryEncodeUTF8,
-    ConvertTypedDictFunctionalToClass,
-    ConvertNamedTupleFunctionalToClass,
+    ConvertTypedDictFunctionalToClass(String),
+    ConvertNamedTupleFunctionalToClass(String),
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -775,8 +775,8 @@ impl CheckCode {
             CheckCode::U010 => CheckKind::UnnecessaryFutureImport(vec!["...".to_string()]),
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
             CheckCode::U012 => CheckKind::UnnecessaryEncodeUTF8,
-            CheckCode::U013 => CheckKind::ConvertTypedDictFunctionalToClass,
-            CheckCode::U014 => CheckKind::ConvertNamedTupleFunctionalToClass,
+            CheckCode::U013 => CheckKind::ConvertTypedDictFunctionalToClass("...".to_string()),
+            CheckCode::U014 => CheckKind::ConvertNamedTupleFunctionalToClass("...".to_string()),
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1231,8 +1231,8 @@ impl CheckKind {
             CheckKind::UnnecessaryFutureImport(_) => &CheckCode::U010,
             CheckKind::UnnecessaryLRUCacheParams => &CheckCode::U011,
             CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::U012,
-            CheckKind::ConvertTypedDictFunctionalToClass => &CheckCode::U013,
-            CheckKind::ConvertNamedTupleFunctionalToClass => &CheckCode::U014,
+            CheckKind::ConvertTypedDictFunctionalToClass(_) => &CheckCode::U013,
+            CheckKind::ConvertNamedTupleFunctionalToClass(_) => &CheckCode::U014,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -1781,11 +1781,11 @@ impl CheckKind {
                 "Unnecessary parameters to `functools.lru_cache`".to_string()
             }
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
-            CheckKind::ConvertTypedDictFunctionalToClass => {
-                "Convert `TypedDict` functional syntax to class syntax".to_string()
+            CheckKind::ConvertTypedDictFunctionalToClass(name) => {
+                format!("Convert `{name}` from `TypedDict` functional to class syntax")
             }
-            CheckKind::ConvertNamedTupleFunctionalToClass => {
-                "Convert `NamedTuple` functional syntax to class syntax".to_string()
+            CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
+                format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
@@ -2053,8 +2053,8 @@ impl CheckKind {
                 | CheckKind::BlankLineAfterSummary
                 | CheckKind::BlankLineBeforeSection(..)
                 | CheckKind::CapitalizeSectionName(..)
-                | CheckKind::ConvertNamedTupleFunctionalToClass
-                | CheckKind::ConvertTypedDictFunctionalToClass
+                | CheckKind::ConvertNamedTupleFunctionalToClass(..)
+                | CheckKind::ConvertTypedDictFunctionalToClass(..)
                 | CheckKind::DashedUnderlineAfterSection(..)
                 | CheckKind::DeprecatedUnittestAlias(..)
                 | CheckKind::DoNotAssertFalse
