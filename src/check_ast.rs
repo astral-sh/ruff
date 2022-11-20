@@ -1445,6 +1445,10 @@ where
                     pyupgrade::plugins::type_of_primitive(self, expr, func, args);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::U013) {
+                    pyupgrade::plugins::redundant_open_modes(self, expr);
+                }
+
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = &mut self.scopes[*(self

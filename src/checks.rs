@@ -163,6 +163,7 @@ pub enum CheckCode {
     U010,
     U011,
     U012,
+    U013,
     // pydocstyle
     D100,
     D101,
@@ -468,6 +469,7 @@ pub enum CheckKind {
     UnnecessaryFutureImport(Vec<String>),
     UnnecessaryLRUCacheParams,
     UnnecessaryEncodeUTF8,
+    RedundantOpenModes,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -731,6 +733,7 @@ impl CheckCode {
             CheckCode::U010 => CheckKind::UnnecessaryFutureImport(vec!["...".to_string()]),
             CheckCode::U011 => CheckKind::UnnecessaryLRUCacheParams,
             CheckCode::U012 => CheckKind::UnnecessaryEncodeUTF8,
+            CheckCode::U013 => CheckKind::RedundantOpenModes,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -955,6 +958,7 @@ impl CheckCode {
             CheckCode::U010 => CheckCategory::Pyupgrade,
             CheckCode::U011 => CheckCategory::Pyupgrade,
             CheckCode::U012 => CheckCategory::Pyupgrade,
+            CheckCode::U013 => CheckCategory::Pyupgrade,
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -1170,6 +1174,7 @@ impl CheckKind {
             CheckKind::UnnecessaryFutureImport(_) => &CheckCode::U010,
             CheckKind::UnnecessaryLRUCacheParams => &CheckCode::U011,
             CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::U012,
+            CheckKind::RedundantOpenModes => &CheckCode::U013,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -1708,6 +1713,7 @@ impl CheckKind {
                 "Unnecessary parameters to `functools.lru_cache`".to_string()
             }
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
+            CheckKind::RedundantOpenModes => "Unnecessary open mode parameters".to_string(),
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
@@ -1991,6 +1997,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryComprehension(_)
                 | CheckKind::UnnecessaryEncodeUTF8
                 | CheckKind::UnnecessaryFutureImport(_)
+                | CheckKind::RedundantOpenModes
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet

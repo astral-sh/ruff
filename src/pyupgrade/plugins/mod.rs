@@ -1,4 +1,5 @@
 pub use deprecated_unittest_alias::deprecated_unittest_alias;
+pub use redundant_open_modes::redundant_open_modes;
 pub use super_call_with_parameters::super_call_with_parameters;
 pub use type_of_primitive::type_of_primitive;
 pub use unnecessary_abspath::unnecessary_abspath;
@@ -11,6 +12,7 @@ pub use useless_metaclass_type::useless_metaclass_type;
 pub use useless_object_inheritance::useless_object_inheritance;
 
 mod deprecated_unittest_alias;
+mod redundant_open_modes;
 mod super_call_with_parameters;
 mod type_of_primitive;
 mod unnecessary_abspath;

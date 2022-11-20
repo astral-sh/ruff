@@ -1,0 +1,8 @@
+open("foo", "U")
+open("foo", "Ur")
+open("foo", "Ub")
+open("foo", "rUb")
+open("foo", "r")
+open("foo", "rt")
+open("f", "r", encoding="UTF-8")
+open("f", "wt")
