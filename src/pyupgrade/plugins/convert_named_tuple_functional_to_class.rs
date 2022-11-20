@@ -190,7 +190,7 @@ pub fn convert_named_tuple_functional_to_class(
             Ok(defaults) => {
                 if let Ok(properties) = create_properties_from_args(args, defaults) {
                     let mut check = Check::new(
-                        CheckKind::ConvertNamedTupleFunctionalToClass,
+                        CheckKind::ConvertNamedTupleFunctionalToClass(typename.to_string()),
                         Range::from_located(stmt),
                     );
                     if checker.patch(check.kind.code()) {
