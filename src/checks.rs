@@ -2056,6 +2056,7 @@ impl CheckKind {
             self,
             CheckKind::AmbiguousUnicodeCharacterString(..)
                 | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+                | CheckKind::ConvertExitToSysExit
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
                 | CheckKind::BlankLineAfterSummary

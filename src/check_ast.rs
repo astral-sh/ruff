@@ -1530,7 +1530,7 @@ where
 
                 // Ruff
                 if self.settings.enabled.contains(&CheckCode::RUF101) {
-                    rules::plugins::convert_sys_to_sys_exit(self, func);
+                    rules::plugins::convert_exit_to_sys_exit(self, func);
                 }
             }
             ExprKind::Dict { keys, .. } => {
