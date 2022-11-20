@@ -10,5 +10,14 @@ expression: checks
   end_location:
     row: 3
     column: 19
-  fix: ~
+  fix:
+    patch:
+      content: ValueError
+      location:
+        row: 3
+        column: 8
+      end_location:
+        row: 3
+        column: 19
+    applied: false
 
