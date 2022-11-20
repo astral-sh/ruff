@@ -398,6 +398,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
 
 [[package]]
+name = "cachedir"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e236bf5873ea57ec2877445297f4da008916bfae51567131acfc54a073d694f3"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "cast"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2257,6 +2266,7 @@ dependencies = [
  "bincode",
  "bitflags",
  "cacache",
+ "cachedir",
  "chrono",
  "clap 4.0.22",
  "clearscreen",
