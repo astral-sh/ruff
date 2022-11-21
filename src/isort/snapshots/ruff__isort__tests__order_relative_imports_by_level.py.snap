@@ -1,0 +1,22 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 5
+    column: 0
+  fix:
+    patch:
+      content: "from ..a import a\nfrom ..b import a\nfrom .a import a\nfrom .b import a\n"
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 5
+        column: 0
+    applied: false
+
