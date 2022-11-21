@@ -89,7 +89,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     let directives = directives::extract_directives(
         &tokens,
         &locator,
-        &directives::Flags::from_settings(&settings),
+        directives::Flags::from_settings(&settings),
     );
 
     // Generate checks.

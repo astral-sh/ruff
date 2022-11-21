@@ -400,7 +400,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
 pub fn format_imports(
     block: &[&Stmt],
     comments: Vec<Comment>,
-    line_length: &usize,
+    line_length: usize,
     src: &[PathBuf],
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,

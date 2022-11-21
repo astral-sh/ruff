@@ -38,7 +38,7 @@ pub fn format_import_from(
     import_from: &ImportFromData,
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
-    line_length: &usize,
+    line_length: usize,
     is_first: bool,
 ) -> String {
     // We can only inline if: (1) none of the aliases have atop comments, and (3)
@@ -54,7 +54,7 @@ pub fn format_import_from(
     {
         let (single_line, import_length) =
             format_single_line(import_from, comments, aliases, is_first);
-        if import_length <= *line_length {
+        if import_length <= line_length {
             return single_line;
         }
     }

@@ -17,7 +17,7 @@ pub fn useless_object_inheritance(
         if checker.patch(check.kind.code()) {
             if let Some(fix) = pyupgrade::fixes::remove_class_def_base(
                 checker.locator,
-                &stmt.location,
+                stmt.location,
                 check.location,
                 bases,
                 keywords,

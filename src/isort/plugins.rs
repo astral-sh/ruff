@@ -55,7 +55,7 @@ pub fn check_imports(
     let expected = format_imports(
         &body,
         comments,
-        &(settings.line_length - indentation.len()),
+        settings.line_length - indentation.len(),
         &settings.src,
         &settings.isort.known_first_party,
         &settings.isort.known_third_party,

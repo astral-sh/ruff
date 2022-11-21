@@ -253,7 +253,7 @@ pub fn to_module_and_member(target: &str) -> (&str, &str) {
 
 /// Convert a location within a file (relative to `base`) to an absolute
 /// position.
-pub fn to_absolute(relative: &Location, base: &Location) -> Location {
+pub fn to_absolute(relative: Location, base: Location) -> Location {
     if relative.row() == 1 {
         Location::new(
             relative.row() + base.row() - 1,
