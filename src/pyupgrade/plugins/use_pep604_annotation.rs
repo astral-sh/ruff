@@ -42,8 +42,25 @@ fn union(elts: &[Expr]) -> Expr {
     }
 }
 
+/// Returns `true` if any argument in the slice is a string.
+fn any_arg_is_str(slice: &Expr) -> bool {
+    match &slice.node {
+        ExprKind::Constant {
+            value: Constant::Str(_),
+            ..
+        } => true,
+        ExprKind::Tuple { elts, .. } => elts.iter().any(any_arg_is_str),
+        _ => false,
+    }
+}
+
 /// U007
 pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
+    // Avoid rewriting forward annotations.
+    if any_arg_is_str(slice) {
+        return;
+    }
+
     let call_path = dealias_call_path(collect_call_paths(value), &checker.import_aliases);
     if checker.match_typing_call_path(&call_path, "Optional") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));

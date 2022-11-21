@@ -22,8 +22,8 @@ pub fn collect_comments<'a>(range: &Range, locator: &'a SourceCodeLocator) -> Ve
         .flatten()
         .filter_map(|(start, tok, end)| {
             if matches!(tok, Tok::Comment) {
-                let start = helpers::to_absolute(&start, &range.location);
-                let end = helpers::to_absolute(&end, &range.location);
+                let start = helpers::to_absolute(start, range.location);
+                let end = helpers::to_absolute(end, range.location);
                 Some(Comment {
                     value: locator.slice_source_code_range(&Range {
                         location: start,

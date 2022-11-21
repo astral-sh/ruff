@@ -13,4 +13,15 @@ expression: checks
     row: 85
     column: 0
   fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - handle
+      - 9
+  location:
+    row: 113
+    column: 4
+  end_location:
+    row: 139
+    column: 0
+  fix: ~
 

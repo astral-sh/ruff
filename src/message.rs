@@ -56,7 +56,7 @@ impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let label = format!(
             "{}{}{}{}{}{} {} {}",
-            relativize_path(Path::new(&self.filename)).white().bold(),
+            relativize_path(Path::new(&self.filename)).bold(),
             ":".cyan(),
             self.location.row(),
             ":".cyan(),

@@ -109,7 +109,7 @@ pub fn init() -> Result<()> {
     Ok(())
 }
 
-fn write_sync(key: &u64, value: &[u8]) -> Result<(), std::io::Error> {
+fn write_sync(key: u64, value: &[u8]) -> Result<(), std::io::Error> {
     fs::write(
         Path::new(cache_dir())
             .join(content_dir())
@@ -118,7 +118,7 @@ fn write_sync(key: &u64, value: &[u8]) -> Result<(), std::io::Error> {
     )
 }
 
-fn read_sync(key: &u64) -> Result<Vec<u8>, std::io::Error> {
+fn read_sync(key: u64) -> Result<Vec<u8>, std::io::Error> {
     fs::read(
         Path::new(cache_dir())
             .join(content_dir())
@@ -138,7 +138,7 @@ pub fn get(
         return None;
     };
 
-    if let Ok(encoded) = read_sync(&cache_key(path, settings, autofix)) {
+    if let Ok(encoded) = read_sync(cache_key(path, settings, autofix)) {
         match bincode::deserialize::<CheckResult>(&encoded[..]) {
             Ok(CheckResult {
                 metadata: CacheMetadata { mtime },
@@ -174,7 +174,7 @@ pub fn set(
         messages,
     };
     if let Err(e) = write_sync(
-        &cache_key(path, settings, autofix),
+        cache_key(path, settings, autofix),
         &bincode::serialize(&check_result).unwrap(),
     ) {
         error!("Failed to write to cache: {e:?}")

@@ -670,7 +670,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.132-dev.0"
+version = "0.0.133-dev.0"
 dependencies = [
  "anyhow",
  "clap 4.0.22",
@@ -1768,7 +1768,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.132"
+version = "0.0.133"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1818,7 +1818,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.132"
+version = "0.0.133"
 dependencies = [
  "anyhow",
  "clap 4.0.22",
@@ -1854,7 +1854,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.1.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb#27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb"
+source = "git+https://github.com/RustPython/RustPython.git?rev=f885db8c61514f069979861f6b3bd83292086231#f885db8c61514f069979861f6b3bd83292086231"
 dependencies = [
  "num-bigint",
  "rustpython-common",
@@ -1864,7 +1864,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.0.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb#27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb"
+source = "git+https://github.com/RustPython/RustPython.git?rev=f885db8c61514f069979861f6b3bd83292086231#f885db8c61514f069979861f6b3bd83292086231"
 dependencies = [
  "ascii",
  "cfg-if 1.0.0",
@@ -1887,7 +1887,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb#27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb"
+source = "git+https://github.com/RustPython/RustPython.git?rev=f885db8c61514f069979861f6b3bd83292086231#f885db8c61514f069979861f6b3bd83292086231"
 dependencies = [
  "bincode",
  "bitflags",
@@ -1904,7 +1904,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb#27bf82a2251d7e6ac6cd75e6ad51be12a53d84bb"
+source = "git+https://github.com/RustPython/RustPython.git?rev=f885db8c61514f069979861f6b3bd83292086231#f885db8c61514f069979861f6b3bd83292086231"
 dependencies = [
  "ahash",
  "anyhow",
@@ -1916,6 +1916,7 @@ dependencies = [
  "num-traits",
  "phf 0.10.1",
  "phf_codegen 0.10.0",
+ "rustc-hash",
  "rustpython-ast",
  "rustpython-compiler-core",
  "thiserror",

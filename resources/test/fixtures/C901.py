@@ -106,3 +106,33 @@ async def foobar(a, b, c):
 # Complexity = 1
 def annotated_assign():
     x: Any = None
+
+
+# Complexity = 9
+class Class:
+    def handle(self, *args, **options):
+        if args:
+            return
+
+        class ServiceProvider:
+            def a(self):
+                pass
+
+            def b(self, data):
+                if not args:
+                    pass
+
+        class Logger:
+            def c(*args, **kwargs):
+                pass
+
+            def error(self, message):
+                pass
+
+            def info(self, message):
+                pass
+
+            def exception(self):
+                pass
+
+        return ServiceProvider(Logger())

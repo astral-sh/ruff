@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::Result;
 use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
@@ -146,7 +147,7 @@ pub fn extract_log_level(cli: &Cli) -> LogLevel {
 pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
     project_root: Option<&PathBuf>,
-) -> Vec<PerFileIgnore> {
+) -> Result<Vec<PerFileIgnore>> {
     let mut per_file_ignores: FxHashMap<String, Vec<CheckCodePrefix>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores

@@ -111,13 +111,14 @@ impl Configuration {
                         .map(|path| FilePattern::from_user(path, project_root))
                         .collect()
                 })
+                .transpose()?
                 .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
             extend_exclude: options
                 .extend_exclude
                 .unwrap_or_default()
                 .iter()
                 .map(|path| FilePattern::from_user(path, project_root))
-                .collect(),
+                .collect::<Result<_>>()?,
             extend_ignore: options.extend_ignore.unwrap_or_default(),
             select: options
                 .select
@@ -159,6 +160,7 @@ impl Configuration {
                         })
                         .collect()
                 })
+                .transpose()?
                 .unwrap_or_default(),
             show_source: options.show_source.unwrap_or_default(),
             // Plugins

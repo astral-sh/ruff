@@ -338,6 +338,7 @@ pub enum PrefixSpecificity {
 
 impl CheckCodePrefix {
     pub fn codes(&self) -> Vec<CheckCode> {
+        #[allow(clippy::match_same_arms)]
         match self {
             CheckCodePrefix::A => vec![CheckCode::A001, CheckCode::A002, CheckCode::A003],
             CheckCodePrefix::A0 => vec![CheckCode::A001, CheckCode::A002, CheckCode::A003],
@@ -1226,6 +1227,7 @@ impl CheckCodePrefix {
 
 impl CheckCodePrefix {
     pub fn specificity(&self) -> PrefixSpecificity {
+        #[allow(clippy::match_same_arms)]
         match self {
             CheckCodePrefix::A => PrefixSpecificity::Category,
             CheckCodePrefix::A0 => PrefixSpecificity::Hundreds,

@@ -38,7 +38,7 @@ pub struct Directives {
 pub fn extract_directives(
     lxr: &[LexResult],
     locator: &SourceCodeLocator,
-    flags: &Flags,
+    flags: Flags,
 ) -> Directives {
     Directives {
         noqa_line_for: if flags.contains(Flags::NOQA) {
@@ -75,13 +75,13 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
 /// Extract a set of lines over which to disable isort.
 pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) -> IntSet<usize> {
     let mut exclusions: IntSet<usize> = IntSet::default();
-    let mut off: Option<&Location> = None;
-    for (start, tok, end) in lxr.iter().flatten() {
+    let mut off: Option<Location> = None;
+    for &(start, ref tok, end) in lxr.iter().flatten() {
         // TODO(charlie): Modify RustPython to include the comment text in the token.
         if matches!(tok, Tok::Comment) {
             let comment_text = locator.slice_source_code_range(&Range {
-                location: *start,
-                end_location: *end,
+                location: start,
+                end_location: end,
             });
             if off.is_some() {
                 if comment_text == "# isort: on" {
