@@ -1,3 +1,6 @@
+use std::str::FromStr;
+
+use anyhow::anyhow;
 use rustpython_ast::{Constant, Expr, ExprKind, Located, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
@@ -21,35 +24,40 @@ enum OpenMode {
     Wt,
 }
 
-impl OpenMode {
-    fn from_str(input: &str) -> Option<OpenMode> {
-        match input {
-            "U" => Some(OpenMode::U),
-            "Ur" => Some(OpenMode::Ur),
-            "Ub" => Some(OpenMode::Ub),
-            "rUb" => Some(OpenMode::RUb),
-            "r" => Some(OpenMode::R),
-            "rt" => Some(OpenMode::Rt),
-            "wt" => Some(OpenMode::Wt),
-            _ => None,
-        }
-    }
+impl FromStr for OpenMode {
+    type Err = anyhow::Error;
 
-    fn replacement_value(&self) -> String {
-        match *self {
-            OpenMode::U => String::from(""),
-            OpenMode::Ur => String::from(""),
-            OpenMode::Ub => String::from("\"rb\""),
-            OpenMode::RUb => String::from("\"rb\""),
-            OpenMode::R => String::from(""),
-            OpenMode::Rt => String::from(""),
-            OpenMode::Wt => String::from("\"w\""),
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        match string {
+            "U" => Ok(OpenMode::U),
+            "Ur" => Ok(OpenMode::Ur),
+            "Ub" => Ok(OpenMode::Ub),
+            "rUb" => Ok(OpenMode::RUb),
+            "r" => Ok(OpenMode::R),
+            "rt" => Ok(OpenMode::Rt),
+            "wt" => Ok(OpenMode::Wt),
+            _ => Err(anyhow!("Unknown open mode: {}", string)),
         }
     }
 }
 
-fn match_open(expr: &Expr) -> Option<&Located<ExprKind>> {
+impl OpenMode {
+    fn replacement_value(&self) -> Option<String> {
+        match *self {
+            OpenMode::U => None,
+            OpenMode::Ur => None,
+            OpenMode::Ub => Some(String::from("\"rb\"")),
+            OpenMode::RUb => Some(String::from("\"rb\"")),
+            OpenMode::R => None,
+            OpenMode::Rt => None,
+            OpenMode::Wt => Some(String::from("\"w\"")),
+        }
+    }
+}
+
+fn match_open(expr: &Expr) -> Option<&Expr> {
     if let ExprKind::Call { func, args, .. } = &expr.node {
+        // TODO(andberger): Verify that "open" is still bound to the built-in function.
         if match_name_or_attr(func, OPEN_FUNC_NAME) {
             // Return the "open mode" parameter.
             return args.get(1);
@@ -61,22 +69,22 @@ fn match_open(expr: &Expr) -> Option<&Located<ExprKind>> {
 fn create_check(
     expr: &Expr,
     mode_param: &Expr,
-    replacement_value: String,
+    replacement_value: Option<String>,
     locator: &SourceCodeLocator,
     patch: bool,
 ) -> Check {
     let mut check = Check::new(CheckKind::RedundantOpenModes, Range::from_located(expr));
     if patch {
-        if replacement_value.is_empty() {
-            if let Some(fix) = create_remove_param_fix(locator, expr, mode_param) {
-                check.amend(fix);
-            }
-        } else {
+        if let Some(replacement_value_content) = replacement_value {
             check.amend(Fix::replacement(
-                replacement_value,
+                replacement_value_content,
                 mode_param.location,
                 mode_param.end_location.unwrap(),
             ))
+        } else {
+            if let Some(fix) = create_remove_param_fix(locator, expr, mode_param) {
+                check.amend(fix);
+            }
         }
     }
     check
@@ -84,22 +92,29 @@ fn create_check(
 
 fn create_remove_param_fix(
     locator: &SourceCodeLocator,
-    expr: &Located<ExprKind>,
-    mode_param: &Located<ExprKind>,
+    expr: &Expr,
+    mode_param: &Expr,
 ) -> Option<Fix> {
     let content = locator.slice_source_code_range(&Range {
         location: expr.location,
         end_location: expr.end_location.unwrap(),
     });
+    // Find the last comma before mode_param
+    // and delete that comma as well as mode_param.
     let mut fix_start: Option<Location> = None;
-    for (start, tok, _) in lexer::make_tokenizer(&content).flatten() {
+    let mut fix_end: Option<Location> = None;
+    for (start, tok, end) in lexer::make_tokenizer(&content).flatten() {
         let start = helpers::to_absolute(&start, &expr.location);
-        if matches!(tok, Tok::Comma) {
-            fix_start = Some(start);
+        let end = helpers::to_absolute(&end, &expr.location);
+        if start == mode_param.location {
+            fix_end = Some(end);
             break;
         }
+        if matches!(tok, Tok::Comma) {
+            fix_start = Some(start);
+        }
     }
-    match (fix_start, mode_param.end_location) {
+    match (fix_start, fix_end) {
         (Some(start), Some(end)) => Some(Fix::deletion(start, end)),
         _ => None,
     }
@@ -117,7 +132,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
             ..
         } = mode_param
         {
-            if let Some(mode) = OpenMode::from_str(mode_param_value.as_str()) {
+            if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
                 checker.add_check(create_check(
                     expr,
                     mode_param,
