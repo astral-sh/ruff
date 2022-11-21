@@ -164,7 +164,84 @@ expression: checks
     row: 107
     column: 0
   end_location:
-    row: 109
+    row: 112
     column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - handle
+      - 9
+  location:
+    row: 113
+    column: 4
+  end_location:
+    row: 139
+    column: 0
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - a
+      - 1
+  location:
+    row: 118
+    column: 12
+  end_location:
+    row: 121
+    column: 12
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - b
+      - 2
+  location:
+    row: 121
+    column: 12
+  end_location:
+    row: 125
+    column: 8
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - c
+      - 1
+  location:
+    row: 126
+    column: 12
+  end_location:
+    row: 129
+    column: 12
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - error
+      - 1
+  location:
+    row: 129
+    column: 12
+  end_location:
+    row: 132
+    column: 12
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - info
+      - 1
+  location:
+    row: 132
+    column: 12
+  end_location:
+    row: 135
+    column: 12
+  fix: ~
+- kind:
+    FunctionIsTooComplex:
+      - exception
+      - 1
+  location:
+    row: 135
+    column: 12
+  end_location:
+    row: 138
+    column: 8
   fix: ~
 
