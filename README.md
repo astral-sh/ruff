@@ -827,7 +827,7 @@ including:
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`isort`](https://pypi.org/project/isort/)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/33)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
 Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
@@ -859,7 +859,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`mccabe`](https://pypi.org/project/mccabe/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
-and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (15/33).
+and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 
