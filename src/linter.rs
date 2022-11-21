@@ -151,7 +151,7 @@ pub fn lint_stdin(
     let directives = directives::extract_directives(
         &tokens,
         &locator,
-        &directives::Flags::from_settings(settings),
+        directives::Flags::from_settings(settings),
     );
 
     // Generate checks.
@@ -215,7 +215,7 @@ pub fn lint_path(
     let directives = directives::extract_directives(
         &tokens,
         &locator,
-        &directives::Flags::from_settings(settings),
+        directives::Flags::from_settings(settings),
     );
 
     // Generate checks.
@@ -269,7 +269,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     let directives = directives::extract_directives(
         &tokens,
         &locator,
-        &directives::Flags::from_settings(settings),
+        directives::Flags::from_settings(settings),
     );
 
     // Generate checks.
@@ -310,7 +310,7 @@ pub fn test_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Res
     let directives = directives::extract_directives(
         &tokens,
         &locator,
-        &directives::Flags::from_settings(settings),
+        directives::Flags::from_settings(settings),
     );
     check_path(
         path,

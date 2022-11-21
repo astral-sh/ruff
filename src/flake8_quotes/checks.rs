@@ -42,14 +42,14 @@ fn good_docstring(quote: &Quote) -> &str {
 
 pub fn quotes(
     locator: &SourceCodeLocator,
-    start: &Location,
-    end: &Location,
+    start: Location,
+    end: Location,
     is_docstring: bool,
     settings: &Settings,
 ) -> Option<Check> {
     let text = locator.slice_source_code_range(&Range {
-        location: *start,
-        end_location: *end,
+        location: start,
+        end_location: end,
     });
 
     // Remove any prefixes (e.g., remove `u` from `u"foo"`).
@@ -77,8 +77,8 @@ pub fn quotes(
         return Some(Check::new(
             CheckKind::BadQuotesDocstring(settings.docstring_quotes.clone()),
             Range {
-                location: *start,
-                end_location: *end,
+                location: start,
+                end_location: end,
             },
         ));
     } else if is_multiline {
@@ -95,8 +95,8 @@ pub fn quotes(
         return Some(Check::new(
             CheckKind::BadQuotesMultilineString(settings.multiline_quotes.clone()),
             Range {
-                location: *start,
-                end_location: *end,
+                location: start,
+                end_location: end,
             },
         ));
     } else {
@@ -113,8 +113,8 @@ pub fn quotes(
                 return Some(Check::new(
                     CheckKind::AvoidQuoteEscape,
                     Range {
-                        location: *start,
-                        end_location: *end,
+                        location: start,
+                        end_location: end,
                     },
                 ));
             }
@@ -126,8 +126,8 @@ pub fn quotes(
             return Some(Check::new(
                 CheckKind::BadQuotesInlineString(settings.inline_quotes.clone()),
                 Range {
-                    location: *start,
-                    end_location: *end,
+                    location: start,
+                    end_location: end,
                 },
             ));
         }

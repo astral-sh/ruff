@@ -26,7 +26,7 @@ fn match_tuple_range<T>(located: &Located<T>, locator: &SourceCodeLocator) -> Re
     for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
         if matches!(tok, Tok::Lpar) {
             if count == 0 {
-                location = Some(helpers::to_absolute(&start, &range.location));
+                location = Some(helpers::to_absolute(start, range.location));
             }
             count += 1;
         }
@@ -34,7 +34,7 @@ fn match_tuple_range<T>(located: &Located<T>, locator: &SourceCodeLocator) -> Re
         if matches!(tok, Tok::Rpar) {
             count -= 1;
             if count == 0 {
-                end_location = Some(helpers::to_absolute(&end, &range.location));
+                end_location = Some(helpers::to_absolute(end, range.location));
                 break;
             }
         }

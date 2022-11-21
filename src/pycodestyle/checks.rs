@@ -103,14 +103,14 @@ fn extract_quote(text: &str) -> &str {
 /// W605
 pub fn invalid_escape_sequence(
     locator: &SourceCodeLocator,
-    start: &Location,
-    end: &Location,
+    start: Location,
+    end: Location,
 ) -> Vec<Check> {
     let mut checks = vec![];
 
     let text = locator.slice_source_code_range(&Range {
-        location: *start,
-        end_location: *end,
+        location: start,
+        end_location: end,
     });
 
     // Determine whether the string is single- or triple-quoted.

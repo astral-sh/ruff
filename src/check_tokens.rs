@@ -26,7 +26,7 @@ pub fn check_tokens(
     let enforce_invalid_escape_sequence = settings.enabled.contains(&CheckCode::W605);
 
     let mut state_machine: StateMachine = Default::default();
-    for (start, tok, end) in tokens.iter().flatten() {
+    for &(start, ref tok, end) in tokens.iter().flatten() {
         let is_docstring = if enforce_ambiguous_unicode_character || enforce_quotes {
             state_machine.consume(tok)
         } else {

@@ -1603,8 +1603,8 @@ pub enum Context {
 
 pub fn ambiguous_unicode_character(
     locator: &SourceCodeLocator,
-    start: &Location,
-    end: &Location,
+    start: Location,
+    end: Location,
     context: Context,
     settings: &Settings,
     autofix: &fixer::Mode,
@@ -1612,8 +1612,8 @@ pub fn ambiguous_unicode_character(
     let mut checks = vec![];
 
     let text = locator.slice_source_code_range(&Range {
-        location: *start,
-        end_location: *end,
+        location: start,
+        end_location: end,
     });
 
     let mut col_offset = 0;
