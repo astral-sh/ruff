@@ -2594,7 +2594,7 @@ impl<'a> Checker<'a> {
                 if !scope.import_starred && !self.path.ends_with("__init__.py") {
                     if let Some(all_binding) = all_binding {
                         if let Some(names) = &all_names {
-                            for name in names {
+                            for &name in names {
                                 if !scope.values.contains_key(name) {
                                     checks.push(Check::new(
                                         CheckKind::UndefinedExport(name.to_string()),
@@ -2622,7 +2622,7 @@ impl<'a> Checker<'a> {
                             }
                             from_list.sort();
 
-                            for name in names {
+                            for &name in names {
                                 if !scope.values.contains_key(name) {
                                     checks.push(Check::new(
                                         CheckKind::ImportStarUsage(
