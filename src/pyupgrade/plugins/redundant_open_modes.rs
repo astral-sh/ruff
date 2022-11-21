@@ -122,6 +122,8 @@ fn create_remove_param_fix(
 
 /// U015
 pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
+    // TODO(andberger): Add "mode" keyword argument handling to handle invocations on the following format:
+    // open("foo", mode="U"), open(name="foo", mode="U"), open(mode="U", name="foo").
     if let Some(mode_param) = match_open(expr) {
         if let Located {
             node:
