@@ -897,7 +897,7 @@ select = [
     "E",
     "W",
     # isort
-    "I"
+    "I001"
 ]
 src = ["src", "tests"]
 
