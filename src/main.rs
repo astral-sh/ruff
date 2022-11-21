@@ -219,12 +219,12 @@ fn inner_main() -> Result<ExitCode> {
         .exclude
         .iter()
         .map(|path| FilePattern::from_user(path, project_root.as_ref()))
-        .collect();
+        .collect::<Result<_>>()?;
     let extend_exclude: Vec<FilePattern> = cli
         .extend_exclude
         .iter()
         .map(|path| FilePattern::from_user(path, project_root.as_ref()))
-        .collect();
+        .collect::<Result<_>>()?;
 
     let mut configuration =
         Configuration::from_pyproject(pyproject.as_ref(), project_root.as_ref())?;
@@ -236,7 +236,7 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !cli.per_file_ignores.is_empty() {
         configuration.per_file_ignores =
-            collect_per_file_ignores(cli.per_file_ignores, project_root.as_ref());
+            collect_per_file_ignores(cli.per_file_ignores, project_root.as_ref())?;
     }
     if !cli.select.is_empty() {
         configuration.select = cli.select;

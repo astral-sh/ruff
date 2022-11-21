@@ -51,21 +51,21 @@ pub enum FilePattern {
 }
 
 impl FilePattern {
-    pub fn from_user(pattern: &str, project_root: Option<&PathBuf>) -> Self {
+    pub fn from_user(pattern: &str, project_root: Option<&PathBuf>) -> Result<Self> {
         let path = Path::new(pattern);
         let absolute_path = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),
             None => fs::normalize_path(path),
         };
 
-        let absolute = Pattern::new(&absolute_path.to_string_lossy()).expect("Invalid pattern.");
+        let absolute = Pattern::new(&absolute_path.to_string_lossy())?;
         let basename = if !pattern.contains(std::path::MAIN_SEPARATOR) {
-            Some(Pattern::new(pattern).expect("Invalid pattern."))
+            Some(Pattern::new(pattern)?)
         } else {
             None
         };
 
-        FilePattern::Complex(absolute, basename)
+        Ok(FilePattern::Complex(absolute, basename))
     }
 }
 
@@ -80,10 +80,10 @@ impl PerFileIgnore {
         pattern: &str,
         prefixes: &[CheckCodePrefix],
         project_root: Option<&PathBuf>,
-    ) -> Self {
-        let pattern = FilePattern::from_user(pattern, project_root);
+    ) -> Result<Self> {
+        let pattern = FilePattern::from_user(pattern, project_root)?;
         let codes = BTreeSet::from_iter(prefixes.iter().flat_map(|prefix| prefix.codes()));
-        Self { pattern, codes }
+        Ok(Self { pattern, codes })
     }
 }
 
