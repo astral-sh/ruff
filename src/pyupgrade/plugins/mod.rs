@@ -1,6 +1,7 @@
 pub use convert_named_tuple_functional_to_class::convert_named_tuple_functional_to_class;
 pub use convert_typed_dict_functional_to_class::convert_typed_dict_functional_to_class;
 pub use deprecated_unittest_alias::deprecated_unittest_alias;
+pub use redundant_open_modes::redundant_open_modes;
 pub use super_call_with_parameters::super_call_with_parameters;
 pub use type_of_primitive::type_of_primitive;
 pub use unnecessary_encode_utf8::unnecessary_encode_utf8;
@@ -14,6 +15,7 @@ pub use useless_object_inheritance::useless_object_inheritance;
 mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
 mod deprecated_unittest_alias;
+mod redundant_open_modes;
 mod super_call_with_parameters;
 mod type_of_primitive;
 mod unnecessary_encode_utf8;

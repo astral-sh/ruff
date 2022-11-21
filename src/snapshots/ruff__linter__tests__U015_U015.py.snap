@@ -1,0 +1,413 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: RedundantOpenModes
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 16
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 1
+        column: 10
+      end_location:
+        row: 1
+        column: 15
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 17
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 2
+        column: 10
+      end_location:
+        row: 2
+        column: 16
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 17
+  fix:
+    patch:
+      content: "\"rb\""
+      location:
+        row: 3
+        column: 12
+      end_location:
+        row: 3
+        column: 16
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 18
+  fix:
+    patch:
+      content: "\"rb\""
+      location:
+        row: 4
+        column: 12
+      end_location:
+        row: 4
+        column: 17
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 16
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 5
+        column: 10
+      end_location:
+        row: 5
+        column: 15
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 17
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 6
+        column: 10
+      end_location:
+        row: 6
+        column: 16
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 32
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 7
+        column: 8
+      end_location:
+        row: 7
+        column: 13
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 15
+  fix:
+    patch:
+      content: "\"w\""
+      location:
+        row: 8
+        column: 10
+      end_location:
+        row: 8
+        column: 14
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 10
+    column: 5
+  end_location:
+    row: 10
+    column: 21
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 10
+        column: 15
+      end_location:
+        row: 10
+        column: 20
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 12
+    column: 5
+  end_location:
+    row: 12
+    column: 22
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 12
+        column: 15
+      end_location:
+        row: 12
+        column: 21
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 14
+    column: 5
+  end_location:
+    row: 14
+    column: 22
+  fix:
+    patch:
+      content: "\"rb\""
+      location:
+        row: 14
+        column: 17
+      end_location:
+        row: 14
+        column: 21
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 16
+    column: 5
+  end_location:
+    row: 16
+    column: 23
+  fix:
+    patch:
+      content: "\"rb\""
+      location:
+        row: 16
+        column: 17
+      end_location:
+        row: 16
+        column: 22
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 18
+    column: 5
+  end_location:
+    row: 18
+    column: 21
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 18
+        column: 15
+      end_location:
+        row: 18
+        column: 20
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 20
+    column: 5
+  end_location:
+    row: 20
+    column: 22
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 20
+        column: 15
+      end_location:
+        row: 20
+        column: 21
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 22
+    column: 5
+  end_location:
+    row: 22
+    column: 39
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 22
+        column: 15
+      end_location:
+        row: 22
+        column: 20
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 24
+    column: 5
+  end_location:
+    row: 24
+    column: 22
+  fix:
+    patch:
+      content: "\"w\""
+      location:
+        row: 24
+        column: 17
+      end_location:
+        row: 24
+        column: 21
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 27
+    column: 27
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 27
+        column: 21
+      end_location:
+        row: 27
+        column: 26
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 28
+    column: 0
+  end_location:
+    row: 28
+    column: 28
+  fix:
+    patch:
+      content: "\"rb\""
+      location:
+        row: 28
+        column: 23
+      end_location:
+        row: 28
+        column: 27
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 30
+    column: 5
+  end_location:
+    row: 30
+    column: 32
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 30
+        column: 26
+      end_location:
+        row: 30
+        column: 31
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 32
+    column: 5
+  end_location:
+    row: 32
+    column: 33
+  fix:
+    patch:
+      content: "\"rb\""
+      location:
+        row: 32
+        column: 28
+      end_location:
+        row: 32
+        column: 32
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 35
+    column: 5
+  end_location:
+    row: 35
+    column: 21
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 35
+        column: 15
+      end_location:
+        row: 35
+        column: 20
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 35
+    column: 29
+  end_location:
+    row: 35
+    column: 45
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 35
+        column: 39
+      end_location:
+        row: 35
+        column: 44
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 37
+    column: 5
+  end_location:
+    row: 37
+    column: 22
+  fix:
+    patch:
+      content: "\"rb\""
+      location:
+        row: 37
+        column: 17
+      end_location:
+        row: 37
+        column: 21
+    applied: false
+- kind: RedundantOpenModes
+  location:
+    row: 37
+    column: 30
+  end_location:
+    row: 37
+    column: 47
+  fix:
+    patch:
+      content: "\"rb\""
+      location:
+        row: 37
+        column: 42
+      end_location:
+        row: 37
+        column: 46
+    applied: false
+

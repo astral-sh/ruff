@@ -171,6 +171,7 @@ pub enum CheckCode {
     U012,
     U013,
     U014,
+    U015,
     // pydocstyle
     D100,
     D101,
@@ -504,6 +505,7 @@ pub enum CheckKind {
     UnnecessaryEncodeUTF8,
     ConvertTypedDictFunctionalToClass(String),
     ConvertNamedTupleFunctionalToClass(String),
+    RedundantOpenModes,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -779,6 +781,7 @@ impl CheckCode {
             CheckCode::U012 => CheckKind::UnnecessaryEncodeUTF8,
             CheckCode::U013 => CheckKind::ConvertTypedDictFunctionalToClass("...".to_string()),
             CheckCode::U014 => CheckKind::ConvertNamedTupleFunctionalToClass("...".to_string()),
+            CheckCode::U015 => CheckKind::RedundantOpenModes,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1013,6 +1016,7 @@ impl CheckCode {
             CheckCode::U012 => CheckCategory::Pyupgrade,
             CheckCode::U013 => CheckCategory::Pyupgrade,
             CheckCode::U014 => CheckCategory::Pyupgrade,
+            CheckCode::U015 => CheckCategory::Pyupgrade,
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -1238,6 +1242,7 @@ impl CheckKind {
             CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::U012,
             CheckKind::ConvertTypedDictFunctionalToClass(_) => &CheckCode::U013,
             CheckKind::ConvertNamedTupleFunctionalToClass(_) => &CheckCode::U014,
+            CheckKind::RedundantOpenModes => &CheckCode::U015,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -1787,6 +1792,7 @@ impl CheckKind {
                 "Unnecessary parameters to `functools.lru_cache`".to_string()
             }
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
+            CheckKind::RedundantOpenModes => "Unnecessary open mode parameters".to_string(),
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
             }
@@ -2104,6 +2110,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryComprehension(..)
                 | CheckKind::UnnecessaryEncodeUTF8
                 | CheckKind::UnnecessaryFutureImport(..)
+                | CheckKind::RedundantOpenModes
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet
