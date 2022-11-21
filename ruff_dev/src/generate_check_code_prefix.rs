@@ -77,6 +77,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         .arg_ref_self()
         .ret(Type::new("Vec<CheckCode>"))
         .vis("pub")
+        .line("#[allow(clippy::match_same_arms)]")
         .line("match self {");
     for (prefix, codes) in &prefix_to_codes {
         gen = gen.line(format!(
@@ -96,6 +97,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         .arg_ref_self()
         .ret(Type::new("PrefixSpecificity"))
         .vis("pub")
+        .line("#[allow(clippy::match_same_arms)]")
         .line("match self {");
     for prefix in prefix_to_codes.keys() {
         let num_numeric = prefix.chars().filter(|char| char.is_numeric()).count();

@@ -881,6 +881,7 @@ impl CheckCode {
     }
 
     pub fn category(&self) -> CheckCategory {
+        #[allow(clippy::match_same_arms)]
         match self {
             CheckCode::E402 => CheckCategory::Pycodestyle,
             CheckCode::E501 => CheckCategory::Pycodestyle,
