@@ -245,7 +245,7 @@ pub fn check_lines(
         }
     }
 
-    ignored.sort();
+    ignored.sort_unstable();
     for index in ignored.iter().rev() {
         checks.swap_remove(*index);
     }
