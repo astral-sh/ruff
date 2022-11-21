@@ -1389,13 +1389,16 @@ mod tests {
 
     #[test]
     fn test_numbers() {
-        let source = "0x2f 0b1101 0 123 123_45_67_890 0.2 2j 2.2j";
+        let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j";
         let tokens = lex_source(source);
         assert_eq!(
             tokens,
             vec![
                 Tok::Int {
                     value: BigInt::from(47),
+                },
+                Tok::Int {
+                    value: BigInt::from(10)
                 },
                 Tok::Int {
                     value: BigInt::from(13),
@@ -1410,6 +1413,8 @@ mod tests {
                     value: BigInt::from(1234567890),
                 },
                 Tok::Float { value: 0.2 },
+                Tok::Float { value: 100.0 },
+                Tok::Float { value: 2100.0 },
                 Tok::Complex {
                     real: 0.0,
                     imag: 2.0,
