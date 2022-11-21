@@ -4,138 +4,121 @@ expression: checks
 ---
 - kind: UsePEP604Annotation
   location:
-    row: 4
+    row: 6
     column: 9
   end_location:
-    row: 4
+    row: 6
     column: 22
   fix:
     patch:
       content: str | None
       location:
-        row: 4
+        row: 6
         column: 9
       end_location:
-        row: 4
+        row: 6
         column: 22
     applied: false
 - kind: UsePEP604Annotation
   location:
-    row: 11
+    row: 10
     column: 9
   end_location:
-    row: 11
+    row: 10
     column: 29
   fix:
     patch:
       content: str | None
       location:
-        row: 11
+        row: 10
         column: 9
       end_location:
-        row: 11
+        row: 10
         column: 29
     applied: false
 - kind: UsePEP604Annotation
   location:
-    row: 18
+    row: 14
     column: 9
   end_location:
-    row: 18
+    row: 14
     column: 45
   fix:
     patch:
       content: "str | int | Union[float, bytes]"
       location:
-        row: 18
+        row: 14
         column: 9
       end_location:
-        row: 18
+        row: 14
         column: 45
     applied: false
 - kind: UsePEP604Annotation
   location:
-    row: 18
+    row: 14
     column: 25
   end_location:
-    row: 18
+    row: 14
     column: 44
   fix:
     patch:
       content: float | bytes
       location:
-        row: 18
+        row: 14
         column: 25
       end_location:
-        row: 18
+        row: 14
         column: 44
     applied: false
 - kind: UsePEP604Annotation
   location:
-    row: 25
+    row: 18
     column: 9
   end_location:
-    row: 25
+    row: 18
     column: 31
   fix:
     patch:
       content: str | int
       location:
-        row: 25
+        row: 18
         column: 9
       end_location:
-        row: 25
+        row: 18
         column: 31
     applied: false
 - kind: UsePEP604Annotation
   location:
-    row: 32
+    row: 22
     column: 9
   end_location:
-    row: 32
-    column: 47
-  fix:
-    patch:
-      content: "str | int | Union[float, bytes]"
-      location:
-        row: 32
-        column: 9
-      end_location:
-        row: 32
-        column: 47
-    applied: false
-- kind: UsePEP604Annotation
-  location:
-    row: 32
-    column: 9
-  end_location:
-    row: 32
-    column: 47
-  fix:
-    patch:
-      content: float | bytes
-      location:
-        row: 32
-        column: 9
-      end_location:
-        row: 32
-        column: 47
-    applied: false
-- kind: UsePEP604Annotation
-  location:
-    row: 39
-    column: 9
-  end_location:
-    row: 39
+    row: 22
     column: 33
   fix:
     patch:
       content: str | int
       location:
-        row: 39
+        row: 22
         column: 9
       end_location:
-        row: 39
+        row: 22
         column: 33
+    applied: false
+- kind: UsePEP604Annotation
+  location:
+    row: 26
+    column: 9
+  end_location:
+    row: 26
+    column: 40
+  fix:
+    patch:
+      content: "(str, int) | float"
+      location:
+        row: 26
+        column: 9
+      end_location:
+        row: 26
+        column: 40
     applied: false
 

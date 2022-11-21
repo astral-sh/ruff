@@ -74,6 +74,7 @@ pub struct Checker<'a> {
     visible_scope: VisibleScope,
     in_f_string: Option<Range>,
     in_annotation: bool,
+    in_deferred_string_annotation: bool,
     in_literal: bool,
     in_subscript: bool,
     seen_import_boundary: bool,
@@ -116,6 +117,7 @@ impl<'a> Checker<'a> {
             },
             in_f_string: Default::default(),
             in_annotation: Default::default(),
+            in_deferred_string_annotation: Default::default(),
             in_literal: Default::default(),
             in_subscript: Default::default(),
             seen_import_boundary: Default::default(),
@@ -1150,7 +1152,8 @@ where
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) typing.List[...]
-                if self.settings.enabled.contains(&CheckCode::U007)
+                if !self.in_deferred_string_annotation
+                    && self.settings.enabled.contains(&CheckCode::U007)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
@@ -1188,7 +1191,8 @@ where
                 match ctx {
                     ExprContext::Load => {
                         // Ex) List[...]
-                        if self.settings.enabled.contains(&CheckCode::U006)
+                        if !self.in_deferred_string_annotation
+                            && self.settings.enabled.contains(&CheckCode::U006)
                             && self.settings.target_version >= PythonVersion::Py39
                             && typing::is_pep585_builtin(
                                 expr,
@@ -2502,9 +2506,11 @@ impl<'a> Checker<'a> {
             }
         }
         for (expr, (scopes, parents)) in allocator.iter().zip(stacks) {
+            self.in_deferred_string_annotation = true;
             self.scope_stack = scopes;
             self.parent_stack = parents;
             self.visit_expr(expr);
+            self.in_deferred_string_annotation = false;
         }
     }
 
