@@ -25,12 +25,11 @@ requires-python = ">=3.7"
 repository = "https://github.com/charliermarsh/ruff"
 
 [build-system]
-requires = ["maturin>=0.13,<0.14"]
+requires = ["maturin>=0.14,<0.15"]
 build-backend = "maturin"
 
 [tool.maturin]
 bindings = "bin"
-sdist-include = ["Cargo.lock"]
 strip = true
 
 [tool.isort]
