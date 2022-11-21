@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
+use log::error;
 use rustpython_ast::{Constant, Expr, ExprKind, Located, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
@@ -75,15 +76,16 @@ fn create_check(
 ) -> Check {
     let mut check = Check::new(CheckKind::RedundantOpenModes, Range::from_located(expr));
     if patch {
-        if let Some(replacement_value_content) = replacement_value {
+        if let Some(content) = replacement_value {
             check.amend(Fix::replacement(
-                replacement_value_content,
+                content,
                 mode_param.location,
                 mode_param.end_location.unwrap(),
             ))
         } else {
-            if let Some(fix) = create_remove_param_fix(locator, expr, mode_param) {
-                check.amend(fix);
+            match create_remove_param_fix(locator, expr, mode_param) {
+                Ok(fix) => check.amend(fix),
+                Err(e) => error!("Failed to remove parameter: {}", e),
             }
         }
     }
@@ -94,7 +96,7 @@ fn create_remove_param_fix(
     locator: &SourceCodeLocator,
     expr: &Expr,
     mode_param: &Expr,
-) -> Option<Fix> {
+) -> Result<Fix> {
     let content = locator.slice_source_code_range(&Range {
         location: expr.location,
         end_location: expr.end_location.unwrap(),
@@ -104,8 +106,8 @@ fn create_remove_param_fix(
     let mut fix_start: Option<Location> = None;
     let mut fix_end: Option<Location> = None;
     for (start, tok, end) in lexer::make_tokenizer(&content).flatten() {
-        let start = helpers::to_absolute(&start, &expr.location);
-        let end = helpers::to_absolute(&end, &expr.location);
+        let start = helpers::to_absolute(start, expr.location);
+        let end = helpers::to_absolute(end, expr.location);
         if start == mode_param.location {
             fix_end = Some(end);
             break;
@@ -115,15 +117,20 @@ fn create_remove_param_fix(
         }
     }
     match (fix_start, fix_end) {
-        (Some(start), Some(end)) => Some(Fix::deletion(start, end)),
-        _ => None,
+        (Some(start), Some(end)) => Ok(Fix::deletion(start, end)),
+        _ => Err(anyhow::anyhow!(
+            "Failed to locate start and end parentheses."
+        )),
     }
 }
 
 /// U015
 pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
-    // TODO(andberger): Add "mode" keyword argument handling to handle invocations on the following format:
-    // open("foo", mode="U"), open(name="foo", mode="U"), open(mode="U", name="foo").
+    // TODO(andberger): Add "mode" keyword argument handling to handle invocations
+    // on the following formats:
+    // - `open("foo", mode="U")`
+    // - `open(name="foo", mode="U")`
+    // - `open(mode="U", name="foo")`
     if let Some(mode_param) = match_open(expr) {
         if let Located {
             node:
