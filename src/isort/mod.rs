@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
@@ -381,6 +382,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                 // Sort each `StmtKind::ImportFrom` by module key, breaking ties based on
                 // members.
                 (
+                    Reverse(import_from.level),
                     import_from
                         .module
                         .as_ref()
@@ -477,6 +479,7 @@ mod tests {
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
     #[test_case(Path::new("order_by_type.py"))]
+    #[test_case(Path::new("order_relative_imports_by_level.py"))]
     #[test_case(Path::new("preserve_comment_order.py"))]
     #[test_case(Path::new("preserve_indentation.py"))]
     #[test_case(Path::new("reorder_within_section.py"))]
