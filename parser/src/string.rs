@@ -15,7 +15,7 @@ pub fn parse_strings(
     let initial_kind = (values[0].1 .1 == StringKind::U).then(|| "u".to_owned());
 
     // Optimization: fast-track the common case of a single string.
-    if values.len() == 1 && matches!(&values[0].1 .1, StringKind::Normal | StringKind::U) {
+    if matches!(&*values, [(_, (_, StringKind::Normal | StringKind::U), _)]) {
         let value = values.into_iter().last().unwrap().1 .0;
         return Ok(Expr::new(
             initial_start,
