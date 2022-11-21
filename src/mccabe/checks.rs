@@ -46,7 +46,6 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(body);
             }
             StmtKind::ClassDef { body, .. } => {
-                complexity += 1;
                 complexity += get_complexity_number(body);
             }
             _ => {}
