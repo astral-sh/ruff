@@ -24,3 +24,7 @@ from typing import List as IList
 
 def f(x: IList[str]) -> None:
     ...
+
+
+def f(x: "List[str]") -> None:
+    ...
