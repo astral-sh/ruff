@@ -64,7 +64,7 @@ pub(crate) fn check_path(
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens));
     if use_tokens {
-        check_tokens(&mut checks, locator, &tokens, settings, autofix);
+        checks.extend(check_tokens(locator, &tokens, settings, autofix));
     }
 
     // Run the AST-based checks.
