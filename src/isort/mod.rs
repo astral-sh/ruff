@@ -437,13 +437,13 @@ pub fn format_imports(
         let mut is_first_statement = true;
 
         // Format `StmtKind::Import` statements.
-        for (alias, comments) in import_block.import.iter() {
+        for (alias, comments) in &import_block.import {
             output.append(&format::format_import(alias, comments, is_first_statement));
             is_first_statement = false;
         }
 
         // Format `StmtKind::ImportFrom` statements.
-        for (import_from, comments, aliases) in import_block.import_from.iter() {
+        for (import_from, comments, aliases) in &import_block.import_from {
             output.append(&format::format_import_from(
                 import_from,
                 comments,

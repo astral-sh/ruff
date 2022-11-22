@@ -129,14 +129,14 @@ impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Add base properties in alphabetical order.
         self.dummy_variable_rgx.as_str().hash(state);
-        for value in self.enabled.iter() {
+        for value in &self.enabled {
             value.hash(state);
         }
-        for value in self.fixable.iter() {
+        for value in &self.fixable {
             value.hash(state);
         }
         self.line_length.hash(state);
-        for value in self.per_file_ignores.iter() {
+        for value in &self.per_file_ignores {
             value.hash(state);
         }
         self.show_source.hash(state);

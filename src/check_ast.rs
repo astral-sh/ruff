@@ -2648,7 +2648,7 @@ impl<'a> Checker<'a> {
                 let mut unused: BTreeMap<(ImportKind, usize, Option<usize>), Vec<&str>> =
                     BTreeMap::new();
 
-                for (name, binding) in scope.values.iter() {
+                for (name, binding) in &scope.values {
                     if !matches!(
                         binding.kind,
                         BindingKind::Importation(..)
