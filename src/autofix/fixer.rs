@@ -42,33 +42,34 @@ impl From<bool> for Mode {
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub fn fix_file<'a>(
-    checks: &'a mut [Check],
+    checks: &'a [Check],
     locator: &'a SourceCodeLocator<'a>,
-) -> Option<Cow<'a, str>> {
+) -> Option<(Cow<'a, str>, usize)> {
     if checks.iter().all(|check| check.fix.is_none()) {
         return None;
     }
 
     Some(apply_fixes(
-        checks.iter_mut().filter_map(|check| check.fix.as_mut()),
+        checks.iter().filter_map(|check| check.fix.as_ref()),
         locator,
     ))
 }
 
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
-    fixes: impl Iterator<Item = &'a mut Fix>,
+    fixes: impl Iterator<Item = &'a Fix>,
     locator: &'a SourceCodeLocator<'a>,
-) -> Cow<'a, str> {
+) -> (Cow<'a, str>, usize) {
     let mut output = RopeBuilder::new();
     let mut last_pos: Location = Location::new(1, 0);
     let mut applied: BTreeSet<&Patch> = BTreeSet::default();
+    let mut num_fixed: usize = 0;
 
     for fix in fixes.sorted_by_key(|fix| fix.patch.location) {
         // If we already applied an identical fix as part of another correction, skip
         // any re-application.
         if applied.contains(&fix.patch) {
-            fix.applied = true;
+            num_fixed += 1;
             continue;
         }
 
@@ -91,14 +92,14 @@ fn apply_fixes<'a>(
         // Track that the fix was applied.
         last_pos = fix.patch.end_location;
         applied.insert(&fix.patch);
-        fix.applied = true;
+        num_fixed += 1;
     }
 
     // Add the remaining content.
     let slice = locator.slice_source_code_at(last_pos);
     output.append(&slice);
 
-    Cow::from(output.finish())
+    (Cow::from(output.finish()), num_fixed)
 }
 
 #[cfg(test)]

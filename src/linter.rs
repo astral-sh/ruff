@@ -1,16 +1,8 @@
+use std::borrow::Cow;
 use std::fs::write;
 use std::io;
 use std::io::Write;
 use std::path::Path;
-
-use anyhow::Result;
-#[cfg(not(target_family = "wasm"))]
-use log::debug;
-use rustpython_ast::{Mod, Suite};
-use rustpython_parser::error::ParseError;
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::parser::Mode;
-use rustpython_parser::{lexer, parser};
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
@@ -26,32 +18,13 @@ use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::{cache, directives, fs};
+use crate::{cache, directives, fs, rustpython_helpers};
+use anyhow::Result;
+#[cfg(not(target_family = "wasm"))]
+use log::debug;
+use rustpython_parser::lexer::LexResult;
 
-/// Collect tokens up to and including the first error.
-pub(crate) fn tokenize(contents: &str) -> Vec<LexResult> {
-    let mut tokens: Vec<LexResult> = vec![];
-    for tok in lexer::make_tokenizer(contents) {
-        let is_err = tok.is_err();
-        tokens.push(tok);
-        if is_err {
-            break;
-        }
-    }
-    tokens
-}
-
-/// Parse a full Python program from its tokens.
-pub(crate) fn parse_program_tokens(
-    lxr: Vec<LexResult>,
-    source_path: &str,
-) -> Result<Suite, ParseError> {
-    parser::parse_tokens(lxr, Mode::Module, source_path).map(|top| match top {
-        Mod::Module { body, .. } => body,
-        _ => unreachable!(),
-    })
-}
-
+/// Generate a list of `Check` violations from the source code contents at the given `Path`.
 pub(crate) fn check_path(
     path: &Path,
     contents: &str,
@@ -83,7 +56,7 @@ pub(crate) fn check_path(
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports));
     if use_ast || use_imports {
-        match parse_program_tokens(tokens, "<filename>") {
+        match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
                 if use_ast {
                     checks.extend(check_ast(&python_ast, locator, settings, autofix, path));
@@ -135,6 +108,157 @@ pub(crate) fn check_path(
     Ok(checks)
 }
 
+#[derive(Default)]
+pub struct Diagnostics {
+    pub messages: Vec<Message>,
+    pub num_fixed: usize,
+}
+
+impl Diagnostics {
+    pub fn new(messages: Vec<Message>) -> Self {
+        Self {
+            messages,
+            num_fixed: 0,
+        }
+    }
+}
+
+/// Lin the source code at the given `Path`.
+pub fn lint_path(
+    path: &Path,
+    settings: &Settings,
+    mode: &cache::Mode,
+    autofix: &fixer::Mode,
+) -> Result<Diagnostics> {
+    let metadata = path.metadata()?;
+
+    // Check the cache.
+    if let Some(messages) = cache::get(path, &metadata, settings, autofix, mode) {
+        debug!("Cache hit for: {}", path.to_string_lossy());
+        return Ok(Diagnostics::new(messages));
+    }
+
+    // Read the file from disk.
+    let mut contents = fs::read_file(path)?;
+
+    // Track the number of fixed errors across iterations.
+    let mut num_fixed = 0;
+
+    // Continuously autofix until the source code stabilizes.
+    let messages = loop {
+        // Tokenize once.
+        let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+
+        // Initialize the SourceCodeLocator (which computes offsets lazily).
+        let locator = SourceCodeLocator::new(&contents);
+
+        // Determine the noqa and isort exclusions.
+        let directives = directives::extract_directives(
+            &tokens,
+            &locator,
+            directives::Flags::from_settings(settings),
+        );
+
+        // Generate checks.
+        let mut checks = check_path(
+            path,
+            &contents,
+            tokens,
+            &locator,
+            &directives,
+            settings,
+            autofix,
+        )?;
+
+        // Apply autofix.
+        if matches!(autofix, fixer::Mode::Apply) {
+            if let Some((new_content, num_applied)) = fix_file(&checks, &locator) {
+                write(path, new_content.as_ref())?;
+
+                // Count the number of fixed errors.
+                num_fixed += num_applied;
+
+                // Store the fixed contents.
+                contents = new_content.to_string();
+
+                // Re-run the linter pass (by avoiding the break).
+                continue;
+            }
+        }
+
+        // Convert to messages.
+        break checks
+            .into_iter()
+            .map(|check| {
+                let filename = path.to_string_lossy().to_string();
+                let source = if settings.show_source {
+                    Some(Source::from_check(&check, &locator))
+                } else {
+                    None
+                };
+                Message::from_check(check, filename, source)
+            })
+            .collect::<Vec<_>>();
+    };
+
+    cache::set(path, &metadata, settings, autofix, &messages, mode);
+
+    Ok(Diagnostics {
+        messages,
+        num_fixed,
+    })
+}
+
+/// Add any missing `#noqa` pragmas to the source code at the given `Path`.
+pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
+    // Read the file from disk.
+    let contents = fs::read_file(path)?;
+
+    // Tokenize once.
+    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+
+    // Initialize the SourceCodeLocator (which computes offsets lazily).
+    let locator = SourceCodeLocator::new(&contents);
+
+    // Extract the `# noqa` and `# isort: skip` directives from the source.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        directives::Flags::from_settings(settings),
+    );
+
+    // Generate checks.
+    let checks = check_path(
+        path,
+        &contents,
+        tokens,
+        &locator,
+        &directives,
+        settings,
+        &fixer::Mode::None,
+    )?;
+
+    add_noqa(&checks, &contents, &directives.noqa_line_for, path)
+}
+
+/// Apply autoformatting to the source code at the given `Path`.
+pub fn autoformat_path(path: &Path) -> Result<()> {
+    // Read the file from disk.
+    let contents = fs::read_file(path)?;
+
+    // Tokenize once.
+    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+
+    // Generate the AST.
+    let python_ast = rustpython_helpers::parse_program_tokens(tokens, "<filename>")?;
+    let mut generator = SourceGenerator::default();
+    generator.unparse_suite(&python_ast)?;
+    write(path, generator.generate()?)?;
+
+    Ok(())
+}
+
+/// Generate a list of `Check` violations from source code content derived from stdin.
 pub fn lint_stdin(
     path: &Path,
     stdin: &str,
@@ -142,7 +266,7 @@ pub fn lint_stdin(
     autofix: &fixer::Mode,
 ) -> Result<Vec<Message>> {
     // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(stdin);
+    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(stdin);
 
     // Initialize the SourceCodeLocator (which computes offsets lazily).
     let locator = SourceCodeLocator::new(stdin);
@@ -169,7 +293,7 @@ pub fn lint_stdin(
     if matches!(autofix, fixer::Mode::Apply) {
         match fix_file(&mut checks, &locator) {
             None => io::stdout().write_all(stdin.as_bytes()),
-            Some(contents) => io::stdout().write_all(contents.as_bytes()),
+            Some((contents, _)) => io::stdout().write_all(contents.as_bytes()),
         }?;
     }
 
@@ -188,124 +312,10 @@ pub fn lint_stdin(
         .collect())
 }
 
-pub fn lint_path(
-    path: &Path,
-    settings: &Settings,
-    mode: &cache::Mode,
-    autofix: &fixer::Mode,
-) -> Result<Vec<Message>> {
-    let metadata = path.metadata()?;
-
-    // Check the cache.
-    if let Some(messages) = cache::get(path, &metadata, settings, autofix, mode) {
-        debug!("Cache hit for: {}", path.to_string_lossy());
-        return Ok(messages);
-    }
-
-    // Read the file from disk.
-    let contents = fs::read_file(path)?;
-
-    // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(&contents);
-
-    // Initialize the SourceCodeLocator (which computes offsets lazily).
-    let locator = SourceCodeLocator::new(&contents);
-
-    // Determine the noqa and isort exclusions.
-    let directives = directives::extract_directives(
-        &tokens,
-        &locator,
-        directives::Flags::from_settings(settings),
-    );
-
-    // Generate checks.
-    let mut checks = check_path(
-        path,
-        &contents,
-        tokens,
-        &locator,
-        &directives,
-        settings,
-        autofix,
-    )?;
-
-    // Apply autofix.
-    if matches!(autofix, fixer::Mode::Apply) {
-        if let Some(fixed_contents) = fix_file(&mut checks, &locator) {
-            write(path, fixed_contents.as_ref())?;
-        }
-    };
-
-    // Convert to messages.
-    let messages: Vec<Message> = checks
-        .into_iter()
-        .map(|check| {
-            let filename = path.to_string_lossy().to_string();
-            let source = if settings.show_source {
-                Some(Source::from_check(&check, &locator))
-            } else {
-                None
-            };
-            Message::from_check(check, filename, source)
-        })
-        .collect();
-
-    cache::set(path, &metadata, settings, autofix, &messages, mode);
-
-    Ok(messages)
-}
-
-pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
-    // Read the file from disk.
-    let contents = fs::read_file(path)?;
-
-    // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(&contents);
-
-    // Initialize the SourceCodeLocator (which computes offsets lazily).
-    let locator = SourceCodeLocator::new(&contents);
-
-    // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(
-        &tokens,
-        &locator,
-        directives::Flags::from_settings(settings),
-    );
-
-    // Generate checks.
-    let checks = check_path(
-        path,
-        &contents,
-        tokens,
-        &locator,
-        &directives,
-        settings,
-        &fixer::Mode::None,
-    )?;
-
-    add_noqa(&checks, &contents, &directives.noqa_line_for, path)
-}
-
-pub fn autoformat_path(path: &Path) -> Result<()> {
-    // Read the file from disk.
-    let contents = fs::read_file(path)?;
-
-    // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(&contents);
-
-    // Generate the AST.
-    let python_ast = parse_program_tokens(tokens, "<filename>")?;
-    let mut generator = SourceGenerator::default();
-    generator.unparse_suite(&python_ast)?;
-    write(path, generator.generate()?)?;
-
-    Ok(())
-}
-
 #[cfg(test)]
 pub fn test_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
     let contents = fs::read_file(path)?;
-    let tokens: Vec<LexResult> = tokenize(&contents);
+    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
     let directives = directives::extract_directives(
         &tokens,

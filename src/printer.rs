@@ -5,6 +5,7 @@ use rustpython_parser::ast::Location;
 use serde::Serialize;
 
 use crate::checks::{CheckCode, CheckKind};
+use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::message::Message;
 use crate::tell_user;
@@ -20,7 +21,6 @@ struct ExpandedMessage<'a> {
     kind: &'a CheckKind,
     code: &'a CheckCode,
     message: String,
-    fixed: bool,
     location: Location,
     end_location: Location,
     filename: &'a String,
@@ -42,14 +42,13 @@ impl<'a> Printer<'a> {
         }
     }
 
-    pub fn write_once(&self, messages: &[Message]) -> Result<()> {
+    pub fn write_once(&self, diagnostics: &Diagnostics) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
 
-        let (fixed, outstanding): (Vec<&Message>, Vec<&Message>) =
-            messages.iter().partition(|message| message.fixed);
-        let num_fixable = outstanding
+        let num_fixable = diagnostics
+            .messages
             .iter()
             .filter(|message| message.kind.fixable())
             .count();
@@ -59,13 +58,13 @@ impl<'a> Printer<'a> {
                 println!(
                     "{}",
                     serde_json::to_string_pretty(
-                        &messages
+                        &diagnostics
+                            .messages
                             .iter()
                             .map(|message| ExpandedMessage {
                                 kind: &message.kind,
                                 code: message.kind.code(),
                                 message: message.kind.body(),
-                                fixed: message.fixed,
                                 location: message.location,
                                 end_location: message.end_location,
                                 filename: &message.filename,
@@ -76,18 +75,18 @@ impl<'a> Printer<'a> {
             }
             SerializationFormat::Text => {
                 if self.log_level >= &LogLevel::Default {
-                    if !fixed.is_empty() {
+                    if diagnostics.num_fixed > 0 {
                         println!(
                             "Found {} error(s) ({} fixed).",
-                            outstanding.len(),
-                            fixed.len()
+                            diagnostics.messages.len(),
+                            diagnostics.num_fixed,
                         )
-                    } else if !outstanding.is_empty() {
-                        println!("Found {} error(s).", outstanding.len())
+                    } else if !diagnostics.messages.is_empty() {
+                        println!("Found {} error(s).", diagnostics.messages.len())
                     }
                 }
 
-                for message in outstanding {
+                for message in &diagnostics.messages {
                     println!("{message}")
                 }
 
@@ -102,7 +101,7 @@ impl<'a> Printer<'a> {
         Ok(())
     }
 
-    pub fn write_continuously(&self, messages: &[Message]) -> Result<()> {
+    pub fn write_continuously(&self, diagnostics: &Diagnostics) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
@@ -110,15 +109,15 @@ impl<'a> Printer<'a> {
         if self.log_level >= &LogLevel::Default {
             tell_user!(
                 "Found {} error(s). Watching for file changes.",
-                messages.len(),
+                diagnostics.messages.len()
             );
         }
 
-        if !messages.is_empty() {
+        if !diagnostics.messages.is_empty() {
             if self.log_level >= &LogLevel::Default {
                 println!();
             }
-            for message in messages {
+            for message in &diagnostics.messages {
                 println!("{message}")
             }
         }
