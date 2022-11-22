@@ -605,9 +605,9 @@ impl SourceGenerator {
                     FloorDiv("//", TERM),
                 );
                 group_if!(prec, {
-                    self.unparse_expr(left, prec + rassoc as u8)?;
+                    self.unparse_expr(left, prec + u8::from(rassoc))?;
                     self.p(op)?;
-                    self.unparse_expr(right, prec + !rassoc as u8)?;
+                    self.unparse_expr(right, prec + u8::from(!rassoc))?;
                 })
             }
             ExprKind::UnaryOp { op, operand } => {
