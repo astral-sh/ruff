@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use glob::Pattern;
+use globset::Glob;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::checks::CheckCode;
@@ -44,34 +44,30 @@ impl FromStr for PythonVersion {
     }
 }
 
-#[derive(Debug, Clone, Hash)]
-pub enum FilePattern {
-    Simple(&'static str),
-    Complex(Pattern, Option<Pattern>),
-}
-
-impl FilePattern {
-    pub fn from_user(pattern: &str, project_root: Option<&PathBuf>) -> Result<Self> {
-        let path = Path::new(pattern);
-        let absolute_path = match project_root {
-            Some(project_root) => fs::normalize_path_to(path, project_root),
-            None => fs::normalize_path(path),
-        };
-
-        let absolute = Pattern::new(&absolute_path.to_string_lossy())?;
-        let basename = if pattern.contains(std::path::MAIN_SEPARATOR) {
-            None
+pub fn from_user(
+    pattern: &str,
+    project_root: Option<&PathBuf>,
+) -> std::result::Result<Glob, globset::Error> {
+    let path = Path::new(pattern);
+    let absolute_path = match project_root {
+        Some(project_root) => fs::normalize_path_to(path, project_root),
+        None => fs::normalize_path(path),
+    };
+    let pattern = Glob::new(&{
+        if pattern.contains(std::path::MAIN_SEPARATOR) {
+            absolute_path.to_string_lossy()
         } else {
-            Some(Pattern::new(pattern)?)
-        };
-
-        Ok(FilePattern::Complex(absolute, basename))
-    }
+            std::borrow::Cow::Owned(
+                "{".to_owned() + &absolute_path.to_string_lossy() + "," + pattern + "}",
+            )
+        }
+    })?;
+    Ok(pattern)
 }
 
 #[derive(Debug, Clone, Hash)]
 pub struct PerFileIgnore {
-    pub pattern: FilePattern,
+    pub pattern: Glob,
     pub codes: BTreeSet<CheckCode>,
 }
 
@@ -81,7 +77,7 @@ impl PerFileIgnore {
         prefixes: &[CheckCodePrefix],
         project_root: Option<&PathBuf>,
     ) -> Result<Self> {
-        let pattern = FilePattern::from_user(pattern, project_root)?;
+        let pattern = from_user(pattern, project_root)?;
         let codes = prefixes.iter().flat_map(CheckCodePrefix::codes).collect();
         Ok(Self { pattern, codes })
     }
