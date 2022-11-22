@@ -128,7 +128,6 @@ impl<'a> Checker<'a> {
     }
 
     /// Add a `Check` to the `Checker`.
-
     pub(crate) fn add_check(&mut self, check: Check) {
         // If we're in an f-string, override the location. RustPython doesn't produce
         // reliable locations for expressions within f-strings, so we use the
@@ -145,7 +144,6 @@ impl<'a> Checker<'a> {
     }
 
     /// Add multiple `Check` items to the `Checker`.
-
     pub(crate) fn add_checks(&mut self, checks: impl Iterator<Item = Check>) {
         for check in checks {
             self.add_check(check);

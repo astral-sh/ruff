@@ -23,7 +23,6 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
 }
 
 /// Convert an `Expr` to its call path (like `List`, or `typing.List`).
-
 pub fn compose_call_path(expr: &Expr) -> Option<String> {
     let segments = collect_call_paths(expr);
     if segments.is_empty() {
@@ -34,7 +33,6 @@ pub fn compose_call_path(expr: &Expr) -> Option<String> {
 }
 
 /// Convert an `Expr` to its call path segments (like ["typing", "List"]).
-
 pub fn collect_call_paths(expr: &Expr) -> Vec<&str> {
     let mut segments = vec![];
     collect_call_path_inner(expr, &mut segments);
