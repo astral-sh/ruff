@@ -10,12 +10,13 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::{flake8_quotes, pycodestyle, rules, Settings};
 
 pub fn check_tokens(
-    checks: &mut Vec<Check>,
     locator: &SourceCodeLocator,
     tokens: &[LexResult],
     settings: &Settings,
     autofix: &fixer::Mode,
-) {
+) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+
     let enforce_ambiguous_unicode_character = settings.enabled.contains(&CheckCode::RUF001)
         || settings.enabled.contains(&CheckCode::RUF002)
         || settings.enabled.contains(&CheckCode::RUF003);
@@ -81,4 +82,6 @@ pub fn check_tokens(
             }
         }
     }
+
+    checks
 }
