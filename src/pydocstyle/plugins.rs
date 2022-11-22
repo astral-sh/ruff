@@ -1385,12 +1385,15 @@ fn args_section(checker: &mut Checker, definition: &Definition, context: &Sectio
         checker,
         definition,
         // Collect the list of arguments documented in the docstring.
-        &FxHashSet::from_iter(args_sections.iter().filter_map(|section| {
-            match GOOGLE_ARGS_REGEX.captures(section.as_str()) {
-                Some(caps) => caps.get(1).map(|arg_name| arg_name.as_str()),
-                None => None,
-            }
-        })),
+        &args_sections
+            .iter()
+            .filter_map(
+                |section| match GOOGLE_ARGS_REGEX.captures(section.as_str()) {
+                    Some(caps) => caps.get(1).map(|arg_name| arg_name.as_str()),
+                    None => None,
+                },
+            )
+            .collect(),
     )
 }
 
