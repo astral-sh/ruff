@@ -2194,7 +2194,7 @@ impl<'a> Checker<'a> {
     pub fn binding_context(&self) -> BindingContext {
         let mut rev = self.parent_stack.iter().rev().fuse();
         let defined_by = *rev.next().expect("Expected to bind within a statement.");
-        let defined_in = rev.next().cloned();
+        let defined_in = rev.next().copied();
         BindingContext {
             defined_by,
             defined_in,
