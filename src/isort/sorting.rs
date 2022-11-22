@@ -26,8 +26,7 @@ pub fn member_key<'a>(
         } else if name
             .chars()
             .next()
-            .map(|char| char.is_uppercase())
-            .unwrap_or(false)
+            .map_or(false, |char| char.is_uppercase())
         {
             // Ex) `Class`
             Prefix::Classes

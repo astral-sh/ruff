@@ -603,8 +603,7 @@ where
                                     .node
                                     .asname
                                     .as_ref()
-                                    .map(|asname| asname == &alias.node.name)
-                                    .unwrap_or(false)
+                                    .map_or(false, |asname| asname == &alias.node.name)
                                 {
                                     Some((
                                         self.scopes[*(self
@@ -823,8 +822,7 @@ where
                                     .node
                                     .asname
                                     .as_ref()
-                                    .map(|asname| asname == &alias.node.name)
-                                    .unwrap_or(false)
+                                    .map_or(false, |asname| asname == &alias.node.name)
                                 {
                                     Some((
                                         self.scopes[*(self
@@ -2341,8 +2339,7 @@ impl<'a> Checker<'a> {
                     .current_scope()
                     .values
                     .get(id)
-                    .map(|binding| matches!(binding.kind, BindingKind::Global))
-                    .unwrap_or(false)
+                    .map_or(false, |binding| matches!(binding.kind, BindingKind::Global))
                 {
                     pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
                 }

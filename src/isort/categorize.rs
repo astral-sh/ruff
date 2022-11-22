@@ -21,7 +21,7 @@ pub fn categorize(
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
 ) -> ImportType {
-    if level.map(|level| *level > 0).unwrap_or(false) {
+    if level.map_or(false, |level| *level > 0) {
         ImportType::LocalFolder
     } else if known_first_party.contains(module_base) {
         ImportType::FirstParty

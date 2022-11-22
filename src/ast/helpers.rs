@@ -121,10 +121,9 @@ pub fn match_call_path(
     // `Match`).
     if num_segments == 0 {
         module.is_empty()
-            || from_imports
-                .get(module)
-                .map(|imports| imports.contains(member) || imports.contains("*"))
-                .unwrap_or(false)
+            || from_imports.get(module).map_or(false, |imports| {
+                imports.contains(member) || imports.contains("*")
+            })
     } else {
         let components: Vec<&str> = module.split('.').collect();
 
@@ -148,8 +147,7 @@ pub fn match_call_path(
             let member = components[cut];
             if from_imports
                 .get(&module.as_str())
-                .map(|imports| imports.contains(member))
-                .unwrap_or(false)
+                .map_or(false, |imports| imports.contains(member))
             {
                 return true;
             }

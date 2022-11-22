@@ -17,8 +17,7 @@ fn is_abc_class(
             .node
             .arg
             .as_ref()
-            .map(|a| a == "metaclass")
-            .unwrap_or(false)
+            .map_or(false, |a| a == "metaclass")
             && match_module_member(
                 &keyword.node.value,
                 "abc",
