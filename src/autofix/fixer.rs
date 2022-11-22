@@ -10,24 +10,11 @@ use crate::autofix::{Fix, Patch};
 use crate::checks::Check;
 use crate::source_code_locator::SourceCodeLocator;
 
-// TODO(charlie): The model here is awkward because `Apply` is only relevant at
-// higher levels in the execution flow.
 #[derive(Hash)]
 pub enum Mode {
     Generate,
     Apply,
     None,
-}
-
-impl Mode {
-    /// Return `true` if a patch should be generated under the given `Mode`.
-    pub fn patch(&self) -> bool {
-        match &self {
-            Mode::Generate => true,
-            Mode::Apply => true,
-            Mode::None => false,
-        }
-    }
 }
 
 impl From<bool> for Mode {
@@ -36,6 +23,15 @@ impl From<bool> for Mode {
             Mode::Apply
         } else {
             Mode::None
+        }
+    }
+}
+
+impl From<&Mode> for bool {
+    fn from(value: &Mode) -> Self {
+        match value {
+            Mode::Generate | Mode::Apply => true,
+            Mode::None => false,
         }
     }
 }

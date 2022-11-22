@@ -464,7 +464,6 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::autofix::fixer;
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::Settings;
@@ -501,7 +500,7 @@ mod tests {
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
                 ..Settings::for_rule(CheckCode::I001)
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

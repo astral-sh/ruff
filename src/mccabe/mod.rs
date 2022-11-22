@@ -8,7 +8,6 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::autofix::fixer;
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::{mccabe, Settings};
@@ -24,7 +23,7 @@ mod tests {
                 mccabe: mccabe::settings::Settings { max_complexity },
                 ..Settings::for_rules(vec![CheckCode::C901])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

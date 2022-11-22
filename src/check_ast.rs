@@ -23,7 +23,6 @@ use crate::ast::types::{
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
-use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -46,7 +45,7 @@ const GLOBAL_SCOPE_INDEX: usize = 0;
 pub struct Checker<'a> {
     // Input data.
     path: &'a Path,
-    autofix: &'a fixer::Mode,
+    autofix: bool,
     pub(crate) settings: &'a Settings,
     pub(crate) locator: &'a SourceCodeLocator<'a>,
     // Computed checks.
@@ -87,7 +86,7 @@ pub struct Checker<'a> {
 impl<'a> Checker<'a> {
     pub fn new(
         settings: &'a Settings,
-        autofix: &'a fixer::Mode,
+        autofix: bool,
         path: &'a Path,
         locator: &'a SourceCodeLocator,
     ) -> Checker<'a> {
@@ -158,7 +157,7 @@ impl<'a> Checker<'a> {
     pub fn patch(&self, code: &CheckCode) -> bool {
         // TODO(charlie): We can't fix errors in f-strings until RustPython adds
         // location data.
-        self.autofix.patch() && self.in_f_string.is_none() && self.settings.fixable.contains(code)
+        self.autofix && self.in_f_string.is_none() && self.settings.fixable.contains(code)
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -2888,7 +2887,7 @@ pub fn check_ast(
     python_ast: &Suite,
     locator: &SourceCodeLocator,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: bool,
     path: &Path,
 ) -> Vec<Check> {
     let mut checker = Checker::new(settings, autofix, path, locator);

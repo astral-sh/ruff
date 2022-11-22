@@ -8,7 +8,6 @@ use rustpython_helpers::tokenize;
 use rustpython_parser::lexer::LexResult;
 use settings::{pyproject, Settings};
 
-use crate::autofix::fixer::Mode;
 use crate::checks::Check;
 use crate::linter::check_path;
 use crate::settings::configuration::Configuration;
@@ -102,7 +101,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         &locator,
         &directives,
         &settings,
-        &if autofix { Mode::Generate } else { Mode::None },
+        autofix,
     )?;
 
     Ok(checks)

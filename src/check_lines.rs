@@ -6,7 +6,7 @@ use regex::Regex;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
-use crate::autofix::{fixer, Fix};
+use crate::autofix::Fix;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::noqa;
 use crate::noqa::Directive;
@@ -37,7 +37,7 @@ pub fn check_lines(
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: bool,
 ) {
     let enforce_unnecessary_coding_comment = settings.enabled.contains(&CheckCode::U009);
     let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
@@ -73,7 +73,7 @@ pub fn check_lines(
                             end_location: Location::new(lineno + 1, line_length + 1),
                         },
                     );
-                    if autofix.patch() && settings.fixable.contains(check.kind.code()) {
+                    if autofix && settings.fixable.contains(check.kind.code()) {
                         check.amend(Fix::deletion(
                             Location::new(lineno + 1, 0),
                             Location::new(lineno + 1, line_length + 1),
@@ -195,7 +195,7 @@ pub fn check_lines(
                                 end_location: Location::new(row + 1, end),
                             },
                         );
-                        if autofix.patch() && settings.fixable.contains(check.kind.code()) {
+                        if autofix && settings.fixable.contains(check.kind.code()) {
                             check.amend(Fix::deletion(
                                 Location::new(row + 1, start - spaces),
                                 Location::new(row + 1, lines[row].chars().count()),
@@ -223,7 +223,7 @@ pub fn check_lines(
                                 end_location: Location::new(row + 1, end),
                             },
                         );
-                        if autofix.patch() && settings.fixable.contains(check.kind.code()) {
+                        if autofix && settings.fixable.contains(check.kind.code()) {
                             if valid_codes.is_empty() {
                                 check.amend(Fix::deletion(
                                     Location::new(row + 1, start - spaces),
@@ -257,7 +257,6 @@ mod tests {
     use nohash_hasher::IntMap;
 
     use super::check_lines;
-    use crate::autofix::fixer;
     use crate::checks::{Check, CheckCode};
     use crate::settings::Settings;
 
@@ -275,7 +274,7 @@ mod tests {
                     line_length,
                     ..Settings::for_rule(CheckCode::E501)
                 },
-                &fixer::Mode::Generate,
+                true,
             );
             checks
         };

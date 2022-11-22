@@ -4,7 +4,6 @@ use nohash_hasher::IntSet;
 use rustpython_parser::ast::Suite;
 
 use crate::ast::visitor::Visitor;
-use crate::autofix::fixer;
 use crate::checks::Check;
 use crate::isort;
 use crate::isort::track::ImportTracker;
@@ -15,7 +14,7 @@ fn check_import_blocks(
     tracker: ImportTracker,
     locator: &SourceCodeLocator,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: bool,
 ) -> Vec<Check> {
     let mut checks = vec![];
     for block in tracker.into_iter() {
@@ -33,7 +32,7 @@ pub fn check_imports(
     locator: &SourceCodeLocator,
     exclusions: &IntSet<usize>,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: bool,
 ) -> Vec<Check> {
     let mut tracker = ImportTracker::new(exclusions);
     for stmt in python_ast {

@@ -4,7 +4,7 @@ use textwrap::{dedent, indent};
 use crate::ast::helpers::{match_leading_content, match_trailing_content};
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
-use crate::autofix::{fixer, Fix};
+use crate::autofix::Fix;
 use crate::checks::CheckKind;
 use crate::isort::{comments, format_imports};
 use crate::{Check, Settings, SourceCodeLocator};
@@ -33,7 +33,7 @@ pub fn check_imports(
     body: &[&Stmt],
     locator: &SourceCodeLocator,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: bool,
 ) -> Option<Check> {
     let range = extract_range(body);
     let indentation = extract_indentation(body, locator);
@@ -64,7 +64,7 @@ pub fn check_imports(
 
     if has_leading_content || has_trailing_content {
         let mut check = Check::new(CheckKind::UnsortedImports, range);
-        if autofix.patch() && settings.fixable.contains(check.kind.code()) {
+        if autofix && settings.fixable.contains(check.kind.code()) {
             let mut content = String::new();
             if has_leading_content {
                 content.push('\n');
@@ -94,7 +94,7 @@ pub fn check_imports(
             None
         } else {
             let mut check = Check::new(CheckKind::UnsortedImports, range);
-            if autofix.patch() && settings.fixable.contains(check.kind.code()) {
+            if autofix && settings.fixable.contains(check.kind.code()) {
                 check.amend(Fix::replacement(
                     indent(&expected, &indentation),
                     range.location,
