@@ -63,7 +63,7 @@ pub fn unused_variables(scope: &Scope, dummy_variable_rgx: &Regex) -> Vec<Check>
         return checks;
     }
 
-    for (&name, binding) in scope.values.iter() {
+    for (&name, binding) in &scope.values {
         if binding.used.is_none()
             && matches!(binding.kind, BindingKind::Assignment)
             && !dummy_variable_rgx.is_match(name)

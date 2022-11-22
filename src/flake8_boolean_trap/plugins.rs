@@ -51,7 +51,7 @@ pub fn check_boolean_default_value_in_function_definition(
     checker: &mut Checker,
     arguments: &Arguments,
 ) {
-    for arg in arguments.defaults.iter() {
+    for arg in &arguments.defaults {
         add_if_boolean(
             checker,
             arg,

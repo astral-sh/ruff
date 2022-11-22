@@ -31,7 +31,7 @@ where
             }
             ExprKind::Lambda { args, body } => {
                 visitor::walk_expr(self, body);
-                for arg in args.args.iter() {
+                for arg in &args.args {
                     self.names.remove(arg.node.arg.as_str());
                 }
             }
