@@ -28,10 +28,10 @@ use rayon::prelude::*;
 use rustpython_ast::Location;
 use walkdir::DirEntry;
 
-/// Shim that calls par_iter except for wasm because there's no wasm support in
-/// rayon yet (there is a shim to be used for the web, but it requires js
-/// cooperation) Unfortunately, ParallelIterator does not implement Iterator so
-/// the signatures diverge
+/// Shim that calls `par_iter` except for wasm because there's no wasm support
+/// in rayon yet (there is a shim to be used for the web, but it requires js
+/// cooperation) Unfortunately, `ParallelIterator` does not implement `Iterator`
+/// so the signatures diverge
 #[cfg(not(target_family = "wasm"))]
 fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl ParallelIterator<Item = &T> {
     iterable.par_iter()

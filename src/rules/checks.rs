@@ -8,7 +8,7 @@ use crate::checks::CheckKind;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::{Check, Settings};
 
-/// See: https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094
+/// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
 static CONFUSABLES: Lazy<FxHashMap<u32, u32>> = Lazy::new(|| {
     #[allow(clippy::unreadable_literal)]
     FxHashMap::from_iter([

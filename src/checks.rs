@@ -613,7 +613,7 @@ impl CheckCode {
         }
     }
 
-    /// A placeholder representation of the CheckKind for the check.
+    /// A placeholder representation of the `CheckKind` for the check.
     pub fn kind(&self) -> CheckKind {
         match self {
             // pycodestyle errors
