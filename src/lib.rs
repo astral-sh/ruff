@@ -4,12 +4,13 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
+use rustpython_helpers::tokenize;
 use rustpython_parser::lexer::LexResult;
 use settings::{pyproject, Settings};
 
 use crate::autofix::fixer::Mode;
 use crate::checks::Check;
-use crate::linter::{check_path, tokenize};
+use crate::linter::check_path;
 use crate::settings::configuration::Configuration;
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -54,6 +55,7 @@ mod pyflakes;
 mod python;
 mod pyupgrade;
 mod rules;
+mod rustpython_helpers;
 pub mod settings;
 pub mod source_code_locator;
 #[cfg(feature = "update-informer")]

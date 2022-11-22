@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 1
         column: 8
-    applied: false
 - kind:
     TypeOfPrimitive: Bytes
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 2
         column: 9
-    applied: false
 - kind:
     TypeOfPrimitive: Int
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 3
         column: 7
-    applied: false
 - kind:
     TypeOfPrimitive: Float
   location:
@@ -73,7 +70,6 @@ expression: checks
       end_location:
         row: 4
         column: 8
-    applied: false
 - kind:
     TypeOfPrimitive: Complex
   location:
@@ -91,5 +87,4 @@ expression: checks
       end_location:
         row: 5
         column: 8
-    applied: false
 

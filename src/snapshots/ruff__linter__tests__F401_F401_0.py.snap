@@ -21,7 +21,6 @@ expression: checks
       end_location:
         row: 2
         column: 20
-    applied: false
 - kind:
     UnusedImport:
       - - collections.OrderedDict
@@ -41,7 +40,6 @@ expression: checks
       end_location:
         row: 8
         column: 1
-    applied: false
 - kind:
     UnusedImport:
       - - logging.handlers
@@ -61,7 +59,6 @@ expression: checks
       end_location:
         row: 13
         column: 0
-    applied: false
 - kind:
     UnusedImport:
       - - shelve
@@ -81,7 +78,6 @@ expression: checks
       end_location:
         row: 33
         column: 0
-    applied: false
 - kind:
     UnusedImport:
       - - importlib
@@ -101,7 +97,6 @@ expression: checks
       end_location:
         row: 33
         column: 20
-    applied: false
 - kind:
     UnusedImport:
       - - pathlib
@@ -121,7 +116,6 @@ expression: checks
       end_location:
         row: 38
         column: 0
-    applied: false
 - kind:
     UnusedImport:
       - - pickle
@@ -141,5 +135,4 @@ expression: checks
       end_location:
         row: 52
         column: 21
-    applied: false
 

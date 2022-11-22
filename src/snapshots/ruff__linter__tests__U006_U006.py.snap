@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 4
         column: 20
-    applied: false
 - kind:
     UsePEP585Annotation: List
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 11
         column: 13
-    applied: false
 - kind:
     UsePEP585Annotation: List
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 18
         column: 15
-    applied: false
 - kind:
     UsePEP585Annotation: List
   location:
@@ -73,5 +70,4 @@ expression: checks
       end_location:
         row: 25
         column: 14
-    applied: false
 

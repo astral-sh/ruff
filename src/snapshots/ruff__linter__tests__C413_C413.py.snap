@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 3
         column: 15
-    applied: false
 - kind:
     UnnecessaryCallAroundSorted: reversed
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 4
         column: 19
-    applied: false
 - kind:
     UnnecessaryCallAroundSorted: reversed
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 5
         column: 36
-    applied: false
 - kind:
     UnnecessaryCallAroundSorted: reversed
   location:
@@ -73,5 +70,4 @@ expression: checks
       end_location:
         row: 6
         column: 33
-    applied: false
 

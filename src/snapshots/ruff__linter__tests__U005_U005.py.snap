@@ -21,7 +21,6 @@ expression: checks
       end_location:
         row: 6
         column: 25
-    applied: false
 - kind:
     DeprecatedUnittestAlias:
       - assertEquals
@@ -41,7 +40,6 @@ expression: checks
       end_location:
         row: 7
         column: 25
-    applied: false
 - kind:
     DeprecatedUnittestAlias:
       - failUnlessAlmostEqual
@@ -61,7 +59,6 @@ expression: checks
       end_location:
         row: 9
         column: 34
-    applied: false
 - kind:
     DeprecatedUnittestAlias:
       - assertNotRegexpMatches
@@ -81,5 +78,4 @@ expression: checks
       end_location:
         row: 10
         column: 35
-    applied: false
 

@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 45
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Returns
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 57
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Raises
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 219
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Returns
   location:
@@ -73,7 +70,6 @@ expression: checks
       end_location:
         row: 258
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Raises
   location:
@@ -91,7 +87,6 @@ expression: checks
       end_location:
         row: 260
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -109,7 +104,6 @@ expression: checks
       end_location:
         row: 272
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -127,7 +121,6 @@ expression: checks
       end_location:
         row: 289
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -145,7 +138,6 @@ expression: checks
       end_location:
         row: 304
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -163,7 +155,6 @@ expression: checks
       end_location:
         row: 316
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -181,7 +172,6 @@ expression: checks
       end_location:
         row: 328
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -199,7 +189,6 @@ expression: checks
       end_location:
         row: 340
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -217,7 +206,6 @@ expression: checks
       end_location:
         row: 353
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -235,7 +223,6 @@ expression: checks
       end_location:
         row: 365
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -253,7 +240,6 @@ expression: checks
       end_location:
         row: 374
         column: 0
-    applied: false
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -271,5 +257,4 @@ expression: checks
       end_location:
         row: 495
         column: 0
-    applied: false
 

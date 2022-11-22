@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 19
         column: 11
-    applied: false
 - kind:
     CapitalizeSectionName: Short summary
   location:
@@ -37,5 +36,4 @@ expression: checks
       end_location:
         row: 209
         column: 17
-    applied: false
 

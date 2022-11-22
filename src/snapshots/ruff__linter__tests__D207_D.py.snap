@@ -18,7 +18,6 @@ expression: checks
       end_location:
         row: 227
         column: 0
-    applied: false
 - kind: NoUnderIndentation
   location:
     row: 435
@@ -35,5 +34,4 @@ expression: checks
       end_location:
         row: 435
         column: 4
-    applied: false
 

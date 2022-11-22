@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 1
         column: 19
-    applied: false
 - kind:
     UnnecessaryLiteralDict: tuple
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 2
         column: 20
-    applied: false
 - kind:
     UnnecessaryLiteralDict: list
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 3
         column: 13
-    applied: false
 - kind:
     UnnecessaryLiteralDict: tuple
   location:
@@ -73,5 +70,4 @@ expression: checks
       end_location:
         row: 4
         column: 13
-    applied: false
 

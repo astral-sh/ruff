@@ -18,7 +18,6 @@ expression: checks
       end_location:
         row: 2
         column: 13
-    applied: false
 - kind: NotInTest
   location:
     row: 5
@@ -35,7 +34,6 @@ expression: checks
       end_location:
         row: 5
         column: 15
-    applied: false
 - kind: NotInTest
   location:
     row: 8
@@ -52,7 +50,6 @@ expression: checks
       end_location:
         row: 8
         column: 13
-    applied: false
 - kind: NotInTest
   location:
     row: 11
@@ -69,7 +66,6 @@ expression: checks
       end_location:
         row: 11
         column: 28
-    applied: false
 - kind: NotInTest
   location:
     row: 14
@@ -86,5 +82,4 @@ expression: checks
       end_location:
         row: 14
         column: 15
-    applied: false
 

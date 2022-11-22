@@ -18,5 +18,4 @@ expression: checks
       end_location:
         row: 12
         column: 0
-    applied: false
 

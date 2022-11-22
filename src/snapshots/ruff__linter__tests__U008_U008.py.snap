@@ -18,7 +18,6 @@ expression: checks
       end_location:
         row: 17
         column: 35
-    applied: false
 - kind: SuperCallWithParameters
   location:
     row: 18
@@ -35,7 +34,6 @@ expression: checks
       end_location:
         row: 18
         column: 26
-    applied: false
 - kind: SuperCallWithParameters
   location:
     row: 19
@@ -52,7 +50,6 @@ expression: checks
       end_location:
         row: 22
         column: 9
-    applied: false
 - kind: SuperCallWithParameters
   location:
     row: 36
@@ -69,7 +66,6 @@ expression: checks
       end_location:
         row: 36
         column: 28
-    applied: false
 - kind: SuperCallWithParameters
   location:
     row: 50
@@ -86,5 +82,4 @@ expression: checks
       end_location:
         row: 50
         column: 32
-    applied: false
 

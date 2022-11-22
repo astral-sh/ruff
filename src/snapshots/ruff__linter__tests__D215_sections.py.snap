@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 150
         column: 9
-    applied: false
 - kind:
     SectionUnderlineNotOverIndented: Returns
   location:
@@ -37,5 +36,4 @@ expression: checks
       end_location:
         row: 164
         column: 9
-    applied: false
 

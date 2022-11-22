@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 1
         column: 16
-    applied: false
 - kind:
     UnnecessaryLiteralSet: tuple
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 2
         column: 16
-    applied: false
 - kind:
     UnnecessaryLiteralSet: list
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 3
         column: 12
-    applied: false
 - kind:
     UnnecessaryLiteralSet: tuple
   location:
@@ -73,5 +70,4 @@ expression: checks
       end_location:
         row: 4
         column: 12
-    applied: false
 

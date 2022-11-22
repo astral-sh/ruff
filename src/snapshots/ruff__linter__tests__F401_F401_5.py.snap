@@ -21,7 +21,6 @@ expression: checks
       end_location:
         row: 3
         column: 0
-    applied: false
 - kind:
     UnusedImport:
       - - d.e.f
@@ -41,7 +40,6 @@ expression: checks
       end_location:
         row: 4
         column: 0
-    applied: false
 - kind:
     UnusedImport:
       - - h.i
@@ -61,7 +59,6 @@ expression: checks
       end_location:
         row: 5
         column: 0
-    applied: false
 - kind:
     UnusedImport:
       - - j.k
@@ -81,5 +78,4 @@ expression: checks
       end_location:
         row: 6
         column: 0
-    applied: false
 

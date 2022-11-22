@@ -16,7 +16,6 @@ use crate::source_code_locator::SourceCodeLocator;
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
     pub kind: CheckKind,
-    pub fixed: bool,
     pub location: Location,
     pub end_location: Location,
     pub filename: String,
@@ -27,7 +26,6 @@ impl Message {
     pub fn from_check(check: Check, filename: String, source: Option<Source>) -> Self {
         Self {
             kind: check.kind,
-            fixed: check.fix.map(|fix| fix.applied).unwrap_or_default(),
             location: Location::new(check.location.row(), check.location.column() + 1),
             end_location: Location::new(check.end_location.row(), check.end_location.column() + 1),
             filename,

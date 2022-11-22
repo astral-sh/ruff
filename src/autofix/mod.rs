@@ -14,7 +14,6 @@ pub struct Patch {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fix {
     pub patch: Patch,
-    pub applied: bool,
 }
 
 impl Fix {
@@ -25,7 +24,6 @@ impl Fix {
                 location: start,
                 end_location: end,
             },
-            applied: false,
         }
     }
 
@@ -36,7 +34,6 @@ impl Fix {
                 location: start,
                 end_location: end,
             },
-            applied: false,
         }
     }
 
@@ -47,7 +44,6 @@ impl Fix {
                 location: at,
                 end_location: at,
             },
-            applied: false,
         }
     }
 
@@ -58,7 +54,6 @@ impl Fix {
                 location,
                 end_location: location,
             },
-            applied: false,
         }
     }
 }

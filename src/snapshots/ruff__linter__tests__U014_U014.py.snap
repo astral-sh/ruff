@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 5
         column: 61
-    applied: false
 - kind:
     ConvertNamedTupleFunctionalToClass: NT2
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 12
         column: 1
-    applied: false
 - kind:
     ConvertNamedTupleFunctionalToClass: NT3
   location:
@@ -55,5 +53,4 @@ expression: checks
       end_location:
         row: 15
         column: 56
-    applied: false
 

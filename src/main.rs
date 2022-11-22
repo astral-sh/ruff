@@ -25,6 +25,7 @@ use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff::linter::Diagnostics;
 use rustpython_ast::Location;
 use walkdir::DirEntry;
 
@@ -71,11 +72,11 @@ fn read_from_stdin() -> Result<String> {
     Ok(buffer)
 }
 
-fn run_once_stdin(settings: &Settings, filename: &Path, autofix: bool) -> Result<Vec<Message>> {
+fn run_once_stdin(settings: &Settings, filename: &Path, autofix: bool) -> Result<Diagnostics> {
     let stdin = read_from_stdin()?;
-    let mut messages = lint_stdin(filename, &stdin, settings, &autofix.into())?;
-    messages.sort_unstable();
-    Ok(messages)
+    let mut diagnostics = lint_stdin(filename, &stdin, settings, &autofix.into())?;
+    diagnostics.messages.sort_unstable();
+    Ok(diagnostics)
 }
 
 fn run_once(
@@ -83,7 +84,7 @@ fn run_once(
     settings: &Settings,
     cache: bool,
     autofix: bool,
-) -> Result<Vec<Message>> {
+) -> Result<Diagnostics> {
     // Collect all the files to check.
     let start = Instant::now();
     let paths: Vec<Result<DirEntry, walkdir::Error>> = files
@@ -94,7 +95,7 @@ fn run_once(
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
-    let mut messages: Vec<Message> = par_iter(&paths)
+    let mut diagnostics: Diagnostics = par_iter(&paths)
         .map(|entry| {
             match entry {
                 Ok(entry) => {
@@ -111,32 +112,33 @@ fn run_once(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = path {
                     if settings.enabled.contains(&CheckCode::E902) {
-                        vec![Message {
+                        Diagnostics::new(vec![Message {
                             kind: CheckKind::IOError(message),
-                            fixed: false,
                             location: Location::default(),
                             end_location: Location::default(),
                             filename: path.to_string_lossy().to_string(),
                             source: None,
-                        }]
+                        }])
                     } else {
                         error!("Failed to check {}: {message}", path.to_string_lossy());
-                        vec![]
+                        Diagnostics::default()
                     }
                 } else {
                     error!("{message}");
-                    vec![]
+                    Diagnostics::default()
                 }
             })
         })
-        .flatten()
-        .collect();
+        .reduce(Diagnostics::default, |mut acc, item| {
+            acc += item;
+            acc
+        });
 
-    messages.sort_unstable();
+    diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked files in: {:?}", duration);
 
-    Ok(messages)
+    Ok(diagnostics)
 }
 
 fn add_noqa(files: &[PathBuf], settings: &Settings) -> Result<usize> {
@@ -363,7 +365,7 @@ fn inner_main() -> Result<ExitCode> {
         let is_stdin = cli.files == vec![PathBuf::from("-")];
 
         // Generate lint violations.
-        let messages = if is_stdin {
+        let diagnostics = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
             run_once_stdin(&settings, path, fix_enabled)?
@@ -375,7 +377,7 @@ fn inner_main() -> Result<ExitCode> {
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
         if !(is_stdin && fix_enabled) {
-            printer.write_once(&messages)?;
+            printer.write_once(&diagnostics)?;
         }
 
         // Check for updates if we're in a non-silent log level.
@@ -384,7 +386,7 @@ fn inner_main() -> Result<ExitCode> {
             drop(updates::check_for_updates());
         }
 
-        if messages.iter().any(|message| !message.fixed) && !cli.exit_zero {
+        if !diagnostics.messages.is_empty() && !cli.exit_zero {
             return Ok(ExitCode::FAILURE);
         }
     }

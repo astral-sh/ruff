@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 1
         column: 14
-    applied: false
 - kind:
     UnnecessaryLiteralWithinTupleCall: list
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 2
         column: 18
-    applied: false
 - kind:
     UnnecessaryLiteralWithinTupleCall: tuple
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 3
         column: 18
-    applied: false
 - kind:
     UnnecessaryLiteralWithinTupleCall: list
   location:
@@ -73,7 +70,6 @@ expression: checks
       end_location:
         row: 7
         column: 2
-    applied: false
 - kind:
     UnnecessaryLiteralWithinTupleCall: tuple
   location:
@@ -91,5 +87,4 @@ expression: checks
       end_location:
         row: 10
         column: 1
-    applied: false
 

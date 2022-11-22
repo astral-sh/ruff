@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 2
         column: 14
-    applied: false
 - kind:
     UnnecessaryComprehension: set
   location:
@@ -37,5 +36,4 @@ expression: checks
       end_location:
         row: 3
         column: 14
-    applied: false
 

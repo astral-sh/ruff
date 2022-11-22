@@ -21,7 +21,6 @@ expression: checks
       end_location:
         row: 8
         column: 1
-    applied: false
 - kind:
     UndefinedName: Bar
   location:

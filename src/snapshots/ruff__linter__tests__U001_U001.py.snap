@@ -18,7 +18,6 @@ expression: checks
       end_location:
         row: 2
         column: 24
-    applied: false
 - kind: UselessMetaclassType
   location:
     row: 6
@@ -35,5 +34,4 @@ expression: checks
       end_location:
         row: 7
         column: 0
-    applied: false
 
