@@ -79,12 +79,7 @@ fn run_once_stdin(settings: &Settings, filename: &Path, autofix: bool) -> Result
     Ok(diagnostics)
 }
 
-fn run_once(
-    files: &[PathBuf],
-    settings: &Settings,
-    cache: bool,
-    autofix: bool,
-) -> Result<Diagnostics> {
+fn run_once(files: &[PathBuf], settings: &Settings, cache: bool, autofix: bool) -> Diagnostics {
     // Collect all the files to check.
     let start = Instant::now();
     let paths: Vec<Result<DirEntry, walkdir::Error>> = files
@@ -138,10 +133,10 @@ fn run_once(
     let duration = start.elapsed();
     debug!("Checked files in: {:?}", duration);
 
-    Ok(diagnostics)
+    diagnostics
 }
 
-fn add_noqa(files: &[PathBuf], settings: &Settings) -> Result<usize> {
+fn add_noqa(files: &[PathBuf], settings: &Settings) -> usize {
     // Collect all the files to check.
     let start = Instant::now();
     let paths: Vec<Result<DirEntry, walkdir::Error>> = files
@@ -166,10 +161,10 @@ fn add_noqa(files: &[PathBuf], settings: &Settings) -> Result<usize> {
     let duration = start.elapsed();
     debug!("Added noqa to files in: {:?}", duration);
 
-    Ok(modifications)
+    modifications
 }
 
-fn autoformat(files: &[PathBuf], settings: &Settings) -> Result<usize> {
+fn autoformat(files: &[PathBuf], settings: &Settings) -> usize {
     // Collect all the files to format.
     let start = Instant::now();
     let paths: Vec<DirEntry> = files
@@ -192,7 +187,7 @@ fn autoformat(files: &[PathBuf], settings: &Settings) -> Result<usize> {
     let duration = start.elapsed();
     debug!("Auto-formatted files in: {:?}", duration);
 
-    Ok(modifications)
+    modifications
 }
 
 fn inner_main() -> Result<ExitCode> {
@@ -325,7 +320,7 @@ fn inner_main() -> Result<ExitCode> {
         printer.clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = run_once(&cli.files, &settings, cache_enabled, false)?;
+        let messages = run_once(&cli.files, &settings, cache_enabled, false);
         printer.write_continuously(&messages)?;
 
         // Configure the file watcher.
@@ -343,7 +338,7 @@ fn inner_main() -> Result<ExitCode> {
                             printer.clear_screen()?;
                             printer.write_to_user("File change detected...\n");
 
-                            let messages = run_once(&cli.files, &settings, cache_enabled, false)?;
+                            let messages = run_once(&cli.files, &settings, cache_enabled, false);
                             printer.write_continuously(&messages)?;
                         }
                     }
@@ -352,12 +347,12 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else if cli.add_noqa {
-        let modifications = add_noqa(&cli.files, &settings)?;
+        let modifications = add_noqa(&cli.files, &settings);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
     } else if cli.autoformat {
-        let modifications = autoformat(&cli.files, &settings)?;
+        let modifications = autoformat(&cli.files, &settings);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Formatted {modifications} files.");
         }
@@ -370,7 +365,7 @@ fn inner_main() -> Result<ExitCode> {
             let path = Path::new(&filename);
             run_once_stdin(&settings, path, fix_enabled)?
         } else {
-            run_once(&cli.files, &settings, cache_enabled, fix_enabled)?
+            run_once(&cli.files, &settings, cache_enabled, fix_enabled)
         };
 
         // Always try to print violations (the printer itself may suppress output),

@@ -66,14 +66,13 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch(check.kind.code()) {
             let mut generator = SourceGenerator::new();
-            if let Ok(()) = generator.unparse_expr(&optional(slice), 0) {
-                if let Ok(content) = generator.generate() {
-                    check.amend(Fix::replacement(
-                        content,
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ))
-                }
+            generator.unparse_expr(&optional(slice), 0);
+            if let Ok(content) = generator.generate() {
+                check.amend(Fix::replacement(
+                    content,
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ))
             }
         }
         checker.add_check(check);
@@ -86,27 +85,25 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                 }
                 ExprKind::Tuple { elts, .. } => {
                     let mut generator = SourceGenerator::new();
-                    if let Ok(()) = generator.unparse_expr(&union(elts), 0) {
-                        if let Ok(content) = generator.generate() {
-                            check.amend(Fix::replacement(
-                                content,
-                                expr.location,
-                                expr.end_location.unwrap(),
-                            ))
-                        }
+                    generator.unparse_expr(&union(elts), 0);
+                    if let Ok(content) = generator.generate() {
+                        check.amend(Fix::replacement(
+                            content,
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ))
                     }
                 }
                 _ => {
                     // Single argument.
                     let mut generator = SourceGenerator::new();
-                    if let Ok(()) = generator.unparse_expr(slice, 0) {
-                        if let Ok(content) = generator.generate() {
-                            check.amend(Fix::replacement(
-                                content,
-                                expr.location,
-                                expr.end_location.unwrap(),
-                            ));
-                        }
+                    generator.unparse_expr(slice, 0);
+                    if let Ok(content) = generator.generate() {
+                        check.amend(Fix::replacement(
+                            content,
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ));
                     }
                 }
             }

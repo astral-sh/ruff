@@ -64,18 +64,17 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
                     );
                     if checker.patch(check.kind.code()) {
                         let mut generator = SourceGenerator::new();
-                        if let Ok(()) = generator.unparse_expr(elt, 0) {
-                            if let Ok(content) = generator.generate() {
-                                match match_tuple_range(handler, checker.locator) {
-                                    Ok(range) => {
-                                        check.amend(Fix::replacement(
-                                            content,
-                                            range.location,
-                                            range.end_location,
-                                        ));
-                                    }
-                                    Err(e) => error!("Failed to locate parentheses: {}", e),
+                        generator.unparse_expr(elt, 0);
+                        if let Ok(content) = generator.generate() {
+                            match match_tuple_range(handler, checker.locator) {
+                                Ok(range) => {
+                                    check.amend(Fix::replacement(
+                                        content,
+                                        range.location,
+                                        range.end_location,
+                                    ));
                                 }
+                                Err(e) => error!("Failed to locate parentheses: {}", e),
                             }
                         }
                     }

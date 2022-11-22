@@ -19,7 +19,7 @@ pub fn main(cli: &Cli) -> Result<()> {
     let contents = fs::read_to_string(&cli.file)?;
     let python_ast = parser::parse_program(&contents, &cli.file.to_string_lossy())?;
     let mut generator = SourceGenerator::new();
-    generator.unparse_suite(&python_ast)?;
+    generator.unparse_suite(&python_ast);
     println!("{}", generator.generate()?);
     Ok(())
 }

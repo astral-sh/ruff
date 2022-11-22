@@ -35,14 +35,13 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                             Check::new(CheckKind::GetAttrWithConstant, Range::from_located(expr));
                         if checker.patch(check.kind.code()) {
                             let mut generator = SourceGenerator::new();
-                            if let Ok(()) = generator.unparse_expr(&attribute(obj, value), 0) {
-                                if let Ok(content) = generator.generate() {
-                                    check.amend(Fix::replacement(
-                                        content,
-                                        expr.location,
-                                        expr.end_location.unwrap(),
-                                    ));
-                                }
+                            generator.unparse_expr(&attribute(obj, value), 0);
+                            if let Ok(content) = generator.generate() {
+                                check.amend(Fix::replacement(
+                                    content,
+                                    expr.location,
+                                    expr.end_location.unwrap(),
+                                ));
                             }
                         }
                         checker.add_check(check);
