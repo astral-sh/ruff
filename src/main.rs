@@ -396,7 +396,7 @@ fn main() -> ExitCode {
     match inner_main() {
         Ok(code) => code,
         Err(err) => {
-            eprintln!("{} {:?}", "error".red().bold(), err);
+            eprintln!("{} {err:?}", "error".red().bold());
             ExitCode::FAILURE
         }
     }

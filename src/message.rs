@@ -66,7 +66,7 @@ impl fmt::Display for Message {
             self.kind.body(),
         );
         match &self.source {
-            None => write!(f, "{}", label),
+            None => write!(f, "{label}"),
             Some(source) => {
                 let snippet = Snippet {
                     title: Some(Annotation {
@@ -97,7 +97,7 @@ impl fmt::Display for Message {
                 // `split_once(' ')` strips "error: " from `message`.
                 let message = DisplayList::from(snippet).to_string();
                 let (_, message) = message.split_once(' ').unwrap();
-                write!(f, "{}", message)
+                write!(f, "{message}")
             }
         }
     }

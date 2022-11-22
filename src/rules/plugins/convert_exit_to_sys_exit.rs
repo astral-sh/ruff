@@ -41,13 +41,13 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
                 // `import sys`         -> `sys.exit`
                 // `import sys as sys2` -> `sys2.exit`
                 BindingKind::Importation(name, full_name, _) if full_name == module => {
-                    Some(format!("{}.{}", name, member))
+                    Some(format!("{name}.{member}"))
                 }
                 // e.g. module=os.path object=join
                 // `from os.path import join`          -> `join`
                 // `from os.path import join as join2` -> `join2`
                 BindingKind::FromImportation(name, full_name, _)
-                    if full_name == &format!("{}.{}", module, member) =>
+                    if full_name == &format!("{module}.{member}") =>
                 {
                     Some(name.to_string())
                 }
@@ -61,7 +61,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
                 // e.g. module=os.path object=join
                 // `import os.path ` -> `os.path.join`
                 BindingKind::SubmoduleImportation(_, full_name, _) if full_name == module => {
-                    Some(format!("{}.{}", full_name, member))
+                    Some(format!("{full_name}.{member}"))
                 }
                 // Non-imports.
                 _ => None,

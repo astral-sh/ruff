@@ -807,7 +807,7 @@ where
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         let full_name = match module {
                             None => alias.node.name.to_string(),
-                            Some(parent) => format!("{}.{}", parent, alias.node.name),
+                            Some(parent) => format!("{parent}.{}", alias.node.name),
                         };
                         self.add_binding(
                             name,

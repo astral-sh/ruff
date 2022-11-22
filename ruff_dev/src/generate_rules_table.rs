@@ -61,7 +61,7 @@ pub fn main(cli: &Cli) -> Result<()> {
     }
 
     if cli.dry_run {
-        print!("{}", output);
+        print!("{output}");
     } else {
         // Read the existing file.
         let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -84,9 +84,9 @@ pub fn main(cli: &Cli) -> Result<()> {
 
         // Write the prefix, new contents, and suffix.
         let mut f = OpenOptions::new().write(true).truncate(true).open(&file)?;
-        write!(f, "{}\n\n", prefix)?;
-        write!(f, "{}", output)?;
-        write!(f, "{}", suffix)?;
+        write!(f, "{prefix}\n\n")?;
+        write!(f, "{output}")?;
+        write!(f, "{suffix}")?;
     }
 
     Ok(())

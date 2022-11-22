@@ -88,7 +88,7 @@ impl<'a> Printer<'a> {
                 }
 
                 for message in outstanding {
-                    println!("{}", message)
+                    println!("{message}")
                 }
 
                 if self.log_level >= &LogLevel::Default {
@@ -119,7 +119,7 @@ impl<'a> Printer<'a> {
                 println!();
             }
             for message in messages {
-                println!("{}", message)
+                println!("{message}")
             }
         }
 

@@ -1334,13 +1334,13 @@ impl CheckKind {
         match self {
             // pycodestyle errors
             CheckKind::AmbiguousClassName(name) => {
-                format!("Ambiguous class name: `{}`", name)
+                format!("Ambiguous class name: `{name}`")
             }
             CheckKind::AmbiguousFunctionName(name) => {
-                format!("Ambiguous function name: `{}`", name)
+                format!("Ambiguous function name: `{name}`")
             }
             CheckKind::AmbiguousVariableName(name) => {
-                format!("Ambiguous variable name: `{}`", name)
+                format!("Ambiguous variable name: `{name}`")
             }
             CheckKind::AssertTuple => {
                 "Assert test is a non-empty tuple, which is always `True`".to_string()
@@ -1383,7 +1383,7 @@ impl CheckKind {
             CheckKind::ImportStarUsage(name, sources) => {
                 let sources = sources
                     .iter()
-                    .map(|source| format!("`{}`", source))
+                    .map(|source| format!("`{source}`"))
                     .join(", ");
                 format!("`{name}` may be undefined, or defined from star imports: {sources}")
             }
