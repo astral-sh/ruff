@@ -577,7 +577,7 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
 }
 
 #[allow(unused_variables)]
-#[inline(always)]
+
 pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     expr_context: &'a ExprContext,
@@ -585,21 +585,21 @@ pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
 }
 
 #[allow(unused_variables)]
-#[inline(always)]
+
 pub fn walk_boolop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, boolop: &'a Boolop) {}
 
 #[allow(unused_variables)]
-#[inline(always)]
+
 pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, operator: &'a Operator) {}
 
 #[allow(unused_variables)]
-#[inline(always)]
+
 pub fn walk_unaryop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unaryop: &'a Unaryop) {}
 
 #[allow(unused_variables)]
-#[inline(always)]
+
 pub fn walk_cmpop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmpop: &'a Cmpop) {}
 
 #[allow(unused_variables)]
-#[inline(always)]
+
 pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, alias: &'a Alias) {}
