@@ -74,13 +74,13 @@ pub fn quotes(
             return None;
         }
 
-        return Some(Check::new(
+        Some(Check::new(
             CheckKind::BadQuotesDocstring(settings.docstring_quotes.clone()),
             Range {
                 location: start,
                 end_location: end,
             },
-        ));
+        ))
     } else if is_multiline {
         // If our string is or contains a known good string, ignore it.
         if raw_text.contains(good_multiline(&settings.multiline_quotes)) {
@@ -92,13 +92,13 @@ pub fn quotes(
             return None;
         }
 
-        return Some(Check::new(
+        Some(Check::new(
             CheckKind::BadQuotesMultilineString(settings.multiline_quotes.clone()),
             Range {
                 location: start,
                 end_location: end,
             },
-        ));
+        ))
     } else {
         let string_contents = &raw_text[1..raw_text.len() - 1];
 
@@ -131,7 +131,7 @@ pub fn quotes(
                 },
             ));
         }
-    }
 
-    None
+        None
+    }
 }
