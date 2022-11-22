@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use log::error;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Location, Stmt, StmtKind};
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
@@ -48,24 +48,29 @@ fn create_property_assignment_stmt(
     value: Option<&ExprKind>,
 ) -> Stmt {
     Stmt::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         StmtKind::AnnAssign {
             target: Box::new(Expr::new(
-                Default::default(),
-                Default::default(),
+                Location::default(),
+                Location::default(),
                 ExprKind::Name {
                     id: property.to_string(),
                     ctx: ExprContext::Load,
                 },
             )),
             annotation: Box::new(Expr::new(
-                Default::default(),
-                Default::default(),
+                Location::default(),
+                Location::default(),
                 annotation.clone(),
             )),
-            value: value
-                .map(|v| Box::new(Expr::new(Default::default(), Default::default(), v.clone()))),
+            value: value.map(|v| {
+                Box::new(Expr::new(
+                    Location::default(),
+                    Location::default(),
+                    v.clone(),
+                ))
+            }),
             simple: 1,
         },
     )
@@ -144,13 +149,13 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
 /// keywords.
 fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &ExprKind) -> Stmt {
     Stmt::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         StmtKind::ClassDef {
             name: typename.to_string(),
             bases: vec![Expr::new(
-                Default::default(),
-                Default::default(),
+                Location::default(),
+                Location::default(),
                 base_class.clone(),
             )],
             keywords: vec![],

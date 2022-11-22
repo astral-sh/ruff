@@ -89,7 +89,7 @@ pub fn load_options(pyproject: Option<&PathBuf>) -> Result<Options> {
         None => {
             debug!("No pyproject.toml found.");
             debug!("Falling back to default configuration...");
-            Ok(Default::default())
+            Ok(Options::default())
         }
     }
 }

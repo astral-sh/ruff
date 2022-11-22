@@ -44,12 +44,12 @@ pub fn extract_directives(
         noqa_line_for: if flags.contains(Flags::NOQA) {
             extract_noqa_line_for(lxr)
         } else {
-            Default::default()
+            IntMap::default()
         },
         isort_exclusions: if flags.contains(Flags::ISORT) {
             extract_isort_exclusions(lxr, locator)
         } else {
-            Default::default()
+            IntSet::default()
         },
     }
 }
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn extraction() -> Result<()> {
-        let empty: IntMap<usize, usize> = Default::default();
+        let empty: IntMap<usize, usize> = IntMap::default();
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1

@@ -1,4 +1,4 @@
-use rustpython_ast::{Constant, Expr, ExprKind, Operator};
+use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path};
 use crate::ast::types::Range;
@@ -9,14 +9,14 @@ use crate::code_gen::SourceGenerator;
 
 fn optional(expr: &Expr) -> Expr {
     Expr::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         ExprKind::BinOp {
             left: Box::new(expr.clone()),
             op: Operator::BitOr,
             right: Box::new(Expr::new(
-                Default::default(),
-                Default::default(),
+                Location::default(),
+                Location::default(),
                 ExprKind::Constant {
                     value: Constant::None,
                     kind: None,
@@ -31,8 +31,8 @@ fn union(elts: &[Expr]) -> Expr {
         elts[0].clone()
     } else {
         Expr::new(
-            Default::default(),
-            Default::default(),
+            Location::default(),
+            Location::default(),
             ExprKind::BinOp {
                 left: Box::new(union(&elts[..elts.len() - 1])),
                 op: Operator::BitOr,

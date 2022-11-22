@@ -1,6 +1,8 @@
 use anyhow::{bail, Result};
 use log::error;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, KeywordData, Stmt, StmtKind};
+use rustpython_ast::{
+    Constant, Expr, ExprContext, ExprKind, Keyword, KeywordData, Location, Stmt, StmtKind,
+};
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
@@ -45,20 +47,20 @@ fn match_typed_dict_assign<'a>(
 /// definition.
 fn create_property_assignment_stmt(property: &str, annotation: &ExprKind) -> Stmt {
     Stmt::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         StmtKind::AnnAssign {
             target: Box::new(Expr::new(
-                Default::default(),
-                Default::default(),
+                Location::default(),
+                Location::default(),
                 ExprKind::Name {
                     id: property.to_string(),
                     ctx: ExprContext::Load,
                 },
             )),
             annotation: Box::new(Expr::new(
-                Default::default(),
-                Default::default(),
+                Location::default(),
+                Location::default(),
                 annotation.clone(),
             )),
             value: None,
@@ -69,7 +71,7 @@ fn create_property_assignment_stmt(property: &str, annotation: &ExprKind) -> Stm
 
 /// Generate a `StmtKind::Pass` statement.
 fn create_pass_stmt() -> Stmt {
-    Stmt::new(Default::default(), Default::default(), StmtKind::Pass)
+    Stmt::new(Location::default(), Location::default(), StmtKind::Pass)
 }
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body,
@@ -82,20 +84,20 @@ fn create_class_def_stmt(
 ) -> Stmt {
     let keywords = match total_keyword {
         Some(keyword) => vec![Keyword::new(
-            Default::default(),
-            Default::default(),
+            Location::default(),
+            Location::default(),
             keyword,
         )],
         None => vec![],
     };
     Stmt::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         StmtKind::ClassDef {
             name: class_name.to_string(),
             bases: vec![Expr::new(
-                Default::default(),
-                Default::default(),
+                Location::default(),
+                Location::default(),
                 base_class.clone(),
             )],
             keywords,

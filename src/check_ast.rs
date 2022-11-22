@@ -19,7 +19,8 @@ use crate::ast::helpers::{
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, ClassScope, ImportKind, Range, Scope, ScopeKind,
+    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, ImportKind, Range, Scope,
+    ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
@@ -95,35 +96,35 @@ impl<'a> Checker<'a> {
             autofix,
             path,
             locator,
-            checks: Default::default(),
-            definitions: Default::default(),
-            deletions: Default::default(),
-            from_imports: Default::default(),
-            import_aliases: Default::default(),
-            parents: Default::default(),
-            parent_stack: Default::default(),
-            scopes: Default::default(),
-            scope_stack: Default::default(),
-            dead_scopes: Default::default(),
-            deferred_string_annotations: Default::default(),
-            deferred_annotations: Default::default(),
-            deferred_functions: Default::default(),
-            deferred_lambdas: Default::default(),
-            deferred_assignments: Default::default(),
+            checks: vec![],
+            definitions: vec![],
+            deletions: FxHashSet::default(),
+            from_imports: FxHashMap::default(),
+            import_aliases: FxHashMap::default(),
+            parents: vec![],
+            parent_stack: vec![],
+            scopes: vec![],
+            scope_stack: vec![],
+            dead_scopes: vec![],
+            deferred_string_annotations: vec![],
+            deferred_annotations: vec![],
+            deferred_functions: vec![],
+            deferred_lambdas: vec![],
+            deferred_assignments: vec![],
             // Internal, derivative state.
             visible_scope: VisibleScope {
                 modifier: Modifier::Module,
                 visibility: module_visibility(path),
             },
-            in_f_string: Default::default(),
-            in_annotation: Default::default(),
-            in_deferred_string_annotation: Default::default(),
-            in_literal: Default::default(),
-            in_subscript: Default::default(),
-            seen_import_boundary: Default::default(),
+            in_f_string: None,
+            in_annotation: false,
+            in_deferred_string_annotation: false,
+            in_literal: false,
+            in_subscript: false,
+            seen_import_boundary: false,
             futures_allowed: true,
-            annotations_future_enabled: Default::default(),
-            except_handlers: Default::default(),
+            annotations_future_enabled: false,
+            except_handlers: vec![],
         }
     }
 
@@ -2161,7 +2162,7 @@ impl<'a> Checker<'a> {
                 builtin,
                 Binding {
                     kind: BindingKind::Builtin,
-                    range: Default::default(),
+                    range: Range::default(),
                     used: None,
                 },
             );
@@ -2171,7 +2172,7 @@ impl<'a> Checker<'a> {
                 builtin,
                 Binding {
                     kind: BindingKind::Builtin,
-                    range: Default::default(),
+                    range: Range::default(),
                     used: None,
                 },
             );
@@ -2523,7 +2524,7 @@ impl<'a> Checker<'a> {
             self.parent_stack = parents;
             self.scope_stack = scopes;
             self.visible_scope = visibility;
-            self.push_scope(Scope::new(ScopeKind::Function(Default::default())));
+            self.push_scope(Scope::new(ScopeKind::Function(FunctionScope::default())));
 
             match &stmt.node {
                 StmtKind::FunctionDef { body, args, .. }

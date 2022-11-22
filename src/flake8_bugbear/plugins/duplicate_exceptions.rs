@@ -1,7 +1,9 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Stmt};
+use rustpython_ast::{
+    Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location, Stmt,
+};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
@@ -12,8 +14,8 @@ use crate::code_gen::SourceGenerator;
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
     Expr::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         ExprKind::Tuple {
             elts: elts.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
@@ -26,9 +28,9 @@ fn duplicate_handler_exceptions<'a>(
     expr: &'a Expr,
     elts: &'a [Expr],
 ) -> BTreeSet<Vec<&'a str>> {
-    let mut seen: BTreeSet<Vec<&str>> = Default::default();
-    let mut duplicates: BTreeSet<Vec<&str>> = Default::default();
-    let mut unique_elts: Vec<&Expr> = Default::default();
+    let mut seen: BTreeSet<Vec<&str>> = BTreeSet::default();
+    let mut duplicates: BTreeSet<Vec<&str>> = BTreeSet::default();
+    let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
         let call_path = helpers::collect_call_paths(type_);
         if !call_path.is_empty() {
@@ -75,8 +77,8 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Excepthandler]) {
-    let mut seen: BTreeSet<Vec<&str>> = Default::default();
-    let mut duplicates: BTreeSet<Vec<&str>> = Default::default();
+    let mut seen: BTreeSet<Vec<&str>> = BTreeSet::default();
+    let mut duplicates: BTreeSet<Vec<&str>> = BTreeSet::default();
     for handler in handlers {
         match &handler.node {
             ExcepthandlerKind::ExceptHandler { type_, .. } => {

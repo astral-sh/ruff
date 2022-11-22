@@ -91,7 +91,7 @@ impl fmt::Display for Message {
                     }],
                     opt: FormatOptions {
                         color: true,
-                        ..Default::default()
+                        ..FormatOptions::default()
                     },
                 };
                 // `split_once(' ')` strips "error: " from `message`.

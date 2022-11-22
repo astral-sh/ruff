@@ -1,4 +1,4 @@
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -10,8 +10,8 @@ use crate::python::keyword::KWLIST;
 
 fn attribute(value: &Expr, attr: &str) -> Expr {
     Expr::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         ExprKind::Attribute {
             value: Box::new(value.clone()),
             attr: attr.to_string(),

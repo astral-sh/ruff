@@ -1326,7 +1326,7 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
             }
 
             // Look for arguments that weren't included in the docstring.
-            let mut missing_args: BTreeSet<&str> = Default::default();
+            let mut missing_args: BTreeSet<&str> = BTreeSet::default();
             for arg in all_arguments {
                 let arg_name = arg.node.arg.as_str();
                 if arg_name.starts_with('_') {

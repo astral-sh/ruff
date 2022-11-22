@@ -17,7 +17,7 @@ impl<'a> SourceCodeLocator<'a> {
     pub fn new(contents: &'a str) -> Self {
         SourceCodeLocator {
             contents,
-            rope: Default::default(),
+            rope: OnceCell::default(),
         }
     }
 
