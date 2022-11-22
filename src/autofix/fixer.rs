@@ -32,9 +32,10 @@ impl Mode {
 
 impl From<bool> for Mode {
     fn from(value: bool) -> Self {
-        match value {
-            true => Mode::Apply,
-            false => Mode::None,
+        if value {
+            Mode::Apply
+        } else {
+            Mode::None
         }
     }
 }
