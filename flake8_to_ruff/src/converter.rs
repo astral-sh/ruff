@@ -110,7 +110,7 @@ pub fn convert(
                     match parser::parse_files_to_codes_mapping(value.as_ref()) {
                         Ok(per_file_ignores) => {
                             options.per_file_ignores =
-                                Some(parser::collect_per_file_ignores(per_file_ignores))
+                                Some(parser::collect_per_file_ignores(per_file_ignores));
                         }
                         Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                     }
@@ -181,7 +181,7 @@ pub fn convert(
                 "ban-relative-imports" | "ban_relative_imports" => match value.trim() {
                     "true" => flake8_tidy_imports.ban_relative_imports = Some(Strictness::All),
                     "parents" => {
-                        flake8_tidy_imports.ban_relative_imports = Some(Strictness::Parents)
+                        flake8_tidy_imports.ban_relative_imports = Some(Strictness::Parents);
                     }
                     _ => eprintln!("Unexpected '{key}' value: {value}"),
                 },

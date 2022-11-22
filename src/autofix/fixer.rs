@@ -100,7 +100,6 @@ fn apply_fixes<'a>(
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
     use rustpython_parser::ast::Location;
 
     use crate::autofix::fixer::apply_fixes;

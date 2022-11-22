@@ -2155,7 +2155,6 @@ impl Check {
 mod tests {
     use std::str::FromStr;
 
-    use anyhow::Result;
     use strum::IntoEnumIterator;
 
     use crate::checks::CheckCode;
