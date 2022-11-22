@@ -63,9 +63,10 @@ impl Mode {
 
 impl From<bool> for Mode {
     fn from(value: bool) -> Self {
-        match value {
-            true => Mode::ReadWrite,
-            false => Mode::None,
+        if value {
+            Mode::ReadWrite
+        } else {
+            Mode::None
         }
     }
 }

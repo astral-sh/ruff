@@ -1421,24 +1421,18 @@ impl CheckKind {
             CheckKind::ExpressionsInStarAssignment => {
                 "Too many expressions in star-unpacking assignment".to_string()
             }
-            CheckKind::TrueFalseComparison(value, op) => match *value {
-                true => match op {
-                    RejectedCmpop::Eq => {
-                        "Comparison to `True` should be `cond is True`".to_string()
-                    }
-                    RejectedCmpop::NotEq => {
-                        "Comparison to `True` should be `cond is not True`".to_string()
-                    }
-                },
-                false => match op {
-                    RejectedCmpop::Eq => {
-                        "Comparison to `False` should be `cond is False`".to_string()
-                    }
-                    RejectedCmpop::NotEq => {
-                        "Comparison to `False` should be `cond is not False`".to_string()
-                    }
-                },
-            },
+            CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq) => {
+                "Comparison to `True` should be `cond is True`".to_string()
+            }
+            CheckKind::TrueFalseComparison(true, RejectedCmpop::NotEq) => {
+                "Comparison to `True` should be `cond is not True`".to_string()
+            }
+            CheckKind::TrueFalseComparison(false, RejectedCmpop::Eq) => {
+                "Comparison to `False` should be `cond is False`".to_string()
+            }
+            CheckKind::TrueFalseComparison(false, RejectedCmpop::NotEq) => {
+                "Comparison to `False` should be `cond is not False`".to_string()
+            }
             CheckKind::TwoStarredExpressions => "Two starred expressions in assignment".to_string(),
             CheckKind::TypeComparison => "Do not compare types, use `isinstance()`".to_string(),
             CheckKind::UndefinedExport(name) => {
