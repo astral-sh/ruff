@@ -151,7 +151,7 @@ mod tests {
     fn apply_single_removal() -> Result<()> {
         let mut fixes = vec![Fix {
             patch: Patch {
-                content: "".to_string(),
+                content: String::new(),
                 location: Location::new(1, 7),
                 end_location: Location::new(1, 15),
             },
@@ -178,7 +178,7 @@ mod tests {
         let mut fixes = vec![
             Fix {
                 patch: Patch {
-                    content: "".to_string(),
+                    content: String::new(),
                     location: Location::new(1, 7),
                     end_location: Location::new(1, 16),
                 },
@@ -186,7 +186,7 @@ mod tests {
             },
             Fix {
                 patch: Patch {
-                    content: "".to_string(),
+                    content: String::new(),
                     location: Location::new(1, 16),
                     end_location: Location::new(1, 23),
                 },
@@ -214,7 +214,7 @@ mod tests {
         let mut fixes = vec![
             Fix {
                 patch: Patch {
-                    content: "".to_string(),
+                    content: String::new(),
                     location: Location::new(1, 7),
                     end_location: Location::new(1, 15),
                 },

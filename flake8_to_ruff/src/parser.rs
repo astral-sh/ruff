@@ -129,7 +129,7 @@ fn tokenize_files_to_codes_mapping(value: &str) -> Vec<Token> {
     }
     tokens.push(Token {
         token_name: TokenType::Eof,
-        src: "".to_string(),
+        src: String::new(),
     });
     tokens
 }
