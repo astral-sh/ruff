@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
@@ -155,7 +154,7 @@ pub(crate) fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
 
 /// Convert an absolute path to be relative to the current working directory.
 pub(crate) fn relativize_path(path: &Path) -> Cow<str> {
-    if let Ok(path) = path.strip_prefix(path_dedot::CWD.deref()) {
+    if let Ok(path) = path.strip_prefix(&*path_dedot::CWD) {
         return path.to_string_lossy();
     }
     path.to_string_lossy()
