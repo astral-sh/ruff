@@ -23,11 +23,7 @@ pub fn member_key<'a>(
         if name.len() > 1 && string::is_upper(name) {
             // Ex) `CONSTANT`
             Prefix::Constants
-        } else if name
-            .chars()
-            .next()
-            .map_or(false, |char| char.is_uppercase())
-        {
+        } else if name.chars().next().map_or(false, char::is_uppercase) {
             // Ex) `Class`
             Prefix::Classes
         } else {

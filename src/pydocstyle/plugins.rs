@@ -532,7 +532,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
                     let content = checker
                         .locator
                         .slice_source_code_range(&Range::from_located(docstring));
-                    if let Some(last_line) = content.lines().last().map(|line| line.trim()) {
+                    if let Some(last_line) = content.lines().last().map(str::trim) {
                         if last_line != "\"\"\"" && last_line != "'''" {
                             let mut check = Check::new(
                                 CheckKind::NewLineAfterLastParagraph,
@@ -587,7 +587,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
                             .slice_source_code_range(&Range::from_located(docstring))
                             .lines()
                             .next()
-                            .map(|line| line.to_lowercase())
+                            .map(str::to_lowercase)
                         {
                             for pattern in constants::TRIPLE_QUOTE_PREFIXES
                                 .iter()
@@ -633,7 +633,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
                     .slice_source_code_range(&Range::from_located(docstring))
                     .lines()
                     .next()
-                    .map(|line| line.to_lowercase())
+                    .map(str::to_lowercase)
                 {
                     if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
                         if checker.settings.enabled.contains(&CheckCode::D212) {
@@ -669,7 +669,7 @@ pub fn triple_quotes(checker: &mut Checker, definition: &Definition) {
                 .slice_source_code_range(&Range::from_located(docstring))
                 .lines()
                 .next()
-                .map(|line| line.to_lowercase())
+                .map(str::to_lowercase)
             {
                 let starts_with_triple = if string.contains("\"\"\"") {
                     first_line.starts_with("'''")
@@ -1362,11 +1362,7 @@ fn args_section(checker: &mut Checker, definition: &Definition, context: &Sectio
         .trim()
         .lines()
     {
-        if line
-            .chars()
-            .next()
-            .map_or(true, |char| char.is_whitespace())
-        {
+        if line.chars().next().map_or(true, char::is_whitespace) {
             // This is a continuation of documentation for the last
             // parameter because it does start with whitespace.
             if let Some(current) = args_sections.last_mut() {

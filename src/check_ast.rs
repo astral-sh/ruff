@@ -2585,9 +2585,7 @@ impl<'a> Checker<'a> {
             let all_binding: Option<&Binding> = scope.values.get("__all__");
             let all_names: Option<Vec<&str>> =
                 all_binding.and_then(|binding| match &binding.kind {
-                    BindingKind::Export(names) => {
-                        Some(names.iter().map(|name| name.as_str()).collect())
-                    }
+                    BindingKind::Export(names) => Some(names.iter().map(String::as_str).collect()),
                     _ => None,
                 });
 
