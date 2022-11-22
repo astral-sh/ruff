@@ -428,10 +428,10 @@ pub fn format_imports(
         let import_block = sort_imports(import_block);
 
         // Add a blank line between every section.
-        if !is_first_block {
-            output.append("\n");
-        } else {
+        if is_first_block {
             is_first_block = false;
+        } else {
+            output.append("\n");
         }
 
         let mut is_first_statement = true;

@@ -90,7 +90,9 @@ pub fn check_imports(
             end_location: Location::new(range.end_location.row() + 1, 0),
         };
         let actual = dedent(&locator.slice_source_code_range(&range));
-        if actual != expected {
+        if actual == expected {
+            None
+        } else {
             let mut check = Check::new(CheckKind::UnsortedImports, range);
             if autofix.patch() && settings.fixable.contains(check.kind.code()) {
                 check.amend(Fix::replacement(
@@ -100,8 +102,6 @@ pub fn check_imports(
                 ));
             }
             Some(check)
-        } else {
-            None
         }
     }
 }

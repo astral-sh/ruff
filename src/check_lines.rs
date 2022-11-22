@@ -208,10 +208,10 @@ pub fn check_lines(
                     let mut invalid_codes = vec![];
                     let mut valid_codes = vec![];
                     for code in codes {
-                        if !matches.contains(&code) {
-                            invalid_codes.push(code.to_string());
-                        } else {
+                        if matches.contains(&code) {
                             valid_codes.push(code.to_string());
+                        } else {
+                            invalid_codes.push(code.to_string());
                         }
                     }
 

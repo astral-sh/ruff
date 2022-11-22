@@ -239,13 +239,13 @@ pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]
         }
     }
 
-    if !allowed {
+    if allowed {
+        None
+    } else {
         Some(Check::new(
             CheckKind::BreakOutsideLoop,
             Range::from_located(stmt),
         ))
-    } else {
-        None
     }
 }
 
@@ -279,12 +279,12 @@ pub fn continue_outside_loop(
         }
     }
 
-    if !allowed {
+    if allowed {
+        None
+    } else {
         Some(Check::new(
             CheckKind::ContinueOutsideLoop,
             Range::from_located(stmt),
         ))
-    } else {
-        None
     }
 }

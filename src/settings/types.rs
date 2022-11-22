@@ -59,10 +59,10 @@ impl FilePattern {
         };
 
         let absolute = Pattern::new(&absolute_path.to_string_lossy())?;
-        let basename = if !pattern.contains(std::path::MAIN_SEPARATOR) {
-            Some(Pattern::new(pattern)?)
-        } else {
+        let basename = if pattern.contains(std::path::MAIN_SEPARATOR) {
             None
+        } else {
+            Some(Pattern::new(pattern)?)
         };
 
         Ok(FilePattern::Complex(absolute, basename))
