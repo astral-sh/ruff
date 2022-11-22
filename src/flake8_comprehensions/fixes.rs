@@ -722,7 +722,7 @@ pub fn fix_unnecessary_call_around_sorted(
                 rpar: inner_call.rpar.clone(),
                 whitespace_after_func: inner_call.whitespace_after_func.clone(),
                 whitespace_before_args: inner_call.whitespace_before_args.clone(),
-            }))
+            }));
         }
     }
 
@@ -766,7 +766,7 @@ pub fn fix_unnecessary_comprehension(
                 rpar: vec![],
                 whitespace_after_func: ParenthesizableWhitespace::default(),
                 whitespace_before_args: ParenthesizableWhitespace::default(),
-            }))
+            }));
         }
         Expression::SetComp(inner) => {
             body.value = Expression::Call(Box::new(Call {
@@ -788,7 +788,7 @@ pub fn fix_unnecessary_comprehension(
                 rpar: vec![],
                 whitespace_after_func: ParenthesizableWhitespace::default(),
                 whitespace_before_args: ParenthesizableWhitespace::default(),
-            }))
+            }));
         }
         _ => {
             return Err(anyhow::anyhow!(

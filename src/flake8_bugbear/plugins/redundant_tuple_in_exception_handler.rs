@@ -78,7 +78,7 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
                             }
                         }
                     }
-                    checker.add_check(check)
+                    checker.add_check(check);
                 }
             }
         }

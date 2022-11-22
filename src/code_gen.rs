@@ -254,7 +254,7 @@ impl SourceGenerator {
                     });
                     self.p("= ");
                     self.unparse_expr(value, precedence::EXPR);
-                })
+                });
             }
             StmtKind::AnnAssign {
                 target,
@@ -273,7 +273,7 @@ impl SourceGenerator {
                         self.p(" = ");
                         self.unparse_expr(value, precedence::EXPR);
                     }
-                })
+                });
             }
             StmtKind::For {
                 target,
@@ -440,7 +440,7 @@ impl SourceGenerator {
                         self.p(", ");
                         self.unparse_expr(msg, precedence::TEST);
                     }
-                })
+                });
             }
             StmtKind::Import { names } => {
                 statement!({
@@ -471,7 +471,7 @@ impl SourceGenerator {
                         self.p_delim(&mut first, ", ");
                         self.unparse_alias(alias);
                     }
-                })
+                });
             }
             StmtKind::Global { names } => {
                 statement!({
@@ -566,14 +566,14 @@ impl SourceGenerator {
                         self.p_delim(&mut first, op);
                         self.unparse_expr(val, prec + 1);
                     }
-                })
+                });
             }
             ExprKind::NamedExpr { target, value } => {
                 group_if!(precedence::TUPLE, {
                     self.unparse_expr(target, precedence::ATOM);
                     self.p(" := ");
                     self.unparse_expr(value, precedence::ATOM);
-                })
+                });
             }
             ExprKind::BinOp { left, op, right } => {
                 let rassoc = matches!(op, Operator::Pow);
@@ -599,7 +599,7 @@ impl SourceGenerator {
                     self.unparse_expr(left, prec + u8::from(rassoc));
                     self.p(op);
                     self.unparse_expr(right, prec + u8::from(!rassoc));
-                })
+                });
             }
             ExprKind::UnaryOp { op, operand } => {
                 let (op, prec) = opprec!(
@@ -614,7 +614,7 @@ impl SourceGenerator {
                 group_if!(prec, {
                     self.p(op);
                     self.unparse_expr(operand, prec);
-                })
+                });
             }
             ExprKind::Lambda { args, body } => {
                 group_if!(precedence::TEST, {
@@ -622,7 +622,7 @@ impl SourceGenerator {
                     self.p(if npos > 0 { "lambda " } else { "lambda" });
                     self.unparse_args(args);
                     write!(self, ": {}", **body);
-                })
+                });
             }
             ExprKind::IfExp { test, body, orelse } => {
                 group_if!(precedence::TEST, {
@@ -631,7 +631,7 @@ impl SourceGenerator {
                     self.unparse_expr(test, precedence::TEST + 1);
                     self.p(" else ");
                     self.unparse_expr(orelse, precedence::TEST);
-                })
+                });
             }
             ExprKind::Dict { keys, values } => {
                 self.p("{");
@@ -694,7 +694,7 @@ impl SourceGenerator {
                 group_if!(precedence::AWAIT, {
                     self.p("await ");
                     self.unparse_expr(value, precedence::ATOM);
-                })
+                });
             }
             ExprKind::Yield { value } => {
                 if let Some(value) = value {
@@ -730,7 +730,7 @@ impl SourceGenerator {
                         self.p(op);
                         self.unparse_expr(cmp, new_lvl);
                     }
-                })
+                });
             }
             ExprKind::Call {
                 func,
@@ -813,7 +813,7 @@ impl SourceGenerator {
                         .iter()
                         .any(|expr| matches!(expr.node, ExprKind::Starred { .. }))
                     {
-                        lvl += 1
+                        lvl += 1;
                     }
                 }
                 self.p("[");
@@ -845,7 +845,7 @@ impl SourceGenerator {
                             self.unparse_expr(elt, precedence::TEST);
                         }
                         self.p_if(elts.len() == 1, ",");
-                    })
+                    });
                 }
             }
             ExprKind::Slice { lower, upper, step } => {
@@ -962,7 +962,7 @@ impl SourceGenerator {
         match &expr.node {
             ExprKind::Constant { value, .. } => {
                 if let Constant::Str(s) = value {
-                    self.unparse_fstring_str(s)
+                    self.unparse_fstring_str(s);
                 } else {
                     unreachable!()
                 }

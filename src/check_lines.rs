@@ -101,7 +101,7 @@ pub fn check_lines(
             match noqa {
                 (Directive::All(..), matches) => {
                     matches.push(check.kind.code().as_ref());
-                    ignored.push(index)
+                    ignored.push(index);
                 }
                 (Directive::Codes(.., codes), matches) => {
                     if codes.contains(&check.kind.code().as_ref()) {

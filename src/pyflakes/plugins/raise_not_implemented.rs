@@ -33,7 +33,7 @@ pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
                 "NotImplementedError".to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
-            ))
+            ));
         }
         checker.add_check(check);
     }

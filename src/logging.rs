@@ -53,7 +53,7 @@ pub fn set_up_logging(level: &LogLevel) -> Result<()> {
                 record.target(),
                 record.level(),
                 message
-            ))
+            ));
         })
         .level(level.level_filter())
         .chain(std::io::stdout())

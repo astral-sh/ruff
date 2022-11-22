@@ -12,7 +12,7 @@ pub fn unary_prefix_increment(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
                 checker.add_check(Check::new(
                     CheckKind::UnaryPrefixIncrement,
                     Range::from_located(expr),
-                ))
+                ));
             }
         }
     }

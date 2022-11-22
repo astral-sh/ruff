@@ -35,7 +35,7 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
                         if fix.patch.content.is_empty() || fix.patch.content == "pass" {
                             checker.deletions.insert(context.defined_by);
                         }
-                        check.amend(fix)
+                        check.amend(fix);
                     }
                     Err(e) => error!("Failed to remove print call: {}", e),
                 }

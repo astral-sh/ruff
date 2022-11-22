@@ -100,7 +100,7 @@ pub(crate) fn check_path(
                             location: parse_error.location,
                             end_location: parse_error.location,
                         },
-                    ))
+                    ));
                 }
             }
         }
