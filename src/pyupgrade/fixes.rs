@@ -13,7 +13,7 @@ use crate::autofix::{self, Fix};
 use crate::cst::matchers::match_module;
 use crate::source_code_locator::SourceCodeLocator;
 
-/// Generate a fix to remove a base from a ClassDef statement.
+/// Generate a fix to remove a base from a `ClassDef` statement.
 pub fn remove_class_def_base(
     locator: &SourceCodeLocator,
     stmt_at: Location,

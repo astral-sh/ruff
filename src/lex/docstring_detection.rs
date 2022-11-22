@@ -1,6 +1,6 @@
 //! Extract docstrings via tokenization.
 //!
-//! See: https://github.com/zheller/flake8-quotes/blob/ef0d9a90249a080e460b70ab62bf4b65e5aa5816/flake8_quotes/docstring_detection.py#L29
+//! See: <https://github.com/zheller/flake8-quotes/blob/ef0d9a90249a080e460b70ab62bf4b65e5aa5816/flake8_quotes/docstring_detection.py#L29>
 //!
 //! TODO(charlie): Consolidate with the existing AST-based docstring extraction.
 

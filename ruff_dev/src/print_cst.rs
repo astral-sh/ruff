@@ -1,4 +1,4 @@
-//! Print the LibCST CST for a given Python file.
+//! Print the `LibCST` CST for a given Python file.
 
 use std::fs;
 use std::path::PathBuf;

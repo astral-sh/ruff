@@ -1,4 +1,4 @@
-/// See: https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13
+/// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
 use crate::python::string;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
