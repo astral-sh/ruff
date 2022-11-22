@@ -42,6 +42,7 @@ use crate::{
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
+#[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
     // Input data.
     path: &'a Path,
