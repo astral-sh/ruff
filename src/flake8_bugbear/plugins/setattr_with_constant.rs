@@ -30,7 +30,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr) -> Result<String> {
     );
     let mut generator = SourceGenerator::new();
     generator.unparse_stmt(&stmt);
-    generator.generate().map_err(|e| e.into())
+    generator.generate().map_err(std::convert::Into::into)
 }
 
 /// B010

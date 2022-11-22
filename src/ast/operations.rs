@@ -11,7 +11,7 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
                 ..
             } = &elt.node
             {
-                names.push(value.to_string())
+                names.push(value.to_string());
             }
         }
     }
@@ -35,7 +35,7 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
     } {
         match &value.node {
             ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
-                add_to_names(&mut names, elts)
+                add_to_names(&mut names, elts);
             }
             ExprKind::BinOp { left, right, .. } => {
                 let mut current_left = left;

@@ -60,9 +60,9 @@ where
                     self.checks.push((
                         CheckKind::FunctionCallArgumentDefault(compose_call_path(expr)),
                         Range::from_located(expr),
-                    ))
+                    ));
                 }
-                visitor::walk_expr(self, expr)
+                visitor::walk_expr(self, expr);
             }
             ExprKind::Lambda { .. } => {}
             _ => visitor::walk_expr(self, expr),

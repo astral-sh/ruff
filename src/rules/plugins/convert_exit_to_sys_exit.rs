@@ -82,7 +82,7 @@ pub fn convert_exit_to_sys_exit(checker: &mut Checker, func: &Expr) {
                             content,
                             func.location,
                             func.end_location.unwrap(),
-                        ))
+                        ));
                     }
                 }
                 checker.add_check(check);

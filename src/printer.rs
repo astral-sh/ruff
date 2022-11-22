@@ -70,7 +70,7 @@ impl<'a> Printer<'a> {
                             })
                             .collect::<Vec<_>>()
                     )?
-                )
+                );
             }
             SerializationFormat::Text => {
                 if self.log_level >= &LogLevel::Default {
@@ -79,19 +79,19 @@ impl<'a> Printer<'a> {
                             "Found {} error(s) ({} fixed).",
                             diagnostics.messages.len(),
                             diagnostics.fixed,
-                        )
+                        );
                     } else if !diagnostics.messages.is_empty() {
-                        println!("Found {} error(s).", diagnostics.messages.len())
+                        println!("Found {} error(s).", diagnostics.messages.len());
                     }
                 }
 
                 for message in &diagnostics.messages {
-                    println!("{message}")
+                    println!("{message}");
                 }
 
                 if self.log_level >= &LogLevel::Default {
                     if num_fixable > 0 {
-                        println!("{num_fixable} potentially fixable with the --fix option.")
+                        println!("{num_fixable} potentially fixable with the --fix option.");
                     }
                 }
             }
@@ -117,7 +117,7 @@ impl<'a> Printer<'a> {
                 println!();
             }
             for message in &diagnostics.messages {
-                println!("{message}")
+                println!("{message}");
             }
         }
 

@@ -65,7 +65,7 @@ fn duplicate_handler_exceptions<'a>(
                         content,
                         expr.location,
                         expr.end_location.unwrap(),
-                    ))
+                    ));
                 }
             }
             checker.add_check(check);

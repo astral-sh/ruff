@@ -142,7 +142,7 @@ where
                 finalbody,
             } => {
                 for excepthandler in handlers {
-                    self.visit_excepthandler(excepthandler)
+                    self.visit_excepthandler(excepthandler);
                 }
 
                 for stmt in body {

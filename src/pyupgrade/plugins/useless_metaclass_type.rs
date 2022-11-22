@@ -28,7 +28,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
                     if fix.patch.content.is_empty() || fix.patch.content == "pass" {
                         checker.deletions.insert(context.defined_by);
                     }
-                    check.amend(fix)
+                    check.amend(fix);
                 }
                 Err(e) => error!("Failed to fix remove metaclass type: {}", e),
             }

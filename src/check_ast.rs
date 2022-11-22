@@ -534,20 +534,20 @@ where
                 self.check_builtin_shadowing(name, Range::from_located(stmt), false);
 
                 for expr in bases {
-                    self.visit_expr(expr)
+                    self.visit_expr(expr);
                 }
                 for keyword in keywords {
-                    self.visit_keyword(keyword)
+                    self.visit_keyword(keyword);
                 }
                 for expr in decorator_list {
-                    self.visit_expr(expr)
+                    self.visit_expr(expr);
                 }
                 self.push_scope(Scope::new(ScopeKind::Class(ClassScope {
                     name,
                     bases,
                     keywords,
                     decorator_list,
-                })))
+                })));
             }
             StmtKind::Import { names } => {
                 if self.settings.enabled.contains(&CheckCode::E402) {
@@ -576,7 +576,7 @@ where
                                 used: None,
                                 range: Range::from_located(stmt),
                             },
-                        )
+                        );
                     } else {
                         if let Some(asname) = &alias.node.asname {
                             self.check_builtin_shadowing(asname, Range::from_located(stmt), false);
@@ -616,7 +616,7 @@ where
                                 },
                                 range: Range::from_located(stmt),
                             },
-                        )
+                        );
                     }
 
                     if let Some(asname) = &alias.node.asname {
@@ -692,7 +692,7 @@ where
                                     .iter()
                                     .filter(|alias| alias.node.asname.is_none())
                                     .map(|alias| alias.node.name.as_str()),
-                            )
+                            );
                     }
                     for alias in names {
                         if let Some(asname) = &alias.node.asname {
@@ -835,7 +835,7 @@ where
                                 },
                                 range: Range::from_located(stmt),
                             },
-                        )
+                        );
                     }
 
                     if self.settings.enabled.contains(&CheckCode::I252) {
@@ -979,7 +979,7 @@ where
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
                     if let [target] = &targets[..] {
-                        pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt)
+                        pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::U001) {
@@ -1016,7 +1016,7 @@ where
             StmtKind::Delete { .. } => {}
             StmtKind::Expr { value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::B015) {
-                    flake8_bugbear::plugins::useless_comparison(self, value)
+                    flake8_bugbear::plugins::useless_comparison(self, value);
                 }
             }
             _ => {}
@@ -1081,7 +1081,7 @@ where
                 }
                 self.except_handlers.pop();
                 for excepthandler in handlers {
-                    self.visit_excepthandler(excepthandler)
+                    self.visit_excepthandler(excepthandler);
                 }
                 for stmt in orelse {
                     self.visit_stmt(stmt);
@@ -1620,7 +1620,7 @@ where
                         comparators,
                         check_none_comparisons,
                         check_true_false_comparisons,
-                    )
+                    );
                 }
 
                 if self.settings.enabled.contains(&CheckCode::F632) {
@@ -1717,7 +1717,7 @@ where
                 for expr in &args.defaults {
                     self.visit_expr(expr);
                 }
-                self.push_scope(Scope::new(ScopeKind::Lambda))
+                self.push_scope(Scope::new(ScopeKind::Lambda));
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&CheckCode::C416) {
@@ -1732,10 +1732,10 @@ where
                         self.add_check(check);
                     };
                 }
-                self.push_scope(Scope::new(ScopeKind::Generator))
+                self.push_scope(Scope::new(ScopeKind::Generator));
             }
             ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
-                self.push_scope(Scope::new(ScopeKind::Generator))
+                self.push_scope(Scope::new(ScopeKind::Generator));
             }
             _ => {}
         };
@@ -1894,7 +1894,7 @@ where
                                         error!(
                                             "Found non-ExprKind::Tuple argument to PEP 593 \
                                              Annotation."
-                                        )
+                                        );
                                     }
                                 }
                             }
@@ -2014,10 +2014,10 @@ where
                 .extend(pyflakes::checks::duplicate_arguments(arguments));
         }
         if self.settings.enabled.contains(&CheckCode::B006) {
-            flake8_bugbear::plugins::mutable_argument_default(self, arguments)
+            flake8_bugbear::plugins::mutable_argument_default(self, arguments);
         }
         if self.settings.enabled.contains(&CheckCode::B008) {
-            flake8_bugbear::plugins::function_call_argument_default(self, arguments)
+            flake8_bugbear::plugins::function_call_argument_default(self, arguments);
         }
 
         // flake8-boolean-trap
@@ -2310,7 +2310,7 @@ impl<'a> Checker<'a> {
                 self.add_check(Check::new(
                     CheckKind::UndefinedName(id.clone()),
                     Range::from_located(expr),
-                ))
+                ));
             }
         }
     }
@@ -2339,20 +2339,22 @@ impl<'a> Checker<'a> {
                     .get(id)
                     .map_or(false, |binding| matches!(binding.kind, BindingKind::Global))
                 {
-                    pep8_naming::plugins::non_lowercase_variable_in_function(self, expr, parent, id)
+                    pep8_naming::plugins::non_lowercase_variable_in_function(
+                        self, expr, parent, id,
+                    );
                 }
             }
         }
 
         if self.settings.enabled.contains(&CheckCode::N815) {
             if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
-                pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id)
+                pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id);
             }
         }
 
         if self.settings.enabled.contains(&CheckCode::N816) {
             if matches!(self.current_scope().kind, ScopeKind::Module) {
-                pep8_naming::plugins::mixed_case_variable_in_global_scope(self, expr, parent, id)
+                pep8_naming::plugins::mixed_case_variable_in_global_scope(self, expr, parent, id);
             }
         }
 
@@ -2448,7 +2450,7 @@ impl<'a> Checker<'a> {
                 self.add_check(Check::new(
                     CheckKind::UndefinedName(id.to_string()),
                     Range::from_located(expr),
-                ))
+                ));
             }
         }
     }

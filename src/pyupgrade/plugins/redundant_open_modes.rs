@@ -81,7 +81,7 @@ fn create_check(
                 content,
                 mode_param.location,
                 mode_param.end_location.unwrap(),
-            ))
+            ));
         } else {
             match create_remove_param_fix(locator, expr, mode_param) {
                 Ok(fix) => check.amend(fix),

@@ -71,7 +71,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
                 format!("_{name}"),
                 expr.location,
                 expr.end_location.unwrap(),
-            ))
+            ));
         }
         checker.add_check(check);
     }

@@ -128,7 +128,7 @@ fn annotate_imports<'a>(
                         asname: alias.node.asname.as_ref(),
                         atop: alias_atop,
                         inline: alias_inline,
-                    })
+                    });
                 }
 
                 annotated.push(AnnotatedImport::ImportFrom {

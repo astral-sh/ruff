@@ -2155,13 +2155,12 @@ impl Check {
 mod tests {
     use std::str::FromStr;
 
-    use anyhow::Result;
     use strum::IntoEnumIterator;
 
     use crate::checks::CheckCode;
 
     #[test]
-    fn check_code_serialization() -> Result<()> {
+    fn check_code_serialization() {
         for check_code in CheckCode::iter() {
             assert!(
                 CheckCode::from_str(check_code.as_ref()).is_ok(),
@@ -2169,6 +2168,5 @@ mod tests {
                 check_code
             );
         }
-        Ok(())
     }
 }

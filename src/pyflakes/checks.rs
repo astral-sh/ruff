@@ -164,7 +164,7 @@ pub fn repeated_keys(
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyLiteral,
                             Range::from_located(k2),
-                        ))
+                        ));
                     }
                 }
                 (Some(DictionaryKey::Variable(v1)), Some(DictionaryKey::Variable(v2))) => {
@@ -172,7 +172,7 @@ pub fn repeated_keys(
                         checks.push(Check::new(
                             CheckKind::MultiValueRepeatedKeyVariable((*v2).to_string()),
                             Range::from_located(k2),
-                        ))
+                        ));
                     }
                 }
                 _ => {}

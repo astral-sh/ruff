@@ -96,7 +96,7 @@ fn replace_with_bytes_literal(
             content,
             expr.location,
             expr.end_location.unwrap(),
-        ))
+        ));
     }
     check
 }

@@ -249,7 +249,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
                 visitor.visit_stmt(stmt);
             }
             for excepthandler in handlers {
-                visitor.visit_excepthandler(excepthandler)
+                visitor.visit_excepthandler(excepthandler);
             }
             for stmt in orelse {
                 visitor.visit_stmt(stmt);
@@ -447,7 +447,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
 pub fn walk_constant<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, constant: &'a Constant) {
     if let Constant::Tuple(constants) = constant {
         for constant in constants {
-            visitor.visit_constant(constant)
+            visitor.visit_constant(constant);
         }
     }
 }

@@ -157,7 +157,7 @@ pub fn invalid_escape_sequence(
                             location,
                             end_location,
                         },
-                    ))
+                    ));
                 }
             }
         }

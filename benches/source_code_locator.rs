@@ -10,7 +10,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let rope = Rope::from_str(black_box(&contents));
             rope.line_to_char(black_box(4));
-        })
+        });
     });
 }
 

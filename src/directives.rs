@@ -113,6 +113,7 @@ pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) 
 
 #[cfg(test)]
 mod tests {
+
     use nohash_hasher::IntMap;
     use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;

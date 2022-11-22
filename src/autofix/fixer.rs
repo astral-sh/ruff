@@ -100,7 +100,6 @@ fn apply_fixes<'a>(
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
     use rustpython_parser::ast::Location;
 
     use crate::autofix::fixer::apply_fixes;
@@ -108,18 +107,16 @@ mod tests {
     use crate::SourceCodeLocator;
 
     #[test]
-    fn empty_file() -> Result<()> {
+    fn empty_file() {
         let fixes = vec![];
         let locator = SourceCodeLocator::new(r#""#);
         let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
         assert_eq!(contents, "");
         assert_eq!(fixed, 0);
-
-        Ok(())
     }
 
     #[test]
-    fn apply_single_replacement() -> Result<()> {
+    fn apply_single_replacement() {
         let fixes = vec![Fix {
             patch: Patch {
                 content: "Bar".to_string(),
@@ -144,12 +141,10 @@ class A(Bar):
             .trim(),
         );
         assert_eq!(fixed, 1);
-
-        Ok(())
     }
 
     #[test]
-    fn apply_single_removal() -> Result<()> {
+    fn apply_single_removal() {
         let fixes = vec![Fix {
             patch: Patch {
                 content: String::new(),
@@ -174,12 +169,10 @@ class A:
             .trim()
         );
         assert_eq!(fixed, 1);
-
-        Ok(())
     }
 
     #[test]
-    fn apply_double_removal() -> Result<()> {
+    fn apply_double_removal() {
         let fixes = vec![
             Fix {
                 patch: Patch {
@@ -214,12 +207,10 @@ class A:
             .trim()
         );
         assert_eq!(fixed, 2);
-
-        Ok(())
     }
 
     #[test]
-    fn ignore_overlapping_fixes() -> Result<()> {
+    fn ignore_overlapping_fixes() {
         let fixes = vec![
             Fix {
                 patch: Patch {
@@ -253,7 +244,5 @@ class A:
             .trim(),
         );
         assert_eq!(fixed, 1);
-
-        Ok(())
     }
 }

@@ -1190,7 +1190,7 @@ fn common_section(
                                 docstring.location.row() + context.original_index,
                                 section_name_start + section_name_length,
                             ),
-                        ))
+                        ));
                     }
                 }
                 checker.add_check(check);
@@ -1284,7 +1284,7 @@ fn common_section(
                     Location::new(docstring.location.row() + context.original_index, 0),
                 ));
             }
-            checker.add_check(check)
+            checker.add_check(check);
         }
     }
 
@@ -1388,7 +1388,7 @@ fn args_section(checker: &mut Checker, definition: &Definition, context: &Sectio
                 },
             )
             .collect(),
-    )
+    );
 }
 
 fn parameters_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
@@ -1458,7 +1458,7 @@ fn numpy_section(checker: &mut Checker, definition: &Definition, context: &Secti
                     ));
                 }
             }
-            checker.add_check(check)
+            checker.add_check(check);
         }
     }
 

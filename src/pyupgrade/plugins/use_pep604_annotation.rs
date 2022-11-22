@@ -72,7 +72,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     content,
                     expr.location,
                     expr.end_location.unwrap(),
-                ))
+                ));
             }
         }
         checker.add_check(check);
@@ -91,7 +91,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                             content,
                             expr.location,
                             expr.end_location.unwrap(),
-                        ))
+                        ));
                     }
                 }
                 _ => {

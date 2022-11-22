@@ -178,6 +178,6 @@ pub fn set(
         cache_key(path, settings, autofix),
         &bincode::serialize(&check_result).unwrap(),
     ) {
-        error!("Failed to write to cache: {e:?}")
+        error!("Failed to write to cache: {e:?}");
     }
 }
