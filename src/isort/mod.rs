@@ -146,7 +146,7 @@ fn annotate_imports<'a>(
 }
 
 fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
-    let mut block: ImportBlock = Default::default();
+    let mut block = ImportBlock::default();
     for import in imports {
         match import {
             AnnotatedImport::Import {
@@ -274,7 +274,7 @@ fn categorize_imports<'a>(
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
 ) -> BTreeMap<ImportType, ImportBlock<'a>> {
-    let mut block_by_type: BTreeMap<ImportType, ImportBlock> = Default::default();
+    let mut block_by_type: BTreeMap<ImportType, ImportBlock> = BTreeMap::default();
     // Categorize `StmtKind::Import`.
     for (alias, comments) in block.import {
         let import_type = categorize(
@@ -327,7 +327,7 @@ fn categorize_imports<'a>(
 }
 
 fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
-    let mut ordered: OrderedImportBlock = Default::default();
+    let mut ordered = OrderedImportBlock::default();
 
     // Sort `StmtKind::Import`.
     ordered.import.extend(
@@ -354,12 +354,12 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                             (
                                 CommentSet {
                                     atop: comments.atop,
-                                    inline: Default::default(),
+                                    inline: vec![],
                                 },
                                 FxHashMap::from_iter([(
                                     alias,
                                     CommentSet {
-                                        atop: Default::default(),
+                                        atop: vec![],
                                         inline: comments.inline,
                                     },
                                 )]),

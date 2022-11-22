@@ -1,4 +1,4 @@
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -8,16 +8,16 @@ use crate::code_gen::SourceGenerator;
 
 fn assertion_error(msg: Option<&Expr>) -> Stmt {
     Stmt::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         StmtKind::Raise {
             exc: Some(Box::new(Expr::new(
-                Default::default(),
-                Default::default(),
+                Location::default(),
+                Location::default(),
                 ExprKind::Call {
                     func: Box::new(Expr::new(
-                        Default::default(),
-                        Default::default(),
+                        Location::default(),
+                        Location::default(),
                         ExprKind::Name {
                             id: "AssertionError".to_string(),
                             ctx: ExprContext::Load,

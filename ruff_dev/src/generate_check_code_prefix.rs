@@ -24,7 +24,7 @@ pub struct Cli {
 
 pub fn main(cli: &Cli) -> Result<()> {
     // Build up a map from prefix to matching CheckCodes.
-    let mut prefix_to_codes: BTreeMap<String, BTreeSet<CheckCode>> = Default::default();
+    let mut prefix_to_codes: BTreeMap<String, BTreeSet<CheckCode>> = BTreeMap::default();
     for check_code in CheckCode::iter() {
         let as_ref: String = check_code.as_ref().to_string();
         let prefix_len = as_ref

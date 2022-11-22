@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
-        let noqa_line_for: IntMap<usize, usize> = Default::default();
+        let noqa_line_for: IntMap<usize, usize> = IntMap::default();
         let check_with_max_line_length = |line_length: usize| {
             let mut checks: Vec<Check> = vec![];
             check_lines(

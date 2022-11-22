@@ -950,7 +950,7 @@ impl SourceGenerator {
         conversion: usize,
         spec: Option<&Expr<U>>,
     ) -> fmt::Result {
-        let mut generator: SourceGenerator = Default::default();
+        let mut generator = SourceGenerator::default();
         generator.unparse_expr(val, precedence::TEST + 1)?;
         let brace = if generator.buffer.starts_with("{".as_bytes()) {
             // put a space to avoid escaping the bracket
@@ -1007,7 +1007,7 @@ impl SourceGenerator {
             self.unparse_fstring_body(values, is_spec)?;
         } else {
             self.p("f")?;
-            let mut generator: SourceGenerator = Default::default();
+            let mut generator = SourceGenerator::default();
             generator.unparse_fstring_body(values, is_spec)?;
             let body = std::str::from_utf8(&generator.buffer).unwrap();
             self.p(&format!("{}", str::repr(body)))?;

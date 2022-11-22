@@ -1,9 +1,9 @@
 use anyhow::Result;
 use libcst_native::{
-    Arg, AssignEqual, Call, Codegen, Dict, DictComp, DictElement, Element, Expr, Expression,
-    LeftCurlyBrace, LeftParen, LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace,
-    RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
-    Tuple,
+    Arg, AssignEqual, Call, Codegen, CodegenState, Dict, DictComp, DictElement, Element, Expr,
+    Expression, LeftCurlyBrace, LeftParen, LeftSquareBracket, List, ListComp, Name,
+    ParenthesizableWhitespace, RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp,
+    SimpleString, SimpleWhitespace, Tuple,
 };
 
 use crate::ast::types::Range;
@@ -60,7 +60,7 @@ pub fn fix_unnecessary_generator_list(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -103,7 +103,7 @@ pub fn fix_unnecessary_generator_set(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -163,13 +163,13 @@ pub fn fix_unnecessary_generator_dict(
         rbrace: RightCurlyBrace {
             whitespace_before: arg.whitespace_after_arg.clone(),
         },
-        lpar: Default::default(),
-        rpar: Default::default(),
-        whitespace_before_colon: Default::default(),
+        lpar: vec![],
+        rpar: vec![],
+        whitespace_before_colon: ParenthesizableWhitespace::default(),
         whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
     }));
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -211,7 +211,7 @@ pub fn fix_unnecessary_list_comprehension_set(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -269,7 +269,7 @@ pub fn fix_unnecessary_list_comprehension_dict(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -312,12 +312,12 @@ pub fn fix_unnecessary_literal_set(
             rbrace: RightCurlyBrace {
                 whitespace_before: arg.whitespace_after_arg.clone(),
             },
-            lpar: Default::default(),
-            rpar: Default::default(),
+            lpar: vec![],
+            rpar: vec![],
         }));
     }
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -363,7 +363,7 @@ pub fn fix_unnecessary_literal_dict(
                             key: key.clone(),
                             value: value.clone(),
                             comma: comma.clone(),
-                            whitespace_before_colon: Default::default(),
+                            whitespace_before_colon: ParenthesizableWhitespace::default(),
                             whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(
                                 SimpleWhitespace(" "),
                             ),
@@ -385,11 +385,11 @@ pub fn fix_unnecessary_literal_dict(
         rbrace: RightCurlyBrace {
             whitespace_before: arg.whitespace_after_arg.clone(),
         },
-        lpar: Default::default(),
-        rpar: Default::default(),
+        lpar: vec![],
+        rpar: vec![],
     }));
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -422,28 +422,28 @@ pub fn fix_unnecessary_collection_call(
     match name.value {
         "tuple" => {
             body.value = Expression::Tuple(Box::new(Tuple {
-                elements: Default::default(),
-                lpar: vec![Default::default()],
-                rpar: vec![Default::default()],
+                elements: vec![],
+                lpar: vec![LeftParen::default()],
+                rpar: vec![RightParen::default()],
             }));
         }
         "list" => {
             body.value = Expression::List(Box::new(List {
-                elements: Default::default(),
-                lbracket: Default::default(),
-                rbracket: Default::default(),
-                lpar: Default::default(),
-                rpar: Default::default(),
+                elements: vec![],
+                lbracket: LeftSquareBracket::default(),
+                rbracket: RightSquareBracket::default(),
+                lpar: vec![],
+                rpar: vec![],
             }));
         }
         "dict" => {
             if call.args.is_empty() {
                 body.value = Expression::Dict(Box::new(Dict {
-                    elements: Default::default(),
-                    lbrace: Default::default(),
-                    rbrace: Default::default(),
-                    lpar: Default::default(),
-                    rpar: Default::default(),
+                    elements: vec![],
+                    lbrace: LeftCurlyBrace::default(),
+                    rbrace: RightCurlyBrace::default(),
+                    lpar: vec![],
+                    rpar: vec![],
                 }));
             } else {
                 // Quote each argument.
@@ -465,12 +465,12 @@ pub fn fix_unnecessary_collection_call(
                     .map(|(i, arg)| DictElement::Simple {
                         key: Expression::SimpleString(Box::new(SimpleString {
                             value: &arena[i],
-                            lpar: Default::default(),
-                            rpar: Default::default(),
+                            lpar: vec![],
+                            rpar: vec![],
                         })),
                         value: arg.value.clone(),
                         comma: arg.comma.clone(),
-                        whitespace_before_colon: Default::default(),
+                        whitespace_before_colon: ParenthesizableWhitespace::default(),
                         whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(
                             SimpleWhitespace(" "),
                         ),
@@ -490,8 +490,8 @@ pub fn fix_unnecessary_collection_call(
                             .whitespace_after_arg
                             .clone(),
                     },
-                    lpar: Default::default(),
-                    rpar: Default::default(),
+                    lpar: vec![],
+                    rpar: vec![],
                 }));
             }
         }
@@ -502,7 +502,7 @@ pub fn fix_unnecessary_collection_call(
         }
     };
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -558,7 +558,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
         }],
     }));
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -612,11 +612,11 @@ pub fn fix_unnecessary_literal_within_list_call(
         rbracket: RightSquareBracket {
             whitespace_before: whitespace_before.clone(),
         },
-        lpar: Default::default(),
-        rpar: Default::default(),
+        lpar: vec![],
+        rpar: vec![],
     }));
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -640,7 +640,7 @@ pub fn fix_unnecessary_list_call(
 
     body.value = arg.value.clone();
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -695,22 +695,22 @@ pub fn fix_unnecessary_call_around_sorted(
                 args.push(Arg {
                     value: Expression::Name(Box::new(Name {
                         value: "True",
-                        lpar: Default::default(),
-                        rpar: Default::default(),
+                        lpar: vec![],
+                        rpar: vec![],
                     })),
                     keyword: Some(Name {
                         value: "reverse",
-                        lpar: Default::default(),
-                        rpar: Default::default(),
+                        lpar: vec![],
+                        rpar: vec![],
                     }),
                     equal: Some(AssignEqual {
-                        whitespace_before: Default::default(),
-                        whitespace_after: Default::default(),
+                        whitespace_before: ParenthesizableWhitespace::default(),
+                        whitespace_after: ParenthesizableWhitespace::default(),
                     }),
-                    comma: Default::default(),
-                    star: Default::default(),
-                    whitespace_after_star: Default::default(),
-                    whitespace_after_arg: Default::default(),
+                    comma: None,
+                    star: "",
+                    whitespace_after_star: ParenthesizableWhitespace::default(),
+                    whitespace_after_arg: ParenthesizableWhitespace::default(),
                 });
                 args
             };
@@ -726,7 +726,7 @@ pub fn fix_unnecessary_call_around_sorted(
         }
     }
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -750,44 +750,44 @@ pub fn fix_unnecessary_comprehension(
             body.value = Expression::Call(Box::new(Call {
                 func: Box::new(Expression::Name(Box::new(Name {
                     value: "list",
-                    lpar: Default::default(),
-                    rpar: Default::default(),
+                    lpar: vec![],
+                    rpar: vec![],
                 }))),
                 args: vec![Arg {
                     value: inner.for_in.iter.clone(),
-                    keyword: Default::default(),
-                    equal: Default::default(),
-                    comma: Default::default(),
-                    star: Default::default(),
-                    whitespace_after_star: Default::default(),
-                    whitespace_after_arg: Default::default(),
+                    keyword: None,
+                    equal: None,
+                    comma: None,
+                    star: "",
+                    whitespace_after_star: ParenthesizableWhitespace::default(),
+                    whitespace_after_arg: ParenthesizableWhitespace::default(),
                 }],
-                lpar: Default::default(),
-                rpar: Default::default(),
-                whitespace_after_func: Default::default(),
-                whitespace_before_args: Default::default(),
+                lpar: vec![],
+                rpar: vec![],
+                whitespace_after_func: ParenthesizableWhitespace::default(),
+                whitespace_before_args: ParenthesizableWhitespace::default(),
             }))
         }
         Expression::SetComp(inner) => {
             body.value = Expression::Call(Box::new(Call {
                 func: Box::new(Expression::Name(Box::new(Name {
                     value: "set",
-                    lpar: Default::default(),
-                    rpar: Default::default(),
+                    lpar: vec![],
+                    rpar: vec![],
                 }))),
                 args: vec![Arg {
                     value: inner.for_in.iter.clone(),
-                    keyword: Default::default(),
-                    equal: Default::default(),
-                    comma: Default::default(),
-                    star: Default::default(),
-                    whitespace_after_star: Default::default(),
-                    whitespace_after_arg: Default::default(),
+                    keyword: None,
+                    equal: None,
+                    comma: None,
+                    star: "",
+                    whitespace_after_star: ParenthesizableWhitespace::default(),
+                    whitespace_after_arg: ParenthesizableWhitespace::default(),
                 }],
-                lpar: Default::default(),
-                rpar: Default::default(),
-                whitespace_after_func: Default::default(),
-                whitespace_before_args: Default::default(),
+                lpar: vec![],
+                rpar: vec![],
+                whitespace_after_func: ParenthesizableWhitespace::default(),
+                whitespace_before_args: ParenthesizableWhitespace::default(),
             }))
         }
         _ => {
@@ -797,7 +797,7 @@ pub fn fix_unnecessary_comprehension(
         }
     }
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(

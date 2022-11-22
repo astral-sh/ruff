@@ -15,8 +15,8 @@ use crate::code_gen::SourceGenerator;
 
 fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr]) -> Option<String> {
     let cmp = Expr::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         ExprKind::Compare {
             left: Box::new(left.clone()),
             ops: ops.to_vec(),
@@ -268,15 +268,15 @@ pub fn not_tests(
 
 fn function(name: &str, args: &Arguments, body: &Expr) -> Result<String> {
     let body = Stmt::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         StmtKind::Return {
             value: Some(Box::new(body.clone())),
         },
     );
     let func = Stmt::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         StmtKind::FunctionDef {
             name: name.to_string(),
             args: Box::new(args.clone()),

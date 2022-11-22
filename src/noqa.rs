@@ -121,6 +121,7 @@ fn add_noqa_inner(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use nohash_hasher::IntMap;
     use rustpython_parser::ast::Location;
 
     use crate::ast::types::Range;
@@ -145,7 +146,7 @@ mod tests {
     fn modification() -> Result<()> {
         let checks = vec![];
         let contents = "x = 1";
-        let noqa_line_for = Default::default();
+        let noqa_line_for = IntMap::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
         assert_eq!(count, 0);
         assert_eq!(output.trim(), contents.trim());
@@ -158,7 +159,7 @@ mod tests {
             },
         )];
         let contents = "x = 1";
-        let noqa_line_for = Default::default();
+        let noqa_line_for = IntMap::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: F841".trim());
@@ -180,7 +181,7 @@ mod tests {
             ),
         ];
         let contents = "x = 1  # noqa: E741";
-        let noqa_line_for = Default::default();
+        let noqa_line_for = IntMap::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());
@@ -202,7 +203,7 @@ mod tests {
             ),
         ];
         let contents = "x = 1  # noqa";
-        let noqa_line_for = Default::default();
+        let noqa_line_for = IntMap::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());

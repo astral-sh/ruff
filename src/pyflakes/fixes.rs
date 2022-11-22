@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libcst_native::{
-    Codegen, CompOp, Comparison, ComparisonTarget, Expr, Expression, ImportNames, NameOrAttribute,
-    SmallStatement, Statement,
+    Codegen, CodegenState, CompOp, Comparison, ComparisonTarget, Expr, Expression, ImportNames,
+    NameOrAttribute, SmallStatement, Statement,
 };
 use rustpython_ast::Stmt;
 
@@ -58,7 +58,7 @@ pub fn remove_unused_imports(
     if aliases.is_empty() {
         helpers::remove_stmt(stmt, parent, deleted)
     } else {
-        let mut state = Default::default();
+        let mut state = CodegenState::default();
         tree.codegen(&mut state);
 
         Ok(Fix::replacement(
@@ -131,7 +131,7 @@ pub fn remove_unused_import_froms(
     if aliases.is_empty() {
         helpers::remove_stmt(stmt, parent, deleted)
     } else {
-        let mut state = Default::default();
+        let mut state = CodegenState::default();
         tree.codegen(&mut state);
 
         Ok(Fix::replacement(
@@ -195,7 +195,7 @@ pub fn fix_invalid_literal_comparison(locator: &SourceCodeLocator, location: Ran
         rpar: cmp.rpar.clone(),
     }));
 
-    let mut state = Default::default();
+    let mut state = CodegenState::default();
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(

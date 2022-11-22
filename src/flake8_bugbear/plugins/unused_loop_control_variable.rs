@@ -17,7 +17,7 @@ struct NameFinder<'a> {
 impl NameFinder<'_> {
     fn new() -> Self {
         NameFinder {
-            names: Default::default(),
+            names: FxHashMap::default(),
         }
     }
 }

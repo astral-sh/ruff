@@ -1,4 +1,4 @@
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -10,12 +10,12 @@ use crate::python::keyword::KWLIST;
 
 fn assignment(obj: &Expr, name: &str, value: &Expr) -> Option<String> {
     let stmt = Stmt::new(
-        Default::default(),
-        Default::default(),
+        Location::default(),
+        Location::default(),
         StmtKind::Assign {
             targets: vec![Expr::new(
-                Default::default(),
-                Default::default(),
+                Location::default(),
+                Location::default(),
                 ExprKind::Attribute {
                     value: Box::new(obj.clone()),
                     attr: name.to_string(),

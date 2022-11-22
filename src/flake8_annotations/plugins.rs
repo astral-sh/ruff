@@ -34,7 +34,7 @@ where
 }
 
 fn is_none_returning(body: &[Stmt]) -> bool {
-    let mut visitor: ReturnStatementVisitor = Default::default();
+    let mut visitor = ReturnStatementVisitor::default();
     for stmt in body {
         visitor.visit_stmt(stmt);
     }

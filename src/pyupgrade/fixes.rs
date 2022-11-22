@@ -1,5 +1,8 @@
 use anyhow::Result;
-use libcst_native::{Codegen, Expression, ImportNames, SmallStatement, Statement};
+use libcst_native::{
+    Codegen, CodegenState, Expression, ImportNames, ParenthesizableWhitespace, SmallStatement,
+    Statement,
+};
 use rustpython_ast::{Expr, Keyword, Location, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -117,10 +120,10 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
         if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
             if let Expression::Call(body) = &mut body.value {
                 body.args = vec![];
-                body.whitespace_before_args = Default::default();
-                body.whitespace_after_func = Default::default();
+                body.whitespace_before_args = ParenthesizableWhitespace::default();
+                body.whitespace_after_func = ParenthesizableWhitespace::default();
 
-                let mut state = Default::default();
+                let mut state = CodegenState::default();
                 tree.codegen(&mut state);
 
                 return Some(Fix::replacement(
@@ -181,7 +184,7 @@ pub fn remove_unnecessary_future_import(
     if aliases.is_empty() {
         autofix::helpers::remove_stmt(stmt, parent, deleted)
     } else {
-        let mut state = Default::default();
+        let mut state = CodegenState::default();
         tree.codegen(&mut state);
 
         Ok(Fix::replacement(

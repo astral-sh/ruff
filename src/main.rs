@@ -25,6 +25,7 @@ use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use rustpython_ast::Location;
 use walkdir::DirEntry;
 
 /// Shim that calls par_iter except for wasm because there's no wasm support in
@@ -113,8 +114,8 @@ fn run_once(
                         vec![Message {
                             kind: CheckKind::IOError(message),
                             fixed: false,
-                            location: Default::default(),
-                            end_location: Default::default(),
+                            location: Location::default(),
+                            end_location: Location::default(),
                             filename: path.to_string_lossy().to_string(),
                             source: None,
                         }]
