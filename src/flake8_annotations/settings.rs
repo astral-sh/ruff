@@ -29,6 +29,7 @@ pub struct Settings {
 }
 
 impl Settings {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: Options) -> Self {
         Self {
             mypy_init_return: options.mypy_init_return.unwrap_or_default(),

@@ -20,7 +20,7 @@ fn check_import_blocks(
     let mut checks = vec![];
     for block in tracker.into_iter() {
         if !block.is_empty() {
-            if let Some(check) = isort::plugins::check_imports(block, locator, settings, autofix) {
+            if let Some(check) = isort::plugins::check_imports(&block, locator, settings, autofix) {
                 checks.push(check);
             }
         }

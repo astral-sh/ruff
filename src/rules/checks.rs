@@ -1596,6 +1596,7 @@ static CONFUSABLES: Lazy<FxHashMap<u32, u32>> = Lazy::new(|| {
     ])
 });
 
+#[derive(Clone, Copy)]
 pub enum Context {
     String,
     Docstring,
