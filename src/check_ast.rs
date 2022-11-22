@@ -1,7 +1,6 @@
 //! Lint rules based on AST traversal.
 
 use std::collections::BTreeMap;
-use std::ops::Deref;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -745,7 +744,7 @@ where
                         }
 
                         if self.settings.enabled.contains(&CheckCode::F407) {
-                            if !ALL_FEATURE_NAMES.contains(&alias.node.name.deref()) {
+                            if !ALL_FEATURE_NAMES.contains(&&*alias.node.name) {
                                 self.add_check(Check::new(
                                     CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
                                     Range::from_located(stmt),
@@ -941,7 +940,7 @@ where
                         self,
                         stmt,
                         test,
-                        msg.as_ref().map(|expr| expr.deref()),
+                        msg.as_ref().map(|expr| &**expr),
                     );
                 }
                 if self.settings.enabled.contains(&CheckCode::S101) {

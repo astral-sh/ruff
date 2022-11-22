@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
@@ -25,9 +23,7 @@ where
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
                 // No recurse.
             }
-            StmtKind::Return { value } => {
-                self.returns.push(value.as_ref().map(|expr| expr.deref()))
-            }
+            StmtKind::Return { value } => self.returns.push(value.as_ref().map(|expr| &**expr)),
             _ => visitor::walk_stmt(self, stmt),
         }
     }
