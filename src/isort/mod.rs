@@ -204,7 +204,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
                             entry.inline.push(comment.value);
                         }
                     } else {
-                        let entry = &mut block
+                        let entry = block
                             .import_from_as
                             .entry((
                                 ImportFromData { module, level },
