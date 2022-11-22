@@ -1,4 +1,32 @@
 #![allow(clippy::collapsible_if, clippy::collapsible_else_if)]
+#![deny(
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation,
+    clippy::cloned_instead_of_copied,
+    clippy::default_trait_access,
+    clippy::doc_markdown,
+    clippy::explicit_deref_methods,
+    clippy::explicit_iter_loop,
+    clippy::from_iter_instead_of_collect,
+    clippy::if_not_else,
+    clippy::inefficient_to_string,
+    clippy::items_after_statements,
+    clippy::let_underscore_drop,
+    clippy::manual_string_new,
+    clippy::map_unwrap_or,
+    clippy::match_bool,
+    clippy::mut_mut,
+    clippy::needless_pass_by_value,
+    clippy::redundant_closure_for_method_calls,
+    clippy::redundant_else,
+    clippy::single_match_else,
+    clippy::stable_sort_primitive,
+    clippy::struct_excessive_bools,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::uninlined_format_args,
+    clippy::unreadable_literal,
+    clippy::unreadable_literal
+)]
 
 use std::path::Path;
 
