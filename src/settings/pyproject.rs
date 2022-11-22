@@ -81,16 +81,15 @@ pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
 }
 
 pub fn load_options(pyproject: Option<&PathBuf>) -> Result<Options> {
-    match pyproject {
-        Some(pyproject) => Ok(parse_pyproject_toml(pyproject)?
+    if let Some(pyproject) = pyproject {
+        Ok(parse_pyproject_toml(pyproject)?
             .tool
             .and_then(|tool| tool.ruff)
-            .unwrap_or_default()),
-        None => {
-            debug!("No pyproject.toml found.");
-            debug!("Falling back to default configuration...");
-            Ok(Options::default())
-        }
+            .unwrap_or_default())
+    } else {
+        debug!("No pyproject.toml found.");
+        debug!("Falling back to default configuration...");
+        Ok(Options::default())
     }
 }
 

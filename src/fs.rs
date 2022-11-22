@@ -101,8 +101,8 @@ pub fn iter_python_files<'a>(
                         true
                     }
                 }
-                Err(_) => {
-                    debug!("Ignored path due to error in parsing: {:?}", path);
+                Err(e) => {
+                    debug!("Ignored path due to error in parsing: {:?}: {}", path, e);
                     true
                 }
             }
