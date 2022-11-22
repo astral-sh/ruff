@@ -390,16 +390,16 @@ pub fn unnecessary_double_cast_or_process(
     args: &[Expr],
     location: Range,
 ) -> Option<Check> {
-    let outer = function_name(func)?;
-    if !["list", "tuple", "set", "reversed", "sorted"].contains(&outer) {
-        return None;
-    }
-
     fn new_check(inner: &str, outer: &str, location: Range) -> Check {
         Check::new(
             CheckKind::UnnecessaryDoubleCastOrProcess(inner.to_string(), outer.to_string()),
             location,
         )
+    }
+
+    let outer = function_name(func)?;
+    if !["list", "tuple", "set", "reversed", "sorted"].contains(&outer) {
+        return None;
     }
 
     if let ExprKind::Call { func, .. } = &args.first()?.node {
