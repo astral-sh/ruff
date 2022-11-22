@@ -30,13 +30,13 @@ fn extract_indentation(body: &[&Stmt], locator: &SourceCodeLocator) -> String {
 
 /// I001
 pub fn check_imports(
-    body: Vec<&Stmt>,
+    body: &[&Stmt],
     locator: &SourceCodeLocator,
     settings: &Settings,
     autofix: &fixer::Mode,
 ) -> Option<Check> {
-    let range = extract_range(&body);
-    let indentation = extract_indentation(&body, locator);
+    let range = extract_range(body);
+    let indentation = extract_indentation(body, locator);
 
     // Extract comments. Take care to grab any inline comments from the last line.
     let comments = comments::collect_comments(
@@ -53,7 +53,7 @@ pub fn check_imports(
 
     // Generate the sorted import block.
     let expected = format_imports(
-        &body,
+        body,
         comments,
         settings.line_length - indentation.len(),
         &settings.src,
