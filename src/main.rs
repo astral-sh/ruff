@@ -381,7 +381,7 @@ fn inner_main() -> Result<ExitCode> {
         // Check for updates if we're in a non-silent log level.
         #[cfg(feature = "update-informer")]
         if !is_stdin && log_level >= LogLevel::Default && atty::is(atty::Stream::Stdout) {
-            let _ = updates::check_for_updates();
+            drop(updates::check_for_updates());
         }
 
         if messages.iter().any(|message| !message.fixed) && !cli.exit_zero {
