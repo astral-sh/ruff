@@ -21,7 +21,7 @@ impl Fix {
     pub fn deletion(start: Location, end: Location) -> Self {
         Self {
             patch: Patch {
-                content: "".to_string(),
+                content: String::new(),
                 location: start,
                 end_location: end,
             },
@@ -54,7 +54,7 @@ impl Fix {
     pub fn dummy(location: Location) -> Self {
         Self {
             patch: Patch {
-                content: "".to_string(),
+                content: String::new(),
                 location,
                 end_location: location,
             },

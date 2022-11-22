@@ -89,7 +89,7 @@ fn add_noqa_inner(
     }
 
     let mut count: usize = 0;
-    let mut output = "".to_string();
+    let mut output = String::new();
     for (lineno, line) in lines.iter().enumerate() {
         match matches_by_line.get(&lineno) {
             None => {
