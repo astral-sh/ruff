@@ -963,6 +963,7 @@ impl SourceGenerator {
 
         if conversion != ConversionFlag::None as usize {
             self.p("!")?;
+            #[allow(clippy::cast_possible_truncation)]
             let buf = &[conversion as u8];
             let c = std::str::from_utf8(buf).unwrap();
             self.p(c)?;
