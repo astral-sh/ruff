@@ -10,7 +10,7 @@ use rustc_hash::FxHashSet;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::checks::CheckCode;
-use crate::settings::types::{FilePattern, PerFileIgnore};
+use crate::settings::types::PerFileIgnore;
 
 /// Extract the absolute path and basename (as strings) from a Path.
 fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -25,32 +25,8 @@ fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
     Ok((file_path, file_basename))
 }
 
-fn is_excluded<'a, T>(file_path: &str, file_basename: &str, exclude: T) -> bool
-where
-    T: Iterator<Item = &'a FilePattern>,
-{
-    for pattern in exclude {
-        match pattern {
-            FilePattern::Simple(basename) => {
-                if *basename == file_basename {
-                    return true;
-                }
-            }
-            FilePattern::Complex(absolute, basename) => {
-                if absolute.matches(file_path) {
-                    return true;
-                }
-                if basename
-                    .as_ref()
-                    .map(|pattern| pattern.matches(file_basename))
-                    .unwrap_or_default()
-                {
-                    return true;
-                }
-            }
-        };
-    }
-    false
+fn is_excluded(file_path: &str, file_basename: &str, exclude: &globset::GlobSet) -> bool {
+    exclude.is_match(file_path) || exclude.is_match(file_basename)
 }
 
 fn is_included(path: &Path) -> bool {
@@ -60,18 +36,12 @@ fn is_included(path: &Path) -> bool {
 
 pub fn iter_python_files<'a>(
     path: &'a Path,
-    exclude: &'a [FilePattern],
-    extend_exclude: &'a [FilePattern],
+    exclude: &'a globset::GlobSet,
+    extend_exclude: &'a globset::GlobSet,
 ) -> impl Iterator<Item = Result<DirEntry, walkdir::Error>> + 'a {
     // Run some checks over the provided patterns, to enable optimizations below.
     let has_exclude = !exclude.is_empty();
     let has_extend_exclude = !extend_exclude.is_empty();
-    let exclude_simple = exclude
-        .iter()
-        .all(|pattern| matches!(pattern, FilePattern::Simple(_)));
-    let extend_exclude_simple = extend_exclude
-        .iter()
-        .all(|pattern| matches!(pattern, FilePattern::Simple(_)));
 
     WalkDir::new(normalize_path(path))
         .into_iter()
@@ -83,17 +53,11 @@ pub fn iter_python_files<'a>(
             let path = entry.path();
             match extract_path_names(path) {
                 Ok((file_path, file_basename)) => {
-                    let file_type = entry.file_type();
-
-                    if has_exclude
-                        && (!exclude_simple || file_type.is_dir())
-                        && is_excluded(file_path, file_basename, exclude.iter())
-                    {
+                    if has_exclude && is_excluded(file_path, file_basename, exclude) {
                         debug!("Ignored path via `exclude`: {:?}", path);
                         false
                     } else if has_extend_exclude
-                        && (!extend_exclude_simple || file_type.is_dir())
-                        && is_excluded(file_path, file_basename, extend_exclude.iter())
+                        && is_excluded(file_path, file_basename, extend_exclude)
                     {
                         debug!("Ignored path via `extend-exclude`: {:?}", path);
                         false
@@ -125,11 +89,8 @@ pub(crate) fn ignores_from_path<'a>(
     Ok(pattern_code_pairs
         .iter()
         .filter(|pattern_code_pair| {
-            is_excluded(
-                file_path,
-                file_basename,
-                [&pattern_code_pair.pattern].into_iter(),
-            )
+            let matcher = pattern_code_pair.pattern.compile_matcher();
+            matcher.is_match(file_path) || matcher.is_match(file_basename)
         })
         .flat_map(|pattern_code_pair| &pattern_code_pair.codes)
         .collect())
