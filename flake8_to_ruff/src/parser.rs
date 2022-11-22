@@ -92,7 +92,7 @@ impl State {
                         });
                     }
                 }
-                Err(_) => eprintln!("Skipping unrecognized prefix: {}", code),
+                Err(_) => eprintln!("Skipping unrecognized prefix: {code}"),
             }
         }
         codes

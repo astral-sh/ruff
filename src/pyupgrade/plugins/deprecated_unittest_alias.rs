@@ -39,7 +39,7 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
                     );
                     if checker.patch(check.kind.code()) {
                         check.amend(Fix::replacement(
-                            format!("self.{}", target),
+                            format!("self.{target}"),
                             expr.location,
                             expr.end_location.unwrap(),
                         ));

@@ -100,7 +100,7 @@ impl SourceGenerator {
     }
 
     fn write_fmt(&mut self, f: fmt::Arguments<'_>) -> fmt::Result {
-        self.buffer.extend(format!("{}", f).as_bytes());
+        self.buffer.extend(format!("{f}").as_bytes());
         Ok(())
     }
 
@@ -797,7 +797,7 @@ impl SourceGenerator {
                     {
                         self.p(&value.to_string().replace("inf", inf_str))?
                     }
-                    _ => self.p(&format!("{}", value))?,
+                    _ => self.p(&format!("{value}"))?,
                 }
             }
             ExprKind::Attribute { value, attr, .. } => {
@@ -900,7 +900,7 @@ impl SourceGenerator {
                 .checked_sub(defaults_start)
                 .and_then(|i| args.kw_defaults.get(i))
             {
-                write!(self, "={}", default)?;
+                write!(self, "={default}")?;
             }
         }
         if let Some(kwarg) = &args.kwarg {

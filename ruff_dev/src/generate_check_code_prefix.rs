@@ -106,7 +106,7 @@ pub fn main(cli: &Cli) -> Result<()> {
             2 => "Tens",
             1 => "Hundreds",
             0 => "Category",
-            _ => panic!("Invalid prefix: {}", prefix),
+            _ => panic!("Invalid prefix: {prefix}"),
         };
         gen = gen.line(format!(
             "CheckCodePrefix::{prefix} => PrefixSpecificity::{},",
@@ -132,10 +132,10 @@ pub fn main(cli: &Cli) -> Result<()> {
 
     // Write the output to `src/checks_gen.rs` (or stdout).
     if cli.dry_run {
-        println!("{}", output);
+        println!("{output}");
     } else {
         let mut f = OpenOptions::new().write(true).truncate(true).open(FILE)?;
-        write!(f, "{}", output)?;
+        write!(f, "{output}")?;
     }
 
     Ok(())

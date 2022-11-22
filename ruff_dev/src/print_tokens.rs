@@ -17,7 +17,7 @@ pub struct Cli {
 pub fn main(cli: &Cli) -> Result<()> {
     let contents = fs::read_to_string(&cli.file)?;
     for (_, tok, _) in lexer::make_tokenizer(&contents).flatten() {
-        println!("{:#?}", tok);
+        println!("{tok:#?}");
     }
     Ok(())
 }

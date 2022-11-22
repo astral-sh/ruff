@@ -17,7 +17,7 @@ mod tests {
     #[test_case(3)]
     #[test_case(10)]
     fn max_complexity_zero(max_complexity: usize) -> Result<()> {
-        let snapshot = format!("max_complexity_{}", max_complexity);
+        let snapshot = format!("max_complexity_{max_complexity}");
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/C901.py"),
             &Settings {

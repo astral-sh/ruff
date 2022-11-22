@@ -17,7 +17,7 @@ pub fn main(cli: &Cli) -> Result<()> {
     let contents = fs::read_to_string(&cli.file)?;
     match libcst_native::parse_module(&contents, None) {
         Ok(python_cst) => {
-            println!("{:#?}", python_cst);
+            println!("{python_cst:#?}");
             Ok(())
         }
         Err(_) => Err(anyhow::anyhow!("Failed to parse CST")),
