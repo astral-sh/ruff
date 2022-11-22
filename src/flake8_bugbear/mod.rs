@@ -7,7 +7,6 @@ mod tests {
 
     use anyhow::Result;
 
-    use crate::autofix::fixer;
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::{flake8_bugbear, Settings};
@@ -26,7 +25,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![CheckCode::B008])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

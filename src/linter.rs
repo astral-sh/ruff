@@ -53,7 +53,7 @@ pub(crate) fn check_path(
     locator: &SourceCodeLocator,
     directives: &Directives,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: bool,
 ) -> Result<Vec<Check>> {
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
@@ -173,7 +173,7 @@ pub fn lint_path(
             &locator,
             &directives,
             settings,
-            autofix,
+            autofix.into(),
         )?;
 
         // Apply autofix.
@@ -242,7 +242,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &locator,
         &directives,
         settings,
-        &fixer::Mode::None,
+        false,
     )?;
 
     add_noqa(&checks, &contents, &directives.noqa_line_for, path)
@@ -301,7 +301,7 @@ pub fn lint_stdin(
             &locator,
             &directives,
             settings,
-            autofix,
+            autofix.into(),
         )?;
 
         // Apply autofix.
@@ -342,7 +342,7 @@ pub fn lint_stdin(
 }
 
 #[cfg(test)]
-pub fn test_path(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> Result<Vec<Check>> {
+pub fn test_path(path: &Path, settings: &Settings, autofix: bool) -> Result<Vec<Check>> {
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
@@ -371,7 +371,6 @@ mod tests {
     use regex::Regex;
     use test_case::test_case;
 
-    use crate::autofix::fixer;
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::settings;
@@ -591,7 +590,7 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures").join(path).as_path(),
             &settings::Settings::for_rule(check_code),
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -606,7 +605,7 @@ mod tests {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
                 ..settings::Settings::for_rule(CheckCode::F841)
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -618,7 +617,7 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/M001.py"),
             &settings::Settings::for_rules(vec![CheckCode::M001, CheckCode::E501, CheckCode::F841]),
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -630,7 +629,7 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/__init__.py"),
             &settings::Settings::for_rules(vec![CheckCode::F821, CheckCode::F822]),
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -642,7 +641,7 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/future_annotations.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);

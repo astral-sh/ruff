@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
-use crate::autofix::{fixer, Fix};
+use crate::autofix::Fix;
 use crate::checks::CheckKind;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::{Check, Settings};
@@ -1609,7 +1609,7 @@ pub fn ambiguous_unicode_character(
     end: Location,
     context: Context,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: bool,
 ) -> Vec<Check> {
     let mut checks = vec![];
 
@@ -1649,7 +1649,7 @@ pub fn ambiguous_unicode_character(
                     },
                 );
                 if settings.enabled.contains(check.kind.code()) {
-                    if autofix.patch() && settings.fixable.contains(check.kind.code()) {
+                    if autofix && settings.fixable.contains(check.kind.code()) {
                         check.amend(Fix::replacement(
                             representant.to_string(),
                             location,

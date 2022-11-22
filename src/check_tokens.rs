@@ -2,7 +2,6 @@
 
 use rustpython_parser::lexer::{LexResult, Tok};
 
-use crate::autofix::fixer;
 use crate::checks::{Check, CheckCode};
 use crate::lex::docstring_detection::StateMachine;
 use crate::rules::checks::Context;
@@ -13,7 +12,7 @@ pub fn check_tokens(
     locator: &SourceCodeLocator,
     tokens: &[LexResult],
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: bool,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 

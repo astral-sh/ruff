@@ -8,7 +8,6 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::autofix::fixer;
     use crate::checks::CheckCode;
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::test_path;
@@ -39,7 +38,7 @@ mod tests {
                     CheckCode::Q003,
                 ])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -71,7 +70,7 @@ mod tests {
                     CheckCode::Q003,
                 ])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -108,7 +107,7 @@ mod tests {
                     CheckCode::Q003,
                 ])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -145,7 +144,7 @@ mod tests {
                     CheckCode::Q003,
                 ])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

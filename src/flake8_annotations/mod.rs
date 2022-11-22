@@ -7,7 +7,6 @@ mod tests {
 
     use anyhow::Result;
 
-    use crate::autofix::fixer;
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::{flake8_annotations, Settings};
@@ -31,7 +30,7 @@ mod tests {
                     CheckCode::ANN401,
                 ])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -57,7 +56,7 @@ mod tests {
                     CheckCode::ANN102,
                 ])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -83,7 +82,7 @@ mod tests {
                     CheckCode::ANN206,
                 ])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -109,7 +108,7 @@ mod tests {
                     CheckCode::ANN206,
                 ])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -129,7 +128,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![CheckCode::ANN401])
             },
-            &fixer::Mode::Generate,
+            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
