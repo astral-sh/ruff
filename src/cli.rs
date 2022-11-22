@@ -13,6 +13,7 @@ use crate::settings::types::{PatternPrefixPair, PerFileIgnore, PythonVersion};
 #[derive(Debug, Parser)]
 #[command(author, about = "Ruff: An extremely fast Python linter.")]
 #[command(version)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Cli {
     #[arg(required = true)]
     pub files: Vec<PathBuf>,

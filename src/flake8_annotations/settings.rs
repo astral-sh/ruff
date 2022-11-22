@@ -21,6 +21,7 @@ pub struct Options {
 }
 
 #[derive(Debug, Hash, Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub mypy_init_return: bool,
     pub suppress_dummy_args: bool,
