@@ -945,51 +945,7 @@ fn blanks_and_section_underline(
         .chars()
         .all(|char| char.is_whitespace() || char == '-');
 
-    if !dash_line_found {
-        if checker.settings.enabled.contains(&CheckCode::D407) {
-            let mut check = Check::new(
-                CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
-                Range::from_located(docstring),
-            );
-            if checker.patch(check.kind.code()) {
-                // Add a dashed line (of the appropriate length) under the section header.
-                let content = format!(
-                    "{}{}\n",
-                    whitespace::clean(&whitespace::indentation(checker, docstring)),
-                    "-".repeat(context.section_name.len())
-                );
-                check.amend(Fix::insertion(
-                    content,
-                    Location::new(docstring.location.row() + context.original_index + 1, 0),
-                ));
-            }
-            checker.add_check(check);
-        }
-        if blank_lines_after_header > 0 {
-            if checker.settings.enabled.contains(&CheckCode::D412) {
-                let mut check = Check::new(
-                    CheckKind::NoBlankLinesBetweenHeaderAndContent(
-                        context.section_name.to_string(),
-                    ),
-                    Range::from_located(docstring),
-                );
-                if checker.patch(check.kind.code()) {
-                    // Delete any blank lines between the header and content.
-                    check.amend(Fix::deletion(
-                        Location::new(docstring.location.row() + context.original_index + 1, 0),
-                        Location::new(
-                            docstring.location.row()
-                                + context.original_index
-                                + 1
-                                + blank_lines_after_header,
-                            0,
-                        ),
-                    ));
-                }
-                checker.add_check(check);
-            }
-        }
-    } else {
+    if dash_line_found {
         if blank_lines_after_header > 0 {
             if checker.settings.enabled.contains(&CheckCode::D408) {
                 let mut check = Check::new(
@@ -1144,6 +1100,50 @@ fn blanks_and_section_underline(
                     CheckKind::NonEmptySection(context.section_name.to_string()),
                     Range::from_located(docstring),
                 ));
+            }
+        }
+    } else {
+        if checker.settings.enabled.contains(&CheckCode::D407) {
+            let mut check = Check::new(
+                CheckKind::DashedUnderlineAfterSection(context.section_name.to_string()),
+                Range::from_located(docstring),
+            );
+            if checker.patch(check.kind.code()) {
+                // Add a dashed line (of the appropriate length) under the section header.
+                let content = format!(
+                    "{}{}\n",
+                    whitespace::clean(&whitespace::indentation(checker, docstring)),
+                    "-".repeat(context.section_name.len())
+                );
+                check.amend(Fix::insertion(
+                    content,
+                    Location::new(docstring.location.row() + context.original_index + 1, 0),
+                ));
+            }
+            checker.add_check(check);
+        }
+        if blank_lines_after_header > 0 {
+            if checker.settings.enabled.contains(&CheckCode::D412) {
+                let mut check = Check::new(
+                    CheckKind::NoBlankLinesBetweenHeaderAndContent(
+                        context.section_name.to_string(),
+                    ),
+                    Range::from_located(docstring),
+                );
+                if checker.patch(check.kind.code()) {
+                    // Delete any blank lines between the header and content.
+                    check.amend(Fix::deletion(
+                        Location::new(docstring.location.row() + context.original_index + 1, 0),
+                        Location::new(
+                            docstring.location.row()
+                                + context.original_index
+                                + 1
+                                + blank_lines_after_header,
+                            0,
+                        ),
+                    ));
+                }
+                checker.add_check(check);
             }
         }
     }
