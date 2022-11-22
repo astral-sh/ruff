@@ -32,12 +32,14 @@ of plugins), [`isort`](https://pypi.org/project/isort/), [`pydocstyle`](https://
 and [`autoflake`](https://pypi.org/project/autoflake/) all while executing tens or hundreds of times
 faster than any individual tool.
 
-(Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
-automatically convert your existing configuration.)
+Ruff is actively developed and used in major open-source projects like:
 
-Ruff is actively developed and used in major open-source projects
-like [FastAPI](https://github.com/tiangolo/fastapi), [Zulip](https://github.com/zulip/zulip),
-[pydantic](https://github.com/pydantic/pydantic), and [Saleor](https://github.com/saleor/saleor).
+- [FastAPI](https://github.com/tiangolo/fastapi)
+- [Bokeh](https://github.com/bokeh/bokeh)
+- [Zulip](https://github.com/zulip/zulip)
+- [Pydantic](https://github.com/pydantic/pydantic)
+- [Saleor](https://github.com/saleor/saleor)
+- [Hatch](https://github.com/pypa/hatch)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -105,7 +107,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.116
+    rev: v0.0.134
     hooks:
       - id: ruff
 ```
