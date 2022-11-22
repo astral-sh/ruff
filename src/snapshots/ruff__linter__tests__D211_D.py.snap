@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 165
         column: 0
-    applied: false
 - kind:
     NoBlankLineBeforeClass: 1
   location:
@@ -37,5 +36,4 @@ expression: checks
       end_location:
         row: 176
         column: 0
-    applied: false
 

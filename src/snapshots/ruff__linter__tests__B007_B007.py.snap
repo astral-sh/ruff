@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 6
         column: 5
-    applied: false
 - kind:
     UnusedLoopControlVariable: k
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 18
         column: 13
-    applied: false
 - kind:
     UnusedLoopControlVariable: i
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 30
         column: 5
-    applied: false
 - kind:
     UnusedLoopControlVariable: k
   location:
@@ -73,5 +70,4 @@ expression: checks
       end_location:
         row: 30
         column: 13
-    applied: false
 

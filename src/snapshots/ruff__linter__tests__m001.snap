@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 9
         column: 17
-    applied: false
 - kind:
     UnusedNOQA:
       - E501
@@ -38,7 +37,6 @@ expression: checks
       end_location:
         row: 13
         column: 23
-    applied: false
 - kind:
     UnusedNOQA:
       - F841
@@ -58,7 +56,6 @@ expression: checks
       end_location:
         row: 16
         column: 29
-    applied: false
 - kind:
     UnusedNOQA:
       - F841
@@ -78,7 +75,6 @@ expression: checks
       end_location:
         row: 19
         column: 29
-    applied: false
 - kind:
     UnusedNOQA:
       - E501
@@ -97,7 +93,6 @@ expression: checks
       end_location:
         row: 23
         column: 21
-    applied: false
 - kind:
     UnusedVariable: d
   location:
@@ -125,7 +120,6 @@ expression: checks
       end_location:
         row: 26
         column: 44
-    applied: false
 - kind:
     UnusedNOQA:
       - F841
@@ -144,7 +138,6 @@ expression: checks
       end_location:
         row: 52
         column: 23
-    applied: false
 - kind:
     UnusedNOQA:
       - E501
@@ -163,7 +156,6 @@ expression: checks
       end_location:
         row: 60
         column: 17
-    applied: false
 - kind:
     UnusedNOQA: ~
   location:
@@ -181,5 +173,4 @@ expression: checks
       end_location:
         row: 68
         column: 11
-    applied: false
 

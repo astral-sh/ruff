@@ -1,8 +1,13 @@
-use std::borrow::Cow;
 use std::fs::write;
 use std::io;
 use std::io::Write;
+use std::ops::AddAssign;
 use std::path::Path;
+
+use anyhow::Result;
+#[cfg(not(target_family = "wasm"))]
+use log::debug;
+use rustpython_parser::lexer::LexResult;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
@@ -19,12 +24,28 @@ use crate::noqa::add_noqa;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::{cache, directives, fs, rustpython_helpers};
-use anyhow::Result;
-#[cfg(not(target_family = "wasm"))]
-use log::debug;
-use rustpython_parser::lexer::LexResult;
 
-/// Generate a list of `Check` violations from the source code contents at the given `Path`.
+#[derive(Debug, Default)]
+pub struct Diagnostics {
+    pub messages: Vec<Message>,
+    pub fixed: usize,
+}
+
+impl Diagnostics {
+    pub fn new(messages: Vec<Message>) -> Self {
+        Self { messages, fixed: 0 }
+    }
+}
+
+impl AddAssign for Diagnostics {
+    fn add_assign(&mut self, other: Self) {
+        self.messages.extend(other.messages);
+        self.fixed += other.fixed;
+    }
+}
+
+/// Generate a list of `Check` violations from the source code contents at the
+/// given `Path`.
 pub(crate) fn check_path(
     path: &Path,
     contents: &str,
@@ -108,22 +129,7 @@ pub(crate) fn check_path(
     Ok(checks)
 }
 
-#[derive(Default)]
-pub struct Diagnostics {
-    pub messages: Vec<Message>,
-    pub num_fixed: usize,
-}
-
-impl Diagnostics {
-    pub fn new(messages: Vec<Message>) -> Self {
-        Self {
-            messages,
-            num_fixed: 0,
-        }
-    }
-}
-
-/// Lin the source code at the given `Path`.
+/// Lint the source code at the given `Path`.
 pub fn lint_path(
     path: &Path,
     settings: &Settings,
@@ -142,7 +148,7 @@ pub fn lint_path(
     let mut contents = fs::read_file(path)?;
 
     // Track the number of fixed errors across iterations.
-    let mut num_fixed = 0;
+    let mut fixed = 0;
 
     // Continuously autofix until the source code stabilizes.
     let messages = loop {
@@ -160,7 +166,7 @@ pub fn lint_path(
         );
 
         // Generate checks.
-        let mut checks = check_path(
+        let checks = check_path(
             path,
             &contents,
             tokens,
@@ -172,14 +178,12 @@ pub fn lint_path(
 
         // Apply autofix.
         if matches!(autofix, fixer::Mode::Apply) {
-            if let Some((new_content, num_applied)) = fix_file(&checks, &locator) {
-                write(path, new_content.as_ref())?;
-
+            if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
                 // Count the number of fixed errors.
-                num_fixed += num_applied;
+                fixed += applied;
 
                 // Store the fixed contents.
-                contents = new_content.to_string();
+                contents = fixed_contents.to_string();
 
                 // Re-run the linter pass (by avoiding the break).
                 continue;
@@ -187,26 +191,29 @@ pub fn lint_path(
         }
 
         // Convert to messages.
+        let filename = path.to_string_lossy().to_string();
         break checks
             .into_iter()
             .map(|check| {
-                let filename = path.to_string_lossy().to_string();
                 let source = if settings.show_source {
                     Some(Source::from_check(&check, &locator))
                 } else {
                     None
                 };
-                Message::from_check(check, filename, source)
+                Message::from_check(check, filename.clone(), source)
             })
             .collect::<Vec<_>>();
     };
 
+    // Re-populate the cache.
     cache::set(path, &metadata, settings, autofix, &messages, mode);
 
-    Ok(Diagnostics {
-        messages,
-        num_fixed,
-    })
+    // If we applied any fixes, write the contents back to disk.
+    if fixed > 0 {
+        write(path, &contents)?;
+    }
+
+    Ok(Diagnostics { messages, fixed })
 }
 
 /// Add any missing `#noqa` pragmas to the source code at the given `Path`.
@@ -258,58 +265,80 @@ pub fn autoformat_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Generate a list of `Check` violations from source code content derived from stdin.
+/// Generate a list of `Check` violations from source code content derived from
+/// stdin.
 pub fn lint_stdin(
     path: &Path,
     stdin: &str,
     settings: &Settings,
     autofix: &fixer::Mode,
-) -> Result<Vec<Message>> {
-    // Tokenize once.
-    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(stdin);
+) -> Result<Diagnostics> {
+    // Read the file from disk.
+    let mut contents = stdin.to_string();
 
-    // Initialize the SourceCodeLocator (which computes offsets lazily).
-    let locator = SourceCodeLocator::new(stdin);
+    // Track the number of fixed errors across iterations.
+    let mut fixed = 0;
 
-    // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(
-        &tokens,
-        &locator,
-        directives::Flags::from_settings(settings),
-    );
+    let messages = loop {
+        // Tokenize once.
+        let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
 
-    // Generate checks.
-    let mut checks = check_path(
-        path,
-        stdin,
-        tokens,
-        &locator,
-        &directives,
-        settings,
-        autofix,
-    )?;
+        // Initialize the SourceCodeLocator (which computes offsets lazily).
+        let locator = SourceCodeLocator::new(&contents);
 
-    // Apply autofix, write results to stdout.
+        // Extract the `# noqa` and `# isort: skip` directives from the source.
+        let directives = directives::extract_directives(
+            &tokens,
+            &locator,
+            directives::Flags::from_settings(settings),
+        );
+
+        // Generate checks.
+        let checks = check_path(
+            path,
+            &contents,
+            tokens,
+            &locator,
+            &directives,
+            settings,
+            autofix,
+        )?;
+
+        // Apply autofix.
+        if matches!(autofix, fixer::Mode::Apply) {
+            if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
+                // Count the number of fixed errors.
+                fixed += applied;
+
+                // Store the fixed contents.
+                contents = fixed_contents.to_string();
+
+                // Re-run the linter pass (by avoiding the break).
+                continue;
+            }
+        }
+
+        // Convert to messages.
+        let filename = path.to_string_lossy().to_string();
+        break checks
+            .into_iter()
+            .map(|check| {
+                let source = if settings.show_source {
+                    Some(Source::from_check(&check, &locator))
+                } else {
+                    None
+                };
+                Message::from_check(check, filename.clone(), source)
+            })
+            .collect();
+    };
+
+    // Write the fixed contents to stdout.
     if matches!(autofix, fixer::Mode::Apply) {
-        match fix_file(&mut checks, &locator) {
-            None => io::stdout().write_all(stdin.as_bytes()),
-            Some((contents, _)) => io::stdout().write_all(contents.as_bytes()),
-        }?;
+        io::stdout().write_all(contents.as_bytes())?;
     }
 
-    // Convert to messages.
-    Ok(checks
-        .into_iter()
-        .map(|check| {
-            let filename = path.to_string_lossy().to_string();
-            let source = if settings.show_source {
-                Some(Source::from_check(&check, &locator))
-            } else {
-                None
-            };
-            Message::from_check(check, filename, source)
-        })
-        .collect())
+    Ok(Diagnostics { messages, fixed })
 }
 
 #[cfg(test)]

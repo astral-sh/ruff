@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 103
         column: 0
-    applied: false
 - kind:
     SectionUnderlineMatchesSectionLength: Returns
   location:
@@ -37,5 +36,4 @@ expression: checks
       end_location:
         row: 217
         column: 0
-    applied: false
 

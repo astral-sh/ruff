@@ -18,7 +18,6 @@ expression: checks
       end_location:
         row: 283
         column: 30
-    applied: false
 - kind: NoSurroundingWhitespace
   location:
     row: 288
@@ -35,7 +34,6 @@ expression: checks
       end_location:
         row: 288
         column: 34
-    applied: false
 - kind: NoSurroundingWhitespace
   location:
     row: 294
@@ -52,5 +50,4 @@ expression: checks
       end_location:
         row: 294
         column: 36
-    applied: false
 

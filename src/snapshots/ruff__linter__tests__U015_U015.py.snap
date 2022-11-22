@@ -18,7 +18,6 @@ expression: checks
       end_location:
         row: 1
         column: 15
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 2
@@ -35,7 +34,6 @@ expression: checks
       end_location:
         row: 2
         column: 16
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 3
@@ -52,7 +50,6 @@ expression: checks
       end_location:
         row: 3
         column: 16
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 4
@@ -69,7 +66,6 @@ expression: checks
       end_location:
         row: 4
         column: 17
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 5
@@ -86,7 +82,6 @@ expression: checks
       end_location:
         row: 5
         column: 15
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 6
@@ -103,7 +98,6 @@ expression: checks
       end_location:
         row: 6
         column: 16
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 7
@@ -120,7 +114,6 @@ expression: checks
       end_location:
         row: 7
         column: 13
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 8
@@ -137,7 +130,6 @@ expression: checks
       end_location:
         row: 8
         column: 14
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 10
@@ -154,7 +146,6 @@ expression: checks
       end_location:
         row: 10
         column: 20
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 12
@@ -171,7 +162,6 @@ expression: checks
       end_location:
         row: 12
         column: 21
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 14
@@ -188,7 +178,6 @@ expression: checks
       end_location:
         row: 14
         column: 21
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 16
@@ -205,7 +194,6 @@ expression: checks
       end_location:
         row: 16
         column: 22
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 18
@@ -222,7 +210,6 @@ expression: checks
       end_location:
         row: 18
         column: 20
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 20
@@ -239,7 +226,6 @@ expression: checks
       end_location:
         row: 20
         column: 21
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 22
@@ -256,7 +242,6 @@ expression: checks
       end_location:
         row: 22
         column: 20
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 24
@@ -273,7 +258,6 @@ expression: checks
       end_location:
         row: 24
         column: 21
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 27
@@ -290,7 +274,6 @@ expression: checks
       end_location:
         row: 27
         column: 26
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 28
@@ -307,7 +290,6 @@ expression: checks
       end_location:
         row: 28
         column: 27
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 30
@@ -324,7 +306,6 @@ expression: checks
       end_location:
         row: 30
         column: 31
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 32
@@ -341,7 +322,6 @@ expression: checks
       end_location:
         row: 32
         column: 32
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 35
@@ -358,7 +338,6 @@ expression: checks
       end_location:
         row: 35
         column: 20
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 35
@@ -375,7 +354,6 @@ expression: checks
       end_location:
         row: 35
         column: 44
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 37
@@ -392,7 +370,6 @@ expression: checks
       end_location:
         row: 37
         column: 21
-    applied: false
 - kind: RedundantOpenModes
   location:
     row: 37
@@ -409,5 +386,4 @@ expression: checks
       end_location:
         row: 37
         column: 46
-    applied: false
 

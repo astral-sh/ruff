@@ -18,7 +18,6 @@ expression: checks
       end_location:
         row: 4
         column: 0
-    applied: false
 - kind: PPrintFound
   location:
     row: 8
@@ -35,5 +34,4 @@ expression: checks
       end_location:
         row: 9
         column: 0
-    applied: false
 

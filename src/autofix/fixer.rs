@@ -113,78 +113,84 @@ mod tests {
 
     #[test]
     fn empty_file() -> Result<()> {
-        let mut fixes = vec![];
-        let locator = SourceCodeLocator::new("");
-        let actual = apply_fixes(fixes.iter_mut(), &locator);
-        let expected = "";
-
-        assert_eq!(actual, expected);
+        let fixes = vec![];
+        let locator = SourceCodeLocator::new(r#""#);
+        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        assert_eq!(contents, "");
+        assert_eq!(fixed, 0);
 
         Ok(())
     }
 
     #[test]
     fn apply_single_replacement() -> Result<()> {
-        let mut fixes = vec![Fix {
+        let fixes = vec![Fix {
             patch: Patch {
                 content: "Bar".to_string(),
                 location: Location::new(1, 8),
                 end_location: Location::new(1, 14),
             },
-            applied: false,
         }];
         let locator = SourceCodeLocator::new(
-            "class A(object):
-        ...
-",
+            r#"
+class A(object):
+    ...
+"#
+            .trim(),
         );
-        let actual = apply_fixes(fixes.iter_mut(), &locator);
-
-        let expected = "class A(Bar):
-        ...
-";
-
-        assert_eq!(actual, expected);
+        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        assert_eq!(
+            contents,
+            r#"
+class A(Bar):
+    ...
+"#
+            .trim(),
+        );
+        assert_eq!(fixed, 1);
 
         Ok(())
     }
 
     #[test]
     fn apply_single_removal() -> Result<()> {
-        let mut fixes = vec![Fix {
+        let fixes = vec![Fix {
             patch: Patch {
                 content: String::new(),
                 location: Location::new(1, 7),
                 end_location: Location::new(1, 15),
             },
-            applied: false,
         }];
         let locator = SourceCodeLocator::new(
-            "class A(object):
-        ...
-",
+            r#"
+class A(object):
+    ...
+"#
+            .trim(),
         );
-        let actual = apply_fixes(fixes.iter_mut(), &locator);
-
-        let expected = "class A:
-        ...
-";
-
-        assert_eq!(actual, expected);
+        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        assert_eq!(
+            contents,
+            r#"
+class A:
+    ...
+"#
+            .trim()
+        );
+        assert_eq!(fixed, 1);
 
         Ok(())
     }
 
     #[test]
     fn apply_double_removal() -> Result<()> {
-        let mut fixes = vec![
+        let fixes = vec![
             Fix {
                 patch: Patch {
                     content: String::new(),
                     location: Location::new(1, 7),
                     end_location: Location::new(1, 16),
                 },
-                applied: false,
             },
             Fix {
                 patch: Patch {
@@ -192,35 +198,39 @@ mod tests {
                     location: Location::new(1, 16),
                     end_location: Location::new(1, 23),
                 },
-                applied: false,
             },
         ];
         let locator = SourceCodeLocator::new(
-            "class A(object, object):
-        ...
-",
+            r#"
+class A(object, object):
+    ...
+"#
+            .trim(),
         );
-        let actual = apply_fixes(fixes.iter_mut(), &locator);
+        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
 
-        let expected = "class A:
-        ...
-";
-
-        assert_eq!(actual, expected);
+        assert_eq!(
+            contents,
+            r#"
+class A:
+    ...
+"#
+            .trim()
+        );
+        assert_eq!(fixed, 2);
 
         Ok(())
     }
 
     #[test]
     fn ignore_overlapping_fixes() -> Result<()> {
-        let mut fixes = vec![
+        let fixes = vec![
             Fix {
                 patch: Patch {
                     content: String::new(),
                     location: Location::new(1, 7),
                     end_location: Location::new(1, 15),
                 },
-                applied: false,
             },
             Fix {
                 patch: Patch {
@@ -228,21 +238,25 @@ mod tests {
                     location: Location::new(1, 9),
                     end_location: Location::new(1, 11),
                 },
-                applied: false,
             },
         ];
         let locator = SourceCodeLocator::new(
-            "class A(object):
+            r#"
+class A(object):
     ...
-",
+"#
+            .trim(),
         );
-        let actual = apply_fixes(fixes.iter_mut(), &locator);
-
-        let expected = "class A:
+        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        assert_eq!(
+            contents,
+            r#"
+class A:
     ...
-";
-
-        assert_eq!(actual, expected);
+"#
+            .trim(),
+        );
+        assert_eq!(fixed, 1);
 
         Ok(())
     }

@@ -18,7 +18,6 @@ expression: checks
       end_location:
         row: 1
         column: 13
-    applied: false
 - kind: IsLiteral
   location:
     row: 4
@@ -35,7 +34,6 @@ expression: checks
       end_location:
         row: 4
         column: 15
-    applied: false
 - kind: IsLiteral
   location:
     row: 7
@@ -52,5 +50,4 @@ expression: checks
       end_location:
         row: 7
         column: 13
-    applied: false
 

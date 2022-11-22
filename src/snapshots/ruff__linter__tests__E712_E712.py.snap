@@ -1,6 +1,5 @@
 ---
 source: src/linter.rs
-assertion_line: 531
 expression: checks
 ---
 - kind:
@@ -22,7 +21,6 @@ expression: checks
       end_location:
         row: 2
         column: 14
-    applied: false
 - kind:
     TrueFalseComparison:
       - false
@@ -42,7 +40,6 @@ expression: checks
       end_location:
         row: 5
         column: 15
-    applied: false
 - kind:
     TrueFalseComparison:
       - true
@@ -62,7 +59,6 @@ expression: checks
       end_location:
         row: 8
         column: 14
-    applied: false
 - kind:
     TrueFalseComparison:
       - false
@@ -82,7 +78,6 @@ expression: checks
       end_location:
         row: 11
         column: 15
-    applied: false
 - kind:
     TrueFalseComparison:
       - true
@@ -102,7 +97,6 @@ expression: checks
       end_location:
         row: 14
         column: 17
-    applied: false
 - kind:
     TrueFalseComparison:
       - false
@@ -122,7 +116,6 @@ expression: checks
       end_location:
         row: 17
         column: 18
-    applied: false
 - kind:
     TrueFalseComparison:
       - true
@@ -142,7 +135,6 @@ expression: checks
       end_location:
         row: 20
         column: 23
-    applied: false
 - kind:
     TrueFalseComparison:
       - false
@@ -162,7 +154,6 @@ expression: checks
       end_location:
         row: 20
         column: 48
-    applied: false
 - kind:
     TrueFalseComparison:
       - true
@@ -182,7 +173,6 @@ expression: checks
       end_location:
         row: 22
         column: 24
-    applied: false
 - kind:
     TrueFalseComparison:
       - true
@@ -202,7 +192,6 @@ expression: checks
       end_location:
         row: 25
         column: 3
-    applied: false
 - kind:
     TrueFalseComparison:
       - false
@@ -222,5 +211,4 @@ expression: checks
       end_location:
         row: 25
         column: 23
-    applied: false
 

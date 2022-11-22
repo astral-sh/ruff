@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 5
         column: 15
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 11
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 18
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -73,7 +70,6 @@ expression: checks
       end_location:
         row: 25
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -91,7 +87,6 @@ expression: checks
       end_location:
         row: 32
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -109,7 +104,6 @@ expression: checks
       end_location:
         row: 39
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -127,7 +121,6 @@ expression: checks
       end_location:
         row: 47
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -145,7 +138,6 @@ expression: checks
       end_location:
         row: 55
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -163,7 +155,6 @@ expression: checks
       end_location:
         row: 63
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -181,7 +172,6 @@ expression: checks
       end_location:
         row: 71
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: B
   location:
@@ -199,7 +189,6 @@ expression: checks
       end_location:
         row: 75
         column: 17
-    applied: false
 - kind:
     UselessObjectInheritance: B
   location:
@@ -217,7 +206,6 @@ expression: checks
       end_location:
         row: 79
         column: 16
-    applied: false
 - kind:
     UselessObjectInheritance: B
   location:
@@ -235,7 +223,6 @@ expression: checks
       end_location:
         row: 85
         column: 4
-    applied: false
 - kind:
     UselessObjectInheritance: B
   location:
@@ -253,7 +240,6 @@ expression: checks
       end_location:
         row: 92
         column: 10
-    applied: false
 - kind:
     UselessObjectInheritance: B
   location:
@@ -271,7 +257,6 @@ expression: checks
       end_location:
         row: 99
         column: 4
-    applied: false
 - kind:
     UselessObjectInheritance: B
   location:
@@ -289,7 +274,6 @@ expression: checks
       end_location:
         row: 108
         column: 10
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -307,7 +291,6 @@ expression: checks
       end_location:
         row: 114
         column: 19
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -325,7 +308,6 @@ expression: checks
       end_location:
         row: 120
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -343,7 +325,6 @@ expression: checks
       end_location:
         row: 126
         column: 1
-    applied: false
 - kind:
     UselessObjectInheritance: A
   location:
@@ -361,5 +342,4 @@ expression: checks
       end_location:
         row: 133
         column: 1
-    applied: false
 

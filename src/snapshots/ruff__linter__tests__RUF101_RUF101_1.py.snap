@@ -18,7 +18,6 @@ expression: checks
       end_location:
         row: 3
         column: 4
-    applied: false
 - kind: ConvertExitToSysExit
   location:
     row: 7
@@ -35,5 +34,4 @@ expression: checks
       end_location:
         row: 7
         column: 8
-    applied: false
 

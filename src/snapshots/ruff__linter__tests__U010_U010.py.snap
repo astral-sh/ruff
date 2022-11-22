@@ -21,7 +21,6 @@ expression: checks
       end_location:
         row: 2
         column: 0
-    applied: false
 - kind:
     UnnecessaryFutureImport:
       - unicode_literals
@@ -41,7 +40,6 @@ expression: checks
       end_location:
         row: 3
         column: 0
-    applied: false
 - kind:
     UnnecessaryFutureImport:
       - absolute_import
@@ -61,7 +59,6 @@ expression: checks
       end_location:
         row: 4
         column: 0
-    applied: false
 - kind:
     UnnecessaryFutureImport:
       - generator_stop
@@ -80,7 +77,6 @@ expression: checks
       end_location:
         row: 5
         column: 0
-    applied: false
 - kind:
     UnnecessaryFutureImport:
       - generator_stop
@@ -100,7 +96,6 @@ expression: checks
       end_location:
         row: 6
         column: 0
-    applied: false
 - kind:
     UnnecessaryFutureImport:
       - generators
@@ -119,7 +114,6 @@ expression: checks
       end_location:
         row: 6
         column: 49
-    applied: false
 - kind:
     UnnecessaryFutureImport:
       - generator_stop
@@ -138,7 +132,6 @@ expression: checks
       end_location:
         row: 10
         column: 0
-    applied: false
 - kind:
     UnnecessaryFutureImport:
       - generators
@@ -157,7 +150,6 @@ expression: checks
       end_location:
         row: 10
         column: 37
-    applied: false
 - kind:
     UnnecessaryFutureImport:
       - generator_stop
@@ -176,7 +168,6 @@ expression: checks
       end_location:
         row: 14
         column: 0
-    applied: false
 - kind:
     UnnecessaryFutureImport:
       - generators
@@ -195,5 +186,4 @@ expression: checks
       end_location:
         row: 14
         column: 53
-    applied: false
 

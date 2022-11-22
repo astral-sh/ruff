@@ -7,7 +7,6 @@ use serde::Serialize;
 use crate::checks::{CheckCode, CheckKind};
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
-use crate::message::Message;
 use crate::tell_user;
 
 #[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Debug)]
@@ -23,7 +22,7 @@ struct ExpandedMessage<'a> {
     message: String,
     location: Location,
     end_location: Location,
-    filename: &'a String,
+    filename: &'a str,
 }
 
 pub struct Printer<'a> {
@@ -75,11 +74,11 @@ impl<'a> Printer<'a> {
             }
             SerializationFormat::Text => {
                 if self.log_level >= &LogLevel::Default {
-                    if diagnostics.num_fixed > 0 {
+                    if diagnostics.fixed > 0 {
                         println!(
                             "Found {} error(s) ({} fixed).",
                             diagnostics.messages.len(),
-                            diagnostics.num_fixed,
+                            diagnostics.fixed,
                         )
                     } else if !diagnostics.messages.is_empty() {
                         println!("Found {} error(s).", diagnostics.messages.len())

@@ -19,7 +19,6 @@ expression: checks
       end_location:
         row: 5
         column: 52
-    applied: false
 - kind:
     ConvertTypedDictFunctionalToClass: MyType2
   location:
@@ -37,7 +36,6 @@ expression: checks
       end_location:
         row: 8
         column: 50
-    applied: false
 - kind:
     ConvertTypedDictFunctionalToClass: MyType3
   location:
@@ -55,7 +53,6 @@ expression: checks
       end_location:
         row: 11
         column: 44
-    applied: false
 - kind:
     ConvertTypedDictFunctionalToClass: MyType4
   location:
@@ -73,7 +70,6 @@ expression: checks
       end_location:
         row: 14
         column: 30
-    applied: false
 - kind:
     ConvertTypedDictFunctionalToClass: MyType5
   location:
@@ -91,7 +87,6 @@ expression: checks
       end_location:
         row: 17
         column: 46
-    applied: false
 - kind:
     ConvertTypedDictFunctionalToClass: MyType6
   location:
@@ -109,7 +104,6 @@ expression: checks
       end_location:
         row: 18
         column: 41
-    applied: false
 - kind:
     ConvertTypedDictFunctionalToClass: MyType7
   location:
@@ -127,7 +121,6 @@ expression: checks
       end_location:
         row: 21
         column: 56
-    applied: false
 - kind:
     ConvertTypedDictFunctionalToClass: MyType8
   location:
@@ -145,7 +138,6 @@ expression: checks
       end_location:
         row: 24
         column: 65
-    applied: false
 - kind:
     ConvertTypedDictFunctionalToClass: MyType10
   location:
@@ -163,7 +155,6 @@ expression: checks
       end_location:
         row: 30
         column: 59
-    applied: false
 - kind:
     ConvertTypedDictFunctionalToClass: MyType11
   location:
@@ -181,5 +172,4 @@ expression: checks
       end_location:
         row: 33
         column: 53
-    applied: false
 

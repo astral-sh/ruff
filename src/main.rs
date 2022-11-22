@@ -74,9 +74,9 @@ fn read_from_stdin() -> Result<String> {
 
 fn run_once_stdin(settings: &Settings, filename: &Path, autofix: bool) -> Result<Diagnostics> {
     let stdin = read_from_stdin()?;
-    let mut messages = lint_stdin(filename, &stdin, settings, &autofix.into())?;
-    messages.sort_unstable();
-    Ok(Diagnostics::new(messages))
+    let mut diagnostics = lint_stdin(filename, &stdin, settings, &autofix.into())?;
+    diagnostics.messages.sort_unstable();
+    Ok(diagnostics)
 }
 
 fn run_once(
@@ -130,8 +130,7 @@ fn run_once(
             })
         })
         .reduce(Diagnostics::default, |mut acc, item| {
-            acc.messages.extend(item.messages);
-            acc.num_fixed += item.num_fixed;
+            acc += item;
             acc
         });
 

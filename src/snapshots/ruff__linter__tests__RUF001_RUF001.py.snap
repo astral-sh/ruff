@@ -21,5 +21,4 @@ expression: checks
       end_location:
         row: 1
         column: 6
-    applied: false
 
