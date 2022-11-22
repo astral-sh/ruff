@@ -82,7 +82,7 @@ impl PerFileIgnore {
         project_root: Option<&PathBuf>,
     ) -> Result<Self> {
         let pattern = FilePattern::from_user(pattern, project_root)?;
-        let codes = BTreeSet::from_iter(prefixes.iter().flat_map(|prefix| prefix.codes()));
+        let codes = prefixes.iter().flat_map(|prefix| prefix.codes()).collect();
         Ok(Self { pattern, codes })
     }
 }
