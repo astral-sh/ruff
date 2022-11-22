@@ -293,27 +293,26 @@ where
     /// Numeric lexing. The feast can start!
     fn lex_number(&mut self) -> LexResult {
         let start_pos = self.get_pos();
-        if self.window[0] == Some('0') {
-            if matches!(self.window[1], Some('x' | 'X')) {
+        match (self.window[0], self.window[1]) {
+            (Some('0'), Some('x' | 'X')) => {
                 // Hex! (0xdeadbeef)
                 self.next_char();
                 self.next_char();
                 self.lex_number_radix(start_pos, 16)
-            } else if matches!(self.window[1], Some('o' | 'O')) {
+            }
+            (Some('0'), Some('o' | 'O')) => {
                 // Octal style! (0o377)
                 self.next_char();
                 self.next_char();
                 self.lex_number_radix(start_pos, 8)
-            } else if matches!(self.window[1], Some('b' | 'B')) {
+            }
+            (Some('0'), Some('b' | 'B')) => {
                 // Binary! (0b_1110_0101)
                 self.next_char();
                 self.next_char();
                 self.lex_number_radix(start_pos, 2)
-            } else {
-                self.lex_normal_number()
             }
-        } else {
-            self.lex_normal_number()
+            _ => self.lex_normal_number(),
         }
     }
 
@@ -439,10 +438,9 @@ where
     fn take_number(&mut self, radix: u32) -> Option<char> {
         let take_char = Lexer::<T>::is_digit_of_radix(self.window[0], radix);
 
-        if take_char {
-            Some(self.next_char().unwrap())
-        } else {
-            None
+        match take_char {
+            true => Some(self.next_char().unwrap()),
+            _ => None,
         }
     }
 
@@ -459,12 +457,9 @@ where
 
     /// Test if we face '[eE][-+]?[0-9]+'
     fn at_exponent(&self) -> bool {
-        match self.window[0] {
-            Some('e' | 'E') => match self.window[1] {
-                Some('+' | '-') => matches!(self.window[2], Some('0'..='9')),
-                Some('0'..='9') => true,
-                _ => false,
-            },
+        match (self.window[0], self.window[1]) {
+            (Some('e' | 'E'), Some('+' | '-')) => matches!(self.window[2], Some('0'..='9')),
+            (Some('e' | 'E'), Some('0'..='9')) => true,
             _ => false,
         }
     }
@@ -705,13 +700,10 @@ where
     }
 
     fn is_identifier_continuation(&self) -> bool {
-        if let Some(c) = self.window[0] {
-            match c {
-                '_' | '0'..='9' => true,
-                c => is_xid_continue(c),
-            }
-        } else {
-            false
+        match self.window[0] {
+            Some('_' | '0'..='9') => true,
+            Some(c) => is_xid_continue(c),
+            _ => false,
         }
     }
 
