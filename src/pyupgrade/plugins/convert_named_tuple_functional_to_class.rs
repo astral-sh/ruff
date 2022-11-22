@@ -172,7 +172,7 @@ fn convert_to_class(
     base_class: &ExprKind,
 ) -> Result<Fix> {
     let mut generator = SourceGenerator::new();
-    generator.unparse_stmt(&create_class_def_stmt(typename, body, base_class))?;
+    generator.unparse_stmt(&create_class_def_stmt(typename, body, base_class));
     let content = generator.generate()?;
     Ok(Fix::replacement(
         content,

@@ -57,7 +57,7 @@ pub fn add_noqa(
     noqa_line_for: &IntMap<usize, usize>,
     path: &Path,
 ) -> Result<usize> {
-    let (count, output) = add_noqa_inner(checks, contents, noqa_line_for)?;
+    let (count, output) = add_noqa_inner(checks, contents, noqa_line_for);
     fs::write(path, output)?;
     Ok(count)
 }
@@ -66,7 +66,7 @@ fn add_noqa_inner(
     checks: &[Check],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
-) -> Result<(usize, String)> {
+) -> (usize, String) {
     let lines: Vec<&str> = contents.lines().collect();
     let mut matches_by_line: BTreeMap<usize, BTreeSet<&CheckCode>> = BTreeMap::new();
     for lineno in 0..lines.len() {
@@ -115,7 +115,7 @@ fn add_noqa_inner(
         }
     }
 
-    Ok((count, output))
+    (count, output)
 }
 
 #[cfg(test)]
@@ -143,11 +143,11 @@ mod tests {
     }
 
     #[test]
-    fn modification() -> Result<()> {
+    fn modification() {
         let checks = vec![];
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
-        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
+        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for);
         assert_eq!(count, 0);
         assert_eq!(output.trim(), contents.trim());
 
@@ -160,7 +160,7 @@ mod tests {
         )];
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
-        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
+        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for);
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: F841".trim());
 
@@ -182,7 +182,7 @@ mod tests {
         ];
         let contents = "x = 1  # noqa: E741";
         let noqa_line_for = IntMap::default();
-        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
+        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for);
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());
 
@@ -204,10 +204,8 @@ mod tests {
         ];
         let contents = "x = 1  # noqa";
         let noqa_line_for = IntMap::default();
-        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for)?;
+        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for);
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());
-
-        Ok(())
     }
 }

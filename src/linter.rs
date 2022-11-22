@@ -259,7 +259,7 @@ pub fn autoformat_path(path: &Path) -> Result<()> {
     // Generate the AST.
     let python_ast = rustpython_helpers::parse_program_tokens(tokens, "<filename>")?;
     let mut generator = SourceGenerator::default();
-    generator.unparse_suite(&python_ast)?;
+    generator.unparse_suite(&python_ast);
     write(path, generator.generate()?)?;
 
     Ok(())

@@ -209,7 +209,7 @@ fn convert_to_class(
         body,
         total_keyword,
         base_class,
-    ))?;
+    ));
     let content = generator.generate()?;
     Ok(Fix::replacement(
         content,

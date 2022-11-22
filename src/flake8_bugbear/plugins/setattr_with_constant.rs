@@ -1,3 +1,5 @@
+use anyhow::Result;
+use log::error;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::types::Range;
@@ -8,7 +10,7 @@ use crate::code_gen::SourceGenerator;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 
-fn assignment(obj: &Expr, name: &str, value: &Expr) -> Option<String> {
+fn assignment(obj: &Expr, name: &str, value: &Expr) -> Result<String> {
     let stmt = Stmt::new(
         Location::default(),
         Location::default(),
@@ -27,10 +29,8 @@ fn assignment(obj: &Expr, name: &str, value: &Expr) -> Option<String> {
         },
     );
     let mut generator = SourceGenerator::new();
-    match generator.unparse_stmt(&stmt) {
-        Ok(()) => generator.generate().ok(),
-        Err(_) => None,
-    }
+    generator.unparse_stmt(&stmt);
+    generator.generate().map_err(|e| e.into())
 }
 
 /// B010
@@ -47,13 +47,14 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                         let mut check =
                             Check::new(CheckKind::SetAttrWithConstant, Range::from_located(expr));
                         if checker.patch(check.kind.code()) {
-                            if let Some(content) = assignment(obj, name, value) {
-                                check.amend(Fix::replacement(
+                            match assignment(obj, name, value) {
+                                Ok(content) => check.amend(Fix::replacement(
                                     content,
                                     expr.location,
                                     expr.end_location.unwrap(),
-                                ));
-                            }
+                                )),
+                                Err(e) => error!("Failed to fix invalid comparison: {}", e),
+                            };
                         }
                         checker.add_check(check);
                     }

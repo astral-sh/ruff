@@ -24,10 +24,9 @@ fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr]) -> Option<String> {
         },
     );
     let mut generator = SourceGenerator::new();
-    if let Ok(()) = generator.unparse_expr(&cmp, 0) {
-        if let Ok(content) = generator.generate() {
-            return Some(content);
-        }
+    generator.unparse_expr(&cmp, 0);
+    if let Ok(content) = generator.generate() {
+        return Some(content);
     }
     None
 }
@@ -287,7 +286,7 @@ fn function(name: &str, args: &Arguments, body: &Expr) -> Result<String> {
         },
     );
     let mut generator = SourceGenerator::new();
-    generator.unparse_stmt(&func)?;
+    generator.unparse_stmt(&func);
     Ok(generator.generate()?)
 }
 

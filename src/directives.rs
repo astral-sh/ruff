@@ -121,7 +121,7 @@ mod tests {
     use crate::directives::extract_noqa_line_for;
 
     #[test]
-    fn extraction() -> Result<()> {
+    fn extraction() {
         let empty: IntMap<usize, usize> = IntMap::default();
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
@@ -200,7 +200,5 @@ z = x + 1",
             extract_noqa_line_for(&lxr),
             IntMap::from_iter([(2, 5), (3, 5), (4, 5)])
         );
-
-        Ok(())
     }
 }
