@@ -120,7 +120,6 @@ fn add_noqa_inner(
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
     use nohash_hasher::IntMap;
     use rustpython_parser::ast::Location;
 
