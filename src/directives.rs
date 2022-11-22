@@ -11,8 +11,8 @@ use crate::{Settings, SourceCodeLocator};
 
 bitflags! {
     pub struct Flags: u32 {
-        const NOQA = 0b00000001;
-        const ISORT = 0b00000010;
+        const NOQA = 0b0000_0001;
+        const ISORT = 0b0000_0010;
     }
 }
 
