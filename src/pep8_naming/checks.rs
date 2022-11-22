@@ -11,13 +11,7 @@ use crate::python::string::{self};
 /// N801
 pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
     let stripped = name.strip_prefix('_').unwrap_or(name);
-    if !stripped
-        .chars()
-        .next()
-        .map(|c| c.is_uppercase())
-        .unwrap_or(false)
-        || stripped.contains('_')
-    {
+    if !stripped.chars().next().map_or(false, |c| c.is_uppercase()) || stripped.contains('_') {
         return Some(Check::new(
             CheckKind::InvalidClassName(name.to_string()),
             Range::from_located(class_def),

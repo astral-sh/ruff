@@ -83,9 +83,14 @@ impl Configuration {
                     .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
                 None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
             },
-            src: options
-                .src
-                .map(|src| {
+            src: options.src.map_or_else(
+                || {
+                    vec![match project_root {
+                        Some(project_root) => project_root.clone(),
+                        None => path_dedot::CWD.clone(),
+                    }]
+                },
+                |src| {
                     src.iter()
                         .map(|path| {
                             let path = Path::new(path);
@@ -95,13 +100,8 @@ impl Configuration {
                             }
                         })
                         .collect()
-                })
-                .unwrap_or_else(|| {
-                    vec![match project_root {
-                        Some(project_root) => project_root.clone(),
-                        None => path_dedot::CWD.clone(),
-                    }]
-                }),
+                },
+            ),
             target_version: options.target_version.unwrap_or(PythonVersion::Py310),
             exclude: options
                 .exclude

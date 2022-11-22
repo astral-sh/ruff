@@ -1224,8 +1224,7 @@ fn common_section(
     if context
         .following_lines
         .last()
-        .map(|line| !line.trim().is_empty())
-        .unwrap_or(true)
+        .map_or(true, |line| !line.trim().is_empty())
     {
         if context.is_last_section {
             if checker.settings.enabled.contains(&CheckCode::D413) {
@@ -1366,8 +1365,7 @@ fn args_section(checker: &mut Checker, definition: &Definition, context: &Sectio
         if line
             .chars()
             .next()
-            .map(|char| char.is_whitespace())
-            .unwrap_or(true)
+            .map_or(true, |char| char.is_whitespace())
         {
             // This is a continuation of documentation for the last
             // parameter because it does start with whitespace.
