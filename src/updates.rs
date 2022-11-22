@@ -31,8 +31,8 @@ fn set_latest(version: &str) -> Result<()> {
     create_dir_all(cache_dir())?;
     let path = file_path();
     let mut file = File::create(path)?;
-    file.write_all(version.trim().as_bytes())
-        .map_err(|e| e.into())
+    file.write_all(version.trim().as_bytes())?;
+    Ok(())
 }
 
 /// Update the user if a newer version is available.

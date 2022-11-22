@@ -288,7 +288,7 @@ fn function(name: &str, args: &Arguments, body: &Expr) -> Result<String> {
     );
     let mut generator = SourceGenerator::new();
     generator.unparse_stmt(&func)?;
-    generator.generate().map_err(|e| e.into())
+    Ok(generator.generate()?)
 }
 
 /// E731

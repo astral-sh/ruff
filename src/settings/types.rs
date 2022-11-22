@@ -82,7 +82,7 @@ impl PerFileIgnore {
         project_root: Option<&PathBuf>,
     ) -> Result<Self> {
         let pattern = FilePattern::from_user(pattern, project_root)?;
-        let codes = prefixes.iter().flat_map(|prefix| prefix.codes()).collect();
+        let codes = prefixes.iter().flat_map(CheckCodePrefix::codes).collect();
         Ok(Self { pattern, codes })
     }
 }

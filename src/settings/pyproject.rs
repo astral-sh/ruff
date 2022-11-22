@@ -33,7 +33,7 @@ impl Pyproject {
 
 fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
-    toml::from_str(&contents).map_err(|e| e.into())
+    Ok(toml::from_str(&contents)?)
 }
 
 pub fn find_pyproject_toml(path: Option<&PathBuf>) -> Option<PathBuf> {

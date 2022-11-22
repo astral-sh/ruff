@@ -78,7 +78,7 @@ pub fn is_mixed_case(name: &str) -> bool {
             .unwrap_or(name)
             .chars()
             .next()
-            .map_or_else(|| false, |c| c.is_lowercase())
+            .map_or_else(|| false, char::is_lowercase)
 }
 
 pub fn is_acronym(name: &str, asname: &str) -> bool {

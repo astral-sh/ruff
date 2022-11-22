@@ -57,8 +57,8 @@ pub fn set_up_logging(level: &LogLevel) -> Result<()> {
         })
         .level(level.level_filter())
         .chain(std::io::stdout())
-        .apply()
-        .map_err(|e| e.into())
+        .apply()?;
+    Ok(())
 }
 
 #[cfg(test)]

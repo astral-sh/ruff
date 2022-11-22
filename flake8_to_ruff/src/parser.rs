@@ -31,7 +31,7 @@ pub fn parse_prefix_codes(value: &str) -> Vec<CheckCodePrefix> {
 pub fn parse_strings(value: &str) -> Vec<String> {
     COMMA_SEPARATED_LIST_RE
         .split(value)
-        .map(|part| part.trim())
+        .map(str::trim)
         .filter(|part| !part.is_empty())
         .map(String::from)
         .collect()

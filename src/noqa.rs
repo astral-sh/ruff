@@ -35,7 +35,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
                         noqa.end(),
                         SPLIT_COMMA_REGEX
                             .split(codes.as_str())
-                            .map(|code| code.trim())
+                            .map(str::trim)
                             .filter(|code| !code.is_empty())
                             .collect(),
                     ),
@@ -107,7 +107,7 @@ fn add_noqa_inner(
                         output.push_str("# noqa: ");
                     }
                 };
-                let codes: Vec<&str> = codes.iter().map(|code| code.as_ref()).collect();
+                let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
                 output.push_str(&codes.join(", "));
                 output.push('\n');
                 count += 1;
