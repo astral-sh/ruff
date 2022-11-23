@@ -79,33 +79,32 @@ impl Configuration {
     ) -> Result<Self> {
         let options = load_options(pyproject)?;
 
-        let mut exclude = globset::GlobSetBuilder::new();
-        let mut exclude_extend = globset::GlobSetBuilder::new();
+        let exclude = {
+            let mut builder = globset::GlobSetBuilder::new();
 
-        let ex = options.exclude.map_or_else(
-            || DEFAULT_EXCLUDE.clone(),
-            |paths| {
-                paths
-                    .iter()
-                    .map(|path| from_user(path, project_root))
-                    .collect()
-            },
-        );
+            let paths = options.exclude.map_or_else(
+                || DEFAULT_EXCLUDE.clone(),
+                |paths| {
+                    paths
+                        .iter()
+                        .map(|path| from_user(path, project_root))
+                        .collect()
+                },
+            );
 
-        for x in ex {
-            exclude.add(x?);
-        }
+            for path in paths {
+                builder.add(path?);
+            }
+            builder.build()?
+        };
 
-        let ex: Vec<Result<globset::Glob, globset::Error>> = options
-            .extend_exclude
-            .unwrap_or_default()
-            .iter()
-            .map(|path| from_user(path, project_root))
-            .collect();
-
-        for x in ex {
-            exclude_extend.add(x?);
-        }
+        let extend_exclude = {
+            let mut builder = globset::GlobSetBuilder::new();
+            for path in options.extend_exclude.unwrap_or_default() {
+                builder.add(from_user(&path, project_root)?);
+            }
+            builder.build()?
+        };
 
         Ok(Configuration {
             dummy_variable_rgx: match options.dummy_variable_rgx {
@@ -133,8 +132,8 @@ impl Configuration {
                 },
             ),
             target_version: options.target_version.unwrap_or(PythonVersion::Py310),
-            exclude: exclude.build().expect("bad pattern"),
-            extend_exclude: exclude_extend.build().expect("bad"),
+            exclude,
+            extend_exclude,
             extend_ignore: options.extend_ignore.unwrap_or_default(),
             select: options
                 .select
