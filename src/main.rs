@@ -1,7 +1,6 @@
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
@@ -77,7 +76,7 @@ fn explain(code: &CheckCode, format: SerializationFormat) -> Result<ExitCode> {
                 "{}",
                 serde_json::to_string_pretty(&Explanation {
                     code: code.as_ref(),
-                    category: &code.category().title(),
+                    category: code.category().title(),
                     summary: &code.kind().summary(),
                 })?
             );
