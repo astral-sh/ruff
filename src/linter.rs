@@ -129,6 +129,8 @@ pub(crate) fn check_path(
     Ok(checks)
 }
 
+const MAX_ITERATIONS: usize = 100;
+
 /// Lint the source code at the given `Path`.
 pub fn lint_path(
     path: &Path,
@@ -149,6 +151,9 @@ pub fn lint_path(
 
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;
+
+    // As an escape hatch, bail after 100 iterations.
+    let mut iterations = 0;
 
     // Continuously autofix until the source code stabilizes.
     let messages = loop {
@@ -177,13 +182,16 @@ pub fn lint_path(
         )?;
 
         // Apply autofix.
-        if matches!(autofix, fixer::Mode::Apply) {
+        if matches!(autofix, fixer::Mode::Apply) && iterations < MAX_ITERATIONS {
             if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
                 // Count the number of fixed errors.
                 fixed += applied;
 
                 // Store the fixed contents.
                 contents = fixed_contents.to_string();
+
+                // Increment the iteration count.
+                iterations += 1;
 
                 // Re-run the linter pass (by avoiding the break).
                 continue;
@@ -279,6 +287,9 @@ pub fn lint_stdin(
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;
 
+    // As an escape hatch, bail after 100 iterations.
+    let mut iterations = 0;
+
     let messages = loop {
         // Tokenize once.
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
@@ -305,13 +316,16 @@ pub fn lint_stdin(
         )?;
 
         // Apply autofix.
-        if matches!(autofix, fixer::Mode::Apply) {
+        if matches!(autofix, fixer::Mode::Apply) && iterations < MAX_ITERATIONS {
             if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
                 // Count the number of fixed errors.
                 fixed += applied;
 
                 // Store the fixed contents.
                 contents = fixed_contents.to_string();
+
+                // Increment the iteration count.
+                iterations += 1;
 
                 // Re-run the linter pass (by avoiding the break).
                 continue;
