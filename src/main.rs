@@ -62,36 +62,28 @@ struct Explanation<'a> {
     summary: &'a str,
 }
 
-fn explain(code: &str, format: SerializationFormat) -> Result<ExitCode> {
-    match CheckCode::from_str(&code) {
-        Ok(code) => {
-            match format {
-                SerializationFormat::Text => {
-                    println!(
-                        "{} ({}): {}",
-                        code.as_ref(),
-                        code.category().title(),
-                        code.kind().summary()
-                    );
-                }
-                SerializationFormat::Json => {
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&Explanation {
-                            code: code.as_ref(),
-                            category: &code.category().title(),
-                            summary: &code.kind().summary(),
-                        })?
-                    );
-                }
-            }
-            Ok(ExitCode::SUCCESS)
+fn explain(code: &CheckCode, format: SerializationFormat) -> Result<ExitCode> {
+    match format {
+        SerializationFormat::Text => {
+            println!(
+                "{} ({}): {}",
+                code.as_ref(),
+                code.category().title(),
+                code.kind().summary()
+            );
         }
-        Err(_) => {
-            eprintln!("Unknown code: {}", code);
-            Ok(ExitCode::FAILURE)
+        SerializationFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&Explanation {
+                    code: code.as_ref(),
+                    category: &code.category().title(),
+                    summary: &code.kind().summary(),
+                })?
+            );
         }
     }
+    Ok(ExitCode::SUCCESS)
 }
 
 fn show_files(files: &[PathBuf], settings: &Settings) {

@@ -5,6 +5,7 @@ use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
+use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
 use crate::logging::LogLevel;
 use crate::printer::SerializationFormat;
@@ -113,7 +114,7 @@ pub struct Cli {
     pub stdin_filename: Option<String>,
     /// Explain a rule.
     #[arg(long)]
-    pub explain: Option<String>,
+    pub explain: Option<CheckCode>,
 }
 
 impl Cli {
