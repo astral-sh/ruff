@@ -47,27 +47,27 @@ impl FromStr for PythonVersion {
 pub fn create_glob(
     pattern: &str,
     project_root: Option<&PathBuf>,
-) -> std::result::Result<Glob, globset::Error> {
+) -> std::result::Result<(Glob, Option<Glob>), globset::Error> {
     let path = Path::new(pattern);
     let absolute_path = match project_root {
         Some(project_root) => fs::normalize_path_to(path, project_root),
         None => fs::normalize_path(path),
     };
-    let pattern = Glob::new(&{
+    let absolute = Glob::new(&absolute_path.to_string_lossy())?;
+
+    let basepath = {
         if pattern.contains(std::path::MAIN_SEPARATOR) {
-            absolute_path.to_string_lossy()
+            None
         } else {
-            std::borrow::Cow::Owned(
-                "{".to_owned() + &absolute_path.to_string_lossy() + "," + pattern + "}",
-            )
+            Some(Glob::new(pattern)?)
         }
-    })?;
-    Ok(pattern)
+    };
+    Ok((absolute, basepath))
 }
 
 #[derive(Debug, Clone, Hash)]
 pub struct PerFileIgnore {
-    pub pattern: Glob,
+    pub pattern: (Glob, Option<Glob>),
     pub codes: BTreeSet<CheckCode>,
 }
 

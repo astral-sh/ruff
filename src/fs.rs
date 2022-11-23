@@ -89,8 +89,16 @@ pub(crate) fn ignores_from_path<'a>(
     Ok(pattern_code_pairs
         .iter()
         .filter(|pattern_code_pair| {
-            let matcher = pattern_code_pair.pattern.compile_matcher();
-            matcher.is_match(file_path) || matcher.is_match(file_basename)
+            let matcher = pattern_code_pair.pattern.0.compile_matcher();
+            let matcher2 = pattern_code_pair
+                .pattern
+                .1
+                .as_ref()
+                .map_or(matcher.clone(), globset::Glob::compile_matcher);
+            matcher.is_match(file_path)
+                || matcher.is_match(file_basename)
+                || matcher2.is_match(file_path)
+                || matcher2.is_match(file_basename)
         })
         .flat_map(|pattern_code_pair| &pattern_code_pair.codes)
         .collect())
@@ -155,10 +163,13 @@ mod tests {
         assert!(!is_included(&path));
     }
 
-    fn fn_exclude(ex: Vec<globset::Glob>) -> globset::GlobSet {
+    fn fn_exclude(ex: Vec<(globset::Glob, Option<globset::Glob>)>) -> globset::GlobSet {
         let mut build = globset::GlobSetBuilder::new();
-        for x in ex {
+        for (x, y) in ex {
             build.add(x);
+            if let Some(glob) = y {
+                build.add(glob);
+            }
         }
         build.build().expect("bad")
     }

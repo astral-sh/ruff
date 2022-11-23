@@ -20,25 +20,10 @@ pub struct Exclusion {
 }
 
 impl Exclusion {
-    pub fn from_file_pattern(file_pattern: &globset::Glob) -> Self {
-        let glob = file_pattern.glob();
-        if glob.starts_with('{') && glob.ends_with('}') {
-            if let Some((absolute, basename)) = glob.split_once(',') {
-                Exclusion {
-                    basename: Some(basename.strip_suffix('}').unwrap().to_string()),
-                    absolute: Some(absolute.strip_prefix('{').unwrap().to_string()),
-                }
-            } else {
-                Exclusion {
-                    basename: Some(glob.to_string()),
-                    absolute: None,
-                }
-            }
-        } else {
-            Exclusion {
-                basename: Some(glob.to_string()),
-                absolute: None,
-            }
+    pub fn from_file_pattern(file_pattern: &(globset::Glob, Option<globset::Glob>)) -> Self {
+        Exclusion {
+            basename: Some(file_pattern.0.glob().to_string()),
+            absolute: file_pattern.1.as_ref().map(|x| x.glob().to_string()),
         }
     }
 }

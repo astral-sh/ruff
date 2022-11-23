@@ -43,31 +43,88 @@ pub struct Configuration {
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
     // Display Info
-    pub exclude_globs: Vec<globset::Glob>,
-    pub extend_exclude_globs: Vec<globset::Glob>,
+    pub exclude_globs: Vec<(globset::Glob, Option<globset::Glob>)>,
+    pub extend_exclude_globs: Vec<(globset::Glob, Option<globset::Glob>)>,
 }
 
-static DEFAULT_EXCLUDE: Lazy<Vec<globset::Glob>> = Lazy::new(|| {
+static DEFAULT_EXCLUDE: Lazy<Vec<(globset::Glob, Option<globset::Glob>)>> = Lazy::new(|| {
     vec![
-        globset::Glob::new(".bzr").expect("Failed to build Glob"),
-        globset::Glob::new(".direnv").expect("Failed to build Glob"),
-        globset::Glob::new(".eggs").expect("Failed to build Glob"),
-        globset::Glob::new(".git").expect("Failed to build Glob"),
-        globset::Glob::new(".hg").expect("Failed to build Glob"),
-        globset::Glob::new(".mypy_cache").expect("Failed to build Glob"),
-        globset::Glob::new(".nox").expect("Failed to build Glob"),
-        globset::Glob::new(".pants.d").expect("Failed to build Glob"),
-        globset::Glob::new(".ruff_cache").expect("Failed to build Glob"),
-        globset::Glob::new(".svn").expect("Failed to build Glob"),
-        globset::Glob::new(".tox").expect("Failed to build Glob"),
-        globset::Glob::new(".venv").expect("Failed to build Glob"),
-        globset::Glob::new("__pypackages__").expect("Failed to build Glob"),
-        globset::Glob::new("_build").expect("Failed to build Glob"),
-        globset::Glob::new("buck-out").expect("Failed to build Glob"),
-        globset::Glob::new("build").expect("Failed to build Glob"),
-        globset::Glob::new("dist").expect("Failed to build Glob"),
-        globset::Glob::new("node_modules").expect("Failed to build Glob"),
-        globset::Glob::new("venv").expect("Failed to build Glob"),
+        (
+            globset::Glob::new(".bzr").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".direnv").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".eggs").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".git").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".hg").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".mypy_cache").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".nox").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".pants.d").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".ruff_cache").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".svn").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".tox").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new(".venv").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new("__pypackages__").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new("_build").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new("buck-out").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new("build").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new("dist").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new("node_modules").expect("Failed to build Glob"),
+            None,
+        ),
+        (
+            globset::Glob::new("venv").expect("Failed to build Glob"),
+            None,
+        ),
     ]
 });
 
@@ -84,6 +141,15 @@ impl Configuration {
         let local_to_glob =
             |path: String| create_glob(&path, project_root).expect("Failed to build Glob");
 
+        let unfurl = |mut vec: Vec<globset::Glob>,
+                      item: &(globset::Glob, Option<globset::Glob>)| {
+            vec.push(item.0.clone());
+            if let Some(glob) = item.1.clone() {
+                vec.push(glob);
+            };
+            vec
+        };
+
         let exclude = {
             let mut builder = globset::GlobSetBuilder::new();
 
@@ -92,7 +158,7 @@ impl Configuration {
                 |paths| paths.into_iter().map(local_to_glob).collect(),
             );
 
-            for path in &paths {
+            for path in paths.iter().fold(vec![], unfurl) {
                 builder.add(path.clone());
             }
             (builder.build()?, paths)
@@ -100,13 +166,14 @@ impl Configuration {
 
         let extend_exclude = {
             let mut builder = globset::GlobSetBuilder::new();
-            let paths: Vec<globset::Glob> = options
+            let paths: Vec<(globset::Glob, Option<globset::Glob>)> = options
                 .extend_exclude
                 .unwrap_or_default()
                 .into_iter()
                 .map(local_to_glob)
                 .collect();
-            for path in &paths {
+
+            for path in &paths.iter().fold(vec![], unfurl) {
                 builder.add(path.clone());
             }
             (builder.build()?, paths)
