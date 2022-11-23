@@ -20,7 +20,7 @@ pub struct Exclusion {
 }
 
 impl Exclusion {
-    pub fn from_file_pattern(file_pattern: globset::Glob) -> Self {
+    pub fn from_file_pattern(file_pattern: &globset::Glob) -> Self {
         Exclusion {
             basename: Some(file_pattern.glob().to_owned()),
             absolute: Some(file_pattern.glob().to_owned()),
@@ -79,7 +79,7 @@ impl UserConfiguration {
                 .into_iter()
                 .map(|per_file_ignore| {
                     (
-                        Exclusion::from_file_pattern(per_file_ignore.pattern),
+                        Exclusion::from_file_pattern(&per_file_ignore.pattern),
                         Vec::from_iter(per_file_ignore.codes),
                     )
                 })

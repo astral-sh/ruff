@@ -82,15 +82,15 @@ impl Configuration {
         let mut exclude = globset::GlobSetBuilder::new();
         let mut exclude_extend = globset::GlobSetBuilder::new();
 
-        let ex = options
-            .exclude
-            .map(|paths| {
+        let ex = options.exclude.map_or_else(
+            || DEFAULT_EXCLUDE.clone(),
+            |paths| {
                 paths
                     .iter()
                     .map(|path| from_user(path, project_root))
                     .collect()
-            })
-            .unwrap_or_else(|| DEFAULT_EXCLUDE.clone());
+            },
+        );
 
         for x in ex {
             exclude.add(x?);
