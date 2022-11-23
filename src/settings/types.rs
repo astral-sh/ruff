@@ -44,7 +44,7 @@ impl FromStr for PythonVersion {
     }
 }
 
-pub fn from_user(
+pub fn create_glob(
     pattern: &str,
     project_root: Option<&PathBuf>,
 ) -> std::result::Result<Glob, globset::Error> {
@@ -77,7 +77,7 @@ impl PerFileIgnore {
         prefixes: &[CheckCodePrefix],
         project_root: Option<&PathBuf>,
     ) -> Result<Self> {
-        let pattern = from_user(pattern, project_root)?;
+        let pattern = create_glob(pattern, project_root)?;
         let codes = prefixes.iter().flat_map(CheckCodePrefix::codes).collect();
         Ok(Self { pattern, codes })
     }

@@ -26,7 +26,7 @@ use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::settings::configuration::Configuration;
-use ::ruff::settings::types::from_user;
+use ::ruff::settings::types::create_glob;
 use ::ruff::settings::user::UserConfiguration;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
@@ -228,24 +228,18 @@ fn inner_main() -> Result<ExitCode> {
     // Reconcile configuration from pyproject.toml and command-line arguments.
     let exclude: globset::GlobSet = {
         let mut ret = globset::GlobSetBuilder::new();
-        for x in cli
-            .exclude
-            .iter()
-            .map(|path| from_user(path, project_root.as_ref()))
+        for path in cli.exclude
         {
-            ret.add(x?);
+            ret.add(create_glob(&path, project_root.as_ref())?);
         }
         ret.build()?
     };
     let extend_exclude = {
         let mut ret = globset::GlobSetBuilder::new();
 
-        for x in cli
-            .extend_exclude
-            .iter()
-            .map(|path| from_user(path, project_root.as_ref()))
+        for path in cli.extend_exclude
         {
-            ret.add(x?);
+            ret.add(create_glob(&path, project_root.as_ref())?);
         }
         ret.build()?
     };

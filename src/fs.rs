@@ -138,7 +138,7 @@ mod tests {
     use path_absolutize::Absolutize;
 
     use crate::fs::{extract_path_names, is_excluded, is_included};
-    use crate::settings::types::from_user;
+    use crate::settings::types::create_glob;
 
     #[test]
     fn inclusions() {
@@ -168,31 +168,31 @@ mod tests {
         let project_root = Path::new("/tmp/");
 
         let path = Path::new("foo").absolutize_from(project_root).unwrap();
-        let exclude = vec![from_user("foo", Some(&project_root.to_path_buf()))?];
+        let exclude = vec![create_glob("foo", Some(&project_root.to_path_buf()))?];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
-        let exclude = vec![from_user("bar", Some(&project_root.to_path_buf()))?];
+        let exclude = vec![create_glob("bar", Some(&project_root.to_path_buf()))?];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = vec![from_user("baz.py", Some(&project_root.to_path_buf()))?];
+        let exclude = vec![create_glob("baz.py", Some(&project_root.to_path_buf()))?];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
-        let exclude = vec![from_user("foo/bar", Some(&project_root.to_path_buf()))?];
+        let exclude = vec![create_glob("foo/bar", Some(&project_root.to_path_buf()))?];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = vec![from_user(
+        let exclude = vec![create_glob(
             "foo/bar/baz.py",
             Some(&project_root.to_path_buf()),
         )?];
@@ -202,7 +202,7 @@ mod tests {
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = vec![from_user(
+        let exclude = vec![create_glob(
             "foo/bar/*.py",
             Some(&project_root.to_path_buf()),
         )?];
@@ -212,7 +212,7 @@ mod tests {
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = vec![from_user("baz", Some(&project_root.to_path_buf()))?];
+        let exclude = vec![create_glob("baz", Some(&project_root.to_path_buf()))?];
         let (file_path, file_basename) = extract_path_names(&path)?;
         assert!(!is_excluded(file_path, file_basename, &fn_exclude(exclude)));
 

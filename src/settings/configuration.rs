@@ -11,7 +11,7 @@ use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::pyproject::load_options;
-use crate::settings::types::{from_user, PerFileIgnore, PythonVersion};
+use crate::settings::types::{create_glob, PerFileIgnore, PythonVersion};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
     pep8_naming,
@@ -87,7 +87,7 @@ impl Configuration {
                 |paths| {
                     paths
                         .iter()
-                        .map(|path| from_user(path, project_root))
+                        .map(|path| create_glob(path, project_root))
                         .collect()
                 },
             );
@@ -101,7 +101,7 @@ impl Configuration {
         let extend_exclude = {
             let mut builder = globset::GlobSetBuilder::new();
             for path in options.extend_exclude.unwrap_or_default() {
-                builder.add(from_user(&path, project_root)?);
+                builder.add(create_glob(&path, project_root)?);
             }
             builder.build()?
         };
