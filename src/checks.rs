@@ -103,6 +103,7 @@ pub enum CheckCode {
     B025,
     B026,
     B027,
+    B904,
     // flake8-blind-except
     BLE001,
     // flake8-comprehensions
@@ -441,6 +442,7 @@ pub enum CheckKind {
     DuplicateTryBlockException(String),
     StarArgUnpackingAfterKeywordArg,
     EmptyMethodWithoutAbstractDecorator(String),
+    RaiseWithoutFromInsideExcept,
     // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
@@ -699,6 +701,7 @@ impl CheckCode {
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
             CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
             CheckCode::B027 => CheckKind::EmptyMethodWithoutAbstractDecorator("...".to_string()),
+            CheckCode::B904 => CheckKind::RaiseWithoutFromInsideExcept,
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
             CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
@@ -958,6 +961,7 @@ impl CheckCode {
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::B027 => CheckCategory::Flake8Bugbear,
+            CheckCode::B904 => CheckCategory::Flake8Bugbear,
             CheckCode::BLE001 => CheckCategory::Flake8BlindExcept,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
@@ -1176,6 +1180,7 @@ impl CheckKind {
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
             CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             CheckKind::EmptyMethodWithoutAbstractDecorator(_) => &CheckCode::B027,
+            CheckKind::RaiseWithoutFromInsideExcept => &CheckCode::B904,
             // flake8-blind-except
             CheckKind::BlindExcept => &CheckCode::BLE001,
             // flake8-comprehensions
@@ -1579,6 +1584,11 @@ impl CheckKind {
                     "`{name}` is an empty method in an abstract base class, but has no abstract \
                      decorator"
                 )
+            }
+            CheckKind::RaiseWithoutFromInsideExcept => {
+                "Within an except clause, raise exceptions with raise ... from err or raise ... \
+                 from None to distinguish them from errors in exception handling"
+                    .to_string()
             }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {

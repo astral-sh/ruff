@@ -910,7 +910,7 @@ where
                     }
                 }
             }
-            StmtKind::Raise { exc, .. } => {
+            StmtKind::Raise { exc, cause, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F901) {
                     if let Some(expr) = exc {
                         pyflakes::plugins::raise_not_implemented(self, expr);
@@ -920,6 +920,17 @@ where
                     if let Some(exc) = exc {
                         flake8_bugbear::plugins::cannot_raise_literal(self, exc);
                     }
+                }
+                if self.settings.enabled.contains(&CheckCode::B904) {
+                    if matches!(self.current_scope().kind, ScopeKind::Excepthandler)
+                        && cause.is_none()
+                    {
+                        if let Some(exc) = exc {
+                            flake8_bugbear::plugins::raise_without_from_inside_except(
+                                self, stmt, exc,
+                            );
+                        }
+                    };
                 }
             }
             StmtKind::AugAssign { target, .. } => {
@@ -1928,6 +1939,7 @@ where
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
+        self.push_scope(Scope::new(ScopeKind::Excepthandler));
         match &excepthandler.node {
             ExcepthandlerKind::ExceptHandler { type_, name, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E722) && type_.is_none() {
@@ -2009,6 +2021,7 @@ where
                 }
             }
         }
+        self.pop_scope();
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {

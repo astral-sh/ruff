@@ -45,6 +45,7 @@ pub enum ScopeKind<'a> {
     Module,
     Arg,
     Lambda,
+    Excepthandler,
 }
 
 #[derive(Clone, Debug)]
