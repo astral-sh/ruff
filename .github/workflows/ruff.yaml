@@ -287,10 +287,14 @@ jobs:
         with:
           name: wheels
       - uses: actions/setup-python@v4
-      - name: Publish to PyPi
+      - name: Publish to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.RUFF_TOKEN }}
         run: |
           pip install --upgrade twine
           twine upload --skip-existing *
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: *
