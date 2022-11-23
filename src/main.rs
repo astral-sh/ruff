@@ -1,6 +1,7 @@
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
@@ -26,6 +27,7 @@ use notify::{raw_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use rustpython_ast::Location;
+use serde::Serialize;
 use walkdir::DirEntry;
 
 /// Shim that calls `par_iter` except for wasm because there's no wasm support
@@ -51,6 +53,45 @@ fn show_settings(
         "{:#?}",
         UserConfiguration::from_configuration(configuration, project_root, pyproject)
     );
+}
+
+#[derive(Serialize)]
+struct Explanation<'a> {
+    code: &'a str,
+    category: &'a str,
+    summary: &'a str,
+}
+
+fn explain(code: &str, format: SerializationFormat) -> Result<ExitCode> {
+    match CheckCode::from_str(&code) {
+        Ok(code) => {
+            match format {
+                SerializationFormat::Text => {
+                    println!(
+                        "{} ({}): {}",
+                        code.as_ref(),
+                        code.category().title(),
+                        code.kind().summary()
+                    );
+                }
+                SerializationFormat::Json => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&Explanation {
+                            code: code.as_ref(),
+                            category: &code.category().title(),
+                            summary: &code.kind().summary(),
+                        })?
+                    );
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(_) => {
+            eprintln!("Unknown code: {}", code);
+            Ok(ExitCode::FAILURE)
+        }
+    }
 }
 
 fn show_files(files: &[PathBuf], settings: &Settings) {
@@ -274,6 +315,10 @@ fn inner_main() -> Result<ExitCode> {
     }
     if cli.show_source {
         configuration.show_source = true;
+    }
+
+    if let Some(code) = cli.explain {
+        return explain(&code, cli.format);
     }
 
     if cli.show_settings && cli.show_files {

@@ -111,6 +111,9 @@ pub struct Cli {
     /// The name of the file when passing it through stdin.
     #[arg(long)]
     pub stdin_filename: Option<String>,
+    /// Explain a rule.
+    #[arg(long)]
+    pub explain: Option<String>,
 }
 
 impl Cli {
