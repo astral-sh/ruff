@@ -52,3 +52,8 @@ def f5():
 
     def f7():
         nonlocal b
+
+
+def f6():
+    annotations = []
+    assert len([annotations for annotations in annotations])
