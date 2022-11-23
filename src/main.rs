@@ -61,7 +61,7 @@ struct Explanation<'a> {
     summary: &'a str,
 }
 
-fn explain(code: &CheckCode, format: SerializationFormat) -> Result<ExitCode> {
+fn explain(code: &CheckCode, format: SerializationFormat) -> Result<()> {
     match format {
         SerializationFormat::Text => {
             println!(
@@ -81,8 +81,8 @@ fn explain(code: &CheckCode, format: SerializationFormat) -> Result<ExitCode> {
                 })?
             );
         }
-    }
-    Ok(ExitCode::SUCCESS)
+    };
+    Ok(())
 }
 
 fn show_files(files: &[PathBuf], settings: &Settings) {
@@ -309,7 +309,13 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     if let Some(code) = cli.explain {
-        return explain(&code, cli.format);
+        match explain(&code, cli.format) {
+            Ok(()) => return Ok(ExitCode::SUCCESS),
+            Err(error) => {
+                eprintln!("{}", error);
+                return Ok(ExitCode::FAILURE);
+            }
+        }
     }
 
     if cli.show_settings && cli.show_files {
