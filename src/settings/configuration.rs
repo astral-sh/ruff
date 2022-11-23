@@ -42,32 +42,34 @@ pub struct Configuration {
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
+    // Display Info
+    pub exclude_globs: Vec<globset::Glob>,
+    pub extend_exclude_globs: Vec<globset::Glob>,
 }
 
-static DEFAULT_EXCLUDE: Lazy<Vec<std::result::Result<globset::Glob, globset::Error>>> =
-    Lazy::new(|| {
-        vec![
-            globset::Glob::new(".bzr"),
-            globset::Glob::new(".direnv"),
-            globset::Glob::new(".eggs"),
-            globset::Glob::new(".git"),
-            globset::Glob::new(".hg"),
-            globset::Glob::new(".mypy_cache"),
-            globset::Glob::new(".nox"),
-            globset::Glob::new(".pants.d"),
-            globset::Glob::new(".ruff_cache"),
-            globset::Glob::new(".svn"),
-            globset::Glob::new(".tox"),
-            globset::Glob::new(".venv"),
-            globset::Glob::new("__pypackages__"),
-            globset::Glob::new("_build"),
-            globset::Glob::new("buck-out"),
-            globset::Glob::new("build"),
-            globset::Glob::new("dist"),
-            globset::Glob::new("node_modules"),
-            globset::Glob::new("venv"),
-        ]
-    });
+static DEFAULT_EXCLUDE: Lazy<Vec<globset::Glob>> = Lazy::new(|| {
+    vec![
+        globset::Glob::new(".bzr").expect("Failed to build Glob"),
+        globset::Glob::new(".direnv").expect("Failed to build Glob"),
+        globset::Glob::new(".eggs").expect("Failed to build Glob"),
+        globset::Glob::new(".git").expect("Failed to build Glob"),
+        globset::Glob::new(".hg").expect("Failed to build Glob"),
+        globset::Glob::new(".mypy_cache").expect("Failed to build Glob"),
+        globset::Glob::new(".nox").expect("Failed to build Glob"),
+        globset::Glob::new(".pants.d").expect("Failed to build Glob"),
+        globset::Glob::new(".ruff_cache").expect("Failed to build Glob"),
+        globset::Glob::new(".svn").expect("Failed to build Glob"),
+        globset::Glob::new(".tox").expect("Failed to build Glob"),
+        globset::Glob::new(".venv").expect("Failed to build Glob"),
+        globset::Glob::new("__pypackages__").expect("Failed to build Glob"),
+        globset::Glob::new("_build").expect("Failed to build Glob"),
+        globset::Glob::new("buck-out").expect("Failed to build Glob"),
+        globset::Glob::new("build").expect("Failed to build Glob"),
+        globset::Glob::new("dist").expect("Failed to build Glob"),
+        globset::Glob::new("node_modules").expect("Failed to build Glob"),
+        globset::Glob::new("venv").expect("Failed to build Glob"),
+    ]
+});
 
 static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
     Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
@@ -79,31 +81,35 @@ impl Configuration {
     ) -> Result<Self> {
         let options = load_options(pyproject)?;
 
+        let local_to_glob =
+            |path: String| create_glob(&path, project_root).expect("Failed to build Glob");
+
         let exclude = {
             let mut builder = globset::GlobSetBuilder::new();
 
             let paths = options.exclude.map_or_else(
                 || DEFAULT_EXCLUDE.clone(),
-                |paths| {
-                    paths
-                        .iter()
-                        .map(|path| create_glob(path, project_root))
-                        .collect()
-                },
+                |paths| paths.into_iter().map(local_to_glob).collect(),
             );
 
-            for path in paths {
-                builder.add(path?);
+            for path in &paths {
+                builder.add(path.clone());
             }
-            builder.build()?
+            (builder.build()?, paths)
         };
 
         let extend_exclude = {
             let mut builder = globset::GlobSetBuilder::new();
-            for path in options.extend_exclude.unwrap_or_default() {
-                builder.add(create_glob(&path, project_root)?);
+            let paths: Vec<globset::Glob> = options
+                .extend_exclude
+                .unwrap_or_default()
+                .into_iter()
+                .map(local_to_glob)
+                .collect();
+            for path in &paths {
+                builder.add(path.clone());
             }
-            builder.build()?
+            (builder.build()?, paths)
         };
 
         Ok(Configuration {
@@ -132,8 +138,10 @@ impl Configuration {
                 },
             ),
             target_version: options.target_version.unwrap_or(PythonVersion::Py310),
-            exclude,
-            extend_exclude,
+            exclude: exclude.0,
+            extend_exclude: extend_exclude.0,
+            exclude_globs: exclude.1,
+            extend_exclude_globs: extend_exclude.1,
             extend_ignore: options.extend_ignore.unwrap_or_default(),
             select: options
                 .select

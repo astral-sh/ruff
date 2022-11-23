@@ -228,8 +228,7 @@ fn inner_main() -> Result<ExitCode> {
     // Reconcile configuration from pyproject.toml and command-line arguments.
     let exclude: globset::GlobSet = {
         let mut ret = globset::GlobSetBuilder::new();
-        for path in cli.exclude
-        {
+        for path in cli.exclude {
             ret.add(create_glob(&path, project_root.as_ref())?);
         }
         ret.build()?
@@ -237,8 +236,7 @@ fn inner_main() -> Result<ExitCode> {
     let extend_exclude = {
         let mut ret = globset::GlobSetBuilder::new();
 
-        for path in cli.extend_exclude
-        {
+        for path in cli.extend_exclude {
             ret.add(create_glob(&path, project_root.as_ref())?);
         }
         ret.build()?
