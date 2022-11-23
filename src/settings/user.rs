@@ -21,9 +21,24 @@ pub struct Exclusion {
 
 impl Exclusion {
     pub fn from_file_pattern(file_pattern: &globset::Glob) -> Self {
-        Exclusion {
-            basename: Some(file_pattern.glob().to_owned()),
-            absolute: Some(file_pattern.glob().to_owned()),
+        let glob = file_pattern.glob();
+        if glob.starts_with('{') && glob.ends_with('}') {
+            if let Some((absolute, basename)) = glob.split_once(',') {
+                Exclusion {
+                    basename: Some(basename.strip_suffix('}').unwrap().to_string()),
+                    absolute: Some(absolute.strip_prefix('{').unwrap().to_string()),
+                }
+            } else {
+                Exclusion {
+                    basename: Some(glob.to_string()),
+                    absolute: None,
+                }
+            }
+        } else {
+            Exclusion {
+                basename: Some(glob.to_string()),
+                absolute: None,
+            }
         }
     }
 }
@@ -32,8 +47,8 @@ impl Exclusion {
 #[derive(Debug)]
 pub struct UserConfiguration {
     pub dummy_variable_rgx: Regex,
-    pub exclude: globset::GlobSet,
-    pub extend_exclude: globset::GlobSet,
+    pub exclude: Vec<Exclusion>,
+    pub extend_exclude: Vec<Exclusion>,
     pub extend_ignore: Vec<CheckCodePrefix>,
     pub extend_select: Vec<CheckCodePrefix>,
     pub fix: bool,
@@ -65,8 +80,16 @@ impl UserConfiguration {
     ) -> Self {
         Self {
             dummy_variable_rgx: configuration.dummy_variable_rgx,
-            exclude: configuration.exclude,
-            extend_exclude: configuration.extend_exclude,
+            exclude: configuration
+                .exclude_globs
+                .iter()
+                .map(Exclusion::from_file_pattern)
+                .collect(),
+            extend_exclude: configuration
+                .extend_exclude_globs
+                .iter()
+                .map(Exclusion::from_file_pattern)
+                .collect(),
             extend_ignore: configuration.extend_ignore,
             extend_select: configuration.extend_select,
             fix: configuration.fix,
