@@ -71,6 +71,7 @@ pub mod source_code_locator;
 #[cfg(feature = "update-informer")]
 pub mod updates;
 pub mod visibility;
+mod vendored;
 
 /// Run Ruff over Python source code directly.
 pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
