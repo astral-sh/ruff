@@ -26,7 +26,7 @@ use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::settings::configuration::Configuration;
-use ::ruff::settings::types::FilePattern;
+use ::ruff::settings::types::from_user;
 use ::ruff::settings::user::UserConfiguration;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
@@ -226,16 +226,29 @@ fn inner_main() -> Result<ExitCode> {
     };
 
     // Reconcile configuration from pyproject.toml and command-line arguments.
-    let exclude: Vec<FilePattern> = cli
-        .exclude
-        .iter()
-        .map(|path| FilePattern::from_user(path, project_root.as_ref()))
-        .collect::<Result<_>>()?;
-    let extend_exclude: Vec<FilePattern> = cli
-        .extend_exclude
-        .iter()
-        .map(|path| FilePattern::from_user(path, project_root.as_ref()))
-        .collect::<Result<_>>()?;
+    let exclude: globset::GlobSet = {
+        let mut ret = globset::GlobSetBuilder::new();
+        for x in cli
+            .exclude
+            .iter()
+            .map(|path| from_user(path, project_root.as_ref()))
+        {
+            ret.add(x?);
+        }
+        ret.build()?
+    };
+    let extend_exclude = {
+        let mut ret = globset::GlobSetBuilder::new();
+
+        for x in cli
+            .extend_exclude
+            .iter()
+            .map(|path| from_user(path, project_root.as_ref()))
+        {
+            ret.add(x?);
+        }
+        ret.build()?
+    };
 
     let mut configuration =
         Configuration::from_pyproject(pyproject.as_ref(), project_root.as_ref())?;

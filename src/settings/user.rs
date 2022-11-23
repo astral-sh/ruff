@@ -6,7 +6,7 @@ use regex::Regex;
 
 use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
-use crate::settings::types::{FilePattern, PythonVersion};
+use crate::settings::types::PythonVersion;
 use crate::{
     flake8_annotations, flake8_quotes, flake8_tidy_imports, isort, pep8_naming, Configuration,
 };
@@ -20,16 +20,10 @@ pub struct Exclusion {
 }
 
 impl Exclusion {
-    pub fn from_file_pattern(file_pattern: FilePattern) -> Self {
-        match file_pattern {
-            FilePattern::Simple(basename) => Exclusion {
-                basename: Some(basename.to_string()),
-                absolute: None,
-            },
-            FilePattern::Complex(absolute, basename) => Exclusion {
-                basename: basename.map(|pattern| pattern.to_string()),
-                absolute: Some(absolute.to_string()),
-            },
+    pub fn from_file_pattern(file_pattern: globset::Glob) -> Self {
+        Exclusion {
+            basename: Some(file_pattern.glob().to_owned()),
+            absolute: Some(file_pattern.glob().to_owned()),
         }
     }
 }
@@ -38,8 +32,8 @@ impl Exclusion {
 #[derive(Debug)]
 pub struct UserConfiguration {
     pub dummy_variable_rgx: Regex,
-    pub exclude: Vec<Exclusion>,
-    pub extend_exclude: Vec<Exclusion>,
+    pub exclude: globset::GlobSet,
+    pub extend_exclude: globset::GlobSet,
     pub extend_ignore: Vec<CheckCodePrefix>,
     pub extend_select: Vec<CheckCodePrefix>,
     pub fix: bool,
@@ -71,16 +65,8 @@ impl UserConfiguration {
     ) -> Self {
         Self {
             dummy_variable_rgx: configuration.dummy_variable_rgx,
-            exclude: configuration
-                .exclude
-                .into_iter()
-                .map(Exclusion::from_file_pattern)
-                .collect(),
-            extend_exclude: configuration
-                .extend_exclude
-                .into_iter()
-                .map(Exclusion::from_file_pattern)
-                .collect(),
+            exclude: configuration.exclude,
+            extend_exclude: configuration.extend_exclude,
             extend_ignore: configuration.extend_ignore,
             extend_select: configuration.extend_select,
             fix: configuration.fix,

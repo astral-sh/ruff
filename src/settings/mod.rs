@@ -12,7 +12,7 @@ use rustc_hash::FxHashSet;
 use crate::checks::CheckCode;
 use crate::checks_gen::{CheckCodePrefix, PrefixSpecificity};
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
+use crate::settings::types::{PerFileIgnore, PythonVersion};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, isort, mccabe,
     pep8_naming,
@@ -28,8 +28,8 @@ pub mod user;
 pub struct Settings {
     pub dummy_variable_rgx: Regex,
     pub enabled: FxHashSet<CheckCode>,
-    pub exclude: Vec<FilePattern>,
-    pub extend_exclude: Vec<FilePattern>,
+    pub exclude: globset::GlobSet,
+    pub extend_exclude: globset::GlobSet,
     pub fixable: FxHashSet<CheckCode>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
@@ -85,8 +85,8 @@ impl Settings {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter([check_code.clone()]),
             fixable: FxHashSet::from_iter([check_code]),
-            exclude: vec![],
-            extend_exclude: vec![],
+            exclude: globset::GlobSet::empty(),
+            extend_exclude: globset::GlobSet::empty(),
             line_length: 88,
             per_file_ignores: vec![],
             src: vec![path_dedot::CWD.clone()],
@@ -107,8 +107,8 @@ impl Settings {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter(check_codes.clone()),
             fixable: FxHashSet::from_iter(check_codes),
-            exclude: vec![],
-            extend_exclude: vec![],
+            exclude: globset::GlobSet::empty(),
+            extend_exclude: globset::GlobSet::empty(),
             line_length: 88,
             per_file_ignores: vec![],
             src: vec![path_dedot::CWD.clone()],
