@@ -456,8 +456,8 @@ pub fn walk_comprehension<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     comprehension: &'a Comprehension,
 ) {
-    visitor.visit_expr(&comprehension.target);
     visitor.visit_expr(&comprehension.iter);
+    visitor.visit_expr(&comprehension.target);
     for expr in &comprehension.ifs {
         visitor.visit_expr(expr);
     }
