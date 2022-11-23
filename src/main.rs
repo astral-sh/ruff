@@ -309,13 +309,8 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     if let Some(code) = cli.explain {
-        match explain(&code, cli.format) {
-            Ok(()) => return Ok(ExitCode::SUCCESS),
-            Err(error) => {
-                eprintln!("{}", error);
-                return Ok(ExitCode::FAILURE);
-            }
-        }
+        explain(&code, cli.format)?;
+        return Ok(ExitCode::SUCCESS);
     }
 
     if cli.show_settings && cli.show_files {
