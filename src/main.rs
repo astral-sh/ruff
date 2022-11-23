@@ -152,23 +152,26 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool, autofix: bool) 
 fn add_noqa(files: &[PathBuf], settings: &Settings) -> usize {
     // Collect all the files to check.
     let start = Instant::now();
-    let paths: Vec<Result<DirEntry, walkdir::Error>> = files
+    let paths: Vec<DirEntry> = files
         .iter()
         .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
+        .flatten()
         .collect();
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
     let modifications: usize = par_iter(&paths)
-        .map(|entry| match entry {
-            Ok(entry) => {
-                let path = entry.path();
-                add_noqa_to_path(path, settings)
+        .filter_map(|entry| {
+            let path = entry.path();
+            match add_noqa_to_path(path, settings) {
+                Ok(count) => Some(count),
+                Err(e) => {
+                    error!("Failed to add noqa to {}: {e}", path.to_string_lossy());
+                    None
+                }
             }
-            Err(_) => Ok(0),
         })
-        .flatten()
         .sum();
 
     let duration = start.elapsed();
@@ -190,11 +193,16 @@ fn autoformat(files: &[PathBuf], settings: &Settings) -> usize {
 
     let start = Instant::now();
     let modifications = par_iter(&paths)
-        .map(|entry| {
+        .filter_map(|entry| {
             let path = entry.path();
-            autoformat_path(path)
+            match autoformat_path(path) {
+                Ok(()) => Some(()),
+                Err(e) => {
+                    error!("Failed to autoformat {}: {e}", path.to_string_lossy());
+                    None
+                }
+            }
         })
-        .flatten()
         .count();
 
     let duration = start.elapsed();
