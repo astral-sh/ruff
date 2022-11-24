@@ -10,9 +10,6 @@
 
 # "{} {1}".format(1, 2)  # F525
 # "{0} {}".format(1, 2)  # F525
-# "{} {}".format(1)  # F524
-# "{2}".format()  # F524
-# "{bar}".format()  # F524
 
 # The following are all "good" uses of .format
 "{.__class__}".format("")
