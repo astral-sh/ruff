@@ -350,6 +350,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F405 | ImportStarUsage | `...` may be undefined, or defined from star imports: `...` |  |
 | F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |  |
 | F407 | FutureFeatureNotDefined | Future feature `...` is not defined |  |
+| F521 | StringDotFormatInvalidFormat | '...'.format(...) has invalid format string: ... |  |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders |  |
 | F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |  |
 | F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |  |
