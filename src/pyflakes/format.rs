@@ -10,10 +10,10 @@ impl fmt::Display for FormatParseError {
             FormatParseError::InvalidCharacterAfterRightBracket => {
                 "Only '.' or '[' may follow ']' in format field specifier"
             }
-            FormatParseError::InvalidFormatSpecifier => "Invalid format specifier",
+            FormatParseError::InvalidFormatSpecifier => "Max string recursion exceeded",
             FormatParseError::MissingStartBracket => "Single '}' encountered in format string",
             FormatParseError::MissingRightBracket => "Expected '}' before end of string",
-            FormatParseError::UnmatchedBracket => "Expected '}' before end of string",
+            FormatParseError::UnmatchedBracket => "Single '{' encountered in format string",
             _ => "Unexpected error parsing format string",
         };
 
