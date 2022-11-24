@@ -1252,10 +1252,21 @@ where
                     {
                         if attr == "format" {
                             // "...".format(...) call
+                            let location = Range::from_located(expr);
+
                             if self.settings.enabled.contains(&CheckCode::F521) {
-                                let location = Range::from_located(expr);
                                 if let Some(check) =
                                     pyflakes::checks::string_dot_format_invalid(value, location)
+                                {
+                                    self.add_check(check);
+                                }
+                            }
+
+                            if self.settings.enabled.contains(&CheckCode::F522) {
+                                if let Some(check) =
+                                    pyflakes::checks::string_dot_format_extra_named_arguments(
+                                        value, keywords, location,
+                                    )
                                 {
                                     self.add_check(check);
                                 }

@@ -1,12 +1,21 @@
 use regex::Regex;
 use rustc_hash::FxHashSet;
+use rustpython_ast::{Keyword, KeywordData};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
 use crate::ast::types::{BindingKind, FunctionScope, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
+use crate::pyflakes::format::FormatSummary;
 use crate::vendored::format::{FieldName, FormatPart, FormatString, FromTemplate};
+
+fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
+    keywords.iter().any(|k| {
+        let KeywordData { arg, .. } = &k.node;
+        arg.is_none()
+    })
+}
 
 // F521
 pub fn string_dot_format_invalid(literal: &str, location: Range) -> Option<Check> {
@@ -27,6 +36,44 @@ pub fn string_dot_format_invalid(literal: &str, location: Range) -> Option<Check
                 }
             }
             None
+        }
+    }
+}
+
+// F522
+pub fn string_dot_format_extra_named_arguments(
+    literal: &str,
+    keywords: &[Keyword],
+    location: Range,
+) -> Option<Check> {
+    if has_star_star_kwargs(keywords) {
+        return None;
+    }
+
+    let keywords = keywords.iter().filter_map(|k| {
+        let KeywordData { arg, .. } = &k.node;
+        arg.clone()
+    });
+
+    match FormatString::from_str(literal) {
+        Err(_) => None, // Cannot proceed - should be picked up by F521
+        Ok(format_string) => {
+            match FormatSummary::try_from(format_string) {
+                Err(_) => None, // Cannot proceed - should be picked up by F521
+                Ok(summary) => {
+                    let missing: Vec<String> =
+                        keywords.filter(|k| !summary.keywords.contains(k)).collect();
+
+                    if missing.is_empty() {
+                        None
+                    } else {
+                        Some(Check::new(
+                            CheckKind::StringDotFormatExtraNamedArguments(missing),
+                            location,
+                        ))
+                    }
+                }
+            }
         }
     }
 }

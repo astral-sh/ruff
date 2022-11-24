@@ -53,6 +53,7 @@ pub enum CheckCode {
     F406,
     F407,
     F521,
+    F522,
     F541,
     F601,
     F602,
@@ -404,6 +405,7 @@ pub enum CheckKind {
     MultiValueRepeatedKeyVariable(String),
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    StringDotFormatExtraNamedArguments(Vec<String>),
     StringDotFormatInvalidFormat(String),
     TwoStarredExpressions,
     UndefinedExport(String),
@@ -649,6 +651,9 @@ impl CheckCode {
             CheckCode::F406 => CheckKind::ImportStarNotPermitted("...".to_string()),
             CheckCode::F407 => CheckKind::FutureFeatureNotDefined("...".to_string()),
             CheckCode::F521 => CheckKind::StringDotFormatInvalidFormat("...".to_string()),
+            CheckCode::F522 => {
+                CheckKind::StringDotFormatExtraNamedArguments(vec!["...".to_string()])
+            }
             CheckCode::F541 => CheckKind::FStringMissingPlaceholders,
             CheckCode::F601 => CheckKind::MultiValueRepeatedKeyLiteral,
             CheckCode::F602 => CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
@@ -916,6 +921,7 @@ impl CheckCode {
             CheckCode::F406 => CheckCategory::Pyflakes,
             CheckCode::F407 => CheckCategory::Pyflakes,
             CheckCode::F521 => CheckCategory::Pyflakes,
+            CheckCode::F522 => CheckCategory::Pyflakes,
             CheckCode::F541 => CheckCategory::Pyflakes,
             CheckCode::F601 => CheckCategory::Pyflakes,
             CheckCode::F602 => CheckCategory::Pyflakes,
@@ -1140,6 +1146,7 @@ impl CheckKind {
             CheckKind::NotIsTest => &CheckCode::E714,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::StringDotFormatExtraNamedArguments(_) => &CheckCode::F522,
             CheckKind::StringDotFormatInvalidFormat(_) => &CheckCode::F521,
             CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::ExpressionsInStarAssignment => &CheckCode::F621,
@@ -1426,6 +1433,10 @@ impl CheckKind {
             }
             CheckKind::ReturnOutsideFunction => {
                 "`return` statement outside of a function/method".to_string()
+            }
+            CheckKind::StringDotFormatExtraNamedArguments(missing) => {
+                let message = missing.join(", ");
+                format!("'...'.format(...) has unused named argument(s): {message}")
             }
             CheckKind::StringDotFormatInvalidFormat(message) => {
                 format!("'...'.format(...) has invalid format string: {message}")
