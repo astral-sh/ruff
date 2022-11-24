@@ -12,12 +12,57 @@ expression: checks
     column: 13
   fix: ~
 - kind:
-    StringDotFormatInvalidFormat: Invalid format specifier
+    StringDotFormatInvalidFormat: "Single '}' encountered in format string"
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 13
+  fix: ~
+- kind:
+    StringDotFormatInvalidFormat: "Expected '}' before end of string"
   location:
     row: 3
     column: 0
   end_location:
     row: 3
+    column: 22
+  fix: ~
+- kind:
+    StringDotFormatInvalidFormat: Invalid format specifier
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 26
+  fix: ~
+- kind:
+    StringDotFormatInvalidFormat: Empty attribute in format string
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 29
+  fix: ~
+- kind:
+    StringDotFormatInvalidFormat: Empty attribute in format string
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 23
+  fix: ~
+- kind:
+    StringDotFormatInvalidFormat: Empty attribute in format string
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
     column: 26
   fix: ~
 
