@@ -438,11 +438,7 @@ where
     fn take_number(&mut self, radix: u32) -> Option<char> {
         let take_char = Lexer::<T>::is_digit_of_radix(self.window[0], radix);
 
-        if take_char {
-            Some(self.next_char().unwrap())
-        } else {
-            None
-        }
+        take_char.then(|| self.next_char().unwrap())
     }
 
     /// Test if a digit is of a certain radix.
