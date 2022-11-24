@@ -1291,6 +1291,16 @@ where
                                     self.add_check(check);
                                 }
                             }
+
+                            if self.settings.enabled.contains(&CheckCode::F525) {
+                                if let Some(check) =
+                                    pyflakes::checks::string_dot_format_mixing_automatic(
+                                        value, location,
+                                    )
+                                {
+                                    self.add_check(check);
+                                }
+                            }
                         }
                     }
                 }

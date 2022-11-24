@@ -56,6 +56,7 @@ pub enum CheckCode {
     F522,
     F523,
     F524,
+    F525,
     F541,
     F601,
     F602,
@@ -411,6 +412,7 @@ pub enum CheckKind {
     StringDotFormatExtraPositionalArguments(Vec<String>),
     StringDotFormatInvalidFormat(String),
     StringDotFormatMissingArguments(Vec<String>),
+    StringDotFormatMixingAutomatic,
     TwoStarredExpressions,
     UndefinedExport(String),
     UndefinedLocal(String),
@@ -662,6 +664,7 @@ impl CheckCode {
                 CheckKind::StringDotFormatExtraPositionalArguments(vec!["...".to_string()])
             }
             CheckCode::F524 => CheckKind::StringDotFormatMissingArguments(vec!["...".to_string()]),
+            CheckCode::F525 => CheckKind::StringDotFormatMixingAutomatic,
             CheckCode::F541 => CheckKind::FStringMissingPlaceholders,
             CheckCode::F601 => CheckKind::MultiValueRepeatedKeyLiteral,
             CheckCode::F602 => CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
@@ -932,6 +935,7 @@ impl CheckCode {
             CheckCode::F522 => CheckCategory::Pyflakes,
             CheckCode::F523 => CheckCategory::Pyflakes,
             CheckCode::F524 => CheckCategory::Pyflakes,
+            CheckCode::F525 => CheckCategory::Pyflakes,
             CheckCode::F541 => CheckCategory::Pyflakes,
             CheckCode::F601 => CheckCategory::Pyflakes,
             CheckCode::F602 => CheckCategory::Pyflakes,
@@ -1160,6 +1164,7 @@ impl CheckKind {
             CheckKind::StringDotFormatExtraPositionalArguments(_) => &CheckCode::F523,
             CheckKind::StringDotFormatInvalidFormat(_) => &CheckCode::F521,
             CheckKind::StringDotFormatMissingArguments(_) => &CheckCode::F524,
+            CheckKind::StringDotFormatMixingAutomatic => &CheckCode::F525,
             CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::ExpressionsInStarAssignment => &CheckCode::F621,
             CheckKind::TrueFalseComparison(..) => &CheckCode::E712,
@@ -1460,6 +1465,9 @@ impl CheckKind {
             CheckKind::StringDotFormatMissingArguments(missing) => {
                 let message = missing.join(", ");
                 format!("'...'.format(...) is missing argument(s) for placeholder(s): {message}")
+            }
+            CheckKind::StringDotFormatMixingAutomatic => {
+                "'...'.format(...) mixes automatic and manual numbering".to_string()
             }
             CheckKind::SyntaxError(message) => format!("SyntaxError: {message}"),
             CheckKind::ExpressionsInStarAssignment => {

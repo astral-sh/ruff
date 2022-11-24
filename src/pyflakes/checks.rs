@@ -166,6 +166,28 @@ pub fn string_dot_format_missing_argument(
     }
 }
 
+// F525
+pub fn string_dot_format_mixing_automatic(literal: &str, location: Range) -> Option<Check> {
+    match FormatString::from_str(literal) {
+        Err(_) => None, // Cannot proceed - should be picked up by F521
+        Ok(format_string) => {
+            match FormatSummary::try_from(format_string) {
+                Err(_) => None, // Cannot proceed - should be picked up by F521
+                Ok(summary) => {
+                    if summary.autos.is_empty() || summary.indexes.is_empty() {
+                        None
+                    } else {
+                        Some(Check::new(
+                            CheckKind::StringDotFormatMixingAutomatic,
+                            location,
+                        ))
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// F631
 pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
