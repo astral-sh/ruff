@@ -1271,6 +1271,16 @@ where
                                     self.add_check(check);
                                 }
                             }
+
+                            if self.settings.enabled.contains(&CheckCode::F523) {
+                                if let Some(check) =
+                                    pyflakes::checks::string_dot_format_extra_positional_arguments(
+                                        value, args, location,
+                                    )
+                                {
+                                    self.add_check(check);
+                                }
+                            }
                         }
                     }
                 }

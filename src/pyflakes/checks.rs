@@ -17,6 +17,11 @@ fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
     })
 }
 
+fn has_star_args(args: &[Expr]) -> bool {
+    args.iter()
+        .any(|a| matches!(&a.node, ExprKind::Starred { .. }))
+}
+
 // F521
 pub fn string_dot_format_invalid(literal: &str, location: Range) -> Option<Check> {
     match FormatString::from_str(literal) {
@@ -69,6 +74,41 @@ pub fn string_dot_format_extra_named_arguments(
                     } else {
                         Some(Check::new(
                             CheckKind::StringDotFormatExtraNamedArguments(missing),
+                            location,
+                        ))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// F523
+pub fn string_dot_format_extra_positional_arguments(
+    literal: &str,
+    args: &[Expr],
+    location: Range,
+) -> Option<Check> {
+    if has_star_args(args) {
+        return None;
+    }
+
+    match FormatString::from_str(literal) {
+        Err(_) => None, // Cannot proceed - should be picked up by F521
+        Ok(format_string) => {
+            match FormatSummary::try_from(format_string) {
+                Err(_) => None, // Cannot proceed - should be picked up by F521
+                Ok(summary) => {
+                    let missing: Vec<String> = (0..args.len())
+                        .filter(|i| !(summary.autos.contains(i) || summary.indexes.contains(i)))
+                        .map(|i| i.to_string())
+                        .collect();
+
+                    if missing.is_empty() {
+                        None
+                    } else {
+                        Some(Check::new(
+                            CheckKind::StringDotFormatExtraPositionalArguments(missing),
                             location,
                         ))
                     }

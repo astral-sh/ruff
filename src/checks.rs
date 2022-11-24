@@ -54,6 +54,7 @@ pub enum CheckCode {
     F407,
     F521,
     F522,
+    F523,
     F541,
     F601,
     F602,
@@ -406,6 +407,7 @@ pub enum CheckKind {
     RaiseNotImplemented,
     ReturnOutsideFunction,
     StringDotFormatExtraNamedArguments(Vec<String>),
+    StringDotFormatExtraPositionalArguments(Vec<String>),
     StringDotFormatInvalidFormat(String),
     TwoStarredExpressions,
     UndefinedExport(String),
@@ -653,6 +655,9 @@ impl CheckCode {
             CheckCode::F521 => CheckKind::StringDotFormatInvalidFormat("...".to_string()),
             CheckCode::F522 => {
                 CheckKind::StringDotFormatExtraNamedArguments(vec!["...".to_string()])
+            }
+            CheckCode::F523 => {
+                CheckKind::StringDotFormatExtraPositionalArguments(vec!["...".to_string()])
             }
             CheckCode::F541 => CheckKind::FStringMissingPlaceholders,
             CheckCode::F601 => CheckKind::MultiValueRepeatedKeyLiteral,
@@ -922,6 +927,7 @@ impl CheckCode {
             CheckCode::F407 => CheckCategory::Pyflakes,
             CheckCode::F521 => CheckCategory::Pyflakes,
             CheckCode::F522 => CheckCategory::Pyflakes,
+            CheckCode::F523 => CheckCategory::Pyflakes,
             CheckCode::F541 => CheckCategory::Pyflakes,
             CheckCode::F601 => CheckCategory::Pyflakes,
             CheckCode::F602 => CheckCategory::Pyflakes,
@@ -1147,6 +1153,7 @@ impl CheckKind {
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
             CheckKind::StringDotFormatExtraNamedArguments(_) => &CheckCode::F522,
+            CheckKind::StringDotFormatExtraPositionalArguments(_) => &CheckCode::F523,
             CheckKind::StringDotFormatInvalidFormat(_) => &CheckCode::F521,
             CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::ExpressionsInStarAssignment => &CheckCode::F621,
@@ -1437,6 +1444,10 @@ impl CheckKind {
             CheckKind::StringDotFormatExtraNamedArguments(missing) => {
                 let message = missing.join(", ");
                 format!("'...'.format(...) has unused named argument(s): {message}")
+            }
+            CheckKind::StringDotFormatExtraPositionalArguments(missing) => {
+                let message = missing.join(", ");
+                format!("'...'.format(...) has unused arguments at position(s): {message}")
             }
             CheckKind::StringDotFormatInvalidFormat(message) => {
                 format!("'...'.format(...) has invalid format string: {message}")
