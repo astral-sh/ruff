@@ -11,7 +11,6 @@
 # "{} {1}".format(1, 2)  # F525
 # "{0} {}".format(1, 2)  # F525
 # "{}".format(1, 2)  # F523
-# "{}".format(1, bar=2)  # F522
 # "{} {}".format(1)  # F524
 # "{2}".format()  # F524
 # "{bar}".format()  # F524

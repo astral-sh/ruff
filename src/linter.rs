@@ -507,6 +507,7 @@ mod tests {
     #[test_case(CheckCode::F406, Path::new("F406.py"); "F406")]
     #[test_case(CheckCode::F407, Path::new("F407.py"); "F407")]
     #[test_case(CheckCode::F521, Path::new("F521.py"); "F521")]
+    #[test_case(CheckCode::F522, Path::new("F522.py"); "F522")]
     #[test_case(CheckCode::F541, Path::new("F541.py"); "F541")]
     #[test_case(CheckCode::F601, Path::new("F601.py"); "F601")]
     #[test_case(CheckCode::F602, Path::new("F602.py"); "F602")]
