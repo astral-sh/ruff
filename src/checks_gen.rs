@@ -847,6 +847,7 @@ impl CheckCodePrefix {
                 CheckCode::F405,
                 CheckCode::F406,
                 CheckCode::F407,
+                CheckCode::F521,
                 CheckCode::F541,
                 CheckCode::F601,
                 CheckCode::F602,

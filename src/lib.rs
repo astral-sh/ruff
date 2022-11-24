@@ -70,6 +70,7 @@ pub mod settings;
 pub mod source_code_locator;
 #[cfg(feature = "update-informer")]
 pub mod updates;
+mod vendored;
 pub mod visibility;
 
 /// Run Ruff over Python source code directly.

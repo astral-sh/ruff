@@ -52,6 +52,7 @@ pub enum CheckCode {
     F405,
     F406,
     F407,
+    F521,
     F541,
     F601,
     F602,
@@ -403,6 +404,7 @@ pub enum CheckKind {
     MultiValueRepeatedKeyVariable(String),
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    StringDotFormatInvalidFormat(String),
     TwoStarredExpressions,
     UndefinedExport(String),
     UndefinedLocal(String),
@@ -646,6 +648,7 @@ impl CheckCode {
             }
             CheckCode::F406 => CheckKind::ImportStarNotPermitted("...".to_string()),
             CheckCode::F407 => CheckKind::FutureFeatureNotDefined("...".to_string()),
+            CheckCode::F521 => CheckKind::StringDotFormatInvalidFormat("...".to_string()),
             CheckCode::F541 => CheckKind::FStringMissingPlaceholders,
             CheckCode::F601 => CheckKind::MultiValueRepeatedKeyLiteral,
             CheckCode::F602 => CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
@@ -912,6 +915,7 @@ impl CheckCode {
             CheckCode::F405 => CheckCategory::Pyflakes,
             CheckCode::F406 => CheckCategory::Pyflakes,
             CheckCode::F407 => CheckCategory::Pyflakes,
+            CheckCode::F521 => CheckCategory::Pyflakes,
             CheckCode::F541 => CheckCategory::Pyflakes,
             CheckCode::F601 => CheckCategory::Pyflakes,
             CheckCode::F602 => CheckCategory::Pyflakes,
@@ -1136,6 +1140,7 @@ impl CheckKind {
             CheckKind::NotIsTest => &CheckCode::E714,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::StringDotFormatInvalidFormat(_) => &CheckCode::F521,
             CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::ExpressionsInStarAssignment => &CheckCode::F621,
             CheckKind::TrueFalseComparison(..) => &CheckCode::E712,
@@ -1421,6 +1426,9 @@ impl CheckKind {
             }
             CheckKind::ReturnOutsideFunction => {
                 "`return` statement outside of a function/method".to_string()
+            }
+            CheckKind::StringDotFormatInvalidFormat(message) => {
+                format!("'...'.format(...) has invalid format string: {message}")
             }
             CheckKind::SyntaxError(message) => format!("SyntaxError: {message}"),
             CheckKind::ExpressionsInStarAssignment => {

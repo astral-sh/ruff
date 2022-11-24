@@ -6,6 +6,30 @@ use rustpython_parser::ast::{
 
 use crate::ast::types::{BindingKind, FunctionScope, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
+use crate::vendored::format::{FieldName, FormatPart, FormatString, FromTemplate};
+
+// F521
+pub fn string_dot_format_invalid(literal: &str, location: Range) -> Option<Check> {
+    match FormatString::from_str(literal) {
+        Err(e) => Some(Check::new(
+            CheckKind::StringDotFormatInvalidFormat(e.to_string()),
+            location,
+        )),
+        Ok(format_string) => {
+            for part in format_string.format_parts {
+                if let FormatPart::Field { field_name, .. } = &part {
+                    if let Err(e) = FieldName::parse(field_name) {
+                        return Some(Check::new(
+                            CheckKind::StringDotFormatInvalidFormat(e.to_string()),
+                            location,
+                        ));
+                    }
+                }
+            }
+            None
+        }
+    }
+}
 
 /// F631
 pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
