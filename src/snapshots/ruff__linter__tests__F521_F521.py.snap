@@ -1,0 +1,23 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    StringDotFormatInvalidFormat: "Expected '}' before end of string"
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 13
+  fix: ~
+- kind:
+    StringDotFormatInvalidFormat: Invalid format specifier
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 26
+  fix: ~
+
