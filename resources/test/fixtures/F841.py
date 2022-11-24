@@ -57,3 +57,11 @@ def f5():
 def f6():
     annotations = []
     assert len([annotations for annotations in annotations])
+
+
+def f7():
+    def connect():
+        return None, None
+
+    with connect() as (connection, cursor):
+        cursor.execute("SELECT * FROM users")
