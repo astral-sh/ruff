@@ -1929,12 +1929,19 @@ where
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         match &excepthandler.node {
-            ExcepthandlerKind::ExceptHandler { type_, name, .. } => {
+            ExcepthandlerKind::ExceptHandler {
+                type_, name, body, ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::E722) && type_.is_none() {
                     self.add_check(Check::new(
                         CheckKind::DoNotUseBareExcept,
                         Range::from_located(excepthandler),
                     ));
+                }
+                if self.settings.enabled.contains(&CheckCode::B904) {
+                    {
+                        flake8_bugbear::plugins::raise_without_from_inside_except(self, body);
+                    }
                 }
                 match name {
                     Some(name) => {
