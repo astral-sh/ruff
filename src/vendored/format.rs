@@ -92,7 +92,7 @@ impl FieldName {
 
         let mut parts = Vec::new();
         while let Some(part) = FieldNamePart::parse_part(&mut chars)? {
-            parts.push(part)
+            parts.push(part);
         }
 
         Ok(FieldName { field_type, parts })
@@ -142,10 +142,10 @@ impl FormatString {
                     cur_text = remaining;
                 }
                 Err(err) => {
-                    return if !result_string.is_empty() {
-                        Ok((FormatPart::Literal(result_string), cur_text))
-                    } else {
+                    return if result_string.is_empty() {
                         Err(err)
+                    } else {
+                        Ok((FormatPart::Literal(result_string), cur_text))
                     };
                 }
             }
@@ -202,20 +202,18 @@ impl FormatString {
             } else if c == '{' {
                 if nested {
                     return Err(FormatParseError::InvalidFormatSpecifier);
-                } else {
-                    nested = true;
-                    left.push(c);
-                    continue;
                 }
+                nested = true;
+                left.push(c);
+                continue;
             } else if c == '}' {
                 if nested {
                     nested = false;
                     left.push(c);
                     continue;
-                } else {
-                    end_bracket_pos = Some(idx);
-                    break;
                 }
+                end_bracket_pos = Some(idx);
+                break;
             } else {
                 left.push(c);
             }
