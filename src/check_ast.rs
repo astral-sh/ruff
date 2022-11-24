@@ -1240,6 +1240,28 @@ where
                 args,
                 keywords,
             } => {
+                // pyflakes
+                if let ExprKind::Attribute { value, attr, .. } = &func.node {
+                    if let ExprKind::Constant {
+                        value: Constant::Str(value),
+                        ..
+                    } = &value.node
+                    {
+                        if attr == "format" {
+                            // "...".format(...) call
+                            if self.settings.enabled.contains(&CheckCode::F521) {
+                                let location = Range::from_located(expr);
+                                if let Some(check) =
+                                    pyflakes::checks::string_dot_format_invalid(value, location)
+                                {
+                                    self.add_check(check);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // pyupgrade
                 if self.settings.enabled.contains(&CheckCode::U005) {
                     pyupgrade::plugins::deprecated_unittest_alias(self, func);
                 }
