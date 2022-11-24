@@ -107,7 +107,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.134
+    rev: v0.0.137
     hooks:
       - id: ruff
 ```
@@ -350,6 +350,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F405 | ImportStarUsage | `...` may be undefined, or defined from star imports: `...` |  |
 | F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |  |
 | F407 | FutureFeatureNotDefined | Future feature `...` is not defined |  |
+| F521 | StringDotFormatInvalidFormat | '...'.format(...) has invalid format string: ... |  |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders |  |
 | F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |  |
 | F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |  |
@@ -574,6 +575,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
 | B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged |  |
 | B027 | EmptyMethodWithoutAbstractDecorator | `...` is an empty method in an abstract base class, but has no abstract decorator |  |
+| B904 | RaiseWithoutFromInsideExcept | Within an except clause, raise exceptions with raise ... from err or raise ... from None to distinguish them from errors in exception handling |  |
 
 ### flake8-builtins
 
@@ -823,7 +825,7 @@ including:
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (25/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (27/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
@@ -854,7 +856,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (26/32)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (27/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)

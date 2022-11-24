@@ -40,6 +40,7 @@ use notify::{raw_watcher, RecursiveMode, Watcher};
 use rayon::prelude::*;
 use ruff::linter::Diagnostics;
 use rustpython_ast::Location;
+use serde::Serialize;
 use walkdir::DirEntry;
 
 /// Shim that calls `par_iter` except for wasm because there's no wasm support
@@ -65,6 +66,37 @@ fn show_settings(
         "{:#?}",
         UserConfiguration::from_configuration(configuration, project_root, pyproject)
     );
+}
+
+#[derive(Serialize)]
+struct Explanation<'a> {
+    code: &'a str,
+    category: &'a str,
+    summary: &'a str,
+}
+
+fn explain(code: &CheckCode, format: SerializationFormat) -> Result<()> {
+    match format {
+        SerializationFormat::Text => {
+            println!(
+                "{} ({}): {}",
+                code.as_ref(),
+                code.category().title(),
+                code.kind().summary()
+            );
+        }
+        SerializationFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&Explanation {
+                    code: code.as_ref(),
+                    category: code.category().title(),
+                    summary: &code.kind().summary(),
+                })?
+            );
+        }
+    };
+    Ok(())
 }
 
 fn show_files(files: &[PathBuf], settings: &Settings) {
@@ -152,23 +184,26 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool, autofix: bool) 
 fn add_noqa(files: &[PathBuf], settings: &Settings) -> usize {
     // Collect all the files to check.
     let start = Instant::now();
-    let paths: Vec<Result<DirEntry, walkdir::Error>> = files
+    let paths: Vec<DirEntry> = files
         .iter()
         .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
+        .flatten()
         .collect();
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
     let modifications: usize = par_iter(&paths)
-        .map(|entry| match entry {
-            Ok(entry) => {
-                let path = entry.path();
-                add_noqa_to_path(path, settings)
+        .filter_map(|entry| {
+            let path = entry.path();
+            match add_noqa_to_path(path, settings) {
+                Ok(count) => Some(count),
+                Err(e) => {
+                    error!("Failed to add noqa to {}: {e}", path.to_string_lossy());
+                    None
+                }
             }
-            Err(_) => Ok(0),
         })
-        .flatten()
         .sum();
 
     let duration = start.elapsed();
@@ -190,11 +225,16 @@ fn autoformat(files: &[PathBuf], settings: &Settings) -> usize {
 
     let start = Instant::now();
     let modifications = par_iter(&paths)
-        .map(|entry| {
+        .filter_map(|entry| {
             let path = entry.path();
-            autoformat_path(path)
+            match autoformat_path(path) {
+                Ok(()) => Some(()),
+                Err(e) => {
+                    error!("Failed to autoformat {}: {e}", path.to_string_lossy());
+                    None
+                }
+            }
         })
-        .flatten()
         .count();
 
     let duration = start.elapsed();
@@ -305,6 +345,11 @@ fn inner_main() -> Result<ExitCode> {
     }
     if cli.show_source {
         configuration.show_source = true;
+    }
+
+    if let Some(code) = cli.explain {
+        explain(&code, cli.format)?;
+        return Ok(ExitCode::SUCCESS);
     }
 
     if cli.show_settings && cli.show_files {

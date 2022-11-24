@@ -5,6 +5,7 @@ use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
+use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
 use crate::logging::LogLevel;
 use crate::printer::SerializationFormat;
@@ -111,6 +112,9 @@ pub struct Cli {
     /// The name of the file when passing it through stdin.
     #[arg(long)]
     pub stdin_filename: Option<String>,
+    /// Explain a rule.
+    #[arg(long)]
+    pub explain: Option<CheckCode>,
 }
 
 impl Cli {

@@ -52,6 +52,7 @@ pub enum CheckCode {
     F405,
     F406,
     F407,
+    F521,
     F541,
     F601,
     F602,
@@ -103,6 +104,7 @@ pub enum CheckCode {
     B025,
     B026,
     B027,
+    B904,
     // flake8-blind-except
     BLE001,
     // flake8-comprehensions
@@ -402,6 +404,7 @@ pub enum CheckKind {
     MultiValueRepeatedKeyVariable(String),
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    StringDotFormatInvalidFormat(String),
     TwoStarredExpressions,
     UndefinedExport(String),
     UndefinedLocal(String),
@@ -441,6 +444,7 @@ pub enum CheckKind {
     DuplicateTryBlockException(String),
     StarArgUnpackingAfterKeywordArg,
     EmptyMethodWithoutAbstractDecorator(String),
+    RaiseWithoutFromInsideExcept,
     // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
@@ -644,6 +648,7 @@ impl CheckCode {
             }
             CheckCode::F406 => CheckKind::ImportStarNotPermitted("...".to_string()),
             CheckCode::F407 => CheckKind::FutureFeatureNotDefined("...".to_string()),
+            CheckCode::F521 => CheckKind::StringDotFormatInvalidFormat("...".to_string()),
             CheckCode::F541 => CheckKind::FStringMissingPlaceholders,
             CheckCode::F601 => CheckKind::MultiValueRepeatedKeyLiteral,
             CheckCode::F602 => CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
@@ -699,6 +704,7 @@ impl CheckCode {
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
             CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
             CheckCode::B027 => CheckKind::EmptyMethodWithoutAbstractDecorator("...".to_string()),
+            CheckCode::B904 => CheckKind::RaiseWithoutFromInsideExcept,
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
             CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
@@ -909,6 +915,7 @@ impl CheckCode {
             CheckCode::F405 => CheckCategory::Pyflakes,
             CheckCode::F406 => CheckCategory::Pyflakes,
             CheckCode::F407 => CheckCategory::Pyflakes,
+            CheckCode::F521 => CheckCategory::Pyflakes,
             CheckCode::F541 => CheckCategory::Pyflakes,
             CheckCode::F601 => CheckCategory::Pyflakes,
             CheckCode::F602 => CheckCategory::Pyflakes,
@@ -958,6 +965,7 @@ impl CheckCode {
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::B027 => CheckCategory::Flake8Bugbear,
+            CheckCode::B904 => CheckCategory::Flake8Bugbear,
             CheckCode::BLE001 => CheckCategory::Flake8BlindExcept,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
@@ -1132,6 +1140,7 @@ impl CheckKind {
             CheckKind::NotIsTest => &CheckCode::E714,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::StringDotFormatInvalidFormat(_) => &CheckCode::F521,
             CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::ExpressionsInStarAssignment => &CheckCode::F621,
             CheckKind::TrueFalseComparison(..) => &CheckCode::E712,
@@ -1176,6 +1185,7 @@ impl CheckKind {
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
             CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             CheckKind::EmptyMethodWithoutAbstractDecorator(_) => &CheckCode::B027,
+            CheckKind::RaiseWithoutFromInsideExcept => &CheckCode::B904,
             // flake8-blind-except
             CheckKind::BlindExcept => &CheckCode::BLE001,
             // flake8-comprehensions
@@ -1417,6 +1427,9 @@ impl CheckKind {
             CheckKind::ReturnOutsideFunction => {
                 "`return` statement outside of a function/method".to_string()
             }
+            CheckKind::StringDotFormatInvalidFormat(message) => {
+                format!("'...'.format(...) has invalid format string: {message}")
+            }
             CheckKind::SyntaxError(message) => format!("SyntaxError: {message}"),
             CheckKind::ExpressionsInStarAssignment => {
                 "Too many expressions in star-unpacking assignment".to_string()
@@ -1579,6 +1592,11 @@ impl CheckKind {
                     "`{name}` is an empty method in an abstract base class, but has no abstract \
                      decorator"
                 )
+            }
+            CheckKind::RaiseWithoutFromInsideExcept => {
+                "Within an except clause, raise exceptions with raise ... from err or raise ... \
+                 from None to distinguish them from errors in exception handling"
+                    .to_string()
             }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {

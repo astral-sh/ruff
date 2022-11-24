@@ -129,6 +129,8 @@ pub(crate) fn check_path(
     Ok(checks)
 }
 
+const MAX_ITERATIONS: usize = 100;
+
 /// Lint the source code at the given `Path`.
 pub fn lint_path(
     path: &Path,
@@ -149,6 +151,9 @@ pub fn lint_path(
 
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;
+
+    // As an escape hatch, bail after 100 iterations.
+    let mut iterations = 0;
 
     // Continuously autofix until the source code stabilizes.
     let messages = loop {
@@ -177,13 +182,16 @@ pub fn lint_path(
         )?;
 
         // Apply autofix.
-        if matches!(autofix, fixer::Mode::Apply) {
+        if matches!(autofix, fixer::Mode::Apply) && iterations < MAX_ITERATIONS {
             if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
                 // Count the number of fixed errors.
                 fixed += applied;
 
                 // Store the fixed contents.
                 contents = fixed_contents.to_string();
+
+                // Increment the iteration count.
+                iterations += 1;
 
                 // Re-run the linter pass (by avoiding the break).
                 continue;
@@ -279,6 +287,9 @@ pub fn lint_stdin(
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;
 
+    // As an escape hatch, bail after 100 iterations.
+    let mut iterations = 0;
+
     let messages = loop {
         // Tokenize once.
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
@@ -305,13 +316,16 @@ pub fn lint_stdin(
         )?;
 
         // Apply autofix.
-        if matches!(autofix, fixer::Mode::Apply) {
+        if matches!(autofix, fixer::Mode::Apply) && iterations < MAX_ITERATIONS {
             if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
                 // Count the number of fixed errors.
                 fixed += applied;
 
                 // Store the fixed contents.
                 contents = fixed_contents.to_string();
+
+                // Increment the iteration count.
+                iterations += 1;
 
                 // Re-run the linter pass (by avoiding the break).
                 continue;
@@ -403,6 +417,7 @@ mod tests {
     #[test_case(CheckCode::B025, Path::new("B025.py"); "B025")]
     #[test_case(CheckCode::B026, Path::new("B026.py"); "B026")]
     #[test_case(CheckCode::B027, Path::new("B027.py"); "B027")]
+    #[test_case(CheckCode::B904, Path::new("B904.py"); "B904")]
     #[test_case(CheckCode::BLE001, Path::new("BLE.py"); "BLE001")]
     #[test_case(CheckCode::C400, Path::new("C400.py"); "C400")]
     #[test_case(CheckCode::C401, Path::new("C401.py"); "C401")]
@@ -491,6 +506,7 @@ mod tests {
     #[test_case(CheckCode::F405, Path::new("F405.py"); "F405")]
     #[test_case(CheckCode::F406, Path::new("F406.py"); "F406")]
     #[test_case(CheckCode::F407, Path::new("F407.py"); "F407")]
+    #[test_case(CheckCode::F521, Path::new("F521.py"); "F521")]
     #[test_case(CheckCode::F541, Path::new("F541.py"); "F541")]
     #[test_case(CheckCode::F601, Path::new("F601.py"); "F601")]
     #[test_case(CheckCode::F602, Path::new("F602.py"); "F602")]

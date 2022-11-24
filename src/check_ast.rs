@@ -6,6 +6,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_ast::Withitem;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -21,7 +22,7 @@ use crate::ast::types::{
     Binding, BindingContext, BindingKind, ClassScope, FunctionScope, ImportKind, Range, Scope,
     ScopeKind,
 };
-use crate::ast::visitor::{walk_excepthandler, Visitor};
+use crate::ast::visitor::{walk_excepthandler, walk_withitem, Visitor};
 use crate::ast::{helpers, operations, visitor};
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
@@ -77,6 +78,7 @@ pub struct Checker<'a> {
     in_deferred_string_annotation: bool,
     in_literal: bool,
     in_subscript: bool,
+    in_withitem: bool,
     seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
@@ -120,6 +122,7 @@ impl<'a> Checker<'a> {
             in_deferred_string_annotation: false,
             in_literal: false,
             in_subscript: false,
+            in_withitem: false,
             seen_import_boundary: false,
             futures_allowed: true,
             annotations_future_enabled: false,
@@ -1240,6 +1243,28 @@ where
                 args,
                 keywords,
             } => {
+                // pyflakes
+                if let ExprKind::Attribute { value, attr, .. } = &func.node {
+                    if let ExprKind::Constant {
+                        value: Constant::Str(value),
+                        ..
+                    } = &value.node
+                    {
+                        if attr == "format" {
+                            // "...".format(...) call
+                            if self.settings.enabled.contains(&CheckCode::F521) {
+                                let location = Range::from_located(expr);
+                                if let Some(check) =
+                                    pyflakes::checks::string_dot_format_invalid(value, location)
+                                {
+                                    self.add_check(check);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // pyupgrade
                 if self.settings.enabled.contains(&CheckCode::U005) {
                     pyupgrade::plugins::deprecated_unittest_alias(self, func);
                 }
@@ -1926,12 +1951,19 @@ where
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         match &excepthandler.node {
-            ExcepthandlerKind::ExceptHandler { type_, name, .. } => {
+            ExcepthandlerKind::ExceptHandler {
+                type_, name, body, ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::E722) && type_.is_none() {
                     self.add_check(Check::new(
                         CheckKind::DoNotUseBareExcept,
                         Range::from_located(excepthandler),
                     ));
+                }
+                if self.settings.enabled.contains(&CheckCode::B904) {
+                    {
+                        flake8_bugbear::plugins::raise_without_from_inside_except(self, body);
+                    }
                 }
                 match name {
                     Some(name) => {
@@ -2079,6 +2111,13 @@ where
         }
 
         self.check_builtin_arg_shadowing(&arg.node.arg, Range::from_located(arg));
+    }
+
+    fn visit_withitem(&mut self, withitem: &'b Withitem) {
+        let prev_in_withitem = self.in_withitem;
+        self.in_withitem = true;
+        walk_withitem(self, withitem);
+        self.in_withitem = prev_in_withitem;
     }
 }
 
@@ -2386,7 +2425,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        if operations::is_unpacking_assignment(parent) {
+        if self.in_withitem || operations::is_unpacking_assignment(parent) {
             self.add_binding(
                 id,
                 Binding {
