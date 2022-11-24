@@ -118,6 +118,54 @@ pub fn string_dot_format_extra_positional_arguments(
     }
 }
 
+// F524
+pub fn string_dot_format_missing_argument(
+    literal: &str,
+    args: &[Expr],
+    keywords: &[Keyword],
+    location: Range,
+) -> Option<Check> {
+    if has_star_args(args) || has_star_star_kwargs(keywords) {
+        return None;
+    }
+
+    let keywords: FxHashSet<_> = keywords
+        .iter()
+        .filter_map(|k| {
+            let KeywordData { arg, .. } = &k.node;
+            arg.clone()
+        })
+        .collect();
+
+    match FormatString::from_str(literal) {
+        Err(_) => None, // Cannot proceed - should be picked up by F521
+        Ok(format_string) => {
+            match FormatSummary::try_from(format_string) {
+                Err(_) => None, // Cannot proceed - should be picked up by F521
+                Ok(summary) => {
+                    let missing: Vec<String> = summary
+                        .autos
+                        .into_iter()
+                        .chain(summary.indexes.into_iter())
+                        .filter(|&i| i >= args.len())
+                        .map(|i| i.to_string())
+                        .chain(summary.keywords.difference(&keywords).cloned())
+                        .collect();
+
+                    if missing.is_empty() {
+                        None
+                    } else {
+                        Some(Check::new(
+                            CheckKind::StringDotFormatMissingArguments(missing),
+                            location,
+                        ))
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// F631
 pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {

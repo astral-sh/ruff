@@ -1281,6 +1281,16 @@ where
                                     self.add_check(check);
                                 }
                             }
+
+                            if self.settings.enabled.contains(&CheckCode::F524) {
+                                if let Some(check) =
+                                    pyflakes::checks::string_dot_format_missing_argument(
+                                        value, args, keywords, location,
+                                    )
+                                {
+                                    self.add_check(check);
+                                }
+                            }
                         }
                     }
                 }
