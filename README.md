@@ -56,6 +56,7 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    1. [pep8-naming (N)](#pep8-naming)
    1. [flake8-bandit (S)](#flake8-bandit)
    1. [flake8-comprehensions (C)](#flake8-comprehensions)
+   1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
    1. [flake8-bugbear (B)](#flake8-bugbear)
    1. [flake8-builtins (A)](#flake8-builtins)
    1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
@@ -64,7 +65,6 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    1. [flake8-annotations (ANN)](#flake8-annotations)
    1. [flake8-2020 (YTT)](#flake8-2020)
    1. [flake8-blind-except (BLE)](#flake8-blind-except)
-   1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
    1. [mccabe (C90)](#mccabe)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
    1. [Meta rules (M)](#meta-rules)
@@ -285,7 +285,7 @@ Exclusions are based on globs, and can be either:
 ### Ignoring errors
 
 To omit a lint check entirely, add it to the "ignore" list via `--ignore` or `--extend-ignore`,
-either  on the command-line or in your `project.toml` file.
+either on the command-line or in your `project.toml` file.
 
 To ignore an error in-line, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual error, add `# noqa: {code}` to the end of the line, like so:
