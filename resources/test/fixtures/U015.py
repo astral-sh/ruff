@@ -36,3 +36,35 @@ with open("foo", "U") as fa, open("bar", "U") as fb:
     pass
 with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
     pass
+
+open("foo", mode="U")
+open(name="foo", mode="U")
+open(mode="U", name="foo")
+
+with open("foo", mode="U") as f:
+    pass
+with open(name="foo", mode="U") as f:
+    pass
+with open(mode="U", name="foo") as f:
+    pass
+
+open("foo", mode="Ub")
+open(name="foo", mode="Ub")
+open(mode="Ub", name="foo")
+
+with open("foo", mode="Ub") as f:
+    pass
+with open(name="foo", mode="Ub") as f:
+    pass
+with open(mode="Ub", name="foo") as f:
+    pass
+
+open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
