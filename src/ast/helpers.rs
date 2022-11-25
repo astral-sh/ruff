@@ -37,7 +37,7 @@ pub fn compose_call_path<'a, E: nodes::Expr>(expr: &'a E) -> Option<String> {
 
 /// Convert an `Expr` to its call path segments (like ["typing", "List"]).
 #[inline(always)]
-pub fn collect_call_paths<'a, E: nodes::Expr>(expr: &'a E) -> Vec<&str> {
+pub fn collect_call_paths<'a, E: nodes::Expr>(expr: &'a E) -> Vec<&'a str> {
     let mut segments = vec![];
     collect_call_path_inner(expr, &mut segments);
     segments
