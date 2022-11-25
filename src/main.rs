@@ -26,7 +26,6 @@ use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::settings::configuration::Configuration;
-use ::ruff::settings::user::UserConfiguration;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
@@ -61,10 +60,9 @@ fn show_settings(
     project_root: Option<PathBuf>,
     pyproject: Option<PathBuf>,
 ) {
-    println!(
-        "{:#?}",
-        UserConfiguration::from_configuration(configuration, project_root, pyproject)
-    );
+    println!("Resolved configuration: {configuration:#?}");
+    println!("Found project root at: {project_root:?}");
+    println!("Found pyproject.toml at: {pyproject:?}");
 }
 
 #[derive(Serialize)]
