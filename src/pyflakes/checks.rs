@@ -35,10 +35,13 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 
     let keywords = keywords.iter().filter_map(|k| {
         let KeywordData { arg, .. } = &k.node;
-        arg.clone()
+        arg.as_ref()
     });
 
-    let missing: Vec<String> = keywords.filter(|k| !summary.keywords.contains(k)).collect();
+    let missing: Vec<String> = keywords
+        .filter(|&k| !summary.keywords.contains(k))
+        .cloned()
+        .collect();
 
     if missing.is_empty() {
         None
@@ -90,7 +93,7 @@ pub(crate) fn string_dot_format_missing_argument(
         .iter()
         .filter_map(|k| {
             let KeywordData { arg, .. } = &k.node;
-            arg.clone()
+            arg.as_ref()
         })
         .collect();
 
@@ -100,7 +103,13 @@ pub(crate) fn string_dot_format_missing_argument(
         .chain(summary.indexes.iter())
         .filter(|&&i| i >= args.len())
         .map(ToString::to_string)
-        .chain(summary.keywords.difference(&keywords).cloned())
+        .chain(
+            summary
+                .keywords
+                .iter()
+                .filter(|k| !keywords.contains(k))
+                .cloned(),
+        )
         .collect();
 
     if missing.is_empty() {
