@@ -8,9 +8,6 @@
 "{foo..}".format(foo=1)
 "{foo..bar}".format(foo=1)
 
-# "{} {1}".format(1, 2)  # F525
-# "{0} {}".format(1, 2)  # F525
-
 # The following are all "good" uses of .format
 "{.__class__}".format("")
 "{foo[bar]}".format(foo={"bar": "barv"})
