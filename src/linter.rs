@@ -413,6 +413,7 @@ mod tests {
     #[test_case(CheckCode::B020, Path::new("B020.py"); "B020")]
     #[test_case(CheckCode::B021, Path::new("B021.py"); "B021")]
     #[test_case(CheckCode::B022, Path::new("B022.py"); "B022")]
+    #[test_case(CheckCode::B023, Path::new("B023.py"); "B023")]
     #[test_case(CheckCode::B024, Path::new("B024.py"); "B024")]
     #[test_case(CheckCode::B025, Path::new("B025.py"); "B025")]
     #[test_case(CheckCode::B026, Path::new("B026.py"); "B026")]

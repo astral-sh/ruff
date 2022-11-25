@@ -1,7 +1,9 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, Stmt, StmtKind};
+use rustpython_ast::{
+    Arguments, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, Stmt, StmtKind,
+};
 
 use crate::ast::types::Range;
 use crate::SourceCodeLocator;
@@ -211,6 +213,27 @@ pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<Vec<&str>> {
         }
     }
     handler_names
+}
+
+/// Return the set of all bound argument names.
+pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
+    let mut arg_names: FxHashSet<&'a str> = FxHashSet::default();
+    for arg in &arguments.posonlyargs {
+        arg_names.insert(arg.node.arg.as_str());
+    }
+    for arg in &arguments.args {
+        arg_names.insert(arg.node.arg.as_str());
+    }
+    if let Some(arg) = &arguments.vararg {
+        arg_names.insert(arg.node.arg.as_str());
+    }
+    for arg in &arguments.kwonlyargs {
+        arg_names.insert(arg.node.arg.as_str());
+    }
+    if let Some(arg) = &arguments.kwarg {
+        arg_names.insert(arg.node.arg.as_str());
+    }
+    arg_names
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
