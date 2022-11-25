@@ -11,7 +11,7 @@ use crate::{Configuration, Settings};
 
 /// Print the user-facing configuration settings.
 pub fn show_settings(
-    configuration: Configuration,
+    configuration: &Configuration,
     project_root: Option<&PathBuf>,
     pyproject: Option<&PathBuf>,
 ) {

@@ -266,7 +266,7 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::FAILURE);
     }
     if cli.show_settings {
-        commands::show_settings(configuration, project_root.as_ref(), pyproject.as_ref());
+        commands::show_settings(&configuration, project_root.as_ref(), pyproject.as_ref());
         return Ok(ExitCode::SUCCESS);
     }
 
