@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use log::error;
-use rustpython_ast::{Constant, Expr, ExprKind, KeywordData, Located, Location};
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword, KeywordData, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
@@ -57,7 +57,7 @@ impl OpenMode {
     }
 }
 
-fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Located<KeywordData>>) {
+fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
     if let ExprKind::Call {
         func,
         args,
@@ -149,45 +149,41 @@ fn create_remove_param_fix(
 
 /// U015
 pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
-    let (mode_param, keywords): (Option<&Expr>, Vec<Located<KeywordData>>) = match_open(expr);
+    let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);
     if mode_param.is_none() && !keywords.is_empty() {
-        for keyword in keywords {
+        if let Some(value) = keywords.iter().find_map(|keyword| {
             let KeywordData { arg, value } = &keyword.node;
             if arg
                 .as_ref()
                 .map(|arg| arg == MODE_KEYWORD_ARGUMENT)
                 .unwrap_or_default()
             {
-                if let Located {
-                    node:
-                        ExprKind::Constant {
-                            value: Constant::Str(mode_param_value),
-                            ..
-                        },
-                    ..
-                } = &**value
-                {
-                    if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                        checker.add_check(create_check(
-                            expr,
-                            value,
-                            mode.replacement_value(),
-                            checker.locator,
-                            checker.patch(&CheckCode::U015),
-                        ));
-                    }
+                Some(value)
+            } else {
+                None
+            }
+        }) {
+            if let ExprKind::Constant {
+                value: Constant::Str(mode_param_value),
+                ..
+            } = &value.node
+            {
+                if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
+                    checker.add_check(create_check(
+                        expr,
+                        value,
+                        mode.replacement_value(),
+                        checker.locator,
+                        checker.patch(&CheckCode::U015),
+                    ));
                 }
             }
         }
     } else if let Some(mode_param) = mode_param {
-        if let Located {
-            node:
-                ExprKind::Constant {
-                    value: Constant::Str(mode_param_value),
-                    ..
-                },
+        if let ExprKind::Constant {
+            value: Constant::Str(mode_param_value),
             ..
-        } = mode_param
+        } = &mode_param.node
         {
             if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
                 checker.add_check(create_check(
