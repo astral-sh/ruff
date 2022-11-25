@@ -53,6 +53,10 @@ pub enum CheckCode {
     F406,
     F407,
     F521,
+    F522,
+    F523,
+    F524,
+    F525,
     F541,
     F601,
     F602,
@@ -404,7 +408,11 @@ pub enum CheckKind {
     MultiValueRepeatedKeyVariable(String),
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    StringDotFormatExtraNamedArguments(Vec<String>),
+    StringDotFormatExtraPositionalArguments(Vec<String>),
     StringDotFormatInvalidFormat(String),
+    StringDotFormatMissingArguments(Vec<String>),
+    StringDotFormatMixingAutomatic,
     TwoStarredExpressions,
     UndefinedExport(String),
     UndefinedLocal(String),
@@ -649,6 +657,14 @@ impl CheckCode {
             CheckCode::F406 => CheckKind::ImportStarNotPermitted("...".to_string()),
             CheckCode::F407 => CheckKind::FutureFeatureNotDefined("...".to_string()),
             CheckCode::F521 => CheckKind::StringDotFormatInvalidFormat("...".to_string()),
+            CheckCode::F522 => {
+                CheckKind::StringDotFormatExtraNamedArguments(vec!["...".to_string()])
+            }
+            CheckCode::F523 => {
+                CheckKind::StringDotFormatExtraPositionalArguments(vec!["...".to_string()])
+            }
+            CheckCode::F524 => CheckKind::StringDotFormatMissingArguments(vec!["...".to_string()]),
+            CheckCode::F525 => CheckKind::StringDotFormatMixingAutomatic,
             CheckCode::F541 => CheckKind::FStringMissingPlaceholders,
             CheckCode::F601 => CheckKind::MultiValueRepeatedKeyLiteral,
             CheckCode::F602 => CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
@@ -916,6 +932,10 @@ impl CheckCode {
             CheckCode::F406 => CheckCategory::Pyflakes,
             CheckCode::F407 => CheckCategory::Pyflakes,
             CheckCode::F521 => CheckCategory::Pyflakes,
+            CheckCode::F522 => CheckCategory::Pyflakes,
+            CheckCode::F523 => CheckCategory::Pyflakes,
+            CheckCode::F524 => CheckCategory::Pyflakes,
+            CheckCode::F525 => CheckCategory::Pyflakes,
             CheckCode::F541 => CheckCategory::Pyflakes,
             CheckCode::F601 => CheckCategory::Pyflakes,
             CheckCode::F602 => CheckCategory::Pyflakes,
@@ -1140,7 +1160,11 @@ impl CheckKind {
             CheckKind::NotIsTest => &CheckCode::E714,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::StringDotFormatExtraNamedArguments(_) => &CheckCode::F522,
+            CheckKind::StringDotFormatExtraPositionalArguments(_) => &CheckCode::F523,
             CheckKind::StringDotFormatInvalidFormat(_) => &CheckCode::F521,
+            CheckKind::StringDotFormatMissingArguments(_) => &CheckCode::F524,
+            CheckKind::StringDotFormatMixingAutomatic => &CheckCode::F525,
             CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::ExpressionsInStarAssignment => &CheckCode::F621,
             CheckKind::TrueFalseComparison(..) => &CheckCode::E712,
@@ -1427,8 +1451,23 @@ impl CheckKind {
             CheckKind::ReturnOutsideFunction => {
                 "`return` statement outside of a function/method".to_string()
             }
+            CheckKind::StringDotFormatExtraNamedArguments(missing) => {
+                let message = missing.join(", ");
+                format!("'...'.format(...) has unused named argument(s): {message}")
+            }
+            CheckKind::StringDotFormatExtraPositionalArguments(missing) => {
+                let message = missing.join(", ");
+                format!("'...'.format(...) has unused arguments at position(s): {message}")
+            }
             CheckKind::StringDotFormatInvalidFormat(message) => {
                 format!("'...'.format(...) has invalid format string: {message}")
+            }
+            CheckKind::StringDotFormatMissingArguments(missing) => {
+                let message = missing.join(", ");
+                format!("'...'.format(...) is missing argument(s) for placeholder(s): {message}")
+            }
+            CheckKind::StringDotFormatMixingAutomatic => {
+                "'...'.format(...) mixes automatic and manual numbering".to_string()
             }
             CheckKind::SyntaxError(message) => format!("SyntaxError: {message}"),
             CheckKind::ExpressionsInStarAssignment => {
