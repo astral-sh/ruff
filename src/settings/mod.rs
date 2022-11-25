@@ -25,7 +25,6 @@ pub mod configuration;
 pub mod options;
 pub mod pyproject;
 pub mod types;
-pub mod user;
 
 #[derive(Debug)]
 pub struct Settings {
