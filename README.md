@@ -351,6 +351,10 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |  |
 | F407 | FutureFeatureNotDefined | Future feature `...` is not defined |  |
 | F521 | StringDotFormatInvalidFormat | '...'.format(...) has invalid format string: ... |  |
+| F522 | StringDotFormatExtraNamedArguments | '...'.format(...) has unused named argument(s): ... |  |
+| F523 | StringDotFormatExtraPositionalArguments | '...'.format(...) has unused arguments at position(s): ... |  |
+| F524 | StringDotFormatMissingArguments | '...'.format(...) is missing argument(s) for placeholder(s): ... |  |
+| F525 | StringDotFormatMixingAutomatic | '...'.format(...) mixes automatic and manual numbering |  |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders |  |
 | F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |  |
 | F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |  |
@@ -807,7 +811,7 @@ automatically convert your existing configuration.)
 Ruff can be used as a (near) drop-in replacement for Flake8 when used (1) without or with a small
 number of plugins, (2) alongside Black, and (3) on Python 3 code.
 
-Under those conditions Ruff is missing 14 rules related to string `.format` calls, 1 rule related
+Under those conditions Ruff is missing 9 rules related to `%` string formatting, 1 rule related
 to docstring parsing, and 1 rule related to redefined variables.
 
 Ruff re-implements some of the most popular Flake8 plugins and related code quality tools natively,
