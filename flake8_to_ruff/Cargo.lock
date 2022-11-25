@@ -1265,7 +1265,7 @@ checksum = "fc7fcc620a3bff7cdd7a365be3376c97191aeaccc2a603e600951e452615bf89"
 [[package]]
 name = "libcst"
 version = "0.1.0"
-source = "git+https://github.com/charliermarsh/LibCST?rev=a13ec97dd4eb925bde4d426c6e422582793b260c#a13ec97dd4eb925bde4d426c6e422582793b260c"
+source = "git+https://github.com/charliermarsh/LibCST?rev=f2f0b7a487a8725d161fe8b3ed73a6758b21e177#f2f0b7a487a8725d161fe8b3ed73a6758b21e177"
 dependencies = [
  "chic",
  "itertools",
@@ -1280,7 +1280,7 @@ dependencies = [
 [[package]]
 name = "libcst_derive"
 version = "0.1.0"
-source = "git+https://github.com/charliermarsh/LibCST?rev=a13ec97dd4eb925bde4d426c6e422582793b260c#a13ec97dd4eb925bde4d426c6e422582793b260c"
+source = "git+https://github.com/charliermarsh/LibCST?rev=f2f0b7a487a8725d161fe8b3ed73a6758b21e177#f2f0b7a487a8725d161fe8b3ed73a6758b21e177"
 dependencies = [
  "quote",
  "syn",

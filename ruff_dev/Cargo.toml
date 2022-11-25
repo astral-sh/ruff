@@ -8,7 +8,7 @@ anyhow = { version = "1.0.66" }
 clap = { version = "4.0.1", features = ["derive"] }
 codegen = { version = "0.2.0" }
 itertools = { version = "0.10.5" }
-libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "a13ec97dd4eb925bde4d426c6e422582793b260c" }
+libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a8725d161fe8b3ed73a6758b21e177" }
 ruff = { path = ".." }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "f885db8c61514f069979861f6b3bd83292086231" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "f885db8c61514f069979861f6b3bd83292086231" }
