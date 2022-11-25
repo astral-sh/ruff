@@ -46,25 +46,25 @@ pub struct Configuration {
 
 static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     vec![
-        FilePattern::Simple(".bzr"),
-        FilePattern::Simple(".direnv"),
-        FilePattern::Simple(".eggs"),
-        FilePattern::Simple(".git"),
-        FilePattern::Simple(".hg"),
-        FilePattern::Simple(".mypy_cache"),
-        FilePattern::Simple(".nox"),
-        FilePattern::Simple(".pants.d"),
-        FilePattern::Simple(".ruff_cache"),
-        FilePattern::Simple(".svn"),
-        FilePattern::Simple(".tox"),
-        FilePattern::Simple(".venv"),
-        FilePattern::Simple("__pypackages__"),
-        FilePattern::Simple("_build"),
-        FilePattern::Simple("buck-out"),
-        FilePattern::Simple("build"),
-        FilePattern::Simple("dist"),
-        FilePattern::Simple("node_modules"),
-        FilePattern::Simple("venv"),
+        FilePattern::Builtin(".bzr"),
+        FilePattern::Builtin(".direnv"),
+        FilePattern::Builtin(".eggs"),
+        FilePattern::Builtin(".git"),
+        FilePattern::Builtin(".hg"),
+        FilePattern::Builtin(".mypy_cache"),
+        FilePattern::Builtin(".nox"),
+        FilePattern::Builtin(".pants.d"),
+        FilePattern::Builtin(".ruff_cache"),
+        FilePattern::Builtin(".svn"),
+        FilePattern::Builtin(".tox"),
+        FilePattern::Builtin(".venv"),
+        FilePattern::Builtin("__pypackages__"),
+        FilePattern::Builtin("_build"),
+        FilePattern::Builtin("buck-out"),
+        FilePattern::Builtin("build"),
+        FilePattern::Builtin("dist"),
+        FilePattern::Builtin("node_modules"),
+        FilePattern::Builtin("venv"),
     ]
 });
 
@@ -103,22 +103,14 @@ impl Configuration {
                 },
             ),
             target_version: options.target_version.unwrap_or(PythonVersion::Py310),
-            exclude: options
-                .exclude
-                .map(|paths| {
-                    paths
-                        .iter()
-                        .map(|path| FilePattern::from_user(path, project_root))
-                        .collect()
-                })
-                .transpose()?
-                .unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
+            exclude: options.exclude.map_or_else(
+                || DEFAULT_EXCLUDE.clone(),
+                |paths| paths.into_iter().map(FilePattern::User).collect(),
+            ),
             extend_exclude: options
                 .extend_exclude
-                .unwrap_or_default()
-                .iter()
-                .map(|path| FilePattern::from_user(path, project_root))
-                .collect::<Result<_>>()?,
+                .map(|paths| paths.into_iter().map(FilePattern::User).collect())
+                .unwrap_or_default(),
             extend_ignore: options.extend_ignore.unwrap_or_default(),
             select: options
                 .select
@@ -154,13 +146,10 @@ impl Configuration {
                 .per_file_ignores
                 .map(|per_file_ignores| {
                     per_file_ignores
-                        .iter()
-                        .map(|(pattern, prefixes)| {
-                            PerFileIgnore::new(pattern, prefixes, project_root)
-                        })
+                        .into_iter()
+                        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes))
                         .collect()
                 })
-                .transpose()?
                 .unwrap_or_default(),
             show_source: options.show_source.unwrap_or_default(),
             // Plugins

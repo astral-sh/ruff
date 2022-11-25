@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
 use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
@@ -9,7 +8,7 @@ use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
 use crate::logging::LogLevel;
 use crate::printer::SerializationFormat;
-use crate::settings::types::{PatternPrefixPair, PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion};
 
 #[derive(Debug, Parser)]
 #[command(author, about = "Ruff: An extremely fast Python linter.")]
@@ -61,11 +60,11 @@ pub struct Cli {
     pub extend_ignore: Vec<CheckCodePrefix>,
     /// List of paths, used to exclude files and/or directories from checks.
     #[arg(long, value_delimiter = ',')]
-    pub exclude: Vec<String>,
+    pub exclude: Vec<FilePattern>,
     /// Like --exclude, but adds additional files and directories on top of the
     /// excluded ones.
     #[arg(long, value_delimiter = ',')]
-    pub extend_exclude: Vec<String>,
+    pub extend_exclude: Vec<FilePattern>,
     /// List of error codes to treat as eligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
     #[arg(long, value_delimiter = ',')]
@@ -78,7 +77,7 @@ pub struct Cli {
     #[arg(long, value_delimiter = ',')]
     pub per_file_ignores: Vec<PatternPrefixPair>,
     /// Output serialization format for error messages.
-    #[arg(long, value_enum, default_value_t=SerializationFormat::Text)]
+    #[arg(long, value_enum, default_value_t = SerializationFormat::Text)]
     pub format: SerializationFormat,
     /// Show violations with source code.
     #[arg(long)]
@@ -149,10 +148,7 @@ pub fn extract_log_level(cli: &Cli) -> LogLevel {
 }
 
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
-pub fn collect_per_file_ignores(
-    pairs: Vec<PatternPrefixPair>,
-    project_root: Option<&PathBuf>,
-) -> Result<Vec<PerFileIgnore>> {
+pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgnore> {
     let mut per_file_ignores: FxHashMap<String, Vec<CheckCodePrefix>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
@@ -161,7 +157,7 @@ pub fn collect_per_file_ignores(
             .push(pair.prefix);
     }
     per_file_ignores
-        .iter()
-        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, prefixes, project_root))
+        .into_iter()
+        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes))
         .collect()
 }
