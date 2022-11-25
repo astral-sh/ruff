@@ -1244,61 +1244,73 @@ where
                 keywords,
             } => {
                 // pyflakes
-                if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                    if let ExprKind::Constant {
-                        value: Constant::Str(value),
-                        ..
-                    } = &value.node
-                    {
-                        if attr == "format" {
-                            // "...".format(...) call
-                            let location = Range::from_located(expr);
+                if self.settings.enabled.contains(&CheckCode::F521)
+                    || self.settings.enabled.contains(&CheckCode::F522)
+                    || self.settings.enabled.contains(&CheckCode::F523)
+                    || self.settings.enabled.contains(&CheckCode::F524)
+                    || self.settings.enabled.contains(&CheckCode::F525)
+                {
+                    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+                        if let ExprKind::Constant {
+                            value: Constant::Str(value),
+                            ..
+                        } = &value.node
+                        {
+                            if attr == "format" {
+                                // "...".format(...) call
+                                let location = Range::from_located(expr);
+                                match pyflakes::format::FormatSummary::try_from(value.as_ref()) {
+                                    Err(e) => {
+                                        if self.settings.enabled.contains(&CheckCode::F521) {
+                                            self.add_check(Check::new(
+                                                CheckKind::StringDotFormatInvalidFormat(
+                                                    e.to_string(),
+                                                ),
+                                                location,
+                                            ));
+                                        }
+                                    }
+                                    Ok(summary) => {
+                                        if self.settings.enabled.contains(&CheckCode::F522) {
+                                            if let Some(check) =
+                                                pyflakes::checks::string_dot_format_extra_named_arguments(
+                                                    &summary, keywords, location,
+                                                )
+                                            {
+                                                self.add_check(check);
+                                            }
+                                        }
 
-                            if self.settings.enabled.contains(&CheckCode::F521) {
-                                if let Some(check) =
-                                    pyflakes::checks::string_dot_format_invalid(value, location)
-                                {
-                                    self.add_check(check);
-                                }
-                            }
+                                        if self.settings.enabled.contains(&CheckCode::F523) {
+                                            if let Some(check) =
+                                                pyflakes::checks::string_dot_format_extra_positional_arguments(
+                                                    &summary, args, location,
+                                                )
+                                            {
+                                                self.add_check(check);
+                                            }
+                                        }
 
-                            if self.settings.enabled.contains(&CheckCode::F522) {
-                                if let Some(check) =
-                                    pyflakes::checks::string_dot_format_extra_named_arguments(
-                                        value, keywords, location,
-                                    )
-                                {
-                                    self.add_check(check);
-                                }
-                            }
+                                        if self.settings.enabled.contains(&CheckCode::F524) {
+                                            if let Some(check) =
+                                                pyflakes::checks::string_dot_format_missing_argument(
+                                                    &summary, args, keywords, location,
+                                                )
+                                            {
+                                                self.add_check(check);
+                                            }
+                                        }
 
-                            if self.settings.enabled.contains(&CheckCode::F523) {
-                                if let Some(check) =
-                                    pyflakes::checks::string_dot_format_extra_positional_arguments(
-                                        value, args, location,
-                                    )
-                                {
-                                    self.add_check(check);
-                                }
-                            }
-
-                            if self.settings.enabled.contains(&CheckCode::F524) {
-                                if let Some(check) =
-                                    pyflakes::checks::string_dot_format_missing_argument(
-                                        value, args, keywords, location,
-                                    )
-                                {
-                                    self.add_check(check);
-                                }
-                            }
-
-                            if self.settings.enabled.contains(&CheckCode::F525) {
-                                if let Some(check) =
-                                    pyflakes::checks::string_dot_format_mixing_automatic(
-                                        value, location,
-                                    )
-                                {
-                                    self.add_check(check);
+                                        if self.settings.enabled.contains(&CheckCode::F525) {
+                                            if let Some(check) =
+                                                pyflakes::checks::string_dot_format_mixing_automatic(
+                                                    &summary, location,
+                                                )
+                                            {
+                                                self.add_check(check);
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
