@@ -1,12 +1,18 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Expr, Keyword};
+use rustpython_ast::{Expr, Keyword, Stmt};
 use rustpython_parser::ast::{Located, Location};
 
 fn id() -> usize {
     static COUNTER: AtomicUsize = AtomicUsize::new(1);
     COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+#[derive(Clone)]
+pub enum Node<'a> {
+    Stmt(&'a Stmt),
+    Expr(&'a Expr),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
