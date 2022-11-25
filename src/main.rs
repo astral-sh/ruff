@@ -26,7 +26,6 @@ use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
 use ::ruff::settings::configuration::Configuration;
-use ::ruff::settings::types::create_glob;
 use ::ruff::settings::user::UserConfiguration;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
@@ -266,49 +265,16 @@ fn inner_main() -> Result<ExitCode> {
     };
 
     // Reconcile configuration from pyproject.toml and command-line arguments.
-    let exclude: globset::GlobSet = {
-        let mut ret = globset::GlobSetBuilder::new();
-        for path in cli.exclude {
-            match create_glob(&path, project_root.as_ref())? {
-                (absolute, Some(basepath)) => {
-                    ret.add(absolute);
-                    ret.add(basepath);
-                }
-                (absolute, None) => {
-                    ret.add(absolute);
-                }
-            }
-        }
-        ret.build()?
-    };
-    let extend_exclude = {
-        let mut ret = globset::GlobSetBuilder::new();
-
-        for path in cli.extend_exclude {
-            match create_glob(&path, project_root.as_ref())? {
-                (absolute, Some(basepath)) => {
-                    ret.add(absolute);
-                    ret.add(basepath);
-                }
-                (absolute, None) => {
-                    ret.add(absolute);
-                }
-            }
-        }
-        ret.build()?
-    };
-
     let mut configuration =
         Configuration::from_pyproject(pyproject.as_ref(), project_root.as_ref())?;
-    if !exclude.is_empty() {
-        configuration.exclude = exclude;
+    if !cli.exclude.is_empty() {
+        configuration.exclude = cli.exclude;
     }
-    if !extend_exclude.is_empty() {
-        configuration.extend_exclude = extend_exclude;
+    if !cli.extend_exclude.is_empty() {
+        configuration.extend_exclude = cli.extend_exclude;
     }
     if !cli.per_file_ignores.is_empty() {
-        configuration.per_file_ignores =
-            collect_per_file_ignores(cli.per_file_ignores, project_root.as_ref())?;
+        configuration.per_file_ignores = collect_per_file_ignores(cli.per_file_ignores);
     }
     if !cli.select.is_empty() {
         configuration.select = cli.select;
@@ -363,7 +329,7 @@ fn inner_main() -> Result<ExitCode> {
 
     // Extract settings for internal use.
     let fix_enabled: bool = configuration.fix;
-    let settings = Settings::from_configuration(configuration);
+    let settings = Settings::from_configuration(configuration, project_root.as_ref())?;
 
     if cli.show_files {
         show_files(&cli.files, &settings);

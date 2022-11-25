@@ -11,7 +11,7 @@ use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::pyproject::load_options;
-use crate::settings::types::{create_glob, PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
     pep8_naming,
@@ -20,8 +20,8 @@ use crate::{
 #[derive(Debug)]
 pub struct Configuration {
     pub dummy_variable_rgx: Regex,
-    pub exclude: globset::GlobSet,
-    pub extend_exclude: globset::GlobSet,
+    pub exclude: Vec<FilePattern>,
+    pub extend_exclude: Vec<FilePattern>,
     pub extend_ignore: Vec<CheckCodePrefix>,
     pub extend_select: Vec<CheckCodePrefix>,
     pub fix: bool,
@@ -42,89 +42,29 @@ pub struct Configuration {
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
-    // Display Info
-    pub exclude_globs: Vec<(globset::Glob, Option<globset::Glob>)>,
-    pub extend_exclude_globs: Vec<(globset::Glob, Option<globset::Glob>)>,
 }
 
-static DEFAULT_EXCLUDE: Lazy<Vec<(globset::Glob, Option<globset::Glob>)>> = Lazy::new(|| {
+static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     vec![
-        (
-            globset::Glob::new(".bzr").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".direnv").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".eggs").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".git").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".hg").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".mypy_cache").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".nox").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".pants.d").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".ruff_cache").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".svn").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".tox").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new(".venv").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new("__pypackages__").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new("_build").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new("buck-out").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new("build").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new("dist").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new("node_modules").expect("Failed to build Glob"),
-            None,
-        ),
-        (
-            globset::Glob::new("venv").expect("Failed to build Glob"),
-            None,
-        ),
+        FilePattern::Builtin(".bzr"),
+        FilePattern::Builtin(".direnv"),
+        FilePattern::Builtin(".eggs"),
+        FilePattern::Builtin(".git"),
+        FilePattern::Builtin(".hg"),
+        FilePattern::Builtin(".mypy_cache"),
+        FilePattern::Builtin(".nox"),
+        FilePattern::Builtin(".pants.d"),
+        FilePattern::Builtin(".ruff_cache"),
+        FilePattern::Builtin(".svn"),
+        FilePattern::Builtin(".tox"),
+        FilePattern::Builtin(".venv"),
+        FilePattern::Builtin("__pypackages__"),
+        FilePattern::Builtin("_build"),
+        FilePattern::Builtin("buck-out"),
+        FilePattern::Builtin("build"),
+        FilePattern::Builtin("dist"),
+        FilePattern::Builtin("node_modules"),
+        FilePattern::Builtin("venv"),
     ]
 });
 
@@ -137,48 +77,6 @@ impl Configuration {
         project_root: Option<&PathBuf>,
     ) -> Result<Self> {
         let options = load_options(pyproject)?;
-
-        let local_to_glob =
-            |path: String| create_glob(&path, project_root).expect("Failed to build Glob");
-
-        let unfurl = |mut vec: Vec<globset::Glob>,
-                      item: &(globset::Glob, Option<globset::Glob>)| {
-            vec.push(item.0.clone());
-            if let Some(glob) = item.1.clone() {
-                vec.push(glob);
-            };
-            vec
-        };
-
-        let exclude = {
-            let mut builder = globset::GlobSetBuilder::new();
-
-            let paths = options.exclude.map_or_else(
-                || DEFAULT_EXCLUDE.clone(),
-                |paths| paths.into_iter().map(local_to_glob).collect(),
-            );
-
-            for path in paths.iter().fold(vec![], unfurl) {
-                builder.add(path.clone());
-            }
-            (builder.build()?, paths)
-        };
-
-        let extend_exclude = {
-            let mut builder = globset::GlobSetBuilder::new();
-            let paths: Vec<(globset::Glob, Option<globset::Glob>)> = options
-                .extend_exclude
-                .unwrap_or_default()
-                .into_iter()
-                .map(local_to_glob)
-                .collect();
-
-            for path in &paths.iter().fold(vec![], unfurl) {
-                builder.add(path.clone());
-            }
-            (builder.build()?, paths)
-        };
-
         Ok(Configuration {
             dummy_variable_rgx: match options.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
@@ -205,10 +103,14 @@ impl Configuration {
                 },
             ),
             target_version: options.target_version.unwrap_or(PythonVersion::Py310),
-            exclude: exclude.0,
-            extend_exclude: extend_exclude.0,
-            exclude_globs: exclude.1,
-            extend_exclude_globs: extend_exclude.1,
+            exclude: options.exclude.map_or_else(
+                || DEFAULT_EXCLUDE.clone(),
+                |paths| paths.into_iter().map(FilePattern::User).collect(),
+            ),
+            extend_exclude: options
+                .extend_exclude
+                .map(|paths| paths.into_iter().map(FilePattern::User).collect())
+                .unwrap_or_default(),
             extend_ignore: options.extend_ignore.unwrap_or_default(),
             select: options
                 .select
@@ -244,13 +146,10 @@ impl Configuration {
                 .per_file_ignores
                 .map(|per_file_ignores| {
                     per_file_ignores
-                        .iter()
-                        .map(|(pattern, prefixes)| {
-                            PerFileIgnore::new(pattern, prefixes, project_root)
-                        })
+                        .into_iter()
+                        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes))
                         .collect()
                 })
-                .transpose()?
                 .unwrap_or_default(),
             show_source: options.show_source.unwrap_or_default(),
             // Plugins

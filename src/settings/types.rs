@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use globset::Glob;
+use globset::{Glob, GlobSetBuilder};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::checks::CheckCode;
@@ -44,42 +44,59 @@ impl FromStr for PythonVersion {
     }
 }
 
-pub fn create_glob(
-    pattern: &str,
-    project_root: Option<&PathBuf>,
-) -> std::result::Result<(Glob, Option<Glob>), globset::Error> {
-    let path = Path::new(pattern);
-    let absolute_path = match project_root {
-        Some(project_root) => fs::normalize_path_to(path, project_root),
-        None => fs::normalize_path(path),
-    };
-    let absolute = Glob::new(&absolute_path.to_string_lossy())?;
+#[derive(Debug, Clone)]
+pub enum FilePattern {
+    Builtin(&'static str),
+    User(String),
+}
 
-    let basepath = {
-        if pattern.contains(std::path::MAIN_SEPARATOR) {
-            None
-        } else {
-            Some(Glob::new(pattern)?)
+impl FilePattern {
+    pub fn add_to(
+        self,
+        builder: &mut GlobSetBuilder,
+        project_root: Option<&PathBuf>,
+    ) -> Result<()> {
+        match self {
+            FilePattern::Builtin(pattern) => {
+                builder.add(Glob::from_str(pattern)?);
+            }
+            FilePattern::User(pattern) => {
+                // Add absolute path.
+                let path = Path::new(&pattern);
+                let absolute_path = match project_root {
+                    Some(project_root) => fs::normalize_path_to(path, project_root),
+                    None => fs::normalize_path(path),
+                };
+                builder.add(Glob::new(&absolute_path.to_string_lossy())?);
+
+                // Add basename path.
+                if !pattern.contains(std::path::MAIN_SEPARATOR) {
+                    builder.add(Glob::from_str(&pattern)?);
+                }
+            }
         }
-    };
-    Ok((absolute, basepath))
+        Ok(())
+    }
+}
+
+impl FromStr for FilePattern {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::User(s.into()))
+    }
 }
 
 #[derive(Debug, Clone, Hash)]
 pub struct PerFileIgnore {
-    pub pattern: (Glob, Option<Glob>),
+    pub pattern: String,
     pub codes: BTreeSet<CheckCode>,
 }
 
 impl PerFileIgnore {
-    pub fn new(
-        pattern: &str,
-        prefixes: &[CheckCodePrefix],
-        project_root: Option<&PathBuf>,
-    ) -> Result<Self> {
-        let pattern = create_glob(pattern, project_root)?;
+    pub fn new(pattern: String, prefixes: &[CheckCodePrefix]) -> Self {
         let codes = prefixes.iter().flat_map(CheckCodePrefix::codes).collect();
-        Ok(Self { pattern, codes })
+        Self { pattern, codes }
     }
 }
 
@@ -111,9 +128,9 @@ impl<'de> Deserialize<'de> for PatternPrefixPair {
 impl FromStr for PatternPrefixPair {
     type Err = anyhow::Error;
 
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (pattern_str, code_string) = {
-            let tokens = string.split(':').collect::<Vec<_>>();
+            let tokens = s.split(':').collect::<Vec<_>>();
             if tokens.len() != 2 {
                 return Err(anyhow!("Expected {}", Self::EXPECTED_PATTERN));
             }

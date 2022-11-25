@@ -87,10 +87,10 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         None => debug!("Unable to find pyproject.toml; using default settings..."),
     };
 
-    let settings = Settings::from_configuration(Configuration::from_pyproject(
-        pyproject.as_ref(),
+    let settings = Settings::from_configuration(
+        Configuration::from_pyproject(pyproject.as_ref(), project_root.as_ref())?,
         project_root.as_ref(),
-    )?);
+    )?;
 
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);

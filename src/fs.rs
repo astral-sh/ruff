@@ -1,16 +1,16 @@
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use globset::GlobMatcher;
 use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
-use rustc_hash::FxHashSet;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::checks::CheckCode;
-use crate::settings::types::PerFileIgnore;
 
 /// Extract the absolute path and basename (as strings) from a Path.
 fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -83,24 +83,15 @@ pub fn iter_python_files<'a>(
 /// Create tree set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path<'a>(
     path: &Path,
-    pattern_code_pairs: &'a [PerFileIgnore],
-) -> Result<FxHashSet<&'a CheckCode>> {
+    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)],
+) -> Result<BTreeSet<&'a CheckCode>> {
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
         .iter()
-        .filter(|pattern_code_pair| {
-            let matcher = pattern_code_pair.pattern.0.compile_matcher();
-            let matcher2 = pattern_code_pair
-                .pattern
-                .1
-                .as_ref()
-                .map_or(matcher.clone(), globset::Glob::compile_matcher);
-            matcher.is_match(file_path)
-                || matcher.is_match(file_basename)
-                || matcher2.is_match(file_path)
-                || matcher2.is_match(file_basename)
+        .filter(|(absolute, basename, _)| {
+            basename.is_match(file_basename) || absolute.is_match(file_path)
         })
-        .flat_map(|pattern_code_pair| &pattern_code_pair.codes)
+        .flat_map(|(_, _, codes)| codes)
         .collect())
 }
 
@@ -140,13 +131,14 @@ pub(crate) fn read_file(path: &Path) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use anyhow::Result;
+    use globset::GlobSet;
     use path_absolutize::Absolutize;
 
     use crate::fs::{extract_path_names, is_excluded, is_included};
-    use crate::settings::types::create_glob;
+    use crate::settings::types::FilePattern;
 
     #[test]
     fn inclusions() {
@@ -163,15 +155,10 @@ mod tests {
         assert!(!is_included(&path));
     }
 
-    fn fn_exclude(ex: Vec<(globset::Glob, Option<globset::Glob>)>) -> globset::GlobSet {
-        let mut build = globset::GlobSetBuilder::new();
-        for (x, y) in ex {
-            build.add(x);
-            if let Some(glob) = y {
-                build.add(glob);
-            }
-        }
-        build.build().expect("bad")
+    fn make_exclusion(file_pattern: FilePattern, project_root: Option<&PathBuf>) -> GlobSet {
+        let mut builder = globset::GlobSetBuilder::new();
+        file_pattern.add_to(&mut builder, project_root).unwrap();
+        builder.build().unwrap()
     }
 
     #[test]
@@ -179,53 +166,75 @@ mod tests {
         let project_root = Path::new("/tmp/");
 
         let path = Path::new("foo").absolutize_from(project_root).unwrap();
-        let exclude = vec![create_glob("foo", Some(&project_root.to_path_buf()))?];
+        let exclude = FilePattern::User("foo".to_string());
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
+        assert!(is_excluded(
+            file_path,
+            file_basename,
+            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+        ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
-        let exclude = vec![create_glob("bar", Some(&project_root.to_path_buf()))?];
+        let exclude = FilePattern::User("bar".to_string());
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
+        assert!(is_excluded(
+            file_path,
+            file_basename,
+            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+        ));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = vec![create_glob("baz.py", Some(&project_root.to_path_buf()))?];
+        let exclude = FilePattern::User("baz.py".to_string());
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
+        assert!(is_excluded(
+            file_path,
+            file_basename,
+            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+        ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
-        let exclude = vec![create_glob("foo/bar", Some(&project_root.to_path_buf()))?];
+        let exclude = FilePattern::User("foo/bar".to_string());
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
+        assert!(is_excluded(
+            file_path,
+            file_basename,
+            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+        ));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = vec![create_glob(
-            "foo/bar/baz.py",
-            Some(&project_root.to_path_buf()),
-        )?];
+        let exclude = FilePattern::User("foo/bar/baz.py".to_string());
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
+        assert!(is_excluded(
+            file_path,
+            file_basename,
+            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+        ));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = vec![create_glob(
-            "foo/bar/*.py",
-            Some(&project_root.to_path_buf()),
-        )?];
+        let exclude = FilePattern::User("foo/bar/*.py".to_string());
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(is_excluded(file_path, file_basename, &fn_exclude(exclude)));
+        assert!(is_excluded(
+            file_path,
+            file_basename,
+            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+        ));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = vec![create_glob("baz", Some(&project_root.to_path_buf()))?];
+        let exclude = FilePattern::User("baz".to_string());
         let (file_path, file_basename) = extract_path_names(&path)?;
-        assert!(!is_excluded(file_path, file_basename, &fn_exclude(exclude)));
+        assert!(!is_excluded(
+            file_path,
+            file_basename,
+            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+        ));
 
         Ok(())
     }

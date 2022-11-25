@@ -2,9 +2,12 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
+use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use anyhow::Result;
+use globset::{Glob, GlobMatcher, GlobSet};
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
@@ -12,9 +15,9 @@ use rustc_hash::FxHashSet;
 use crate::checks::CheckCode;
 use crate::checks_gen::{CheckCodePrefix, PrefixSpecificity};
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, isort, mccabe,
+    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
     pep8_naming,
 };
 
@@ -28,11 +31,11 @@ pub mod user;
 pub struct Settings {
     pub dummy_variable_rgx: Regex,
     pub enabled: FxHashSet<CheckCode>,
-    pub exclude: globset::GlobSet,
-    pub extend_exclude: globset::GlobSet,
+    pub exclude: GlobSet,
+    pub extend_exclude: GlobSet,
     pub fixable: FxHashSet<CheckCode>,
     pub line_length: usize,
-    pub per_file_ignores: Vec<PerFileIgnore>,
+    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)>,
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
@@ -47,8 +50,11 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_configuration(config: Configuration) -> Self {
-        Self {
+    pub fn from_configuration(
+        config: Configuration,
+        project_root: Option<&PathBuf>,
+    ) -> Result<Self> {
+        Ok(Self {
             dummy_variable_rgx: config.dummy_variable_rgx,
             enabled: resolve_codes(
                 &config
@@ -62,8 +68,8 @@ impl Settings {
                     .chain(config.extend_ignore.into_iter())
                     .collect::<Vec<_>>(),
             ),
-            exclude: config.exclude,
-            extend_exclude: config.extend_exclude,
+            exclude: resolve_globset(config.exclude, project_root)?,
+            extend_exclude: resolve_globset(config.extend_exclude, project_root)?,
             fixable: resolve_codes(&config.fixable, &config.unfixable),
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
@@ -73,11 +79,11 @@ impl Settings {
             mccabe: config.mccabe,
             line_length: config.line_length,
             pep8_naming: config.pep8_naming,
-            per_file_ignores: config.per_file_ignores,
+            per_file_ignores: resolve_per_file_ignores(config.per_file_ignores, project_root)?,
             src: config.src,
             target_version: config.target_version,
             show_source: config.show_source,
-        }
+        })
     }
 
     pub fn for_rule(check_code: CheckCode) -> Self {
@@ -85,8 +91,8 @@ impl Settings {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter([check_code.clone()]),
             fixable: FxHashSet::from_iter([check_code]),
-            exclude: globset::GlobSet::empty(),
-            extend_exclude: globset::GlobSet::empty(),
+            exclude: GlobSet::empty(),
+            extend_exclude: GlobSet::empty(),
             line_length: 88,
             per_file_ignores: vec![],
             src: vec![path_dedot::CWD.clone()],
@@ -107,8 +113,8 @@ impl Settings {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter(check_codes.clone()),
             fixable: FxHashSet::from_iter(check_codes),
-            exclude: globset::GlobSet::empty(),
-            extend_exclude: globset::GlobSet::empty(),
+            exclude: GlobSet::empty(),
+            extend_exclude: GlobSet::empty(),
             line_length: 88,
             per_file_ignores: vec![],
             src: vec![path_dedot::CWD.clone()],
@@ -136,8 +142,10 @@ impl Hash for Settings {
             value.hash(state);
         }
         self.line_length.hash(state);
-        for value in &self.per_file_ignores {
-            value.hash(state);
+        for (absolute, basename, codes) in &self.per_file_ignores {
+            absolute.glob().hash(state);
+            basename.glob().hash(state);
+            codes.hash(state);
         }
         self.show_source.hash(state);
         self.target_version.hash(state);
@@ -150,6 +158,42 @@ impl Hash for Settings {
         self.mccabe.hash(state);
         self.pep8_naming.hash(state);
     }
+}
+
+/// Given a list of patterns, create a `GlobSet`.
+pub fn resolve_globset(
+    patterns: Vec<FilePattern>,
+    project_root: Option<&PathBuf>,
+) -> Result<GlobSet> {
+    let mut builder = globset::GlobSetBuilder::new();
+    for pattern in patterns {
+        pattern.add_to(&mut builder, project_root)?;
+    }
+    builder.build().map_err(std::convert::Into::into)
+}
+
+/// Given a list of patterns, create a `GlobSet`.
+pub fn resolve_per_file_ignores(
+    per_file_ignores: Vec<PerFileIgnore>,
+    project_root: Option<&PathBuf>,
+) -> Result<Vec<(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)>> {
+    per_file_ignores
+        .into_iter()
+        .map(|per_file_ignore| {
+            // Construct absolute path matcher.
+            let path = Path::new(&per_file_ignore.pattern);
+            let absolute_path = match project_root {
+                Some(project_root) => fs::normalize_path_to(path, project_root),
+                None => fs::normalize_path(path),
+            };
+            let absolute = Glob::new(&absolute_path.to_string_lossy())?.compile_matcher();
+
+            // Construct basename matcher.
+            let basename = Glob::new(&per_file_ignore.pattern)?.compile_matcher();
+
+            Ok((absolute, basename, per_file_ignore.codes))
+        })
+        .collect()
 }
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
