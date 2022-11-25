@@ -19,8 +19,8 @@ pub trait Visitor<'a> {
     fn visit_constant(&mut self, constant: &'a Constant) {
         walk_constant(self, constant);
     }
-    fn visit_expr_context(&mut self, expr_content: &'a ExprContext) {
-        walk_expr_context(self, expr_content);
+    fn visit_expr_context(&mut self, expr_context: &'a ExprContext) {
+        walk_expr_context(self, expr_context);
     }
     fn visit_boolop(&mut self, boolop: &'a Boolop) {
         walk_boolop(self, boolop);
