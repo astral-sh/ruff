@@ -23,7 +23,7 @@ fn has_star_args(args: &[Expr]) -> bool {
         .any(|a| matches!(&a.node, ExprKind::Starred { .. }))
 }
 
-// F522
+/// F522
 pub(crate) fn string_dot_format_extra_named_arguments(
     summary: &FormatSummary,
     keywords: &[Keyword],
@@ -53,7 +53,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     }
 }
 
-// F523
+/// F523
 pub(crate) fn string_dot_format_extra_positional_arguments(
     summary: &FormatSummary,
     args: &[Expr],
@@ -78,7 +78,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     }
 }
 
-// F524
+/// F524
 pub(crate) fn string_dot_format_missing_argument(
     summary: &FormatSummary,
     args: &[Expr],
@@ -122,7 +122,7 @@ pub(crate) fn string_dot_format_missing_argument(
     }
 }
 
-// F525
+/// F525
 pub(crate) fn string_dot_format_mixing_automatic(
     summary: &FormatSummary,
     location: Range,
