@@ -106,8 +106,8 @@ fn create_remove_param_fix(
     let mut fix_start: Option<Location> = None;
     let mut fix_end: Option<Location> = None;
     for (start, tok, end) in lexer::make_tokenizer(&content).flatten() {
-        let start = helpers::to_absolute(start, expr.location);
-        let end = helpers::to_absolute(end, expr.location);
+        let start = helpers::to_absolute(&start, &expr.location);
+        let end = helpers::to_absolute(&end, &expr.location);
         if start == mode_param.location {
             fix_end = Some(end);
             break;

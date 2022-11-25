@@ -99,7 +99,7 @@ fn is_immutable_annotation(
                 .any(|(module, member)| match_call_path(&call_path, module, member, from_imports))
         }
         ExprKind::Subscript { value, slice, .. } => {
-            let call_path = dealias_call_path(collect_call_paths(value), import_aliases);
+            let call_path = dealias_call_path(collect_call_paths(&**value), import_aliases);
             if IMMUTABLE_GENERIC_TYPES
                 .iter()
                 .any(|(module, member)| match_call_path(&call_path, module, member, from_imports))

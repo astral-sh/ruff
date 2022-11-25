@@ -31,7 +31,7 @@ pub fn remove_class_def_base(
         for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
-                    fix_start = Some(helpers::to_absolute(start, stmt_at));
+                    fix_start = Some(helpers::to_absolute(&start, &stmt_at));
                 }
                 count += 1;
             }
@@ -39,7 +39,7 @@ pub fn remove_class_def_base(
             if matches!(tok, Tok::Rpar) {
                 count -= 1;
                 if count == 0 {
-                    fix_end = Some(helpers::to_absolute(end, stmt_at));
+                    fix_end = Some(helpers::to_absolute(&end, &stmt_at));
                     break;
                 }
             }
@@ -62,7 +62,7 @@ pub fn remove_class_def_base(
         let mut fix_end: Option<Location> = None;
         let mut seen_comma = false;
         for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
-            let start = helpers::to_absolute(start, stmt_at);
+            let start = helpers::to_absolute(&start, &stmt_at);
             if seen_comma {
                 if matches!(tok, Tok::Newline) {
                     fix_end = Some(end);
@@ -89,8 +89,8 @@ pub fn remove_class_def_base(
         let mut fix_start: Option<Location> = None;
         let mut fix_end: Option<Location> = None;
         for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
-            let start = helpers::to_absolute(start, stmt_at);
-            let end = helpers::to_absolute(end, stmt_at);
+            let start = helpers::to_absolute(&start, &stmt_at);
+            let end = helpers::to_absolute(&end, &stmt_at);
             if start == expr_at {
                 fix_end = Some(end);
                 break;
