@@ -1,33 +1,139 @@
+use std::string::ToString;
+
 use regex::Regex;
 use rustc_hash::FxHashSet;
+use rustpython_ast::{Keyword, KeywordData};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
 use crate::ast::types::{BindingKind, FunctionScope, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
-use crate::vendored::format::{FieldName, FormatPart, FormatString, FromTemplate};
+use crate::pyflakes::format::FormatSummary;
 
-// F521
-pub fn string_dot_format_invalid(literal: &str, location: Range) -> Option<Check> {
-    match FormatString::from_str(literal) {
-        Err(e) => Some(Check::new(
-            CheckKind::StringDotFormatInvalidFormat(e.to_string()),
+fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
+    keywords.iter().any(|k| {
+        let KeywordData { arg, .. } = &k.node;
+        arg.is_none()
+    })
+}
+
+fn has_star_args(args: &[Expr]) -> bool {
+    args.iter()
+        .any(|a| matches!(&a.node, ExprKind::Starred { .. }))
+}
+
+/// F522
+pub(crate) fn string_dot_format_extra_named_arguments(
+    summary: &FormatSummary,
+    keywords: &[Keyword],
+    location: Range,
+) -> Option<Check> {
+    if has_star_star_kwargs(keywords) {
+        return None;
+    }
+
+    let keywords = keywords.iter().filter_map(|k| {
+        let KeywordData { arg, .. } = &k.node;
+        arg.as_ref()
+    });
+
+    let missing: Vec<String> = keywords
+        .filter(|&k| !summary.keywords.contains(k))
+        .cloned()
+        .collect();
+
+    if missing.is_empty() {
+        None
+    } else {
+        Some(Check::new(
+            CheckKind::StringDotFormatExtraNamedArguments(missing),
             location,
-        )),
-        Ok(format_string) => {
-            for part in format_string.format_parts {
-                if let FormatPart::Field { field_name, .. } = &part {
-                    if let Err(e) = FieldName::parse(field_name) {
-                        return Some(Check::new(
-                            CheckKind::StringDotFormatInvalidFormat(e.to_string()),
-                            location,
-                        ));
-                    }
-                }
-            }
-            None
-        }
+        ))
+    }
+}
+
+/// F523
+pub(crate) fn string_dot_format_extra_positional_arguments(
+    summary: &FormatSummary,
+    args: &[Expr],
+    location: Range,
+) -> Option<Check> {
+    if has_star_args(args) {
+        return None;
+    }
+
+    let missing: Vec<String> = (0..args.len())
+        .filter(|i| !(summary.autos.contains(i) || summary.indexes.contains(i)))
+        .map(|i| i.to_string())
+        .collect();
+
+    if missing.is_empty() {
+        None
+    } else {
+        Some(Check::new(
+            CheckKind::StringDotFormatExtraPositionalArguments(missing),
+            location,
+        ))
+    }
+}
+
+/// F524
+pub(crate) fn string_dot_format_missing_argument(
+    summary: &FormatSummary,
+    args: &[Expr],
+    keywords: &[Keyword],
+    location: Range,
+) -> Option<Check> {
+    if has_star_args(args) || has_star_star_kwargs(keywords) {
+        return None;
+    }
+
+    let keywords: FxHashSet<_> = keywords
+        .iter()
+        .filter_map(|k| {
+            let KeywordData { arg, .. } = &k.node;
+            arg.as_ref()
+        })
+        .collect();
+
+    let missing: Vec<String> = summary
+        .autos
+        .iter()
+        .chain(summary.indexes.iter())
+        .filter(|&&i| i >= args.len())
+        .map(ToString::to_string)
+        .chain(
+            summary
+                .keywords
+                .iter()
+                .filter(|k| !keywords.contains(k))
+                .cloned(),
+        )
+        .collect();
+
+    if missing.is_empty() {
+        None
+    } else {
+        Some(Check::new(
+            CheckKind::StringDotFormatMissingArguments(missing),
+            location,
+        ))
+    }
+}
+
+/// F525
+pub(crate) fn string_dot_format_mixing_automatic(
+    summary: &FormatSummary,
+    location: Range,
+) -> Option<Check> {
+    if summary.autos.is_empty() || summary.indexes.is_empty() {
+        None
+    } else {
+        Some(Check::new(
+            CheckKind::StringDotFormatMixingAutomatic,
+            location,
+        ))
     }
 }
 

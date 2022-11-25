@@ -21,7 +21,7 @@ where
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match &stmt.node {
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                // No recurse.
+                // Don't recurse.
             }
             StmtKind::Return { value } => self.returns.push(value.as_ref().map(|expr| &**expr)),
             _ => visitor::walk_stmt(self, stmt),

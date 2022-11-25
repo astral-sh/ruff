@@ -53,6 +53,10 @@ pub enum CheckCode {
     F406,
     F407,
     F521,
+    F522,
+    F523,
+    F524,
+    F525,
     F541,
     F601,
     F602,
@@ -100,6 +104,7 @@ pub enum CheckCode {
     B020,
     B021,
     B022,
+    B023,
     B024,
     B025,
     B026,
@@ -404,7 +409,11 @@ pub enum CheckKind {
     MultiValueRepeatedKeyVariable(String),
     RaiseNotImplemented,
     ReturnOutsideFunction,
+    StringDotFormatExtraNamedArguments(Vec<String>),
+    StringDotFormatExtraPositionalArguments(Vec<String>),
     StringDotFormatInvalidFormat(String),
+    StringDotFormatMissingArguments(Vec<String>),
+    StringDotFormatMixingAutomatic,
     TwoStarredExpressions,
     UndefinedExport(String),
     UndefinedLocal(String),
@@ -419,32 +428,33 @@ pub enum CheckKind {
     // flake8-blind-except
     BlindExcept,
     // flake8-bugbear
-    UnaryPrefixIncrement,
-    AssignmentToOsEnviron,
-    UnreliableCallableCheck,
-    StripWithMultiCharacters,
-    MutableArgumentDefault,
-    UnusedLoopControlVariable(String),
-    FunctionCallArgumentDefault(Option<String>),
-    GetAttrWithConstant,
-    SetAttrWithConstant,
-    DoNotAssertFalse,
-    JumpStatementInFinally(String),
-    RedundantTupleInExceptionHandler(String),
-    DuplicateHandlerException(Vec<String>),
-    UselessComparison,
-    CannotRaiseLiteral,
-    NoAssertRaisesException,
-    UselessExpression,
-    CachedInstanceMethod,
-    LoopVariableOverridesIterator(String),
-    FStringDocstring,
-    UselessContextlibSuppress,
     AbstractBaseClassWithoutAbstractMethod(String),
+    AssignmentToOsEnviron,
+    CachedInstanceMethod,
+    CannotRaiseLiteral,
+    DoNotAssertFalse,
+    DuplicateHandlerException(Vec<String>),
     DuplicateTryBlockException(String),
-    StarArgUnpackingAfterKeywordArg,
     EmptyMethodWithoutAbstractDecorator(String),
+    FStringDocstring,
+    FunctionCallArgumentDefault(Option<String>),
+    FunctionUsesLoopVariable(String),
+    GetAttrWithConstant,
+    JumpStatementInFinally(String),
+    LoopVariableOverridesIterator(String),
+    MutableArgumentDefault,
+    NoAssertRaisesException,
     RaiseWithoutFromInsideExcept,
+    RedundantTupleInExceptionHandler(String),
+    SetAttrWithConstant,
+    StarArgUnpackingAfterKeywordArg,
+    StripWithMultiCharacters,
+    UnaryPrefixIncrement,
+    UnreliableCallableCheck,
+    UnusedLoopControlVariable(String),
+    UselessComparison,
+    UselessContextlibSuppress,
+    UselessExpression,
     // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
@@ -649,6 +659,14 @@ impl CheckCode {
             CheckCode::F406 => CheckKind::ImportStarNotPermitted("...".to_string()),
             CheckCode::F407 => CheckKind::FutureFeatureNotDefined("...".to_string()),
             CheckCode::F521 => CheckKind::StringDotFormatInvalidFormat("...".to_string()),
+            CheckCode::F522 => {
+                CheckKind::StringDotFormatExtraNamedArguments(vec!["...".to_string()])
+            }
+            CheckCode::F523 => {
+                CheckKind::StringDotFormatExtraPositionalArguments(vec!["...".to_string()])
+            }
+            CheckCode::F524 => CheckKind::StringDotFormatMissingArguments(vec!["...".to_string()]),
+            CheckCode::F525 => CheckKind::StringDotFormatMixingAutomatic,
             CheckCode::F541 => CheckKind::FStringMissingPlaceholders,
             CheckCode::F601 => CheckKind::MultiValueRepeatedKeyLiteral,
             CheckCode::F602 => CheckKind::MultiValueRepeatedKeyVariable("...".to_string()),
@@ -700,6 +718,7 @@ impl CheckCode {
             CheckCode::B020 => CheckKind::LoopVariableOverridesIterator("...".to_string()),
             CheckCode::B021 => CheckKind::FStringDocstring,
             CheckCode::B022 => CheckKind::UselessContextlibSuppress,
+            CheckCode::B023 => CheckKind::FunctionUsesLoopVariable("...".to_string()),
             CheckCode::B024 => CheckKind::AbstractBaseClassWithoutAbstractMethod("...".to_string()),
             CheckCode::B025 => CheckKind::DuplicateTryBlockException("Exception".to_string()),
             CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
@@ -916,6 +935,10 @@ impl CheckCode {
             CheckCode::F406 => CheckCategory::Pyflakes,
             CheckCode::F407 => CheckCategory::Pyflakes,
             CheckCode::F521 => CheckCategory::Pyflakes,
+            CheckCode::F522 => CheckCategory::Pyflakes,
+            CheckCode::F523 => CheckCategory::Pyflakes,
+            CheckCode::F524 => CheckCategory::Pyflakes,
+            CheckCode::F525 => CheckCategory::Pyflakes,
             CheckCode::F541 => CheckCategory::Pyflakes,
             CheckCode::F601 => CheckCategory::Pyflakes,
             CheckCode::F602 => CheckCategory::Pyflakes,
@@ -961,6 +984,7 @@ impl CheckCode {
             CheckCode::B020 => CheckCategory::Flake8Bugbear,
             CheckCode::B021 => CheckCategory::Flake8Bugbear,
             CheckCode::B022 => CheckCategory::Flake8Bugbear,
+            CheckCode::B023 => CheckCategory::Flake8Bugbear,
             CheckCode::B024 => CheckCategory::Flake8Bugbear,
             CheckCode::B025 => CheckCategory::Flake8Bugbear,
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
@@ -1140,7 +1164,11 @@ impl CheckKind {
             CheckKind::NotIsTest => &CheckCode::E714,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
+            CheckKind::StringDotFormatExtraNamedArguments(_) => &CheckCode::F522,
+            CheckKind::StringDotFormatExtraPositionalArguments(_) => &CheckCode::F523,
             CheckKind::StringDotFormatInvalidFormat(_) => &CheckCode::F521,
+            CheckKind::StringDotFormatMissingArguments(_) => &CheckCode::F524,
+            CheckKind::StringDotFormatMixingAutomatic => &CheckCode::F525,
             CheckKind::SyntaxError(_) => &CheckCode::E999,
             CheckKind::ExpressionsInStarAssignment => &CheckCode::F621,
             CheckKind::TrueFalseComparison(..) => &CheckCode::E712,
@@ -1160,32 +1188,33 @@ impl CheckKind {
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
             CheckKind::BuiltinAttributeShadowing(_) => &CheckCode::A003,
             // flake8-bugbear
-            CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
-            CheckKind::AssignmentToOsEnviron => &CheckCode::B003,
-            CheckKind::UnreliableCallableCheck => &CheckCode::B004,
-            CheckKind::StripWithMultiCharacters => &CheckCode::B005,
-            CheckKind::MutableArgumentDefault => &CheckCode::B006,
-            CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
-            CheckKind::FunctionCallArgumentDefault(_) => &CheckCode::B008,
-            CheckKind::GetAttrWithConstant => &CheckCode::B009,
-            CheckKind::SetAttrWithConstant => &CheckCode::B010,
-            CheckKind::DoNotAssertFalse => &CheckCode::B011,
-            CheckKind::JumpStatementInFinally(_) => &CheckCode::B012,
-            CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
-            CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
-            CheckKind::UselessComparison => &CheckCode::B015,
-            CheckKind::CannotRaiseLiteral => &CheckCode::B016,
-            CheckKind::NoAssertRaisesException => &CheckCode::B017,
-            CheckKind::UselessExpression => &CheckCode::B018,
-            CheckKind::CachedInstanceMethod => &CheckCode::B019,
-            CheckKind::LoopVariableOverridesIterator(_) => &CheckCode::B020,
-            CheckKind::FStringDocstring => &CheckCode::B021,
-            CheckKind::UselessContextlibSuppress => &CheckCode::B022,
             CheckKind::AbstractBaseClassWithoutAbstractMethod(_) => &CheckCode::B024,
+            CheckKind::AssignmentToOsEnviron => &CheckCode::B003,
+            CheckKind::CachedInstanceMethod => &CheckCode::B019,
+            CheckKind::CannotRaiseLiteral => &CheckCode::B016,
+            CheckKind::DoNotAssertFalse => &CheckCode::B011,
+            CheckKind::DuplicateHandlerException(_) => &CheckCode::B014,
             CheckKind::DuplicateTryBlockException(_) => &CheckCode::B025,
-            CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
             CheckKind::EmptyMethodWithoutAbstractDecorator(_) => &CheckCode::B027,
+            CheckKind::FStringDocstring => &CheckCode::B021,
+            CheckKind::FunctionCallArgumentDefault(_) => &CheckCode::B008,
+            CheckKind::FunctionUsesLoopVariable(_) => &CheckCode::B023,
+            CheckKind::GetAttrWithConstant => &CheckCode::B009,
+            CheckKind::JumpStatementInFinally(_) => &CheckCode::B012,
+            CheckKind::LoopVariableOverridesIterator(_) => &CheckCode::B020,
+            CheckKind::MutableArgumentDefault => &CheckCode::B006,
+            CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::RaiseWithoutFromInsideExcept => &CheckCode::B904,
+            CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
+            CheckKind::SetAttrWithConstant => &CheckCode::B010,
+            CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
+            CheckKind::StripWithMultiCharacters => &CheckCode::B005,
+            CheckKind::UnaryPrefixIncrement => &CheckCode::B002,
+            CheckKind::UnreliableCallableCheck => &CheckCode::B004,
+            CheckKind::UnusedLoopControlVariable(_) => &CheckCode::B007,
+            CheckKind::UselessComparison => &CheckCode::B015,
+            CheckKind::UselessContextlibSuppress => &CheckCode::B022,
+            CheckKind::UselessExpression => &CheckCode::B018,
             // flake8-blind-except
             CheckKind::BlindExcept => &CheckCode::BLE001,
             // flake8-comprehensions
@@ -1427,8 +1456,23 @@ impl CheckKind {
             CheckKind::ReturnOutsideFunction => {
                 "`return` statement outside of a function/method".to_string()
             }
+            CheckKind::StringDotFormatExtraNamedArguments(missing) => {
+                let message = missing.join(", ");
+                format!("'...'.format(...) has unused named argument(s): {message}")
+            }
+            CheckKind::StringDotFormatExtraPositionalArguments(missing) => {
+                let message = missing.join(", ");
+                format!("'...'.format(...) has unused arguments at position(s): {message}")
+            }
             CheckKind::StringDotFormatInvalidFormat(message) => {
                 format!("'...'.format(...) has invalid format string: {message}")
+            }
+            CheckKind::StringDotFormatMissingArguments(missing) => {
+                let message = missing.join(", ");
+                format!("'...'.format(...) is missing argument(s) for placeholder(s): {message}")
+            }
+            CheckKind::StringDotFormatMixingAutomatic => {
+                "'...'.format(...) mixes automatic and manual numbering".to_string()
             }
             CheckKind::SyntaxError(message) => format!("SyntaxError: {message}"),
             CheckKind::ExpressionsInStarAssignment => {
@@ -1514,6 +1558,9 @@ impl CheckKind {
                 } else {
                     "Do not perform function call in argument defaults".to_string()
                 }
+            }
+            CheckKind::FunctionUsesLoopVariable(name) => {
+                format!("Function definition does not bind loop variable `{name}`")
             }
             CheckKind::GetAttrWithConstant => "Do not call `getattr` with a constant attribute \
                                                value. It is not any safer than normal property \

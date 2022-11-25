@@ -19,8 +19,8 @@ use crate::ast::helpers::{
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, ImportKind, Range, Scope,
-    ScopeKind,
+    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, ImportKind, Node, Range,
+    Scope, ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, walk_withitem, Visitor};
 use crate::ast::{helpers, operations, visitor};
@@ -83,6 +83,8 @@ pub struct Checker<'a> {
     futures_allowed: bool,
     annotations_future_enabled: bool,
     except_handlers: Vec<Vec<Vec<&'a str>>>,
+    // Check-specific state.
+    pub(crate) seen_b023: Vec<&'a Expr>,
 }
 
 impl<'a> Checker<'a> {
@@ -127,6 +129,8 @@ impl<'a> Checker<'a> {
             futures_allowed: true,
             annotations_future_enabled: false,
             except_handlers: vec![],
+            // Check-specific state.
+            seen_b023: vec![],
         }
     }
 
@@ -951,7 +955,15 @@ where
                     flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
                 }
             }
+            StmtKind::While { .. } => {
+                if self.settings.enabled.contains(&CheckCode::B023) {
+                    flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Stmt(stmt));
+                }
+            }
             StmtKind::For {
+                target, body, iter, ..
+            }
+            | StmtKind::AsyncFor {
                 target, body, iter, ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::B007) {
@@ -959,6 +971,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B020) {
                     flake8_bugbear::plugins::loop_variable_overrides_iterator(self, target, iter);
+                }
+                if self.settings.enabled.contains(&CheckCode::B023) {
+                    flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
             }
             StmtKind::Try { handlers, .. } => {
@@ -1244,20 +1259,73 @@ where
                 keywords,
             } => {
                 // pyflakes
-                if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                    if let ExprKind::Constant {
-                        value: Constant::Str(value),
-                        ..
-                    } = &value.node
-                    {
-                        if attr == "format" {
-                            // "...".format(...) call
-                            if self.settings.enabled.contains(&CheckCode::F521) {
+                if self.settings.enabled.contains(&CheckCode::F521)
+                    || self.settings.enabled.contains(&CheckCode::F522)
+                    || self.settings.enabled.contains(&CheckCode::F523)
+                    || self.settings.enabled.contains(&CheckCode::F524)
+                    || self.settings.enabled.contains(&CheckCode::F525)
+                {
+                    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+                        if let ExprKind::Constant {
+                            value: Constant::Str(value),
+                            ..
+                        } = &value.node
+                        {
+                            if attr == "format" {
+                                // "...".format(...) call
                                 let location = Range::from_located(expr);
-                                if let Some(check) =
-                                    pyflakes::checks::string_dot_format_invalid(value, location)
-                                {
-                                    self.add_check(check);
+                                match pyflakes::format::FormatSummary::try_from(value.as_ref()) {
+                                    Err(e) => {
+                                        if self.settings.enabled.contains(&CheckCode::F521) {
+                                            self.add_check(Check::new(
+                                                CheckKind::StringDotFormatInvalidFormat(
+                                                    e.to_string(),
+                                                ),
+                                                location,
+                                            ));
+                                        }
+                                    }
+                                    Ok(summary) => {
+                                        if self.settings.enabled.contains(&CheckCode::F522) {
+                                            if let Some(check) =
+                                                pyflakes::checks::string_dot_format_extra_named_arguments(
+                                                    &summary, keywords, location,
+                                                )
+                                            {
+                                                self.add_check(check);
+                                            }
+                                        }
+
+                                        if self.settings.enabled.contains(&CheckCode::F523) {
+                                            if let Some(check) =
+                                                pyflakes::checks::string_dot_format_extra_positional_arguments(
+                                                    &summary, args, location,
+                                                )
+                                            {
+                                                self.add_check(check);
+                                            }
+                                        }
+
+                                        if self.settings.enabled.contains(&CheckCode::F524) {
+                                            if let Some(check) =
+                                                pyflakes::checks::string_dot_format_missing_argument(
+                                                    &summary, args, keywords, location,
+                                                )
+                                            {
+                                                self.add_check(check);
+                                            }
+                                        }
+
+                                        if self.settings.enabled.contains(&CheckCode::F525) {
+                                            if let Some(check) =
+                                                pyflakes::checks::string_dot_format_mixing_automatic(
+                                                    &summary, location,
+                                                )
+                                            {
+                                                self.add_check(check);
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1757,9 +1825,15 @@ where
                         self.add_check(check);
                     };
                 }
+                if self.settings.enabled.contains(&CheckCode::B023) {
+                    flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Expr(expr));
+                }
                 self.push_scope(Scope::new(ScopeKind::Generator));
             }
             ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
+                if self.settings.enabled.contains(&CheckCode::B023) {
+                    flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Expr(expr));
+                }
                 self.push_scope(Scope::new(ScopeKind::Generator));
             }
             _ => {}

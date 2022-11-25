@@ -351,6 +351,10 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |  |
 | F407 | FutureFeatureNotDefined | Future feature `...` is not defined |  |
 | F521 | StringDotFormatInvalidFormat | '...'.format(...) has invalid format string: ... |  |
+| F522 | StringDotFormatExtraNamedArguments | '...'.format(...) has unused named argument(s): ... |  |
+| F523 | StringDotFormatExtraPositionalArguments | '...'.format(...) has unused arguments at position(s): ... |  |
+| F524 | StringDotFormatMissingArguments | '...'.format(...) is missing argument(s) for placeholder(s): ... |  |
+| F525 | StringDotFormatMixingAutomatic | '...'.format(...) mixes automatic and manual numbering |  |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders |  |
 | F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |  |
 | F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |  |
@@ -571,6 +575,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B020 | LoopVariableOverridesIterator | Loop control variable `...` overrides iterable it iterates |  |
 | B021 | FStringDocstring | f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring. |  |
 | B022 | UselessContextlibSuppress | No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant |  |
+| B023 | FunctionUsesLoopVariable | Function definition does not bind loop variable `...` |  |
 | B024 | AbstractBaseClassWithoutAbstractMethod | `...` is an abstract base class, but it has no abstract methods |  |
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
 | B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged |  |
@@ -807,7 +812,7 @@ automatically convert your existing configuration.)
 Ruff can be used as a (near) drop-in replacement for Flake8 when used (1) without or with a small
 number of plugins, (2) alongside Black, and (3) on Python 3 code.
 
-Under those conditions Ruff is missing 14 rules related to string `.format` calls, 1 rule related
+Under those conditions Ruff is missing 9 rules related to `%` string formatting, 1 rule related
 to docstring parsing, and 1 rule related to redefined variables.
 
 Ruff re-implements some of the most popular Flake8 plugins and related code quality tools natively,
@@ -816,6 +821,8 @@ including:
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`yesqa`](https://github.com/asottile/yesqa)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
+- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
@@ -823,9 +830,7 @@ including:
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
-- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (27/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
@@ -847,6 +852,8 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
+- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
+- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
@@ -855,8 +862,6 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
-- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/) (27/32)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
