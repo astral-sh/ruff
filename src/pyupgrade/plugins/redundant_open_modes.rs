@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use log::error;
-use rustpython_ast::{Constant, Expr, ExprKind, Located, Location};
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword, KeywordData, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
@@ -14,6 +14,7 @@ use crate::checks::{Check, CheckCode, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 const OPEN_FUNC_NAME: &str = "open";
+const MODE_KEYWORD_ARGUMENT: &str = "mode";
 
 enum OpenMode {
     U,
@@ -56,15 +57,20 @@ impl OpenMode {
     }
 }
 
-fn match_open(expr: &Expr) -> Option<&Expr> {
-    if let ExprKind::Call { func, args, .. } = &expr.node {
+fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
+    if let ExprKind::Call {
+        func,
+        args,
+        keywords,
+    } = &expr.node
+    {
         // TODO(andberger): Verify that "open" is still bound to the built-in function.
         if match_name_or_attr(func, OPEN_FUNC_NAME) {
-            // Return the "open mode" parameter.
-            return args.get(1);
+            // Return the "open mode" parameter and keywords.
+            return (args.get(1), keywords.clone());
         }
     }
-    None
+    (None, vec![])
 }
 
 fn create_check(
@@ -101,19 +107,36 @@ fn create_remove_param_fix(
         location: expr.location,
         end_location: expr.end_location.unwrap(),
     });
-    // Find the last comma before mode_param
-    // and delete that comma as well as mode_param.
+    // Find the last comma before mode_param and create a deletion fix
+    // starting from the comma and ending after mode_param.
     let mut fix_start: Option<Location> = None;
     let mut fix_end: Option<Location> = None;
+    let mut is_first_arg: bool = false;
+    let mut delete_first_arg: bool = false;
     for (start, tok, end) in lexer::make_tokenizer(&content).flatten() {
         let start = helpers::to_absolute(start, expr.location);
         let end = helpers::to_absolute(end, expr.location);
         if start == mode_param.location {
+            if is_first_arg {
+                delete_first_arg = true;
+                continue;
+            }
             fix_end = Some(end);
             break;
         }
+        if delete_first_arg && matches!(tok, Tok::Name { .. }) {
+            fix_end = Some(start);
+            break;
+        }
+        if matches!(tok, Tok::Lpar) {
+            is_first_arg = true;
+            fix_start = Some(end);
+        }
         if matches!(tok, Tok::Comma) {
-            fix_start = Some(start);
+            is_first_arg = false;
+            if !delete_first_arg {
+                fix_start = Some(start);
+            }
         }
     }
     match (fix_start, fix_end) {
@@ -126,20 +149,41 @@ fn create_remove_param_fix(
 
 /// U015
 pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
-    // TODO(andberger): Add "mode" keyword argument handling to handle invocations
-    // on the following formats:
-    // - `open("foo", mode="U")`
-    // - `open(name="foo", mode="U")`
-    // - `open(mode="U", name="foo")`
-    if let Some(mode_param) = match_open(expr) {
-        if let Located {
-            node:
-                ExprKind::Constant {
-                    value: Constant::Str(mode_param_value),
-                    ..
-                },
+    let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);
+    if mode_param.is_none() && !keywords.is_empty() {
+        if let Some(value) = keywords.iter().find_map(|keyword| {
+            let KeywordData { arg, value } = &keyword.node;
+            if arg
+                .as_ref()
+                .map(|arg| arg == MODE_KEYWORD_ARGUMENT)
+                .unwrap_or_default()
+            {
+                Some(value)
+            } else {
+                None
+            }
+        }) {
+            if let ExprKind::Constant {
+                value: Constant::Str(mode_param_value),
+                ..
+            } = &value.node
+            {
+                if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
+                    checker.add_check(create_check(
+                        expr,
+                        value,
+                        mode.replacement_value(),
+                        checker.locator,
+                        checker.patch(&CheckCode::U015),
+                    ));
+                }
+            }
+        }
+    } else if let Some(mode_param) = mode_param {
+        if let ExprKind::Constant {
+            value: Constant::Str(mode_param_value),
             ..
-        } = mode_param
+        } = &mode_param.node
         {
             if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
                 checker.add_check(create_check(
