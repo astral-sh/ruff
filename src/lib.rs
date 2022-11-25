@@ -35,6 +35,7 @@ pub mod checks;
 pub mod checks_gen;
 pub mod cli;
 pub mod code_gen;
+pub mod commands;
 mod cst;
 mod directives;
 mod docstrings;
