@@ -19,7 +19,7 @@ pub fn leading_space(line: &str) -> String {
 }
 
 /// Extract the leading indentation from a line.
-pub fn indentation<'a, T>(checker: &'a Checker, located: &Located<T>) -> String {
+pub fn indentation<T>(checker: &Checker, located: &Located<T>) -> String {
     let range = Range::from_located(located);
     checker
         .locator

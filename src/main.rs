@@ -17,11 +17,10 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
-use ::ruff::cache;
 use ::ruff::checks::{CheckCode, CheckKind};
 use ::ruff::cli::{collect_per_file_ignores, extract_log_level, Cli};
 use ::ruff::fs::iter_python_files;
-use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin};
+use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::message::Message;
 use ::ruff::printer::{Printer, SerializationFormat};
@@ -29,6 +28,7 @@ use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
+use ::ruff::{cache, commands};
 use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
@@ -36,9 +36,7 @@ use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff::linter::Diagnostics;
 use rustpython_ast::Location;
-use serde::Serialize;
 use walkdir::DirEntry;
 
 /// Shim that calls `par_iter` except for wasm because there's no wasm support
@@ -53,59 +51,6 @@ fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl ParallelIterator<Item = &T> {
 #[cfg(target_family = "wasm")]
 fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl Iterator<Item = &T> {
     iterable.iter()
-}
-
-fn show_settings(
-    configuration: Configuration,
-    project_root: Option<PathBuf>,
-    pyproject: Option<PathBuf>,
-) {
-    println!("Resolved configuration: {configuration:#?}");
-    println!("Found project root at: {project_root:?}");
-    println!("Found pyproject.toml at: {pyproject:?}");
-}
-
-#[derive(Serialize)]
-struct Explanation<'a> {
-    code: &'a str,
-    category: &'a str,
-    summary: &'a str,
-}
-
-fn explain(code: &CheckCode, format: SerializationFormat) -> Result<()> {
-    match format {
-        SerializationFormat::Text => {
-            println!(
-                "{} ({}): {}",
-                code.as_ref(),
-                code.category().title(),
-                code.kind().summary()
-            );
-        }
-        SerializationFormat::Json => {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&Explanation {
-                    code: code.as_ref(),
-                    category: code.category().title(),
-                    summary: &code.kind().summary(),
-                })?
-            );
-        }
-    };
-    Ok(())
-}
-
-fn show_files(files: &[PathBuf], settings: &Settings) {
-    let mut entries: Vec<DirEntry> = files
-        .iter()
-        .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
-        .flatten()
-        .collect();
-    entries.sort_by(|a, b| a.path().cmp(b.path()));
-    for entry in entries {
-        println!("{}", entry.path().to_string_lossy());
-    }
 }
 
 fn read_from_stdin() -> Result<String> {
@@ -312,7 +257,7 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     if let Some(code) = cli.explain {
-        explain(&code, cli.format)?;
+        commands::explain(&code, cli.format)?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -321,7 +266,7 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::FAILURE);
     }
     if cli.show_settings {
-        show_settings(configuration, project_root, pyproject);
+        commands::show_settings(configuration, project_root.as_ref(), pyproject.as_ref());
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -330,7 +275,7 @@ fn inner_main() -> Result<ExitCode> {
     let settings = Settings::from_configuration(configuration, project_root.as_ref())?;
 
     if cli.show_files {
-        show_files(&cli.files, &settings);
+        commands::show_files(&cli.files, &settings);
         return Ok(ExitCode::SUCCESS);
     }
 
