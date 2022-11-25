@@ -50,8 +50,6 @@ strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
 titlecase = { version = "2.2.1" }
 toml = { version = "0.5.9" }
-tree-sitter = { version = "0.20" }
-tree-sitter-python  = { version = "0.20" }
 update-informer = { version = "0.5.0", default-features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
 
