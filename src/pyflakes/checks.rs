@@ -60,24 +60,18 @@ pub fn string_dot_format_extra_named_arguments(
         arg.clone()
     });
 
-    match FormatString::from_str(literal) {
+    match FormatSummary::try_from(literal) {
         Err(_) => None, // Cannot proceed - should be picked up by F521
-        Ok(format_string) => {
-            match FormatSummary::try_from(format_string) {
-                Err(_) => None, // Cannot proceed - should be picked up by F521
-                Ok(summary) => {
-                    let missing: Vec<String> =
-                        keywords.filter(|k| !summary.keywords.contains(k)).collect();
+        Ok(summary) => {
+            let missing: Vec<String> = keywords.filter(|k| !summary.keywords.contains(k)).collect();
 
-                    if missing.is_empty() {
-                        None
-                    } else {
-                        Some(Check::new(
-                            CheckKind::StringDotFormatExtraNamedArguments(missing),
-                            location,
-                        ))
-                    }
-                }
+            if missing.is_empty() {
+                None
+            } else {
+                Some(Check::new(
+                    CheckKind::StringDotFormatExtraNamedArguments(missing),
+                    location,
+                ))
             }
         }
     }
@@ -93,26 +87,21 @@ pub fn string_dot_format_extra_positional_arguments(
         return None;
     }
 
-    match FormatString::from_str(literal) {
+    match FormatSummary::try_from(literal) {
         Err(_) => None, // Cannot proceed - should be picked up by F521
-        Ok(format_string) => {
-            match FormatSummary::try_from(format_string) {
-                Err(_) => None, // Cannot proceed - should be picked up by F521
-                Ok(summary) => {
-                    let missing: Vec<String> = (0..args.len())
-                        .filter(|i| !(summary.autos.contains(i) || summary.indexes.contains(i)))
-                        .map(|i| i.to_string())
-                        .collect();
+        Ok(summary) => {
+            let missing: Vec<String> = (0..args.len())
+                .filter(|i| !(summary.autos.contains(i) || summary.indexes.contains(i)))
+                .map(|i| i.to_string())
+                .collect();
 
-                    if missing.is_empty() {
-                        None
-                    } else {
-                        Some(Check::new(
-                            CheckKind::StringDotFormatExtraPositionalArguments(missing),
-                            location,
-                        ))
-                    }
-                }
+            if missing.is_empty() {
+                None
+            } else {
+                Some(Check::new(
+                    CheckKind::StringDotFormatExtraPositionalArguments(missing),
+                    location,
+                ))
             }
         }
     }
@@ -137,30 +126,25 @@ pub fn string_dot_format_missing_argument(
         })
         .collect();
 
-    match FormatString::from_str(literal) {
+    match FormatSummary::try_from(literal) {
         Err(_) => None, // Cannot proceed - should be picked up by F521
-        Ok(format_string) => {
-            match FormatSummary::try_from(format_string) {
-                Err(_) => None, // Cannot proceed - should be picked up by F521
-                Ok(summary) => {
-                    let missing: Vec<String> = summary
-                        .autos
-                        .into_iter()
-                        .chain(summary.indexes.into_iter())
-                        .filter(|&i| i >= args.len())
-                        .map(|i| i.to_string())
-                        .chain(summary.keywords.difference(&keywords).cloned())
-                        .collect();
+        Ok(summary) => {
+            let missing: Vec<String> = summary
+                .autos
+                .into_iter()
+                .chain(summary.indexes.into_iter())
+                .filter(|&i| i >= args.len())
+                .map(|i| i.to_string())
+                .chain(summary.keywords.difference(&keywords).cloned())
+                .collect();
 
-                    if missing.is_empty() {
-                        None
-                    } else {
-                        Some(Check::new(
-                            CheckKind::StringDotFormatMissingArguments(missing),
-                            location,
-                        ))
-                    }
-                }
+            if missing.is_empty() {
+                None
+            } else {
+                Some(Check::new(
+                    CheckKind::StringDotFormatMissingArguments(missing),
+                    location,
+                ))
             }
         }
     }
@@ -168,21 +152,16 @@ pub fn string_dot_format_missing_argument(
 
 // F525
 pub fn string_dot_format_mixing_automatic(literal: &str, location: Range) -> Option<Check> {
-    match FormatString::from_str(literal) {
+    match FormatSummary::try_from(literal) {
         Err(_) => None, // Cannot proceed - should be picked up by F521
-        Ok(format_string) => {
-            match FormatSummary::try_from(format_string) {
-                Err(_) => None, // Cannot proceed - should be picked up by F521
-                Ok(summary) => {
-                    if summary.autos.is_empty() || summary.indexes.is_empty() {
-                        None
-                    } else {
-                        Some(Check::new(
-                            CheckKind::StringDotFormatMixingAutomatic,
-                            location,
-                        ))
-                    }
-                }
+        Ok(summary) => {
+            if summary.autos.is_empty() || summary.indexes.is_empty() {
+                None
+            } else {
+                Some(Check::new(
+                    CheckKind::StringDotFormatMixingAutomatic,
+                    location,
+                ))
             }
         }
     }

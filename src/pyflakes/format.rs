@@ -32,10 +32,12 @@ pub(crate) struct FormatSummary {
     pub keywords: FxHashSet<String>,
 }
 
-impl TryFrom<FormatString> for FormatSummary {
+impl TryFrom<&str> for FormatSummary {
     type Error = FormatParseError;
 
-    fn try_from(format_string: FormatString) -> Result<Self, Self::Error> {
+    fn try_from(literal: &str) -> Result<Self, Self::Error> {
+        let format_string = FormatString::from_str(literal)?;
+
         let mut autos = FxHashSet::default();
         let mut indexes = FxHashSet::default();
         let mut keywords = FxHashSet::default();
@@ -47,35 +49,23 @@ impl TryFrom<FormatString> for FormatSummary {
                 ..
             } = format_part
             {
-                match FieldName::parse(&field_name) {
-                    Ok(parsed) => {
+                let parsed = FieldName::parse(&field_name)?;
+                match parsed.field_type {
+                    FieldType::Auto => autos.insert(autos.len()),
+                    FieldType::Index(i) => indexes.insert(i),
+                    FieldType::Keyword(k) => keywords.insert(k),
+                };
+
+                let nested = FormatString::from_str(&format_spec)?;
+                for nested_part in nested.format_parts {
+                    if let FormatPart::Field { field_name, .. } = nested_part {
+                        let parsed = FieldName::parse(&field_name)?;
                         match parsed.field_type {
                             FieldType::Auto => autos.insert(autos.len()),
                             FieldType::Index(i) => indexes.insert(i),
                             FieldType::Keyword(k) => keywords.insert(k),
                         };
                     }
-                    Err(e) => return Err(e),
-                }
-
-                match FormatString::from_str(&format_spec) {
-                    Ok(nested) => {
-                        for nested_part in nested.format_parts {
-                            if let FormatPart::Field { field_name, .. } = nested_part {
-                                match FieldName::parse(&field_name) {
-                                    Ok(parsed) => {
-                                        match parsed.field_type {
-                                            FieldType::Auto => autos.insert(autos.len()),
-                                            FieldType::Index(i) => indexes.insert(i),
-                                            FieldType::Keyword(k) => keywords.insert(k),
-                                        };
-                                    }
-                                    Err(e) => return Err(e),
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => return Err(e),
                 }
             }
         }
@@ -104,8 +94,7 @@ mod tests {
             .map(String::from)
             .collect();
 
-        let format_string = FormatString::from_str(literal).unwrap();
-        let format_summary = FormatSummary::try_from(format_string).unwrap();
+        let format_summary = FormatSummary::try_from(literal).unwrap();
 
         assert_eq!(format_summary.autos, expected_autos);
         assert_eq!(format_summary.indexes, expected_indexes);
@@ -123,8 +112,7 @@ mod tests {
             .map(String::from)
             .collect();
 
-        let format_string = FormatString::from_str(literal).unwrap();
-        let format_summary = FormatSummary::try_from(format_string).unwrap();
+        let format_summary = FormatSummary::try_from(literal).unwrap();
 
         assert_eq!(format_summary.autos, expected_autos);
         assert_eq!(format_summary.indexes, expected_indexes);
@@ -133,12 +121,14 @@ mod tests {
 
     #[test]
     fn test_format_summary_invalid() {
+        assert!(FormatSummary::try_from("{").is_err());
+
         let literal = "{foo}a{}b{bar..}";
-        let format_string = FormatString::from_str(literal).unwrap();
-        assert!(FormatSummary::try_from(format_string).is_err());
+        assert!(FormatString::from_str(literal).is_ok());
+        assert!(FormatSummary::try_from(literal).is_err());
 
         let literal_nested = "{foo}a{}b{bar:{spam..}}";
-        let format_string_nested = FormatString::from_str(literal_nested).unwrap();
-        assert!(FormatSummary::try_from(format_string_nested).is_err());
+        assert!(FormatString::from_str(literal_nested).is_ok());
+        assert!(FormatSummary::try_from(literal_nested).is_err());
     }
 }
