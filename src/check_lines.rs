@@ -38,6 +38,7 @@ pub fn check_lines(
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: bool,
+    ignore_noqa: bool,
 ) {
     let enforce_unnecessary_coding_comment = settings.enabled.contains(&CheckCode::U009);
     let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
@@ -53,6 +54,30 @@ pub fn check_lines(
         assert!(check.location.row() >= 1);
     }
 
+    macro_rules! add_if {
+        ($check:expr, $noqa:expr) => {{
+            match $noqa {
+                (Directive::All(..), matches) => {
+                    matches.push($check.kind.code().as_ref());
+                    if ignore_noqa {
+                        line_checks.push($check);
+                    }
+                }
+                (Directive::Codes(.., codes), matches) => {
+                    if codes.contains(&$check.kind.code().as_ref()) {
+                        matches.push($check.kind.code().as_ref());
+                        if ignore_noqa {
+                            line_checks.push($check);
+                        }
+                    } else {
+                        line_checks.push($check);
+                    }
+                }
+                (Directive::None, ..) => line_checks.push($check),
+            }
+        }};
+    }
+
     let lines: Vec<&str> = contents.lines().collect();
     for (lineno, line) in lines.iter().enumerate() {
         // Grab the noqa (logical) line number for the current (physical) line.
@@ -65,10 +90,6 @@ pub fn check_lines(
             if lineno < 2 {
                 // PEP3120 makes utf-8 the default encoding.
                 if CODING_COMMENT_REGEX.is_match(line) {
-                    let noqa = noqa_directives.entry(noqa_lineno).or_insert_with(|| {
-                        (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![])
-                    });
-
                     let mut check = Check::new(
                         CheckKind::PEP3120UnnecessaryCodingComment,
                         Range {
@@ -83,19 +104,10 @@ pub fn check_lines(
                         ));
                     }
 
-                    match noqa {
-                        (Directive::All(..), matches) => {
-                            matches.push(check.kind.code().as_ref());
-                        }
-                        (Directive::Codes(.., codes), matches) => {
-                            if codes.contains(&check.kind.code().as_ref()) {
-                                matches.push(check.kind.code().as_ref());
-                            } else {
-                                line_checks.push(check);
-                            }
-                        }
-                        (Directive::None, ..) => line_checks.push(check),
-                    }
+                    let noqa = noqa_directives.entry(noqa_lineno).or_insert_with(|| {
+                        (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![])
+                    });
+                    add_if!(check, noqa);
                 }
             }
         }
@@ -133,10 +145,6 @@ pub fn check_lines(
         if enforce_line_too_long {
             let line_length = line.chars().count();
             if should_enforce_line_length(line, line_length, settings.line_length) {
-                let noqa = noqa_directives
-                    .entry(noqa_lineno)
-                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
-
                 let check = Check::new(
                     CheckKind::LineTooLong(line_length, settings.line_length),
                     Range {
@@ -145,35 +153,19 @@ pub fn check_lines(
                     },
                 );
 
-                match noqa {
-                    (Directive::All(..), matches) => {
-                        matches.push(check.kind.code().as_ref());
-                    }
-                    (Directive::Codes(.., codes), matches) => {
-                        if codes.contains(&check.kind.code().as_ref()) {
-                            matches.push(check.kind.code().as_ref());
-                        } else {
-                            line_checks.push(check);
-                        }
-                    }
-                    (Directive::None, ..) => line_checks.push(check),
-                }
+                let noqa = noqa_directives
+                    .entry(noqa_lineno)
+                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
+                add_if!(check, noqa);
             }
         }
     }
 
-    // Enforce newlines at end of files.
+    // Enforce newlines at end of files (W292).
     if settings.enabled.contains(&CheckCode::W292) && !contents.ends_with('\n') {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
         if let Some(line) = lines.last() {
-            let lineno = lines.len() - 1;
-            let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
-
-            let noqa = noqa_directives
-                .entry(noqa_lineno)
-                .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
-
             let check = Check::new(
                 CheckKind::NoNewLineAtEndOfFile,
                 Range {
@@ -182,23 +174,16 @@ pub fn check_lines(
                 },
             );
 
-            match noqa {
-                (Directive::All(..), matches) => {
-                    matches.push(check.kind.code().as_ref());
-                }
-                (Directive::Codes(.., codes), matches) => {
-                    if codes.contains(&check.kind.code().as_ref()) {
-                        matches.push(check.kind.code().as_ref());
-                    } else {
-                        line_checks.push(check);
-                    }
-                }
-                (Directive::None, ..) => line_checks.push(check),
-            }
+            let lineno = lines.len() - 1;
+            let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
+            let noqa = noqa_directives
+                .entry(noqa_lineno)
+                .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
+            add_if!(check, noqa);
         }
     }
 
-    // Enforce that the noqa directive was actually used.
+    // Enforce that the noqa directive was actually used (M001).
     if enforce_noqa {
         for (row, (directive, matches)) in noqa_directives {
             match directive {
@@ -261,9 +246,11 @@ pub fn check_lines(
         }
     }
 
-    ignored.sort_unstable();
-    for index in ignored.iter().rev() {
-        checks.swap_remove(*index);
+    if !ignore_noqa {
+        ignored.sort_unstable();
+        for index in ignored.iter().rev() {
+            checks.swap_remove(*index);
+        }
     }
     checks.extend(line_checks);
 }
@@ -291,6 +278,7 @@ mod tests {
                     ..Settings::for_rule(CheckCode::E501)
                 },
                 true,
+                false,
             );
             checks
         };

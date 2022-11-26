@@ -115,6 +115,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         &directives,
         &settings,
         autofix,
+        false,
     )?;
 
     Ok(checks)

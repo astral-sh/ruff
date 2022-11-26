@@ -97,30 +97,44 @@ fn add_noqa_inner(
                 output.push('\n');
             }
             Some(codes) => {
-                let mut codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
-
-                // Add the preamble.
                 match extract_noqa_directive(line) {
                     Directive::None => {
-                        output.push_str(line);
+                        // Add existing content.
+                        output.push_str(line.trim_end());
+
+                        // Add `noqa` directive.
                         output.push_str("  # noqa: ");
+
+                        // Add codes.
+                        let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
+                        let suffix = codes.join(", ");
+                        output.push_str(&suffix);
+                        output.push('\n');
+                        count += 1;
                     }
-                    Directive::All(_, start, _) => {
-                        output.push_str(&line[..start]);
-                        output.push_str("# noqa: ");
-                    }
-                    Directive::Codes(_, start, _, existing) => {
-                        output.push_str(&line[..start]);
-                        output.push_str("# noqa: ");
-                        codes.extend(existing);
+                    Directive::All(_, start, _) | Directive::Codes(_, start, ..) => {
+                        let mut new_line = String::new();
+
+                        // Add existing content.
+                        new_line.push_str(&line[..start].trim_end());
+
+                        // Add `noqa` directive.
+                        new_line.push_str("  # noqa: ");
+
+                        // Add codes.
+                        let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
+                        let suffix = codes.join(", ");
+                        new_line.push_str(&suffix);
+
+                        output.push_str(&new_line);
+                        output.push('\n');
+
+                        // Only count if the new line is an actual edit.
+                        if &new_line != line {
+                            count += 1;
+                        }
                     }
                 };
-
-                // Add the codes themselves.
-                codes.sort_unstable();
-                output.push_str(&codes.join(", "));
-                output.push('\n');
-                count += 1;
             }
         }
     }
