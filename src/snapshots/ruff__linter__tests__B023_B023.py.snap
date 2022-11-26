@@ -146,4 +146,13 @@ expression: checks
     row: 68
     column: 10
   fix: ~
+- kind:
+    FunctionUsesLoopVariable: i
+  location:
+    row: 82
+    column: 12
+  end_location:
+    row: 82
+    column: 18
+  fix: ~
 

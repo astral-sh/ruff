@@ -21,12 +21,7 @@ fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
 
 /// Return `true` if `exit` is (still) bound as a built-in in the current scope.
 fn has_builtin_exit_in_scope(checker: &Checker) -> bool {
-    !is_module_star_imported(checker, "sys")
-        && checker
-            .current_scopes()
-            .find_map(|scope| scope.values.get("exit"))
-            .map(|binding| matches!(binding.kind, BindingKind::Builtin))
-            .unwrap_or_default()
+    !is_module_star_imported(checker, "sys") && checker.is_builtin("exit")
 }
 
 /// Return the appropriate `sys.exit` reference based on the current set of

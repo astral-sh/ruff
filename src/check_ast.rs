@@ -178,6 +178,15 @@ impl<'a> Checker<'a> {
             || (typing::in_extensions(target)
                 && match_call_path(call_path, "typing_extensions", target, &self.from_imports))
     }
+
+    /// Return `true` if `member` is bound as a builtin.
+    pub fn is_builtin(&self, member: &str) -> bool {
+        self.current_scopes()
+            .find_map(|scope| scope.values.get(member))
+            .map_or(false, |binding| {
+                matches!(binding.kind, BindingKind::Builtin)
+            })
+    }
 }
 
 impl<'a, 'b> Visitor<'b> for Checker<'a>
@@ -1992,6 +2001,7 @@ where
                         value,
                         &self.from_imports,
                         &self.import_aliases,
+                        |member| self.is_builtin(member),
                     ) {
                         Some(subscript) => {
                             match subscript {

@@ -99,18 +99,42 @@ fn add_noqa_inner(
             Some(codes) => {
                 match extract_noqa_directive(line) {
                     Directive::None => {
-                        output.push_str(line);
+                        // Add existing content.
+                        output.push_str(line.trim_end());
+
+                        // Add `noqa` directive.
                         output.push_str("  # noqa: ");
+
+                        // Add codes.
+                        let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
+                        let suffix = codes.join(", ");
+                        output.push_str(&suffix);
+                        output.push('\n');
+                        count += 1;
                     }
                     Directive::All(_, start, _) | Directive::Codes(_, start, ..) => {
-                        output.push_str(&line[..start]);
-                        output.push_str("# noqa: ");
+                        let mut new_line = String::new();
+
+                        // Add existing content.
+                        new_line.push_str(&line[..start].trim_end());
+
+                        // Add `noqa` directive.
+                        new_line.push_str("  # noqa: ");
+
+                        // Add codes.
+                        let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
+                        let suffix = codes.join(", ");
+                        new_line.push_str(&suffix);
+
+                        output.push_str(&new_line);
+                        output.push('\n');
+
+                        // Only count if the new line is an actual edit.
+                        if &new_line != line {
+                            count += 1;
+                        }
                     }
                 };
-                let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
-                output.push_str(&codes.join(", "));
-                output.push('\n');
-                count += 1;
             }
         }
     }

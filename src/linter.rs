@@ -54,6 +54,7 @@ pub(crate) fn check_path(
     directives: &Directives,
     settings: &Settings,
     autofix: bool,
+    ignore_noqa: bool,
 ) -> Result<Vec<Check>> {
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
@@ -113,6 +114,7 @@ pub(crate) fn check_path(
         &directives.noqa_line_for,
         settings,
         autofix,
+        ignore_noqa,
     );
 
     // Create path ignores.
@@ -179,6 +181,7 @@ pub fn lint_path(
             &directives,
             settings,
             autofix.into(),
+            false,
         )?;
 
         // Apply autofix.
@@ -242,15 +245,19 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         directives::Flags::from_settings(settings),
     );
 
-    // Generate checks.
+    // Generate checks, ignoring any existing `noqa` directives.
     let checks = check_path(
         path,
         &contents,
         tokens,
         &locator,
-        &directives,
+        &Directives {
+            noqa_line_for: Default::default(),
+            isort_exclusions: directives.isort_exclusions,
+        },
         settings,
         false,
+        true,
     )?;
 
     add_noqa(&checks, &contents, &directives.noqa_line_for, path)
@@ -313,6 +320,7 @@ pub fn lint_stdin(
             &directives,
             settings,
             autofix.into(),
+            false,
         )?;
 
         // Apply autofix.
@@ -373,6 +381,7 @@ pub fn test_path(path: &Path, settings: &Settings, autofix: bool) -> Result<Vec<
         &directives,
         settings,
         autofix,
+        false,
     )
 }
 
@@ -572,6 +581,7 @@ mod tests {
     #[test_case(CheckCode::U009, Path::new("U009_1.py"); "U009_1")]
     #[test_case(CheckCode::U009, Path::new("U009_2.py"); "U009_2")]
     #[test_case(CheckCode::U009, Path::new("U009_3.py"); "U009_3")]
+    #[test_case(CheckCode::U009, Path::new("U009_4.py"); "U009_4")]
     #[test_case(CheckCode::U010, Path::new("U010.py"); "U010")]
     #[test_case(CheckCode::U011, Path::new("U011_0.py"); "U011_0")]
     #[test_case(CheckCode::U011, Path::new("U011_1.py"); "U011_1")]
