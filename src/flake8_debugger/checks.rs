@@ -1,4 +1,4 @@
-use fnv::FnvHashMap;
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
@@ -14,7 +14,10 @@ const DEBUGGERS: [Debugger; 7] = [
     ("pudb", &["set_trace"]),
     ("ipdb", &["set_trace", "sset_trace"]),
     ("IPython.terminal.embed", &["InteractiveShellEmbed"]),
-    ("IPython.frontend.terminal.embed", &["InteractiveShellEmbed"]),
+    (
+        "IPython.frontend.terminal.embed",
+        &["InteractiveShellEmbed"],
+    ),
     ("celery.contrib.rdb", &["set_trace"]),
     (BUILTINS_MODULE, &[BREAKPOINT_FN]),
 ];
@@ -35,7 +38,7 @@ fn function_name(func: &Expr) -> Option<&str> {
 pub fn debugger_call(
     expr: &Expr,
     func: &Expr,
-    import_aliases: &FnvHashMap<&str, &str>,
+    import_aliases: &FxHashMap<&str, &str>,
 ) -> Option<Check> {
     let raw_func_name = function_name(func)?;
     let func_name = match import_aliases.get(raw_func_name) {
@@ -61,7 +64,7 @@ pub fn debugger_call(
 }
 
 /// Checks for the presence of a debugger import.
-pub fn debugger_import(stmt: &Stmt, module: &Option<String>, name: &str) -> Option<Check> {
+pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Check> {
     if let Some(module) = module {
         if let Some(debugger) = get_debugger(module) {
             if debugger.1.contains(&name) {
@@ -72,7 +75,7 @@ pub fn debugger_import(stmt: &Stmt, module: &Option<String>, name: &str) -> Opti
             }
         }
     } else if name != BUILTINS_MODULE {
-        if let Some(_) = get_debugger(name) {
+        if get_debugger(name).is_some() {
             return Some(Check::new(
                 CheckKind::Debugger(DebuggerUsingType::Import),
                 Range::from_located(stmt),

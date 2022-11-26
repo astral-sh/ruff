@@ -638,9 +638,9 @@ where
 
                     // flake8-debugger
                     if self.settings.enabled.contains(&CheckCode::T100) {
-                        if let Some(check) = flake8_debugger::checks::debugger_import(
-                            stmt, &None, &alias.node.name,
-                        ) {
+                        if let Some(check) =
+                            flake8_debugger::checks::debugger_import(stmt, None, &alias.node.name)
+                        {
                             self.add_check(check);
                         }
                     }
@@ -877,7 +877,9 @@ where
                     // flake8-debugger
                     if self.settings.enabled.contains(&CheckCode::T100) {
                         if let Some(check) = flake8_debugger::checks::debugger_import(
-                            stmt, module, &alias.node.name,
+                            stmt,
+                            module.as_ref().map(String::as_str),
+                            &alias.node.name,
                         ) {
                             self.add_check(check);
                         }
@@ -1655,9 +1657,9 @@ where
 
                 // flake8-debugger
                 if self.settings.enabled.contains(&CheckCode::T100) {
-                    if let Some(check) = flake8_debugger::checks::debugger_call(
-                        expr, func, &self.import_aliases,
-                    ) {
+                    if let Some(check) =
+                        flake8_debugger::checks::debugger_call(expr, func, &self.import_aliases)
+                    {
                         self.add_check(check);
                     }
                 }

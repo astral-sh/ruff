@@ -1737,7 +1737,7 @@ impl CheckKind {
             CheckKind::Debugger(using_type) => match using_type {
                 DebuggerUsingType::Call(func_name) => format!("`{func_name}` call found"),
                 DebuggerUsingType::Import => "Debugger import found".to_string(),
-            }
+            },
             // flake8-tidy-imports
             CheckKind::BannedRelativeImport(strictness) => match strictness {
                 Strictness::Parents => {
