@@ -1603,3 +1603,29 @@ impl CheckCodePrefix {
         }
     }
 }
+
+impl CheckCodePrefix {
+    pub fn fixables() -> Vec<CheckCodePrefix> {
+        vec![
+            CheckCodePrefix::A,
+            CheckCodePrefix::ANN,
+            CheckCodePrefix::B,
+            CheckCodePrefix::BLE,
+            CheckCodePrefix::C,
+            CheckCodePrefix::D,
+            CheckCodePrefix::E,
+            CheckCodePrefix::F,
+            CheckCodePrefix::FBT,
+            CheckCodePrefix::I,
+            CheckCodePrefix::M,
+            CheckCodePrefix::N,
+            CheckCodePrefix::Q,
+            CheckCodePrefix::RUF,
+            CheckCodePrefix::S,
+            CheckCodePrefix::T,
+            CheckCodePrefix::U,
+            CheckCodePrefix::W,
+            CheckCodePrefix::YTT,
+        ]
+    }
+}

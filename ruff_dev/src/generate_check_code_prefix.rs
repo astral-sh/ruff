@@ -115,6 +115,20 @@ pub fn main(cli: &Cli) -> Result<()> {
     }
     gen.line("}");
 
+    // Create the default list of fixables.
+    let mut gen = scope
+        .new_impl("CheckCodePrefix")
+        .new_fn("fixables")
+        .ret(Type::new("Vec<CheckCodePrefix>"))
+        .vis("pub")
+        .line("vec![");
+    for prefix in prefix_to_codes.keys() {
+        if prefix.chars().all(char::is_alphabetic) {
+            gen = gen.line(format!("CheckCodePrefix::{prefix},"));
+        }
+    }
+    gen.line("]");
+
     // Construct the output contents.
     let mut output = String::new();
     output
