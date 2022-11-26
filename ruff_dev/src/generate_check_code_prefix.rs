@@ -130,6 +130,21 @@ pub fn main(cli: &Cli) -> Result<()> {
     output.push('\n');
     output.push('\n');
     output.push_str(&scope.to_string());
+    output.push('\n');
+    output.push('\n');
+
+    // Add the list of output categories (not generated).
+    output.push_str("pub const CATEGORIES: &[CheckCodePrefix] = &[");
+    output.push('\n');
+    for prefix in prefix_to_codes.keys() {
+        if prefix.chars().all(char::is_alphabetic) {
+            output.push_str(&format!("CheckCodePrefix::{prefix},"));
+            output.push('\n');
+        }
+    }
+    output.push_str("];");
+    output.push('\n');
+    output.push('\n');
 
     // Write the output to `src/checks_gen.rs` (or stdout).
     if cli.dry_run {
