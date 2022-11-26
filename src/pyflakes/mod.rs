@@ -2204,7 +2204,6 @@ mod tests {
         flakes(
             r#"
         import fu
-        import fu.bar
         fu.x
         "#,
             &[],
@@ -2212,7 +2211,6 @@ mod tests {
 
         flakes(
             r#"
-        import fu.bar
         import fu
         fu.x
         "#,
@@ -2228,7 +2226,6 @@ mod tests {
         flakes(
             r#"
         import foo as f
-        import foo.bar
         f.bar.do_something()
         "#,
             &[],
@@ -2237,7 +2234,6 @@ mod tests {
         flakes(
             r#"
         import foo as f
-        import foo.bar.blah
         f.bar.blah.do_something()
         "#,
             &[],
@@ -2248,13 +2244,13 @@ mod tests {
 
     #[test]
     fn unused_package_with_submodule_import() -> Result<()> {
-        // When a package and its submodule are imported, only report once.
+        // When a package and its submodule are imported, report both.
         flakes(
             r#"
         import fu
         import fu.bar
         "#,
-            &[CheckCode::F401],
+            &[CheckCode::F401, CheckCode::F401],
         )?;
 
         Ok(())

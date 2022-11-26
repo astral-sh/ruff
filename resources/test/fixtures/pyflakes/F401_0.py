@@ -85,3 +85,11 @@ else:
 
 
 CustomInt: TypeAlias = "np.int8 | np.int16"
+
+# Test: referencing an import completely
+import a.b.c.d
+foo = a.b.c.d
+
+# Test: referencing an import via subscript
+from django.core.cache import caches
+caches["default"].clear()

@@ -311,6 +311,15 @@ pub fn count_trailing_lines(stmt: &Stmt, locator: &SourceCodeLocator) -> usize {
         .count()
 }
 
+/// Returns 'true' if the expression is only composed of attribute access.
+pub fn is_deep_attribute_access(expr: &Expr) -> bool {
+    match &expr.node {
+        ExprKind::Attribute { value, .. } => is_deep_attribute_access(value),
+        ExprKind::Name { .. } => true,
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;

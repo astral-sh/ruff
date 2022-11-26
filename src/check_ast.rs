@@ -13,7 +13,8 @@ use rustpython_parser::ast::{
 use rustpython_parser::parser;
 
 use crate::ast::helpers::{
-    collect_call_paths, dealias_call_path, extract_handler_names, match_call_path,
+    collect_call_paths, compose_call_path, dealias_call_path, extract_handler_names,
+    is_deep_attribute_access, match_call_path,
 };
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
@@ -85,6 +86,7 @@ pub struct Checker<'a> {
     in_deferred_type_definition: bool,
     in_literal: bool,
     in_subscript: bool,
+    in_attribute: Option<&'a Expr>,
     seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
@@ -134,6 +136,7 @@ impl<'a> Checker<'a> {
             in_deferred_type_definition: false,
             in_literal: false,
             in_subscript: false,
+            in_attribute: None,
             seen_import_boundary: false,
             futures_allowed: true,
             annotations_future_enabled: false,
@@ -614,7 +617,7 @@ where
                         let name = alias.node.name.split('.').next().unwrap();
                         let full_name = &alias.node.name;
                         self.add_binding(
-                            name,
+                            full_name,
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(
                                     name.to_string(),
@@ -1348,7 +1351,8 @@ where
                             pyupgrade::plugins::use_pep585_annotation(self, expr, id);
                         }
 
-                        self.handle_node_load(expr);
+                        self.handle_node_load(self.in_attribute.unwrap_or(expr));
+                        self.in_attribute = None;
                     }
                     ExprContext::Store => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
@@ -1371,7 +1375,7 @@ where
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
             }
-            ExprKind::Attribute { attr, .. } => {
+            ExprKind::Attribute { attr, value, .. } => {
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
                     && self.settings.enabled.contains(&CheckCode::UP006)
@@ -1386,6 +1390,10 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
+                }
+
+                if self.in_attribute.is_none() && is_deep_attribute_access(value) {
+                    self.in_attribute = Some(expr);
                 }
             }
             ExprKind::Call {
@@ -2682,24 +2690,50 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        if let ExprKind::Name { id, .. } = &expr.node {
-            let scope_id = self.current_scope().id;
+        // Some modules can be accessed from the their parent module, so here we
+        // create all possible access patterns. That means it's possible we do
+        // not find all unused imports, but at least we're not reporting
+        // false-positives. One example is `os.path`, which can be accessed when
+        // importing either `os` or `os.path`.
+        let call_path;
+        let ids: Vec<(&str, &Expr)> = match &expr.node {
+            ExprKind::Name { id, .. } => vec![(id, expr)],
+            ExprKind::Attribute { value, .. } => {
+                call_path = compose_call_path(expr).unwrap();
+                let mut result = vec![(call_path.as_ref(), expr)];
+                result.extend(
+                    call_path
+                        .rmatch_indices('.')
+                        .map(|(i, _)| (&call_path[..i], &**value)),
+                );
+                result
+            }
+            _ => return,
+        };
 
-            let mut first_iter = true;
-            let mut in_generator = false;
-            let mut import_starred = false;
-            for scope_index in self.scope_stack.iter().rev() {
-                let scope = &self.scopes[*scope_index];
+        let mut not_found = match ids.first() {
+            Some(s) => *s,
+            None => return,
+        };
 
-                if matches!(scope.kind, ScopeKind::Class(_)) {
-                    if id == "__class__" {
-                        return;
-                    } else if !first_iter && !in_generator {
-                        continue;
-                    }
+        let scope_id = self.current_scope().id;
+
+        let mut first_iter = true;
+        let mut in_generator = false;
+        let mut import_starred = false;
+        for scope_index in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[*scope_index];
+
+            if matches!(scope.kind, ScopeKind::Class(_)) {
+                if !ids.is_empty() && ids.last().map(|e| e.0) == Some("__class__") {
+                    return;
+                } else if !first_iter && !in_generator {
+                    continue;
                 }
+            }
 
-                if let Some(index) = scope.values.get(&id.as_str()) {
+            for (id, expr) in &ids {
+                if let Some(index) = scope.values.get(id) {
                     // Mark the binding as used.
                     self.bindings[*index].used = Some((scope_id, Range::from_located(expr)));
 
@@ -2740,63 +2774,63 @@ impl<'a> Checker<'a> {
                     return;
                 }
 
+                not_found = (*id, *expr);
+
                 first_iter = false;
                 in_generator = matches!(scope.kind, ScopeKind::Generator);
                 import_starred = import_starred || scope.import_starred;
             }
+        }
 
-            if import_starred {
-                if self.settings.enabled.contains(&CheckCode::F405) {
-                    let mut from_list = vec![];
-                    for scope_index in self.scope_stack.iter().rev() {
-                        let scope = &self.scopes[*scope_index];
-                        for binding in scope.values.values().map(|index| &self.bindings[*index]) {
-                            if let BindingKind::StarImportation(level, module) = &binding.kind {
-                                from_list.push(helpers::format_import_from(
-                                    level.as_ref(),
-                                    module.as_ref(),
-                                ));
-                            }
+        if import_starred {
+            if self.settings.enabled.contains(&CheckCode::F405) {
+                let mut from_list = vec![];
+                for scope_index in self.scope_stack.iter().rev() {
+                    let scope = &self.scopes[*scope_index];
+                    for binding in scope.values.values().map(|index| &self.bindings[*index]) {
+                        if let BindingKind::StarImportation(level, module) = &binding.kind {
+                            from_list
+                                .push(helpers::format_import_from(level.as_ref(), module.as_ref()));
                         }
                     }
-                    from_list.sort();
-
-                    self.add_check(Check::new(
-                        CheckKind::ImportStarUsage(id.to_string(), from_list),
-                        Range::from_located(expr),
-                    ));
                 }
+                from_list.sort();
+
+                self.add_check(Check::new(
+                    CheckKind::ImportStarUsage(not_found.0.to_string(), from_list),
+                    Range::from_located(not_found.1),
+                ));
+            }
+            return;
+        }
+
+        if self.settings.enabled.contains(&CheckCode::F821) {
+            // Allow __path__.
+            if self.path.ends_with("__init__.py") && not_found.0 == "__path__" {
                 return;
             }
 
-            if self.settings.enabled.contains(&CheckCode::F821) {
-                // Allow __path__.
-                if self.path.ends_with("__init__.py") && id == "__path__" {
-                    return;
-                }
+            // Allow "__module__" and "__qualname__" in class scopes.
+            if (not_found.0 == "__module__" || not_found.0 == "__qualname__")
+                && matches!(self.current_scope().kind, ScopeKind::Class(..))
+            {
+                return;
+            }
 
-                // Allow "__module__" and "__qualname__" in class scopes.
-                if (id == "__module__" || id == "__qualname__")
-                    && matches!(self.current_scope().kind, ScopeKind::Class(..))
+            // Avoid flagging if NameError is handled.
+            if let Some(handler_names) = self.except_handlers.last() {
+                if handler_names
+                    .iter()
+                    .any(|call_path| call_path.len() == 1 && call_path[0] == "NameError")
                 {
                     return;
                 }
-
-                // Avoid flagging if NameError is handled.
-                if let Some(handler_names) = self.except_handlers.last() {
-                    if handler_names
-                        .iter()
-                        .any(|call_path| call_path.len() == 1 && call_path[0] == "NameError")
-                    {
-                        return;
-                    }
-                }
-
-                self.add_check(Check::new(
-                    CheckKind::UndefinedName(id.clone()),
-                    Range::from_located(expr),
-                ));
             }
+
+            self.add_check(Check::new(
+                CheckKind::UndefinedName(not_found.0.to_string()),
+                Range::from_located(not_found.1),
+            ));
         }
     }
 
