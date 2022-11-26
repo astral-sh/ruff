@@ -1,0 +1,95 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind:
+    Debugger:
+      Call: breakpoint
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 12
+  fix: ~
+- kind:
+    Debugger:
+      Import: pdb
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 10
+  fix: ~
+- kind:
+    Debugger:
+      Import: builtins.breakpoint
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 31
+  fix: ~
+- kind:
+    Debugger:
+      Import: pdb.set_trace
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 31
+  fix: ~
+- kind:
+    Debugger:
+      Import: celery.contrib.rdb.set_trace
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 40
+  fix: ~
+- kind:
+    Debugger:
+      Import: celery.contrib.rdb
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 25
+  fix: ~
+- kind:
+    Debugger:
+      Call: breakpoint
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 12
+  fix: ~
+- kind:
+    Debugger:
+      Call: set_trace
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 4
+  fix: ~
+- kind:
+    Debugger:
+      Call: set_trace
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 11
+  fix: ~
+

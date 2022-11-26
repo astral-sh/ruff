@@ -59,6 +59,7 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
    1. [flake8-bugbear (B)](#flake8-bugbear)
    1. [flake8-builtins (A)](#flake8-builtins)
+   1. [flake8-debugger (T)](#flake8-debugger)
    1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
    1. [flake8-print (T)](#flake8-print)
    1. [flake8-quotes (Q)](#flake8-quotes)
@@ -538,6 +539,14 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C416 | UnnecessaryComprehension | Unnecessary `(list\|set)` comprehension (rewrite using `(list\|set)()`) | 🛠 |
 | C417 | UnnecessaryMap | Unnecessary `map` usage (rewrite using a `(list\|set\|dict)` comprehension) |  |
 
+### flake8-debugger
+
+For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| T100 | Debugger | Import for `...` found |  |
+
 ### flake8-boolean-trap
 
 For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/0.1.0/) on PyPI.
@@ -825,6 +834,7 @@ including:
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
+- [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
@@ -856,6 +866,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
+- [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)

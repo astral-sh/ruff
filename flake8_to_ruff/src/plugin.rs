@@ -10,6 +10,7 @@ pub enum Plugin {
     Flake8Bugbear,
     Flake8Builtins,
     Flake8Comprehensions,
+    Flake8Debugger,
     Flake8Docstrings,
     Flake8TidyImports,
     Flake8Print,
@@ -30,6 +31,7 @@ impl FromStr for Plugin {
             "flake8-bugbear" => Ok(Plugin::Flake8Bugbear),
             "flake8-builtins" => Ok(Plugin::Flake8Builtins),
             "flake8-comprehensions" => Ok(Plugin::Flake8Comprehensions),
+            "flake8-debugger" => Ok(Plugin::Flake8Debugger),
             "flake8-docstrings" => Ok(Plugin::Flake8Docstrings),
             "flake8-tidy-imports" => Ok(Plugin::Flake8TidyImports),
             "flake8-print" => Ok(Plugin::Flake8Print),
@@ -51,9 +53,10 @@ impl Plugin {
             Plugin::Flake8Bugbear => CheckCodePrefix::B,
             Plugin::Flake8Builtins => CheckCodePrefix::A,
             Plugin::Flake8Comprehensions => CheckCodePrefix::C4,
+            Plugin::Flake8Debugger => CheckCodePrefix::T1,
             Plugin::Flake8Docstrings => CheckCodePrefix::D,
             Plugin::Flake8TidyImports => CheckCodePrefix::I25,
-            Plugin::Flake8Print => CheckCodePrefix::T,
+            Plugin::Flake8Print => CheckCodePrefix::T2,
             Plugin::Flake8Quotes => CheckCodePrefix::Q,
             Plugin::Flake8Annotations => CheckCodePrefix::ANN,
             Plugin::Flake8BlindExcept => CheckCodePrefix::BLE,
@@ -69,6 +72,7 @@ impl Plugin {
             Plugin::Flake8Bugbear => vec![CheckCodePrefix::B],
             Plugin::Flake8Builtins => vec![CheckCodePrefix::A],
             Plugin::Flake8Comprehensions => vec![CheckCodePrefix::C4],
+            Plugin::Flake8Debugger => vec![CheckCodePrefix::T1],
             Plugin::Flake8Docstrings => {
                 // Use the user-provided docstring.
                 for key in ["docstring-convention", "docstring_convention"] {
@@ -86,7 +90,7 @@ impl Plugin {
                 DocstringConvention::PEP8.select()
             }
             Plugin::Flake8TidyImports => vec![CheckCodePrefix::I25],
-            Plugin::Flake8Print => vec![CheckCodePrefix::T],
+            Plugin::Flake8Print => vec![CheckCodePrefix::T2],
             Plugin::Flake8Quotes => vec![CheckCodePrefix::Q],
             Plugin::Flake8Annotations => vec![CheckCodePrefix::ANN],
             Plugin::Flake8BlindExcept => vec![CheckCodePrefix::BLE],
@@ -364,6 +368,7 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin
         Plugin::Flake8Bugbear,
         Plugin::Flake8Builtins,
         Plugin::Flake8Comprehensions,
+        Plugin::Flake8Debugger,
         Plugin::Flake8Docstrings,
         Plugin::Flake8TidyImports,
         Plugin::Flake8Print,
