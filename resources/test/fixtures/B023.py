@@ -76,3 +76,7 @@ for var in range(2):
 
     def explicit_capture(captured=var):
         return captured
+
+
+for i in range(3):
+    lambda: f"{i}"

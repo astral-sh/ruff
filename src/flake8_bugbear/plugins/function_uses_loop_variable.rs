@@ -10,7 +10,10 @@ use crate::checks::{Check, CheckKind};
 
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
-    names: Vec<(&'a str, &'a Expr)>,
+    // Tuple of: name, defining expression, and defining range.
+    names: Vec<(&'a str, &'a Expr, Range)>,
+    // If we're in an f-string, the range of the defining expression.
+    in_f_string: Option<Range>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
@@ -20,8 +23,19 @@ where
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
+            ExprKind::JoinedStr { .. } => {
+                let prev_in_f_string = self.in_f_string;
+                self.in_f_string = Some(Range::from_located(expr));
+                visitor::walk_expr(self, expr);
+                self.in_f_string = prev_in_f_string;
+            }
             ExprKind::Name { id, ctx } if matches!(ctx, ExprContext::Load) => {
-                self.names.push((id, expr));
+                self.names.push((
+                    id,
+                    expr,
+                    self.in_f_string
+                        .unwrap_or_else(|| Range::from_located(expr)),
+                ));
             }
             _ => visitor::walk_expr(self, expr),
         }
@@ -30,7 +44,7 @@ where
 
 #[derive(Default)]
 struct SuspiciousVariablesVisitor<'a> {
-    names: Vec<(&'a str, &'a Expr)>,
+    names: Vec<(&'a str, &'a Expr, Range)>,
 }
 
 /// `Visitor` to collect all suspicious variables (those referenced in
@@ -57,7 +71,7 @@ where
                     visitor
                         .names
                         .into_iter()
-                        .filter(|(id, _)| !arg_names.contains(id)),
+                        .filter(|(id, ..)| !arg_names.contains(id)),
                 );
             }
             _ => visitor::walk_stmt(self, stmt),
@@ -79,7 +93,7 @@ where
                     visitor
                         .names
                         .into_iter()
-                        .filter(|(id, _)| !arg_names.contains(id)),
+                        .filter(|(id, ..)| !arg_names.contains(id)),
                 );
             }
             _ => visitor::walk_expr(self, expr),
@@ -203,13 +217,13 @@ where
 
         // If a variable was used in a function or lambda body, and assigned in the
         // loop, flag it.
-        for (name, expr) in suspicious_variables {
+        for (name, expr, range) in suspicious_variables {
             if reassigned_in_loop.contains(name) {
                 if !checker.seen_b023.contains(&expr) {
                     checker.seen_b023.push(expr);
                     checker.add_check(Check::new(
                         CheckKind::FunctionUsesLoopVariable(name.to_string()),
-                        Range::from_located(expr),
+                        range,
                     ));
                 }
             }
