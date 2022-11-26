@@ -116,7 +116,7 @@ fn add_noqa_inner(
                         let mut new_line = String::new();
 
                         // Add existing content.
-                        new_line.push_str(&line[..start].trim_end());
+                        new_line.push_str(line[..start].trim_end());
 
                         // Add `noqa` directive.
                         new_line.push_str("  # noqa: ");
