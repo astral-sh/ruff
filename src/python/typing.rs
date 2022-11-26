@@ -209,15 +209,21 @@ pub enum SubscriptKind {
     PEP593AnnotatedSubscript,
 }
 
-pub fn match_annotated_subscript(
+pub fn match_annotated_subscript<F>(
     expr: &Expr,
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
-) -> Option<SubscriptKind> {
+    is_builtin: F,
+) -> Option<SubscriptKind>
+where
+    F: Fn(&str) -> bool,
+{
     let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
     if !call_path.is_empty() {
         for (module, member) in SUBSCRIPTS {
-            if match_call_path(&call_path, module, member, from_imports) {
+            if match_call_path(&call_path, module, member, from_imports)
+                && (!module.is_empty() || is_builtin(member))
+            {
                 return Some(SubscriptKind::AnnotatedSubscript);
             }
         }

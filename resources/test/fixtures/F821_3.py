@@ -12,3 +12,13 @@ x: dict["key", "value"]
 
 # OK
 x: dict[str, str]
+
+# OK
+def unimportant(name):
+    pass
+
+
+def dang(dict, set, list):
+    unimportant(name=dict["name"])
+    unimportant(name=set["name"])
+    unimportant(name=list["name"])
