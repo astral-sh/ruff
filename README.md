@@ -59,6 +59,7 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
    1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
    1. [flake8-bugbear (B)](#flake8-bugbear)
    1. [flake8-builtins (A)](#flake8-builtins)
+   1. [flake8-debugger (T)](#flake8-debugger)
    1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
    1. [flake8-print (T)](#flake8-print)
    1. [flake8-quotes (Q)](#flake8-quotes)
@@ -537,6 +538,14 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within `(reversed\|set\|sorted)()` |  |
 | C416 | UnnecessaryComprehension | Unnecessary `(list\|set)` comprehension (rewrite using `(list\|set)()`) | 🛠 |
 | C417 | UnnecessaryMap | Unnecessary `map` usage (rewrite using a `(list\|set\|dict)` comprehension) |  |
+
+### flake8-debugger
+
+For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| T100 | Debugger | Debugger import found |  |
 
 ### flake8-boolean-trap
 

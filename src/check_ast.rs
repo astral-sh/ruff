@@ -36,8 +36,9 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
-    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_print,
-    flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pyupgrade, rules,
+    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
+    flake8_print, flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes,
+    pyupgrade, rules,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -626,6 +627,15 @@ where
                         );
                     }
 
+                    // flake8-debugger
+                    if self.settings.enabled.contains(&CheckCode::T100) {
+                        if let Some(check) = flake8_debugger::checks::debugger_import(
+                            stmt, &None, &alias.node.name,
+                        ) {
+                            self.add_check(check);
+                        }
+                    }
+
                     if let Some(asname) = &alias.node.asname {
                         for alias in names {
                             if let Some(asname) = &alias.node.asname {
@@ -850,6 +860,15 @@ where
                             stmt,
                             level.as_ref(),
                             &self.settings.flake8_tidy_imports.ban_relative_imports,
+                        ) {
+                            self.add_check(check);
+                        }
+                    }
+
+                    // flake8-debugger
+                    if self.settings.enabled.contains(&CheckCode::T100) {
+                        if let Some(check) = flake8_debugger::checks::debugger_import(
+                            stmt, module, &alias.node.name,
                         ) {
                             self.add_check(check);
                         }
@@ -1622,6 +1641,15 @@ where
                         if let ScopeKind::Function(inner) = &mut scope.kind {
                             inner.uses_locals = true;
                         }
+                    }
+                }
+
+                // flake8-debugger
+                if self.settings.enabled.contains(&CheckCode::T100) {
+                    if let Some(check) = flake8_debugger::checks::debugger_call(
+                        expr, func, &self.import_aliases,
+                    ) {
+                        self.add_check(check);
                     }
                 }
 

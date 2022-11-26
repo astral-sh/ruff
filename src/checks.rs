@@ -7,6 +7,7 @@ use strum_macros::{AsRefStr, EnumIter, EnumString};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::flake8_debugger::types::DebuggerUsingType;
 use crate::flake8_quotes::settings::Quote;
 use crate::flake8_tidy_imports::settings::Strictness;
 use crate::pyupgrade::types::Primitive;
@@ -129,6 +130,8 @@ pub enum CheckCode {
     C415,
     C416,
     C417,
+    // flake8-debugger
+    T100,
     // mccabe
     C901,
     // flake8-tidy-imports
@@ -272,6 +275,7 @@ pub enum CheckCategory {
     PEP8Naming,
     Flake8Bandit,
     Flake8Comprehensions,
+    Flake8Debugger,
     Flake8BooleanTrap,
     Flake8Bugbear,
     Flake8Builtins,
@@ -297,6 +301,7 @@ impl CheckCategory {
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
+            CheckCategory::Flake8Debugger => "flake8-debugger",
             CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
@@ -325,6 +330,9 @@ impl CheckCategory {
             }
             CheckCategory::Flake8Comprehensions => {
                 Some("https://pypi.org/project/flake8-comprehensions/3.10.1/")
+            }
+            CheckCategory::Flake8Debugger => {
+                Some("https://pypi.org/project/flake8-debugger/4.1.2/")
             }
             CheckCategory::Flake8TidyImports => {
                 Some("https://pypi.org/project/flake8-tidy-imports/4.8.0/")
@@ -472,6 +480,8 @@ pub enum CheckKind {
     UnnecessarySubscriptReversal(String),
     UnnecessaryComprehension(String),
     UnnecessaryMap(String),
+    // flake8-debugger
+    Debugger(DebuggerUsingType),
     // flake8-tidy-imports
     BannedRelativeImport(Strictness),
     // flake8-print
@@ -754,6 +764,8 @@ impl CheckCode {
             }
             CheckCode::C416 => CheckKind::UnnecessaryComprehension("(list|set)".to_string()),
             CheckCode::C417 => CheckKind::UnnecessaryMap("(list|set|dict)".to_string()),
+            // flake8-debugger
+            CheckCode::T100 => CheckKind::Debugger(DebuggerUsingType::Import),
             // flake8-tidy-imports
             CheckCode::I252 => CheckKind::BannedRelativeImport(Strictness::All),
             // flake8-print
@@ -1007,6 +1019,7 @@ impl CheckCode {
             CheckCode::C415 => CheckCategory::Flake8Comprehensions,
             CheckCode::C416 => CheckCategory::Flake8Comprehensions,
             CheckCode::C417 => CheckCategory::Flake8Comprehensions,
+            CheckCode::T100 => CheckCategory::Flake8Debugger,
             CheckCode::I252 => CheckCategory::Flake8TidyImports,
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
@@ -1234,6 +1247,8 @@ impl CheckKind {
             CheckKind::UnnecessarySubscriptReversal(_) => &CheckCode::C415,
             CheckKind::UnnecessaryComprehension(..) => &CheckCode::C416,
             CheckKind::UnnecessaryMap(_) => &CheckCode::C417,
+            // flake8-debugger
+            CheckKind::Debugger(_) => &CheckCode::T100,
             // flake8-tidy-imports
             CheckKind::BannedRelativeImport(_) => &CheckCode::I252,
             // flake8-print
@@ -1717,6 +1732,11 @@ impl CheckKind {
                 } else {
                     format!("Unnecessary `map` usage (rewrite using a `{obj_type}` comprehension)")
                 }
+            }
+            // flake8-debugger
+            CheckKind::Debugger(using_type) => match using_type {
+                DebuggerUsingType::Call(func_name) => format!("`{func_name}` call found"),
+                DebuggerUsingType::Import => "Debugger import found".to_string(),
             }
             // flake8-tidy-imports
             CheckKind::BannedRelativeImport(strictness) => match strictness {
