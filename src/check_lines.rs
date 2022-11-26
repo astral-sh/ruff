@@ -11,6 +11,7 @@ use crate::checks::{Check, CheckCode, CheckKind};
 use crate::noqa;
 use crate::noqa::Directive;
 use crate::settings::Settings;
+use textwrap::wrap;
 
 // Regex from PEP263
 static CODING_COMMENT_REGEX: Lazy<Regex> =
@@ -31,6 +32,25 @@ fn should_enforce_line_length(line: &str, length: usize, limit: usize) -> bool {
         false
     }
 }
+
+
+fn add_fix_if_can_fix(check: &mut Check, line: &str, autofix: bool, line_length: usize, target_line_length: usize) {
+    if !autofix {
+        return
+    }
+    if line_length <= target_line_length {
+        return
+    }
+    if line.trim_start().starts_with("\"\"\"") {
+        let mut whitespace = line.chars().take_while(|c| c.is_whitespace()).collect::<String>();
+        let wrap_length = target_line_length - whitespace.len();
+        let wrapped = wrap(line, wrap_length);
+        whitespace.insert(0, '\n');
+        let wrapped = wrapped.join(&whitespace);
+        check.fix = Some(Fix::replacement(wrapped, check.location, check.end_location));
+    }
+}
+
 
 pub fn check_lines(
     checks: &mut Vec<Check>,
@@ -112,7 +132,6 @@ pub fn check_lines(
                 (Directive::None, _) => {}
             }
         }
-
         // Enforce line length violations (E501).
         if enforce_line_too_long {
             let line_length = line.chars().count();
@@ -121,13 +140,14 @@ pub fn check_lines(
                     .entry(noqa_lineno)
                     .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
 
-                let check = Check::new(
+                let mut check = Check::new(
                     CheckKind::LineTooLong(line_length, settings.line_length),
                     Range {
                         location: Location::new(lineno + 1, 0),
                         end_location: Location::new(lineno + 1, line_length),
                     },
                 );
+                add_fix_if_can_fix(&mut check, line, autofix, line_length, settings.line_length);
 
                 match noqa {
                     (Directive::All(..), matches) => {
@@ -280,5 +300,33 @@ mod tests {
         };
         assert!(!check_with_max_line_length(6).is_empty());
         assert!(check_with_max_line_length(7).is_empty());
+    }
+
+    #[test]
+    fn test_fix_field_docstring() {
+        let file = r#"
+class Account:
+    address: str = None
+    """Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."""
+"#.trim_start();
+        let mut checks = vec![];
+        check_lines(
+            &mut checks,
+            file,
+            &IntMap::default(),
+            &Settings {
+                line_length: 79,
+                ..Settings::for_rule(CheckCode::E501)
+            },
+            true,
+        );
+        assert_eq!(checks.len(), 1);
+        let check = &checks[0];
+        assert_eq!(check.kind.code(), &CheckCode::E501);
+        let Some(fix) = &check.fix else { panic!("No fix."); };
+        assert_eq!(fix.patch.content, r#"
+    """Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+    eiusmod tempor incididunt ut labore et dolore magna aliqua."""
+"#.trim_matches('\n'));
     }
 }

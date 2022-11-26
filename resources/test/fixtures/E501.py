@@ -50,7 +50,3 @@ sit amet  consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labor
 """,  # noqa: E501
 }
 
-
-class Foo:
-    field1: int = 0
-    """Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."""
