@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
 
-use crate::checks_gen::CheckCodePrefix;
+use crate::checks_gen::{CheckCodePrefix, CATEGORIES};
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
 use crate::{
@@ -117,7 +117,7 @@ impl Configuration {
                 .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F]),
             extend_select: options.extend_select.unwrap_or_default(),
             fix: options.fix.unwrap_or_default(),
-            fixable: options.fixable.unwrap_or_else(CheckCodePrefix::fixables),
+            fixable: options.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
             unfixable: options.unfixable.unwrap_or_default(),
             ignore: options.ignore.unwrap_or_default(),
             line_length: options.line_length.unwrap_or(88),
