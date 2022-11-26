@@ -7,6 +7,7 @@ use std::path::Path;
 use anyhow::Result;
 #[cfg(not(target_family = "wasm"))]
 use log::debug;
+use nohash_hasher::IntMap;
 use rustpython_parser::lexer::LexResult;
 
 use crate::ast::types::Range;
@@ -46,6 +47,7 @@ impl AddAssign for Diagnostics {
 
 /// Generate a list of `Check` violations from the source code contents at the
 /// given `Path`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_path(
     path: &Path,
     contents: &str,
@@ -252,7 +254,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         tokens,
         &locator,
         &Directives {
-            noqa_line_for: Default::default(),
+            noqa_line_for: IntMap::default(),
             isort_exclusions: directives.isort_exclusions,
         },
         settings,
