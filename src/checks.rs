@@ -765,7 +765,7 @@ impl CheckCode {
             CheckCode::C416 => CheckKind::UnnecessaryComprehension("(list|set)".to_string()),
             CheckCode::C417 => CheckKind::UnnecessaryMap("(list|set|dict)".to_string()),
             // flake8-debugger
-            CheckCode::T100 => CheckKind::Debugger(DebuggerUsingType::Import),
+            CheckCode::T100 => CheckKind::Debugger(DebuggerUsingType::Import("...".to_string())),
             // flake8-tidy-imports
             CheckCode::I252 => CheckKind::BannedRelativeImport(Strictness::All),
             // flake8-print
@@ -1735,8 +1735,8 @@ impl CheckKind {
             }
             // flake8-debugger
             CheckKind::Debugger(using_type) => match using_type {
-                DebuggerUsingType::Call(func_name) => format!("`{func_name}` call found"),
-                DebuggerUsingType::Import => "Debugger import found".to_string(),
+                DebuggerUsingType::Call(name) => format!("Trace found: `{name}` used"),
+                DebuggerUsingType::Import(name) => format!("Import for `{name}` found"),
             },
             // flake8-tidy-imports
             CheckKind::BannedRelativeImport(strictness) => match strictness {

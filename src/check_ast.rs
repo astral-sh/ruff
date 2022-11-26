@@ -1657,9 +1657,12 @@ where
 
                 // flake8-debugger
                 if self.settings.enabled.contains(&CheckCode::T100) {
-                    if let Some(check) =
-                        flake8_debugger::checks::debugger_call(expr, func, &self.import_aliases)
-                    {
+                    if let Some(check) = flake8_debugger::checks::debugger_call(
+                        expr,
+                        func,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
                         self.add_check(check);
                     }
                 }

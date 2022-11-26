@@ -545,7 +545,7 @@ For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| T100 | Debugger | Debugger import found |  |
+| T100 | Debugger | Import for `...` found |  |
 
 ### flake8-boolean-trap
 
