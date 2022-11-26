@@ -65,21 +65,37 @@ pub fn check_lines(
             if lineno < 2 {
                 // PEP3120 makes utf-8 the default encoding.
                 if CODING_COMMENT_REGEX.is_match(line) {
-                    let line_length = line.len();
+                    let noqa = noqa_directives.entry(noqa_lineno).or_insert_with(|| {
+                        (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![])
+                    });
+
                     let mut check = Check::new(
                         CheckKind::PEP3120UnnecessaryCodingComment,
                         Range {
                             location: Location::new(lineno + 1, 0),
-                            end_location: Location::new(lineno + 1, line_length + 1),
+                            end_location: Location::new(lineno + 2, 0),
                         },
                     );
                     if autofix && settings.fixable.contains(check.kind.code()) {
                         check.amend(Fix::deletion(
                             Location::new(lineno + 1, 0),
-                            Location::new(lineno + 1, line_length + 1),
+                            Location::new(lineno + 2, 0),
                         ));
                     }
-                    line_checks.push(check);
+
+                    match noqa {
+                        (Directive::All(..), matches) => {
+                            matches.push(check.kind.code().as_ref());
+                        }
+                        (Directive::Codes(.., codes), matches) => {
+                            if codes.contains(&check.kind.code().as_ref()) {
+                                matches.push(check.kind.code().as_ref());
+                            } else {
+                                line_checks.push(check);
+                            }
+                        }
+                        (Directive::None, ..) => line_checks.push(check),
+                    }
                 }
             }
         }
@@ -109,7 +125,7 @@ pub fn check_lines(
                         ignored.push(index);
                     }
                 }
-                (Directive::None, _) => {}
+                (Directive::None, ..) => {}
             }
         }
 
@@ -140,7 +156,7 @@ pub fn check_lines(
                             line_checks.push(check);
                         }
                     }
-                    (Directive::None, _) => line_checks.push(check),
+                    (Directive::None, ..) => line_checks.push(check),
                 }
             }
         }
@@ -177,7 +193,7 @@ pub fn check_lines(
                         line_checks.push(check);
                     }
                 }
-                (Directive::None, _) => line_checks.push(check),
+                (Directive::None, ..) => line_checks.push(check),
             }
         }
     }
