@@ -97,17 +97,27 @@ fn add_noqa_inner(
                 output.push('\n');
             }
             Some(codes) => {
+                let mut codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
+
+                // Add the preamble.
                 match extract_noqa_directive(line) {
                     Directive::None => {
                         output.push_str(line);
                         output.push_str("  # noqa: ");
                     }
-                    Directive::All(_, start, _) | Directive::Codes(_, start, ..) => {
+                    Directive::All(_, start, _) => {
                         output.push_str(&line[..start]);
                         output.push_str("# noqa: ");
                     }
+                    Directive::Codes(_, start, _, existing) => {
+                        output.push_str(&line[..start]);
+                        output.push_str("# noqa: ");
+                        codes.extend(existing);
+                    }
                 };
-                let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
+
+                // Add the codes themselves.
+                codes.sort_unstable();
                 output.push_str(&codes.join(", "));
                 output.push('\n');
                 count += 1;
