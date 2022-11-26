@@ -97,8 +97,8 @@ enum CFormatQuantity {
 }
 
 #[derive(Debug, PartialEq)]
-struct CFormatSpec {
-    mapping_key: Option<String>,
+pub(crate) struct CFormatSpec {
+    pub mapping_key: Option<String>,
     flags: CConversionFlags,
     min_field_width: Option<CFormatQuantity>,
     precision: Option<CFormatQuantity>,
@@ -136,27 +136,14 @@ impl CFormatSpec {
 }
 
 #[derive(Debug, PartialEq)]
-enum CFormatPart<T> {
+pub(crate) enum CFormatPart<T> {
     Literal(T),
     Spec(CFormatSpec),
 }
 
-impl<T> CFormatPart<T> {
-    fn is_specifier(&self) -> bool {
-        matches!(self, CFormatPart::Spec(_))
-    }
-
-    fn has_key(&self) -> bool {
-        match self {
-            CFormatPart::Spec(s) => s.mapping_key.is_some(),
-            _ => false,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub(crate) struct CFormatString {
-    parts: Vec<(usize, CFormatPart<String>)>,
+    pub parts: Vec<(usize, CFormatPart<String>)>,
 }
 
 impl FromStr for CFormatString {

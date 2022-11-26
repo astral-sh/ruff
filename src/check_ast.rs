@@ -2,7 +2,6 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::str::FromStr;
 
 use itertools::Itertools;
 use log::error;
@@ -34,7 +33,7 @@ use crate::python::typing::SubscriptKind;
 use crate::settings::types::PythonVersion;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::vendored::cformat::{CFormatError, CFormatErrorType, CFormatString};
+use crate::vendored::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
@@ -1737,8 +1736,7 @@ where
                         || self.settings.enabled.contains(&CheckCode::F509)
                     {
                         let location = Range::from_located(expr);
-                        let cformat_string = CFormatString::from_str(value);
-                        match cformat_string {
+                        match pyflakes::cformat::CFormatSummary::try_from(value.as_ref()) {
                             Err(CFormatError {
                                 typ: CFormatErrorType::UnsupportedFormatChar(c),
                                 ..
