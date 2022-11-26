@@ -68,3 +68,13 @@ open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=N
 open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
 open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
 open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+open = 1
+open("foo", "U")
+open("foo", "Ur")
+open("foo", "Ub")
+open("foo", "rUb")
+open("foo", "r")
+open("foo", "rt")
+open("f", "r", encoding="UTF-8")
+open("f", "wt")
