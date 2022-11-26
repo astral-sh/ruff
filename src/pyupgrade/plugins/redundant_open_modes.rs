@@ -64,7 +64,6 @@ fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
         keywords,
     } = &expr.node
     {
-        // TODO(andberger): Verify that "open" is still bound to the built-in function.
         if match_name_or_attr(func, OPEN_FUNC_NAME) {
             // Return the "open mode" parameter and keywords.
             return (args.get(1), keywords.clone());
@@ -149,6 +148,10 @@ fn create_remove_param_fix(
 
 /// U015
 pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
+    // If `open` has been rebound, skip this check entirely.
+    if !checker.is_builtin(OPEN_FUNC_NAME) {
+        return;
+    }
     let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);
     if mode_param.is_none() && !keywords.is_empty() {
         if let Some(value) = keywords.iter().find_map(|keyword| {
