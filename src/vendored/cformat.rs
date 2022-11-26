@@ -90,18 +90,6 @@ bitflags! {
     }
 }
 
-impl CConversionFlags {
-    fn sign_string(&self) -> &'static str {
-        if self.contains(CConversionFlags::SIGN_CHAR) {
-            "+"
-        } else if self.contains(CConversionFlags::BLANK_SIGN) {
-            " "
-        } else {
-            ""
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 enum CFormatQuantity {
     Amount(usize),
@@ -163,63 +151,6 @@ impl<T> CFormatPart<T> {
             CFormatPart::Spec(s) => s.mapping_key.is_some(),
             _ => false,
         }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub(crate) struct CFormatBytes {
-    parts: Vec<(usize, CFormatPart<Vec<u8>>)>,
-}
-
-impl CFormatBytes {
-    pub(crate) fn parse<I: Iterator<Item = u8>>(
-        iter: &mut ParseIter<I>,
-    ) -> Result<Self, CFormatError> {
-        let mut parts = vec![];
-        let mut literal = vec![];
-        let mut part_index = 0;
-        while let Some((index, c)) = iter.next() {
-            if c == b'%' {
-                if let Some(&(_, second)) = iter.peek() {
-                    if second == b'%' {
-                        iter.next().unwrap();
-                        literal.push(b'%');
-                        continue;
-                    } else {
-                        if !literal.is_empty() {
-                            parts.push((
-                                part_index,
-                                CFormatPart::Literal(std::mem::take(&mut literal)),
-                            ));
-                        }
-                        let spec = CFormatSpec::parse(iter).map_err(|err| CFormatError {
-                            typ: err.0,
-                            index: err.1,
-                        })?;
-                        parts.push((index, CFormatPart::Spec(spec)));
-                        if let Some(&(index, _)) = iter.peek() {
-                            part_index = index;
-                        }
-                    }
-                } else {
-                    return Err(CFormatError {
-                        typ: CFormatErrorType::IncompleteFormat,
-                        index: index + 1,
-                    });
-                }
-            } else {
-                literal.push(c);
-            }
-        }
-        if !literal.is_empty() {
-            parts.push((part_index, CFormatPart::Literal(literal)));
-        }
-        Ok(Self { parts })
-    }
-
-    pub(crate) fn parse_from_bytes(bytes: &[u8]) -> Result<Self, CFormatError> {
-        let mut iter = bytes.iter().cloned().enumerate().peekable();
-        Self::parse(&mut iter)
     }
 }
 
