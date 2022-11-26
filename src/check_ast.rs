@@ -1964,6 +1964,7 @@ where
                         value,
                         &self.from_imports,
                         &self.import_aliases,
+                        |member| self.is_still_builtin(member),
                     ) {
                         Some(subscript) => {
                             match subscript {
@@ -2293,6 +2294,14 @@ impl<'a> Checker<'a> {
 
     pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
         self.scope_stack.iter().rev().map(|s| &self.scopes[*s])
+    }
+
+    /// if `member` is in the scopes return `Some(is_builtin)`
+    /// else return None
+    pub fn is_still_builtin(&self, member: &str) -> Option<bool> {
+        self.current_scopes()
+            .find_map(|scope| scope.values.get(member))
+            .map(|binding| matches!(binding.kind, BindingKind::Builtin))
     }
 
     pub fn current_parent(&self) -> &'a Stmt {
