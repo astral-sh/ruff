@@ -216,13 +216,13 @@ pub fn match_annotated_subscript<F>(
     is_builtin: F,
 ) -> Option<SubscriptKind>
 where
-    F: Fn(&str) -> Option<bool>,
+    F: Fn(&str) -> bool,
 {
     let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
     if !call_path.is_empty() {
         for (module, member) in SUBSCRIPTS {
             if match_call_path(&call_path, module, member, from_imports)
-                && (!module.is_empty() || is_builtin(member).unwrap_or(true))
+                && (!module.is_empty() || is_builtin(member))
             {
                 return Some(SubscriptKind::AnnotatedSubscript);
             }
