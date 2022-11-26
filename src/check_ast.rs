@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::str::FromStr;
 
 use itertools::Itertools;
 use log::error;
@@ -33,6 +34,7 @@ use crate::python::typing::SubscriptKind;
 use crate::settings::types::PythonVersion;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
+use crate::vendored::cformat::{CFormatError, CFormatErrorType, CFormatString};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
@@ -1719,6 +1721,46 @@ where
             } => {
                 if self.settings.enabled.contains(&CheckCode::F633) {
                     pyflakes::plugins::invalid_print_syntax(self, left);
+                }
+            }
+            ExprKind::BinOp {
+                left,
+                op: Operator::Mod,
+                ..
+            } => {
+                if let ExprKind::Constant {
+                    value: Constant::Str(value),
+                    ..
+                } = &left.node
+                {
+                    if self.settings.enabled.contains(&CheckCode::F501)
+                        || self.settings.enabled.contains(&CheckCode::F509)
+                    {
+                        let location = Range::from_located(expr);
+                        let cformat_string = CFormatString::from_str(value);
+                        match cformat_string {
+                            Err(CFormatError {
+                                typ: CFormatErrorType::UnsupportedFormatChar(c),
+                                ..
+                            }) => {
+                                if self.settings.enabled.contains(&CheckCode::F509) {
+                                    self.add_check(Check::new(
+                                        CheckKind::PercentFormatUnsupportedFormatCharacter(c),
+                                        location,
+                                    ))
+                                }
+                            }
+                            Err(e) => {
+                                if self.settings.enabled.contains(&CheckCode::F501) {
+                                    self.add_check(Check::new(
+                                        CheckKind::PercentFormatInvalidFormat(e.to_string()),
+                                        location,
+                                    ))
+                                }
+                            }
+                            Ok(_) => (),
+                        }
+                    }
                 }
             }
             ExprKind::UnaryOp { op, operand } => {

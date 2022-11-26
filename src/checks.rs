@@ -53,6 +53,8 @@ pub enum CheckCode {
     F405,
     F406,
     F407,
+    F501,
+    F509,
     F521,
     F522,
     F523,
@@ -415,6 +417,8 @@ pub enum CheckKind {
     LateFutureImport,
     MultiValueRepeatedKeyLiteral,
     MultiValueRepeatedKeyVariable(String),
+    PercentFormatInvalidFormat(String),
+    PercentFormatUnsupportedFormatCharacter(char),
     RaiseNotImplemented,
     ReturnOutsideFunction,
     StringDotFormatExtraNamedArguments(Vec<String>),
@@ -668,6 +672,8 @@ impl CheckCode {
             }
             CheckCode::F406 => CheckKind::ImportStarNotPermitted("...".to_string()),
             CheckCode::F407 => CheckKind::FutureFeatureNotDefined("...".to_string()),
+            CheckCode::F501 => CheckKind::PercentFormatInvalidFormat("...".to_string()),
+            CheckCode::F509 => CheckKind::PercentFormatUnsupportedFormatCharacter('c'),
             CheckCode::F521 => CheckKind::StringDotFormatInvalidFormat("...".to_string()),
             CheckCode::F522 => {
                 CheckKind::StringDotFormatExtraNamedArguments(vec!["...".to_string()])
@@ -946,6 +952,8 @@ impl CheckCode {
             CheckCode::F405 => CheckCategory::Pyflakes,
             CheckCode::F406 => CheckCategory::Pyflakes,
             CheckCode::F407 => CheckCategory::Pyflakes,
+            CheckCode::F501 => CheckCategory::Pyflakes,
+            CheckCode::F509 => CheckCategory::Pyflakes,
             CheckCode::F521 => CheckCategory::Pyflakes,
             CheckCode::F522 => CheckCategory::Pyflakes,
             CheckCode::F523 => CheckCategory::Pyflakes,
@@ -1175,6 +1183,8 @@ impl CheckKind {
             CheckKind::NoneComparison(_) => &CheckCode::E711,
             CheckKind::NotInTest => &CheckCode::E713,
             CheckKind::NotIsTest => &CheckCode::E714,
+            CheckKind::PercentFormatInvalidFormat(_) => &CheckCode::F501,
+            CheckKind::PercentFormatUnsupportedFormatCharacter(_) => &CheckCode::F509,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
             CheckKind::StringDotFormatExtraNamedArguments(_) => &CheckCode::F522,
@@ -1465,6 +1475,12 @@ impl CheckKind {
             },
             CheckKind::NotInTest => "Test for membership should be `not in`".to_string(),
             CheckKind::NotIsTest => "Test for object identity should be `is not`".to_string(),
+            CheckKind::PercentFormatInvalidFormat(message) => {
+                format!("'...' % ... has invalid format string: {message}")
+            }
+            CheckKind::PercentFormatUnsupportedFormatCharacter(char) => {
+                format!("'...' % ... has unsupported format character '{char}'")
+            }
             CheckKind::RaiseNotImplemented => {
                 "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
             }
