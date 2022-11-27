@@ -1,0 +1,13 @@
+---
+source: src/linter.rs
+expression: checks
+---
+- kind: PercentFormatStarRequiresSequence
+  location:
+    row: 11
+    column: 11
+  end_location:
+    row: 11
+    column: 27
+  fix: ~
+
