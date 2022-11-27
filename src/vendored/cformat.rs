@@ -91,7 +91,7 @@ bitflags! {
 }
 
 #[derive(Debug, PartialEq)]
-enum CFormatQuantity {
+pub(crate) enum CFormatQuantity {
     Amount(usize),
     FromValuesTuple,
 }
@@ -100,11 +100,10 @@ enum CFormatQuantity {
 pub(crate) struct CFormatSpec {
     pub mapping_key: Option<String>,
     flags: CConversionFlags,
-    min_field_width: Option<CFormatQuantity>,
-    precision: Option<CFormatQuantity>,
+    pub min_field_width: Option<CFormatQuantity>,
+    pub precision: Option<CFormatQuantity>,
     format_type: CFormatType,
     format_char: char,
-    // chars_consumed: usize,
 }
 
 impl CFormatSpec {

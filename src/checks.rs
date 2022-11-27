@@ -424,19 +424,14 @@ pub enum CheckKind {
     LateFutureImport,
     MultiValueRepeatedKeyLiteral,
     MultiValueRepeatedKeyVariable(String),
-    PercentFormatExpectedMapping, // message = "'...' %% ... expected mapping but got sequence"
-    PercentFormatExpectedSequence, // message = "'...' %% ... expected sequence but got mapping"
-    PercentFormatExtraNamedArguments(Vec<String>), /* message = "'...' %% ... has unused named
-                                   * argument(s): %s" */
+    PercentFormatExpectedMapping,
+    PercentFormatExpectedSequence,
+    PercentFormatExtraNamedArguments(Vec<String>),
     PercentFormatInvalidFormat(String),
-    PercentFormatMissingArgument(Vec<String>), /* message = "'...' %% ... is missing
-                                                * argument(s) for placeholder(s): %s" */
-    PercentFormatMixedPositionalAndNamed, /* message = "'...' %% ... has mixed positional and
-                                           * named placeholders" */
-    PercentFormatPositionalCountMismatch(usize, usize), /* message = "'...' %% ... has %d
-                                                         * placeholder(s) but %d
-                                                         * substitution(s)" */
-    PercentFormatStarRequiresSequence, // message = "'...' %% ... `*` specifier requires sequence"
+    PercentFormatMissingArgument(Vec<String>),
+    PercentFormatMixedPositionalAndNamed,
+    PercentFormatPositionalCountMismatch(usize, usize),
+    PercentFormatStarRequiresSequence,
     PercentFormatUnsupportedFormatCharacter(char),
     RaiseNotImplemented,
     ReturnOutsideFunction,
@@ -1529,20 +1524,20 @@ impl CheckKind {
             }
             CheckKind::PercentFormatExtraNamedArguments(missing) => {
                 let message = missing.join(", ");
-                format!("'...' %% ... has unused named argument(s): {message}")
+                format!("'...' % ... has unused named argument(s): {message}")
             }
             CheckKind::PercentFormatMissingArgument(missing) => {
                 let message = missing.join(", ");
-                format!("'...' %% ... is missing argument(s) for placeholder(s): {message}")
+                format!("'...' % ... is missing argument(s) for placeholder(s): {message}")
             }
             CheckKind::PercentFormatMixedPositionalAndNamed => {
-                "'...' %% ... has mixed positional and named placeholders".to_string()
+                "'...' % ... has mixed positional and named placeholders".to_string()
             }
             CheckKind::PercentFormatPositionalCountMismatch(wanted, got) => {
-                format!("'...' %% ... has {wanted} placeholder(s) but {got} substitution(s)")
+                format!("'...' % ... has {wanted} placeholder(s) but {got} substitution(s)")
             }
             CheckKind::PercentFormatStarRequiresSequence => {
-                "'...' %% ... `*` specifier requires sequence".to_string()
+                "'...' % ... `*` specifier requires sequence".to_string()
             }
             CheckKind::RaiseNotImplemented => {
                 "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
