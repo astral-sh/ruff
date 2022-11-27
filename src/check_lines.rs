@@ -16,13 +16,20 @@ use crate::settings::Settings;
 static CODING_COMMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").expect("Invalid regex"));
 
+static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").expect("Invalid regex"));
+
 /// Whether the given line is too long and should be reported.
 fn should_enforce_line_length(line: &str, length: usize, limit: usize) -> bool {
     if length > limit {
         let mut chunks = line.split_whitespace();
         if let (Some(first), Some(_)) = (chunks.next(), chunks.next()) {
-            // Do not enforce the line length for commented lines with a single word
-            !(first == "#" && chunks.next().is_none())
+            // Do not enforce the line length for commented lines that end with a URL
+            // or contain only a single word.
+            !(first == "#"
+                && chunks
+                    .last()
+                    .map(|c| URL_REGEX.is_match(c))
+                    .unwrap_or(false))
         } else {
             // Single word / no printable chars - no way to make the line shorter
             false
