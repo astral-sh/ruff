@@ -351,6 +351,15 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F405 | ImportStarUsage | `...` may be undefined, or defined from star imports: `...` |  |
 | F406 | ImportStarNotPermitted | `from ... import *` only allowed at module level |  |
 | F407 | FutureFeatureNotDefined | Future feature `...` is not defined |  |
+| F501 | PercentFormatInvalidFormat | '...' % ... has invalid format string: ... |  |
+| F502 | PercentFormatExpectedMapping | '...' % ... expected mapping but got sequence |  |
+| F503 | PercentFormatExpectedSequence | '...' % ... expected sequence but got mapping |  |
+| F504 | PercentFormatExtraNamedArguments | '...' % ... has unused named argument(s): ... |  |
+| F505 | PercentFormatMissingArgument | '...' % ... is missing argument(s) for placeholder(s): ... |  |
+| F506 | PercentFormatMixedPositionalAndNamed | '...' % ... has mixed positional and named placeholders |  |
+| F507 | PercentFormatPositionalCountMismatch | '...' % ... has 4 placeholder(s) but 2 substitution(s) |  |
+| F508 | PercentFormatStarRequiresSequence | '...' % ... `*` specifier requires sequence |  |
+| F509 | PercentFormatUnsupportedFormatCharacter | '...' % ... has unsupported format character 'c' |  |
 | F521 | StringDotFormatInvalidFormat | '...'.format(...) has invalid format string: ... |  |
 | F522 | StringDotFormatExtraNamedArguments | '...'.format(...) has unused named argument(s): ... |  |
 | F523 | StringDotFormatExtraPositionalArguments | '...'.format(...) has unused arguments at position(s): ... |  |
@@ -821,7 +830,7 @@ automatically convert your existing configuration.)
 Ruff can be used as a (near) drop-in replacement for Flake8 when used (1) without or with a small
 number of plugins, (2) alongside Black, and (3) on Python 3 code.
 
-Under those conditions Ruff is missing 9 rules related to `%` string formatting, 1 rule related
+Under those conditions Ruff is missing 1 rule related
 to docstring parsing, and 1 rule related to redefined variables.
 
 Ruff re-implements some of the most popular Flake8 plugins and related code quality tools natively,

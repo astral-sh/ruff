@@ -35,10 +35,10 @@ impl TryFrom<&str> for CFormatSummary {
                 match mapping_key {
                     Some(k) => {
                         keywords.insert(k);
-                    },
+                    }
                     None => {
                         num_positional += 1;
-                    },
+                    }
                 };
                 if min_field_width == Some(CFormatQuantity::FromValuesTuple) {
                     num_positional += 1;

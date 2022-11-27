@@ -124,7 +124,7 @@ pub(crate) fn percent_format_missing_arguments(
     if let ExprKind::Dict { keys, values } = &right.node {
         let mut keywords = FxHashSet::default();
         if values.len() > keys.len() {
-            return None;  // contains **x splat
+            return None; // contains **x splat
         }
 
         for key in keys {
@@ -136,7 +136,7 @@ pub(crate) fn percent_format_missing_arguments(
                     keywords.insert(value);
                 }
                 _ => {
-                    return None;  // Dynamic keys present
+                    return None; // Dynamic keys present
                 }
             }
         }

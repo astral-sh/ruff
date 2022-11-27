@@ -692,7 +692,7 @@ impl CheckCode {
             CheckCode::F504 => CheckKind::PercentFormatExtraNamedArguments(vec!["...".to_string()]),
             CheckCode::F505 => CheckKind::PercentFormatMissingArgument(vec!["...".to_string()]),
             CheckCode::F506 => CheckKind::PercentFormatMixedPositionalAndNamed,
-            CheckCode::F507 => CheckKind::PercentFormatPositionalCountMismatch(42, 111),
+            CheckCode::F507 => CheckKind::PercentFormatPositionalCountMismatch(4, 2),
             CheckCode::F508 => CheckKind::PercentFormatStarRequiresSequence,
             CheckCode::F509 => CheckKind::PercentFormatUnsupportedFormatCharacter('c'),
             CheckCode::F521 => CheckKind::StringDotFormatInvalidFormat("...".to_string()),
