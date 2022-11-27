@@ -6,8 +6,6 @@ use std::fmt;
 use std::iter::{Enumerate, Peekable};
 use std::str::FromStr;
 
-use bitflags::bitflags;
-
 #[derive(Debug, PartialEq)]
 pub(crate) enum CFormatErrorType {
     UnmatchedKeyParentheses,
@@ -47,52 +45,6 @@ impl fmt::Display for CFormatError {
 }
 
 #[derive(Debug, PartialEq)]
-enum CFormatPreconversor {
-    Repr,
-    Str,
-    Ascii,
-    Bytes,
-}
-
-#[derive(Debug, PartialEq)]
-enum CFormatCase {
-    Lowercase,
-    Uppercase,
-}
-
-#[derive(Debug, PartialEq)]
-enum CNumberType {
-    Decimal,
-    Octal,
-    Hex(CFormatCase),
-}
-
-#[derive(Debug, PartialEq)]
-enum CFloatType {
-    Exponent(CFormatCase),
-    PointDecimal(CFormatCase),
-    General(CFormatCase),
-}
-
-#[derive(Debug, PartialEq)]
-enum CFormatType {
-    Number(CNumberType),
-    Float(CFloatType),
-    Character,
-    String(CFormatPreconversor),
-}
-
-bitflags! {
-    struct CConversionFlags: u32 {
-        const ALTERNATE_FORM = 0b0000_0001;
-        const ZERO_PAD = 0b0000_0010;
-        const LEFT_ADJUST = 0b0000_0100;
-        const BLANK_SIGN = 0b0000_1000;
-        const SIGN_CHAR = 0b0001_0000;
-    }
-}
-
-#[derive(Debug, PartialEq)]
 pub(crate) enum CFormatQuantity {
     Amount(usize),
     FromValuesTuple,
@@ -101,11 +53,8 @@ pub(crate) enum CFormatQuantity {
 #[derive(Debug, PartialEq)]
 pub(crate) struct CFormatSpec {
     pub mapping_key: Option<String>,
-    flags: CConversionFlags,
     pub min_field_width: Option<CFormatQuantity>,
     pub precision: Option<CFormatQuantity>,
-    format_type: CFormatType,
-    format_char: char,
 }
 
 impl CFormatSpec {
@@ -115,23 +64,16 @@ impl CFormatSpec {
         I: Iterator<Item = T>,
     {
         let mapping_key = parse_spec_mapping_key(iter)?;
-        let flags = parse_flags(iter);
+        consume_flags(iter);
         let min_field_width = parse_quantity(iter)?;
         let precision = parse_precision(iter)?;
         consume_length(iter);
-        let (format_type, format_char) = parse_format_type(iter)?;
-        let precision = precision.or(match format_type {
-            CFormatType::Float(_) => Some(CFormatQuantity::Amount(6)),
-            _ => None,
-        });
+        parse_format_type(iter)?;
 
         Ok(CFormatSpec {
             mapping_key,
-            flags,
             min_field_width,
             precision,
-            format_type,
-            format_char,
         })
     }
 }
@@ -298,25 +240,20 @@ where
     Ok(None)
 }
 
-fn parse_flags<T, I>(iter: &mut ParseIter<I>) -> CConversionFlags
+fn consume_flags<T, I>(iter: &mut ParseIter<I>)
 where
     T: Into<char> + Copy,
     I: Iterator<Item = T>,
 {
-    let mut flags = CConversionFlags::empty();
     while let Some(&(_, c)) = iter.peek() {
-        let flag = match c.into() {
-            '#' => CConversionFlags::ALTERNATE_FORM,
-            '0' => CConversionFlags::ZERO_PAD,
-            '-' => CConversionFlags::LEFT_ADJUST,
-            ' ' => CConversionFlags::BLANK_SIGN,
-            '+' => CConversionFlags::SIGN_CHAR,
+        match c.into() {
+            '#' | '0' | '-' | ' ' | '+' => {
+                iter.next().unwrap();
+                continue;
+            }
             _ => break,
         };
-        iter.next().unwrap();
-        flags |= flag;
     }
-    flags
 }
 
 fn consume_length<T, I>(iter: &mut ParseIter<I>)
@@ -332,14 +269,11 @@ where
     }
 }
 
-fn parse_format_type<T, I>(iter: &mut ParseIter<I>) -> Result<(CFormatType, char), ParsingError>
+fn parse_format_type<T, I>(iter: &mut ParseIter<I>) -> Result<(), ParsingError>
 where
     T: Into<char>,
     I: Iterator<Item = T>,
 {
-    use CFloatType::{Exponent, General, PointDecimal};
-    use CFormatCase::{Lowercase, Uppercase};
-    use CNumberType::{Decimal, Hex, Octal};
     let (index, c) = match iter.next() {
         Some((index, c)) => (index, c.into()),
         None => {
@@ -349,25 +283,11 @@ where
             ));
         }
     };
-    let format_type = match c {
-        'd' | 'i' | 'u' => CFormatType::Number(Decimal),
-        'o' => CFormatType::Number(Octal),
-        'x' => CFormatType::Number(Hex(Lowercase)),
-        'X' => CFormatType::Number(Hex(Uppercase)),
-        'e' => CFormatType::Float(Exponent(Lowercase)),
-        'E' => CFormatType::Float(Exponent(Uppercase)),
-        'f' => CFormatType::Float(PointDecimal(Lowercase)),
-        'F' => CFormatType::Float(PointDecimal(Uppercase)),
-        'g' => CFormatType::Float(General(Lowercase)),
-        'G' => CFormatType::Float(General(Uppercase)),
-        'c' => CFormatType::Character,
-        'r' => CFormatType::String(CFormatPreconversor::Repr),
-        's' => CFormatType::String(CFormatPreconversor::Str),
-        'b' => CFormatType::String(CFormatPreconversor::Bytes),
-        'a' => CFormatType::String(CFormatPreconversor::Ascii),
-        _ => return Err((CFormatErrorType::UnsupportedFormatChar(c), index)),
-    };
-    Ok((format_type, c))
+    match c {
+        'd' | 'i' | 'u' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 'g' | 'G' | 'c' | 'r' | 's'
+        | 'b' | 'a' => Ok(()),
+        _ => Err((CFormatErrorType::UnsupportedFormatChar(c), index)),
+    }
 }
 
 impl FromStr for CFormatSpec {
@@ -391,21 +311,15 @@ mod tests {
     fn test_parse_key() {
         let expected = Ok(CFormatSpec {
             mapping_key: Some("amount".to_owned()),
-            format_type: CFormatType::Number(CNumberType::Decimal),
-            format_char: 'd',
             min_field_width: None,
             precision: None,
-            flags: CConversionFlags::empty(),
         });
         assert_eq!("%(amount)d".parse::<CFormatSpec>(), expected);
 
         let expected = Ok(CFormatSpec {
             mapping_key: Some("m((u(((l((((ti))))p)))l))e".to_owned()),
-            format_type: CFormatType::Number(CNumberType::Decimal),
-            format_char: 'd',
             min_field_width: None,
             precision: None,
-            flags: CConversionFlags::empty(),
         });
         assert_eq!(
             "%(m((u(((l((((ti))))p)))l))e)d".parse::<CFormatSpec>(),
@@ -447,14 +361,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_flags() {
+    fn test_consume_flags() {
         let expected = Ok(CFormatSpec {
-            format_type: CFormatType::Number(CNumberType::Decimal),
-            format_char: 'd',
             min_field_width: Some(CFormatQuantity::Amount(10)),
             precision: None,
             mapping_key: None,
-            flags: CConversionFlags::all(),
         });
         let parsed = "%  0   -+++###10d".parse::<CFormatSpec>();
         assert_eq!(parsed, expected);
@@ -475,24 +386,18 @@ mod tests {
                 (
                     18,
                     CFormatPart::Spec(CFormatSpec {
-                        format_type: CFormatType::String(CFormatPreconversor::Str),
-                        format_char: 's',
                         mapping_key: None,
                         min_field_width: None,
                         precision: None,
-                        flags: CConversionFlags::empty(),
                     }),
                 ),
                 (20, CFormatPart::Literal(" and I'm ".to_owned())),
                 (
                     29,
                     CFormatPart::Spec(CFormatSpec {
-                        format_type: CFormatType::Number(CNumberType::Decimal),
-                        format_char: 'd',
                         mapping_key: None,
                         min_field_width: None,
                         precision: None,
-                        flags: CConversionFlags::empty(),
                     }),
                 ),
                 (31, CFormatPart::Literal(" years old".to_owned())),
