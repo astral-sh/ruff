@@ -79,10 +79,10 @@ pub(crate) fn percent_format_extra_named_arguments(
     }
 
     if let ExprKind::Dict { keys, .. } = &right.node {
-        // We can only check that string literals exist
         let missing: Vec<String> = keys
             .iter()
             .filter_map(|k| match &k.node {
+                // We can only check that string literals exist
                 ExprKind::Constant {
                     value: Constant::Str(value),
                     ..
@@ -122,11 +122,11 @@ pub(crate) fn percent_format_missing_arguments(
     }
 
     if let ExprKind::Dict { keys, values } = &right.node {
-        let mut keywords = FxHashSet::default();
         if values.len() > keys.len() {
             return None; // contains **x splat
         }
 
+        let mut keywords = FxHashSet::default();
         for key in keys {
             match &key.node {
                 ExprKind::Constant {
