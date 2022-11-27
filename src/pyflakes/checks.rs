@@ -78,7 +78,11 @@ pub(crate) fn percent_format_extra_named_arguments(
         return None;
     }
 
-    if let ExprKind::Dict { keys, .. } = &right.node {
+    if let ExprKind::Dict { keys, values } = &right.node {
+        if values.len() > keys.len() {
+            return None; // contains **x splat
+        }
+
         let missing: Vec<String> = keys
             .iter()
             .filter_map(|k| match &k.node {

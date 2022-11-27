@@ -12,14 +12,4 @@ expression: checks
     row: 3
     column: 34
   fix: ~
-- kind:
-    PercentFormatExtraNamedArguments:
-      - x
-  location:
-    row: 6
-    column: 14
-  end_location:
-    row: 6
-    column: 34
-  fix: ~
 
