@@ -713,12 +713,7 @@ where
                         self.from_imports
                             .entry(module)
                             .or_insert_with(FxHashSet::default)
-                            .extend(
-                                names
-                                    .iter()
-                                    .filter(|alias| alias.node.asname.is_none())
-                                    .map(|alias| alias.node.name.as_str()),
-                            );
+                            .extend(names.iter().map(|alias| alias.node.name.as_str()));
                     }
                     for alias in names {
                         if let Some(asname) = &alias.node.asname {
