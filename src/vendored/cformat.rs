@@ -29,7 +29,9 @@ pub(crate) struct CFormatError {
 
 impl fmt::Display for CFormatError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use CFormatErrorType::*;
+        use CFormatErrorType::{
+            IntTooBig, MissingModuloSign, UnmatchedKeyParentheses, UnsupportedFormatChar,
+        };
         match self.typ {
             UnmatchedKeyParentheses => write!(f, "incomplete format key"),
             CFormatErrorType::IncompleteFormat => write!(f, "incomplete format"),
@@ -39,7 +41,7 @@ impl fmt::Display for CFormatError {
                 c, c as u32, self.index
             ),
             IntTooBig => write!(f, "width/precision too big"),
-            _ => write!(f, "unexpected error parsing format string"),
+            MissingModuloSign => write!(f, "unexpected error parsing format string"),
         }
     }
 }
@@ -168,21 +170,20 @@ impl CFormatString {
                         iter.next().unwrap();
                         literal.push('%');
                         continue;
-                    } else {
-                        if !literal.is_empty() {
-                            parts.push((
-                                part_index,
-                                CFormatPart::Literal(std::mem::take(&mut literal)),
-                            ));
-                        }
-                        let spec = CFormatSpec::parse(iter).map_err(|err| CFormatError {
-                            typ: err.0,
-                            index: err.1,
-                        })?;
-                        parts.push((index, CFormatPart::Spec(spec)));
-                        if let Some(&(index, _)) = iter.peek() {
-                            part_index = index;
-                        }
+                    }
+                    if !literal.is_empty() {
+                        parts.push((
+                            part_index,
+                            CFormatPart::Literal(std::mem::take(&mut literal)),
+                        ));
+                    }
+                    let spec = CFormatSpec::parse(iter).map_err(|err| CFormatError {
+                        typ: err.0,
+                        index: err.1,
+                    })?;
+                    parts.push((index, CFormatPart::Spec(spec)));
+                    if let Some(&(index, _)) = iter.peek() {
+                        part_index = index;
                     }
                 } else {
                     return Err(CFormatError {
@@ -208,6 +209,8 @@ where
     T: Into<char> + Copy,
     I: Iterator<Item = T>,
 {
+    #![allow(clippy::cast_possible_wrap)] // A single digit will never overflow
+
     if let Some(&(_, c)) = iter.peek() {
         let c: char = c.into();
         if c == '*' {
@@ -334,15 +337,15 @@ where
     T: Into<char>,
     I: Iterator<Item = T>,
 {
-    use CFloatType::*;
+    use CFloatType::{Exponent, General, PointDecimal};
     use CFormatCase::{Lowercase, Uppercase};
-    use CNumberType::*;
+    use CNumberType::{Decimal, Hex, Octal};
     let (index, c) = match iter.next() {
         Some((index, c)) => (index, c.into()),
         None => {
             return Err((
                 CFormatErrorType::IncompleteFormat,
-                iter.peek().map(|x| x.0).unwrap_or(0),
+                iter.peek().map_or(0, |x| x.0),
             ));
         }
     };

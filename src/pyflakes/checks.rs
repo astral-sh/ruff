@@ -192,9 +192,8 @@ pub(crate) fn percent_format_positional_count_mismatch(
             for elt in elts {
                 if let ExprKind::Starred { .. } = &elt.node {
                     return None;
-                } else {
-                    found += 1;
                 }
+                found += 1;
             }
 
             if found == summary.num_positional {

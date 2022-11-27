@@ -1752,7 +1752,7 @@ where
                                     self.add_check(Check::new(
                                         CheckKind::PercentFormatUnsupportedFormatCharacter(c),
                                         location,
-                                    ))
+                                    ));
                                 }
                             }
                             Err(e) => {
@@ -1760,7 +1760,7 @@ where
                                     self.add_check(Check::new(
                                         CheckKind::PercentFormatInvalidFormat(e.to_string()),
                                         location,
-                                    ))
+                                    ));
                                 }
                             }
                             Ok(summary) => {
