@@ -73,7 +73,7 @@ expectation.expected.add((
         "(found 'A')", arg_count=3)
 @expect("D413: Missing blank line after last section ('Examples')",
         arg_count=3)
-def foo(var1, var2, long_var_name='hi'):
+def foo(var1, var2, long_var_name='hi', **kwargs):
     r"""A one-line summary that does not use variable names.
 
     Several sentences providing an extended description. Refer to
@@ -91,6 +91,8 @@ def foo(var1, var2, long_var_name='hi'):
         detail, e.g. ``(N,) ndarray`` or ``array_like``.
     long_var_name : {'hi', 'ho'}, optional
         Choices in brackets, default first when optional.
+    **kwargs : int
+        More keyword arguments.
 
     Returns
     -------
