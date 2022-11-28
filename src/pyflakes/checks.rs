@@ -83,7 +83,7 @@ pub(crate) fn percent_format_extra_named_arguments(
             return None; // contains **x splat
         }
 
-        let missing: Vec<String> = keys
+        let missing: Vec<&String> = keys
             .iter()
             .filter_map(|k| match &k.node {
                 // We can only check that string literals exist
@@ -99,14 +99,15 @@ pub(crate) fn percent_format_extra_named_arguments(
                 }
                 _ => None,
             })
-            .cloned()
             .collect();
 
         if missing.is_empty() {
             None
         } else {
             Some(Check::new(
-                CheckKind::PercentFormatExtraNamedArguments(missing),
+                CheckKind::PercentFormatExtraNamedArguments(
+                    missing.iter().map(|&s| s.clone()).collect(),
+                ),
                 location,
             ))
         }
@@ -145,18 +146,19 @@ pub(crate) fn percent_format_missing_arguments(
             }
         }
 
-        let missing: Vec<String> = summary
+        let missing: Vec<&String> = summary
             .keywords
             .iter()
             .filter(|k| !keywords.contains(k))
-            .cloned()
             .collect();
 
         if missing.is_empty() {
             None
         } else {
             Some(Check::new(
-                CheckKind::PercentFormatMissingArgument(missing),
+                CheckKind::PercentFormatMissingArgument(
+                    missing.iter().map(|&s| s.clone()).collect(),
+                ),
                 location,
             ))
         }
@@ -247,16 +249,17 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         arg.as_ref()
     });
 
-    let missing: Vec<String> = keywords
+    let missing: Vec<&String> = keywords
         .filter(|&k| !summary.keywords.contains(k))
-        .cloned()
         .collect();
 
     if missing.is_empty() {
         None
     } else {
         Some(Check::new(
-            CheckKind::StringDotFormatExtraNamedArguments(missing),
+            CheckKind::StringDotFormatExtraNamedArguments(
+                missing.iter().map(|&s| s.clone()).collect(),
+            ),
             location,
         ))
     }
