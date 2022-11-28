@@ -187,7 +187,9 @@ fix = true
 unfixable = ["F401"]
 
 # Ignore `E402` (import violations in any `__init__.py` file, and in `path/to/file.py`.
-per-file-ignores = {"__init__.py" = ["E402"], "path/to/file.py" = ["E402"]}
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["E402"]
+"path/to/file.py" = ["E402"]
 ```
 
 Plugin configurations should be expressed as subsections, e.g.:
