@@ -53,6 +53,15 @@ pub enum CheckCode {
     F405,
     F406,
     F407,
+    F501,
+    F502,
+    F503,
+    F504,
+    F505,
+    F506,
+    F507,
+    F508,
+    F509,
     F521,
     F522,
     F523,
@@ -415,6 +424,15 @@ pub enum CheckKind {
     LateFutureImport,
     MultiValueRepeatedKeyLiteral,
     MultiValueRepeatedKeyVariable(String),
+    PercentFormatExpectedMapping,
+    PercentFormatExpectedSequence,
+    PercentFormatExtraNamedArguments(Vec<String>),
+    PercentFormatInvalidFormat(String),
+    PercentFormatMissingArgument(Vec<String>),
+    PercentFormatMixedPositionalAndNamed,
+    PercentFormatPositionalCountMismatch(usize, usize),
+    PercentFormatStarRequiresSequence,
+    PercentFormatUnsupportedFormatCharacter(char),
     RaiseNotImplemented,
     ReturnOutsideFunction,
     StringDotFormatExtraNamedArguments(Vec<String>),
@@ -668,6 +686,15 @@ impl CheckCode {
             }
             CheckCode::F406 => CheckKind::ImportStarNotPermitted("...".to_string()),
             CheckCode::F407 => CheckKind::FutureFeatureNotDefined("...".to_string()),
+            CheckCode::F501 => CheckKind::PercentFormatInvalidFormat("...".to_string()),
+            CheckCode::F502 => CheckKind::PercentFormatExpectedMapping,
+            CheckCode::F503 => CheckKind::PercentFormatExpectedSequence,
+            CheckCode::F504 => CheckKind::PercentFormatExtraNamedArguments(vec!["...".to_string()]),
+            CheckCode::F505 => CheckKind::PercentFormatMissingArgument(vec!["...".to_string()]),
+            CheckCode::F506 => CheckKind::PercentFormatMixedPositionalAndNamed,
+            CheckCode::F507 => CheckKind::PercentFormatPositionalCountMismatch(4, 2),
+            CheckCode::F508 => CheckKind::PercentFormatStarRequiresSequence,
+            CheckCode::F509 => CheckKind::PercentFormatUnsupportedFormatCharacter('c'),
             CheckCode::F521 => CheckKind::StringDotFormatInvalidFormat("...".to_string()),
             CheckCode::F522 => {
                 CheckKind::StringDotFormatExtraNamedArguments(vec!["...".to_string()])
@@ -946,6 +973,15 @@ impl CheckCode {
             CheckCode::F405 => CheckCategory::Pyflakes,
             CheckCode::F406 => CheckCategory::Pyflakes,
             CheckCode::F407 => CheckCategory::Pyflakes,
+            CheckCode::F501 => CheckCategory::Pyflakes,
+            CheckCode::F502 => CheckCategory::Pyflakes,
+            CheckCode::F503 => CheckCategory::Pyflakes,
+            CheckCode::F504 => CheckCategory::Pyflakes,
+            CheckCode::F505 => CheckCategory::Pyflakes,
+            CheckCode::F506 => CheckCategory::Pyflakes,
+            CheckCode::F507 => CheckCategory::Pyflakes,
+            CheckCode::F508 => CheckCategory::Pyflakes,
+            CheckCode::F509 => CheckCategory::Pyflakes,
             CheckCode::F521 => CheckCategory::Pyflakes,
             CheckCode::F522 => CheckCategory::Pyflakes,
             CheckCode::F523 => CheckCategory::Pyflakes,
@@ -1175,6 +1211,15 @@ impl CheckKind {
             CheckKind::NoneComparison(_) => &CheckCode::E711,
             CheckKind::NotInTest => &CheckCode::E713,
             CheckKind::NotIsTest => &CheckCode::E714,
+            CheckKind::PercentFormatExpectedMapping => &CheckCode::F502,
+            CheckKind::PercentFormatExpectedSequence => &CheckCode::F503,
+            CheckKind::PercentFormatExtraNamedArguments(_) => &CheckCode::F504,
+            CheckKind::PercentFormatInvalidFormat(_) => &CheckCode::F501,
+            CheckKind::PercentFormatMissingArgument(_) => &CheckCode::F505,
+            CheckKind::PercentFormatMixedPositionalAndNamed => &CheckCode::F506,
+            CheckKind::PercentFormatPositionalCountMismatch(..) => &CheckCode::F507,
+            CheckKind::PercentFormatStarRequiresSequence => &CheckCode::F508,
+            CheckKind::PercentFormatUnsupportedFormatCharacter(_) => &CheckCode::F509,
             CheckKind::RaiseNotImplemented => &CheckCode::F901,
             CheckKind::ReturnOutsideFunction => &CheckCode::F706,
             CheckKind::StringDotFormatExtraNamedArguments(_) => &CheckCode::F522,
@@ -1465,6 +1510,35 @@ impl CheckKind {
             },
             CheckKind::NotInTest => "Test for membership should be `not in`".to_string(),
             CheckKind::NotIsTest => "Test for object identity should be `is not`".to_string(),
+            CheckKind::PercentFormatInvalidFormat(message) => {
+                format!("'...' % ... has invalid format string: {message}")
+            }
+            CheckKind::PercentFormatUnsupportedFormatCharacter(char) => {
+                format!("'...' % ... has unsupported format character '{char}'")
+            }
+            CheckKind::PercentFormatExpectedMapping => {
+                "'...' % ... expected mapping but got sequence".to_string()
+            }
+            CheckKind::PercentFormatExpectedSequence => {
+                "'...' % ... expected sequence but got mapping".to_string()
+            }
+            CheckKind::PercentFormatExtraNamedArguments(missing) => {
+                let message = missing.join(", ");
+                format!("'...' % ... has unused named argument(s): {message}")
+            }
+            CheckKind::PercentFormatMissingArgument(missing) => {
+                let message = missing.join(", ");
+                format!("'...' % ... is missing argument(s) for placeholder(s): {message}")
+            }
+            CheckKind::PercentFormatMixedPositionalAndNamed => {
+                "'...' % ... has mixed positional and named placeholders".to_string()
+            }
+            CheckKind::PercentFormatPositionalCountMismatch(wanted, got) => {
+                format!("'...' % ... has {wanted} placeholder(s) but {got} substitution(s)")
+            }
+            CheckKind::PercentFormatStarRequiresSequence => {
+                "'...' % ... `*` specifier requires sequence".to_string()
+            }
             CheckKind::RaiseNotImplemented => {
                 "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
             }

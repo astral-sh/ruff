@@ -1,3 +1,4 @@
+pub mod cformat;
 pub mod checks;
 pub mod fixes;
 pub mod format;

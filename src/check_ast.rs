@@ -33,6 +33,7 @@ use crate::python::typing::SubscriptKind;
 use crate::settings::types::PythonVersion;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
+use crate::vendored::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
@@ -1714,6 +1715,116 @@ where
             } => {
                 if self.settings.enabled.contains(&CheckCode::F633) {
                     pyflakes::plugins::invalid_print_syntax(self, left);
+                }
+            }
+            ExprKind::BinOp {
+                left,
+                op: Operator::Mod,
+                right,
+            } => {
+                if let ExprKind::Constant {
+                    value: Constant::Str(value),
+                    ..
+                } = &left.node
+                {
+                    if self.settings.enabled.contains(&CheckCode::F501)
+                        || self.settings.enabled.contains(&CheckCode::F502)
+                        || self.settings.enabled.contains(&CheckCode::F503)
+                        || self.settings.enabled.contains(&CheckCode::F504)
+                        || self.settings.enabled.contains(&CheckCode::F505)
+                        || self.settings.enabled.contains(&CheckCode::F506)
+                        || self.settings.enabled.contains(&CheckCode::F507)
+                        || self.settings.enabled.contains(&CheckCode::F508)
+                        || self.settings.enabled.contains(&CheckCode::F509)
+                    {
+                        let location = Range::from_located(expr);
+                        match pyflakes::cformat::CFormatSummary::try_from(value.as_ref()) {
+                            Err(CFormatError {
+                                typ: CFormatErrorType::UnsupportedFormatChar(c),
+                                ..
+                            }) => {
+                                if self.settings.enabled.contains(&CheckCode::F509) {
+                                    self.add_check(Check::new(
+                                        CheckKind::PercentFormatUnsupportedFormatCharacter(c),
+                                        location,
+                                    ));
+                                }
+                            }
+                            Err(e) => {
+                                if self.settings.enabled.contains(&CheckCode::F501) {
+                                    self.add_check(Check::new(
+                                        CheckKind::PercentFormatInvalidFormat(e.to_string()),
+                                        location,
+                                    ));
+                                }
+                            }
+                            Ok(summary) => {
+                                if self.settings.enabled.contains(&CheckCode::F502) {
+                                    if let Some(check) =
+                                        pyflakes::checks::percent_format_expected_mapping(
+                                            &summary, right, location,
+                                        )
+                                    {
+                                        self.add_check(check);
+                                    }
+                                }
+                                if self.settings.enabled.contains(&CheckCode::F503) {
+                                    if let Some(check) =
+                                        pyflakes::checks::percent_format_expected_sequence(
+                                            &summary, right, location,
+                                        )
+                                    {
+                                        self.add_check(check);
+                                    }
+                                }
+                                if self.settings.enabled.contains(&CheckCode::F504) {
+                                    if let Some(check) =
+                                        pyflakes::checks::percent_format_extra_named_arguments(
+                                            &summary, right, location,
+                                        )
+                                    {
+                                        self.add_check(check);
+                                    }
+                                }
+                                if self.settings.enabled.contains(&CheckCode::F505) {
+                                    if let Some(check) =
+                                        pyflakes::checks::percent_format_missing_arguments(
+                                            &summary, right, location,
+                                        )
+                                    {
+                                        self.add_check(check);
+                                    }
+                                }
+                                if self.settings.enabled.contains(&CheckCode::F506) {
+                                    if let Some(check) =
+                                        pyflakes::checks::percent_format_mixed_positional_and_named(
+                                            &summary, location,
+                                        )
+                                    {
+                                        self.add_check(check);
+                                    }
+                                }
+                                if self.settings.enabled.contains(&CheckCode::F507) {
+                                    if let Some(check) =
+                                        pyflakes::checks::percent_format_positional_count_mismatch(
+                                            &summary, right, location,
+                                        )
+                                    {
+                                        self.add_check(check);
+                                    }
+                                }
+                                if self.settings.enabled.contains(&CheckCode::F508) {
+                                    if let Some(check) =
+                                        pyflakes::checks::percent_format_star_requires_sequence(
+                                            &summary, right, location,
+                                        )
+                                    {
+                                        self.add_check(check);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
