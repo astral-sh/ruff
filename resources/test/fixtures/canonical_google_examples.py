@@ -44,7 +44,7 @@ expectation.expected.add((
 @expect("D407: Missing dashed underline after section ('Returns')",
         arg_count=3)
 @expect("D413: Missing blank line after last section ('Raises')", arg_count=3)
-def fetch_bigtable_rows(big_table, keys, other_silly_variable=None):
+def fetch_bigtable_rows(big_table, keys, other_silly_variable=None, **kwargs):
     """Fetches rows from a Bigtable.
 
     Retrieves rows pertaining to the given keys from the Table instance
@@ -57,6 +57,7 @@ def fetch_bigtable_rows(big_table, keys, other_silly_variable=None):
             to fetch.
         other_silly_variable: Another optional variable, that has a much
             longer name than the other args, and which does nothing.
+        **kwargs: More keyword arguments.
 
     Returns:
         A dict mapping keys to the corresponding table row data

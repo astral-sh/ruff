@@ -4,7 +4,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Arg, Constant, ExprKind, Location, StmtKind};
+use rustpython_ast::{Constant, ExprKind, Location, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace;
@@ -1303,8 +1303,9 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
             args: arguments, ..
         } = &parent.node
         {
-            // Collect all the arguments into a single vector.
-            let mut all_arguments: Vec<&Arg> = arguments
+            // Look for arguments that weren't included in the docstring.
+            let mut missing_arg_names: BTreeSet<String> = BTreeSet::default();
+            for arg in arguments
                 .args
                 .iter()
                 .chain(arguments.posonlyargs.iter())
@@ -1316,33 +1317,38 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
                             && !is_staticmethod(parent),
                     ),
                 )
-                .collect();
+            {
+                let arg_name = arg.node.arg.as_str();
+                if !arg_name.starts_with('_') && !docstrings_args.contains(&arg_name) {
+                    missing_arg_names.insert(arg_name.to_string());
+                }
+            }
+
+            // Check specifically for `vararg` and `kwarg`, which can be prefixed with a single or
+            // double star, respectively.
             if let Some(arg) = &arguments.vararg {
-                all_arguments.push(arg);
+                let arg_name = arg.node.arg.as_str();
+                let starred_arg_name = format!("*{arg_name}");
+                if !arg_name.starts_with('_')
+                    && !docstrings_args.contains(&arg_name)
+                    && !docstrings_args.contains(&starred_arg_name.as_str())
+                {
+                    missing_arg_names.insert(starred_arg_name);
+                }
             }
             if let Some(arg) = &arguments.kwarg {
-                all_arguments.push(arg);
-            }
-
-            // Look for arguments that weren't included in the docstring.
-            let mut missing_args: BTreeSet<&str> = BTreeSet::default();
-            for arg in all_arguments {
                 let arg_name = arg.node.arg.as_str();
-                if arg_name.starts_with('_') {
-                    continue;
+                let starred_arg_name = format!("**{arg_name}");
+                if !arg_name.starts_with('_')
+                    && !docstrings_args.contains(&arg_name)
+                    && !docstrings_args.contains(&starred_arg_name.as_str())
+                {
+                    missing_arg_names.insert(starred_arg_name);
                 }
-                if docstrings_args.contains(&arg_name) {
-                    continue;
-                }
-                missing_args.insert(arg_name);
             }
 
-            if !missing_args.is_empty() {
-                let names = missing_args
-                    .into_iter()
-                    .map(String::from)
-                    .sorted()
-                    .collect();
+            if !missing_arg_names.is_empty() {
+                let names = missing_arg_names.into_iter().sorted().collect();
                 checker.add_check(Check::new(
                     CheckKind::DocumentAllArguments(names),
                     Range::from_located(parent),
