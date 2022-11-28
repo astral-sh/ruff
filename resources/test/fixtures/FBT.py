@@ -40,3 +40,17 @@ def used(do):
 
 used("a", True)
 used(do=True)
+
+# avoid FBT003 from explicit whitelist
+"""
+FBT003 Boolean positional value on dict
+"""
+a = {"a":"b"}
+a.get("hello", False)
+{}.get("hello", False)
+{}.setdefault("hello", True)
+{}.pop("hello", False)
+{}.pop(True, False)
+dict.fromkeys(("world",), True)
+{}.deploy(True, False)
+

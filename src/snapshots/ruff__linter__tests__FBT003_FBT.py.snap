@@ -10,4 +10,20 @@ expression: checks
     row: 41
     column: 14
   fix: ~
+- kind: BooleanPositionalValueInFunctionCall
+  location:
+    row: 55
+    column: 10
+  end_location:
+    row: 55
+    column: 14
+  fix: ~
+- kind: BooleanPositionalValueInFunctionCall
+  location:
+    row: 55
+    column: 16
+  end_location:
+    row: 55
+    column: 21
+  fix: ~
 
