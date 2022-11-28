@@ -49,3 +49,6 @@ sit amet  consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labor
 sit amet  consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 """,  # noqa: E501
 }
+
+# OK
+# A very long URL: https://loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.url.com
