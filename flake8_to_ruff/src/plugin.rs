@@ -6,18 +6,19 @@ use ruff::checks_gen::CheckCodePrefix;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {
+    Flake8Annotations,
     Flake8Bandit,
+    Flake8BlindExcept,
     Flake8Bugbear,
     Flake8Builtins,
     Flake8Comprehensions,
     Flake8Debugger,
     Flake8Docstrings,
-    Flake8TidyImports,
+    Flake8Eradicate,
     Flake8Print,
     Flake8Quotes,
-    Flake8Annotations,
+    Flake8TidyImports,
     McCabe,
-    Flake8BlindExcept,
     PEP8Naming,
     Pyupgrade,
 }
@@ -27,17 +28,18 @@ impl FromStr for Plugin {
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         match string {
+            "flake8-annotations" => Ok(Plugin::Flake8Annotations),
             "flake8-bandit" => Ok(Plugin::Flake8Bandit),
+            "flake8-blind-except" => Ok(Plugin::Flake8BlindExcept),
             "flake8-bugbear" => Ok(Plugin::Flake8Bugbear),
             "flake8-builtins" => Ok(Plugin::Flake8Builtins),
             "flake8-comprehensions" => Ok(Plugin::Flake8Comprehensions),
             "flake8-debugger" => Ok(Plugin::Flake8Debugger),
             "flake8-docstrings" => Ok(Plugin::Flake8Docstrings),
-            "flake8-tidy-imports" => Ok(Plugin::Flake8TidyImports),
+            "flake8-eradicate" => Ok(Plugin::Flake8BlindExcept),
             "flake8-print" => Ok(Plugin::Flake8Print),
             "flake8-quotes" => Ok(Plugin::Flake8Quotes),
-            "flake8-annotations" => Ok(Plugin::Flake8Annotations),
-            "flake8-blind-except" => Ok(Plugin::Flake8BlindExcept),
+            "flake8-tidy-imports" => Ok(Plugin::Flake8TidyImports),
             "mccabe" => Ok(Plugin::McCabe),
             "pep8-naming" => Ok(Plugin::PEP8Naming),
             "pyupgrade" => Ok(Plugin::Pyupgrade),
@@ -49,17 +51,18 @@ impl FromStr for Plugin {
 impl Plugin {
     pub fn default(&self) -> CheckCodePrefix {
         match self {
+            Plugin::Flake8Annotations => CheckCodePrefix::ANN,
             Plugin::Flake8Bandit => CheckCodePrefix::S,
+            Plugin::Flake8BlindExcept => CheckCodePrefix::BLE,
             Plugin::Flake8Bugbear => CheckCodePrefix::B,
             Plugin::Flake8Builtins => CheckCodePrefix::A,
             Plugin::Flake8Comprehensions => CheckCodePrefix::C4,
             Plugin::Flake8Debugger => CheckCodePrefix::T1,
             Plugin::Flake8Docstrings => CheckCodePrefix::D,
-            Plugin::Flake8TidyImports => CheckCodePrefix::I25,
+            Plugin::Flake8Eradicate => CheckCodePrefix::ERA,
             Plugin::Flake8Print => CheckCodePrefix::T2,
             Plugin::Flake8Quotes => CheckCodePrefix::Q,
-            Plugin::Flake8Annotations => CheckCodePrefix::ANN,
-            Plugin::Flake8BlindExcept => CheckCodePrefix::BLE,
+            Plugin::Flake8TidyImports => CheckCodePrefix::I25,
             Plugin::McCabe => CheckCodePrefix::C9,
             Plugin::PEP8Naming => CheckCodePrefix::N,
             Plugin::Pyupgrade => CheckCodePrefix::U,
@@ -68,7 +71,9 @@ impl Plugin {
 
     pub fn select(&self, flake8: &HashMap<String, Option<String>>) -> Vec<CheckCodePrefix> {
         match self {
+            Plugin::Flake8Annotations => vec![CheckCodePrefix::ANN],
             Plugin::Flake8Bandit => vec![CheckCodePrefix::S],
+            Plugin::Flake8BlindExcept => vec![CheckCodePrefix::BLE],
             Plugin::Flake8Bugbear => vec![CheckCodePrefix::B],
             Plugin::Flake8Builtins => vec![CheckCodePrefix::A],
             Plugin::Flake8Comprehensions => vec![CheckCodePrefix::C4],
@@ -89,11 +94,10 @@ impl Plugin {
                 // Default to PEP8.
                 DocstringConvention::PEP8.select()
             }
-            Plugin::Flake8TidyImports => vec![CheckCodePrefix::I25],
+            Plugin::Flake8Eradicate => vec![CheckCodePrefix::ERA],
             Plugin::Flake8Print => vec![CheckCodePrefix::T2],
             Plugin::Flake8Quotes => vec![CheckCodePrefix::Q],
-            Plugin::Flake8Annotations => vec![CheckCodePrefix::ANN],
-            Plugin::Flake8BlindExcept => vec![CheckCodePrefix::BLE],
+            Plugin::Flake8TidyImports => vec![CheckCodePrefix::I25],
             Plugin::McCabe => vec![CheckCodePrefix::C9],
             Plugin::PEP8Naming => vec![CheckCodePrefix::N],
             Plugin::Pyupgrade => vec![CheckCodePrefix::U],
@@ -281,31 +285,6 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
     let mut plugins = BTreeSet::new();
     for key in flake8.keys() {
         match key.as_str() {
-            // flake8-docstrings
-            "docstring-convention" | "docstring_convention" => {
-                plugins.insert(Plugin::Flake8Docstrings);
-            }
-            // flake8-bugbear
-            "extend-immutable-calls" | "extend_immutable_calls" => {
-                plugins.insert(Plugin::Flake8Bugbear);
-            }
-            // flake8-builtins
-            "builtins-ignorelist" | "builtins_ignorelist" => {
-                plugins.insert(Plugin::Flake8Builtins);
-            }
-            // flake8-quotes
-            "quotes" | "inline-quotes" | "inline_quotes" => {
-                plugins.insert(Plugin::Flake8Quotes);
-            }
-            "multiline-quotes" | "multiline_quotes" => {
-                plugins.insert(Plugin::Flake8Quotes);
-            }
-            "docstring-quotes" | "docstring_quotes" => {
-                plugins.insert(Plugin::Flake8Quotes);
-            }
-            "avoid-escape" | "avoid_escape" => {
-                plugins.insert(Plugin::Flake8Quotes);
-            }
             // flake8-annotations
             "suppress-none-returning" | "suppress_none_returning" => {
                 plugins.insert(Plugin::Flake8Annotations);
@@ -330,6 +309,41 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
             }
             "allow-star-arg-any" | "allow_star_arg_any" => {
                 plugins.insert(Plugin::Flake8Annotations);
+            }
+            // flake8-bugbear
+            "extend-immutable-calls" | "extend_immutable_calls" => {
+                plugins.insert(Plugin::Flake8Bugbear);
+            }
+            // flake8-builtins
+            "builtins-ignorelist" | "builtins_ignorelist" => {
+                plugins.insert(Plugin::Flake8Builtins);
+            }
+            // flake8-docstrings
+            "docstring-convention" | "docstring_convention" => {
+                plugins.insert(Plugin::Flake8Docstrings);
+            }
+            // flake8-eradicate
+            "eradicate-aggressive" | "eradicate_aggressive" => {
+                plugins.insert(Plugin::Flake8Eradicate);
+            }
+            "eradicate-whitelist" | "eradicate_whitelist" => {
+                plugins.insert(Plugin::Flake8Eradicate);
+            }
+            "eradicate-whitelist-extend" | "eradicate_whitelist_extend" => {
+                plugins.insert(Plugin::Flake8Eradicate);
+            }
+            // flake8-quotes
+            "quotes" | "inline-quotes" | "inline_quotes" => {
+                plugins.insert(Plugin::Flake8Quotes);
+            }
+            "multiline-quotes" | "multiline_quotes" => {
+                plugins.insert(Plugin::Flake8Quotes);
+            }
+            "docstring-quotes" | "docstring_quotes" => {
+                plugins.insert(Plugin::Flake8Quotes);
+            }
+            "avoid-escape" | "avoid_escape" => {
+                plugins.insert(Plugin::Flake8Quotes);
             }
             // flake8-tidy-imports
             "ban-relative-imports" | "ban_relative_imports" => {
@@ -364,17 +378,18 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
 /// `flake8-annotations` is active.
 pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin> {
     [
+        Plugin::Flake8Annotations,
         Plugin::Flake8Bandit,
+        Plugin::Flake8BlindExcept,
         Plugin::Flake8Bugbear,
         Plugin::Flake8Builtins,
         Plugin::Flake8Comprehensions,
         Plugin::Flake8Debugger,
         Plugin::Flake8Docstrings,
-        Plugin::Flake8TidyImports,
+        Plugin::Flake8Eradicate,
         Plugin::Flake8Print,
         Plugin::Flake8Quotes,
-        Plugin::Flake8Annotations,
-        Plugin::Flake8BlindExcept,
+        Plugin::Flake8TidyImports,
         Plugin::PEP8Naming,
         Plugin::Pyupgrade,
     ]
