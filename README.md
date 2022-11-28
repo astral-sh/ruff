@@ -827,14 +827,13 @@ stylistic lint rules that are obviated by autoformatting.
 (Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
 automatically convert your existing configuration.)
 
-Ruff can be used as a (near) drop-in replacement for Flake8 when used (1) without or with a small
-number of plugins, (2) alongside Black, and (3) on Python 3 code.
+Ruff can be used as a drop-in replacement for Flake8 when used (1) without or with a small number of
+plugins, (2) alongside Black, and (3) on Python 3 code.
 
-Under those conditions Ruff is missing 1 rule related
-to docstring parsing, and 1 rule related to redefined variables.
+Under those conditions, Ruff implements every rule in Flake8, with the exception of `F811`.
 
-Ruff re-implements some of the most popular Flake8 plugins and related code quality tools natively,
-including:
+Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
+natively,  including:
 
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
@@ -858,12 +857,12 @@ including:
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
-Beyond rule-set parity, Ruff suffers from the following limitations vis-à-vis Flake8:
+Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
 
 1. Ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
    pattern matching and parenthesized context managers.
-2. Flake8 has a plugin architecture and supports writing custom lint rules. (To date, popular Flake8
-   plugins have been re-implemented within Ruff directly.)
+2. Flake8 has a plugin architecture and supports writing custom lint rules. (Instead, popular Flake8
+   plugins are re-implemented in Rust as part of Ruff itself.)
 
 ### Which tools does Ruff replace?
 
