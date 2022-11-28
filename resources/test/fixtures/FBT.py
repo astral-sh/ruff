@@ -38,5 +38,20 @@ def function(
 def used(do):
     return do
 
+
 used("a", True)
 used(do=True)
+
+
+# Avoid FBT003 for explicitly allowed methods.
+"""
+FBT003 Boolean positional value on dict
+"""
+a = {"a": "b"}
+a.get("hello", False)
+{}.get("hello", False)
+{}.setdefault("hello", True)
+{}.pop("hello", False)
+{}.pop(True, False)
+dict.fromkeys(("world",), True)
+{}.deploy(True, False)

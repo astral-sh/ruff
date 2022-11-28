@@ -1638,7 +1638,7 @@ where
                 // flake8-boolean-trap
                 if self.settings.enabled.contains(&CheckCode::FBT003) {
                     flake8_boolean_trap::plugins::check_boolean_positional_value_in_function_call(
-                        self, args,
+                        self, args, func,
                     );
                 }
                 if let ExprKind::Name { id, ctx } = &func.node {
