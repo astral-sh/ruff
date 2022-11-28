@@ -39,9 +39,7 @@ pub fn fix_unnecessary_generator_list(
     let call = match_call(body)?;
     let arg = match_arg(call)?;
 
-    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg.value {
-        generator_exp
-    } else {
+    let Expression::GeneratorExp(generator_exp) = &arg.value else {
         return Err(anyhow::anyhow!(
             "Expected node to be: Expression::GeneratorExp"
         ));
@@ -82,9 +80,7 @@ pub fn fix_unnecessary_generator_set(
     let call = match_call(body)?;
     let arg = match_arg(call)?;
 
-    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg.value {
-        generator_exp
-    } else {
+    let Expression::GeneratorExp(generator_exp) = &arg.value else {
         return Err(anyhow::anyhow!(
             "Expected node to be: Expression::GeneratorExp"
         ));
@@ -126,28 +122,20 @@ pub fn fix_unnecessary_generator_dict(
     let arg = match_arg(call)?;
 
     // Extract the (k, v) from `(k, v) for ...`.
-    let generator_exp = if let Expression::GeneratorExp(generator_exp) = &arg.value {
-        generator_exp
-    } else {
+    let Expression::GeneratorExp(generator_exp) = &arg.value else {
         return Err(anyhow::anyhow!(
             "Expected node to be: Expression::GeneratorExp"
         ));
     };
-    let tuple = if let Expression::Tuple(tuple) = &generator_exp.elt.as_ref() {
-        tuple
-    } else {
+    let Expression::Tuple(tuple) = &generator_exp.elt.as_ref() else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Tuple"));
     };
-    let key = if let Some(Element::Simple { value, .. }) = &tuple.elements.get(0) {
-        value
-    } else {
+    let Some(Element::Simple { value: key, .. }) = &tuple.elements.get(0) else {
         return Err(anyhow::anyhow!(
             "Expected tuple to contain a key as the first element"
         ));
     };
-    let value = if let Some(Element::Simple { value, .. }) = &tuple.elements.get(1) {
-        value
-    } else {
+    let Some(Element::Simple { value, .. }) = &tuple.elements.get(1) else {
         return Err(anyhow::anyhow!(
             "Expected tuple to contain a key as the second element"
         ));
@@ -192,9 +180,7 @@ pub fn fix_unnecessary_list_comprehension_set(
     let call = match_call(body)?;
     let arg = match_arg(call)?;
 
-    let list_comp = if let Expression::ListComp(list_comp) = &arg.value {
-        list_comp
-    } else {
+    let Expression::ListComp(list_comp) = &arg.value else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::ListComp"));
     };
 
@@ -233,25 +219,18 @@ pub fn fix_unnecessary_list_comprehension_dict(
     let call = match_call(body)?;
     let arg = match_arg(call)?;
 
-    let list_comp = if let Expression::ListComp(list_comp) = &arg.value {
-        list_comp
-    } else {
+    let Expression::ListComp(list_comp) = &arg.value else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::ListComp"));
     };
 
-    let tuple = if let Expression::Tuple(tuple) = &*list_comp.elt {
-        tuple
-    } else {
+    let Expression::Tuple(tuple) = &*list_comp.elt else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Tuple"));
     };
 
-    let (key, comma, value) = match &tuple.elements[..] {
-        [Element::Simple {
+    let [Element::Simple {
             value: key,
             comma: Some(comma),
-        }, Element::Simple { value, .. }] => (key, comma, value),
-        _ => return Err(anyhow::anyhow!("Expected tuple with two elements")),
-    };
+        }, Element::Simple { value, .. }] = &tuple.elements[..] else { return Err(anyhow::anyhow!("Expected tuple with two elements")) };
 
     body.value = Expression::DictComp(Box::new(DictComp {
         key: Box::new(key.clone()),
@@ -409,9 +388,7 @@ pub fn fix_unnecessary_collection_call(
     let mut tree = match_module(&module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
-    let name = if let Expression::Name(name) = &call.func.as_ref() {
-        name
-    } else {
+    let Expression::Name(name) = &call.func.as_ref() else {
         return Err(anyhow::anyhow!("Expected node to be: Expression::Name"));
     };
 
