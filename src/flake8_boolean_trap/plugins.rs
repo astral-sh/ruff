@@ -5,7 +5,18 @@ use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-const FUNC_NAME_WHITELIST: &[&str] = &["get", "setdefault", "pop", "fromkeys"];
+const FUNC_NAME_ALLOWLIST: &[&str] = &["get", "setdefault", "pop", "fromkeys"];
+
+/// Returns `true` if an argument is allowed to use a boolean trap. To return
+/// `true`, the function name must be explicitly allowed, and the argument must
+/// be either the first or second argument in the call.
+fn allow_boolean_trap(func: &Expr) -> bool {
+    if let ExprKind::Attribute { attr, .. } = &func.node {
+        FUNC_NAME_ALLOWLIST.contains(&attr.as_ref())
+    } else {
+        false
+    }
+}
 
 fn is_boolean_arg(arg: &Expr) -> bool {
     matches!(
@@ -21,32 +32,6 @@ fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: CheckKind) {
     if is_boolean_arg(arg) {
         checker.add_check(Check::new(kind, Range::from_located(arg)));
     }
-}
-
-/// Returns true if an argument fulfills all whiltelist conditions.
-///
-/// Conditions:
-/// * function name must be explicitly whitelisted
-/// * argument in function call must be one of the first two
-fn is_whitelisted(arg: &Expr, func: &Expr, args: &[Expr]) -> bool {
-    if let ExprKind::Attribute { attr, .. } = &func.node {
-        FUNC_NAME_WHITELIST.contains(&attr.as_ref()) & args[..2].contains(arg)
-    } else {
-        false
-    }
-}
-
-fn add_if_boolean_and_not_whitelisted(
-    checker: &mut Checker,
-    arg: &Expr,
-    kind: CheckKind,
-    func: &Expr,
-    args: &[Expr],
-) {
-    if is_whitelisted(arg, func, args) {
-        return;
-    }
-    add_if_boolean(checker, arg, kind);
 }
 
 pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Arguments) {
@@ -93,13 +78,14 @@ pub fn check_boolean_positional_value_in_function_call(
     args: &[Expr],
     func: &Expr,
 ) {
-    for arg in args {
-        add_if_boolean_and_not_whitelisted(
+    for (index, arg) in args.iter().enumerate() {
+        if index < 2 && allow_boolean_trap(func) {
+            continue;
+        }
+        add_if_boolean(
             checker,
             arg,
             CheckKind::BooleanPositionalValueInFunctionCall,
-            func,
-            args,
         );
     }
 }
