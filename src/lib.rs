@@ -39,6 +39,7 @@ pub mod commands;
 mod cst;
 mod directives;
 mod docstrings;
+mod eradicate;
 mod flake8_2020;
 pub mod flake8_annotations;
 pub mod flake8_bandit;

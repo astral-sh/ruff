@@ -1360,7 +1360,7 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
 static GOOGLE_ARGS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*(\w+)\s*(\(.*?\))?\s*:\n?\s*.+").expect("Invalid regex"));
+    Lazy::new(|| Regex::new(r"^\s*(\w+)\s*(\(.*?\))?\s*:\n?\s*.+").unwrap());
 
 fn args_section(checker: &mut Checker, definition: &Definition, context: &SectionContext) {
     let mut args_sections: Vec<String> = vec![];
