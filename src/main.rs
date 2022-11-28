@@ -30,7 +30,7 @@ use ::ruff::settings::{pyproject, Settings};
 use ::ruff::updates;
 use ::ruff::{cache, commands};
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
@@ -258,6 +258,11 @@ fn inner_main() -> Result<ExitCode> {
 
     if let Some(code) = cli.explain {
         commands::explain(&code, cli.format)?;
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    if let Some(shell) = cli.generate_shell_completion {
+        shell.generate(&mut Cli::command(), &mut std::io::stdout());
         return Ok(ExitCode::SUCCESS);
     }
 

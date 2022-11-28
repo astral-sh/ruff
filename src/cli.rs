@@ -114,6 +114,9 @@ pub struct Cli {
     /// Explain a rule.
     #[arg(long)]
     pub explain: Option<CheckCode>,
+    /// Generate shell completion
+    #[arg(long, hide = true, value_name = "SHELL")]
+    pub generate_shell_completion: Option<clap_complete_command::Shell>,
 }
 
 impl Cli {
