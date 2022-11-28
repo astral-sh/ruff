@@ -15,7 +15,7 @@ use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
-use crate::visibility::{is_init, is_magic, is_overload, is_staticmethod, Visibility};
+use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub fn not_missing(
@@ -88,7 +88,7 @@ pub fn not_missing(
             }
         }
         DefinitionKind::Method(stmt) => {
-            if is_overload(stmt) {
+            if is_overload(stmt) || is_override(stmt) {
                 true
             } else if is_magic(stmt) {
                 if checker.settings.enabled.contains(&CheckCode::D105) {

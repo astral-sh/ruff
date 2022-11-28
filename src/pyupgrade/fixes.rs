@@ -111,10 +111,7 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
     let range = Range::from_located(expr);
     let contents = locator.slice_source_code_range(&range);
 
-    let mut tree = match libcst_native::parse_module(&contents, None) {
-        Ok(m) => m,
-        Err(_) => return None,
-    };
+    let mut tree = libcst_native::parse_module(&contents, None).ok()?;
 
     if let Some(Statement::Simple(body)) = tree.body.first_mut() {
         if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
@@ -150,22 +147,16 @@ pub fn remove_unnecessary_future_import(
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text)?;
 
-    let body = if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        body
-    } else {
+    let Some(Statement::Simple(body)) = tree.body.first_mut() else {
         return Err(anyhow::anyhow!("Expected node to be: Statement::Simple"));
     };
-    let body = if let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() {
-        body
-    } else {
+    let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() else {
         return Err(anyhow::anyhow!(
             "Expected node to be: SmallStatement::ImportFrom"
         ));
     };
 
-    let aliases = if let ImportNames::Aliases(aliases) = &mut body.names {
-        aliases
-    } else {
+    let ImportNames::Aliases(aliases) = &mut body.names else {
         return Err(anyhow::anyhow!("Expected node to be: Aliases"));
     };
 

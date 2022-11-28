@@ -4,50 +4,50 @@ expression: checks
 ---
 - kind: NoOverIndentation
   location:
-    row: 247
+    row: 252
     column: 0
   end_location:
-    row: 247
+    row: 252
     column: 0
   fix:
     patch:
       content: "    "
       location:
-        row: 247
+        row: 252
         column: 0
       end_location:
-        row: 247
+        row: 252
         column: 7
 - kind: NoOverIndentation
   location:
-    row: 259
+    row: 264
     column: 0
   end_location:
-    row: 259
+    row: 264
     column: 0
   fix:
     patch:
       content: "    "
       location:
-        row: 259
+        row: 264
         column: 0
       end_location:
-        row: 259
+        row: 264
         column: 8
 - kind: NoOverIndentation
   location:
-    row: 267
+    row: 272
     column: 0
   end_location:
-    row: 267
+    row: 272
     column: 0
   fix:
     patch:
       content: "    "
       location:
-        row: 267
+        row: 272
         column: 0
       end_location:
-        row: 267
+        row: 272
         column: 8
 

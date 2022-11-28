@@ -4,10 +4,10 @@ expression: checks
 ---
 - kind: PublicClass
   location:
-    row: 14
+    row: 15
     column: 0
   end_location:
-    row: 67
+    row: 72
     column: 0
   fix: ~
 

@@ -5,35 +5,35 @@ expression: checks
 - kind:
     OneBlankLineAfterClass: 0
   location:
-    row: 176
+    row: 181
     column: 4
   end_location:
-    row: 176
+    row: 181
     column: 24
   fix:
     patch:
       content: "\n"
       location:
-        row: 177
+        row: 182
         column: 0
       end_location:
-        row: 177
+        row: 182
         column: 0
 - kind:
     OneBlankLineAfterClass: 0
   location:
-    row: 187
+    row: 192
     column: 4
   end_location:
-    row: 187
+    row: 192
     column: 45
   fix:
     patch:
       content: "\n"
       location:
-        row: 188
+        row: 193
         column: 0
       end_location:
-        row: 188
+        row: 193
         column: 0
 

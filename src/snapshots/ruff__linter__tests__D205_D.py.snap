@@ -4,34 +4,34 @@ expression: checks
 ---
 - kind: BlankLineAfterSummary
   location:
-    row: 195
+    row: 200
     column: 4
   end_location:
-    row: 198
+    row: 203
     column: 7
   fix:
     patch:
       content: "\n"
       location:
-        row: 196
+        row: 201
         column: 0
       end_location:
-        row: 196
+        row: 201
         column: 0
 - kind: BlankLineAfterSummary
   location:
-    row: 205
+    row: 210
     column: 4
   end_location:
-    row: 210
+    row: 215
     column: 7
   fix:
     patch:
       content: "\n"
       location:
-        row: 206
+        row: 211
         column: 0
       end_location:
-        row: 208
+        row: 213
         column: 0
 

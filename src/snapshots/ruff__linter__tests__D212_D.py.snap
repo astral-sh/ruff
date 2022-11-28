@@ -4,10 +4,10 @@ expression: checks
 ---
 - kind: MultiLineSummaryFirstLine
   location:
-    row: 124
+    row: 129
     column: 4
   end_location:
-    row: 126
+    row: 131
     column: 7
   fix: ~
 

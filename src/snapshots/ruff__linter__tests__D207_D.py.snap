@@ -4,34 +4,34 @@ expression: checks
 ---
 - kind: NoUnderIndentation
   location:
-    row: 227
+    row: 232
     column: 0
   end_location:
-    row: 227
+    row: 232
     column: 0
   fix:
     patch:
       content: "    "
       location:
-        row: 227
+        row: 232
         column: 0
       end_location:
-        row: 227
+        row: 232
         column: 0
 - kind: NoUnderIndentation
   location:
-    row: 435
+    row: 440
     column: 0
   end_location:
-    row: 435
+    row: 440
     column: 0
   fix:
     patch:
       content: "                                    "
       location:
-        row: 435
+        row: 440
         column: 0
       end_location:
-        row: 435
+        row: 440
         column: 4
 

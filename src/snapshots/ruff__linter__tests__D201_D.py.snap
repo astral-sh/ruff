@@ -5,69 +5,69 @@ expression: checks
 - kind:
     NoBlankLineBeforeFunction: 1
   location:
-    row: 132
+    row: 137
     column: 4
   end_location:
-    row: 132
+    row: 137
     column: 24
   fix:
     patch:
       content: ""
       location:
-        row: 131
+        row: 136
         column: 0
       end_location:
-        row: 132
+        row: 137
         column: 0
 - kind:
     NoBlankLineBeforeFunction: 1
   location:
-    row: 146
+    row: 151
     column: 4
   end_location:
-    row: 146
+    row: 151
     column: 37
   fix:
     patch:
       content: ""
       location:
-        row: 145
+        row: 150
         column: 0
       end_location:
-        row: 146
+        row: 151
         column: 0
 - kind:
     NoBlankLineBeforeFunction: 1
   location:
-    row: 541
+    row: 546
     column: 4
   end_location:
-    row: 544
+    row: 549
     column: 7
   fix:
     patch:
       content: ""
       location:
-        row: 540
+        row: 545
         column: 0
       end_location:
-        row: 541
+        row: 546
         column: 0
 - kind:
     NoBlankLineBeforeFunction: 1
   location:
-    row: 563
+    row: 568
     column: 4
   end_location:
-    row: 566
+    row: 571
     column: 7
   fix:
     patch:
       content: ""
       location:
-        row: 562
+        row: 567
         column: 0
       end_location:
-        row: 563
+        row: 568
         column: 0
 
