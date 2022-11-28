@@ -208,7 +208,7 @@ ignore = ["E501"]
 fix = true
 unfixable = ["F401"]
 
-# Ignore `E402` (import violations in any `__init__.py` file, and in `path/to/file.py`.
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["E402"]
 "path/to/file.py" = ["E402"]
@@ -1410,16 +1410,21 @@ line-length = 120
 
 #### [`per_file_ignores`](#per_file_ignores)
 
-Description.
+A list of mappings from file pattern to check code prefixes to exclude, when considering any
+matching files.
 
-**Default value**:
+**Default value**: `{}`
 
-**Type**: `Vec<PerFileIgnore>`
+**Type**: `HashMap<String, Vec<CheckCodePrefix>>`
 
 **Example usage**:
 
 ```toml
 [tool.ruff]
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["E402"]
+"path/to/file.py" = ["E402"]
 ```
 
 ---
@@ -1477,6 +1482,316 @@ and instead must be specified explicitly (as seen below).
 [tool.ruff]
 # Always generate Python 3.7-compatible code.
 target-version = "py37"
+```
+
+### `flake8-annotations`
+
+#### [`mypy_init_return`](#mypy_init_return)
+
+Whether to allow the omission of a return type hint for `__init__` if at least one argument is
+annotated.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-annotations]
+mypy_init_return = true
+```
+
+---
+
+#### [`suppress_dummy_args`](#suppress_dummy_args)
+
+Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable regex (like
+`_`).
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-annotations]
+suppress_dummy_args = true
+```
+
+---
+
+#### [`suppress_none_returning`](#suppress_none_returning)
+
+Whether to suppress `ANN200`-level errors for functions that meet either of the following criteria:
+
+- Contain no `return` statement.
+- Explicit `return` statement(s) all return `None` (explicitly or implicitly).
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-annotations]
+suppress_none_returning = true
+```
+
+---
+
+#### [`allow_star_arg_any`](#allow_star_arg_any)
+
+Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-annotations]
+allow_star_arg_any = true
+```
+
+### `flake8-bugbear`
+
+#### [`extend_immutable_calls`](#extend_immutable_calls)
+
+Additional callable functions to consider "immutable" when evaluating, e.g., no-mutable-default-argument
+checks (`B006`).
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-bugbear]
+# Allow default arguments like, e.g., `data: List[str] = fastapi.Query(None)`.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+```
+
+### `flake8-quotes`
+
+#### [`inline_quotes`](#inline_quotes)
+
+Quote style to prefer for inline strings (either "single" (`'`) or "double" (`"`)).
+
+**Default value**: `"double"`
+
+**Type**: `Quote`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-quotes]
+inline-quotes = "single"
+```
+
+---
+
+#### [`multiline_quotes`](#multiline_quotes)
+
+Quote style to prefer for multiline strings (either "single" (`'`) or "double" (`"`)).
+
+**Default value**: `"double"`
+
+**Type**: `Quote`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-quotes]
+multiline-quotes = "single"
+```
+
+---
+
+#### [`docstring_quotes`](#docstring_quotes)
+
+Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
+
+**Default value**: `"double"`
+
+**Type**: `Quote`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-quotes]
+docstring-quotes = "single"
+```
+
+---
+
+#### [`avoid_escape`](#avoid_escape)
+
+Whether to avoid using single quotes if a string contains single quotes, or vice-versa with
+double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the
+need to escape quotation marks within strings.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-quotes]
+# Don't bother trying to avoid escapes.
+avoid-escape = false
+```
+
+### `flake8-tidy-imports`
+
+#### [`ban_relative_imports`](#ban_relative_imports)
+
+Whether to ban all relative imports (`"all"`), or only those imports that extend into the parent
+module and beyond (`"parents"`).
+
+**Default value**: `"parents"`
+
+**Type**: `Strictness`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-tidy-imports]
+# Disallow all relative imports.
+ban-relative-imports = "all"
+```
+
+### `isort`
+
+#### [`known_first_party`](known_first_party)
+
+A list of modules to consider first-party, regardless of whether they can be identified as such
+via introspection of the local filesystem.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+known-first-party = ["src"]
+```
+
+---
+
+#### [`known_third_party`](known_third_party)
+
+A list of modules to consider third-party, regardless of whether they can be identified as such
+via introspection of the local filesystem.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+known-third-party = ["fastapi"]
+```
+
+---
+
+#### [`extra_standard_library`](extra_standard_library)
+
+A list of modules to consider standard-library, in addition to those known to Ruff in advance.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+extra-standard-library = ["path"]
+```
+
+### `mccabe`
+
+#### [`max_complexity`](#max_complexity)
+
+The maximum McCabe complexity to allow before triggering `C901` errors.
+
+**Default value**: `10`
+
+**Type**: `usize`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-tidy-imports]
+# Flag errors (`C901`) whenever the complexity level exceeds 5.
+max-complexity = 5
+```
+
+### `pep8-naming`
+
+#### [`ignore_names`](#ignore_names)
+
+A list of names to ignore when considering `pep8-naming` violations.
+
+**Default value**: `["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pep8-naming]
+ignore-names = ["callMethod"]
+```
+
+---
+
+#### [`classmethod_decorators`](#classmethod_decorators)
+
+A list of decorators that, when applied to a method, indicate that the method should be treated as
+a class method. For example, Ruff will expect that any method decorated by a decorator in this list
+takes a `cls` argument as its first argument.
+
+**Default value**: `["classmethod"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pep8-naming]
+# Allow Pydantic's `@validator` decorator to trigger class method treatment.
+classmethod-decorators = ["classmethod", "pydantic.validator"]
+```
+
+---
+
+#### [`staticmethod_decorators`](#staticmethod_decorators)
+
+A list of decorators that, when applied to a method, indicate that the method should be treated as
+a static method. For example, Ruff will expect that any method decorated by a decorator in this list
+has no `self` or `cls` argument.
+
+**Default value**: `["staticmethod"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pep8-naming]
+# Allow a shorthand alias, `@stcmthd`, to trigger static method treatment.
+staticmethod-decorators = ["staticmethod", "stcmthd"]
 ```
 
 ## License
