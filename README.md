@@ -81,10 +81,16 @@ Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-mu
 
 ### Installation
 
-Available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
+Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
 ```shell
 pip install ruff
+```
+
+If you're a **macOS Homebrew** or a **Linuxbrew** user, you can also install `ruff` via Homebrew:
+
+```shell
+brew install ruff
 ```
 
 ### Usage
