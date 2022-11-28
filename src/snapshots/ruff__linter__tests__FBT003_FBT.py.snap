@@ -4,26 +4,26 @@ expression: checks
 ---
 - kind: BooleanPositionalValueInFunctionCall
   location:
-    row: 41
+    row: 42
     column: 10
   end_location:
-    row: 41
+    row: 42
     column: 14
   fix: ~
 - kind: BooleanPositionalValueInFunctionCall
   location:
-    row: 55
+    row: 57
     column: 10
   end_location:
-    row: 55
+    row: 57
     column: 14
   fix: ~
 - kind: BooleanPositionalValueInFunctionCall
   location:
-    row: 55
+    row: 57
     column: 16
   end_location:
-    row: 55
+    row: 57
     column: 21
   fix: ~
 
