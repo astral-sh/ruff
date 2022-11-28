@@ -93,6 +93,7 @@ of [Conda](https://docs.conda.io/en/latest/):
 1. [Development](#development)
 1. [Releases](#releases)
 1. [Benchmarks](#benchmarks)
+1. [Reference](#reference)
 1. [License](#license)
 1. [Contributing](#contributing)
 
@@ -143,8 +144,10 @@ _Note: prior to `v0.0.86`, `ruff-pre-commit` used `lint` (rather than `ruff`) as
 
 ## Configuration
 
-Ruff is configurable both via `pyproject.toml` and the command line. If left unspecified, the
-default configuration is equivalent to:
+Ruff is configurable both via `pyproject.toml` and the command line. For a full list of configurable
+options, see the [API reference](#reference).
+
+If left unspecified, the default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
@@ -222,7 +225,9 @@ select = ["E", "F", "Q"]
 docstring-quotes = "double"
 ```
 
-Alternatively, common configuration settings can be provided via the command-line:
+For a full list of configurable options, see the [API reference](#reference).
+
+Some common configuration settings can be provided via the command-line:
 
 ```shell
 ruff path/to/code/ --select F401 --select F403
@@ -298,17 +303,6 @@ Options:
   -V, --version
           Print version information
 ```
-
-### Excluding files
-
-Exclusions are based on globs, and can be either:
-
-- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the
-  tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching
-  `foo_*.py` ).
-- Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py`
-  (to exclude any Python files in `directory`). Note that these paths are relative to the
-  project root (e.g., the directory containing your `pyproject.toml`).
 
 ### Ignoring errors
 
@@ -1190,6 +1184,299 @@ Summary
   137.46 ± 3.55 times faster than 'pyflakes resources/test/cpython'
   226.35 ± 6.23 times faster than 'pycodestyle resources/test/cpython'
   389.73 ± 9.92 times faster than 'flake8 resources/test/cpython'
+```
+
+## Reference
+
+### Options
+
+#### [`dummy_variable_rgx`](#dummy_variable_rgx)
+
+A regular expression used to identify "dummy" variables, or those which should be ignored when evaluating
+(e.g.) unused-variable checks.
+
+**Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"` (matches `_`, `__`, and `_var`, but not `_var_`)
+
+**Type**: `Regex`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Only ignore variables named "_".
+dummy_variable_rgx = "^_$"
+```
+
+---
+
+#### [`exclude`](#exclude)
+
+A list of file patterns to exclude from linting.
+
+Exclusions are based on globs, and can be either:
+
+- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the
+  tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching
+  `foo_*.py` ).
+- Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py`
+  (to exclude any Python files in `directory`). Note that these paths are relative to the
+  project root (e.g., the directory containing your `pyproject.toml`).
+
+Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify the excluded
+paths.
+
+**Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
+
+**Type**: `Vec<FilePattern>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+exclude = [".venv"]
+````
+
+---
+
+#### [`extend_exclude`](#extend_exclude)
+
+A list of file patterns to omit from linting, in addition to those specified by `exclude`.
+
+**Default value**: `[]`
+
+**Type**: `Vec<FilePattern>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# In addition to the standard set of exclusions, omit all tests, plus a specific file.
+extend-exclude = ["tests", "src/bad.py"]
+````
+
+---
+
+#### [`ignore`](#ignore)
+
+A list of check code prefixes to ignore. Prefixes can specify exact checks (like `F841`), entire
+categories (like `F`), or anything in between.
+
+When breaking ties between enabled and disabled checks (via `select` and `ignore`, respectively),
+more specific prefixes override less specific prefixes.
+
+**Default value**: `[]`
+
+**Type**: `Vec<CheckCodePrefix>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Skip unused variable checks (`F841`).
+ignore = ["F841"]
+```
+
+---
+
+#### [`extend_ignore`](#extend_ignore)
+
+A list of check code prefixes to ignore, in addition to those specified by `ignore`.
+
+**Default value**: `[]`
+
+**Type**: `Vec<CheckCodePrefix>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Skip unused variable checks (`F841`).
+extend-ignore = ["F841"]
+```
+
+---
+
+#### [`select`](#select)
+
+A list of check code prefixes to enable. Prefixes can specify exact checks (like `F841`), entire
+categories (like `F`), or anything in between.
+
+When breaking ties between enabled and disabled checks (via `select` and `ignore`, respectively),
+more specific prefixes override less specific prefixes.
+
+**Default value**: `["E", "F"]`
+
+**Type**: `Vec<CheckCodePrefix>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+select = ["E", "F", "B", "Q"]
+```
+
+---
+
+#### [`extend_select`](#extend_select)
+
+A list of check code prefixes to enable, in addition to those specified by `select`.
+
+**Default value**: `[]`
+
+**Type**: `Vec<CheckCodePrefix>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+extend-select = ["B", "Q"]
+```
+
+---
+
+#### [`fix`](#fix)
+
+Enable autofix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix`
+command-line flags).
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+fix = true
+```
+
+---
+
+#### [`fixable`](#fixable)
+
+A list of check code prefixes to consider autofix-able.
+
+**Default value**: `["A", "ANN", "B", "BLE", "C", "D", "E", "F", "FBT", "I", "M", "N", "Q", "RUF", "S", "T", "U", "W", "YTT"]`
+
+**Type**: `Vec<CheckCodePrefix>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Only allow autofix behavior for `E` and `F` checks.
+fixable = ["E", "F"]
+```
+
+---
+
+#### [`unfixable`](#unfixable)
+
+A list of check code prefixes to consider un-autofix-able.
+
+**Default value**: `[]`
+
+**Type**: `Vec<CheckCodePrefix>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Disable autofix for unused imports (`F401`).
+unfixable = ["F401"]
+```
+
+---
+
+#### [`line_length`](#line_length)
+
+The line length to use when enforcing long-lines violations (like E501).
+
+**Default value**: `88`
+
+**Type**: `usize`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Allow lines to be as long as 120 characters.
+line-length = 120
+```
+
+---
+
+#### [`per_file_ignores`](#per_file_ignores)
+
+Description.
+
+**Default value**:
+
+**Type**: `Vec<PerFileIgnore>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+```
+
+---
+
+#### [`show_source`](#show_source)
+
+Whether to show source code snippets when reporting lint error violations (overridden by the
+`--show-source` command-line flag).
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# By default, always show source code snippets.
+show_source = true
+```
+
+---
+
+#### [`src`](#src)
+
+The source code paths to consider, e.g., when resolving first- vs. third-party imports.
+
+**Default value**: `["."]`
+
+**Type**: `Vec<PathBuf>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Allow imports relative to the "src" and "test" directories.
+src = ["src", "test"]
+```
+
+---
+
+#### [`target_version`](#target_version)
+
+The Python version to target, e.g., when considering automatic code upgrades, like rewriting type
+annotations. Note that the target version will _not_ be inferred from the _current_ Python version,
+and instead must be specified explicitly (as seen below).
+
+**Default value**: `"py310"`
+
+**Type**: `PythonVersion`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Always generate Python 3.7-compatible code.
+target-version = "py37"
 ```
 
 ## License
