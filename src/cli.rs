@@ -15,7 +15,7 @@ use crate::settings::types::{FilePattern, PatternPrefixPair, PerFileIgnore, Pyth
 #[command(version)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Cli {
-    #[arg(required = true)]
+    #[arg(required_unless_present_any = ["explain", "generate_shell_completion"])]
     pub files: Vec<PathBuf>,
     /// Path to the `pyproject.toml` file to use for configuration.
     #[arg(long)]
