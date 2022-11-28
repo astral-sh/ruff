@@ -4,14 +4,6 @@ expression: checks
 ---
 - kind: UsesTripleQuotes
   location:
-    row: 302
-    column: 4
-  end_location:
-    row: 302
-    column: 19
-  fix: ~
-- kind: UsesTripleQuotes
-  location:
     row: 307
     column: 4
   end_location:
@@ -24,7 +16,7 @@ expression: checks
     column: 4
   end_location:
     row: 312
-    column: 15
+    column: 19
   fix: ~
 - kind: UsesTripleQuotes
   location:
@@ -36,10 +28,18 @@ expression: checks
   fix: ~
 - kind: UsesTripleQuotes
   location:
-    row: 323
+    row: 322
     column: 4
   end_location:
-    row: 323
+    row: 322
+    column: 15
+  fix: ~
+- kind: UsesTripleQuotes
+  location:
+    row: 328
+    column: 4
+  end_location:
+    row: 328
     column: 16
   fix: ~
 

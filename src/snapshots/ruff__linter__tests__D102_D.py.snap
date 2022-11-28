@@ -4,26 +4,26 @@ expression: checks
 ---
 - kind: PublicMethod
   location:
-    row: 22
+    row: 23
     column: 4
   end_location:
-    row: 25
+    row: 26
     column: 4
   fix: ~
 - kind: PublicMethod
   location:
-    row: 51
+    row: 56
     column: 4
   end_location:
-    row: 54
+    row: 59
     column: 4
   fix: ~
 - kind: PublicMethod
   location:
-    row: 63
+    row: 68
     column: 4
   end_location:
-    row: 67
+    row: 72
     column: 0
   fix: ~
 

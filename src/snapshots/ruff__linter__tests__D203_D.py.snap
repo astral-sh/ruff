@@ -5,52 +5,52 @@ expression: checks
 - kind:
     OneBlankLineBeforeClass: 0
   location:
-    row: 156
+    row: 161
     column: 4
   end_location:
-    row: 156
+    row: 161
     column: 32
   fix:
     patch:
       content: "\n"
       location:
-        row: 156
+        row: 161
         column: 0
       end_location:
-        row: 156
+        row: 161
         column: 0
 - kind:
     OneBlankLineBeforeClass: 0
   location:
-    row: 187
+    row: 192
     column: 4
   end_location:
-    row: 187
+    row: 192
     column: 45
   fix:
     patch:
       content: "\n"
       location:
-        row: 187
+        row: 192
         column: 0
       end_location:
-        row: 187
+        row: 192
         column: 0
 - kind:
     OneBlankLineBeforeClass: 0
   location:
-    row: 521
+    row: 526
     column: 4
   end_location:
-    row: 527
+    row: 532
     column: 7
   fix:
     patch:
       content: "\n"
       location:
-        row: 521
+        row: 526
         column: 0
       end_location:
-        row: 521
+        row: 526
         column: 0
 

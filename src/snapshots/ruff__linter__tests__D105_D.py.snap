@@ -4,10 +4,10 @@ expression: checks
 ---
 - kind: MagicMethod
   location:
-    row: 59
+    row: 64
     column: 4
   end_location:
-    row: 62
+    row: 67
     column: 4
   fix: ~
 

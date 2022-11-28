@@ -60,6 +60,17 @@ pub fn is_overload(stmt: &Stmt) -> bool {
     }
 }
 
+/// Returns `true` if a function definition is an `@override` (PEP 698).
+pub fn is_override(stmt: &Stmt) -> bool {
+    match &stmt.node {
+        StmtKind::FunctionDef { decorator_list, .. }
+        | StmtKind::AsyncFunctionDef { decorator_list, .. } => decorator_list
+            .iter()
+            .any(|expr| match_name_or_attr(expr, "override")),
+        _ => panic!("Found non-FunctionDef in is_override"),
+    }
+}
+
 /// Returns `true` if a function is a "magic method".
 pub fn is_magic(stmt: &Stmt) -> bool {
     match &stmt.node {
