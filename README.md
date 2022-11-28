@@ -20,10 +20,9 @@ An extremely fast Python linter, written in Rust.
 - 🤝  Python 3.10 compatibility
 - 🛠️  `pyproject.toml` support
 - 📦  Built-in caching, to avoid re-analyzing unchanged files
-- 🔧  `--fix` support, for automatic error correction (e.g., automatically remove unused imports)
-- 👀  `--watch` support, for continuous file monitoring
+- 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
 - ⚖️  [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
-- 🔌  Native re-implementations of popular Flake8 plugins, like [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/) ([`pydocstyle`](https://pypi.org/project/pydocstyle/))
+- 🔌  Native re-implementations of popular Flake8 plugins, like [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface. Ruff can be used to replace Flake8 (plus a variety
@@ -32,7 +31,7 @@ of plugins), [`isort`](https://pypi.org/project/isort/), [`pydocstyle`](https://
 and [`autoflake`](https://pypi.org/project/autoflake/) all while executing tens or hundreds of times
 faster than any individual tool.
 
-Ruff is actively developed and used in major open-source projects like:
+Ruff is extremely actively developed and used in major open-source projects like:
 
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Bokeh](https://github.com/bokeh/bokeh)
@@ -42,6 +41,26 @@ Ruff is actively developed and used in major open-source projects like:
 - [Hatch](https://github.com/pypa/hatch)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
+
+## Testimonials
+
+[**Sebastián Ramírez**](https://twitter.com/tiangolo/status/1591912354882764802), creator
+of [FastAPI](https://github.com/tiangolo/fastapi):
+
+> Ruff is so fast that sometimes I add an intentional bug in the code just to confirm it's actually
+> running and checking the code.
+
+[**Bryan Van de Ven**](https://github.com/bokeh/bokeh/pull/12605), co-creator
+of [Bokeh](https://github.com/bokeh/bokeh/), original author
+of [Conda](https://docs.conda.io/en/latest/):
+
+> Ruff is ~150-200x faster than flake8 on my machine, scanning the whole repo takes ~0.2s instead of
+> ~20s. This is an enormous quality of life improvement for local dev. It's fast enough that I added
+> it as an actual commit hook, which is terrific.
+
+[**Tim Abbott**](https://github.com/charliermarsh/ruff/issues/465#issuecomment-1317400028), lead developer of [Zulip](https://github.com/zulip/zulip):
+
+> This is just ridiculously fast... `ruff` is amazing.
 
 ## Table of Contents
 
