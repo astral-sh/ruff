@@ -4,18 +4,18 @@ expression: checks
 ---
 - kind: NewLineAfterLastParagraph
   location:
-    row: 276
+    row: 281
     column: 4
   end_location:
-    row: 278
+    row: 283
     column: 19
   fix:
     patch:
       content: "\n    "
       location:
-        row: 278
+        row: 283
         column: 16
       end_location:
-        row: 278
+        row: 283
         column: 16
 

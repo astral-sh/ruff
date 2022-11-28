@@ -4,10 +4,10 @@ expression: checks
 ---
 - kind: PublicFunction
   location:
-    row: 395
+    row: 400
     column: 0
   end_location:
-    row: 396
+    row: 401
     column: 0
   fix: ~
 

@@ -3,6 +3,7 @@ from functools import wraps
 import os
 from .expected import Expectation
 from typing import overload
+from typing_extensions import override
 
 
 expectation = Expectation()
@@ -42,9 +43,13 @@ class class_:
            "D418: Function/ Method decorated with @overload"
            " shouldn't contain a docstring")
 
+    @override
+    def overridden_method(a):
+        return str(a)
+
     @property
     def foo(self):
-        """The foo of the thing, which isn't in imperitive mood."""
+        """The foo of the thing, which isn't in imperative mood."""
         return "hello"
 
     @expect('D102: Missing docstring in public method')

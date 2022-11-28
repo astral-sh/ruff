@@ -4,18 +4,18 @@ expression: checks
 ---
 - kind: PublicInit
   location:
-    row: 55
+    row: 60
     column: 4
   end_location:
-    row: 58
+    row: 63
     column: 4
   fix: ~
 - kind: PublicInit
   location:
-    row: 529
+    row: 534
     column: 4
   end_location:
-    row: 533
+    row: 538
     column: 0
   fix: ~
 

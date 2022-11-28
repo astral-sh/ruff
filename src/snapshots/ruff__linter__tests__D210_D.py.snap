@@ -4,50 +4,50 @@ expression: checks
 ---
 - kind: NoSurroundingWhitespace
   location:
-    row: 283
+    row: 288
     column: 4
   end_location:
-    row: 283
+    row: 288
     column: 33
   fix:
     patch:
       content: Whitespace at the end.
       location:
-        row: 283
+        row: 288
         column: 7
       end_location:
-        row: 283
+        row: 288
         column: 30
 - kind: NoSurroundingWhitespace
   location:
-    row: 288
+    row: 293
     column: 4
   end_location:
-    row: 288
+    row: 293
     column: 37
   fix:
     patch:
       content: Whitespace at everywhere.
       location:
-        row: 288
+        row: 293
         column: 7
       end_location:
-        row: 288
+        row: 293
         column: 34
 - kind: NoSurroundingWhitespace
   location:
-    row: 294
+    row: 299
     column: 4
   end_location:
-    row: 297
+    row: 302
     column: 7
   fix:
     patch:
       content: Whitespace at the beginning.
       location:
-        row: 294
+        row: 299
         column: 7
       end_location:
-        row: 294
+        row: 299
         column: 36
 
