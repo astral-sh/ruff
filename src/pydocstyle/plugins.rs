@@ -1324,8 +1324,8 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
                 }
             }
 
-            // Check specifically for `vararg` and `kwarg`, which can be prefixed with a single or
-            // double star, respectively.
+            // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
+            // single or double star, respectively.
             if let Some(arg) = &arguments.vararg {
                 let arg_name = arg.node.arg.as_str();
                 let starred_arg_name = format!("*{arg_name}");
