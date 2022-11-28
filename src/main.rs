@@ -193,6 +193,16 @@ fn inner_main() -> Result<ExitCode> {
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
 
+    if let Some(code) = cli.explain {
+        commands::explain(&code, cli.format)?;
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    if let Some(shell) = cli.generate_shell_completion {
+        shell.generate(&mut Cli::command(), &mut std::io::stdout());
+        return Ok(ExitCode::SUCCESS);
+    }
+
     // Find the project root and pyproject.toml.
     let project_root = pyproject::find_project_root(&cli.files);
     match &project_root {
@@ -254,16 +264,6 @@ fn inner_main() -> Result<ExitCode> {
     }
     if cli.show_source {
         configuration.show_source = true;
-    }
-
-    if let Some(code) = cli.explain {
-        commands::explain(&code, cli.format)?;
-        return Ok(ExitCode::SUCCESS);
-    }
-
-    if let Some(shell) = cli.generate_shell_completion {
-        shell.generate(&mut Cli::command(), &mut std::io::stdout());
-        return Ok(ExitCode::SUCCESS);
     }
 
     if cli.show_settings && cli.show_files {
