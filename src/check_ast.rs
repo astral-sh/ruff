@@ -2945,7 +2945,7 @@ impl<'a> Checker<'a> {
                         .push((full_name, &binding.range));
                 }
 
-                for ((defined_by, defined_in), unused_import) in unused {
+                for ((defined_by, defined_in), unused_imports) in unused {
                     let child = self.parents[defined_by];
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
@@ -2958,7 +2958,7 @@ impl<'a> Checker<'a> {
                             .collect();
                         match pyflakes::fixes::remove_unused_imports(
                             self.locator,
-                            &unused_import,
+                            &unused_imports,
                             child,
                             parent,
                             &deleted,
@@ -2978,7 +2978,7 @@ impl<'a> Checker<'a> {
                         None
                     };
 
-                    for (full_name, range) in unused_import {
+                    for (full_name, range) in unused_imports {
                         let mut check = Check::new(
                             CheckKind::UnusedImport(full_name.clone(), in_init_py),
                             *range,
