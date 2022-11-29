@@ -1762,7 +1762,7 @@ The maximum McCabe complexity to allow before triggering `C901` errors.
 **Example usage**:
 
 ```toml
-[tool.ruff.flake8-tidy-imports]
+[tool.ruff.mccabe]
 # Flag errors (`C901`) whenever the complexity level exceeds 5.
 max-complexity = 5
 ```
