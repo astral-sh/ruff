@@ -28,10 +28,13 @@ pub fn remove_unused_imports(
 
     let (aliases, import_module) = match body.body.first_mut() {
         Some(SmallStatement::Import(import_body)) => Ok((&mut import_body.names, None)),
-        Some(SmallStatement::ImportFrom(import_body)) => match &mut import_body.names {
-            ImportNames::Aliases(names) => Ok((names, import_body.module.as_ref())),
-            _ => Err(anyhow::anyhow!("Expected node to be: Aliases")),
-        },
+        Some(SmallStatement::ImportFrom(import_body)) => {
+            if let ImportNames::Aliases(names) = &mut import_body.names {
+                Ok((names, import_body.module.as_ref()))
+            } else {
+                Err(anyhow::anyhow!("Expected node to be: Aliases"))
+            }
+        }
         _ => Err(anyhow::anyhow!(
             "Expected node to be: SmallStatement::ImportFrom or SmallStatement::Import"
         )),

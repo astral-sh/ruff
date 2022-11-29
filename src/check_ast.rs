@@ -2988,7 +2988,7 @@ impl<'a> Checker<'a> {
                             check.amend(fix.clone());
                         }
 
-                        checks.push(check)
+                        checks.push(check);
                     }
                 }
             }
