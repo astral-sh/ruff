@@ -7,10 +7,10 @@ expression: checks
       - models.Nut
       - false
   location:
-    row: 7
+    row: 8
     column: 4
   end_location:
-    row: 7
+    row: 8
     column: 7
   fix:
     patch:
