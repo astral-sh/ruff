@@ -107,9 +107,3 @@ pub struct Binding {
     /// the binding was last used.
     pub used: Option<(usize, Range)>,
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ImportKind {
-    Import,
-    ImportFrom,
-}

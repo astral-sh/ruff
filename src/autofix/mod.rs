@@ -4,14 +4,14 @@ use serde::{Deserialize, Serialize};
 pub mod fixer;
 pub mod helpers;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Patch {
     pub content: String,
     pub location: Location,
     pub end_location: Location,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fix {
     pub patch: Patch,
 }

@@ -449,7 +449,7 @@ pub enum CheckKind {
     UndefinedExport(String),
     UndefinedLocal(String),
     UndefinedName(String),
-    UnusedImport(Vec<String>, bool),
+    UnusedImport(String, bool),
     UnusedVariable(String),
     YieldOutsideFunction,
     // flake8-builtins
@@ -685,7 +685,7 @@ impl CheckCode {
             CheckCode::W292 => CheckKind::NoNewLineAtEndOfFile,
             CheckCode::W605 => CheckKind::InvalidEscapeSequence('c'),
             // pyflakes
-            CheckCode::F401 => CheckKind::UnusedImport(vec!["...".to_string()], false),
+            CheckCode::F401 => CheckKind::UnusedImport("...".to_string(), false),
             CheckCode::F402 => CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
             CheckCode::F403 => CheckKind::ImportStarUsed("...".to_string()),
             CheckCode::F404 => CheckKind::LateFutureImport,
@@ -1603,12 +1603,11 @@ impl CheckKind {
             CheckKind::UndefinedName(name) => {
                 format!("Undefined name `{name}`")
             }
-            CheckKind::UnusedImport(names, in_init_py) => {
-                let names = names.iter().map(|name| format!("`{name}`")).join(", ");
+            CheckKind::UnusedImport(name, in_init_py) => {
                 if *in_init_py {
-                    format!("{names} imported but unused and missing from `__all__`")
+                    format!("`{name}` imported but unused and missing from `__all__`")
                 } else {
-                    format!("{names} imported but unused")
+                    format!("`{name}` imported but unused")
                 }
             }
             CheckKind::UnusedVariable(name) => {
