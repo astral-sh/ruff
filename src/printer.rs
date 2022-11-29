@@ -133,7 +133,6 @@ impl<'a> Printer<'a> {
                     );
                 }
 
-                println!(""); // Add a newline after the last message
                 self.post_test(num_fixable);
             }
         }
