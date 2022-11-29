@@ -24,6 +24,7 @@ pub struct Configuration {
     pub extend_exclude: Vec<FilePattern>,
     pub extend_ignore: Vec<CheckCodePrefix>,
     pub extend_select: Vec<CheckCodePrefix>,
+    pub external: Vec<String>,
     pub fix: bool,
     pub fixable: Vec<CheckCodePrefix>,
     pub ignore: Vec<CheckCodePrefix>,
@@ -116,6 +117,7 @@ impl Configuration {
                 .select
                 .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F]),
             extend_select: options.extend_select.unwrap_or_default(),
+            external: options.external.unwrap_or_default(),
             fix: options.fix.unwrap_or_default(),
             fixable: options.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
             unfixable: options.unfixable.unwrap_or_default(),

@@ -1348,6 +1348,27 @@ extend-select = ["B", "Q"]
 
 ---
 
+#### [`external`](#external)
+
+A list of check codes that are unsupported by Ruff, but should be preserved when (e.g.)
+validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not
+yet implemented in Ruff.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Avoiding flagging (and removing) `V101` from any `# noqa` directives, despite Ruff's lack of
+# support for `vulture`.
+external = ["V101"]
+```
+
+---
+
 #### [`fix`](#fix)
 
 Enable autofix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix`

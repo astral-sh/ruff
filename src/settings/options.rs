@@ -18,6 +18,7 @@ pub struct Options {
     pub extend_exclude: Option<Vec<String>>,
     pub extend_ignore: Option<Vec<CheckCodePrefix>>,
     pub extend_select: Option<Vec<CheckCodePrefix>>,
+    pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fixable: Option<Vec<CheckCodePrefix>>,
     pub ignore: Option<Vec<CheckCodePrefix>>,

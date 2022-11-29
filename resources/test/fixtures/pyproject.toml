@@ -5,6 +5,7 @@ extend-exclude = [
   "migrations",
   "with_excluded_file/other_excluded_file.py",
 ]
+external = ["V101"]
 per-file-ignores = { "__init__.py" = ["F401"] }
 
 [tool.ruff.flake8-bugbear]
