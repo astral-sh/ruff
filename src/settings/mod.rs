@@ -32,6 +32,7 @@ pub struct Settings {
     pub enabled: FxHashSet<CheckCode>,
     pub exclude: GlobSet,
     pub extend_exclude: GlobSet,
+    pub external: BTreeSet<String>,
     pub fixable: FxHashSet<CheckCode>,
     pub line_length: usize,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)>,
@@ -69,6 +70,7 @@ impl Settings {
             ),
             exclude: resolve_globset(config.exclude, project_root)?,
             extend_exclude: resolve_globset(config.extend_exclude, project_root)?,
+            external: BTreeSet::from_iter(config.external),
             fixable: resolve_codes(&config.fixable, &config.unfixable),
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
@@ -92,6 +94,7 @@ impl Settings {
             fixable: FxHashSet::from_iter([check_code]),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
+            external: BTreeSet::default(),
             line_length: 88,
             per_file_ignores: vec![],
             src: vec![path_dedot::CWD.clone()],
@@ -114,6 +117,7 @@ impl Settings {
             fixable: FxHashSet::from_iter(check_codes),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
+            external: BTreeSet::default(),
             line_length: 88,
             per_file_ignores: vec![],
             src: vec![path_dedot::CWD.clone()],
@@ -137,6 +141,7 @@ impl Hash for Settings {
         for value in &self.enabled {
             value.hash(state);
         }
+        self.external.hash(state);
         for value in &self.fixable {
             value.hash(state);
         }

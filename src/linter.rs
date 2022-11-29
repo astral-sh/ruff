@@ -262,7 +262,13 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         true,
     )?;
 
-    add_noqa(&checks, &contents, &directives.noqa_line_for, path)
+    add_noqa(
+        path,
+        &checks,
+        &contents,
+        &directives.noqa_line_for,
+        &settings.external,
+    )
 }
 
 /// Apply autoformatting to the source code at the given `Path`.
