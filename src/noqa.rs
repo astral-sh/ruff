@@ -169,9 +169,10 @@ fn add_noqa_inner(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use nohash_hasher::IntMap;
     use rustpython_parser::ast::Location;
-    use std::collections::BTreeSet;
 
     use crate::ast::types::Range;
     use crate::checks::{Check, CheckKind};
