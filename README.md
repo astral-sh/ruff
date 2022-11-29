@@ -537,7 +537,7 @@ For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ERA001 | CommentedCode | Found commented-out code | 🛠 |
+| ERA001 | CommentedOutCode | Found commented-out code | 🛠 |
 
 ### flake8-bandit
 
