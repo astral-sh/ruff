@@ -59,7 +59,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    fn post_test(&self, num_fixable: usize) {
+    fn post_text(&self, num_fixable: usize) {
         if self.log_level >= &LogLevel::Default {
             if num_fixable > 0 {
                 println!("{num_fixable} potentially fixable with the --fix option.");
@@ -105,7 +105,7 @@ impl<'a> Printer<'a> {
                     println!("{message}");
                 }
 
-                self.post_test(num_fixable);
+                self.post_text(num_fixable);
             }
             SerializationFormat::Grouped => {
                 self.pre_text(diagnostics);
@@ -133,7 +133,7 @@ impl<'a> Printer<'a> {
                     );
                 }
 
-                self.post_test(num_fixable);
+                self.post_text(num_fixable);
             }
         }
 
