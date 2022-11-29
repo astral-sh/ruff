@@ -78,6 +78,7 @@ pub struct Checker<'a> {
     in_f_string: Option<Range>,
     in_annotation: bool,
     in_deferred_string_annotation: bool,
+    in_deferred_annotation: bool,
     in_literal: bool,
     in_subscript: bool,
     in_withitem: bool,
@@ -124,6 +125,7 @@ impl<'a> Checker<'a> {
             in_f_string: None,
             in_annotation: false,
             in_deferred_string_annotation: false,
+            in_deferred_annotation: false,
             in_literal: false,
             in_subscript: false,
             in_withitem: false,
@@ -1191,10 +1193,13 @@ where
         // Pre-visit.
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
-                // Ex) typing.List[...]
+                // Ex) Optional[...]
                 if !self.in_deferred_string_annotation
                     && self.settings.enabled.contains(&CheckCode::U007)
-                    && self.settings.target_version >= PythonVersion::Py310
+                    && (self.settings.target_version >= PythonVersion::Py310
+                        || (self.settings.target_version >= PythonVersion::Py37
+                            && self.annotations_future_enabled
+                            && self.in_deferred_annotation))
                 {
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
@@ -1233,7 +1238,10 @@ where
                         // Ex) List[...]
                         if !self.in_deferred_string_annotation
                             && self.settings.enabled.contains(&CheckCode::U006)
-                            && self.settings.target_version >= PythonVersion::Py39
+                            && (self.settings.target_version >= PythonVersion::Py39
+                                || (self.settings.target_version >= PythonVersion::Py37
+                                    && self.annotations_future_enabled
+                                    && self.in_deferred_annotation))
                             && typing::is_pep585_builtin(
                                 expr,
                                 &self.from_imports,
@@ -1268,8 +1276,12 @@ where
             }
             ExprKind::Attribute { attr, .. } => {
                 // Ex) typing.List[...]
-                if self.settings.enabled.contains(&CheckCode::U006)
-                    && self.settings.target_version >= PythonVersion::Py39
+                if !self.in_deferred_string_annotation
+                    && self.settings.enabled.contains(&CheckCode::U006)
+                    && (self.settings.target_version >= PythonVersion::Py39
+                        || (self.settings.target_version >= PythonVersion::Py37
+                            && self.annotations_future_enabled
+                            && self.in_deferred_annotation))
                     && typing::is_pep585_builtin(expr, &self.from_imports, &self.import_aliases)
                 {
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
@@ -2743,7 +2755,9 @@ impl<'a> Checker<'a> {
         while let Some((expr, scopes, parents)) = self.deferred_annotations.pop() {
             self.scope_stack = scopes;
             self.parent_stack = parents;
+            self.in_deferred_annotation = true;
             self.visit_expr(expr);
+            self.in_deferred_annotation = false;
         }
     }
 
@@ -2769,9 +2783,9 @@ impl<'a> Checker<'a> {
             }
         }
         for (expr, (scopes, parents)) in allocator.iter().zip(stacks) {
-            self.in_deferred_string_annotation = true;
             self.scope_stack = scopes;
             self.parent_stack = parents;
+            self.in_deferred_string_annotation = true;
             self.visit_expr(expr);
             self.in_deferred_string_annotation = false;
         }

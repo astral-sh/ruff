@@ -399,6 +399,7 @@ mod tests {
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::settings;
+    use crate::settings::types::PythonVersion;
 
     #[test_case(CheckCode::A001, Path::new("A001.py"); "A001")]
     #[test_case(CheckCode::A002, Path::new("A002.py"); "A002")]
@@ -689,6 +690,66 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/future_annotations.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn future_annotations_pep_585_p37() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/future_annotations.py"),
+            &settings::Settings {
+                target_version: PythonVersion::Py37,
+                ..settings::Settings::for_rule(CheckCode::U006)
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn future_annotations_pep_585_py310() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/future_annotations.py"),
+            &settings::Settings {
+                target_version: PythonVersion::Py310,
+                ..settings::Settings::for_rule(CheckCode::U006)
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn future_annotations_pep_604_p37() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/future_annotations.py"),
+            &settings::Settings {
+                target_version: PythonVersion::Py37,
+                ..settings::Settings::for_rule(CheckCode::U007)
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn future_annotations_pep_604_py310() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/future_annotations.py"),
+            &settings::Settings {
+                target_version: PythonVersion::Py310,
+                ..settings::Settings::for_rule(CheckCode::U007)
+            },
             true,
         )?;
         checks.sort_by_key(|check| check.location);
