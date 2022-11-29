@@ -52,3 +52,6 @@ sit amet  consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labor
 
 # OK
 # A very long URL: https://loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.url.com
+
+# OK
+# https://loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.url.com
