@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import List, Optional
 
 from models import (
     Fruit,
@@ -28,3 +29,12 @@ class Foo:
     @classmethod
     def d(cls) -> Fruit:
         return cls(x=0, y=0)
+
+
+def f(x: int) -> List[int]:
+    y = List[int]()
+    y.append(x)
+    return y
+
+
+x: Optional[int] = None

@@ -7,27 +7,27 @@ expression: checks
       - - models.Nut
       - false
   location:
-    row: 5
+    row: 6
     column: 0
   end_location:
-    row: 8
+    row: 9
     column: 1
   fix:
     patch:
       content: "from models import (\n    Fruit,\n)"
       location:
-        row: 5
+        row: 6
         column: 0
       end_location:
-        row: 8
+        row: 9
         column: 1
 - kind:
     UndefinedName: Bar
   location:
-    row: 25
+    row: 26
     column: 18
   end_location:
-    row: 25
+    row: 26
     column: 21
   fix: ~
 
