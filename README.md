@@ -236,10 +236,10 @@ See `ruff --help` for more:
 ```shell
 Ruff: An extremely fast Python linter.
 
-Usage: ruff [OPTIONS] <FILES>...
+Usage: ruff [OPTIONS] [FILES]...
 
 Arguments:
-  <FILES>...
+  [FILES]...
 
 Options:
       --config <CONFIG>
@@ -277,7 +277,7 @@ Options:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for error messages [default: text] [possible values: text, json]
+          Output serialization format for error messages [default: text] [possible values: text, json, grouped]
       --show-source
           Show violations with source code
       --show-files
@@ -296,6 +296,8 @@ Options:
           Max McCabe complexity allowed for a function
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
+      --explain <EXPLAIN>
+          Explain a rule
   -h, --help
           Print help information
   -V, --version
