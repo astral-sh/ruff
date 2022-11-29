@@ -43,7 +43,7 @@ struct Explanation<'a> {
 /// Explain a `CheckCode` to the user.
 pub fn explain(code: &CheckCode, format: SerializationFormat) -> Result<()> {
     match format {
-        SerializationFormat::Text => {
+        SerializationFormat::Text | SerializationFormat::Grouped => {
             println!(
                 "{} ({}): {}",
                 code.as_ref(),

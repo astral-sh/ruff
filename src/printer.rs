@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use anyhow::Result;
 use clap::ValueEnum;
 use colored::Colorize;
@@ -5,6 +7,7 @@ use rustpython_parser::ast::Location;
 use serde::Serialize;
 
 use crate::checks::{CheckCode, CheckKind};
+use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::tell_user;
@@ -13,6 +16,7 @@ use crate::tell_user;
 pub enum SerializationFormat {
     Text,
     Json,
+    Grouped,
 }
 
 #[derive(Serialize)]
@@ -38,6 +42,28 @@ impl<'a> Printer<'a> {
     pub fn write_to_user(&self, message: &str) {
         if self.log_level >= &LogLevel::Default {
             tell_user!("{}", message);
+        }
+    }
+
+    fn pre_text(&self, diagnostics: &Diagnostics) {
+        if self.log_level >= &LogLevel::Default {
+            if diagnostics.fixed > 0 {
+                println!(
+                    "Found {} error(s) ({} fixed).",
+                    diagnostics.messages.len(),
+                    diagnostics.fixed,
+                );
+            } else if !diagnostics.messages.is_empty() {
+                println!("Found {} error(s).", diagnostics.messages.len());
+            }
+        }
+    }
+
+    fn post_test(&self, num_fixable: usize) {
+        if self.log_level >= &LogLevel::Default {
+            if num_fixable > 0 {
+                println!("{num_fixable} potentially fixable with the --fix option.");
+            }
         }
     }
 
@@ -73,27 +99,42 @@ impl<'a> Printer<'a> {
                 );
             }
             SerializationFormat::Text => {
-                if self.log_level >= &LogLevel::Default {
-                    if diagnostics.fixed > 0 {
-                        println!(
-                            "Found {} error(s) ({} fixed).",
-                            diagnostics.messages.len(),
-                            diagnostics.fixed,
-                        );
-                    } else if !diagnostics.messages.is_empty() {
-                        println!("Found {} error(s).", diagnostics.messages.len());
-                    }
-                }
+                self.pre_text(diagnostics);
 
                 for message in &diagnostics.messages {
                     println!("{message}");
                 }
 
-                if self.log_level >= &LogLevel::Default {
-                    if num_fixable > 0 {
-                        println!("{num_fixable} potentially fixable with the --fix option.");
+                self.post_test(num_fixable);
+            }
+            SerializationFormat::Grouped => {
+                self.pre_text(diagnostics);
+
+                let mut filename = "".to_string();
+
+                for message in &diagnostics.messages {
+                    if filename != message.filename {
+                        filename = message.filename.clone();
+                        println!(
+                            "\n{}:",
+                            relativize_path(Path::new(&message.filename))
+                                .bold()
+                                .underline()
+                        );
                     }
+
+                    println!(
+                        "    {}{}{} {}  {}",
+                        message.location.row(),
+                        ":".cyan(),
+                        message.location.column(),
+                        message.kind.code().as_ref().red().bold(),
+                        message.kind.body(),
+                    );
                 }
+
+                println!(""); // Add a newline after the last message
+                self.post_test(num_fixable);
             }
         }
 
