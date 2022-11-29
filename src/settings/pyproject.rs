@@ -374,7 +374,7 @@ other-attribute = 1
                 ]),
                 select: None,
                 extend_select: None,
-                external: None,
+                external: Some(vec!["V101".to_string()]),
                 ignore: None,
                 extend_ignore: None,
                 fixable: None,
