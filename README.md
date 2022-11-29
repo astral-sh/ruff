@@ -279,7 +279,7 @@ Options:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for error messages [default: text] [possible values: text, json]
+          Output serialization format for error messages [default: text] [possible values: text, json, grouped]
       --show-source
           Show violations with source code
       --show-files
