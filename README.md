@@ -238,10 +238,10 @@ See `ruff --help` for more:
 ```shell
 Ruff: An extremely fast Python linter.
 
-Usage: ruff [OPTIONS] <FILES>...
+Usage: ruff [OPTIONS] [FILES]...
 
 Arguments:
-  <FILES>...
+  [FILES]...
 
 Options:
       --config <CONFIG>
@@ -298,6 +298,8 @@ Options:
           Max McCabe complexity allowed for a function
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
+      --explain <EXPLAIN>
+          Explain a rule
   -h, --help
           Print help information
   -V, --version
