@@ -110,7 +110,7 @@ impl<'a> Printer<'a> {
             SerializationFormat::Grouped => {
                 self.pre_text(diagnostics);
 
-                let mut filename = "".to_string();
+                let mut filename = String::new();
 
                 for message in &diagnostics.messages {
                     if filename != message.filename {
