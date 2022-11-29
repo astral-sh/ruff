@@ -254,6 +254,8 @@ pub enum CheckCode {
     N818,
     // isort
     I001,
+    // eradicate
+    ERA001,
     // flake8-bandit
     S101,
     S102,
@@ -282,6 +284,7 @@ pub enum CheckCategory {
     Pydocstyle,
     Pyupgrade,
     PEP8Naming,
+    Eradicate,
     Flake8Bandit,
     Flake8Comprehensions,
     Flake8Debugger,
@@ -302,40 +305,50 @@ pub enum CheckCategory {
 impl CheckCategory {
     pub fn title(&self) -> &'static str {
         match self {
-            CheckCategory::Pycodestyle => "pycodestyle",
-            CheckCategory::Pyflakes => "Pyflakes",
-            CheckCategory::Isort => "isort",
+            CheckCategory::Eradicate => "eradicate",
+            CheckCategory::Flake82020 => "flake8-2020",
+            CheckCategory::Flake8Annotations => "flake8-annotations",
             CheckCategory::Flake8Bandit => "flake8-bandit",
+            CheckCategory::Flake8BlindExcept => "flake8-blind-except",
             CheckCategory::Flake8BooleanTrap => "flake8-boolean-trap",
-            CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Bugbear => "flake8-bugbear",
+            CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
             CheckCategory::Flake8Debugger => "flake8-debugger",
-            CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
-            CheckCategory::Flake8Annotations => "flake8-annotations",
-            CheckCategory::Flake82020 => "flake8-2020",
-            CheckCategory::Flake8BlindExcept => "flake8-blind-except",
-            CheckCategory::Pyupgrade => "pyupgrade",
-            CheckCategory::Pydocstyle => "pydocstyle",
-            CheckCategory::PEP8Naming => "pep8-naming",
+            CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
+            CheckCategory::Isort => "isort",
             CheckCategory::McCabe => "mccabe",
-            CheckCategory::Ruff => "Ruff-specific rules",
             CheckCategory::Meta => "Meta rules",
+            CheckCategory::PEP8Naming => "pep8-naming",
+            CheckCategory::Pycodestyle => "pycodestyle",
+            CheckCategory::Pydocstyle => "pydocstyle",
+            CheckCategory::Pyflakes => "Pyflakes",
+            CheckCategory::Pyupgrade => "pyupgrade",
+            CheckCategory::Ruff => "Ruff-specific rules",
         }
     }
 
     pub fn url(&self) -> Option<&'static str> {
         match self {
-            CheckCategory::Pycodestyle => Some("https://pypi.org/project/pycodestyle/2.9.1/"),
-            CheckCategory::Pyflakes => Some("https://pypi.org/project/pyflakes/2.5.0/"),
-            CheckCategory::Isort => Some("https://pypi.org/project/isort/5.10.1/"),
-            CheckCategory::Flake8Builtins => {
-                Some("https://pypi.org/project/flake8-builtins/2.0.1/")
+            CheckCategory::Eradicate => Some("https://pypi.org/project/eradicate/2.1.0/"),
+            CheckCategory::Flake82020 => Some("https://pypi.org/project/flake8-2020/1.7.0/"),
+            CheckCategory::Flake8Annotations => {
+                Some("https://pypi.org/project/flake8-annotations/2.9.1/")
+            }
+            CheckCategory::Flake8Bandit => Some("https://pypi.org/project/flake8-bandit/4.1.1/"),
+            CheckCategory::Flake8BlindExcept => {
+                Some("https://pypi.org/project/flake8-blind-except/0.2.1/")
+            }
+            CheckCategory::Flake8BooleanTrap => {
+                Some("https://pypi.org/project/flake8-boolean-trap/0.1.0/")
             }
             CheckCategory::Flake8Bugbear => {
                 Some("https://pypi.org/project/flake8-bugbear/22.10.27/")
+            }
+            CheckCategory::Flake8Builtins => {
+                Some("https://pypi.org/project/flake8-builtins/2.0.1/")
             }
             CheckCategory::Flake8Comprehensions => {
                 Some("https://pypi.org/project/flake8-comprehensions/3.10.1/")
@@ -343,28 +356,20 @@ impl CheckCategory {
             CheckCategory::Flake8Debugger => {
                 Some("https://pypi.org/project/flake8-debugger/4.1.2/")
             }
+            CheckCategory::Flake8Print => Some("https://pypi.org/project/flake8-print/5.0.0/"),
+            CheckCategory::Flake8Quotes => Some("https://pypi.org/project/flake8-quotes/3.3.1/"),
             CheckCategory::Flake8TidyImports => {
                 Some("https://pypi.org/project/flake8-tidy-imports/4.8.0/")
             }
-            CheckCategory::Flake8Print => Some("https://pypi.org/project/flake8-print/5.0.0/"),
-            CheckCategory::Flake8Quotes => Some("https://pypi.org/project/flake8-quotes/3.3.1/"),
-            CheckCategory::Flake8Annotations => {
-                Some("https://pypi.org/project/flake8-annotations/2.9.1/")
-            }
-            CheckCategory::Flake82020 => Some("https://pypi.org/project/flake8-2020/1.7.0/"),
-            CheckCategory::Pyupgrade => Some("https://pypi.org/project/pyupgrade/3.2.0/"),
-            CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
-            CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
-            CheckCategory::Flake8Bandit => Some("https://pypi.org/project/flake8-bandit/4.1.1/"),
-            CheckCategory::Flake8BlindExcept => {
-                Some("https://pypi.org/project/flake8-blind-except/0.2.1/")
-            }
+            CheckCategory::Isort => Some("https://pypi.org/project/isort/5.10.1/"),
             CheckCategory::McCabe => Some("https://pypi.org/project/mccabe/0.7.0/"),
-            CheckCategory::Flake8BooleanTrap => {
-                Some("https://pypi.org/project/flake8-boolean-trap/0.1.0/")
-            }
-            CheckCategory::Ruff => None,
             CheckCategory::Meta => None,
+            CheckCategory::PEP8Naming => Some("https://pypi.org/project/pep8-naming/0.13.2/"),
+            CheckCategory::Pycodestyle => Some("https://pypi.org/project/pycodestyle/2.9.1/"),
+            CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
+            CheckCategory::Pyflakes => Some("https://pypi.org/project/pyflakes/2.5.0/"),
+            CheckCategory::Pyupgrade => Some("https://pypi.org/project/pyupgrade/3.2.0/"),
+            CheckCategory::Ruff => None,
         }
     }
 }
@@ -611,6 +616,8 @@ pub enum CheckKind {
     ErrorSuffixOnExceptionName(String),
     // isort
     UnsortedImports,
+    // eradicate
+    CommentedOutCode,
     // flake8-bandit
     AssertUsed,
     ExecUsed,
@@ -641,7 +648,8 @@ impl CheckCode {
             CheckCode::E501 | CheckCode::W292 | CheckCode::M001 | CheckCode::U009 => {
                 &LintSource::Lines
             }
-            CheckCode::Q000
+            CheckCode::ERA001
+            | CheckCode::Q000
             | CheckCode::Q001
             | CheckCode::Q002
             | CheckCode::Q003
@@ -925,6 +933,8 @@ impl CheckCode {
             CheckCode::N818 => CheckKind::ErrorSuffixOnExceptionName("...".to_string()),
             // isort
             CheckCode::I001 => CheckKind::UnsortedImports,
+            // eradicate
+            CheckCode::ERA001 => CheckKind::CommentedOutCode,
             // flake8-bandit
             CheckCode::S101 => CheckKind::AssertUsed,
             CheckCode::S102 => CheckKind::ExecUsed,
@@ -950,67 +960,20 @@ impl CheckCode {
     pub fn category(&self) -> CheckCategory {
         #[allow(clippy::match_same_arms)]
         match self {
-            CheckCode::E402 => CheckCategory::Pycodestyle,
-            CheckCode::E501 => CheckCategory::Pycodestyle,
-            CheckCode::E711 => CheckCategory::Pycodestyle,
-            CheckCode::E712 => CheckCategory::Pycodestyle,
-            CheckCode::E713 => CheckCategory::Pycodestyle,
-            CheckCode::E714 => CheckCategory::Pycodestyle,
-            CheckCode::E721 => CheckCategory::Pycodestyle,
-            CheckCode::E722 => CheckCategory::Pycodestyle,
-            CheckCode::E731 => CheckCategory::Pycodestyle,
-            CheckCode::E741 => CheckCategory::Pycodestyle,
-            CheckCode::E742 => CheckCategory::Pycodestyle,
-            CheckCode::E743 => CheckCategory::Pycodestyle,
-            CheckCode::E902 => CheckCategory::Pycodestyle,
-            CheckCode::E999 => CheckCategory::Pycodestyle,
-            CheckCode::W292 => CheckCategory::Pycodestyle,
-            CheckCode::W605 => CheckCategory::Pycodestyle,
-            CheckCode::F401 => CheckCategory::Pyflakes,
-            CheckCode::F402 => CheckCategory::Pyflakes,
-            CheckCode::F403 => CheckCategory::Pyflakes,
-            CheckCode::F404 => CheckCategory::Pyflakes,
-            CheckCode::F405 => CheckCategory::Pyflakes,
-            CheckCode::F406 => CheckCategory::Pyflakes,
-            CheckCode::F407 => CheckCategory::Pyflakes,
-            CheckCode::F501 => CheckCategory::Pyflakes,
-            CheckCode::F502 => CheckCategory::Pyflakes,
-            CheckCode::F503 => CheckCategory::Pyflakes,
-            CheckCode::F504 => CheckCategory::Pyflakes,
-            CheckCode::F505 => CheckCategory::Pyflakes,
-            CheckCode::F506 => CheckCategory::Pyflakes,
-            CheckCode::F507 => CheckCategory::Pyflakes,
-            CheckCode::F508 => CheckCategory::Pyflakes,
-            CheckCode::F509 => CheckCategory::Pyflakes,
-            CheckCode::F521 => CheckCategory::Pyflakes,
-            CheckCode::F522 => CheckCategory::Pyflakes,
-            CheckCode::F523 => CheckCategory::Pyflakes,
-            CheckCode::F524 => CheckCategory::Pyflakes,
-            CheckCode::F525 => CheckCategory::Pyflakes,
-            CheckCode::F541 => CheckCategory::Pyflakes,
-            CheckCode::F601 => CheckCategory::Pyflakes,
-            CheckCode::F602 => CheckCategory::Pyflakes,
-            CheckCode::F621 => CheckCategory::Pyflakes,
-            CheckCode::F622 => CheckCategory::Pyflakes,
-            CheckCode::F631 => CheckCategory::Pyflakes,
-            CheckCode::F632 => CheckCategory::Pyflakes,
-            CheckCode::F633 => CheckCategory::Pyflakes,
-            CheckCode::F634 => CheckCategory::Pyflakes,
-            CheckCode::F701 => CheckCategory::Pyflakes,
-            CheckCode::F702 => CheckCategory::Pyflakes,
-            CheckCode::F704 => CheckCategory::Pyflakes,
-            CheckCode::F706 => CheckCategory::Pyflakes,
-            CheckCode::F707 => CheckCategory::Pyflakes,
-            CheckCode::F722 => CheckCategory::Pyflakes,
-            CheckCode::F821 => CheckCategory::Pyflakes,
-            CheckCode::F822 => CheckCategory::Pyflakes,
-            CheckCode::F823 => CheckCategory::Pyflakes,
-            CheckCode::F831 => CheckCategory::Pyflakes,
-            CheckCode::F841 => CheckCategory::Pyflakes,
-            CheckCode::F901 => CheckCategory::Pyflakes,
             CheckCode::A001 => CheckCategory::Flake8Builtins,
             CheckCode::A002 => CheckCategory::Flake8Builtins,
             CheckCode::A003 => CheckCategory::Flake8Builtins,
+            CheckCode::ANN001 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN002 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN003 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN101 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN102 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN201 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN202 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN204 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN205 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN206 => CheckCategory::Flake8Annotations,
+            CheckCode::ANN401 => CheckCategory::Flake8Annotations,
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
             CheckCode::B003 => CheckCategory::Flake8Bugbear,
             CheckCode::B004 => CheckCategory::Flake8Bugbear,
@@ -1055,49 +1018,7 @@ impl CheckCode {
             CheckCode::C415 => CheckCategory::Flake8Comprehensions,
             CheckCode::C416 => CheckCategory::Flake8Comprehensions,
             CheckCode::C417 => CheckCategory::Flake8Comprehensions,
-            CheckCode::T100 => CheckCategory::Flake8Debugger,
-            CheckCode::I252 => CheckCategory::Flake8TidyImports,
-            CheckCode::T201 => CheckCategory::Flake8Print,
-            CheckCode::T203 => CheckCategory::Flake8Print,
-            CheckCode::Q000 => CheckCategory::Flake8Quotes,
-            CheckCode::Q001 => CheckCategory::Flake8Quotes,
-            CheckCode::Q002 => CheckCategory::Flake8Quotes,
-            CheckCode::Q003 => CheckCategory::Flake8Quotes,
-            CheckCode::ANN001 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN002 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN003 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN101 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN102 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN201 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN202 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN204 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN205 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN206 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN401 => CheckCategory::Flake8Annotations,
-            CheckCode::YTT101 => CheckCategory::Flake82020,
-            CheckCode::YTT102 => CheckCategory::Flake82020,
-            CheckCode::YTT103 => CheckCategory::Flake82020,
-            CheckCode::YTT201 => CheckCategory::Flake82020,
-            CheckCode::YTT202 => CheckCategory::Flake82020,
-            CheckCode::YTT203 => CheckCategory::Flake82020,
-            CheckCode::YTT204 => CheckCategory::Flake82020,
-            CheckCode::YTT301 => CheckCategory::Flake82020,
-            CheckCode::YTT302 => CheckCategory::Flake82020,
-            CheckCode::YTT303 => CheckCategory::Flake82020,
-            CheckCode::U001 => CheckCategory::Pyupgrade,
-            CheckCode::U003 => CheckCategory::Pyupgrade,
-            CheckCode::U004 => CheckCategory::Pyupgrade,
-            CheckCode::U005 => CheckCategory::Pyupgrade,
-            CheckCode::U006 => CheckCategory::Pyupgrade,
-            CheckCode::U007 => CheckCategory::Pyupgrade,
-            CheckCode::U008 => CheckCategory::Pyupgrade,
-            CheckCode::U009 => CheckCategory::Pyupgrade,
-            CheckCode::U010 => CheckCategory::Pyupgrade,
-            CheckCode::U011 => CheckCategory::Pyupgrade,
-            CheckCode::U012 => CheckCategory::Pyupgrade,
-            CheckCode::U013 => CheckCategory::Pyupgrade,
-            CheckCode::U014 => CheckCategory::Pyupgrade,
-            CheckCode::U015 => CheckCategory::Pyupgrade,
+            CheckCode::C901 => CheckCategory::McCabe,
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -1142,6 +1063,69 @@ impl CheckCode {
             CheckCode::D417 => CheckCategory::Pydocstyle,
             CheckCode::D418 => CheckCategory::Pydocstyle,
             CheckCode::D419 => CheckCategory::Pydocstyle,
+            CheckCode::E402 => CheckCategory::Pycodestyle,
+            CheckCode::E501 => CheckCategory::Pycodestyle,
+            CheckCode::E711 => CheckCategory::Pycodestyle,
+            CheckCode::E712 => CheckCategory::Pycodestyle,
+            CheckCode::E713 => CheckCategory::Pycodestyle,
+            CheckCode::E714 => CheckCategory::Pycodestyle,
+            CheckCode::E721 => CheckCategory::Pycodestyle,
+            CheckCode::E722 => CheckCategory::Pycodestyle,
+            CheckCode::E731 => CheckCategory::Pycodestyle,
+            CheckCode::E741 => CheckCategory::Pycodestyle,
+            CheckCode::E742 => CheckCategory::Pycodestyle,
+            CheckCode::E743 => CheckCategory::Pycodestyle,
+            CheckCode::E902 => CheckCategory::Pycodestyle,
+            CheckCode::E999 => CheckCategory::Pycodestyle,
+            CheckCode::ERA001 => CheckCategory::Eradicate,
+            CheckCode::F401 => CheckCategory::Pyflakes,
+            CheckCode::F402 => CheckCategory::Pyflakes,
+            CheckCode::F403 => CheckCategory::Pyflakes,
+            CheckCode::F404 => CheckCategory::Pyflakes,
+            CheckCode::F405 => CheckCategory::Pyflakes,
+            CheckCode::F406 => CheckCategory::Pyflakes,
+            CheckCode::F407 => CheckCategory::Pyflakes,
+            CheckCode::F501 => CheckCategory::Pyflakes,
+            CheckCode::F502 => CheckCategory::Pyflakes,
+            CheckCode::F503 => CheckCategory::Pyflakes,
+            CheckCode::F504 => CheckCategory::Pyflakes,
+            CheckCode::F505 => CheckCategory::Pyflakes,
+            CheckCode::F506 => CheckCategory::Pyflakes,
+            CheckCode::F507 => CheckCategory::Pyflakes,
+            CheckCode::F508 => CheckCategory::Pyflakes,
+            CheckCode::F509 => CheckCategory::Pyflakes,
+            CheckCode::F521 => CheckCategory::Pyflakes,
+            CheckCode::F522 => CheckCategory::Pyflakes,
+            CheckCode::F523 => CheckCategory::Pyflakes,
+            CheckCode::F524 => CheckCategory::Pyflakes,
+            CheckCode::F525 => CheckCategory::Pyflakes,
+            CheckCode::F541 => CheckCategory::Pyflakes,
+            CheckCode::F601 => CheckCategory::Pyflakes,
+            CheckCode::F602 => CheckCategory::Pyflakes,
+            CheckCode::F621 => CheckCategory::Pyflakes,
+            CheckCode::F622 => CheckCategory::Pyflakes,
+            CheckCode::F631 => CheckCategory::Pyflakes,
+            CheckCode::F632 => CheckCategory::Pyflakes,
+            CheckCode::F633 => CheckCategory::Pyflakes,
+            CheckCode::F634 => CheckCategory::Pyflakes,
+            CheckCode::F701 => CheckCategory::Pyflakes,
+            CheckCode::F702 => CheckCategory::Pyflakes,
+            CheckCode::F704 => CheckCategory::Pyflakes,
+            CheckCode::F706 => CheckCategory::Pyflakes,
+            CheckCode::F707 => CheckCategory::Pyflakes,
+            CheckCode::F722 => CheckCategory::Pyflakes,
+            CheckCode::F821 => CheckCategory::Pyflakes,
+            CheckCode::F822 => CheckCategory::Pyflakes,
+            CheckCode::F823 => CheckCategory::Pyflakes,
+            CheckCode::F831 => CheckCategory::Pyflakes,
+            CheckCode::F841 => CheckCategory::Pyflakes,
+            CheckCode::F901 => CheckCategory::Pyflakes,
+            CheckCode::FBT001 => CheckCategory::Flake8BooleanTrap,
+            CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
+            CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
+            CheckCode::I001 => CheckCategory::Isort,
+            CheckCode::I252 => CheckCategory::Flake8TidyImports,
+            CheckCode::M001 => CheckCategory::Meta,
             CheckCode::N801 => CheckCategory::PEP8Naming,
             CheckCode::N802 => CheckCategory::PEP8Naming,
             CheckCode::N803 => CheckCategory::PEP8Naming,
@@ -1157,22 +1141,49 @@ impl CheckCode {
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
-            CheckCode::I001 => CheckCategory::Isort,
+            CheckCode::Q000 => CheckCategory::Flake8Quotes,
+            CheckCode::Q001 => CheckCategory::Flake8Quotes,
+            CheckCode::Q002 => CheckCategory::Flake8Quotes,
+            CheckCode::Q003 => CheckCategory::Flake8Quotes,
+            CheckCode::RUF001 => CheckCategory::Ruff,
+            CheckCode::RUF002 => CheckCategory::Ruff,
+            CheckCode::RUF003 => CheckCategory::Ruff,
+            CheckCode::RUF101 => CheckCategory::Ruff,
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
             CheckCode::S104 => CheckCategory::Flake8Bandit,
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
-            CheckCode::C901 => CheckCategory::McCabe,
-            CheckCode::FBT001 => CheckCategory::Flake8BooleanTrap,
-            CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
-            CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
-            CheckCode::RUF001 => CheckCategory::Ruff,
-            CheckCode::RUF002 => CheckCategory::Ruff,
-            CheckCode::RUF003 => CheckCategory::Ruff,
-            CheckCode::RUF101 => CheckCategory::Ruff,
-            CheckCode::M001 => CheckCategory::Meta,
+            CheckCode::T100 => CheckCategory::Flake8Debugger,
+            CheckCode::T201 => CheckCategory::Flake8Print,
+            CheckCode::T203 => CheckCategory::Flake8Print,
+            CheckCode::U001 => CheckCategory::Pyupgrade,
+            CheckCode::U003 => CheckCategory::Pyupgrade,
+            CheckCode::U004 => CheckCategory::Pyupgrade,
+            CheckCode::U005 => CheckCategory::Pyupgrade,
+            CheckCode::U006 => CheckCategory::Pyupgrade,
+            CheckCode::U007 => CheckCategory::Pyupgrade,
+            CheckCode::U008 => CheckCategory::Pyupgrade,
+            CheckCode::U009 => CheckCategory::Pyupgrade,
+            CheckCode::U010 => CheckCategory::Pyupgrade,
+            CheckCode::U011 => CheckCategory::Pyupgrade,
+            CheckCode::U012 => CheckCategory::Pyupgrade,
+            CheckCode::U013 => CheckCategory::Pyupgrade,
+            CheckCode::U014 => CheckCategory::Pyupgrade,
+            CheckCode::U015 => CheckCategory::Pyupgrade,
+            CheckCode::W292 => CheckCategory::Pycodestyle,
+            CheckCode::W605 => CheckCategory::Pycodestyle,
+            CheckCode::YTT101 => CheckCategory::Flake82020,
+            CheckCode::YTT102 => CheckCategory::Flake82020,
+            CheckCode::YTT103 => CheckCategory::Flake82020,
+            CheckCode::YTT201 => CheckCategory::Flake82020,
+            CheckCode::YTT202 => CheckCategory::Flake82020,
+            CheckCode::YTT203 => CheckCategory::Flake82020,
+            CheckCode::YTT204 => CheckCategory::Flake82020,
+            CheckCode::YTT301 => CheckCategory::Flake82020,
+            CheckCode::YTT302 => CheckCategory::Flake82020,
+            CheckCode::YTT303 => CheckCategory::Flake82020,
         }
     }
 }
@@ -1405,6 +1416,8 @@ impl CheckKind {
             CheckKind::ErrorSuffixOnExceptionName(..) => &CheckCode::N818,
             // isort
             CheckKind::UnsortedImports => &CheckCode::I001,
+            // eradicate
+            CheckKind::CommentedOutCode => &CheckCode::ERA001,
             // flake8-bandit
             CheckKind::AssertUsed => &CheckCode::S101,
             CheckKind::ExecUsed => &CheckCode::S102,
@@ -2117,6 +2130,8 @@ impl CheckKind {
             }
             // isort
             CheckKind::UnsortedImports => "Import block is un-sorted or un-formatted".to_string(),
+            // eradicate
+            CheckKind::CommentedOutCode => "Found commented-out code".to_string(),
             // flake8-bandit
             CheckKind::AssertUsed => "Use of `assert` detected".to_string(),
             CheckKind::ExecUsed => "Use of `exec` detected".to_string(),
@@ -2221,6 +2236,7 @@ impl CheckKind {
                 | CheckKind::BlankLineAfterSummary
                 | CheckKind::BlankLineBeforeSection(..)
                 | CheckKind::CapitalizeSectionName(..)
+                | CheckKind::CommentedOutCode
                 | CheckKind::ConvertExitToSysExit
                 | CheckKind::ConvertNamedTupleFunctionalToClass(..)
                 | CheckKind::ConvertTypedDictFunctionalToClass(..)

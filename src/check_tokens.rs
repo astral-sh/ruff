@@ -6,7 +6,7 @@ use crate::checks::{Check, CheckCode};
 use crate::lex::docstring_detection::StateMachine;
 use crate::rules::checks::Context;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::{flake8_quotes, pycodestyle, rules, Settings};
+use crate::{eradicate, flake8_quotes, pycodestyle, rules, Settings};
 
 pub fn check_tokens(
     locator: &SourceCodeLocator,
@@ -23,6 +23,7 @@ pub fn check_tokens(
         || settings.enabled.contains(&CheckCode::Q001)
         || settings.enabled.contains(&CheckCode::Q002)
         || settings.enabled.contains(&CheckCode::Q003);
+    let enforce_commented_out_code = settings.enabled.contains(&CheckCode::ERA001);
     let enforce_invalid_escape_sequence = settings.enabled.contains(&CheckCode::W605);
 
     let mut state_machine = StateMachine::default();
@@ -68,6 +69,17 @@ pub fn check_tokens(
                     if settings.enabled.contains(check.kind.code()) {
                         checks.push(check);
                     }
+                }
+            }
+        }
+
+        // eradicate
+        if enforce_commented_out_code {
+            if matches!(tok, Tok::Comment) {
+                if let Some(check) =
+                    eradicate::checks::commented_out_code(locator, start, end, settings, autofix)
+                {
+                    checks.push(check);
                 }
             }
         }

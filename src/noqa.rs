@@ -13,9 +13,9 @@ static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)",
     )
-    .expect("Invalid regex")
+    .unwrap()
 });
-static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").expect("Invalid regex"));
+static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
 #[derive(Debug)]
 pub enum Directive<'a> {
