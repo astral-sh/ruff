@@ -117,9 +117,19 @@ impl<'a> Printer<'a> {
                     for message in messages {
                         let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                         status.set_message(message.kind.body());
+                        status.set_description(format!(
+                            "{}:{}:{}: {}",
+                            filename,
+                            message.location.row(),
+                            message.location.column(),
+                            message.kind.body()
+                        ));
                         let mut case =
                             TestCase::new(format!("org.ruff.{}", message.kind.code()), status);
-                        case.set_classname(filename);
+                        let file_path = Path::new(filename);
+                        let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
+                        let classname = file_path.parent().unwrap().join(file_stem);
+                        case.set_classname(classname.to_str().unwrap());
                         case.extra
                             .insert("line".to_string(), message.location.row().to_string());
                         case.extra
