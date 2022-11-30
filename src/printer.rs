@@ -4,7 +4,6 @@ use std::path::Path;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use anyhow::Result;
-use clap::ValueEnum;
 use colored::Colorize;
 use itertools::iterate;
 use rustpython_parser::ast::Location;
@@ -15,14 +14,8 @@ use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::message::Message;
+use crate::settings::types::SerializationFormat;
 use crate::tell_user;
-
-#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Debug)]
-pub enum SerializationFormat {
-    Text,
-    Json,
-    Grouped,
-}
 
 #[derive(Serialize)]
 struct ExpandedMessage<'a> {

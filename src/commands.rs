@@ -6,7 +6,7 @@ use walkdir::DirEntry;
 
 use crate::checks::CheckCode;
 use crate::fs::iter_python_files;
-use crate::printer::SerializationFormat;
+use crate::settings::types::SerializationFormat;
 use crate::{Configuration, Settings};
 
 /// Print the user-facing configuration settings.

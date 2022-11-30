@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::checks_gen::CheckCodePrefix;
-use crate::settings::types::PythonVersion;
+use crate::settings::types::{PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, isort, mccabe,
     pep8_naming,
@@ -21,6 +21,7 @@ pub struct Options {
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fixable: Option<Vec<CheckCodePrefix>>,
+    pub format: Option<SerializationFormat>,
     pub ignore: Option<Vec<CheckCodePrefix>>,
     pub line_length: Option<usize>,
     pub select: Option<Vec<CheckCodePrefix>>,

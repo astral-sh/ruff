@@ -1440,6 +1440,25 @@ line-length = 120
 
 ---
 
+#### [`format`](#format)
+
+The style in which violation messages should be formatted: `"text"` (default), `"grouped"`
+(group messages by file), or `"json"` (machine-readable).
+
+**Default value**: `"text"`
+
+**Type**: `SerializationFormat`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Group violations by containing file.
+format = "grouped"
+```
+
+---
+
 #### [`per_file_ignores`](#per_file_ignores)
 
 A list of mappings from file pattern to check code prefixes to exclude, when considering any

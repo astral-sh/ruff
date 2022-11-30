@@ -23,8 +23,9 @@ use ::ruff::fs::iter_python_files;
 use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::message::Message;
-use ::ruff::printer::{Printer, SerializationFormat};
+use ::ruff::printer::Printer;
 use ::ruff::settings::configuration::Configuration;
+use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
@@ -189,14 +190,7 @@ fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
     let cli = Cli::parse();
     let fix = cli.fix();
-
     let log_level = extract_log_level(&cli);
-    set_up_logging(&log_level)?;
-
-    if let Some(code) = cli.explain {
-        commands::explain(&code, cli.format)?;
-        return Ok(ExitCode::SUCCESS);
-    }
 
     if let Some(shell) = cli.generate_shell_completion {
         shell.generate(&mut Cli::command(), &mut std::io::stdout());
@@ -205,17 +199,9 @@ fn inner_main() -> Result<ExitCode> {
 
     // Find the project root and pyproject.toml.
     let project_root = pyproject::find_project_root(&cli.files);
-    match &project_root {
-        Some(path) => debug!("Found project root at: {:?}", path),
-        None => debug!("Unable to identify project root; assuming current directory..."),
-    };
     let pyproject = cli
         .config
         .or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
-    match &pyproject {
-        Some(path) => debug!("Found pyproject.toml at: {:?}", path),
-        None => debug!("Unable to find pyproject.toml; using default settings..."),
-    };
 
     // Reconcile configuration from pyproject.toml and command-line arguments.
     let mut configuration =
@@ -246,6 +232,9 @@ fn inner_main() -> Result<ExitCode> {
     }
     if !cli.unfixable.is_empty() {
         configuration.unfixable = cli.unfixable;
+    }
+    if let Some(format) = cli.format {
+        configuration.format = format;
     }
     if let Some(line_length) = cli.line_length {
         configuration.line_length = line_length;
@@ -279,6 +268,30 @@ fn inner_main() -> Result<ExitCode> {
     let fix_enabled: bool = configuration.fix;
     let settings = Settings::from_configuration(configuration, project_root.as_ref())?;
 
+    // If we're using JSON, override the log level.
+    let log_level = if matches!(settings.format, SerializationFormat::Json) {
+        LogLevel::Quiet
+    } else {
+        log_level
+    };
+    set_up_logging(&log_level)?;
+
+    // Now that we've inferred the appropriate log level, add some debug
+    // information.
+    match &project_root {
+        Some(path) => debug!("Found project root at: {:?}", path),
+        None => debug!("Unable to identify project root; assuming current directory..."),
+    };
+    match &pyproject {
+        Some(path) => debug!("Found pyproject.toml at: {:?}", path),
+        None => debug!("Unable to find pyproject.toml; using default settings..."),
+    };
+
+    if let Some(code) = cli.explain {
+        commands::explain(&code, settings.format)?;
+        return Ok(ExitCode::SUCCESS);
+    }
+
     if cli.show_files {
         commands::show_files(&cli.files, &settings);
         return Ok(ExitCode::SUCCESS);
@@ -291,22 +304,19 @@ fn inner_main() -> Result<ExitCode> {
         cache_enabled = false;
     }
 
-    let printer = Printer::new(&cli.format, &log_level);
+    let printer = Printer::new(&settings.format, &log_level);
     if cli.watch {
+        if settings.format != SerializationFormat::Text {
+            eprintln!("Warning: --format 'text' is used in watch mode.");
+        }
         if fix_enabled {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
-
         if cli.add_noqa {
             eprintln!("Warning: --no-qa is not enabled in watch mode.");
         }
-
         if cli.autoformat {
             eprintln!("Warning: --autoformat is not enabled in watch mode.");
-        }
-
-        if cli.format != SerializationFormat::Text {
-            eprintln!("Warning: --format 'text' is used in watch mode.");
         }
 
         // Perform an initial run instantly.
