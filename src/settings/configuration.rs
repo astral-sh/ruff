@@ -14,7 +14,7 @@ use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
-    pep8_naming,
+    pep8_naming, pyupgrade,
 };
 
 #[derive(Debug)]
@@ -44,6 +44,7 @@ pub struct Configuration {
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
+    pub pyupgrade: pyupgrade::settings::Settings,
 }
 
 static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
@@ -163,6 +164,10 @@ impl Configuration {
             pep8_naming: options
                 .pep8_naming
                 .map(pep8_naming::settings::Settings::from_options)
+                .unwrap_or_default(),
+            pyupgrade: options
+                .pyupgrade
+                .map(pyupgrade::settings::Settings::from_options)
                 .unwrap_or_default(),
         })
     }

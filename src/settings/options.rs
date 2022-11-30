@@ -7,7 +7,7 @@ use crate::checks_gen::CheckCodePrefix;
 use crate::settings::types::{PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, isort, mccabe,
-    pep8_naming,
+    pep8_naming, pyupgrade,
 };
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -37,6 +37,7 @@ pub struct Options {
     pub isort: Option<isort::settings::Options>,
     pub mccabe: Option<mccabe::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
+    pub pyupgrade: Option<pyupgrade::settings::Options>,
     // Tables are required to go last.
     pub per_file_ignores: Option<FxHashMap<String, Vec<CheckCodePrefix>>>,
 }

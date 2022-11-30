@@ -18,7 +18,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
-    pep8_naming,
+    pep8_naming, pyupgrade,
 };
 
 pub mod configuration;
@@ -48,6 +48,7 @@ pub struct Settings {
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
+    pub pyupgrade: pyupgrade::settings::Settings,
 }
 
 impl Settings {
@@ -82,6 +83,7 @@ impl Settings {
             mccabe: config.mccabe,
             line_length: config.line_length,
             pep8_naming: config.pep8_naming,
+            pyupgrade: config.pyupgrade,
             per_file_ignores: resolve_per_file_ignores(config.per_file_ignores, project_root)?,
             src: config.src,
             target_version: config.target_version,
@@ -110,6 +112,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pyupgrade: pyupgrade::settings::Settings::default(),
         }
     }
 
@@ -134,6 +137,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pyupgrade: pyupgrade::settings::Settings::default(),
         }
     }
 }
@@ -165,6 +169,7 @@ impl Hash for Settings {
         self.isort.hash(state);
         self.mccabe.hash(state);
         self.pep8_naming.hash(state);
+        self.pyupgrade.hash(state);
     }
 }
 
