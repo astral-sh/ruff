@@ -897,6 +897,18 @@ Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flak
 2. Flake8 has a plugin architecture and supports writing custom lint rules. (Instead, popular Flake8
    plugins are re-implemented in Rust as part of Ruff itself.)
 
+### How does Ruff compare to Pylint?
+
+At time of writing, Pylint implements 409 total rules, while Ruff implements 224, of which
+at least 60 overlap with the Pylint rule set. Subjectively, Pylint tends to implement more rules
+based on type inference (e.g., validating the number of arguments in a function call).
+
+Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all checks natively.
+
+Unlike Pylint, Ruff is capable of automatically fixing its own lint errors.
+
+Pylint parity is being tracked in [#689](https://github.com/charliermarsh/ruff/issues/689).
+
 ### Which tools does Ruff replace?
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
