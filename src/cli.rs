@@ -7,8 +7,9 @@ use rustc_hash::FxHashMap;
 use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
 use crate::logging::LogLevel;
-use crate::printer::SerializationFormat;
-use crate::settings::types::{FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion};
+use crate::settings::types::{
+    FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
+};
 
 #[derive(Debug, Parser)]
 #[command(author, about = "Ruff: An extremely fast Python linter.")]
@@ -77,8 +78,8 @@ pub struct Cli {
     #[arg(long, value_delimiter = ',')]
     pub per_file_ignores: Vec<PatternPrefixPair>,
     /// Output serialization format for error messages.
-    #[arg(long, value_enum, default_value_t = SerializationFormat::Text)]
-    pub format: SerializationFormat,
+    #[arg(long, value_enum)]
+    pub format: Option<SerializationFormat>,
     /// Show violations with source code.
     #[arg(long)]
     pub show_source: bool,
@@ -143,8 +144,6 @@ pub fn extract_log_level(cli: &Cli) -> LogLevel {
         LogLevel::Quiet
     } else if cli.verbose {
         LogLevel::Verbose
-    } else if matches!(cli.format, SerializationFormat::Json) {
-        LogLevel::Quiet
     } else {
         LogLevel::Default
     }

@@ -11,7 +11,7 @@ use regex::Regex;
 
 use crate::checks_gen::{CheckCodePrefix, CATEGORIES};
 use crate::settings::pyproject::load_options;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
     pep8_naming,
@@ -27,6 +27,7 @@ pub struct Configuration {
     pub external: Vec<String>,
     pub fix: bool,
     pub fixable: Vec<CheckCodePrefix>,
+    pub format: SerializationFormat,
     pub ignore: Vec<CheckCodePrefix>,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
@@ -121,6 +122,7 @@ impl Configuration {
             fix: options.fix.unwrap_or_default(),
             fixable: options.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
             unfixable: options.unfixable.unwrap_or_default(),
+            format: options.format.unwrap_or(SerializationFormat::Text),
             ignore: options.ignore.unwrap_or_default(),
             line_length: options.line_length.unwrap_or(88),
             per_file_ignores: options

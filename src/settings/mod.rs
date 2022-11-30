@@ -15,7 +15,7 @@ use rustc_hash::FxHashSet;
 use crate::checks::CheckCode;
 use crate::checks_gen::{CheckCodePrefix, PrefixSpecificity};
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
     pep8_naming,
@@ -34,6 +34,7 @@ pub struct Settings {
     pub extend_exclude: GlobSet,
     pub external: BTreeSet<String>,
     pub fixable: FxHashSet<CheckCode>,
+    pub format: SerializationFormat,
     pub line_length: usize,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)>,
     pub show_source: bool,
@@ -72,6 +73,7 @@ impl Settings {
             extend_exclude: resolve_globset(config.extend_exclude, project_root)?,
             external: BTreeSet::from_iter(config.external),
             fixable: resolve_codes(&config.fixable, &config.unfixable),
+            format: config.format,
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
             flake8_quotes: config.flake8_quotes,
@@ -91,12 +93,14 @@ impl Settings {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter([check_code.clone()]),
-            fixable: FxHashSet::from_iter([check_code]),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: BTreeSet::default(),
+            fixable: FxHashSet::from_iter([check_code]),
+            format: SerializationFormat::Text,
             line_length: 88,
             per_file_ignores: vec![],
+            show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
@@ -106,7 +110,6 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
-            show_source: false,
         }
     }
 
@@ -114,12 +117,14 @@ impl Settings {
         Self {
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter(check_codes.clone()),
-            fixable: FxHashSet::from_iter(check_codes),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: BTreeSet::default(),
+            fixable: FxHashSet::from_iter(check_codes),
+            format: SerializationFormat::Text,
             line_length: 88,
             per_file_ignores: vec![],
+            show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
@@ -129,7 +134,6 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
-            show_source: false,
         }
     }
 }

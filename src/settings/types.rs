@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
+use clap::ValueEnum;
 use globset::{Glob, GlobSetBuilder};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
@@ -140,4 +141,12 @@ impl FromStr for PatternPrefixPair {
         let prefix = CheckCodePrefix::from_str(code_string)?;
         Ok(Self { pattern, prefix })
     }
+}
+
+#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum SerializationFormat {
+    Text,
+    Json,
+    Grouped,
 }
