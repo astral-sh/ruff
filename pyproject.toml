@@ -31,10 +31,3 @@ build-backend = "maturin"
 [tool.maturin]
 bindings = "bin"
 strip = true
-
-[tool.isort]
-profile = "black"
-known_third_party = ["fastapi", "pydantic", "starlette"]
-
-[tool.ruff.pyupgrade]
-
