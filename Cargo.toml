@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "ruff"
-version = "0.0.148"
+version = "0.0.149"
 edition = "2021"
 rust-version = "1.65.0"
 
@@ -28,7 +28,7 @@ common-path = { version = "1.0.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 filetime = { version = "0.2.17" }
-globset = {version = "0.4.9" }
+globset = { version = "0.4.9" }
 itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a8725d161fe8b3ed73a6758b21e177" }
 log = { version = "0.4.17" }
@@ -37,7 +37,7 @@ notify = { version = "4.0.17" }
 num-bigint = { version = "0.4.3" }
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
-quick-junit = "0.3.2"
+quick-junit = { version = "0.3.2" }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
