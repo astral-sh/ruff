@@ -14,7 +14,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: Options) -> Self {
+    pub fn from_options(options: &Options) -> Self {
         Self {
             keep_runtime_typing: options.keep_runtime_typing.unwrap_or_default(),
         }

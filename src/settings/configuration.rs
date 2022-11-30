@@ -167,6 +167,7 @@ impl Configuration {
                 .unwrap_or_default(),
             pyupgrade: options
                 .pyupgrade
+                .as_ref()
                 .map(pyupgrade::settings::Settings::from_options)
                 .unwrap_or_default(),
         })
