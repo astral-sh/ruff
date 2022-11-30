@@ -279,7 +279,7 @@ Options:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for error messages [default: text] [possible values: text, json, grouped]
+          Output serialization format for error messages [default: text] [possible values: text, json, junit, grouped]
       --show-source
           Show violations with source code
       --show-files
@@ -1445,7 +1445,7 @@ line-length = 120
 #### [`format`](#format)
 
 The style in which violation messages should be formatted: `"text"` (default), `"grouped"`
-(group messages by file), or `"json"` (machine-readable).
+(group messages by file), `"json"` (machine-readable), or `"junit"` (machine-readable XML).
 
 **Default value**: `"text"`
 
