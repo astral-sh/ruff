@@ -118,8 +118,7 @@ impl<'a> Printer<'a> {
                         let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                         status.set_message(message.kind.body());
                         status.set_description(format!(
-                            "{}:{}:{}: {}",
-                            filename,
+                            "line {}, col {}, {}",
                             message.location.row(),
                             message.location.column(),
                             message.kind.body()
