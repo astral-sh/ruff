@@ -22,7 +22,7 @@ use crate::ast::types::{
 };
 use crate::ast::visitor::{walk_excepthandler, walk_withitem, Visitor};
 use crate::ast::{helpers, operations, visitor};
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind, DeferralKeyword};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
@@ -1695,12 +1695,34 @@ where
                     );
                 }
             }
-            ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. } => {
+            ExprKind::Yield { .. } => {
                 let scope = self.current_scope();
                 if self.settings.enabled.contains(&CheckCode::F704) {
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.add_check(Check::new(
-                            CheckKind::YieldOutsideFunction,
+                            CheckKind::YieldOutsideFunction(DeferralKeyword::Yield),
+                            Range::from_located(expr),
+                        ));
+                    }
+                }
+            }
+            ExprKind::YieldFrom { .. } => {
+                let scope = self.current_scope();
+                if self.settings.enabled.contains(&CheckCode::F704) {
+                    if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
+                        self.add_check(Check::new(
+                            CheckKind::YieldOutsideFunction(DeferralKeyword::YieldFrom),
+                            Range::from_located(expr),
+                        ));
+                    }
+                }
+            }
+            ExprKind::Await { .. } => {
+                let scope = self.current_scope();
+                if self.settings.enabled.contains(&CheckCode::F704) {
+                    if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
+                        self.add_check(Check::new(
+                            CheckKind::YieldOutsideFunction(DeferralKeyword::Await),
                             Range::from_located(expr),
                         ));
                     }

@@ -8,3 +8,4 @@ class Foo:
 
 yield 3
 yield from 3
+await f()
