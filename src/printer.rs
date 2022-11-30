@@ -97,7 +97,7 @@ impl<'a> Printer<'a> {
                 );
             }
             SerializationFormat::Junit => {
-                use quick_junit::*;
+                use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
                 // Group by filename.
                 let mut grouped_messages = BTreeMap::default();
@@ -111,23 +111,19 @@ impl<'a> Printer<'a> {
                 let mut report = Report::new("ruff");
                 for (filename, messages) in grouped_messages {
                     let mut test_suite = TestSuite::new(filename);
+                    test_suite
+                        .extra
+                        .insert("package".to_string(), "org.ruff".to_string());
                     for message in messages {
                         let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
-                        status.set_type(message.kind.code().as_ref());
-                        let status_message = format!(
-                            "{}:{}:{}: {}",
-                            message.filename,
-                            message.location.row(),
-                            message.location.column(),
-                            message.kind.body()
-                        );
-                        status.set_message(status_message);
+                        status.set_message(message.kind.body());
                         let mut case =
-                            TestCase::new(message.kind.code().category().title(), status);
-                        case.extra
-                            .insert("file".to_string(), message.filename.clone());
+                            TestCase::new(format!("org.ruff.{}", message.kind.code()), status);
+                        case.set_classname(filename);
                         case.extra
                             .insert("line".to_string(), message.location.row().to_string());
+                        case.extra
+                            .insert("column".to_string(), message.location.column().to_string());
 
                         test_suite.add_test_case(case);
                     }
