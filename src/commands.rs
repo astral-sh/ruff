@@ -61,6 +61,9 @@ pub fn explain(code: &CheckCode, format: SerializationFormat) -> Result<()> {
                 })?
             );
         }
+        SerializationFormat::Junit => {
+            todo!()
+        }
     };
     Ok(())
 }

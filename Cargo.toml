@@ -37,6 +37,7 @@ notify = { version = "4.0.17" }
 num-bigint = { version = "0.4.3" }
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
+quick-junit = "0.3.2"
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }

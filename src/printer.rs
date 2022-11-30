@@ -96,6 +96,45 @@ impl<'a> Printer<'a> {
                     )?
                 );
             }
+            SerializationFormat::Junit => {
+                use quick_junit::*;
+
+                // Group by filename.
+                let mut grouped_messages = BTreeMap::default();
+                for message in &diagnostics.messages {
+                    grouped_messages
+                        .entry(&message.filename)
+                        .or_insert_with(Vec::new)
+                        .push(message);
+                }
+
+                let mut report = Report::new("ruff");
+                for (filename, messages) in grouped_messages {
+                    let mut test_suite = TestSuite::new(filename);
+                    for message in messages {
+                        let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
+                        status.set_type(message.kind.code().as_ref());
+                        let status_message = format!(
+                            "{}:{}:{}: {}",
+                            message.filename,
+                            message.location.row(),
+                            message.location.column(),
+                            message.kind.body()
+                        );
+                        status.set_message(status_message);
+                        let mut case =
+                            TestCase::new(message.kind.code().category().title(), status);
+                        case.extra
+                            .insert("file".to_string(), message.filename.clone());
+                        case.extra
+                            .insert("line".to_string(), message.location.row().to_string());
+
+                        test_suite.add_test_case(case);
+                    }
+                    report.add_test_suite(test_suite);
+                }
+                println!("{}", report.to_string().unwrap());
+            }
             SerializationFormat::Text => {
                 self.pre_text(diagnostics);
 

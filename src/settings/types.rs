@@ -148,5 +148,6 @@ impl FromStr for PatternPrefixPair {
 pub enum SerializationFormat {
     Text,
     Json,
+    Junit,
     Grouped,
 }
