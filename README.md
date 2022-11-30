@@ -68,7 +68,7 @@ of [Conda](https://docs.conda.io/en/latest/):
 1. [Configuration](#configuration)
 1. [Supported Rules](#supported-rules)
    1. [Pyflakes (F)](#pyflakes)
-   1. [pycodestyle (E)](#pycodestyle)
+   1. [pycodestyle (E, W)](#pycodestyle)
    1. [isort (I)](#isort)
    1. [pydocstyle (D)](#pydocstyle)
    1. [pyupgrade (U)](#pyupgrade)
