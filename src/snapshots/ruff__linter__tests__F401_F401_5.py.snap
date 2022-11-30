@@ -4,11 +4,11 @@ expression: checks
 ---
 - kind:
     UnusedImport:
-      - - a.b.c
+      - a.b.c
       - false
   location:
     row: 2
-    column: 0
+    column: 16
   end_location:
     row: 2
     column: 17
@@ -23,11 +23,11 @@ expression: checks
         column: 0
 - kind:
     UnusedImport:
-      - - d.e.f
+      - d.e.f
       - false
   location:
     row: 3
-    column: 0
+    column: 16
   end_location:
     row: 3
     column: 22
@@ -42,11 +42,11 @@ expression: checks
         column: 0
 - kind:
     UnusedImport:
-      - - h.i
+      - h.i
       - false
   location:
     row: 4
-    column: 0
+    column: 7
   end_location:
     row: 4
     column: 10
@@ -61,11 +61,11 @@ expression: checks
         column: 0
 - kind:
     UnusedImport:
-      - - j.k
+      - j.k
       - false
   location:
     row: 5
-    column: 0
+    column: 7
   end_location:
     row: 5
     column: 15

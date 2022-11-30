@@ -4,11 +4,11 @@ expression: checks
 ---
 - kind:
     UnusedImport:
-      - - background.BackgroundTasks
+      - background.BackgroundTasks
       - false
   location:
     row: 7
-    column: 0
+    column: 24
   end_location:
     row: 7
     column: 39
@@ -23,11 +23,11 @@ expression: checks
         column: 0
 - kind:
     UnusedImport:
-      - - datastructures.UploadFile
+      - datastructures.UploadFile
       - false
   location:
     row: 10
-    column: 0
+    column: 28
   end_location:
     row: 10
     column: 52
@@ -42,11 +42,11 @@ expression: checks
         column: 0
 - kind:
     UnusedImport:
-      - - background
+      - background
       - false
   location:
     row: 17
-    column: 0
+    column: 7
   end_location:
     row: 17
     column: 17
@@ -61,11 +61,11 @@ expression: checks
         column: 0
 - kind:
     UnusedImport:
-      - - datastructures
+      - datastructures
       - false
   location:
     row: 20
-    column: 0
+    column: 7
   end_location:
     row: 20
     column: 35

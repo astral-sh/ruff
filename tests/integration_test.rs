@@ -18,7 +18,7 @@ fn test_stdin_error() -> Result<()> {
         .write_stdin("import os\n")
         .assert()
         .failure();
-    assert!(str::from_utf8(&output.get_output().stdout)?.contains("-:1:1: F401"));
+    assert!(str::from_utf8(&output.get_output().stdout)?.contains("-:1:8: F401"));
     Ok(())
 }
 
@@ -30,7 +30,7 @@ fn test_stdin_filename() -> Result<()> {
         .write_stdin("import os\n")
         .assert()
         .failure();
-    assert!(str::from_utf8(&output.get_output().stdout)?.contains("F401.py:1:1: F401"));
+    assert!(str::from_utf8(&output.get_output().stdout)?.contains("F401.py:1:8: F401"));
     Ok(())
 }
 

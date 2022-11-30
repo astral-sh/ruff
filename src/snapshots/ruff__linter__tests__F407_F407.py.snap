@@ -6,7 +6,7 @@ expression: checks
     FutureFeatureNotDefined: non_existent_feature
   location:
     row: 2
-    column: 0
+    column: 23
   end_location:
     row: 2
     column: 43

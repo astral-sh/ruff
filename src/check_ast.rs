@@ -3,7 +3,6 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use itertools::Itertools;
 use log::error;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::Withitem;
@@ -19,8 +18,7 @@ use crate::ast::helpers::{
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, ImportKind, Node, Range,
-    Scope, ScopeKind,
+    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, Node, Range, Scope, ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, walk_withitem, Visitor};
 use crate::ast::{helpers, operations, visitor};
@@ -594,7 +592,7 @@ where
                                     self.binding_context(),
                                 ),
                                 used: None,
-                                range: Range::from_located(stmt),
+                                range: Range::from_located(alias),
                             },
                         );
                     } else {
@@ -629,12 +627,12 @@ where
                                             .last()
                                             .expect("No current scope found."))]
                                         .id,
-                                        Range::from_located(stmt),
+                                        Range::from_located(alias),
                                     ))
                                 } else {
                                     None
                                 },
-                                range: Range::from_located(stmt),
+                                range: Range::from_located(alias),
                             },
                         );
                     }
@@ -754,9 +752,9 @@ where
                                         .last()
                                         .expect("No current scope found."))]
                                     .id,
-                                    Range::from_located(stmt),
+                                    Range::from_located(alias),
                                 )),
-                                range: Range::from_located(stmt),
+                                range: Range::from_located(alias),
                             },
                         );
 
@@ -768,7 +766,7 @@ where
                             if !ALL_FEATURE_NAMES.contains(&&*alias.node.name) {
                                 self.add_check(Check::new(
                                     CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
-                                    Range::from_located(stmt),
+                                    Range::from_located(alias),
                                 ));
                             }
                         }
@@ -830,6 +828,7 @@ where
                             None => alias.node.name.to_string(),
                             Some(parent) => format!("{parent}.{}", alias.node.name),
                         };
+                        let range = Range::from_located(alias);
                         self.add_binding(
                             name,
                             Binding {
@@ -852,12 +851,12 @@ where
                                             .last()
                                             .expect("No current scope found."))]
                                         .id,
-                                        Range::from_located(stmt),
+                                        range,
                                     ))
                                 } else {
                                     None
                                 },
-                                range: Range::from_located(stmt),
+                                range,
                             },
                         );
                     }
@@ -2916,68 +2915,54 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::F401) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
-                let mut unused: BTreeMap<(ImportKind, usize, Option<usize>), Vec<&str>> =
+                type UnusedImport<'a> = (&'a String, &'a Range);
+
+                let mut unused: BTreeMap<(usize, Option<usize>), Vec<UnusedImport>> =
                     BTreeMap::new();
 
                 for (name, binding) in &scope.values {
-                    if !matches!(
-                        binding.kind,
-                        BindingKind::Importation(..)
-                            | BindingKind::SubmoduleImportation(..)
-                            | BindingKind::FromImportation(..)
-                    ) {
-                        continue;
-                    }
+                    let (full_name, context) = match &binding.kind {
+                        BindingKind::Importation(_, full_name, context)
+                        | BindingKind::SubmoduleImportation(_, full_name, context)
+                        | BindingKind::FromImportation(_, full_name, context) => {
+                            (full_name, context)
+                        }
+                        _ => continue,
+                    };
 
-                    let used = binding.used.is_some()
+                    // Skip used exports from `__all__`
+                    if binding.used.is_some()
                         || all_names
                             .as_ref()
                             .map(|names| names.contains(name))
-                            .unwrap_or_default();
-
-                    if !used {
-                        match &binding.kind {
-                            BindingKind::FromImportation(_, full_name, context) => {
-                                unused
-                                    .entry((
-                                        ImportKind::ImportFrom,
-                                        context.defined_by,
-                                        context.defined_in,
-                                    ))
-                                    .or_default()
-                                    .push(full_name);
-                            }
-                            BindingKind::Importation(_, full_name, context)
-                            | BindingKind::SubmoduleImportation(_, full_name, context) => {
-                                unused
-                                    .entry((
-                                        ImportKind::Import,
-                                        context.defined_by,
-                                        context.defined_in,
-                                    ))
-                                    .or_default()
-                                    .push(full_name);
-                            }
-                            _ => unreachable!("Already filtered on BindingKind."),
-                        }
+                            .unwrap_or_default()
+                    {
+                        continue;
                     }
+
+                    unused
+                        .entry((context.defined_by, context.defined_in))
+                        .or_default()
+                        .push((full_name, &binding.range));
                 }
 
-                for ((kind, defined_by, defined_in), full_names) in unused {
+                for ((defined_by, defined_in), unused_imports) in unused {
                     let child = self.parents[defined_by];
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
-                    let fix = if self.patch(&CheckCode::F401) {
+                    let in_init_py = self.path.ends_with("__init__.py");
+                    let fix = if !in_init_py && self.patch(&CheckCode::F401) {
                         let deleted: Vec<&Stmt> = self
                             .deletions
                             .iter()
                             .map(|index| self.parents[*index])
                             .collect();
-                        match match kind {
-                            ImportKind::Import => pyflakes::fixes::remove_unused_imports,
-                            ImportKind::ImportFrom => pyflakes::fixes::remove_unused_import_froms,
-                        }(
-                            self.locator, &full_names, child, parent, &deleted
+                        match pyflakes::fixes::remove_unused_imports(
+                            self.locator,
+                            &unused_imports,
+                            child,
+                            parent,
+                            &deleted,
                         ) {
                             Ok(fix) => {
                                 if fix.patch.content.is_empty() || fix.patch.content == "pass" {
@@ -2994,24 +2979,13 @@ impl<'a> Checker<'a> {
                         None
                     };
 
-                    if self.path.ends_with("__init__.py") {
-                        checks.push(Check::new(
-                            CheckKind::UnusedImport(
-                                full_names.into_iter().sorted().map(String::from).collect(),
-                                true,
-                            ),
-                            Range::from_located(child),
-                        ));
-                    } else {
+                    for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(
-                                full_names.into_iter().sorted().map(String::from).collect(),
-                                false,
-                            ),
-                            Range::from_located(child),
+                            CheckKind::UnusedImport(full_name.clone(), in_init_py),
+                            *range,
                         );
-                        if let Some(fix) = fix {
-                            check.amend(fix);
+                        if let Some(fix) = fix.as_ref() {
+                            check.amend(fix.clone());
                         }
                         checks.push(check);
                     }

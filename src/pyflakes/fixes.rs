@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libcst_native::{
     Codegen, CodegenState, CompOp, Comparison, ComparisonTarget, Expr, Expression, ImportNames,
-    NameOrAttribute, SmallStatement, Statement,
+    SmallStatement, Statement,
 };
 use rustpython_ast::Stmt;
 
@@ -14,7 +14,7 @@ use crate::source_code_locator::SourceCodeLocator;
 /// Generate a Fix to remove any unused imports from an `import` statement.
 pub fn remove_unused_imports(
     locator: &SourceCodeLocator,
-    full_names: &[&str],
+    unused_imports: &Vec<(&String, &Range)>,
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
@@ -25,93 +25,40 @@ pub fn remove_unused_imports(
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {
         return Err(anyhow::anyhow!("Expected node to be: Statement::Simple"));
     };
-    let Some(SmallStatement::Import(body)) = body.body.first_mut() else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::ImportFrom"
-        ));
-    };
-    let aliases = &mut body.names;
 
-    // Preserve the trailing comma (or not) from the last entry.
-    let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
-
-    // Identify unused imports from within the `import`.
-    let mut removable = vec![];
-    for (index, alias) in aliases.iter().enumerate() {
-        if full_names.contains(&compose_module_path(&alias.name).as_str()) {
-            removable.push(index);
-        }
-    }
-    // TODO(charlie): This is quadratic.
-    for index in removable.iter().rev() {
-        aliases.remove(*index);
-    }
-
-    if let Some(alias) = aliases.last_mut() {
-        alias.comma = trailing_comma;
-    }
-
-    if aliases.is_empty() {
-        helpers::remove_stmt(stmt, parent, deleted)
-    } else {
-        let mut state = CodegenState::default();
-        tree.codegen(&mut state);
-
-        Ok(Fix::replacement(
-            state.to_string(),
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ))
-    }
-}
-
-/// Generate a Fix to remove any unused imports from an `import from` statement.
-pub fn remove_unused_import_froms(
-    locator: &SourceCodeLocator,
-    full_names: &[&str],
-    stmt: &Stmt,
-    parent: Option<&Stmt>,
-    deleted: &[&Stmt],
-) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text)?;
-
-    let Some(Statement::Simple(body)) = tree.body.first_mut() else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple"));
-    };
-    let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() else {
-        return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::ImportFrom"
-        ));
-    };
-
-    let ImportNames::Aliases(aliases) = &mut body.names else {
-        return Err(anyhow::anyhow!("Expected node to be: Aliases"));
-    };
-
-    // Preserve the trailing comma (or not) from the last entry.
-    let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
-
-    // Identify unused imports from within the `import from`.
-    let mut removable = vec![];
-    for (index, alias) in aliases.iter().enumerate() {
-        if let NameOrAttribute::N(name) = &alias.name {
-            let import_name = name.value.to_string();
-            let full_name = body
-                .module
-                .as_ref()
-                .map(compose_module_path)
-                .map(|module_name| format!("{module_name}.{import_name}"))
-                .unwrap_or(import_name);
-
-            if full_names.contains(&full_name.as_str()) {
-                removable.push(index);
+    let (aliases, import_module) = match body.body.first_mut() {
+        Some(SmallStatement::Import(import_body)) => Ok((&mut import_body.names, None)),
+        Some(SmallStatement::ImportFrom(import_body)) => {
+            if let ImportNames::Aliases(names) = &mut import_body.names {
+                Ok((names, import_body.module.as_ref()))
+            } else {
+                Err(anyhow::anyhow!("Expected node to be: Aliases"))
             }
         }
-    }
-    // TODO(charlie): This is quadratic.
-    for index in removable.iter().rev() {
-        aliases.remove(*index);
+        _ => Err(anyhow::anyhow!(
+            "Expected node to be: SmallStatement::ImportFrom or SmallStatement::Import"
+        )),
+    }?;
+
+    // Preserve the trailing comma (or not) from the last entry.
+    let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
+
+    for (name_to_remove, _) in unused_imports {
+        let alias_index = aliases.iter().position(|alias| {
+            let full_name = match import_module {
+                Some(module_name) => format!(
+                    "{}.{}",
+                    compose_module_path(module_name),
+                    compose_module_path(&alias.name)
+                ),
+                None => compose_module_path(&alias.name),
+            };
+            &full_name.as_str() == name_to_remove
+        });
+
+        if let Some(index) = alias_index {
+            aliases.remove(index);
+        }
     }
 
     if let Some(alias) = aliases.last_mut() {
