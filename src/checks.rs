@@ -3,7 +3,7 @@ use std::str::FromStr;
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
-use strum_macros::{AsRefStr, EnumIter, EnumString};
+use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -17,6 +17,7 @@ use crate::pyupgrade::types::Primitive;
     EnumIter,
     EnumString,
     Debug,
+    Display,
     PartialEq,
     Eq,
     Clone,

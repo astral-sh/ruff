@@ -96,6 +96,50 @@ impl<'a> Printer<'a> {
                     )?
                 );
             }
+            SerializationFormat::Junit => {
+                use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
+
+                // Group by filename.
+                let mut grouped_messages = BTreeMap::default();
+                for message in &diagnostics.messages {
+                    grouped_messages
+                        .entry(&message.filename)
+                        .or_insert_with(Vec::new)
+                        .push(message);
+                }
+
+                let mut report = Report::new("ruff");
+                for (filename, messages) in grouped_messages {
+                    let mut test_suite = TestSuite::new(filename);
+                    test_suite
+                        .extra
+                        .insert("package".to_string(), "org.ruff".to_string());
+                    for message in messages {
+                        let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
+                        status.set_message(message.kind.body());
+                        status.set_description(format!(
+                            "line {}, col {}, {}",
+                            message.location.row(),
+                            message.location.column(),
+                            message.kind.body()
+                        ));
+                        let mut case =
+                            TestCase::new(format!("org.ruff.{}", message.kind.code()), status);
+                        let file_path = Path::new(filename);
+                        let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
+                        let classname = file_path.parent().unwrap().join(file_stem);
+                        case.set_classname(classname.to_str().unwrap());
+                        case.extra
+                            .insert("line".to_string(), message.location.row().to_string());
+                        case.extra
+                            .insert("column".to_string(), message.location.column().to_string());
+
+                        test_suite.add_test_case(case);
+                    }
+                    report.add_test_suite(test_suite);
+                }
+                println!("{}", report.to_string().unwrap());
+            }
             SerializationFormat::Text => {
                 self.pre_text(diagnostics);
 

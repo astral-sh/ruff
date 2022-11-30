@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::Serialize;
 use walkdir::DirEntry;
 
@@ -60,6 +60,9 @@ pub fn explain(code: &CheckCode, format: SerializationFormat) -> Result<()> {
                     summary: &code.kind().summary(),
                 })?
             );
+        }
+        SerializationFormat::Junit => {
+            bail!("`--explain` does not support junit format")
         }
     };
     Ok(())
