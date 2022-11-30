@@ -2915,7 +2915,8 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::F401) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
-                type UnusedImport<'s> = (&'s String, &'s Range);
+                type UnusedImport<'a> = (&'a String, &'a Range);
+
                 let mut unused: BTreeMap<(usize, Option<usize>), Vec<UnusedImport>> =
                     BTreeMap::new();
 
@@ -2950,7 +2951,7 @@ impl<'a> Checker<'a> {
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
                     let in_init_py = self.path.ends_with("__init__.py");
-                    let fix = if self.patch(&CheckCode::F401) && !in_init_py {
+                    let fix = if !in_init_py && self.patch(&CheckCode::F401) {
                         let deleted: Vec<&Stmt> = self
                             .deletions
                             .iter()
@@ -2983,11 +2984,9 @@ impl<'a> Checker<'a> {
                             CheckKind::UnusedImport(full_name.clone(), in_init_py),
                             *range,
                         );
-
                         if let Some(fix) = fix.as_ref() {
                             check.amend(fix.clone());
                         }
-
                         checks.push(check);
                     }
                 }
