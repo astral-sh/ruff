@@ -1,0 +1,21 @@
+---
+source: src/pylint/mod.rs
+expression: checks
+---
+- kind: AwaitOutsideAsync
+  location:
+    row: 12
+    column: 10
+  end_location:
+    row: 12
+    column: 24
+  fix: ~
+- kind: AwaitOutsideAsync
+  location:
+    row: 25
+    column: 8
+  end_location:
+    row: 25
+    column: 30
+  fix: ~
+

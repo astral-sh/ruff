@@ -57,18 +57,19 @@ pub fn main(cli: &Cli) -> Result<()> {
         gen = gen.push_variant(Variant::new(prefix.to_string()));
     }
 
-    // Create the `PrefixSpecificity` definition.
+    // Create the `SuffixLength` definition.
     scope
-        .new_enum("PrefixSpecificity")
+        .new_enum("SuffixLength")
         .vis("pub")
         .derive("PartialEq")
         .derive("Eq")
         .derive("PartialOrd")
         .derive("Ord")
-        .push_variant(Variant::new("Category"))
-        .push_variant(Variant::new("Hundreds"))
-        .push_variant(Variant::new("Tens"))
-        .push_variant(Variant::new("Explicit"));
+        .push_variant(Variant::new("Zero"))
+        .push_variant(Variant::new("One"))
+        .push_variant(Variant::new("Two"))
+        .push_variant(Variant::new("Three"))
+        .push_variant(Variant::new("Four"));
 
     // Create the `match` statement, to map from definition to relevant codes.
     let mut gen = scope
@@ -95,21 +96,22 @@ pub fn main(cli: &Cli) -> Result<()> {
         .new_impl("CheckCodePrefix")
         .new_fn("specificity")
         .arg_ref_self()
-        .ret(Type::new("PrefixSpecificity"))
+        .ret(Type::new("SuffixLength"))
         .vis("pub")
         .line("#[allow(clippy::match_same_arms)]")
         .line("match self {");
     for prefix in prefix_to_codes.keys() {
         let num_numeric = prefix.chars().filter(|char| char.is_numeric()).count();
         let specificity = match num_numeric {
-            3 => "Explicit",
-            2 => "Tens",
-            1 => "Hundreds",
-            0 => "Category",
+            0 => "Zero",
+            1 => "One",
+            2 => "Two",
+            3 => "Three",
+            4 => "Four",
             _ => panic!("Invalid prefix: {prefix}"),
         };
         gen = gen.line(format!(
-            "CheckCodePrefix::{prefix} => PrefixSpecificity::{},",
+            "CheckCodePrefix::{prefix} => SuffixLength::{},",
             specificity
         ));
     }

@@ -399,7 +399,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F634 | IfTuple | If test is a tuple, which is always `True` |  |
 | F701 | BreakOutsideLoop | `break` outside loop |  |
 | F702 | ContinueOutsideLoop | `continue` not properly in loop |  |
-| F704 | YieldOutsideFunction | `yield` or `yield from` statement outside of a function |  |
+| F704 | YieldOutsideFunction | `yield` statement outside of a function |  |
 | F706 | ReturnOutsideFunction | `return` statement outside of a function/method |  |
 | F707 | DefaultExceptNotLast | An `except` block as not the last exception handler |  |
 | F722 | ForwardAnnotationSyntaxError | Syntax error in forward annotation: `...` |  |
@@ -719,6 +719,14 @@ For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
+
+### Pylint
+
+For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 
 ### Ruff-specific rules
 

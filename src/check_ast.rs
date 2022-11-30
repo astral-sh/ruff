@@ -37,7 +37,7 @@ use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
     flake8_print, flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pyupgrade, rules,
+    pylint, pyupgrade, rules,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -1696,8 +1696,8 @@ where
                 }
             }
             ExprKind::Yield { .. } => {
-                let scope = self.current_scope();
                 if self.settings.enabled.contains(&CheckCode::F704) {
+                    let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.add_check(Check::new(
                             CheckKind::YieldOutsideFunction(DeferralKeyword::Yield),
@@ -1707,8 +1707,8 @@ where
                 }
             }
             ExprKind::YieldFrom { .. } => {
-                let scope = self.current_scope();
                 if self.settings.enabled.contains(&CheckCode::F704) {
+                    let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.add_check(Check::new(
                             CheckKind::YieldOutsideFunction(DeferralKeyword::YieldFrom),
@@ -1718,14 +1718,17 @@ where
                 }
             }
             ExprKind::Await { .. } => {
-                let scope = self.current_scope();
                 if self.settings.enabled.contains(&CheckCode::F704) {
+                    let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.add_check(Check::new(
                             CheckKind::YieldOutsideFunction(DeferralKeyword::Await),
                             Range::from_located(expr),
                         ));
                     }
+                }
+                if self.settings.enabled.contains(&CheckCode::PLE1142) {
+                    pylint::plugins::await_outside_async(self, expr);
                 }
             }
             ExprKind::JoinedStr { values } => {
@@ -2819,7 +2822,10 @@ impl<'a> Checker<'a> {
             self.parent_stack = parents;
             self.scope_stack = scopes;
             self.visible_scope = visibility;
-            self.push_scope(Scope::new(ScopeKind::Function(FunctionScope::default())));
+            self.push_scope(Scope::new(ScopeKind::Function(FunctionScope {
+                async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
+                uses_locals: false,
+            })));
 
             match &stmt.node {
                 StmtKind::FunctionDef { body, args, .. }
@@ -2945,14 +2951,9 @@ impl<'a> Checker<'a> {
                     BTreeMap::new();
 
                 for (name, binding) in &scope.values {
-                    let (full_name, context) = match &binding.kind {
-                        BindingKind::Importation(_, full_name, context)
-                        | BindingKind::SubmoduleImportation(_, full_name, context)
-                        | BindingKind::FromImportation(_, full_name, context) => {
-                            (full_name, context)
-                        }
-                        _ => continue,
-                    };
+                    let (BindingKind::Importation(_, full_name, context)
+                    | BindingKind::SubmoduleImportation(_, full_name, context)
+                    | BindingKind::FromImportation(_, full_name, context)) = &binding.kind else { continue };
 
                     // Skip used exports from `__all__`
                     if binding.used.is_some()

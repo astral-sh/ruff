@@ -65,6 +65,7 @@ pub mod printer;
 mod pycodestyle;
 mod pydocstyle;
 mod pyflakes;
+mod pylint;
 mod python;
 mod pyupgrade;
 mod rules;

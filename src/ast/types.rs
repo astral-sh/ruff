@@ -30,12 +30,13 @@ impl Range {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct FunctionScope {
+    pub async_: bool,
     pub uses_locals: bool,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ClassScope<'a> {
     pub name: &'a str,
     pub bases: &'a [Expr],
