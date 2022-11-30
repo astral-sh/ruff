@@ -1,3 +1,4 @@
+use std::fmt;
 use std::str::FromStr;
 
 use itertools::Itertools;
@@ -390,6 +391,23 @@ pub enum RejectedCmpop {
     NotEq,
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeferralKeyword {
+    Yield,
+    YieldFrom,
+    Await,
+}
+
+impl fmt::Display for DeferralKeyword {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DeferralKeyword::Yield => fmt.write_str("yield"),
+            DeferralKeyword::YieldFrom => fmt.write_str("yield from"),
+            DeferralKeyword::Await => fmt.write_str("await"),
+        }
+    }
+}
+
 #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckKind {
     // pycodestyle errors
@@ -452,7 +470,7 @@ pub enum CheckKind {
     UndefinedName(String),
     UnusedImport(String, bool),
     UnusedVariable(String),
-    YieldOutsideFunction,
+    YieldOutsideFunction(DeferralKeyword),
     // flake8-builtins
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
@@ -724,7 +742,7 @@ impl CheckCode {
             CheckCode::F634 => CheckKind::IfTuple,
             CheckCode::F701 => CheckKind::BreakOutsideLoop,
             CheckCode::F702 => CheckKind::ContinueOutsideLoop,
-            CheckCode::F704 => CheckKind::YieldOutsideFunction,
+            CheckCode::F704 => CheckKind::YieldOutsideFunction(DeferralKeyword::Yield),
             CheckCode::F706 => CheckKind::ReturnOutsideFunction,
             CheckCode::F707 => CheckKind::DefaultExceptNotLast,
             CheckCode::F722 => CheckKind::ForwardAnnotationSyntaxError("...".to_string()),
@@ -1249,7 +1267,7 @@ impl CheckKind {
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(..) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
-            CheckKind::YieldOutsideFunction => &CheckCode::F704,
+            CheckKind::YieldOutsideFunction(_) => &CheckCode::F704,
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
@@ -1614,8 +1632,8 @@ impl CheckKind {
             CheckKind::UnusedVariable(name) => {
                 format!("Local variable `{name}` is assigned to but never used")
             }
-            CheckKind::YieldOutsideFunction => {
-                "`yield` or `yield from` statement outside of a function".to_string()
+            CheckKind::YieldOutsideFunction(keyword) => {
+                format!("`{keyword}` statement outside of a function")
             }
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
