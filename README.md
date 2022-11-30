@@ -1249,7 +1249,7 @@ exclude = [".venv"]
 
 ---
 
-#### [`extend_exclude`](#extend_exclude)
+#### [`extend-exclude`](#extend-exclude)
 
 A list of file patterns to omit from linting, in addition to those specified by `exclude`.
 
@@ -1289,7 +1289,7 @@ ignore = ["F841"]
 
 ---
 
-#### [`extend_ignore`](#extend_ignore)
+#### [`extend-ignore`](#extend-ignore)
 
 A list of check code prefixes to ignore, in addition to those specified by `ignore`.
 
@@ -1329,7 +1329,7 @@ select = ["E", "F", "B", "Q"]
 
 ---
 
-#### [`extend_select`](#extend_select)
+#### [`extend-select`](#extend-select)
 
 A list of check code prefixes to enable, in addition to those specified by `select`.
 
@@ -1422,7 +1422,7 @@ unfixable = ["F401"]
 
 ---
 
-#### [`line_length`](#line_length)
+#### [`line-length`](#line-length)
 
 The line length to use when enforcing long-lines violations (like E501).
 
@@ -1459,7 +1459,7 @@ format = "grouped"
 
 ---
 
-#### [`per_file_ignores`](#per_file_ignores)
+#### [`per-file-ignores`](#per-file-ignores)
 
 A list of mappings from file pattern to check code prefixes to exclude, when considering any
 matching files.
@@ -1480,7 +1480,7 @@ matching files.
 
 ---
 
-#### [`show_source`](#show_source)
+#### [`show-source`](#show-source)
 
 Whether to show source code snippets when reporting lint error violations (overridden by the
 `--show-source` command-line flag).
@@ -1494,7 +1494,7 @@ Whether to show source code snippets when reporting lint error violations (overr
 ```toml
 [tool.ruff]
 # By default, always show source code snippets.
-show_source = true
+show-source = true
 ```
 
 ---
@@ -1517,7 +1517,7 @@ src = ["src", "test"]
 
 ---
 
-#### [`target_version`](#target_version)
+#### [`target-version`](#target-version)
 
 The Python version to target, e.g., when considering automatic code upgrades, like rewriting type
 annotations. Note that the target version will _not_ be inferred from the _current_ Python version,
@@ -1537,7 +1537,7 @@ target-version = "py37"
 
 ### `flake8-annotations`
 
-#### [`mypy_init_return`](#mypy_init_return)
+#### [`mypy-init-return`](#mypy-init-return)
 
 Whether to allow the omission of a return type hint for `__init__` if at least one argument is
 annotated.
@@ -1550,12 +1550,12 @@ annotated.
 
 ```toml
 [tool.ruff.flake8-annotations]
-mypy_init_return = true
+mypy-init-return = true
 ```
 
 ---
 
-#### [`suppress_dummy_args`](#suppress_dummy_args)
+#### [`suppress-dummy-args`](#suppress-dummy-args)
 
 Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable regex (like
 `_`).
@@ -1568,12 +1568,12 @@ Whether to suppress `ANN000`-level errors for arguments matching the "dummy" var
 
 ```toml
 [tool.ruff.flake8-annotations]
-suppress_dummy_args = true
+suppress-dummy-args = true
 ```
 
 ---
 
-#### [`suppress_none_returning`](#suppress_none_returning)
+#### [`suppress-none-returning`](#suppress-none-returning)
 
 Whether to suppress `ANN200`-level errors for functions that meet either of the following criteria:
 
@@ -1588,12 +1588,12 @@ Whether to suppress `ANN200`-level errors for functions that meet either of the 
 
 ```toml
 [tool.ruff.flake8-annotations]
-suppress_none_returning = true
+suppress-none-returning = true
 ```
 
 ---
 
-#### [`allow_star_arg_any`](#allow_star_arg_any)
+#### [`allow-star-arg-any`](#allow-star-arg-any)
 
 Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.
 
@@ -1605,12 +1605,12 @@ Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` argume
 
 ```toml
 [tool.ruff.flake8-annotations]
-allow_star_arg_any = true
+allow-star-arg-any = true
 ```
 
 ### `flake8-bugbear`
 
-#### [`extend_immutable_calls`](#extend_immutable_calls)
+#### [`extend-immutable-calls`](#extend-immutable-calls)
 
 Additional callable functions to consider "immutable" when evaluating, e.g., no-mutable-default-argument
 checks (`B006`).
@@ -1629,7 +1629,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 ### `flake8-quotes`
 
-#### [`inline_quotes`](#inline_quotes)
+#### [`inline-quotes`](#inline-quotes)
 
 Quote style to prefer for inline strings (either "single" (`'`) or "double" (`"`)).
 
@@ -1646,7 +1646,7 @@ inline-quotes = "single"
 
 ---
 
-#### [`multiline_quotes`](#multiline_quotes)
+#### [`multiline-quotes`](#multiline-quotes)
 
 Quote style to prefer for multiline strings (either "single" (`'`) or "double" (`"`)).
 
@@ -1663,7 +1663,7 @@ multiline-quotes = "single"
 
 ---
 
-#### [`docstring_quotes`](#docstring_quotes)
+#### [`docstring-quotes`](#docstring-quotes)
 
 Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
 
@@ -1680,7 +1680,7 @@ docstring-quotes = "single"
 
 ---
 
-#### [`avoid_escape`](#avoid_escape)
+#### [`avoid-escape`](#avoid-escape)
 
 Whether to avoid using single quotes if a string contains single quotes, or vice-versa with
 double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the
@@ -1700,7 +1700,7 @@ avoid-escape = false
 
 ### `flake8-tidy-imports`
 
-#### [`ban_relative_imports`](#ban_relative_imports)
+#### [`ban-relative-imports`](#ban-relative-imports)
 
 Whether to ban all relative imports (`"all"`), or only those imports that extend into the parent
 module and beyond (`"parents"`).
@@ -1719,7 +1719,7 @@ ban-relative-imports = "all"
 
 ### `isort`
 
-#### [`known_first_party`](known_first_party)
+#### [`known-first-party`](known-first-party)
 
 A list of modules to consider first-party, regardless of whether they can be identified as such
 via introspection of the local filesystem.
@@ -1737,7 +1737,7 @@ known-first-party = ["src"]
 
 ---
 
-#### [`known_third_party`](known_third_party)
+#### [`known-third-party`](known-third-party)
 
 A list of modules to consider third-party, regardless of whether they can be identified as such
 via introspection of the local filesystem.
@@ -1755,7 +1755,7 @@ known-third-party = ["fastapi"]
 
 ---
 
-#### [`extra_standard_library`](extra_standard_library)
+#### [`extra-standard-library`](extra-standard-library)
 
 A list of modules to consider standard-library, in addition to those known to Ruff in advance.
 
@@ -1772,7 +1772,7 @@ extra-standard-library = ["path"]
 
 ### `mccabe`
 
-#### [`max_complexity`](#max_complexity)
+#### [`max-complexity`](#max-complexity)
 
 The maximum McCabe complexity to allow before triggering `C901` errors.
 
@@ -1790,7 +1790,7 @@ max-complexity = 5
 
 ### `pep8-naming`
 
-#### [`ignore_names`](#ignore_names)
+#### [`ignore-names`](#ignore-names)
 
 A list of names to ignore when considering `pep8-naming` violations.
 
@@ -1807,7 +1807,7 @@ ignore-names = ["callMethod"]
 
 ---
 
-#### [`classmethod_decorators`](#classmethod_decorators)
+#### [`classmethod-decorators`](#classmethod-decorators)
 
 A list of decorators that, when applied to a method, indicate that the method should be treated as
 a class method. For example, Ruff will expect that any method decorated by a decorator in this list
@@ -1827,7 +1827,7 @@ classmethod-decorators = ["classmethod", "pydantic.validator"]
 
 ---
 
-#### [`staticmethod_decorators`](#staticmethod_decorators)
+#### [`staticmethod-decorators`](#staticmethod-decorators)
 
 A list of decorators that, when applied to a method, indicate that the method should be treated as
 a static method. For example, Ruff will expect that any method decorated by a decorator in this list
@@ -1847,7 +1847,7 @@ staticmethod-decorators = ["staticmethod", "stcmthd"]
 
 ### `pyupgrade`
 
-#### [`keep_runtime_typing`](#keep_runtime_typing)
+#### [`keep-runtime-typing`](#keep-runtime-typing)
 
 Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`)
 rewrites even if a file imports `from __future__ import annotations`. Note that this setting is
@@ -1860,7 +1860,7 @@ only applicable when the target Python version is below 3.9 and 3.10 respectivel
 **Example usage**:
 
 ```toml
-[tool.ruff.pep8-naming]
+[tool.ruff.pyupgrade]
 # Preserve types, even if a file imports `from __future__ import annotations`.
 keep-runtime-typing = true
 ```
