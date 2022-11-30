@@ -1197,6 +1197,7 @@ where
                     && self.settings.enabled.contains(&CheckCode::U007)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
+                            && !self.settings.pyupgrade.keep_runtime_typing
                             && self.annotations_future_enabled
                             && self.in_deferred_annotation))
                 {
@@ -1239,6 +1240,7 @@ where
                             && self.settings.enabled.contains(&CheckCode::U006)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
+                                    && !self.settings.pyupgrade.keep_runtime_typing
                                     && self.annotations_future_enabled
                                     && self.in_deferred_annotation))
                             && typing::is_pep585_builtin(

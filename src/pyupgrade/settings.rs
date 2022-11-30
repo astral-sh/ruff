@@ -1,22 +1,22 @@
-//! Settings for the `flake8-bugbear` plugin.
+//! Settings for the `pyupgrade` plugin.
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
-    pub extend_immutable_calls: Option<Vec<String>>,
+    pub keep_runtime_typing: Option<bool>,
 }
 
 #[derive(Debug, Hash, Default)]
 pub struct Settings {
-    pub extend_immutable_calls: Vec<String>,
+    pub keep_runtime_typing: bool,
 }
 
 impl Settings {
     pub fn from_options(options: Options) -> Self {
         Self {
-            extend_immutable_calls: options.extend_immutable_calls.unwrap_or_default(),
+            keep_runtime_typing: options.keep_runtime_typing.unwrap_or_default(),
         }
     }
 }
