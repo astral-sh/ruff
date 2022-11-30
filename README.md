@@ -29,7 +29,9 @@ functionality behind a single, common interface. Ruff can be used to replace Fla
 of plugins), [`isort`](https://pypi.org/project/isort/), [`pydocstyle`](https://pypi.org/project/pydocstyle/),
 [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
 and even a subset of [`pyupgrade`](https://pypi.org/project/pyupgrade/) and [`autoflake`](https://pypi.org/project/autoflake/)
-all while executing tens or hundreds of times faster than any individual tool.
+all while executing tens or hundreds of times faster than any individual tool. Ruff goes beyond the
+responsibilities of a traditional linter, instead functioning as an advanced code transformation
+tool capable of upgrading type annotations, rewriting class definitions, sorting imports, and more.
 
 Ruff is extremely actively developed and used in major open-source projects like:
 
