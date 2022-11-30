@@ -90,6 +90,8 @@ pub enum CheckCode {
     F831,
     F841,
     F901,
+    // pylint errors
+    PLE1142,
     // flake8-builtins
     A001,
     A002,
@@ -300,6 +302,7 @@ pub enum CheckCategory {
     Flake82020,
     Flake8BlindExcept,
     McCabe,
+    Pylint,
     Ruff,
     Meta,
 }
@@ -327,6 +330,7 @@ impl CheckCategory {
             CheckCategory::Pycodestyle => "pycodestyle",
             CheckCategory::Pydocstyle => "pydocstyle",
             CheckCategory::Pyflakes => "Pyflakes",
+            CheckCategory::Pylint => "Pylint",
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Ruff => "Ruff-specific rules",
         }
@@ -370,6 +374,7 @@ impl CheckCategory {
             CheckCategory::Pycodestyle => Some("https://pypi.org/project/pycodestyle/2.9.1/"),
             CheckCategory::Pydocstyle => Some("https://pypi.org/project/pydocstyle/6.1.1/"),
             CheckCategory::Pyflakes => Some("https://pypi.org/project/pyflakes/2.5.0/"),
+            CheckCategory::Pylint => Some("https://pypi.org/project/pylint/2.15.7/"),
             CheckCategory::Pyupgrade => Some("https://pypi.org/project/pyupgrade/3.2.0/"),
             CheckCategory::Ruff => None,
         }
@@ -471,6 +476,8 @@ pub enum CheckKind {
     UnusedImport(String, bool),
     UnusedVariable(String),
     YieldOutsideFunction(DeferralKeyword),
+    // pylint errors
+    AwaitOutsideAsync,
     // flake8-builtins
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
@@ -752,6 +759,8 @@ impl CheckCode {
             CheckCode::F831 => CheckKind::DuplicateArgumentName,
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
+            // pylint errors
+            CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
             // flake8-builtins
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
@@ -1160,6 +1169,7 @@ impl CheckCode {
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
+            CheckCode::PLE1142 => CheckCategory::Pylint,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
             CheckCode::Q002 => CheckCategory::Flake8Quotes,
@@ -1271,6 +1281,8 @@ impl CheckKind {
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
+            // pylint errors
+            CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
@@ -1639,6 +1651,10 @@ impl CheckKind {
             CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
             CheckKind::InvalidEscapeSequence(char) => {
                 format!("Invalid escape sequence: '\\{char}'")
+            }
+            // pylint errors
+            CheckKind::AwaitOutsideAsync => {
+                "`await` should be used within an async function".to_string()
             }
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {

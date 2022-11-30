@@ -13,7 +13,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::checks::CheckCode;
-use crate::checks_gen::{CheckCodePrefix, PrefixSpecificity};
+use crate::checks_gen::{CheckCodePrefix, SuffixLength};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
@@ -214,10 +214,11 @@ pub fn resolve_per_file_ignores(
 fn resolve_codes(select: &[CheckCodePrefix], ignore: &[CheckCodePrefix]) -> FxHashSet<CheckCode> {
     let mut codes: FxHashSet<CheckCode> = FxHashSet::default();
     for specificity in [
-        PrefixSpecificity::Category,
-        PrefixSpecificity::Hundreds,
-        PrefixSpecificity::Tens,
-        PrefixSpecificity::Explicit,
+        SuffixLength::Zero,
+        SuffixLength::One,
+        SuffixLength::Two,
+        SuffixLength::Three,
+        SuffixLength::Four,
     ] {
         for prefix in select {
             if prefix.specificity() == specificity {
