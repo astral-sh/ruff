@@ -37,6 +37,7 @@ use log::{debug, error};
 use notify::{raw_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff::autofix::fixer;
 use rustpython_ast::Location;
 use walkdir::DirEntry;
 
@@ -60,14 +61,23 @@ fn read_from_stdin() -> Result<String> {
     Ok(buffer)
 }
 
-fn run_once_stdin(settings: &Settings, filename: &Path, autofix: bool) -> Result<Diagnostics> {
+fn run_once_stdin(
+    settings: &Settings,
+    filename: &Path,
+    autofix: &fixer::Mode,
+) -> Result<Diagnostics> {
     let stdin = read_from_stdin()?;
-    let mut diagnostics = lint_stdin(filename, &stdin, settings, &autofix.into())?;
+    let mut diagnostics = lint_stdin(filename, &stdin, settings, autofix)?;
     diagnostics.messages.sort_unstable();
     Ok(diagnostics)
 }
 
-fn run_once(files: &[PathBuf], settings: &Settings, cache: bool, autofix: bool) -> Diagnostics {
+fn run_once(
+    files: &[PathBuf],
+    settings: &Settings,
+    cache: bool,
+    autofix: &fixer::Mode,
+) -> Diagnostics {
     // Collect all the files to check.
     let start = Instant::now();
     let paths: Vec<Result<DirEntry, walkdir::Error>> = files
@@ -83,7 +93,7 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool, autofix: bool) 
             match entry {
                 Ok(entry) => {
                     let path = entry.path();
-                    lint_path(path, settings, &cache.into(), &autofix.into())
+                    lint_path(path, settings, &cache.into(), autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
                 Err(e) => Err((
@@ -99,6 +109,7 @@ fn run_once(files: &[PathBuf], settings: &Settings, cache: bool, autofix: bool) 
                             kind: CheckKind::IOError(message),
                             location: Location::default(),
                             end_location: Location::default(),
+                            fix: None,
                             filename: path.to_string_lossy().to_string(),
                             source: None,
                         }])
@@ -266,7 +277,13 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     // Extract settings for internal use.
-    let fix_enabled: bool = configuration.fix;
+    let autofix = if configuration.fix {
+        fixer::Mode::Apply
+    } else if matches!(configuration.format, SerializationFormat::Json) {
+        fixer::Mode::Generate
+    } else {
+        fixer::Mode::None
+    };
     let settings = Settings::from_configuration(configuration, project_root.as_ref())?;
 
     // Now that we've inferred the appropriate log level, add some debug
@@ -299,10 +316,7 @@ fn inner_main() -> Result<ExitCode> {
 
     let printer = Printer::new(&settings.format, &log_level);
     if cli.watch {
-        if settings.format != SerializationFormat::Text {
-            eprintln!("Warning: --format 'text' is used in watch mode.");
-        }
-        if fix_enabled {
+        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
         if cli.add_noqa {
@@ -311,12 +325,15 @@ fn inner_main() -> Result<ExitCode> {
         if cli.autoformat {
             eprintln!("Warning: --autoformat is not enabled in watch mode.");
         }
+        if settings.format != SerializationFormat::Text {
+            eprintln!("Warning: --format 'text' is used in watch mode.");
+        }
 
         // Perform an initial run instantly.
         printer.clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = run_once(&cli.files, &settings, cache_enabled, false);
+        let messages = run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
         printer.write_continuously(&messages)?;
 
         // Configure the file watcher.
@@ -334,7 +351,8 @@ fn inner_main() -> Result<ExitCode> {
                             printer.clear_screen()?;
                             printer.write_to_user("File change detected...\n");
 
-                            let messages = run_once(&cli.files, &settings, cache_enabled, false);
+                            let messages =
+                                run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
                             printer.write_continuously(&messages)?;
                         }
                     }
@@ -359,15 +377,15 @@ fn inner_main() -> Result<ExitCode> {
         let diagnostics = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            run_once_stdin(&settings, path, fix_enabled)?
+            run_once_stdin(&settings, path, &autofix)?
         } else {
-            run_once(&cli.files, &settings, cache_enabled, fix_enabled)
+            run_once(&cli.files, &settings, cache_enabled, &autofix)
         };
 
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && fix_enabled) {
+        if !(is_stdin && matches!(autofix, fixer::Mode::Apply)) {
             printer.write_once(&diagnostics)?;
         }
 

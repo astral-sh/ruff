@@ -4,6 +4,7 @@ use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
+use crate::autofix::Fix;
 use crate::checks::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -12,6 +13,7 @@ pub struct Message {
     pub kind: CheckKind,
     pub location: Location,
     pub end_location: Location,
+    pub fix: Option<Fix>,
     pub filename: String,
     pub source: Option<Source>,
 }
@@ -22,6 +24,7 @@ impl Message {
             kind: check.kind,
             location: Location::new(check.location.row(), check.location.column() + 1),
             end_location: Location::new(check.end_location.row(), check.end_location.column() + 1),
+            fix: check.fix,
             filename,
             source,
         }

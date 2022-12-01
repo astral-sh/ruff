@@ -9,7 +9,8 @@ use itertools::iterate;
 use rustpython_parser::ast::Location;
 use serde::Serialize;
 
-use crate::checks::{CheckCode, CheckKind};
+use crate::autofix::Fix;
+use crate::checks::CheckCode;
 use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
@@ -19,9 +20,9 @@ use crate::tell_user;
 
 #[derive(Serialize)]
 struct ExpandedMessage<'a> {
-    kind: &'a CheckKind,
     code: &'a CheckCode,
     message: String,
+    fix: Option<&'a Fix>,
     location: Location,
     end_location: Location,
     filename: &'a str,
@@ -85,9 +86,9 @@ impl<'a> Printer<'a> {
                             .messages
                             .iter()
                             .map(|message| ExpandedMessage {
-                                kind: &message.kind,
                                 code: message.kind.code(),
                                 message: message.kind.body(),
+                                fix: message.fix.as_ref(),
                                 location: message.location,
                                 end_location: message.end_location,
                                 filename: &message.filename,
