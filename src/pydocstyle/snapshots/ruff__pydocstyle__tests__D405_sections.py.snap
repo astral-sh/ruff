@@ -11,14 +11,13 @@ expression: checks
     row: 23
     column: 7
   fix:
-    patch:
-      content: Returns
-      location:
-        row: 19
-        column: 4
-      end_location:
-        row: 19
-        column: 11
+    content: Returns
+    location:
+      row: 19
+      column: 4
+    end_location:
+      row: 19
+      column: 11
 - kind:
     CapitalizeSectionName: Short summary
   location:
@@ -28,12 +27,11 @@ expression: checks
     row: 221
     column: 7
   fix:
-    patch:
-      content: Short Summary
-      location:
-        row: 209
-        column: 4
-      end_location:
-        row: 209
-        column: 17
+    content: Short Summary
+    location:
+      row: 209
+      column: 4
+    end_location:
+      row: 209
+      column: 17
 

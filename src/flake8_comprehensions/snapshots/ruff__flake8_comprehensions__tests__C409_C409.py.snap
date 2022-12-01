@@ -11,14 +11,13 @@ expression: checks
     row: 1
     column: 14
   fix:
-    patch:
-      content: ()
-      location:
-        row: 1
-        column: 5
-      end_location:
-        row: 1
-        column: 14
+    content: ()
+    location:
+      row: 1
+      column: 5
+    end_location:
+      row: 1
+      column: 14
 - kind:
     UnnecessaryLiteralWithinTupleCall: list
   location:
@@ -28,14 +27,13 @@ expression: checks
     row: 2
     column: 18
   fix:
-    patch:
-      content: "(1, 2)"
-      location:
-        row: 2
-        column: 5
-      end_location:
-        row: 2
-        column: 18
+    content: "(1, 2)"
+    location:
+      row: 2
+      column: 5
+    end_location:
+      row: 2
+      column: 18
 - kind:
     UnnecessaryLiteralWithinTupleCall: tuple
   location:
@@ -45,14 +43,13 @@ expression: checks
     row: 3
     column: 18
   fix:
-    patch:
-      content: "(1, 2)"
-      location:
-        row: 3
-        column: 5
-      end_location:
-        row: 3
-        column: 18
+    content: "(1, 2)"
+    location:
+      row: 3
+      column: 5
+    end_location:
+      row: 3
+      column: 18
 - kind:
     UnnecessaryLiteralWithinTupleCall: list
   location:
@@ -62,14 +59,13 @@ expression: checks
     row: 7
     column: 2
   fix:
-    patch:
-      content: "(\n    1,\n    2\n)"
-      location:
-        row: 4
-        column: 5
-      end_location:
-        row: 7
-        column: 2
+    content: "(\n    1,\n    2\n)"
+    location:
+      row: 4
+      column: 5
+    end_location:
+      row: 7
+      column: 2
 - kind:
     UnnecessaryLiteralWithinTupleCall: tuple
   location:
@@ -79,12 +75,11 @@ expression: checks
     row: 10
     column: 1
   fix:
-    patch:
-      content: "(1, 2)"
-      location:
-        row: 8
-        column: 5
-      end_location:
-        row: 10
-        column: 1
+    content: "(1, 2)"
+    location:
+      row: 8
+      column: 5
+    end_location:
+      row: 10
+      column: 1
 

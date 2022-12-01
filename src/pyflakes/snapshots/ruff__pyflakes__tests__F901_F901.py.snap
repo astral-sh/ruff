@@ -10,14 +10,13 @@ expression: checks
     row: 2
     column: 24
   fix:
-    patch:
-      content: NotImplementedError
-      location:
-        row: 2
-        column: 10
-      end_location:
-        row: 2
-        column: 24
+    content: NotImplementedError
+    location:
+      row: 2
+      column: 10
+    end_location:
+      row: 2
+      column: 24
 - kind: RaiseNotImplemented
   location:
     row: 6
@@ -26,12 +25,11 @@ expression: checks
     row: 6
     column: 24
   fix:
-    patch:
-      content: NotImplementedError
-      location:
-        row: 6
-        column: 10
-      end_location:
-        row: 6
-        column: 24
+    content: NotImplementedError
+    location:
+      row: 6
+      column: 10
+    end_location:
+      row: 6
+      column: 24
 

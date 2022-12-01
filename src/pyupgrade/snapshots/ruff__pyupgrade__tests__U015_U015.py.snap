@@ -10,14 +10,13 @@ expression: checks
     row: 1
     column: 16
   fix:
-    patch:
-      content: ""
-      location:
-        row: 1
-        column: 10
-      end_location:
-        row: 1
-        column: 15
+    content: ""
+    location:
+      row: 1
+      column: 10
+    end_location:
+      row: 1
+      column: 15
 - kind: RedundantOpenModes
   location:
     row: 2
@@ -26,14 +25,13 @@ expression: checks
     row: 2
     column: 17
   fix:
-    patch:
-      content: ""
-      location:
-        row: 2
-        column: 10
-      end_location:
-        row: 2
-        column: 16
+    content: ""
+    location:
+      row: 2
+      column: 10
+    end_location:
+      row: 2
+      column: 16
 - kind: RedundantOpenModes
   location:
     row: 3
@@ -42,14 +40,13 @@ expression: checks
     row: 3
     column: 17
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 3
-        column: 12
-      end_location:
-        row: 3
-        column: 16
+    content: "\"rb\""
+    location:
+      row: 3
+      column: 12
+    end_location:
+      row: 3
+      column: 16
 - kind: RedundantOpenModes
   location:
     row: 4
@@ -58,14 +55,13 @@ expression: checks
     row: 4
     column: 18
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 4
-        column: 12
-      end_location:
-        row: 4
-        column: 17
+    content: "\"rb\""
+    location:
+      row: 4
+      column: 12
+    end_location:
+      row: 4
+      column: 17
 - kind: RedundantOpenModes
   location:
     row: 5
@@ -74,14 +70,13 @@ expression: checks
     row: 5
     column: 16
   fix:
-    patch:
-      content: ""
-      location:
-        row: 5
-        column: 10
-      end_location:
-        row: 5
-        column: 15
+    content: ""
+    location:
+      row: 5
+      column: 10
+    end_location:
+      row: 5
+      column: 15
 - kind: RedundantOpenModes
   location:
     row: 6
@@ -90,14 +85,13 @@ expression: checks
     row: 6
     column: 17
   fix:
-    patch:
-      content: ""
-      location:
-        row: 6
-        column: 10
-      end_location:
-        row: 6
-        column: 16
+    content: ""
+    location:
+      row: 6
+      column: 10
+    end_location:
+      row: 6
+      column: 16
 - kind: RedundantOpenModes
   location:
     row: 7
@@ -106,14 +100,13 @@ expression: checks
     row: 7
     column: 32
   fix:
-    patch:
-      content: ""
-      location:
-        row: 7
-        column: 8
-      end_location:
-        row: 7
-        column: 13
+    content: ""
+    location:
+      row: 7
+      column: 8
+    end_location:
+      row: 7
+      column: 13
 - kind: RedundantOpenModes
   location:
     row: 8
@@ -122,14 +115,13 @@ expression: checks
     row: 8
     column: 15
   fix:
-    patch:
-      content: "\"w\""
-      location:
-        row: 8
-        column: 10
-      end_location:
-        row: 8
-        column: 14
+    content: "\"w\""
+    location:
+      row: 8
+      column: 10
+    end_location:
+      row: 8
+      column: 14
 - kind: RedundantOpenModes
   location:
     row: 10
@@ -138,14 +130,13 @@ expression: checks
     row: 10
     column: 21
   fix:
-    patch:
-      content: ""
-      location:
-        row: 10
-        column: 15
-      end_location:
-        row: 10
-        column: 20
+    content: ""
+    location:
+      row: 10
+      column: 15
+    end_location:
+      row: 10
+      column: 20
 - kind: RedundantOpenModes
   location:
     row: 12
@@ -154,14 +145,13 @@ expression: checks
     row: 12
     column: 22
   fix:
-    patch:
-      content: ""
-      location:
-        row: 12
-        column: 15
-      end_location:
-        row: 12
-        column: 21
+    content: ""
+    location:
+      row: 12
+      column: 15
+    end_location:
+      row: 12
+      column: 21
 - kind: RedundantOpenModes
   location:
     row: 14
@@ -170,14 +160,13 @@ expression: checks
     row: 14
     column: 22
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 14
-        column: 17
-      end_location:
-        row: 14
-        column: 21
+    content: "\"rb\""
+    location:
+      row: 14
+      column: 17
+    end_location:
+      row: 14
+      column: 21
 - kind: RedundantOpenModes
   location:
     row: 16
@@ -186,14 +175,13 @@ expression: checks
     row: 16
     column: 23
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 16
-        column: 17
-      end_location:
-        row: 16
-        column: 22
+    content: "\"rb\""
+    location:
+      row: 16
+      column: 17
+    end_location:
+      row: 16
+      column: 22
 - kind: RedundantOpenModes
   location:
     row: 18
@@ -202,14 +190,13 @@ expression: checks
     row: 18
     column: 21
   fix:
-    patch:
-      content: ""
-      location:
-        row: 18
-        column: 15
-      end_location:
-        row: 18
-        column: 20
+    content: ""
+    location:
+      row: 18
+      column: 15
+    end_location:
+      row: 18
+      column: 20
 - kind: RedundantOpenModes
   location:
     row: 20
@@ -218,14 +205,13 @@ expression: checks
     row: 20
     column: 22
   fix:
-    patch:
-      content: ""
-      location:
-        row: 20
-        column: 15
-      end_location:
-        row: 20
-        column: 21
+    content: ""
+    location:
+      row: 20
+      column: 15
+    end_location:
+      row: 20
+      column: 21
 - kind: RedundantOpenModes
   location:
     row: 22
@@ -234,14 +220,13 @@ expression: checks
     row: 22
     column: 39
   fix:
-    patch:
-      content: ""
-      location:
-        row: 22
-        column: 15
-      end_location:
-        row: 22
-        column: 20
+    content: ""
+    location:
+      row: 22
+      column: 15
+    end_location:
+      row: 22
+      column: 20
 - kind: RedundantOpenModes
   location:
     row: 24
@@ -250,14 +235,13 @@ expression: checks
     row: 24
     column: 22
   fix:
-    patch:
-      content: "\"w\""
-      location:
-        row: 24
-        column: 17
-      end_location:
-        row: 24
-        column: 21
+    content: "\"w\""
+    location:
+      row: 24
+      column: 17
+    end_location:
+      row: 24
+      column: 21
 - kind: RedundantOpenModes
   location:
     row: 27
@@ -266,14 +250,13 @@ expression: checks
     row: 27
     column: 27
   fix:
-    patch:
-      content: ""
-      location:
-        row: 27
-        column: 21
-      end_location:
-        row: 27
-        column: 26
+    content: ""
+    location:
+      row: 27
+      column: 21
+    end_location:
+      row: 27
+      column: 26
 - kind: RedundantOpenModes
   location:
     row: 28
@@ -282,14 +265,13 @@ expression: checks
     row: 28
     column: 28
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 28
-        column: 23
-      end_location:
-        row: 28
-        column: 27
+    content: "\"rb\""
+    location:
+      row: 28
+      column: 23
+    end_location:
+      row: 28
+      column: 27
 - kind: RedundantOpenModes
   location:
     row: 30
@@ -298,14 +280,13 @@ expression: checks
     row: 30
     column: 32
   fix:
-    patch:
-      content: ""
-      location:
-        row: 30
-        column: 26
-      end_location:
-        row: 30
-        column: 31
+    content: ""
+    location:
+      row: 30
+      column: 26
+    end_location:
+      row: 30
+      column: 31
 - kind: RedundantOpenModes
   location:
     row: 32
@@ -314,14 +295,13 @@ expression: checks
     row: 32
     column: 33
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 32
-        column: 28
-      end_location:
-        row: 32
-        column: 32
+    content: "\"rb\""
+    location:
+      row: 32
+      column: 28
+    end_location:
+      row: 32
+      column: 32
 - kind: RedundantOpenModes
   location:
     row: 35
@@ -330,14 +310,13 @@ expression: checks
     row: 35
     column: 21
   fix:
-    patch:
-      content: ""
-      location:
-        row: 35
-        column: 15
-      end_location:
-        row: 35
-        column: 20
+    content: ""
+    location:
+      row: 35
+      column: 15
+    end_location:
+      row: 35
+      column: 20
 - kind: RedundantOpenModes
   location:
     row: 35
@@ -346,14 +325,13 @@ expression: checks
     row: 35
     column: 45
   fix:
-    patch:
-      content: ""
-      location:
-        row: 35
-        column: 39
-      end_location:
-        row: 35
-        column: 44
+    content: ""
+    location:
+      row: 35
+      column: 39
+    end_location:
+      row: 35
+      column: 44
 - kind: RedundantOpenModes
   location:
     row: 37
@@ -362,14 +340,13 @@ expression: checks
     row: 37
     column: 22
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 37
-        column: 17
-      end_location:
-        row: 37
-        column: 21
+    content: "\"rb\""
+    location:
+      row: 37
+      column: 17
+    end_location:
+      row: 37
+      column: 21
 - kind: RedundantOpenModes
   location:
     row: 37
@@ -378,14 +355,13 @@ expression: checks
     row: 37
     column: 47
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 37
-        column: 42
-      end_location:
-        row: 37
-        column: 46
+    content: "\"rb\""
+    location:
+      row: 37
+      column: 42
+    end_location:
+      row: 37
+      column: 46
 - kind: RedundantOpenModes
   location:
     row: 40
@@ -394,14 +370,13 @@ expression: checks
     row: 40
     column: 21
   fix:
-    patch:
-      content: ""
-      location:
-        row: 40
-        column: 10
-      end_location:
-        row: 40
-        column: 20
+    content: ""
+    location:
+      row: 40
+      column: 10
+    end_location:
+      row: 40
+      column: 20
 - kind: RedundantOpenModes
   location:
     row: 41
@@ -410,14 +385,13 @@ expression: checks
     row: 41
     column: 26
   fix:
-    patch:
-      content: ""
-      location:
-        row: 41
-        column: 15
-      end_location:
-        row: 41
-        column: 25
+    content: ""
+    location:
+      row: 41
+      column: 15
+    end_location:
+      row: 41
+      column: 25
 - kind: RedundantOpenModes
   location:
     row: 42
@@ -426,14 +400,13 @@ expression: checks
     row: 42
     column: 26
   fix:
-    patch:
-      content: ""
-      location:
-        row: 42
-        column: 5
-      end_location:
-        row: 42
-        column: 15
+    content: ""
+    location:
+      row: 42
+      column: 5
+    end_location:
+      row: 42
+      column: 15
 - kind: RedundantOpenModes
   location:
     row: 44
@@ -442,14 +415,13 @@ expression: checks
     row: 44
     column: 26
   fix:
-    patch:
-      content: ""
-      location:
-        row: 44
-        column: 15
-      end_location:
-        row: 44
-        column: 25
+    content: ""
+    location:
+      row: 44
+      column: 15
+    end_location:
+      row: 44
+      column: 25
 - kind: RedundantOpenModes
   location:
     row: 46
@@ -458,14 +430,13 @@ expression: checks
     row: 46
     column: 31
   fix:
-    patch:
-      content: ""
-      location:
-        row: 46
-        column: 20
-      end_location:
-        row: 46
-        column: 30
+    content: ""
+    location:
+      row: 46
+      column: 20
+    end_location:
+      row: 46
+      column: 30
 - kind: RedundantOpenModes
   location:
     row: 48
@@ -474,14 +445,13 @@ expression: checks
     row: 48
     column: 31
   fix:
-    patch:
-      content: ""
-      location:
-        row: 48
-        column: 10
-      end_location:
-        row: 48
-        column: 20
+    content: ""
+    location:
+      row: 48
+      column: 10
+    end_location:
+      row: 48
+      column: 20
 - kind: RedundantOpenModes
   location:
     row: 51
@@ -490,14 +460,13 @@ expression: checks
     row: 51
     column: 22
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 51
-        column: 17
-      end_location:
-        row: 51
-        column: 21
+    content: "\"rb\""
+    location:
+      row: 51
+      column: 17
+    end_location:
+      row: 51
+      column: 21
 - kind: RedundantOpenModes
   location:
     row: 52
@@ -506,14 +475,13 @@ expression: checks
     row: 52
     column: 27
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 52
-        column: 22
-      end_location:
-        row: 52
-        column: 26
+    content: "\"rb\""
+    location:
+      row: 52
+      column: 22
+    end_location:
+      row: 52
+      column: 26
 - kind: RedundantOpenModes
   location:
     row: 53
@@ -522,14 +490,13 @@ expression: checks
     row: 53
     column: 27
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 53
-        column: 10
-      end_location:
-        row: 53
-        column: 14
+    content: "\"rb\""
+    location:
+      row: 53
+      column: 10
+    end_location:
+      row: 53
+      column: 14
 - kind: RedundantOpenModes
   location:
     row: 55
@@ -538,14 +505,13 @@ expression: checks
     row: 55
     column: 27
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 55
-        column: 22
-      end_location:
-        row: 55
-        column: 26
+    content: "\"rb\""
+    location:
+      row: 55
+      column: 22
+    end_location:
+      row: 55
+      column: 26
 - kind: RedundantOpenModes
   location:
     row: 57
@@ -554,14 +520,13 @@ expression: checks
     row: 57
     column: 32
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 57
-        column: 27
-      end_location:
-        row: 57
-        column: 31
+    content: "\"rb\""
+    location:
+      row: 57
+      column: 27
+    end_location:
+      row: 57
+      column: 31
 - kind: RedundantOpenModes
   location:
     row: 59
@@ -570,14 +535,13 @@ expression: checks
     row: 59
     column: 32
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 59
-        column: 15
-      end_location:
-        row: 59
-        column: 19
+    content: "\"rb\""
+    location:
+      row: 59
+      column: 15
+    end_location:
+      row: 59
+      column: 19
 - kind: RedundantOpenModes
   location:
     row: 62
@@ -586,14 +550,13 @@ expression: checks
     row: 62
     column: 110
   fix:
-    patch:
-      content: ""
-      location:
-        row: 62
-        column: 15
-      end_location:
-        row: 62
-        column: 25
+    content: ""
+    location:
+      row: 62
+      column: 15
+    end_location:
+      row: 62
+      column: 25
 - kind: RedundantOpenModes
   location:
     row: 63
@@ -602,14 +565,13 @@ expression: checks
     row: 63
     column: 110
   fix:
-    patch:
-      content: ""
-      location:
-        row: 63
-        column: 99
-      end_location:
-        row: 63
-        column: 109
+    content: ""
+    location:
+      row: 63
+      column: 99
+    end_location:
+      row: 63
+      column: 109
 - kind: RedundantOpenModes
   location:
     row: 64
@@ -618,14 +580,13 @@ expression: checks
     row: 64
     column: 110
   fix:
-    patch:
-      content: ""
-      location:
-        row: 64
-        column: 58
-      end_location:
-        row: 64
-        column: 68
+    content: ""
+    location:
+      row: 64
+      column: 58
+    end_location:
+      row: 64
+      column: 68
 - kind: RedundantOpenModes
   location:
     row: 65
@@ -634,14 +595,13 @@ expression: checks
     row: 65
     column: 110
   fix:
-    patch:
-      content: ""
-      location:
-        row: 65
-        column: 5
-      end_location:
-        row: 65
-        column: 15
+    content: ""
+    location:
+      row: 65
+      column: 5
+    end_location:
+      row: 65
+      column: 15
 - kind: RedundantOpenModes
   location:
     row: 67
@@ -650,14 +610,13 @@ expression: checks
     row: 67
     column: 111
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 67
-        column: 22
-      end_location:
-        row: 67
-        column: 26
+    content: "\"rb\""
+    location:
+      row: 67
+      column: 22
+    end_location:
+      row: 67
+      column: 26
 - kind: RedundantOpenModes
   location:
     row: 68
@@ -666,14 +625,13 @@ expression: checks
     row: 68
     column: 111
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 68
-        column: 106
-      end_location:
-        row: 68
-        column: 110
+    content: "\"rb\""
+    location:
+      row: 68
+      column: 106
+    end_location:
+      row: 68
+      column: 110
 - kind: RedundantOpenModes
   location:
     row: 69
@@ -682,14 +640,13 @@ expression: checks
     row: 69
     column: 111
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 69
-        column: 65
-      end_location:
-        row: 69
-        column: 69
+    content: "\"rb\""
+    location:
+      row: 69
+      column: 65
+    end_location:
+      row: 69
+      column: 69
 - kind: RedundantOpenModes
   location:
     row: 70
@@ -698,12 +655,11 @@ expression: checks
     row: 70
     column: 111
   fix:
-    patch:
-      content: "\"rb\""
-      location:
-        row: 70
-        column: 10
-      end_location:
-        row: 70
-        column: 14
+    content: "\"rb\""
+    location:
+      row: 70
+      column: 10
+    end_location:
+      row: 70
+      column: 14
 

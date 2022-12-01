@@ -10,14 +10,13 @@ expression: checks
     row: 2
     column: 13
   fix:
-    patch:
-      content: X not in Y
-      location:
-        row: 2
-        column: 3
-      end_location:
-        row: 2
-        column: 13
+    content: X not in Y
+    location:
+      row: 2
+      column: 3
+    end_location:
+      row: 2
+      column: 13
 - kind: NotInTest
   location:
     row: 5
@@ -26,14 +25,13 @@ expression: checks
     row: 5
     column: 15
   fix:
-    patch:
-      content: X.B not in Y
-      location:
-        row: 5
-        column: 3
-      end_location:
-        row: 5
-        column: 15
+    content: X.B not in Y
+    location:
+      row: 5
+      column: 3
+    end_location:
+      row: 5
+      column: 15
 - kind: NotInTest
   location:
     row: 8
@@ -42,14 +40,13 @@ expression: checks
     row: 8
     column: 13
   fix:
-    patch:
-      content: X not in Y
-      location:
-        row: 8
-        column: 3
-      end_location:
-        row: 8
-        column: 13
+    content: X not in Y
+    location:
+      row: 8
+      column: 3
+    end_location:
+      row: 8
+      column: 13
 - kind: NotInTest
   location:
     row: 11
@@ -58,14 +55,13 @@ expression: checks
     row: 11
     column: 28
   fix:
-    patch:
-      content: Y not in Z
-      location:
-        row: 11
-        column: 18
-      end_location:
-        row: 11
-        column: 28
+    content: Y not in Z
+    location:
+      row: 11
+      column: 18
+    end_location:
+      row: 11
+      column: 28
 - kind: NotInTest
   location:
     row: 14
@@ -74,12 +70,11 @@ expression: checks
     row: 14
     column: 14
   fix:
-    patch:
-      content: X not in Y
-      location:
-        row: 14
-        column: 3
-      end_location:
-        row: 14
-        column: 15
+    content: X not in Y
+    location:
+      row: 14
+      column: 3
+    end_location:
+      row: 14
+      column: 15
 

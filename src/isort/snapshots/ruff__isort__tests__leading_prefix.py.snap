@@ -10,14 +10,13 @@ expression: checks
     row: 2
     column: 9
   fix:
-    patch:
-      content: "\nimport os\nimport sys\n"
-      location:
-        row: 1
-        column: 7
-      end_location:
-        row: 3
-        column: 0
+    content: "\nimport os\nimport sys\n"
+    location:
+      row: 1
+      column: 7
+    end_location:
+      row: 3
+      column: 0
 - kind: UnsortedImports
   location:
     row: 5
@@ -26,12 +25,11 @@ expression: checks
     row: 6
     column: 13
   fix:
-    patch:
-      content: "\n    import os\n    import sys\n"
-      location:
-        row: 5
-        column: 11
-      end_location:
-        row: 7
-        column: 0
+    content: "\n    import os\n    import sys\n"
+    location:
+      row: 5
+      column: 11
+    end_location:
+      row: 7
+      column: 0
 

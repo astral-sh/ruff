@@ -11,12 +11,11 @@ expression: checks
     row: 3
     column: 19
   fix:
-    patch:
-      content: ValueError
-      location:
-        row: 3
-        column: 7
-      end_location:
-        row: 3
-        column: 20
+    content: ValueError
+    location:
+      row: 3
+      column: 7
+    end_location:
+      row: 3
+      column: 20
 

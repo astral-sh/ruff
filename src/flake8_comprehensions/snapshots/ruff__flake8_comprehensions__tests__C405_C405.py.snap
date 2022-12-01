@@ -11,14 +11,13 @@ expression: checks
     row: 1
     column: 16
   fix:
-    patch:
-      content: "{1, 2}"
-      location:
-        row: 1
-        column: 5
-      end_location:
-        row: 1
-        column: 16
+    content: "{1, 2}"
+    location:
+      row: 1
+      column: 5
+    end_location:
+      row: 1
+      column: 16
 - kind:
     UnnecessaryLiteralSet: tuple
   location:
@@ -28,14 +27,13 @@ expression: checks
     row: 2
     column: 16
   fix:
-    patch:
-      content: "{1, 2}"
-      location:
-        row: 2
-        column: 5
-      end_location:
-        row: 2
-        column: 16
+    content: "{1, 2}"
+    location:
+      row: 2
+      column: 5
+    end_location:
+      row: 2
+      column: 16
 - kind:
     UnnecessaryLiteralSet: list
   location:
@@ -45,14 +43,13 @@ expression: checks
     row: 3
     column: 12
   fix:
-    patch:
-      content: set()
-      location:
-        row: 3
-        column: 5
-      end_location:
-        row: 3
-        column: 12
+    content: set()
+    location:
+      row: 3
+      column: 5
+    end_location:
+      row: 3
+      column: 12
 - kind:
     UnnecessaryLiteralSet: tuple
   location:
@@ -62,12 +59,11 @@ expression: checks
     row: 4
     column: 12
   fix:
-    patch:
-      content: set()
-      location:
-        row: 4
-        column: 5
-      end_location:
-        row: 4
-        column: 12
+    content: set()
+    location:
+      row: 4
+      column: 5
+    end_location:
+      row: 4
+      column: 12
 

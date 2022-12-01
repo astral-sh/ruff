@@ -11,14 +11,13 @@ expression: checks
     row: 78
     column: 7
   fix:
-    patch:
-      content: "\n"
-      location:
-        row: 71
-        column: 0
-      end_location:
-        row: 71
-        column: 0
+    content: "\n"
+    location:
+      row: 71
+      column: 0
+    end_location:
+      row: 71
+      column: 0
 - kind:
     BlankLineAfterSection: Returns
   location:
@@ -28,12 +27,11 @@ expression: checks
     row: 221
     column: 7
   fix:
-    patch:
-      content: "\n"
-      location:
-        row: 218
-        column: 0
-      end_location:
-        row: 218
-        column: 0
+    content: "\n"
+    location:
+      row: 218
+      column: 0
+    end_location:
+      row: 218
+      column: 0
 

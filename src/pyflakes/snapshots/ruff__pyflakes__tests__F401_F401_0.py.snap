@@ -13,14 +13,13 @@ expression: checks
     row: 2
     column: 16
   fix:
-    patch:
-      content: import os
-      location:
-        row: 2
-        column: 0
-      end_location:
-        row: 2
-        column: 20
+    content: import os
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 20
 - kind:
     UnusedImport:
       - collections.OrderedDict
@@ -32,14 +31,13 @@ expression: checks
     row: 6
     column: 15
   fix:
-    patch:
-      content: "from collections import (\n    Counter,\n    namedtuple,\n)"
-      location:
-        row: 4
-        column: 0
-      end_location:
-        row: 8
-        column: 1
+    content: "from collections import (\n    Counter,\n    namedtuple,\n)"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 8
+      column: 1
 - kind:
     UnusedImport:
       - logging.handlers
@@ -51,14 +49,13 @@ expression: checks
     row: 12
     column: 23
   fix:
-    patch:
-      content: ""
-      location:
-        row: 12
-        column: 0
-      end_location:
-        row: 13
-        column: 0
+    content: ""
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 13
+      column: 0
 - kind:
     UnusedImport:
       - shelve
@@ -70,14 +67,13 @@ expression: checks
     row: 32
     column: 17
   fix:
-    patch:
-      content: ""
-      location:
-        row: 32
-        column: 0
-      end_location:
-        row: 33
-        column: 0
+    content: ""
+    location:
+      row: 32
+      column: 0
+    end_location:
+      row: 33
+      column: 0
 - kind:
     UnusedImport:
       - importlib
@@ -89,14 +85,13 @@ expression: checks
     row: 33
     column: 20
   fix:
-    patch:
-      content: pass
-      location:
-        row: 33
-        column: 4
-      end_location:
-        row: 33
-        column: 20
+    content: pass
+    location:
+      row: 33
+      column: 4
+    end_location:
+      row: 33
+      column: 20
 - kind:
     UnusedImport:
       - pathlib
@@ -108,14 +103,13 @@ expression: checks
     row: 37
     column: 18
   fix:
-    patch:
-      content: ""
-      location:
-        row: 37
-        column: 0
-      end_location:
-        row: 38
-        column: 0
+    content: ""
+    location:
+      row: 37
+      column: 0
+    end_location:
+      row: 38
+      column: 0
 - kind:
     UnusedImport:
       - pickle
@@ -127,12 +121,11 @@ expression: checks
     row: 52
     column: 21
   fix:
-    patch:
-      content: pass
-      location:
-        row: 52
-        column: 8
-      end_location:
-        row: 52
-        column: 21
+    content: pass
+    location:
+      row: 52
+      column: 8
+    end_location:
+      row: 52
+      column: 21
 

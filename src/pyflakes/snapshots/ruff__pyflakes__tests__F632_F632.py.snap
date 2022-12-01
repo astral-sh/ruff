@@ -10,14 +10,13 @@ expression: checks
     row: 1
     column: 13
   fix:
-    patch:
-      content: "x == \"abc\""
-      location:
-        row: 1
-        column: 3
-      end_location:
-        row: 1
-        column: 13
+    content: "x == \"abc\""
+    location:
+      row: 1
+      column: 3
+    end_location:
+      row: 1
+      column: 13
 - kind: IsLiteral
   location:
     row: 4
@@ -26,14 +25,13 @@ expression: checks
     row: 4
     column: 15
   fix:
-    patch:
-      content: 123 != y
-      location:
-        row: 4
-        column: 3
-      end_location:
-        row: 4
-        column: 15
+    content: 123 != y
+    location:
+      row: 4
+      column: 3
+    end_location:
+      row: 4
+      column: 15
 - kind: IsLiteral
   location:
     row: 7
@@ -42,12 +40,11 @@ expression: checks
     row: 7
     column: 17
   fix:
-    patch:
-      content: "\"123\" == x"
-      location:
-        row: 7
-        column: 3
-      end_location:
-        row: 7
-        column: 13
+    content: "\"123\" == x"
+    location:
+      row: 7
+      column: 3
+    end_location:
+      row: 7
+      column: 13
 

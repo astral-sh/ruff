@@ -10,14 +10,13 @@ expression: checks
     row: 6
     column: 22
   fix:
-    patch:
-      content: str | None
-      location:
-        row: 6
-        column: 9
-      end_location:
-        row: 6
-        column: 22
+    content: str | None
+    location:
+      row: 6
+      column: 9
+    end_location:
+      row: 6
+      column: 22
 - kind: UsePEP604Annotation
   location:
     row: 10
@@ -26,14 +25,13 @@ expression: checks
     row: 10
     column: 29
   fix:
-    patch:
-      content: str | None
-      location:
-        row: 10
-        column: 9
-      end_location:
-        row: 10
-        column: 29
+    content: str | None
+    location:
+      row: 10
+      column: 9
+    end_location:
+      row: 10
+      column: 29
 - kind: UsePEP604Annotation
   location:
     row: 14
@@ -42,14 +40,13 @@ expression: checks
     row: 14
     column: 45
   fix:
-    patch:
-      content: "str | int | Union[float, bytes]"
-      location:
-        row: 14
-        column: 9
-      end_location:
-        row: 14
-        column: 45
+    content: "str | int | Union[float, bytes]"
+    location:
+      row: 14
+      column: 9
+    end_location:
+      row: 14
+      column: 45
 - kind: UsePEP604Annotation
   location:
     row: 14
@@ -58,14 +55,13 @@ expression: checks
     row: 14
     column: 44
   fix:
-    patch:
-      content: float | bytes
-      location:
-        row: 14
-        column: 25
-      end_location:
-        row: 14
-        column: 44
+    content: float | bytes
+    location:
+      row: 14
+      column: 25
+    end_location:
+      row: 14
+      column: 44
 - kind: UsePEP604Annotation
   location:
     row: 18
@@ -74,14 +70,13 @@ expression: checks
     row: 18
     column: 31
   fix:
-    patch:
-      content: str | int
-      location:
-        row: 18
-        column: 9
-      end_location:
-        row: 18
-        column: 31
+    content: str | int
+    location:
+      row: 18
+      column: 9
+    end_location:
+      row: 18
+      column: 31
 - kind: UsePEP604Annotation
   location:
     row: 22
@@ -90,14 +85,13 @@ expression: checks
     row: 22
     column: 33
   fix:
-    patch:
-      content: str | int
-      location:
-        row: 22
-        column: 9
-      end_location:
-        row: 22
-        column: 33
+    content: str | int
+    location:
+      row: 22
+      column: 9
+    end_location:
+      row: 22
+      column: 33
 - kind: UsePEP604Annotation
   location:
     row: 26
@@ -106,12 +100,11 @@ expression: checks
     row: 26
     column: 40
   fix:
-    patch:
-      content: "(str, int) | float"
-      location:
-        row: 26
-        column: 9
-      end_location:
-        row: 26
-        column: 40
+    content: "(str, int) | float"
+    location:
+      row: 26
+      column: 9
+    end_location:
+      row: 26
+      column: 40
 

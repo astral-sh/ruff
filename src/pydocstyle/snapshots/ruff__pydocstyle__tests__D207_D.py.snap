@@ -10,14 +10,13 @@ expression: checks
     row: 232
     column: 0
   fix:
-    patch:
-      content: "    "
-      location:
-        row: 232
-        column: 0
-      end_location:
-        row: 232
-        column: 0
+    content: "    "
+    location:
+      row: 232
+      column: 0
+    end_location:
+      row: 232
+      column: 0
 - kind: NoUnderIndentation
   location:
     row: 440
@@ -26,12 +25,11 @@ expression: checks
     row: 440
     column: 0
   fix:
-    patch:
-      content: "                                    "
-      location:
-        row: 440
-        column: 0
-      end_location:
-        row: 440
-        column: 4
+    content: "                                    "
+    location:
+      row: 440
+      column: 0
+    end_location:
+      row: 440
+      column: 4
 

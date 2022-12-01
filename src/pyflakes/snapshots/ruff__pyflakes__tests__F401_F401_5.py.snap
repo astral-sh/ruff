@@ -13,14 +13,13 @@ expression: checks
     row: 2
     column: 17
   fix:
-    patch:
-      content: ""
-      location:
-        row: 2
-        column: 0
-      end_location:
-        row: 3
-        column: 0
+    content: ""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 3
+      column: 0
 - kind:
     UnusedImport:
       - d.e.f
@@ -32,14 +31,13 @@ expression: checks
     row: 3
     column: 22
   fix:
-    patch:
-      content: ""
-      location:
-        row: 3
-        column: 0
-      end_location:
-        row: 4
-        column: 0
+    content: ""
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 4
+      column: 0
 - kind:
     UnusedImport:
       - h.i
@@ -51,14 +49,13 @@ expression: checks
     row: 4
     column: 10
   fix:
-    patch:
-      content: ""
-      location:
-        row: 4
-        column: 0
-      end_location:
-        row: 5
-        column: 0
+    content: ""
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 5
+      column: 0
 - kind:
     UnusedImport:
       - j.k
@@ -70,12 +67,11 @@ expression: checks
     row: 5
     column: 15
   fix:
-    patch:
-      content: ""
-      location:
-        row: 5
-        column: 0
-      end_location:
-        row: 6
-        column: 0
+    content: ""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 6
+      column: 0
 

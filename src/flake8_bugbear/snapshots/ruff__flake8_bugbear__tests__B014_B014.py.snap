@@ -12,14 +12,13 @@ expression: checks
     row: 17
     column: 24
   fix:
-    patch:
-      content: "OSError,"
-      location:
-        row: 17
-        column: 8
-      end_location:
-        row: 17
-        column: 24
+    content: "OSError,"
+    location:
+      row: 17
+      column: 8
+    end_location:
+      row: 17
+      column: 24
 - kind:
     DuplicateHandlerException:
       - MyError
@@ -30,14 +29,13 @@ expression: checks
     row: 28
     column: 24
   fix:
-    patch:
-      content: "MyError,"
-      location:
-        row: 28
-        column: 8
-      end_location:
-        row: 28
-        column: 24
+    content: "MyError,"
+    location:
+      row: 28
+      column: 8
+    end_location:
+      row: 28
+      column: 24
 - kind:
     DuplicateHandlerException:
       - re.error
@@ -48,12 +46,11 @@ expression: checks
     row: 49
     column: 26
   fix:
-    patch:
-      content: "re.error,"
-      location:
-        row: 49
-        column: 8
-      end_location:
-        row: 49
-        column: 26
+    content: "re.error,"
+    location:
+      row: 49
+      column: 8
+    end_location:
+      row: 49
+      column: 26
 

@@ -13,14 +13,13 @@ expression: checks
     row: 7
     column: 39
   fix:
-    patch:
-      content: ""
-      location:
-        row: 7
-        column: 0
-      end_location:
-        row: 8
-        column: 0
+    content: ""
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 8
+      column: 0
 - kind:
     UnusedImport:
       - datastructures.UploadFile
@@ -32,14 +31,13 @@ expression: checks
     row: 10
     column: 52
   fix:
-    patch:
-      content: ""
-      location:
-        row: 10
-        column: 0
-      end_location:
-        row: 11
-        column: 0
+    content: ""
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 11
+      column: 0
 - kind:
     UnusedImport:
       - background
@@ -51,14 +49,13 @@ expression: checks
     row: 17
     column: 17
   fix:
-    patch:
-      content: ""
-      location:
-        row: 17
-        column: 0
-      end_location:
-        row: 18
-        column: 0
+    content: ""
+    location:
+      row: 17
+      column: 0
+    end_location:
+      row: 18
+      column: 0
 - kind:
     UnusedImport:
       - datastructures
@@ -70,12 +67,11 @@ expression: checks
     row: 20
     column: 35
   fix:
-    patch:
-      content: ""
-      location:
-        row: 20
-        column: 0
-      end_location:
-        row: 21
-        column: 0
+    content: ""
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 21
+      column: 0
 

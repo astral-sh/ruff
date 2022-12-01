@@ -71,7 +71,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
                 &deleted,
             ) {
                 Ok(fix) => {
-                    if fix.patch.content.is_empty() || fix.patch.content == "pass" {
+                    if fix.content.is_empty() || fix.content == "pass" {
                         checker.deletions.insert(context.defined_by);
                     }
                     check.amend(fix);
