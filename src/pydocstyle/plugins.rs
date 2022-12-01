@@ -900,7 +900,7 @@ fn blanks_and_section_underline(
 ) {
     let docstring = definition
         .docstring
-        .expect("Sections are only available for docstrings.");
+        .expect("Sections are only available for docstrings");
 
     let mut blank_lines_after_header = 0;
     for line in context.following_lines {
@@ -1157,7 +1157,7 @@ fn common_section(
 ) {
     let docstring = definition
         .docstring
-        .expect("Sections are only available for docstrings.");
+        .expect("Sections are only available for docstrings");
 
     if checker.settings.enabled.contains(&CheckCode::D405) {
         if !style
@@ -1439,7 +1439,7 @@ fn numpy_section(checker: &mut Checker, definition: &Definition, context: &Secti
         if !suffix.is_empty() {
             let docstring = definition
                 .docstring
-                .expect("Sections are only available for docstrings.");
+                .expect("Sections are only available for docstrings");
             let mut check = Check::new(
                 CheckKind::NewLineAfterSectionName(context.section_name.to_string()),
                 Range::from_located(docstring),
@@ -1488,7 +1488,7 @@ fn google_section(checker: &mut Checker, definition: &Definition, context: &Sect
         if suffix != ":" {
             let docstring = definition
                 .docstring
-                .expect("Sections are only available for docstrings.");
+                .expect("Sections are only available for docstrings");
             let mut check = Check::new(
                 CheckKind::SectionNameEndsInColon(context.section_name.to_string()),
                 Range::from_located(docstring),

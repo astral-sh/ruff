@@ -141,7 +141,7 @@ fn create_remove_param_fix(
     match (fix_start, fix_end) {
         (Some(start), Some(end)) => Ok(Fix::deletion(start, end)),
         _ => Err(anyhow::anyhow!(
-            "Failed to locate start and end parentheses."
+            "Failed to locate start and end parentheses"
         )),
     }
 }

@@ -148,16 +148,16 @@ pub fn remove_unnecessary_future_import(
     let mut tree = match_module(&module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple"));
+        return Err(anyhow::anyhow!("Expected Statement::Simple"));
     };
     let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() else {
         return Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::ImportFrom"
+            "Expected SmallStatement::ImportFrom"
         ));
     };
 
     let ImportNames::Aliases(aliases) = &mut body.names else {
-        return Err(anyhow::anyhow!("Expected node to be: Aliases"));
+        return Err(anyhow::anyhow!("Expected Aliases"));
     };
 
     // Preserve the trailing comma (or not) from the last entry.

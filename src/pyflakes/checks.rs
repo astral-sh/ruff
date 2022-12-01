@@ -371,7 +371,7 @@ pub fn if_tuple(test: &Expr, location: Range) -> Option<Check> {
 
 /// F821
 pub fn undefined_local(scopes: &[&Scope], name: &str) -> Option<Check> {
-    let current = &scopes.last().expect("No current scope found.");
+    let current = &scopes.last().expect("No current scope found");
     if matches!(current.kind, ScopeKind::Function(_)) && !current.values.contains_key(name) {
         for scope in scopes.iter().rev().skip(1) {
             if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {

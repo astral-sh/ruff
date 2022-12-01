@@ -46,7 +46,7 @@ fn main() -> Result<()> {
     // Extract the Flake8 section.
     let flake8 = config
         .get("flake8")
-        .expect("Unable to find flake8 section in INI file.");
+        .expect("Unable to find flake8 section in INI file");
 
     // Create the pyproject.toml.
     let pyproject = converter::convert(flake8, cli.plugin)?;

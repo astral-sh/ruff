@@ -232,7 +232,7 @@ where
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
-                let scope_index = *self.scope_stack.last().expect("No current scope found.");
+                let scope_index = *self.scope_stack.last().expect("No current scope found");
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
@@ -272,7 +272,7 @@ where
                 }
             }
             StmtKind::Nonlocal { names } => {
-                let scope_index = *self.scope_stack.last().expect("No current scope found.");
+                let scope_index = *self.scope_stack.last().expect("No current scope found");
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
@@ -625,7 +625,7 @@ where
                                         self.scopes[*(self
                                             .scope_stack
                                             .last()
-                                            .expect("No current scope found."))]
+                                            .expect("No current scope found"))]
                                         .id,
                                         Range::from_located(alias),
                                     ))
@@ -750,7 +750,7 @@ where
                                     self.scopes[*(self
                                         .scope_stack
                                         .last()
-                                        .expect("No current scope found."))]
+                                        .expect("No current scope found"))]
                                     .id,
                                     Range::from_located(alias),
                                 )),
@@ -790,7 +790,7 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::F406) {
                             let scope = &self.scopes
-                                [*(self.scope_stack.last().expect("No current scope found."))];
+                                [*(self.scope_stack.last().expect("No current scope found"))];
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.add_check(Check::new(
                                     CheckKind::ImportStarNotPermitted(helpers::format_import_from(
@@ -813,7 +813,7 @@ where
                         }
 
                         let scope = &mut self.scopes
-                            [*(self.scope_stack.last().expect("No current scope found."))];
+                            [*(self.scope_stack.last().expect("No current scope found"))];
                         scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
@@ -849,7 +849,7 @@ where
                                         self.scopes[*(self
                                             .scope_stack
                                             .last()
-                                            .expect("No current scope found."))]
+                                            .expect("No current scope found"))]
                                         .id,
                                         range,
                                     ))
@@ -1657,7 +1657,7 @@ where
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = &mut self.scopes
-                            [*(self.scope_stack.last().expect("No current scope found."))];
+                            [*(self.scope_stack.last().expect("No current scope found"))];
                         if let ScopeKind::Function(inner) = &mut scope.kind {
                             inner.uses_locals = true;
                         }
@@ -2276,7 +2276,7 @@ where
 
                         if let Some(binding) = {
                             let scope = &mut self.scopes
-                                [*(self.scope_stack.last().expect("No current scope found."))];
+                                [*(self.scope_stack.last().expect("No current scope found"))];
                             &scope.values.remove(&name.as_str())
                         } {
                             if binding.used.is_none() {
@@ -2291,7 +2291,7 @@ where
 
                         if let Some(binding) = definition {
                             let scope = &mut self.scopes
-                                [*(self.scope_stack.last().expect("No current scope found."))];
+                                [*(self.scope_stack.last().expect("No current scope found"))];
                             scope.values.insert(name, binding);
                         }
                     }
@@ -2433,7 +2433,7 @@ impl<'a> Checker<'a> {
     fn pop_parent(&mut self) {
         self.parent_stack
             .pop()
-            .expect("Attempted to pop without scope.");
+            .expect("Attempted to pop without scope");
     }
 
     fn push_scope(&mut self, scope: Scope<'a>) {
@@ -2445,12 +2445,12 @@ impl<'a> Checker<'a> {
         self.dead_scopes.push(
             self.scope_stack
                 .pop()
-                .expect("Attempted to pop without scope."),
+                .expect("Attempted to pop without scope"),
         );
     }
 
     fn bind_builtins(&mut self) {
-        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
 
         for builtin in BUILTINS {
             scope.values.insert(
@@ -2475,7 +2475,7 @@ impl<'a> Checker<'a> {
     }
 
     pub fn current_scope(&self) -> &Scope {
-        &self.scopes[*(self.scope_stack.last().expect("No current scope found."))]
+        &self.scopes[*(self.scope_stack.last().expect("No current scope found"))]
     }
 
     pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
@@ -2483,12 +2483,12 @@ impl<'a> Checker<'a> {
     }
 
     pub fn current_parent(&self) -> &'a Stmt {
-        self.parents[*(self.parent_stack.last().expect("No parent found."))]
+        self.parents[*(self.parent_stack.last().expect("No parent found"))]
     }
 
     pub fn binding_context(&self) -> BindingContext {
         let mut rev = self.parent_stack.iter().rev().fuse();
-        let defined_by = *rev.next().expect("Expected to bind within a statement.");
+        let defined_by = *rev.next().expect("Expected to bind within a statement");
         let defined_in = rev.next().copied();
         BindingContext {
             defined_by,
@@ -2536,7 +2536,7 @@ impl<'a> Checker<'a> {
             },
         };
 
-        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
         scope.values.insert(name, binding);
     }
 
@@ -2743,7 +2743,7 @@ impl<'a> Checker<'a> {
             }
 
             let scope =
-                &mut self.scopes[*(self.scope_stack.last().expect("No current scope found."))];
+                &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
             if scope.values.remove(&id.as_str()).is_none()
                 && self.settings.enabled.contains(&CheckCode::F821)
             {
@@ -2839,7 +2839,7 @@ impl<'a> Checker<'a> {
             }
 
             self.deferred_assignments
-                .push(*self.scope_stack.last().expect("No current scope found."));
+                .push(*self.scope_stack.last().expect("No current scope found"));
 
             self.pop_scope();
         }
@@ -2857,7 +2857,7 @@ impl<'a> Checker<'a> {
             }
 
             self.deferred_assignments
-                .push(*self.scope_stack.last().expect("No current scope found."));
+                .push(*self.scope_stack.last().expect("No current scope found"));
 
             self.pop_scope();
         }

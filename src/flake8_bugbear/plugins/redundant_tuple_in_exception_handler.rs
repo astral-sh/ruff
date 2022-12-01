@@ -45,9 +45,7 @@ fn match_tuple_range<T>(located: &Located<T>, locator: &SourceCodeLocator) -> Re
             end_location,
         })
     } else {
-        Err(anyhow::anyhow!(
-            "Unable to find left and right parentheses."
-        ))
+        Err(anyhow::anyhow!("Unable to find left and right parentheses"))
     }
 }
 
