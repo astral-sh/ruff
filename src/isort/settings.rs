@@ -10,6 +10,7 @@ pub struct Options {
     pub known_first_party: Option<Vec<String>>,
     pub known_third_party: Option<Vec<String>>,
     pub extra_standard_library: Option<Vec<String>>,
+    pub force_to_top: Option<Vec<String>>,
 }
 
 #[derive(Debug, Hash, Default)]
@@ -17,6 +18,7 @@ pub struct Settings {
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
     pub extra_standard_library: BTreeSet<String>,
+    pub force_to_top: BTreeSet<String>,
 }
 
 impl Settings {
@@ -27,6 +29,7 @@ impl Settings {
             extra_standard_library: BTreeSet::from_iter(
                 options.extra_standard_library.unwrap_or_default(),
             ),
+            force_to_top: BTreeSet::from_iter(options.force_to_top.unwrap_or_default()),
         }
     }
 }
