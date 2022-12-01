@@ -110,10 +110,16 @@ Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 pip install ruff
 ```
 
-If you're a **macOS Homebrew** or a **Linuxbrew** user, you can also install `ruff` via Homebrew:
+For **macOS Homebrew** and **Linuxbrew** users, Ruff is also available as [`ruff`](https://formulae.brew.sh/formula/ruff) on Homebrew:
 
 ```shell
 brew install ruff
+```
+
+For Conda users, Ruff is also available as [`ruff`](https://anaconda.org/conda-forge/ruff) on `conda-forge`:
+
+```shell
+conda install -c conda-forge ruff
 ```
 
 ### Usage
