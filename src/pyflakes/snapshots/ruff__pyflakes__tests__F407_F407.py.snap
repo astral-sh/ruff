@@ -1,0 +1,14 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    FutureFeatureNotDefined: non_existent_feature
+  location:
+    row: 2
+    column: 23
+  end_location:
+    row: 2
+    column: 43
+  fix: ~
+

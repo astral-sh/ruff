@@ -1,0 +1,29 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: NonEmpty
+  location:
+    row: 20
+    column: 8
+  end_location:
+    row: 20
+    column: 14
+  fix: ~
+- kind: NonEmpty
+  location:
+    row: 74
+    column: 4
+  end_location:
+    row: 74
+    column: 11
+  fix: ~
+- kind: NonEmpty
+  location:
+    row: 80
+    column: 8
+  end_location:
+    row: 80
+    column: 10
+  fix: ~
+

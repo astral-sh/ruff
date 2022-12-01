@@ -1,0 +1,13 @@
+---
+source: src/pycodestyle/mod.rs
+expression: checks
+---
+- kind: NoNewLineAtEndOfFile
+  location:
+    row: 2
+    column: 9
+  end_location:
+    row: 2
+    column: 9
+  fix: ~
+

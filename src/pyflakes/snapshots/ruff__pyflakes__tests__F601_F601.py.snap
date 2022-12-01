@@ -1,0 +1,29 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: MultiValueRepeatedKeyLiteral
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 7
+  fix: ~
+- kind: MultiValueRepeatedKeyLiteral
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 5
+  fix: ~
+- kind: MultiValueRepeatedKeyLiteral
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 10
+  fix: ~
+

@@ -1,0 +1,24 @@
+---
+source: src/rules/mod.rs
+expression: checks
+---
+- kind:
+    AmbiguousUnicodeCharacterString:
+      - 𝐁
+      - B
+  location:
+    row: 1
+    column: 5
+  end_location:
+    row: 1
+    column: 6
+  fix:
+    patch:
+      content: B
+      location:
+        row: 1
+        column: 5
+      end_location:
+        row: 1
+        column: 6
+

@@ -1,0 +1,36 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    StringDotFormatExtraNamedArguments:
+      - bar
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 21
+  fix: ~
+- kind:
+    StringDotFormatExtraNamedArguments:
+      - spam
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 34
+  fix: ~
+- kind:
+    StringDotFormatExtraNamedArguments:
+      - eggs
+      - ham
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 51
+  fix: ~
+

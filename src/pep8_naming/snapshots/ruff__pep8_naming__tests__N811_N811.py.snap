@@ -1,0 +1,38 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind:
+    ConstantImportedAsNonConstant:
+      - CONST
+      - const
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 25
+  fix: ~
+- kind:
+    ConstantImportedAsNonConstant:
+      - CONSTANT
+      - constant
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 36
+  fix: ~
+- kind:
+    ConstantImportedAsNonConstant:
+      - ANOTHER_CONSTANT
+      - another_constant
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 52
+  fix: ~
+

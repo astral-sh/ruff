@@ -1,0 +1,14 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    UndefinedExport: b
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 7
+  fix: ~
+

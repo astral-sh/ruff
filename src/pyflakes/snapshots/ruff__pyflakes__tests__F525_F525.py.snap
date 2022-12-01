@@ -1,0 +1,21 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: StringDotFormatMixingAutomatic
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 21
+  fix: ~
+- kind: StringDotFormatMixingAutomatic
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 21
+  fix: ~
+

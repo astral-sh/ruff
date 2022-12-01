@@ -1,0 +1,13 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: LateFutureImport
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 37
+  fix: ~
+

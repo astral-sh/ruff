@@ -1,0 +1,59 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind:
+    AbstractBaseClassWithoutAbstractMethod: Base_1
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 22
+    column: 0
+  fix: ~
+- kind:
+    AbstractBaseClassWithoutAbstractMethod: MetaBase_1
+  location:
+    row: 58
+    column: 0
+  end_location:
+    row: 63
+    column: 0
+  fix: ~
+- kind:
+    AbstractBaseClassWithoutAbstractMethod: abc_Base_1
+  location:
+    row: 69
+    column: 0
+  end_location:
+    row: 74
+    column: 0
+  fix: ~
+- kind:
+    AbstractBaseClassWithoutAbstractMethod: abc_Base_2
+  location:
+    row: 74
+    column: 0
+  end_location:
+    row: 79
+    column: 0
+  fix: ~
+- kind:
+    AbstractBaseClassWithoutAbstractMethod: notabc_Base_1
+  location:
+    row: 79
+    column: 0
+  end_location:
+    row: 84
+    column: 0
+  fix: ~
+- kind:
+    AbstractBaseClassWithoutAbstractMethod: abc_set_class_variable_4
+  location:
+    row: 128
+    column: 0
+  end_location:
+    row: 130
+    column: 0
+  fix: ~
+

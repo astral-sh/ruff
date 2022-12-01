@@ -1,0 +1,29 @@
+---
+source: src/flake8_bandit/mod.rs
+expression: checks
+---
+- kind: AssertUsed
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 11
+  fix: ~
+- kind: AssertUsed
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 17
+  fix: ~
+- kind: AssertUsed
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 17
+  fix: ~
+

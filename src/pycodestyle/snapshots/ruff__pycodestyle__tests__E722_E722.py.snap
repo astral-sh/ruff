@@ -1,0 +1,29 @@
+---
+source: src/pycodestyle/mod.rs
+expression: checks
+---
+- kind: DoNotUseBareExcept
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 7
+    column: 0
+  fix: ~
+- kind: DoNotUseBareExcept
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 14
+    column: 0
+  fix: ~
+- kind: DoNotUseBareExcept
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 19
+    column: 0
+  fix: ~
+

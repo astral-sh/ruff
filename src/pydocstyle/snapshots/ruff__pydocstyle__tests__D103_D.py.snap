@@ -1,0 +1,13 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: PublicFunction
+  location:
+    row: 400
+    column: 0
+  end_location:
+    row: 401
+    column: 0
+  fix: ~
+

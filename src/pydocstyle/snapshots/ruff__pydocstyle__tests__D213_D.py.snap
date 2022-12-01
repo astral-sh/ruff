@@ -1,0 +1,157 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 200
+    column: 4
+  end_location:
+    row: 203
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 210
+    column: 4
+  end_location:
+    row: 215
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 220
+    column: 4
+  end_location:
+    row: 224
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 230
+    column: 4
+  end_location:
+    row: 234
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 240
+    column: 4
+  end_location:
+    row: 244
+    column: 3
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 250
+    column: 4
+  end_location:
+    row: 254
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 260
+    column: 4
+  end_location:
+    row: 264
+    column: 11
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 270
+    column: 4
+  end_location:
+    row: 274
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 281
+    column: 4
+  end_location:
+    row: 283
+    column: 19
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 299
+    column: 4
+  end_location:
+    row: 302
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 343
+    column: 4
+  end_location:
+    row: 348
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 383
+    column: 4
+  end_location:
+    row: 386
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 392
+    column: 4
+  end_location:
+    row: 396
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 438
+    column: 36
+  end_location:
+    row: 441
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 450
+    column: 4
+  end_location:
+    row: 454
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 526
+    column: 4
+  end_location:
+    row: 532
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 546
+    column: 4
+  end_location:
+    row: 549
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 555
+    column: 4
+  end_location:
+    row: 558
+    column: 7
+  fix: ~
+- kind: MultiLineSummarySecondLine
+  location:
+    row: 568
+    column: 4
+  end_location:
+    row: 571
+    column: 7
+  fix: ~
+

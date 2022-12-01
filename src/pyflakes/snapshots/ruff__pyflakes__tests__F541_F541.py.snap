@@ -1,0 +1,29 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: FStringMissingPlaceholders
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 10
+  fix: ~
+- kind: FStringMissingPlaceholders
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 10
+  fix: ~
+- kind: FStringMissingPlaceholders
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 7
+    column: 10
+  fix: ~
+

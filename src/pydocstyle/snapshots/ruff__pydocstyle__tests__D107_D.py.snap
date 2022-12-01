@@ -1,0 +1,21 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: PublicInit
+  location:
+    row: 60
+    column: 4
+  end_location:
+    row: 63
+    column: 4
+  fix: ~
+- kind: PublicInit
+  location:
+    row: 534
+    column: 4
+  end_location:
+    row: 538
+    column: 0
+  fix: ~
+

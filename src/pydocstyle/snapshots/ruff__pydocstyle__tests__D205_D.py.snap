@@ -1,0 +1,37 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: BlankLineAfterSummary
+  location:
+    row: 200
+    column: 4
+  end_location:
+    row: 203
+    column: 7
+  fix:
+    patch:
+      content: "\n"
+      location:
+        row: 201
+        column: 0
+      end_location:
+        row: 201
+        column: 0
+- kind: BlankLineAfterSummary
+  location:
+    row: 210
+    column: 4
+  end_location:
+    row: 215
+    column: 7
+  fix:
+    patch:
+      content: "\n"
+      location:
+        row: 211
+        column: 0
+      end_location:
+        row: 213
+        column: 0
+

@@ -1,0 +1,13 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind: NoAssertRaisesException
+  location:
+    row: 22
+    column: 8
+  end_location:
+    row: 25
+    column: 4
+  fix: ~
+

@@ -1,0 +1,29 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind: InvalidFirstArgumentNameForClassMethod
+  location:
+    row: 30
+    column: 26
+  end_location:
+    row: 30
+    column: 30
+  fix: ~
+- kind: InvalidFirstArgumentNameForClassMethod
+  location:
+    row: 38
+    column: 55
+  end_location:
+    row: 38
+    column: 59
+  fix: ~
+- kind: InvalidFirstArgumentNameForClassMethod
+  location:
+    row: 43
+    column: 19
+  end_location:
+    row: 43
+    column: 23
+  fix: ~
+

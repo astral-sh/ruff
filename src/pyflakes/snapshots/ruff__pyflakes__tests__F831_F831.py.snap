@@ -1,0 +1,29 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: DuplicateArgumentName
+  location:
+    row: 1
+    column: 24
+  end_location:
+    row: 1
+    column: 30
+  fix: ~
+- kind: DuplicateArgumentName
+  location:
+    row: 5
+    column: 27
+  end_location:
+    row: 5
+    column: 33
+  fix: ~
+- kind: DuplicateArgumentName
+  location:
+    row: 9
+    column: 26
+  end_location:
+    row: 9
+    column: 32
+  fix: ~
+

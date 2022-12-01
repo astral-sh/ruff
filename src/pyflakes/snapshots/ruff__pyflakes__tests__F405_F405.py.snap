@@ -1,0 +1,27 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    ImportStarUsage:
+      - name
+      - - mymodule
+  location:
+    row: 5
+    column: 10
+  end_location:
+    row: 5
+    column: 14
+  fix: ~
+- kind:
+    ImportStarUsage:
+      - a
+      - - mymodule
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 7
+  fix: ~
+

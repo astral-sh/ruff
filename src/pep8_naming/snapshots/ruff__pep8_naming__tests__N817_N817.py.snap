@@ -1,0 +1,27 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind:
+    CamelcaseImportedAsAcronym:
+      - CaMel
+      - CM
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 22
+  fix: ~
+- kind:
+    CamelcaseImportedAsAcronym:
+      - CamelCase
+      - CC
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 31
+  fix: ~
+

@@ -1,0 +1,127 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
+    row: 283
+    column: 4
+  end_location:
+    row: 296
+    column: 0
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
+    row: 300
+    column: 0
+  end_location:
+    row: 309
+    column: 0
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - test
+      - y
+      - z
+  location:
+    row: 324
+    column: 4
+  end_location:
+    row: 332
+    column: 4
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - test
+      - y
+      - z
+  location:
+    row: 336
+    column: 4
+  end_location:
+    row: 345
+    column: 4
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - a
+      - y
+      - z
+  location:
+    row: 349
+    column: 4
+  end_location:
+    row: 357
+    column: 4
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - a
+      - b
+  location:
+    row: 361
+    column: 4
+  end_location:
+    row: 369
+    column: 4
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
+    row: 389
+    column: 0
+  end_location:
+    row: 401
+    column: 0
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - test
+      - y
+      - z
+  location:
+    row: 425
+    column: 4
+  end_location:
+    row: 436
+    column: 4
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - test
+      - y
+      - z
+  location:
+    row: 440
+    column: 4
+  end_location:
+    row: 455
+    column: 4
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - a
+      - z
+  location:
+    row: 459
+    column: 4
+  end_location:
+    row: 471
+    column: 4
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
+    row: 489
+    column: 4
+  end_location:
+    row: 498
+    column: 0
+  fix: ~
+

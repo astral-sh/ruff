@@ -1,0 +1,23 @@
+---
+source: src/flake8_builtins/mod.rs
+expression: checks
+---
+- kind:
+    BuiltinAttributeShadowing: ImportError
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 15
+  fix: ~
+- kind:
+    BuiltinAttributeShadowing: str
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 9
+    column: 0
+  fix: ~
+

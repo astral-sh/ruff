@@ -1,0 +1,41 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind:
+    DuplicateTryBlockException: ValueError
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 22
+    column: 0
+  fix: ~
+- kind:
+    DuplicateTryBlockException: pickle.PickleError
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 31
+    column: 0
+  fix: ~
+- kind:
+    DuplicateTryBlockException: TypeError
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 39
+    column: 0
+  fix: ~
+- kind:
+    DuplicateTryBlockException: ValueError
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 39
+    column: 0
+  fix: ~
+

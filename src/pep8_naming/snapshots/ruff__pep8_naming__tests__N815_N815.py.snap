@@ -1,0 +1,32 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind:
+    MixedCaseVariableInClassScope: mixedCase
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 13
+  fix: ~
+- kind:
+    MixedCaseVariableInClassScope: _mixedCase
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 14
+  fix: ~
+- kind:
+    MixedCaseVariableInClassScope: mixed_Case
+  location:
+    row: 10
+    column: 4
+  end_location:
+    row: 10
+    column: 14
+  fix: ~
+

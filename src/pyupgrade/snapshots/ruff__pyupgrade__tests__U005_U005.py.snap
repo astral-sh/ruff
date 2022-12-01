@@ -1,0 +1,81 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind:
+    DeprecatedUnittestAlias:
+      - assertEquals
+      - assertEqual
+  location:
+    row: 6
+    column: 8
+  end_location:
+    row: 6
+    column: 25
+  fix:
+    patch:
+      content: self.assertEqual
+      location:
+        row: 6
+        column: 8
+      end_location:
+        row: 6
+        column: 25
+- kind:
+    DeprecatedUnittestAlias:
+      - assertEquals
+      - assertEqual
+  location:
+    row: 7
+    column: 8
+  end_location:
+    row: 7
+    column: 25
+  fix:
+    patch:
+      content: self.assertEqual
+      location:
+        row: 7
+        column: 8
+      end_location:
+        row: 7
+        column: 25
+- kind:
+    DeprecatedUnittestAlias:
+      - failUnlessAlmostEqual
+      - assertAlmostEqual
+  location:
+    row: 9
+    column: 8
+  end_location:
+    row: 9
+    column: 34
+  fix:
+    patch:
+      content: self.assertAlmostEqual
+      location:
+        row: 9
+        column: 8
+      end_location:
+        row: 9
+        column: 34
+- kind:
+    DeprecatedUnittestAlias:
+      - assertNotRegexpMatches
+      - assertNotRegex
+  location:
+    row: 10
+    column: 8
+  end_location:
+    row: 10
+    column: 35
+  fix:
+    patch:
+      content: self.assertNotRegex
+      location:
+        row: 10
+        column: 8
+      end_location:
+        row: 10
+        column: 35
+

@@ -1,0 +1,50 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind:
+    NonEmptySection: Returns
+  location:
+    row: 54
+    column: 4
+  end_location:
+    row: 58
+    column: 7
+  fix: ~
+- kind:
+    NonEmptySection: Returns
+  location:
+    row: 67
+    column: 4
+  end_location:
+    row: 78
+    column: 7
+  fix: ~
+- kind:
+    NonEmptySection: Yields
+  location:
+    row: 67
+    column: 4
+  end_location:
+    row: 78
+    column: 7
+  fix: ~
+- kind:
+    NonEmptySection: Returns
+  location:
+    row: 161
+    column: 4
+  end_location:
+    row: 165
+    column: 7
+  fix: ~
+- kind:
+    NonEmptySection: Returns
+  location:
+    row: 252
+    column: 4
+  end_location:
+    row: 262
+    column: 7
+  fix: ~
+

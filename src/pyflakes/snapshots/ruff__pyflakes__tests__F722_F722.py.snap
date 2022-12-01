@@ -1,0 +1,14 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    ForwardAnnotationSyntaxError: ///
+  location:
+    row: 9
+    column: 11
+  end_location:
+    row: 9
+    column: 16
+  fix: ~
+

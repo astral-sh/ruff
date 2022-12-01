@@ -1,0 +1,13 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: NoSignature
+  location:
+    row: 378
+    column: 4
+  end_location:
+    row: 378
+    column: 30
+  fix: ~
+
