@@ -156,11 +156,11 @@ pub enum SerializationFormat {
 
 impl Default for SerializationFormat {
     fn default() -> Self {
-        if let Some(github_actions) = env::var("GITHUB_ACTIONS").ok() {
+        if let Ok(github_actions) = env::var("GITHUB_ACTIONS") {
             if github_actions == "true" {
                 return Self::Github;
             }
         }
-        return Self::Text;
+        Self::Text
     }
 }
