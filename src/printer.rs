@@ -199,7 +199,7 @@ impl<'a> Printer<'a> {
                 // https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
                 diagnostics.messages.iter().for_each(|message| {
                     println!(
-                        "::notice file={},line={},col={},endLine={},endColum={}::({}) {}",
+                        "::notice file={},line={},col={},endLine={},endColumn={}::({}) {}",
                         relativize_path(Path::new(&message.filename)),
                         message.location.row(),
                         message.location.column(),
