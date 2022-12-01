@@ -11,14 +11,13 @@ expression: checks
     row: 47
     column: 7
   fix:
-    patch:
-      content: "    -------\n"
-      location:
-        row: 45
-        column: 0
-      end_location:
-        row: 45
-        column: 0
+    content: "    -------\n"
+    location:
+      row: 45
+      column: 0
+    end_location:
+      row: 45
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Returns
   location:
@@ -28,14 +27,13 @@ expression: checks
     row: 58
     column: 7
   fix:
-    patch:
-      content: "    -------\n"
-      location:
-        row: 57
-        column: 0
-      end_location:
-        row: 57
-        column: 0
+    content: "    -------\n"
+    location:
+      row: 57
+      column: 0
+    end_location:
+      row: 57
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Raises
   location:
@@ -45,14 +43,13 @@ expression: checks
     row: 221
     column: 7
   fix:
-    patch:
-      content: "    ------\n"
-      location:
-        row: 219
-        column: 0
-      end_location:
-        row: 219
-        column: 0
+    content: "    ------\n"
+    location:
+      row: 219
+      column: 0
+    end_location:
+      row: 219
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Returns
   location:
@@ -62,14 +59,13 @@ expression: checks
     row: 262
     column: 7
   fix:
-    patch:
-      content: "    -------\n"
-      location:
-        row: 258
-        column: 0
-      end_location:
-        row: 258
-        column: 0
+    content: "    -------\n"
+    location:
+      row: 258
+      column: 0
+    end_location:
+      row: 258
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Raises
   location:
@@ -79,14 +75,13 @@ expression: checks
     row: 262
     column: 7
   fix:
-    patch:
-      content: "    ------\n"
-      location:
-        row: 260
-        column: 0
-      end_location:
-        row: 260
-        column: 0
+    content: "    ------\n"
+    location:
+      row: 260
+      column: 0
+    end_location:
+      row: 260
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -96,14 +91,13 @@ expression: checks
     row: 274
     column: 7
   fix:
-    patch:
-      content: "    ----\n"
-      location:
-        row: 272
-        column: 0
-      end_location:
-        row: 272
-        column: 0
+    content: "    ----\n"
+    location:
+      row: 272
+      column: 0
+    end_location:
+      row: 272
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -113,14 +107,13 @@ expression: checks
     row: 292
     column: 11
   fix:
-    patch:
-      content: "        ----\n"
-      location:
-        row: 289
-        column: 0
-      end_location:
-        row: 289
-        column: 0
+    content: "        ----\n"
+    location:
+      row: 289
+      column: 0
+    end_location:
+      row: 289
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -130,14 +123,13 @@ expression: checks
     row: 306
     column: 7
   fix:
-    patch:
-      content: "    ----\n"
-      location:
-        row: 304
-        column: 0
-      end_location:
-        row: 304
-        column: 0
+    content: "    ----\n"
+    location:
+      row: 304
+      column: 0
+    end_location:
+      row: 304
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -147,14 +139,13 @@ expression: checks
     row: 319
     column: 11
   fix:
-    patch:
-      content: "        ----\n"
-      location:
-        row: 316
-        column: 0
-      end_location:
-        row: 316
-        column: 0
+    content: "        ----\n"
+    location:
+      row: 316
+      column: 0
+    end_location:
+      row: 316
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -164,14 +155,13 @@ expression: checks
     row: 330
     column: 11
   fix:
-    patch:
-      content: "        ----\n"
-      location:
-        row: 328
-        column: 0
-      end_location:
-        row: 328
-        column: 0
+    content: "        ----\n"
+    location:
+      row: 328
+      column: 0
+    end_location:
+      row: 328
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -181,14 +171,13 @@ expression: checks
     row: 343
     column: 11
   fix:
-    patch:
-      content: "        ----\n"
-      location:
-        row: 340
-        column: 0
-      end_location:
-        row: 340
-        column: 0
+    content: "        ----\n"
+    location:
+      row: 340
+      column: 0
+    end_location:
+      row: 340
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -198,14 +187,13 @@ expression: checks
     row: 355
     column: 11
   fix:
-    patch:
-      content: "        ----\n"
-      location:
-        row: 353
-        column: 0
-      end_location:
-        row: 353
-        column: 0
+    content: "        ----\n"
+    location:
+      row: 353
+      column: 0
+    end_location:
+      row: 353
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -215,14 +203,13 @@ expression: checks
     row: 367
     column: 11
   fix:
-    patch:
-      content: "        ----\n"
-      location:
-        row: 365
-        column: 0
-      end_location:
-        row: 365
-        column: 0
+    content: "        ----\n"
+    location:
+      row: 365
+      column: 0
+    end_location:
+      row: 365
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -232,14 +219,13 @@ expression: checks
     row: 382
     column: 11
   fix:
-    patch:
-      content: "        ----\n"
-      location:
-        row: 374
-        column: 0
-      end_location:
-        row: 374
-        column: 0
+    content: "        ----\n"
+    location:
+      row: 374
+      column: 0
+    end_location:
+      row: 374
+      column: 0
 - kind:
     DashedUnderlineAfterSection: Args
   location:
@@ -249,12 +235,11 @@ expression: checks
     row: 497
     column: 11
   fix:
-    patch:
-      content: "        ----\n"
-      location:
-        row: 495
-        column: 0
-      end_location:
-        row: 495
-        column: 0
+    content: "        ----\n"
+    location:
+      row: 495
+      column: 0
+    end_location:
+      row: 495
+      column: 0
 

@@ -10,14 +10,13 @@ expression: checks
     row: 18
     column: 19
   fix:
-    patch:
-      content: foo.bar
-      location:
-        row: 18
-        column: 0
-      end_location:
-        row: 18
-        column: 19
+    content: foo.bar
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 18
+      column: 19
 - kind: GetAttrWithConstant
   location:
     row: 19
@@ -26,14 +25,13 @@ expression: checks
     row: 19
     column: 23
   fix:
-    patch:
-      content: foo._123abc
-      location:
-        row: 19
-        column: 0
-      end_location:
-        row: 19
-        column: 23
+    content: foo._123abc
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 23
 - kind: GetAttrWithConstant
   location:
     row: 20
@@ -42,14 +40,13 @@ expression: checks
     row: 20
     column: 22
   fix:
-    patch:
-      content: foo.abc123
-      location:
-        row: 20
-        column: 0
-      end_location:
-        row: 20
-        column: 22
+    content: foo.abc123
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 20
+      column: 22
 - kind: GetAttrWithConstant
   location:
     row: 21
@@ -58,14 +55,13 @@ expression: checks
     row: 21
     column: 23
   fix:
-    patch:
-      content: foo.abc123
-      location:
-        row: 21
-        column: 0
-      end_location:
-        row: 21
-        column: 23
+    content: foo.abc123
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 21
+      column: 23
 - kind: GetAttrWithConstant
   location:
     row: 22
@@ -74,12 +70,11 @@ expression: checks
     row: 22
     column: 31
   fix:
-    patch:
-      content: x.bar
-      location:
-        row: 22
-        column: 14
-      end_location:
-        row: 22
-        column: 31
+    content: x.bar
+    location:
+      row: 22
+      column: 14
+    end_location:
+      row: 22
+      column: 31
 

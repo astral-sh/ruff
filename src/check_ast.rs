@@ -2990,7 +2990,7 @@ impl<'a> Checker<'a> {
                             &deleted,
                         ) {
                             Ok(fix) => {
-                                if fix.patch.content.is_empty() || fix.patch.content == "pass" {
+                                if fix.content.is_empty() || fix.content == "pass" {
                                     self.deletions.insert(defined_by);
                                 }
                                 Some(fix)

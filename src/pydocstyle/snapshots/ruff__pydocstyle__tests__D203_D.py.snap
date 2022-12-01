@@ -11,14 +11,13 @@ expression: checks
     row: 161
     column: 32
   fix:
-    patch:
-      content: "\n"
-      location:
-        row: 161
-        column: 0
-      end_location:
-        row: 161
-        column: 0
+    content: "\n"
+    location:
+      row: 161
+      column: 0
+    end_location:
+      row: 161
+      column: 0
 - kind:
     OneBlankLineBeforeClass: 0
   location:
@@ -28,14 +27,13 @@ expression: checks
     row: 192
     column: 45
   fix:
-    patch:
-      content: "\n"
-      location:
-        row: 192
-        column: 0
-      end_location:
-        row: 192
-        column: 0
+    content: "\n"
+    location:
+      row: 192
+      column: 0
+    end_location:
+      row: 192
+      column: 0
 - kind:
     OneBlankLineBeforeClass: 0
   location:
@@ -45,12 +43,11 @@ expression: checks
     row: 532
     column: 7
   fix:
-    patch:
-      content: "\n"
-      location:
-        row: 526
-        column: 0
-      end_location:
-        row: 526
-        column: 0
+    content: "\n"
+    location:
+      row: 526
+      column: 0
+    end_location:
+      row: 526
+      column: 0
 

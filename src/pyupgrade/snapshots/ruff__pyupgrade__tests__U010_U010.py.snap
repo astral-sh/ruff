@@ -13,14 +13,13 @@ expression: checks
     row: 1
     column: 48
   fix:
-    patch:
-      content: ""
-      location:
-        row: 1
-        column: 0
-      end_location:
-        row: 2
-        column: 0
+    content: ""
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 2
+      column: 0
 - kind:
     UnnecessaryFutureImport:
       - unicode_literals
@@ -32,14 +31,13 @@ expression: checks
     row: 2
     column: 55
   fix:
-    patch:
-      content: ""
-      location:
-        row: 2
-        column: 0
-      end_location:
-        row: 3
-        column: 0
+    content: ""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 3
+      column: 0
 - kind:
     UnnecessaryFutureImport:
       - absolute_import
@@ -51,14 +49,13 @@ expression: checks
     row: 3
     column: 48
   fix:
-    patch:
-      content: ""
-      location:
-        row: 3
-        column: 0
-      end_location:
-        row: 4
-        column: 0
+    content: ""
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 4
+      column: 0
 - kind:
     UnnecessaryFutureImport:
       - generator_stop
@@ -69,14 +66,13 @@ expression: checks
     row: 4
     column: 37
   fix:
-    patch:
-      content: ""
-      location:
-        row: 4
-        column: 0
-      end_location:
-        row: 5
-        column: 0
+    content: ""
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 5
+      column: 0
 - kind:
     UnnecessaryFutureImport:
       - generator_stop
@@ -88,14 +84,13 @@ expression: checks
     row: 5
     column: 53
   fix:
-    patch:
-      content: ""
-      location:
-        row: 5
-        column: 0
-      end_location:
-        row: 6
-        column: 0
+    content: ""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 6
+      column: 0
 - kind:
     UnnecessaryFutureImport:
       - generators
@@ -106,14 +101,13 @@ expression: checks
     row: 6
     column: 49
   fix:
-    patch:
-      content: from __future__ import invalid_module
-      location:
-        row: 6
-        column: 0
-      end_location:
-        row: 6
-        column: 49
+    content: from __future__ import invalid_module
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 49
 - kind:
     UnnecessaryFutureImport:
       - generator_stop
@@ -124,14 +118,13 @@ expression: checks
     row: 9
     column: 41
   fix:
-    patch:
-      content: ""
-      location:
-        row: 9
-        column: 0
-      end_location:
-        row: 10
-        column: 0
+    content: ""
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 10
+      column: 0
 - kind:
     UnnecessaryFutureImport:
       - generators
@@ -142,14 +135,13 @@ expression: checks
     row: 10
     column: 37
   fix:
-    patch:
-      content: pass
-      location:
-        row: 10
-        column: 4
-      end_location:
-        row: 10
-        column: 37
+    content: pass
+    location:
+      row: 10
+      column: 4
+    end_location:
+      row: 10
+      column: 37
 - kind:
     UnnecessaryFutureImport:
       - generator_stop
@@ -160,14 +152,13 @@ expression: checks
     row: 13
     column: 41
   fix:
-    patch:
-      content: ""
-      location:
-        row: 13
-        column: 0
-      end_location:
-        row: 14
-        column: 0
+    content: ""
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 14
+      column: 0
 - kind:
     UnnecessaryFutureImport:
       - generators
@@ -178,12 +169,11 @@ expression: checks
     row: 14
     column: 53
   fix:
-    patch:
-      content: from __future__ import invalid_module
-      location:
-        row: 14
-        column: 4
-      end_location:
-        row: 14
-        column: 53
+    content: from __future__ import invalid_module
+    location:
+      row: 14
+      column: 4
+    end_location:
+      row: 14
+      column: 53
 

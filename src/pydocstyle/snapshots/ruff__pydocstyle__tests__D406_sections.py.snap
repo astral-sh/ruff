@@ -11,14 +11,13 @@ expression: checks
     row: 36
     column: 7
   fix:
-    patch:
-      content: ""
-      location:
-        row: 32
-        column: 11
-      end_location:
-        row: 32
-        column: 12
+    content: ""
+    location:
+      row: 32
+      column: 11
+    end_location:
+      row: 32
+      column: 12
 - kind:
     NewLineAfterSectionName: Raises
   location:
@@ -28,14 +27,13 @@ expression: checks
     row: 221
     column: 7
   fix:
-    patch:
-      content: ""
-      location:
-        row: 218
-        column: 10
-      end_location:
-        row: 218
-        column: 11
+    content: ""
+    location:
+      row: 218
+      column: 10
+    end_location:
+      row: 218
+      column: 11
 - kind:
     NewLineAfterSectionName: Returns
   location:
@@ -45,14 +43,13 @@ expression: checks
     row: 262
     column: 7
   fix:
-    patch:
-      content: ""
-      location:
-        row: 257
-        column: 11
-      end_location:
-        row: 257
-        column: 12
+    content: ""
+    location:
+      row: 257
+      column: 11
+    end_location:
+      row: 257
+      column: 12
 - kind:
     NewLineAfterSectionName: Raises
   location:
@@ -62,12 +59,11 @@ expression: checks
     row: 262
     column: 7
   fix:
-    patch:
-      content: ""
-      location:
-        row: 259
-        column: 10
-      end_location:
-        row: 259
-        column: 11
+    content: ""
+    location:
+      row: 259
+      column: 10
+    end_location:
+      row: 259
+      column: 11
 

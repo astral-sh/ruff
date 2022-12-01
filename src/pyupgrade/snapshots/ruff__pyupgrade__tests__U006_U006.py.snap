@@ -11,14 +11,13 @@ expression: checks
     row: 4
     column: 20
   fix:
-    patch:
-      content: list
-      location:
-        row: 4
-        column: 9
-      end_location:
-        row: 4
-        column: 20
+    content: list
+    location:
+      row: 4
+      column: 9
+    end_location:
+      row: 4
+      column: 20
 - kind:
     UsePEP585Annotation: List
   location:
@@ -28,14 +27,13 @@ expression: checks
     row: 11
     column: 13
   fix:
-    patch:
-      content: list
-      location:
-        row: 11
-        column: 9
-      end_location:
-        row: 11
-        column: 13
+    content: list
+    location:
+      row: 11
+      column: 9
+    end_location:
+      row: 11
+      column: 13
 - kind:
     UsePEP585Annotation: List
   location:
@@ -45,14 +43,13 @@ expression: checks
     row: 18
     column: 15
   fix:
-    patch:
-      content: list
-      location:
-        row: 18
-        column: 9
-      end_location:
-        row: 18
-        column: 15
+    content: list
+    location:
+      row: 18
+      column: 9
+    end_location:
+      row: 18
+      column: 15
 - kind:
     UsePEP585Annotation: List
   location:
@@ -62,12 +59,11 @@ expression: checks
     row: 25
     column: 14
   fix:
-    patch:
-      content: list
-      location:
-        row: 25
-        column: 9
-      end_location:
-        row: 25
-        column: 14
+    content: list
+    location:
+      row: 25
+      column: 9
+    end_location:
+      row: 25
+      column: 14
 

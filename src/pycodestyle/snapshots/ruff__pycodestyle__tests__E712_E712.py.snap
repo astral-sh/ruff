@@ -13,14 +13,13 @@ expression: checks
     row: 2
     column: 14
   fix:
-    patch:
-      content: res is True
-      location:
-        row: 2
-        column: 3
-      end_location:
-        row: 2
-        column: 14
+    content: res is True
+    location:
+      row: 2
+      column: 3
+    end_location:
+      row: 2
+      column: 14
 - kind:
     TrueFalseComparison:
       - false
@@ -32,14 +31,13 @@ expression: checks
     row: 5
     column: 15
   fix:
-    patch:
-      content: res is not False
-      location:
-        row: 5
-        column: 3
-      end_location:
-        row: 5
-        column: 15
+    content: res is not False
+    location:
+      row: 5
+      column: 3
+    end_location:
+      row: 5
+      column: 15
 - kind:
     TrueFalseComparison:
       - true
@@ -51,14 +49,13 @@ expression: checks
     row: 8
     column: 7
   fix:
-    patch:
-      content: True is not res
-      location:
-        row: 8
-        column: 3
-      end_location:
-        row: 8
-        column: 14
+    content: True is not res
+    location:
+      row: 8
+      column: 3
+    end_location:
+      row: 8
+      column: 14
 - kind:
     TrueFalseComparison:
       - false
@@ -70,14 +67,13 @@ expression: checks
     row: 11
     column: 8
   fix:
-    patch:
-      content: False is res
-      location:
-        row: 11
-        column: 3
-      end_location:
-        row: 11
-        column: 15
+    content: False is res
+    location:
+      row: 11
+      column: 3
+    end_location:
+      row: 11
+      column: 15
 - kind:
     TrueFalseComparison:
       - true
@@ -89,14 +85,13 @@ expression: checks
     row: 14
     column: 17
   fix:
-    patch:
-      content: "res[1] is True"
-      location:
-        row: 14
-        column: 3
-      end_location:
-        row: 14
-        column: 17
+    content: "res[1] is True"
+    location:
+      row: 14
+      column: 3
+    end_location:
+      row: 14
+      column: 17
 - kind:
     TrueFalseComparison:
       - false
@@ -108,14 +103,13 @@ expression: checks
     row: 17
     column: 18
   fix:
-    patch:
-      content: "res[1] is not False"
-      location:
-        row: 17
-        column: 3
-      end_location:
-        row: 17
-        column: 18
+    content: "res[1] is not False"
+    location:
+      row: 17
+      column: 3
+    end_location:
+      row: 17
+      column: 18
 - kind:
     TrueFalseComparison:
       - true
@@ -127,14 +121,13 @@ expression: checks
     row: 20
     column: 23
   fix:
-    patch:
-      content: cond is True
-      location:
-        row: 20
-        column: 11
-      end_location:
-        row: 20
-        column: 23
+    content: cond is True
+    location:
+      row: 20
+      column: 11
+    end_location:
+      row: 20
+      column: 23
 - kind:
     TrueFalseComparison:
       - false
@@ -146,14 +139,13 @@ expression: checks
     row: 20
     column: 48
   fix:
-    patch:
-      content: cond is False
-      location:
-        row: 20
-        column: 35
-      end_location:
-        row: 20
-        column: 48
+    content: cond is False
+    location:
+      row: 20
+      column: 35
+    end_location:
+      row: 20
+      column: 48
 - kind:
     TrueFalseComparison:
       - true
@@ -165,14 +157,13 @@ expression: checks
     row: 22
     column: 8
   fix:
-    patch:
-      content: True is TrueElement
-      location:
-        row: 22
-        column: 3
-      end_location:
-        row: 22
-        column: 24
+    content: True is TrueElement
+    location:
+      row: 22
+      column: 3
+    end_location:
+      row: 22
+      column: 24
 - kind:
     TrueFalseComparison:
       - true
@@ -184,14 +175,13 @@ expression: checks
     row: 25
     column: 14
   fix:
-    patch:
-      content: ""
-      location:
-        row: 25
-        column: 3
-      end_location:
-        row: 25
-        column: 3
+    content: ""
+    location:
+      row: 25
+      column: 3
+    end_location:
+      row: 25
+      column: 3
 - kind:
     TrueFalseComparison:
       - false
@@ -203,12 +193,11 @@ expression: checks
     row: 25
     column: 23
   fix:
-    patch:
-      content: res is True is not False
-      location:
-        row: 25
-        column: 3
-      end_location:
-        row: 25
-        column: 23
+    content: res is True is not False
+    location:
+      row: 25
+      column: 3
+    end_location:
+      row: 25
+      column: 23
 

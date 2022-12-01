@@ -11,14 +11,13 @@ expression: checks
     row: 1
     column: 19
   fix:
-    patch:
-      content: "{1: 2}"
-      location:
-        row: 1
-        column: 5
-      end_location:
-        row: 1
-        column: 19
+    content: "{1: 2}"
+    location:
+      row: 1
+      column: 5
+    end_location:
+      row: 1
+      column: 19
 - kind:
     UnnecessaryLiteralDict: tuple
   location:
@@ -28,14 +27,13 @@ expression: checks
     row: 2
     column: 20
   fix:
-    patch:
-      content: "{1: 2,}"
-      location:
-        row: 2
-        column: 5
-      end_location:
-        row: 2
-        column: 20
+    content: "{1: 2,}"
+    location:
+      row: 2
+      column: 5
+    end_location:
+      row: 2
+      column: 20
 - kind:
     UnnecessaryLiteralDict: list
   location:
@@ -45,14 +43,13 @@ expression: checks
     row: 3
     column: 13
   fix:
-    patch:
-      content: "{}"
-      location:
-        row: 3
-        column: 5
-      end_location:
-        row: 3
-        column: 13
+    content: "{}"
+    location:
+      row: 3
+      column: 5
+    end_location:
+      row: 3
+      column: 13
 - kind:
     UnnecessaryLiteralDict: tuple
   location:
@@ -62,12 +59,11 @@ expression: checks
     row: 4
     column: 13
   fix:
-    patch:
-      content: "{}"
-      location:
-        row: 4
-        column: 5
-      end_location:
-        row: 4
-        column: 13
+    content: "{}"
+    location:
+      row: 4
+      column: 5
+    end_location:
+      row: 4
+      column: 13
 

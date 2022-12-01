@@ -6,7 +6,7 @@ use ropey::RopeBuilder;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
-use crate::autofix::{Fix, Patch};
+use crate::autofix::Fix;
 use crate::checks::Check;
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -58,36 +58,36 @@ fn apply_fixes<'a>(
 ) -> (Cow<'a, str>, usize) {
     let mut output = RopeBuilder::new();
     let mut last_pos: Location = Location::new(1, 0);
-    let mut applied: BTreeSet<&Patch> = BTreeSet::default();
+    let mut applied: BTreeSet<&Fix> = BTreeSet::default();
     let mut num_fixed: usize = 0;
 
-    for fix in fixes.sorted_by_key(|fix| fix.patch.location) {
+    for fix in fixes.sorted_by_key(|fix| fix.location) {
         // If we already applied an identical fix as part of another correction, skip
         // any re-application.
-        if applied.contains(&fix.patch) {
+        if applied.contains(&fix) {
             num_fixed += 1;
             continue;
         }
 
         // Best-effort approach: if this fix overlaps with a fix we've already applied,
         // skip it.
-        if last_pos > fix.patch.location {
+        if last_pos > fix.location {
             continue;
         }
 
-        // Add all contents from `last_pos` to `fix.patch.location`.
+        // Add all contents from `last_pos` to `fix.location`.
         let slice = locator.slice_source_code_range(&Range {
             location: last_pos,
-            end_location: fix.patch.location,
+            end_location: fix.location,
         });
         output.append(&slice);
 
         // Add the patch itself.
-        output.append(&fix.patch.content);
+        output.append(&fix.content);
 
         // Track that the fix was applied.
-        last_pos = fix.patch.end_location;
-        applied.insert(&fix.patch);
+        last_pos = fix.end_location;
+        applied.insert(fix);
         num_fixed += 1;
     }
 
@@ -103,7 +103,7 @@ mod tests {
     use rustpython_parser::ast::Location;
 
     use crate::autofix::fixer::apply_fixes;
-    use crate::autofix::{Fix, Patch};
+    use crate::autofix::Fix;
     use crate::SourceCodeLocator;
 
     #[test]
@@ -118,11 +118,9 @@ mod tests {
     #[test]
     fn apply_single_replacement() {
         let fixes = vec![Fix {
-            patch: Patch {
-                content: "Bar".to_string(),
-                location: Location::new(1, 8),
-                end_location: Location::new(1, 14),
-            },
+            content: "Bar".to_string(),
+            location: Location::new(1, 8),
+            end_location: Location::new(1, 14),
         }];
         let locator = SourceCodeLocator::new(
             r#"
@@ -146,11 +144,9 @@ class A(Bar):
     #[test]
     fn apply_single_removal() {
         let fixes = vec![Fix {
-            patch: Patch {
-                content: String::new(),
-                location: Location::new(1, 7),
-                end_location: Location::new(1, 15),
-            },
+            content: String::new(),
+            location: Location::new(1, 7),
+            end_location: Location::new(1, 15),
         }];
         let locator = SourceCodeLocator::new(
             r#"
@@ -175,18 +171,14 @@ class A:
     fn apply_double_removal() {
         let fixes = vec![
             Fix {
-                patch: Patch {
-                    content: String::new(),
-                    location: Location::new(1, 7),
-                    end_location: Location::new(1, 16),
-                },
+                content: String::new(),
+                location: Location::new(1, 7),
+                end_location: Location::new(1, 16),
             },
             Fix {
-                patch: Patch {
-                    content: String::new(),
-                    location: Location::new(1, 16),
-                    end_location: Location::new(1, 23),
-                },
+                content: String::new(),
+                location: Location::new(1, 16),
+                end_location: Location::new(1, 23),
             },
         ];
         let locator = SourceCodeLocator::new(
@@ -213,18 +205,14 @@ class A:
     fn ignore_overlapping_fixes() {
         let fixes = vec![
             Fix {
-                patch: Patch {
-                    content: String::new(),
-                    location: Location::new(1, 7),
-                    end_location: Location::new(1, 15),
-                },
+                content: String::new(),
+                location: Location::new(1, 7),
+                end_location: Location::new(1, 15),
             },
             Fix {
-                patch: Patch {
-                    content: "ignored".to_string(),
-                    location: Location::new(1, 9),
-                    end_location: Location::new(1, 11),
-                },
+                content: "ignored".to_string(),
+                location: Location::new(1, 9),
+                end_location: Location::new(1, 11),
             },
         ];
         let locator = SourceCodeLocator::new(

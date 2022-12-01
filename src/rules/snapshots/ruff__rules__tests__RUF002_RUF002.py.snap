@@ -13,12 +13,11 @@ expression: checks
     row: 5
     column: 56
   fix:
-    patch:
-      content: )
-      location:
-        row: 5
-        column: 55
-      end_location:
-        row: 5
-        column: 56
+    content: )
+    location:
+      row: 5
+      column: 55
+    end_location:
+      row: 5
+      column: 56
 
