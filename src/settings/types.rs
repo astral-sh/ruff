@@ -4,7 +4,7 @@ use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::ValueEnum;
 use globset::{Glob, GlobSetBuilder};
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -41,7 +41,7 @@ impl FromStr for PythonVersion {
             "py39" => Ok(PythonVersion::Py39),
             "py310" => Ok(PythonVersion::Py310),
             "py311" => Ok(PythonVersion::Py311),
-            _ => Err(anyhow!("Unknown version: {}", string)),
+            _ => Err(anyhow!("Unknown version: {string}")),
         }
     }
 }
@@ -134,7 +134,7 @@ impl FromStr for PatternPrefixPair {
         let (pattern_str, code_string) = {
             let tokens = s.split(':').collect::<Vec<_>>();
             if tokens.len() != 2 {
-                return Err(anyhow!("Expected {}", Self::EXPECTED_PATTERN));
+                bail!("Expected {}", Self::EXPECTED_PATTERN);
             }
             (tokens[0].trim(), tokens[1].trim())
         };

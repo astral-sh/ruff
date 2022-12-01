@@ -43,7 +43,7 @@ impl FromStr for Plugin {
             "mccabe" => Ok(Plugin::McCabe),
             "pep8-naming" => Ok(Plugin::PEP8Naming),
             "pyupgrade" => Ok(Plugin::Pyupgrade),
-            _ => Err(anyhow!("Unknown plugin: {}", string)),
+            _ => Err(anyhow!("Unknown plugin: {string}")),
         }
     }
 }
@@ -121,7 +121,7 @@ impl FromStr for DocstringConvention {
             "pep8" => Ok(DocstringConvention::PEP8),
             "numpy" => Ok(DocstringConvention::NumPy),
             "google" => Ok(DocstringConvention::Google),
-            _ => Err(anyhow!("Unknown docstring convention: {}", string)),
+            _ => Err(anyhow!("Unknown docstring convention: {string}")),
         }
     }
 }
