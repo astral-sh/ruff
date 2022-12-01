@@ -15,7 +15,7 @@ fn match_call<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Call<'b>> {
     if let Expression::Call(call) = &mut expr.value {
         Ok(call)
     } else {
-        Err(anyhow::anyhow!("Expected node to be: Expression::Call"))
+        Err(anyhow::anyhow!("Expected Expression::Call"))
     }
 }
 
@@ -23,7 +23,7 @@ fn match_arg<'a, 'b>(call: &'a Call<'b>) -> Result<&'a Arg<'b>> {
     if let Some(arg) = call.args.first() {
         Ok(arg)
     } else {
-        Err(anyhow::anyhow!("Expected node to be: Arg"))
+        Err(anyhow::anyhow!("Expected Arg"))
     }
 }
 
@@ -41,7 +41,7 @@ pub fn fix_unnecessary_generator_list(
 
     let Expression::GeneratorExp(generator_exp) = &arg.value else {
         return Err(anyhow::anyhow!(
-            "Expected node to be: Expression::GeneratorExp"
+            "Expected Expression::GeneratorExp"
         ));
     };
 
@@ -82,7 +82,7 @@ pub fn fix_unnecessary_generator_set(
 
     let Expression::GeneratorExp(generator_exp) = &arg.value else {
         return Err(anyhow::anyhow!(
-            "Expected node to be: Expression::GeneratorExp"
+            "Expected Expression::GeneratorExp"
         ));
     };
 
@@ -124,11 +124,11 @@ pub fn fix_unnecessary_generator_dict(
     // Extract the (k, v) from `(k, v) for ...`.
     let Expression::GeneratorExp(generator_exp) = &arg.value else {
         return Err(anyhow::anyhow!(
-            "Expected node to be: Expression::GeneratorExp"
+            "Expected Expression::GeneratorExp"
         ));
     };
     let Expression::Tuple(tuple) = &generator_exp.elt.as_ref() else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Tuple"));
+        return Err(anyhow::anyhow!("Expected Expression::Tuple"));
     };
     let Some(Element::Simple { value: key, .. }) = &tuple.elements.get(0) else {
         return Err(anyhow::anyhow!(
@@ -181,7 +181,7 @@ pub fn fix_unnecessary_list_comprehension_set(
     let arg = match_arg(call)?;
 
     let Expression::ListComp(list_comp) = &arg.value else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::ListComp"));
+        return Err(anyhow::anyhow!("Expected Expression::ListComp"));
     };
 
     body.value = Expression::SetComp(Box::new(SetComp {
@@ -220,11 +220,11 @@ pub fn fix_unnecessary_list_comprehension_dict(
     let arg = match_arg(call)?;
 
     let Expression::ListComp(list_comp) = &arg.value else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::ListComp"));
+        return Err(anyhow::anyhow!("Expected Expression::ListComp"));
     };
 
     let Expression::Tuple(tuple) = &*list_comp.elt else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Tuple"));
+        return Err(anyhow::anyhow!("Expected Expression::Tuple"));
     };
 
     let [Element::Simple {
@@ -275,7 +275,7 @@ pub fn fix_unnecessary_literal_set(
         Expression::List(inner) => &inner.elements,
         _ => {
             return Err(anyhow::anyhow!(
-                "Expected node to be: Expression::Tuple | Expression::List"
+                "Expected Expression::Tuple | Expression::List"
             ))
         }
     };
@@ -323,7 +323,7 @@ pub fn fix_unnecessary_literal_dict(
         Expression::List(inner) => &inner.elements,
         _ => {
             return Err(anyhow::anyhow!(
-                "Expected node to be: Expression::Tuple | Expression::List"
+                "Expected Expression::Tuple | Expression::List"
             ))
         }
     };
@@ -389,7 +389,7 @@ pub fn fix_unnecessary_collection_call(
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let Expression::Name(name) = &call.func.as_ref() else {
-        return Err(anyhow::anyhow!("Expected node to be: Expression::Name"));
+        return Err(anyhow::anyhow!("Expected Expression::Name"));
     };
 
     // Arena allocator used to create formatted strings of sufficient lifetime,
@@ -520,7 +520,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
         ),
         _ => {
             return Err(anyhow::anyhow!(
-                "Expected node to be: Expression::Tuple | Expression::List"
+                "Expected Expression::Tuple | Expression::List"
             ))
         }
     };
@@ -576,7 +576,7 @@ pub fn fix_unnecessary_literal_within_list_call(
         ),
         _ => {
             return Err(anyhow::anyhow!(
-                "Expected node to be: Expression::Tuple | Expression::List"
+                "Expected Expression::Tuple | Expression::List"
             ))
         }
     };
@@ -643,7 +643,7 @@ pub fn fix_unnecessary_call_around_sorted(
             if let Expression::Call(call) = &arg.value {
                 call
             } else {
-                return Err(anyhow::anyhow!("Expected node to be: Expression::Call "));
+                return Err(anyhow::anyhow!("Expected Expression::Call "));
             }
         }
         _ => {
@@ -769,7 +769,7 @@ pub fn fix_unnecessary_comprehension(
         }
         _ => {
             return Err(anyhow::anyhow!(
-                "Expected node to be: Expression::ListComp | Expression:SetComp"
+                "Expected Expression::ListComp | Expression:SetComp"
             ))
         }
     }

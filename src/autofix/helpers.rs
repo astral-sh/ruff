@@ -21,7 +21,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
             } else {
-                Err(anyhow::anyhow!("Unable to find child in parent body."))
+                Err(anyhow::anyhow!("Unable to find child in parent body"))
             }
         }
         StmtKind::For { body, orelse, .. }
@@ -33,7 +33,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
             } else if orelse.iter().contains(child) {
                 Ok(has_single_child(orelse, deleted))
             } else {
-                Err(anyhow::anyhow!("Unable to find child in parent body."))
+                Err(anyhow::anyhow!("Unable to find child in parent body"))
             }
         }
         StmtKind::Try {
@@ -59,10 +59,10 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
             }) {
                 Ok(has_single_child(body, deleted))
             } else {
-                Err(anyhow::anyhow!("Unable to find child in parent body."))
+                Err(anyhow::anyhow!("Unable to find child in parent body"))
             }
         }
-        _ => Err(anyhow::anyhow!("Unable to find child in parent body.")),
+        _ => Err(anyhow::anyhow!("Unable to find child in parent body")),
     }
 }
 

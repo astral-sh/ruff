@@ -97,7 +97,7 @@ fn extract_quote(text: &str) -> &str {
         }
     }
 
-    panic!("Unable to find quotation mark for String token.")
+    panic!("Unable to find quotation mark for String token")
 }
 
 /// W605

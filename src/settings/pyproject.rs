@@ -358,19 +358,14 @@ other-attribute = 1
     fn find_and_parse_pyproject_toml() -> Result<()> {
         let cwd = current_dir()?;
         let project_root =
-            find_project_root(&[PathBuf::from("resources/test/fixtures/__init__.py")])
-                .expect("Unable to find project root.");
+            find_project_root(&[PathBuf::from("resources/test/fixtures/__init__.py")]).unwrap();
         assert_eq!(project_root, cwd.join("resources/test/fixtures"));
 
-        let path =
-            find_pyproject_toml(Some(&project_root)).expect("Unable to find pyproject.toml.");
+        let path = find_pyproject_toml(Some(&project_root)).unwrap();
         assert_eq!(path, cwd.join("resources/test/fixtures/pyproject.toml"));
 
         let pyproject = parse_pyproject_toml(&path)?;
-        let config = pyproject
-            .tool
-            .and_then(|tool| tool.ruff)
-            .expect("Unable to find tool.ruff.");
+        let config = pyproject.tool.and_then(|tool| tool.ruff).unwrap();
         assert_eq!(
             config,
             Options {

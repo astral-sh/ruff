@@ -73,13 +73,13 @@ pub fn main(cli: &Cli) -> Result<()> {
         // Extract the prefix.
         let index = existing
             .find(BEGIN_PRAGMA)
-            .expect("Unable to find begin pragma.");
+            .expect("Unable to find begin pragma");
         let prefix = &existing[..index + BEGIN_PRAGMA.len()];
 
         // Extract the suffix.
         let index = existing
             .find(END_PRAGMA)
-            .expect("Unable to find end pragma.");
+            .expect("Unable to find end pragma");
         let suffix = &existing[index..];
 
         // Write the prefix, new contents, and suffix.

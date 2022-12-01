@@ -23,7 +23,7 @@ pub fn remove_unused_imports(
     let mut tree = match_module(&module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {
-        return Err(anyhow::anyhow!("Expected node to be: Statement::Simple"));
+        return Err(anyhow::anyhow!("Expected Statement::Simple"));
     };
 
     let (aliases, import_module) = match body.body.first_mut() {
@@ -32,11 +32,11 @@ pub fn remove_unused_imports(
             if let ImportNames::Aliases(names) = &mut import_body.names {
                 Ok((names, import_body.module.as_ref()))
             } else {
-                Err(anyhow::anyhow!("Expected node to be: Aliases"))
+                Err(anyhow::anyhow!("Expected Aliases"))
             }
         }
         _ => Err(anyhow::anyhow!(
-            "Expected node to be: SmallStatement::ImportFrom or SmallStatement::Import"
+            "Expected SmallStatement::ImportFrom or SmallStatement::Import"
         )),
     }?;
 
@@ -83,9 +83,7 @@ fn match_comparison<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Comparison
     if let Expression::Comparison(comparison) = &mut expr.value {
         Ok(comparison)
     } else {
-        Err(anyhow::anyhow!(
-            "Expected node to be: Expression::Comparison"
-        ))
+        Err(anyhow::anyhow!("Expected Expression::Comparison"))
     }
 }
 
@@ -117,7 +115,7 @@ pub fn fix_invalid_literal_comparison(locator: &SourceCodeLocator, location: Ran
             whitespace_after: a.clone(),
         }),
         op => Err(anyhow::anyhow!(
-            "Unexpected operator: {:?}. Expected Is or IsNot.",
+            "Unexpected operator: {:?} (expected CompOp::Is or CompOp::IsNot)",
             op
         )),
     }?;
