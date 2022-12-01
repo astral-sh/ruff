@@ -64,6 +64,9 @@ pub fn explain(code: &CheckCode, format: SerializationFormat) -> Result<()> {
         SerializationFormat::Junit => {
             bail!("`--explain` does not support junit format")
         }
+        SerializationFormat::Github => {
+            bail!("`--explain` does not support GitHub format")
+        }
     };
     Ok(())
 }

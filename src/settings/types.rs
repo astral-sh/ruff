@@ -150,4 +150,5 @@ pub enum SerializationFormat {
     Json,
     Junit,
     Grouped,
+    Github,
 }

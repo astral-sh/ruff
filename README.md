@@ -1465,7 +1465,7 @@ line-length = 120
 #### [`format`](#format)
 
 The style in which violation messages should be formatted: `"text"` (default), `"grouped"`
-(group messages by file), `"json"` (machine-readable), or `"junit"` (machine-readable XML).
+(group messages by file), `"json"` (machine-readable), `"junit"` (machine-readable XML), or `"github"` (GitHub Actions annotations).
 
 **Default value**: `"text"`
 

@@ -192,6 +192,24 @@ impl<'a> Printer<'a> {
 
                 self.post_text(num_fixable);
             }
+            SerializationFormat::Github => {
+                self.pre_text(diagnostics);
+
+                // Generate error workflow command in GitHub Actions format
+                // https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
+                diagnostics.messages.iter().for_each(|message| {
+                    println!(
+                        "::notice file={},line={},col={},endLine={},endColum={}::({}) {}",
+                        relativize_path(Path::new(&message.filename)),
+                        message.location.row(),
+                        message.location.column(),
+                        message.end_location.row(),
+                        message.end_location.column(),
+                        message.kind.code(),
+                        message.kind.body(),
+                    );
+                });
+            }
         }
 
         Ok(())
