@@ -6,7 +6,10 @@ use assert_cmd::{crate_name, Command};
 #[test]
 fn test_stdin_success() -> Result<()> {
     let mut cmd = Command::cargo_bin(crate_name!())?;
-    cmd.args(["-"]).write_stdin("").assert().success();
+    cmd.args(["-", "--format", "text"])
+        .write_stdin("")
+        .assert()
+        .success();
     Ok(())
 }
 
@@ -14,7 +17,7 @@ fn test_stdin_success() -> Result<()> {
 fn test_stdin_error() -> Result<()> {
     let mut cmd = Command::cargo_bin(crate_name!())?;
     let output = cmd
-        .args(["-"])
+        .args(["-", "--format", "text"])
         .write_stdin("import os\n")
         .assert()
         .failure();
@@ -26,7 +29,7 @@ fn test_stdin_error() -> Result<()> {
 fn test_stdin_filename() -> Result<()> {
     let mut cmd = Command::cargo_bin(crate_name!())?;
     let output = cmd
-        .args(["-", "--stdin-filename", "F401.py"])
+        .args(["-", "--format", "text", "--stdin-filename", "F401.py"])
         .write_stdin("import os\n")
         .assert()
         .failure();
@@ -38,7 +41,7 @@ fn test_stdin_filename() -> Result<()> {
 fn test_stdin_autofix() -> Result<()> {
     let mut cmd = Command::cargo_bin(crate_name!())?;
     let output = cmd
-        .args(["-", "--fix"])
+        .args(["-", "--format", "text", "--fix"])
         .write_stdin("import os\nimport sys\n\nprint(sys.version)\n")
         .assert()
         .success();
@@ -53,7 +56,7 @@ fn test_stdin_autofix() -> Result<()> {
 fn test_stdin_autofix_when_not_fixable_should_still_print_contents() -> Result<()> {
     let mut cmd = Command::cargo_bin(crate_name!())?;
     let output = cmd
-        .args(["-", "--fix"])
+        .args(["-", "--format", "text", "--fix"])
         .write_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n")
         .assert()
         .failure();
@@ -68,7 +71,7 @@ fn test_stdin_autofix_when_not_fixable_should_still_print_contents() -> Result<(
 fn test_stdin_autofix_when_no_issues_should_still_print_contents() -> Result<()> {
     let mut cmd = Command::cargo_bin(crate_name!())?;
     let output = cmd
-        .args(["-", "--fix"])
+        .args(["-", "--format", "text", "--fix"])
         .write_stdin("import sys\n\nprint(sys.version)\n")
         .assert()
         .success();
@@ -83,7 +86,7 @@ fn test_stdin_autofix_when_no_issues_should_still_print_contents() -> Result<()>
 fn test_show_source() -> Result<()> {
     let mut cmd = Command::cargo_bin(crate_name!())?;
     let output = cmd
-        .args(["-", "--show-source"])
+        .args(["-", "--format", "text", "--show-source"])
         .write_stdin("l = 1")
         .assert()
         .failure();
