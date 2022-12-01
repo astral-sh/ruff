@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use libcst_native::{
     Arg, AssignEqual, Call, Codegen, CodegenState, Dict, DictComp, DictElement, Element, Expr,
     Expression, LeftCurlyBrace, LeftParen, LeftSquareBracket, List, ListComp, Name,
@@ -15,7 +15,7 @@ fn match_call<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Call<'b>> {
     if let Expression::Call(call) = &mut expr.value {
         Ok(call)
     } else {
-        Err(anyhow::anyhow!("Expected Expression::Call"))
+        bail!("Expected Expression::Call")
     }
 }
 
@@ -23,7 +23,7 @@ fn match_arg<'a, 'b>(call: &'a Call<'b>) -> Result<&'a Arg<'b>> {
     if let Some(arg) = call.args.first() {
         Ok(arg)
     } else {
-        Err(anyhow::anyhow!("Expected Arg"))
+        bail!("Expected Arg")
     }
 }
 
@@ -40,9 +40,9 @@ pub fn fix_unnecessary_generator_list(
     let arg = match_arg(call)?;
 
     let Expression::GeneratorExp(generator_exp) = &arg.value else {
-        return Err(anyhow::anyhow!(
+        bail!(
             "Expected Expression::GeneratorExp"
-        ));
+        );
     };
 
     body.value = Expression::ListComp(Box::new(ListComp {
@@ -81,9 +81,9 @@ pub fn fix_unnecessary_generator_set(
     let arg = match_arg(call)?;
 
     let Expression::GeneratorExp(generator_exp) = &arg.value else {
-        return Err(anyhow::anyhow!(
+        bail!(
             "Expected Expression::GeneratorExp"
-        ));
+        );
     };
 
     body.value = Expression::SetComp(Box::new(SetComp {
@@ -123,22 +123,22 @@ pub fn fix_unnecessary_generator_dict(
 
     // Extract the (k, v) from `(k, v) for ...`.
     let Expression::GeneratorExp(generator_exp) = &arg.value else {
-        return Err(anyhow::anyhow!(
+        bail!(
             "Expected Expression::GeneratorExp"
-        ));
+        );
     };
     let Expression::Tuple(tuple) = &generator_exp.elt.as_ref() else {
-        return Err(anyhow::anyhow!("Expected Expression::Tuple"));
+        bail!("Expected Expression::Tuple");
     };
     let Some(Element::Simple { value: key, .. }) = &tuple.elements.get(0) else {
-        return Err(anyhow::anyhow!(
+        bail!(
             "Expected tuple to contain a key as the first element"
-        ));
+        );
     };
     let Some(Element::Simple { value, .. }) = &tuple.elements.get(1) else {
-        return Err(anyhow::anyhow!(
+        bail!(
             "Expected tuple to contain a key as the second element"
-        ));
+        );
     };
 
     body.value = Expression::DictComp(Box::new(DictComp {
@@ -181,7 +181,7 @@ pub fn fix_unnecessary_list_comprehension_set(
     let arg = match_arg(call)?;
 
     let Expression::ListComp(list_comp) = &arg.value else {
-        return Err(anyhow::anyhow!("Expected Expression::ListComp"));
+        bail!("Expected Expression::ListComp");
     };
 
     body.value = Expression::SetComp(Box::new(SetComp {
@@ -220,17 +220,17 @@ pub fn fix_unnecessary_list_comprehension_dict(
     let arg = match_arg(call)?;
 
     let Expression::ListComp(list_comp) = &arg.value else {
-        return Err(anyhow::anyhow!("Expected Expression::ListComp"));
+        bail!("Expected Expression::ListComp")
     };
 
     let Expression::Tuple(tuple) = &*list_comp.elt else {
-        return Err(anyhow::anyhow!("Expected Expression::Tuple"));
+        bail!("Expected Expression::Tuple")
     };
 
     let [Element::Simple {
             value: key,
             comma: Some(comma),
-        }, Element::Simple { value, .. }] = &tuple.elements[..] else { return Err(anyhow::anyhow!("Expected tuple with two elements")) };
+        }, Element::Simple { value, .. }] = &tuple.elements[..] else { bail!("Expected tuple with two elements"); };
 
     body.value = Expression::DictComp(Box::new(DictComp {
         key: Box::new(key.clone()),
@@ -274,9 +274,7 @@ pub fn fix_unnecessary_literal_set(
         Expression::Tuple(inner) => &inner.elements,
         Expression::List(inner) => &inner.elements,
         _ => {
-            return Err(anyhow::anyhow!(
-                "Expected Expression::Tuple | Expression::List"
-            ))
+            bail!("Expected Expression::Tuple | Expression::List");
         }
     };
 
@@ -322,9 +320,7 @@ pub fn fix_unnecessary_literal_dict(
         Expression::Tuple(inner) => &inner.elements,
         Expression::List(inner) => &inner.elements,
         _ => {
-            return Err(anyhow::anyhow!(
-                "Expected Expression::Tuple | Expression::List"
-            ))
+            bail!("Expected Expression::Tuple | Expression::List");
         }
     };
 
@@ -350,9 +346,7 @@ pub fn fix_unnecessary_literal_dict(
                     }
                 }
             }
-            Err(anyhow::anyhow!(
-                "Expected each argument to be a tuple of length two"
-            ))
+            bail!("Expected each argument to be a tuple of length two")
         })
         .collect::<Result<Vec<DictElement>>>()?;
 
@@ -389,7 +383,7 @@ pub fn fix_unnecessary_collection_call(
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
     let Expression::Name(name) = &call.func.as_ref() else {
-        return Err(anyhow::anyhow!("Expected Expression::Name"));
+        bail!("Expected Expression::Name");
     };
 
     // Arena allocator used to create formatted strings of sufficient lifetime,
@@ -473,9 +467,7 @@ pub fn fix_unnecessary_collection_call(
             }
         }
         _ => {
-            return Err(anyhow::anyhow!("Expected function name to be one of: \
-                                        'tuple', 'list', 'dict'"
-                .to_string()));
+            bail!("Expected function name to be one of: 'tuple', 'list', 'dict'");
         }
     };
 
@@ -519,9 +511,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
             &inner.rbracket.whitespace_before,
         ),
         _ => {
-            return Err(anyhow::anyhow!(
-                "Expected Expression::Tuple | Expression::List"
-            ))
+            bail!("Expected Expression::Tuple | Expression::List");
         }
     };
 
@@ -575,9 +565,7 @@ pub fn fix_unnecessary_literal_within_list_call(
             &inner.rbracket.whitespace_before,
         ),
         _ => {
-            return Err(anyhow::anyhow!(
-                "Expected Expression::Tuple | Expression::List"
-            ))
+            bail!("Expected Expression::Tuple | Expression::List");
         }
     };
 
@@ -643,13 +631,11 @@ pub fn fix_unnecessary_call_around_sorted(
             if let Expression::Call(call) = &arg.value {
                 call
             } else {
-                return Err(anyhow::anyhow!("Expected Expression::Call "));
+                bail!("Expected Expression::Call ");
             }
         }
         _ => {
-            return Err(anyhow::anyhow!(
-                "Expected one argument in outer function call"
-            ))
+            bail!("Expected one argument in outer function call");
         }
     };
 
@@ -768,9 +754,7 @@ pub fn fix_unnecessary_comprehension(
             }));
         }
         _ => {
-            return Err(anyhow::anyhow!(
-                "Expected Expression::ListComp | Expression:SetComp"
-            ))
+            bail!("Expected Expression::ListComp | Expression:SetComp");
         }
     }
 

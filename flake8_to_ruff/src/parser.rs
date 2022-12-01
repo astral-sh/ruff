@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff::checks_gen::CheckCodePrefix;
@@ -42,7 +42,7 @@ pub fn parse_bool(value: &str) -> Result<bool> {
     match value.trim() {
         "true" => Ok(true),
         "false" => Ok(false),
-        _ => Err(anyhow::anyhow!("Unexpected boolean value: {value}")),
+        _ => bail!("Unexpected boolean value: {value}"),
     }
 }
 
@@ -154,7 +154,7 @@ pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair
                 state.filenames.push(token.src);
                 state.seen_sep = false;
             } else {
-                return Err(anyhow::anyhow!("Unexpected token: {:?}", token.token_name));
+                bail!("Unexpected token: {:?}", token.token_name);
             }
         } else {
             if matches!(token.token_name, TokenType::Eof) {
@@ -169,7 +169,7 @@ pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair
                 state.filenames.push(token.src);
                 state.seen_sep = false;
             } else {
-                return Err(anyhow::anyhow!("Unexpected token: {:?}", token.token_name));
+                bail!("Unexpected token: {:?}", token.token_name);
             }
         }
     }

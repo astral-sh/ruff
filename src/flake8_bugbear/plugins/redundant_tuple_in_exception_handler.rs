@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use log::error;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind, Located};
 use rustpython_parser::lexer;
@@ -45,7 +45,7 @@ fn match_tuple_range<T>(located: &Located<T>, locator: &SourceCodeLocator) -> Re
             end_location,
         })
     } else {
-        Err(anyhow::anyhow!("Unable to find left and right parentheses"))
+        bail!("Unable to find left and right parentheses");
     }
 }
 

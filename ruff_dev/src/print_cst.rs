@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Args;
 
 #[derive(Args)]
@@ -20,6 +20,6 @@ pub fn main(cli: &Cli) -> Result<()> {
             println!("{python_cst:#?}");
             Ok(())
         }
-        Err(_) => Err(anyhow::anyhow!("Failed to parse CST")),
+        Err(_) => bail!("Failed to parse CST"),
     }
 }

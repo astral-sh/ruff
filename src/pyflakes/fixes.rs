@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use libcst_native::{
     Codegen, CodegenState, CompOp, Comparison, ComparisonTarget, Expr, Expression, ImportNames,
     SmallStatement, Statement,
@@ -23,22 +23,20 @@ pub fn remove_unused_imports(
     let mut tree = match_module(&module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {
-        return Err(anyhow::anyhow!("Expected Statement::Simple"));
+        bail!("Expected Statement::Simple");
     };
 
     let (aliases, import_module) = match body.body.first_mut() {
-        Some(SmallStatement::Import(import_body)) => Ok((&mut import_body.names, None)),
+        Some(SmallStatement::Import(import_body)) => (&mut import_body.names, None),
         Some(SmallStatement::ImportFrom(import_body)) => {
             if let ImportNames::Aliases(names) = &mut import_body.names {
-                Ok((names, import_body.module.as_ref()))
+                (names, import_body.module.as_ref())
             } else {
-                Err(anyhow::anyhow!("Expected Aliases"))
+                bail!("Expected ImportNames::Aliases")
             }
         }
-        _ => Err(anyhow::anyhow!(
-            "Expected SmallStatement::ImportFrom or SmallStatement::Import"
-        )),
-    }?;
+        _ => bail!("Expected SmallStatement::ImportFrom or SmallStatement::Import"),
+    };
 
     // Preserve the trailing comma (or not) from the last entry.
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
@@ -83,7 +81,7 @@ fn match_comparison<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Comparison
     if let Expression::Comparison(comparison) = &mut expr.value {
         Ok(comparison)
     } else {
-        Err(anyhow::anyhow!("Expected Expression::Comparison"))
+        bail!("Expected Expression::Comparison")
     }
 }
 
@@ -102,23 +100,20 @@ pub fn fix_invalid_literal_comparison(locator: &SourceCodeLocator, location: Ran
         CompOp::Is {
             whitespace_before: b,
             whitespace_after: a,
-        } => Ok(CompOp::Equal {
+        } => CompOp::Equal {
             whitespace_before: b.clone(),
             whitespace_after: a.clone(),
-        }),
+        },
         CompOp::IsNot {
             whitespace_before: b,
             whitespace_after: a,
             whitespace_between: _,
-        } => Ok(CompOp::NotEqual {
+        } => CompOp::NotEqual {
             whitespace_before: b.clone(),
             whitespace_after: a.clone(),
-        }),
-        op => Err(anyhow::anyhow!(
-            "Unexpected operator: {:?} (expected CompOp::Is or CompOp::IsNot)",
-            op
-        )),
-    }?;
+        },
+        op => bail!("Unexpected operator: {op:?} (expected CompOp::Is or CompOp::IsNot)"),
+    };
 
     expr.value = Expression::Comparison(Box::new(Comparison {
         left: cmp.left.clone(),
