@@ -56,7 +56,7 @@ pub fn set_up_logging(level: &LogLevel) -> Result<()> {
             ));
         })
         .level(level.level_filter())
-        .chain(std::io::stdout())
+        .chain(std::io::stderr())
         .apply()?;
     Ok(())
 }

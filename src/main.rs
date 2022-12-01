@@ -191,6 +191,7 @@ fn inner_main() -> Result<ExitCode> {
     let cli = Cli::parse();
     let fix = cli.fix();
     let log_level = extract_log_level(&cli);
+    set_up_logging(&log_level)?;
 
     if let Some(shell) = cli.generate_shell_completion {
         shell.generate(&mut Cli::command(), &mut std::io::stdout());
@@ -267,14 +268,6 @@ fn inner_main() -> Result<ExitCode> {
     // Extract settings for internal use.
     let fix_enabled: bool = configuration.fix;
     let settings = Settings::from_configuration(configuration, project_root.as_ref())?;
-
-    // If we're using JSON, override the log level.
-    let log_level = if matches!(settings.format, SerializationFormat::Json) {
-        LogLevel::Quiet
-    } else {
-        log_level
-    };
-    set_up_logging(&log_level)?;
 
     // Now that we've inferred the appropriate log level, add some debug
     // information.
