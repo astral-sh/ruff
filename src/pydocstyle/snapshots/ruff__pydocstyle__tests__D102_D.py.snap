@@ -1,0 +1,29 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: PublicMethod
+  location:
+    row: 23
+    column: 4
+  end_location:
+    row: 26
+    column: 4
+  fix: ~
+- kind: PublicMethod
+  location:
+    row: 56
+    column: 4
+  end_location:
+    row: 59
+    column: 4
+  fix: ~
+- kind: PublicMethod
+  location:
+    row: 68
+    column: 4
+  end_location:
+    row: 72
+    column: 0
+  fix: ~
+

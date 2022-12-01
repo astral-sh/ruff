@@ -1,0 +1,45 @@
+---
+source: src/flake8_2020/mod.rs
+expression: checks
+---
+- kind: SysVersionCmpStr10
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 7
+  fix: ~
+- kind: SysVersionCmpStr10
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 11
+  fix: ~
+- kind: SysVersionCmpStr10
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 11
+  fix: ~
+- kind: SysVersionCmpStr10
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 11
+  fix: ~
+- kind: SysVersionCmpStr10
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 11
+  fix: ~
+

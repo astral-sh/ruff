@@ -1,0 +1,21 @@
+---
+source: src/flake8_2020/mod.rs
+expression: checks
+---
+- kind: SysVersion0Referenced
+  location:
+    row: 4
+    column: 11
+  end_location:
+    row: 4
+    column: 22
+  fix: ~
+- kind: SysVersion0Referenced
+  location:
+    row: 5
+    column: 11
+  end_location:
+    row: 5
+    column: 18
+  fix: ~
+

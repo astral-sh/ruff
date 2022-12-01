@@ -1,0 +1,53 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: NoOverIndentation
+  location:
+    row: 252
+    column: 0
+  end_location:
+    row: 252
+    column: 0
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 252
+        column: 0
+      end_location:
+        row: 252
+        column: 7
+- kind: NoOverIndentation
+  location:
+    row: 264
+    column: 0
+  end_location:
+    row: 264
+    column: 0
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 264
+        column: 0
+      end_location:
+        row: 264
+        column: 8
+- kind: NoOverIndentation
+  location:
+    row: 272
+    column: 0
+  end_location:
+    row: 272
+    column: 0
+  fix:
+    patch:
+      content: "    "
+      location:
+        row: 272
+        column: 0
+      end_location:
+        row: 272
+        column: 8
+

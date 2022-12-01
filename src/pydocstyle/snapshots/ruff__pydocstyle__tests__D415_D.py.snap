@@ -1,0 +1,101 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: EndsInPunctuation
+  location:
+    row: 355
+    column: 4
+  end_location:
+    row: 355
+    column: 17
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 406
+    column: 24
+  end_location:
+    row: 406
+    column: 39
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 410
+    column: 4
+  end_location:
+    row: 410
+    column: 24
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 416
+    column: 4
+  end_location:
+    row: 416
+    column: 24
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 422
+    column: 34
+  end_location:
+    row: 422
+    column: 49
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 429
+    column: 48
+  end_location:
+    row: 429
+    column: 63
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 470
+    column: 4
+  end_location:
+    row: 470
+    column: 24
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 475
+    column: 4
+  end_location:
+    row: 475
+    column: 24
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 480
+    column: 4
+  end_location:
+    row: 480
+    column: 24
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 487
+    column: 4
+  end_location:
+    row: 487
+    column: 24
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 509
+    column: 4
+  end_location:
+    row: 509
+    column: 34
+  fix: ~
+- kind: EndsInPunctuation
+  location:
+    row: 520
+    column: 4
+  end_location:
+    row: 520
+    column: 32
+  fix: ~
+

@@ -1,0 +1,21 @@
+---
+source: src/flake8_2020/mod.rs
+expression: checks
+---
+- kind: SysVersionInfoMinorCmpInt
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 22
+  fix: ~
+- kind: SysVersionInfoMinorCmpInt
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 18
+  fix: ~
+

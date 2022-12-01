@@ -1,0 +1,29 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: SkipDocstring
+  location:
+    row: 34
+    column: 4
+  end_location:
+    row: 38
+    column: 4
+  fix: ~
+- kind: SkipDocstring
+  location:
+    row: 90
+    column: 4
+  end_location:
+    row: 94
+    column: 4
+  fix: ~
+- kind: SkipDocstring
+  location:
+    row: 110
+    column: 0
+  end_location:
+    row: 115
+    column: 0
+  fix: ~
+

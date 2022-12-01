@@ -1,0 +1,6 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+[]
+

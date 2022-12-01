@@ -1,0 +1,13 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: PublicModule
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 0
+  fix: ~
+

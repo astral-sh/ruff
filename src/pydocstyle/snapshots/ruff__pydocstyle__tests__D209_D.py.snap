@@ -1,0 +1,21 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: NewLineAfterLastParagraph
+  location:
+    row: 281
+    column: 4
+  end_location:
+    row: 283
+    column: 19
+  fix:
+    patch:
+      content: "\n    "
+      location:
+        row: 283
+        column: 16
+      end_location:
+        row: 283
+        column: 16
+
