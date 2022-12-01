@@ -8,6 +8,7 @@ Ruff welcomes contributions in the form of Pull Requests. For small changes (e.g
 free to submit a PR. For larger changes (e.g., new lint rules, new functionality, new configuration
 options), consider submitting an [Issue](https://github.com/charliermarsh/ruff/issues) outlining
 your proposed change.
+Issues named "Implement xxx" are a good place to start looking for rules to implement. Please comment on the issue which rules you want to implement before starting working on it.
 
 ### Prerequisites
 
