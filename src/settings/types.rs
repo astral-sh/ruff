@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::env;
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -151,4 +152,15 @@ pub enum SerializationFormat {
     Junit,
     Grouped,
     Github,
+}
+
+impl Default for SerializationFormat {
+    fn default() -> Self {
+        if let Some(github_actions) = env::var("GITHUB_ACTIONS").ok() {
+            if github_actions == "true" {
+                return Self::Github;
+            }
+        }
+        return Self::Text;
+    }
 }

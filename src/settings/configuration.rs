@@ -123,7 +123,7 @@ impl Configuration {
             fix: options.fix.unwrap_or_default(),
             fixable: options.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
             unfixable: options.unfixable.unwrap_or_default(),
-            format: options.format.unwrap_or(SerializationFormat::Text),
+            format: options.format.unwrap_or_default(),
             ignore: options.ignore.unwrap_or_default(),
             line_length: options.line_length.unwrap_or(88),
             per_file_ignores: options
