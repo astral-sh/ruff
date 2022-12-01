@@ -1,0 +1,67 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    StringDotFormatMissingArguments:
+      - "1"
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 17
+  fix: ~
+- kind:
+    StringDotFormatMissingArguments:
+      - "2"
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 14
+  fix: ~
+- kind:
+    StringDotFormatMissingArguments:
+      - bar
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 16
+  fix: ~
+- kind:
+    StringDotFormatMissingArguments:
+      - bar
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 21
+  fix: ~
+- kind:
+    StringDotFormatMissingArguments:
+      - "0"
+      - bar
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 20
+  fix: ~
+- kind:
+    StringDotFormatMissingArguments:
+      - "0"
+      - bar
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 20
+  fix: ~
+

@@ -1,0 +1,15 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    PercentFormatMissingArgument:
+      - bar
+  location:
+    row: 7
+    column: 10
+  end_location:
+    row: 7
+    column: 14
+  fix: ~
+

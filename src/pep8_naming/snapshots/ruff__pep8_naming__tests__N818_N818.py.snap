@@ -1,0 +1,23 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind:
+    ErrorSuffixOnExceptionName: C
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 13
+    column: 0
+  fix: ~
+- kind:
+    ErrorSuffixOnExceptionName: E
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 19
+    column: 0
+  fix: ~
+

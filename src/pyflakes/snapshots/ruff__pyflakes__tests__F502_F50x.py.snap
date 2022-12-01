@@ -1,0 +1,13 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: PercentFormatExpectedMapping
+  location:
+    row: 9
+    column: 10
+  end_location:
+    row: 9
+    column: 21
+  fix: ~
+

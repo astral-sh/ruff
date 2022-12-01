@@ -1,0 +1,14 @@
+---
+source: src/pycodestyle/mod.rs
+expression: checks
+---
+- kind:
+    SyntaxError: Got unexpected EOF
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 0
+  fix: ~
+

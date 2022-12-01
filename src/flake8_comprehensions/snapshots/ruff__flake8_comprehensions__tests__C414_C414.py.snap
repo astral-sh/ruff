@@ -1,0 +1,148 @@
+---
+source: src/flake8_comprehensions/mod.rs
+expression: checks
+---
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - list
+      - list
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 13
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - tuple
+      - list
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 14
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - list
+      - tuple
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 14
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - tuple
+      - tuple
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 15
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - set
+      - set
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 11
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - list
+      - set
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 12
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - tuple
+      - set
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 13
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - sorted
+      - set
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 14
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - reversed
+      - set
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 16
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - list
+      - sorted
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 15
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - tuple
+      - sorted
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 16
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - sorted
+      - sorted
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 17
+  fix: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      - reversed
+      - sorted
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 19
+  fix: ~
+

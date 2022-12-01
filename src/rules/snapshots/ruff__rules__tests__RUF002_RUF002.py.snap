@@ -1,0 +1,24 @@
+---
+source: src/rules/mod.rs
+expression: checks
+---
+- kind:
+    AmbiguousUnicodeCharacterDocstring:
+      - ）
+      - )
+  location:
+    row: 5
+    column: 55
+  end_location:
+    row: 5
+    column: 56
+  fix:
+    patch:
+      content: )
+      location:
+        row: 5
+        column: 55
+      end_location:
+        row: 5
+        column: 56
+

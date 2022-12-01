@@ -1,0 +1,49 @@
+---
+source: src/pycodestyle/mod.rs
+expression: checks
+---
+- kind:
+    LineTooLong:
+      - 123
+      - 88
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 123
+  fix: ~
+- kind:
+    LineTooLong:
+      - 127
+      - 88
+  location:
+    row: 25
+    column: 0
+  end_location:
+    row: 25
+    column: 127
+  fix: ~
+- kind:
+    LineTooLong:
+      - 132
+      - 88
+  location:
+    row: 40
+    column: 0
+  end_location:
+    row: 40
+    column: 132
+  fix: ~
+- kind:
+    LineTooLong:
+      - 105
+      - 88
+  location:
+    row: 43
+    column: 0
+  end_location:
+    row: 43
+    column: 105
+  fix: ~
+

@@ -1,0 +1,73 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind:
+    UnusedLoopControlVariable: i
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 5
+  fix:
+    patch:
+      content: _i
+      location:
+        row: 6
+        column: 4
+      end_location:
+        row: 6
+        column: 5
+- kind:
+    UnusedLoopControlVariable: k
+  location:
+    row: 18
+    column: 12
+  end_location:
+    row: 18
+    column: 13
+  fix:
+    patch:
+      content: _k
+      location:
+        row: 18
+        column: 12
+      end_location:
+        row: 18
+        column: 13
+- kind:
+    UnusedLoopControlVariable: i
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 30
+    column: 5
+  fix:
+    patch:
+      content: _i
+      location:
+        row: 30
+        column: 4
+      end_location:
+        row: 30
+        column: 5
+- kind:
+    UnusedLoopControlVariable: k
+  location:
+    row: 30
+    column: 12
+  end_location:
+    row: 30
+    column: 13
+  fix:
+    patch:
+      content: _k
+      location:
+        row: 30
+        column: 12
+      end_location:
+        row: 30
+        column: 13
+

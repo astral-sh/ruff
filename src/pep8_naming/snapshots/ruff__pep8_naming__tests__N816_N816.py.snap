@@ -1,0 +1,32 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind:
+    MixedCaseVariableInGlobalScope: mixedCase
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 9
+  fix: ~
+- kind:
+    MixedCaseVariableInGlobalScope: _mixedCase
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 10
+  fix: ~
+- kind:
+    MixedCaseVariableInGlobalScope: mixed_Case
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 10
+  fix: ~
+

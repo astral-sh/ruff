@@ -1,0 +1,50 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind:
+    InvalidClassName: bad
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 5
+    column: 0
+  fix: ~
+- kind:
+    InvalidClassName: _bad
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 9
+    column: 0
+  fix: ~
+- kind:
+    InvalidClassName: bad_class
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 13
+    column: 0
+  fix: ~
+- kind:
+    InvalidClassName: Bad_Class
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 17
+    column: 0
+  fix: ~
+- kind:
+    InvalidClassName: BAD_CLASS
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 21
+    column: 0
+  fix: ~
+

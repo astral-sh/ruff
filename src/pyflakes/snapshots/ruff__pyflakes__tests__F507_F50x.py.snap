@@ -1,0 +1,27 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    PercentFormatPositionalCountMismatch:
+      - 2
+      - 1
+  location:
+    row: 5
+    column: 8
+  end_location:
+    row: 5
+    column: 14
+  fix: ~
+- kind:
+    PercentFormatPositionalCountMismatch:
+      - 2
+      - 3
+  location:
+    row: 6
+    column: 8
+  end_location:
+    row: 6
+    column: 19
+  fix: ~
+

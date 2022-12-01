@@ -1,0 +1,140 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind:
+    FunctionCallArgumentDefault: range
+  location:
+    row: 85
+    column: 60
+  end_location:
+    row: 85
+    column: 68
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: range
+  location:
+    row: 89
+    column: 63
+  end_location:
+    row: 89
+    column: 71
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: range
+  location:
+    row: 93
+    column: 59
+  end_location:
+    row: 93
+    column: 67
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: time.time
+  location:
+    row: 109
+    column: 38
+  end_location:
+    row: 109
+    column: 49
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: dt.datetime.now
+  location:
+    row: 113
+    column: 11
+  end_location:
+    row: 113
+    column: 28
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: dt.timedelta
+  location:
+    row: 113
+    column: 31
+  end_location:
+    row: 113
+    column: 51
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: ~
+  location:
+    row: 117
+    column: 29
+  end_location:
+    row: 117
+    column: 44
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: float
+  location:
+    row: 155
+    column: 33
+  end_location:
+    row: 155
+    column: 47
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: float
+  location:
+    row: 160
+    column: 29
+  end_location:
+    row: 160
+    column: 37
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: float
+  location:
+    row: 164
+    column: 44
+  end_location:
+    row: 164
+    column: 57
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: float
+  location:
+    row: 170
+    column: 20
+  end_location:
+    row: 170
+    column: 28
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: dt.datetime.now
+  location:
+    row: 170
+    column: 30
+  end_location:
+    row: 170
+    column: 47
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: map
+  location:
+    row: 176
+    column: 21
+  end_location:
+    row: 176
+    column: 62
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: random.randint
+  location:
+    row: 181
+    column: 18
+  end_location:
+    row: 181
+    column: 59
+  fix: ~
+- kind:
+    FunctionCallArgumentDefault: dt.datetime.now
+  location:
+    row: 181
+    column: 36
+  end_location:
+    row: 181
+    column: 53
+  fix: ~
+

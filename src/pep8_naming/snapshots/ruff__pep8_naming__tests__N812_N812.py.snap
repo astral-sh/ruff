@@ -1,0 +1,38 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind:
+    LowercaseImportedAsNonLowercase:
+      - lowercase
+      - Lower
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 30
+  fix: ~
+- kind:
+    LowercaseImportedAsNonLowercase:
+      - lowercase
+      - Lowercase
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 38
+  fix: ~
+- kind:
+    LowercaseImportedAsNonLowercase:
+      - another_lowercase
+      - AnotherLowercase
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 53
+  fix: ~
+

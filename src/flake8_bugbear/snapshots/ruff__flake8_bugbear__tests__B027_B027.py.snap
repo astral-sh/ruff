@@ -1,0 +1,41 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind:
+    EmptyMethodWithoutAbstractDecorator: AbstractClass
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 15
+    column: 4
+  fix: ~
+- kind:
+    EmptyMethodWithoutAbstractDecorator: AbstractClass
+  location:
+    row: 15
+    column: 4
+  end_location:
+    row: 18
+    column: 4
+  fix: ~
+- kind:
+    EmptyMethodWithoutAbstractDecorator: AbstractClass
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 22
+    column: 4
+  fix: ~
+- kind:
+    EmptyMethodWithoutAbstractDecorator: AbstractClass
+  location:
+    row: 22
+    column: 4
+  end_location:
+    row: 29
+    column: 4
+  fix: ~
+

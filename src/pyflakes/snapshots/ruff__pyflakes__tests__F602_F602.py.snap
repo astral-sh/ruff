@@ -1,0 +1,14 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    MultiValueRepeatedKeyVariable: a
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 5
+  fix: ~
+

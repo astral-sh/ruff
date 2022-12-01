@@ -1,0 +1,32 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind:
+    LoopVariableOverridesIterator: items
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 9
+  fix: ~
+- kind:
+    LoopVariableOverridesIterator: values
+  location:
+    row: 21
+    column: 9
+  end_location:
+    row: 21
+    column: 15
+  fix: ~
+- kind:
+    LoopVariableOverridesIterator: vars
+  location:
+    row: 36
+    column: 4
+  end_location:
+    row: 36
+    column: 8
+  fix: ~
+

@@ -1,0 +1,29 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: PercentFormatMixedPositionalAndNamed
+  location:
+    row: 2
+    column: 13
+  end_location:
+    row: 2
+    column: 29
+  fix: ~
+- kind: PercentFormatMixedPositionalAndNamed
+  location:
+    row: 3
+    column: 13
+  end_location:
+    row: 3
+    column: 29
+  fix: ~
+- kind: PercentFormatMixedPositionalAndNamed
+  location:
+    row: 11
+    column: 11
+  end_location:
+    row: 11
+    column: 27
+  fix: ~
+

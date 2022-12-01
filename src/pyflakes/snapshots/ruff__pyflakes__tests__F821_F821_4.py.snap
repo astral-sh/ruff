@@ -1,0 +1,50 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    UndefinedName: Model
+  location:
+    row: 4
+    column: 9
+  end_location:
+    row: 4
+    column: 16
+  fix: ~
+- kind:
+    UndefinedName: Model
+  location:
+    row: 9
+    column: 10
+  end_location:
+    row: 9
+    column: 17
+  fix: ~
+- kind:
+    UndefinedName: Model
+  location:
+    row: 14
+    column: 14
+  end_location:
+    row: 14
+    column: 21
+  fix: ~
+- kind:
+    UndefinedName: Model
+  location:
+    row: 19
+    column: 30
+  end_location:
+    row: 19
+    column: 37
+  fix: ~
+- kind:
+    UndefinedName: Model
+  location:
+    row: 24
+    column: 18
+  end_location:
+    row: 24
+    column: 25
+  fix: ~
+

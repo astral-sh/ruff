@@ -1,0 +1,61 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: PercentFormatExpectedMapping
+  location:
+    row: 6
+    column: 10
+  end_location:
+    row: 6
+    column: 19
+  fix: ~
+- kind: PercentFormatExpectedMapping
+  location:
+    row: 7
+    column: 10
+  end_location:
+    row: 7
+    column: 20
+  fix: ~
+- kind: PercentFormatExpectedMapping
+  location:
+    row: 8
+    column: 10
+  end_location:
+    row: 8
+    column: 19
+  fix: ~
+- kind: PercentFormatExpectedMapping
+  location:
+    row: 9
+    column: 10
+  end_location:
+    row: 9
+    column: 22
+  fix: ~
+- kind: PercentFormatExpectedMapping
+  location:
+    row: 11
+    column: 10
+  end_location:
+    row: 11
+    column: 37
+  fix: ~
+- kind: PercentFormatExpectedMapping
+  location:
+    row: 12
+    column: 10
+  end_location:
+    row: 12
+    column: 37
+  fix: ~
+- kind: PercentFormatExpectedMapping
+  location:
+    row: 13
+    column: 10
+  end_location:
+    row: 13
+    column: 37
+  fix: ~
+

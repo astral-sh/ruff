@@ -1,0 +1,45 @@
+---
+source: src/pycodestyle/mod.rs
+expression: checks
+---
+- kind: NotIsTest
+  location:
+    row: 2
+    column: 7
+  end_location:
+    row: 2
+    column: 13
+  fix:
+    patch:
+      content: X is not Y
+      location:
+        row: 2
+        column: 3
+      end_location:
+        row: 2
+        column: 13
+- kind: NotIsTest
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 15
+  fix:
+    patch:
+      content: X.B is not Y
+      location:
+        row: 5
+        column: 3
+      end_location:
+        row: 5
+        column: 15
+- kind: NotIsTest
+  location:
+    row: 8
+    column: 7
+  end_location:
+    row: 8
+    column: 22
+  fix: ~
+

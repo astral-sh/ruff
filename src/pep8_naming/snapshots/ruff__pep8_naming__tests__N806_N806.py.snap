@@ -1,0 +1,23 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind:
+    NonLowercaseVariableInFunction: Camel
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 9
+  fix: ~
+- kind:
+    NonLowercaseVariableInFunction: CONSTANT
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 12
+  fix: ~
+

@@ -1,0 +1,13 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: InvalidPrintSyntax
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 5
+  fix: ~
+

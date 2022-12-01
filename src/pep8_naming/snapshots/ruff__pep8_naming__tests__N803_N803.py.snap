@@ -1,0 +1,23 @@
+---
+source: src/pep8_naming/mod.rs
+expression: checks
+---
+- kind:
+    InvalidArgumentName: A
+  location:
+    row: 1
+    column: 15
+  end_location:
+    row: 1
+    column: 16
+  fix: ~
+- kind:
+    InvalidArgumentName: A
+  location:
+    row: 6
+    column: 27
+  end_location:
+    row: 6
+    column: 28
+  fix: ~
+

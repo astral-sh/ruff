@@ -1,0 +1,14 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    PercentFormatInvalidFormat: incomplete format
+  location:
+    row: 1
+    column: 9
+  end_location:
+    row: 1
+    column: 25
+  fix: ~
+

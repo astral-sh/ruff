@@ -1,0 +1,29 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind: RaiseWithoutFromInsideExcept
+  location:
+    row: 10
+    column: 8
+  end_location:
+    row: 10
+    column: 23
+  fix: ~
+- kind: RaiseWithoutFromInsideExcept
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 21
+  fix: ~
+- kind: RaiseWithoutFromInsideExcept
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 39
+  fix: ~
+

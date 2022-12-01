@@ -1,0 +1,15 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    PercentFormatExtraNamedArguments:
+      - b
+  location:
+    row: 3
+    column: 14
+  end_location:
+    row: 3
+    column: 34
+  fix: ~
+

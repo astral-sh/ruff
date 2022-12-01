@@ -1,0 +1,29 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind: PercentFormatExpectedSequence
+  location:
+    row: 17
+    column: 8
+  end_location:
+    row: 17
+    column: 24
+  fix: ~
+- kind: PercentFormatExpectedSequence
+  location:
+    row: 18
+    column: 8
+  end_location:
+    row: 18
+    column: 28
+  fix: ~
+- kind: PercentFormatExpectedSequence
+  location:
+    row: 23
+    column: 8
+  end_location:
+    row: 23
+    column: 42
+  fix: ~
+

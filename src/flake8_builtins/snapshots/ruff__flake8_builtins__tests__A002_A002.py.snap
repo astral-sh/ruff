@@ -1,0 +1,68 @@
+---
+source: src/flake8_builtins/mod.rs
+expression: checks
+---
+- kind:
+    BuiltinArgumentShadowing: str
+  location:
+    row: 1
+    column: 10
+  end_location:
+    row: 1
+    column: 13
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: type
+  location:
+    row: 1
+    column: 18
+  end_location:
+    row: 1
+    column: 22
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: complex
+  location:
+    row: 1
+    column: 25
+  end_location:
+    row: 1
+    column: 32
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: Exception
+  location:
+    row: 1
+    column: 34
+  end_location:
+    row: 1
+    column: 43
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: getattr
+  location:
+    row: 1
+    column: 47
+  end_location:
+    row: 1
+    column: 54
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: bytes
+  location:
+    row: 5
+    column: 16
+  end_location:
+    row: 5
+    column: 21
+  fix: ~
+- kind:
+    BuiltinArgumentShadowing: float
+  location:
+    row: 9
+    column: 15
+  end_location:
+    row: 9
+    column: 20
+  fix: ~
+

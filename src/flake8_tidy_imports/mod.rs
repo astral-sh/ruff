@@ -15,7 +15,7 @@ mod tests {
     #[test]
     fn ban_parent_imports() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/I252.py"),
+            Path::new("./resources/test/fixtures/flake8_tidy_imports/I252.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     ban_relative_imports: Strictness::Parents,
@@ -32,7 +32,7 @@ mod tests {
     #[test]
     fn ban_all_imports() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/I252.py"),
+            Path::new("./resources/test/fixtures/flake8_tidy_imports/I252.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     ban_relative_imports: Strictness::All,

@@ -1,0 +1,158 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind:
+    FunctionUsesLoopVariable: x
+  location:
+    row: 12
+    column: 29
+  end_location:
+    row: 12
+    column: 30
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: y
+  location:
+    row: 13
+    column: 29
+  end_location:
+    row: 13
+    column: 30
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: x
+  location:
+    row: 16
+    column: 15
+  end_location:
+    row: 16
+    column: 16
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: x
+  location:
+    row: 28
+    column: 18
+  end_location:
+    row: 28
+    column: 19
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: x
+  location:
+    row: 29
+    column: 18
+  end_location:
+    row: 29
+    column: 19
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: x
+  location:
+    row: 30
+    column: 18
+  end_location:
+    row: 30
+    column: 19
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: x
+  location:
+    row: 31
+    column: 21
+  end_location:
+    row: 31
+    column: 22
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: x
+  location:
+    row: 40
+    column: 33
+  end_location:
+    row: 40
+    column: 34
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: x
+  location:
+    row: 42
+    column: 13
+  end_location:
+    row: 42
+    column: 14
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: a
+  location:
+    row: 50
+    column: 29
+  end_location:
+    row: 50
+    column: 30
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: a_
+  location:
+    row: 51
+    column: 29
+  end_location:
+    row: 51
+    column: 31
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: b
+  location:
+    row: 52
+    column: 29
+  end_location:
+    row: 52
+    column: 30
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: c
+  location:
+    row: 53
+    column: 29
+  end_location:
+    row: 53
+    column: 30
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: j
+  location:
+    row: 61
+    column: 16
+  end_location:
+    row: 61
+    column: 17
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: k
+  location:
+    row: 61
+    column: 20
+  end_location:
+    row: 61
+    column: 21
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: l
+  location:
+    row: 68
+    column: 9
+  end_location:
+    row: 68
+    column: 10
+  fix: ~
+- kind:
+    FunctionUsesLoopVariable: i
+  location:
+    row: 82
+    column: 12
+  end_location:
+    row: 82
+    column: 18
+  fix: ~
+

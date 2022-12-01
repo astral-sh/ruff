@@ -1,0 +1,21 @@
+---
+source: src/flake8_bugbear/mod.rs
+expression: checks
+---
+- kind: UnaryPrefixIncrement
+  location:
+    row: 15
+    column: 8
+  end_location:
+    row: 15
+    column: 11
+  fix: ~
+- kind: UnaryPrefixIncrement
+  location:
+    row: 20
+    column: 11
+  end_location:
+    row: 20
+    column: 14
+  fix: ~
+

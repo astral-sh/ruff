@@ -1,0 +1,37 @@
+---
+source: src/flake8_print/mod.rs
+expression: checks
+---
+- kind: PPrintFound
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 23
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 4
+        column: 0
+- kind: PPrintFound
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 30
+  fix:
+    patch:
+      content: ""
+      location:
+        row: 8
+        column: 0
+      end_location:
+        row: 9
+        column: 0
+
