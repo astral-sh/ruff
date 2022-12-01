@@ -21,7 +21,11 @@ fn test_stdin_error() -> Result<()> {
         .write_stdin("import os\n")
         .assert()
         .failure();
-    assert!(str::from_utf8(&output.get_output().stdout)?.contains("-:1:8: F401"));
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "Found 1 error(s).\n-:1:8: F401 `os` imported but unused\n1 potentially fixable with the \
+         --fix option.\n"
+    );
     Ok(())
 }
 
@@ -33,7 +37,31 @@ fn test_stdin_filename() -> Result<()> {
         .write_stdin("import os\n")
         .assert()
         .failure();
-    assert!(str::from_utf8(&output.get_output().stdout)?.contains("F401.py:1:8: F401"));
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "Found 1 error(s).\nF401.py:1:8: F401 `os` imported but unused\n1 potentially fixable \
+         with the --fix option.\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_stdin_json() -> Result<()> {
+    let mut cmd = Command::cargo_bin(crate_name!())?;
+    let output = cmd
+        .args(["-", "--format", "json", "--stdin-filename", "F401.py"])
+        .write_stdin("import os\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "[\n  {\n    \"code\": \"F401\",\n    \"message\": \"`os` imported but unused\",\n    \
+         \"fix\": {\n      \"content\": \"\",\n      \"location\": {\n        \"row\": 1,\n        \
+         \"column\": 0\n      },\n      \"end_location\": {\n        \"row\": 2,\n        \
+         \"column\": 0\n      }\n    },\n    \"location\": {\n      \"row\": 1,\n      \
+         \"column\": 8\n    },\n    \"end_location\": {\n      \"row\": 1,\n      \"column\": \
+         10\n    },\n    \"filename\": \"F401.py\"\n  }\n]\n"
+    );
     Ok(())
 }
 
