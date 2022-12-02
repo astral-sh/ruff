@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, TypeAlias, Union
 
 from models import (
     Fruit,
@@ -38,3 +38,5 @@ def f(x: int) -> List[int]:
 
 
 x: Optional[int] = None
+
+MyList: TypeAlias = Union[List[int], List[str]]

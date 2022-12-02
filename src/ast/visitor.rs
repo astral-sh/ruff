@@ -4,8 +4,6 @@ use rustpython_parser::ast::{
     PatternKind, Stmt, StmtKind, Unaryop, Withitem,
 };
 
-use crate::ast::helpers::match_name_or_attr;
-
 pub trait Visitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         walk_stmt(self, stmt);
@@ -150,11 +148,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         } => {
             visitor.visit_annotation(annotation);
             if let Some(expr) = value {
-                if match_name_or_attr(annotation, "TypeAlias") {
-                    visitor.visit_annotation(expr);
-                } else {
-                    visitor.visit_expr(expr);
-                }
+                visitor.visit_expr(expr);
             }
             visitor.visit_expr(target);
         }

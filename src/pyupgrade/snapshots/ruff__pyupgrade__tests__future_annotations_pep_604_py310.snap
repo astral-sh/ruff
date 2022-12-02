@@ -17,4 +17,19 @@ expression: checks
     end_location:
       row: 40
       column: 16
+- kind: UsePEP604Annotation
+  location:
+    row: 42
+    column: 20
+  end_location:
+    row: 42
+    column: 47
+  fix:
+    content: "List[int] | List[str]"
+    location:
+      row: 42
+      column: 20
+    end_location:
+      row: 42
+      column: 47
 
