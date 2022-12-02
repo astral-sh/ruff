@@ -273,6 +273,7 @@ fn categorize_imports<'a>(
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
+    force_to_top: &BTreeSet<String>,
 ) -> BTreeMap<ImportType, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<ImportType, ImportBlock> = BTreeMap::default();
     // Categorize `StmtKind::Import`.
@@ -284,6 +285,7 @@ fn categorize_imports<'a>(
             known_first_party,
             known_third_party,
             extra_standard_library,
+            force_to_top
         );
         block_by_type
             .entry(import_type)
@@ -300,6 +302,7 @@ fn categorize_imports<'a>(
             known_first_party,
             known_third_party,
             extra_standard_library,
+            force_to_top
         );
         block_by_type
             .entry(classification)
@@ -316,6 +319,7 @@ fn categorize_imports<'a>(
             known_first_party,
             known_third_party,
             extra_standard_library,
+            force_to_top
         );
         block_by_type
             .entry(classification)
@@ -405,6 +409,7 @@ pub fn format_imports(
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
+    force_to_top: &BTreeSet<String>,
 ) -> String {
     let block = annotate_imports(block, comments);
 
@@ -418,6 +423,7 @@ pub fn format_imports(
         known_first_party,
         known_third_party,
         extra_standard_library,
+        force_to_top
     );
 
     let mut output = RopeBuilder::new();
@@ -474,6 +480,7 @@ mod tests {
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
+    #[test_case(Path::new("force_to_top.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]

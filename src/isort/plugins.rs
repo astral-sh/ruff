@@ -60,6 +60,7 @@ pub fn check_imports(
         &settings.isort.known_first_party,
         &settings.isort.known_third_party,
         &settings.isort.extra_standard_library,
+        &settings.isort.force_to_top,
     );
 
     if has_leading_content || has_trailing_content {

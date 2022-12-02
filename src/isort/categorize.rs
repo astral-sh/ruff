@@ -11,6 +11,7 @@ pub enum ImportType {
     ThirdParty,
     FirstParty,
     LocalFolder,
+    FirstInSection
 }
 
 pub fn categorize(
@@ -20,6 +21,7 @@ pub fn categorize(
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
+    force_to_top: &BTreeSet<String>,
 ) -> ImportType {
     if level.map_or(false, |level| *level > 0) {
         ImportType::LocalFolder
@@ -35,6 +37,8 @@ pub fn categorize(
         ImportType::StandardLibrary
     } else if find_local(src, module_base) {
         ImportType::FirstParty
+    } else if force_to_top.contains(module_base) {
+        ImportType::FirstInSection
     } else {
         ImportType::ThirdParty
     }
