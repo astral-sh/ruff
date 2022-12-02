@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Callable, List, Tuple, Optional, Sequence
 
 from models import (
     Fruit,
@@ -37,4 +37,12 @@ def f(x: int) -> List[int]:
     return y
 
 
-x: Optional[int] = None
+x: Tuple[int, ...] = (1, 2)
+
+
+def f(param: "Optional[Callable]" = None) -> "None":
+    pass
+
+
+def f(param: Optional["Sequence"] = None) -> "None":
+    pass
