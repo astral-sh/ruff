@@ -288,7 +288,6 @@ pub enum CheckCategory {
     Pycodestyle,
     Isort,
     Pydocstyle,
-    PygrepHooks,
     Pyupgrade,
     PEP8Naming,
     Eradicate,
@@ -305,9 +304,24 @@ pub enum CheckCategory {
     Flake82020,
     Flake8BlindExcept,
     McCabe,
+    PygrepHooks,
     Pylint,
     Ruff,
     Meta,
+}
+
+pub enum Platform {
+    PyPI,
+    GitHub,
+}
+
+impl fmt::Display for Platform {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Platform::PyPI => fmt.write_str("PyPI"),
+            Platform::GitHub => fmt.write_str("GitHub"),
+        }
+    }
 }
 
 impl CheckCategory {
@@ -340,67 +354,91 @@ impl CheckCategory {
         }
     }
 
-    pub fn url(&self) -> Option<(&'static str, &'static str)> {
+    pub fn url(&self) -> Option<(&'static str, &'static Platform)> {
         match self {
-            CheckCategory::Eradicate => Some(("https://pypi.org/project/eradicate/2.1.0/", "PyPI")),
-            CheckCategory::Flake82020 => {
-                Some(("https://pypi.org/project/flake8-2020/1.7.0/", "PyPI"))
+            CheckCategory::Eradicate => {
+                Some(("https://pypi.org/project/eradicate/2.1.0/", &Platform::PyPI))
             }
-            CheckCategory::Flake8Annotations => {
-                Some(("https://pypi.org/project/flake8-annotations/2.9.1/", "PyPI"))
-            }
-            CheckCategory::Flake8Bandit => {
-                Some(("https://pypi.org/project/flake8-bandit/4.1.1/", "PyPI"))
-            }
+            CheckCategory::Flake82020 => Some((
+                "https://pypi.org/project/flake8-2020/1.7.0/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8Annotations => Some((
+                "https://pypi.org/project/flake8-annotations/2.9.1/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8Bandit => Some((
+                "https://pypi.org/project/flake8-bandit/4.1.1/",
+                &Platform::PyPI,
+            )),
             CheckCategory::Flake8BlindExcept => Some((
                 "https://pypi.org/project/flake8-blind-except/0.2.1/",
-                "PyPI",
+                &Platform::PyPI,
             )),
             CheckCategory::Flake8BooleanTrap => Some((
                 "https://pypi.org/project/flake8-boolean-trap/0.1.0/",
-                "PyPI",
+                &Platform::PyPI,
             )),
-            CheckCategory::Flake8Bugbear => {
-                Some(("https://pypi.org/project/flake8-bugbear/22.10.27/", "PyPI"))
-            }
-            CheckCategory::Flake8Builtins => {
-                Some(("https://pypi.org/project/flake8-builtins/2.0.1/", "PyPI"))
-            }
+            CheckCategory::Flake8Bugbear => Some((
+                "https://pypi.org/project/flake8-bugbear/22.10.27/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8Builtins => Some((
+                "https://pypi.org/project/flake8-builtins/2.0.1/",
+                &Platform::PyPI,
+            )),
             CheckCategory::Flake8Comprehensions => Some((
                 "https://pypi.org/project/flake8-comprehensions/3.10.1/",
-                "PyPI",
+                &Platform::PyPI,
             )),
-            CheckCategory::Flake8Debugger => {
-                Some(("https://pypi.org/project/flake8-debugger/4.1.2/", "PyPI"))
-            }
-            CheckCategory::Flake8Print => {
-                Some(("https://pypi.org/project/flake8-print/5.0.0/", "PyPI"))
-            }
-            CheckCategory::Flake8Quotes => {
-                Some(("https://pypi.org/project/flake8-quotes/3.3.1/", "PyPI"))
-            }
+            CheckCategory::Flake8Debugger => Some((
+                "https://pypi.org/project/flake8-debugger/4.1.2/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8Print => Some((
+                "https://pypi.org/project/flake8-print/5.0.0/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8Quotes => Some((
+                "https://pypi.org/project/flake8-quotes/3.3.1/",
+                &Platform::PyPI,
+            )),
             CheckCategory::Flake8TidyImports => Some((
                 "https://pypi.org/project/flake8-tidy-imports/4.8.0/",
-                "PyPI",
+                &Platform::PyPI,
             )),
-            CheckCategory::Isort => Some(("https://pypi.org/project/isort/5.10.1/", "PyPI")),
-            CheckCategory::McCabe => Some(("https://pypi.org/project/mccabe/0.7.0/", "PyPI")),
+            CheckCategory::Isort => {
+                Some(("https://pypi.org/project/isort/5.10.1/", &Platform::PyPI))
+            }
+            CheckCategory::McCabe => {
+                Some(("https://pypi.org/project/mccabe/0.7.0/", &Platform::PyPI))
+            }
             CheckCategory::Meta => None,
-            CheckCategory::PEP8Naming => {
-                Some(("https://pypi.org/project/pep8-naming/0.13.2/", "PyPI"))
+            CheckCategory::PEP8Naming => Some((
+                "https://pypi.org/project/pep8-naming/0.13.2/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Pycodestyle => Some((
+                "https://pypi.org/project/pycodestyle/2.9.1/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Pydocstyle => Some((
+                "https://pypi.org/project/pydocstyle/6.1.1/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Pyflakes => {
+                Some(("https://pypi.org/project/pyflakes/2.5.0/", &Platform::PyPI))
             }
-            CheckCategory::Pycodestyle => {
-                Some(("https://pypi.org/project/pycodestyle/2.9.1/", "PyPI"))
+            CheckCategory::Pylint => {
+                Some(("https://pypi.org/project/pylint/2.15.7/", &Platform::PyPI))
             }
-            CheckCategory::Pydocstyle => {
-                Some(("https://pypi.org/project/pydocstyle/6.1.1/", "PyPI"))
+            CheckCategory::PygrepHooks => Some((
+                "https://github.com/pre-commit/pygrep-hooks",
+                &Platform::GitHub,
+            )),
+            CheckCategory::Pyupgrade => {
+                Some(("https://pypi.org/project/pyupgrade/3.2.0/", &Platform::PyPI))
             }
-            CheckCategory::Pyflakes => Some(("https://pypi.org/project/pyflakes/2.5.0/", "PyPI")),
-            CheckCategory::Pylint => Some(("https://pypi.org/project/pylint/2.15.7/", "PyPI")),
-            CheckCategory::PygrepHooks => {
-                Some(("https://github.com/pre-commit/pygrep-hooks", "GitHub"))
-            }
-            CheckCategory::Pyupgrade => Some(("https://pypi.org/project/pyupgrade/3.2.0/", "PyPI")),
             CheckCategory::Ruff => None,
         }
     }
@@ -682,6 +720,8 @@ pub enum CheckKind {
     BooleanPositionalArgInFunctionDefinition,
     BooleanDefaultValueInFunctionDefinition,
     BooleanPositionalValueInFunctionCall,
+    // pygrep-hooks
+    NoEval,
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -689,8 +729,6 @@ pub enum CheckKind {
     ConvertExitToSysExit,
     // Meta
     UnusedNOQA(Option<Vec<String>>),
-    // pygrep-hooks
-    NoEval,
 }
 
 impl CheckCode {
@@ -1002,6 +1040,8 @@ impl CheckCode {
             CheckCode::FBT001 => CheckKind::BooleanPositionalArgInFunctionDefinition,
             CheckCode::FBT002 => CheckKind::BooleanDefaultValueInFunctionDefinition,
             CheckCode::FBT003 => CheckKind::BooleanPositionalValueInFunctionCall,
+            // pygrep-hooks
+            CheckCode::PGH001 => CheckKind::NoEval,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1009,8 +1049,6 @@ impl CheckCode {
             CheckCode::RUF101 => CheckKind::ConvertExitToSysExit,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
-            // pygrep-hooks
-            CheckCode::PGH001 => CheckKind::NoEval,
         }
     }
 
@@ -1486,12 +1524,14 @@ impl CheckKind {
             CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
-            // McCabe
+            // mccabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
             // flake8-boolean-trap
             CheckKind::BooleanPositionalArgInFunctionDefinition => &CheckCode::FBT001,
             CheckKind::BooleanDefaultValueInFunctionDefinition => &CheckCode::FBT002,
             CheckKind::BooleanPositionalValueInFunctionCall => &CheckCode::FBT003,
+            // pygrep-hooks
+            CheckKind::NoEval => &CheckCode::PGH001,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -1499,8 +1539,6 @@ impl CheckKind {
             CheckKind::ConvertExitToSysExit => &CheckCode::RUF101,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
-            // pygrep-hooks
-            CheckKind::NoEval => &CheckCode::PGH001,
         }
     }
 
@@ -2215,7 +2253,7 @@ impl CheckKind {
             }
             // flake8-blind-except
             CheckKind::BlindExcept => "Blind except Exception: statement".to_string(),
-            // McCabe
+            // mccabe
             CheckKind::FunctionIsTooComplex(name, complexity) => {
                 format!("`{name}` is too complex ({complexity})")
             }
@@ -2229,6 +2267,8 @@ impl CheckKind {
             CheckKind::BooleanPositionalValueInFunctionCall => {
                 "Boolean positional value in function call".to_string()
             }
+            // pygrep-hooks
+            CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(
@@ -2268,8 +2308,6 @@ impl CheckKind {
                     format!("Unused `noqa` directive for: {codes}")
                 }
             },
-            // pygrep-hooks
-            CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
         }
     }
 

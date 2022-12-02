@@ -1700,14 +1700,14 @@ where
                     }
                 }
 
-                // Ruff
-                if self.settings.enabled.contains(&CheckCode::RUF101) {
-                    rules::plugins::convert_exit_to_sys_exit(self, func);
+                // pygrep-hooks
+                if self.settings.enabled.contains(&CheckCode::PGH001) {
+                    pygrep_hooks::checks::no_eval(self, func);
                 }
 
                 // Ruff
-                if self.settings.enabled.contains(&CheckCode::PGH001) {
-                    pygrep_hooks::checks::no_eval(self, func);
+                if self.settings.enabled.contains(&CheckCode::RUF101) {
+                    rules::plugins::convert_exit_to_sys_exit(self, func);
                 }
             }
             ExprKind::Dict { keys, .. } => {

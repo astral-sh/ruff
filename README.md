@@ -73,7 +73,6 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [pycodestyle (E, W)](#pycodestyle)
    1. [isort (I)](#isort)
    1. [pydocstyle (D)](#pydocstyle)
-   1. [pygrep-hooks (PGH)](#pygrep-hooks)
    1. [pyupgrade (U)](#pyupgrade)
    1. [pep8-naming (N)](#pep8-naming)
    1. [eradicate (ERA)](#eradicate)
@@ -90,6 +89,8 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-2020 (YTT)](#flake8-2020)
    1. [flake8-blind-except (BLE)](#flake8-blind-except)
    1. [mccabe (C90)](#mccabe)
+   1. [pygrep-hooks (PGH)](#pygrep-hooks)
+   1. [Pylint (PL)](#pylint)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
    1. [Meta rules (M)](#meta-rules)
 1. [Editor Integrations](#editor-integrations)
@@ -499,14 +500,6 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D418 | SkipDocstring | Function decorated with `@overload` shouldn't contain a docstring |  |
 | D419 | NonEmpty | Docstring is empty |  |
 
-### pygrep-hooks
-
-For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitHub.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| PGH001 | NoEval | No builtin `eval()` allowed |  |
-
 ### pyupgrade
 
 For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
@@ -735,6 +728,14 @@ For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
 | ---- | ---- | ------- | --- |
 | C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
 
+### pygrep-hooks
+
+For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitHub.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PGH001 | NoEval | No builtin `eval()` allowed |  |
+
 ### Pylint
 
 For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
@@ -911,8 +912,8 @@ natively, including:
 - [`yesqa`](https://github.com/asottile/yesqa)
 - [`eradicate`](https://pypi.org/project/eradicate/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
-- [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (1/10)
+- [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
 
 Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -956,7 +957,10 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 
-Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/), [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (1/10), and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33).
+Ruff can also replace [`isort`](https://pypi.org/project/isort/),
+[`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
+[`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (1/10), and a subset of the rules
+implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 
