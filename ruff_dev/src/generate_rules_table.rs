@@ -28,11 +28,12 @@ pub fn main(cli: &Cli) -> Result<()> {
         output.push('\n');
         output.push('\n');
 
-        if let Some(url) = check_category.url() {
+        if let Some((url, platform)) = check_category.url() {
             output.push_str(&format!(
-                "For more, see [{}]({}) on PyPI.",
+                "For more, see [{}]({}) on {}.",
                 check_category.title(),
-                url
+                url,
+                platform
             ));
             output.push('\n');
             output.push('\n');

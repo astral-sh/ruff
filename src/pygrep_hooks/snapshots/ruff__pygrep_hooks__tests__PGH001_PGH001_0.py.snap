@@ -1,0 +1,21 @@
+---
+source: src/pygrep_hooks/mod.rs
+expression: checks
+---
+- kind: NoEval
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 4
+  fix: ~
+- kind: NoEval
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 8
+  fix: ~
+
