@@ -7,7 +7,7 @@ use std::path::Path;
 use anyhow::Result;
 #[cfg(not(target_family = "wasm"))]
 use log::debug;
-use nohash_hasher::IntMap;
+use nohash_hasher::{IntMap, IntSet};
 use rustpython_parser::lexer::LexResult;
 
 use crate::ast::types::Range;
@@ -114,6 +114,7 @@ pub(crate) fn check_path(
         &mut checks,
         contents,
         &directives.noqa_line_for,
+        &directives.candidates,
         settings,
         autofix,
         ignore_noqa,
@@ -254,6 +255,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         tokens,
         &locator,
         &Directives {
+            candidates: IntSet::default(),
             noqa_line_for: IntMap::default(),
             isort_exclusions: directives.isort_exclusions,
         },

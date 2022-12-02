@@ -31,6 +31,7 @@ impl Flags {
 }
 
 pub struct Directives {
+    pub candidates: IntSet<usize>,
     pub noqa_line_for: IntMap<usize, usize>,
     pub isort_exclusions: IntSet<usize>,
 }
@@ -41,6 +42,7 @@ pub fn extract_directives(
     flags: Flags,
 ) -> Directives {
     Directives {
+        candidates: extract_candidates(lxr),
         noqa_line_for: if flags.contains(Flags::NOQA) {
             extract_noqa_line_for(lxr)
         } else {
@@ -52,6 +54,20 @@ pub fn extract_directives(
             IntSet::default()
         },
     }
+}
+
+/// Extract a mapping from logical line to noqa line.
+pub fn extract_candidates(lxr: &[LexResult]) -> IntSet<usize> {
+    let mut candidates: IntSet<usize> = IntSet::default();
+    for (start, tok, _) in lxr.iter().flatten() {
+        if matches!(tok, Tok::EndOfFile) {
+            break;
+        }
+        if matches!(tok, Tok::Comment) {
+            candidates.insert(start.row());
+        }
+    }
+    candidates
 }
 
 /// Extract a mapping from logical line to noqa line.

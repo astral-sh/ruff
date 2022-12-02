@@ -316,10 +316,10 @@ Options:
 
 ### Ignoring errors
 
-To omit a lint check entirely, add it to the "ignore" list via `--ignore` or `--extend-ignore`,
-either on the command-line or in your `project.toml` file.
+To omit a lint check entirely, add it to the "ignore" list via [`ignore`](#ignore) or
+[`extend-ignore`](#extend-ignore), either on the command-line or in your `project.toml` file.
 
-To ignore an error in-line, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
+To ignore an error inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual error, add `# noqa: {code}` to the end of the line, like so:
 
 ```python
@@ -334,7 +334,7 @@ x = 1  # noqa
 ```
 
 Note that, for multi-line strings, the `noqa` directive should come at the end of the string, and
-will apply to the entire body, like so:
+will apply to the entire string, like so:
 
 ```python
 """Lorem ipsum dolor sit amet.
@@ -342,6 +342,15 @@ will apply to the entire body, like so:
 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 """  # noqa: E501
 ```
+
+To ignore all errors across an entire file, Ruff supports Flake8's `# flake8: noqa` directive (or,
+equivalently, `# ruff: noqa`). Adding either of those directives to any part of a file will disable
+error reporting for the entire file.
+
+For targeted exclusions across entire files (e.g., "Ignore all F841 violations in
+`/path/to/file.py`"), see the [`per-file-ignores`](#per-file-ignores) configuration setting.
+
+### Automating `noqa` Directives
 
 Ruff supports several workflows to aid in `noqa` management.
 
