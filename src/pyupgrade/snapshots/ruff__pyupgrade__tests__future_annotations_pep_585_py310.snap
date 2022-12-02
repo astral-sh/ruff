@@ -34,4 +34,36 @@ expression: checks
     end_location:
       row: 35
       column: 12
+- kind:
+    UsePEP585Annotation: List
+  location:
+    row: 42
+    column: 26
+  end_location:
+    row: 42
+    column: 30
+  fix:
+    content: list
+    location:
+      row: 42
+      column: 26
+    end_location:
+      row: 42
+      column: 30
+- kind:
+    UsePEP585Annotation: List
+  location:
+    row: 42
+    column: 37
+  end_location:
+    row: 42
+    column: 41
+  fix:
+    content: list
+    location:
+      row: 42
+      column: 37
+    end_location:
+      row: 42
+      column: 41
 

@@ -42,6 +42,8 @@ use crate::{
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
+type DeferralContext = (Vec<usize>, Vec<usize>);
+
 #[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
     // Input data.
@@ -66,17 +68,18 @@ pub struct Checker<'a> {
     scopes: Vec<Scope<'a>>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
-    deferred_string_annotations: Vec<(Range, &'a str, Vec<usize>, Vec<usize>)>,
-    deferred_annotations: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
-    deferred_functions: Vec<(&'a Stmt, Vec<usize>, Vec<usize>, VisibleScope)>,
-    deferred_lambdas: Vec<(&'a Expr, Vec<usize>, Vec<usize>)>,
+    deferred_string_type_definitions: Vec<(Range, &'a str, bool, DeferralContext)>,
+    deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext)>,
+    deferred_functions: Vec<(&'a Stmt, DeferralContext, VisibleScope)>,
+    deferred_lambdas: Vec<(&'a Expr, DeferralContext)>,
     deferred_assignments: Vec<usize>,
     // Internal, derivative state.
     visible_scope: VisibleScope,
     in_f_string: Option<Range>,
     in_annotation: bool,
-    in_deferred_string_annotation: bool,
-    in_deferred_annotation: bool,
+    in_type_definition: bool,
+    in_deferred_string_type_definition: bool,
+    in_deferred_type_definition: bool,
     in_literal: bool,
     in_subscript: bool,
     in_withitem: bool,
@@ -110,8 +113,8 @@ impl<'a> Checker<'a> {
             scopes: vec![],
             scope_stack: vec![],
             dead_scopes: vec![],
-            deferred_string_annotations: vec![],
-            deferred_annotations: vec![],
+            deferred_string_type_definitions: vec![],
+            deferred_type_definitions: vec![],
             deferred_functions: vec![],
             deferred_lambdas: vec![],
             deferred_assignments: vec![],
@@ -122,8 +125,9 @@ impl<'a> Checker<'a> {
             },
             in_f_string: None,
             in_annotation: false,
-            in_deferred_string_annotation: false,
-            in_deferred_annotation: false,
+            in_type_definition: false,
+            in_deferred_string_type_definition: false,
+            in_deferred_type_definition: false,
             in_literal: false,
             in_subscript: false,
             in_withitem: false,
@@ -1087,8 +1091,7 @@ where
 
                 self.deferred_functions.push((
                     stmt,
-                    self.scope_stack.clone(),
-                    self.parent_stack.clone(),
+                    (self.scope_stack.clone(), self.parent_stack.clone()),
                     self.visible_scope.clone(),
                 ));
             }
@@ -1135,6 +1138,24 @@ where
                     self.visit_stmt(stmt);
                 }
             }
+            StmtKind::AnnAssign {
+                target,
+                annotation,
+                value,
+                ..
+            } => {
+                self.visit_annotation(annotation);
+                if let Some(expr) = value {
+                    if self.match_typing_expr(annotation, "TypeAlias") {
+                        self.in_type_definition = true;
+                        self.visit_expr(expr);
+                        self.in_type_definition = false;
+                    } else {
+                        self.visit_expr(expr);
+                    }
+                }
+                self.visit_expr(target);
+            }
             _ => visitor::walk_stmt(self, stmt),
         };
         self.visible_scope = prev_visible_scope;
@@ -1157,33 +1178,36 @@ where
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
         let prev_in_annotation = self.in_annotation;
+        let prev_in_type_definition = self.in_type_definition;
         self.in_annotation = true;
+        self.in_type_definition = true;
         self.visit_expr(expr);
         self.in_annotation = prev_in_annotation;
+        self.in_type_definition = prev_in_type_definition;
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
         let prev_in_f_string = self.in_f_string;
         let prev_in_literal = self.in_literal;
-        let prev_in_annotation = self.in_annotation;
+        let prev_in_type_definition = self.in_type_definition;
 
-        if self.in_annotation && self.annotations_future_enabled {
+        if self.in_type_definition && self.annotations_future_enabled {
             if let ExprKind::Constant {
                 value: Constant::Str(value),
                 ..
             } = &expr.node
             {
-                self.deferred_string_annotations.push((
+                self.deferred_string_type_definitions.push((
                     Range::from_located(expr),
                     value,
-                    self.scope_stack.clone(),
-                    self.parent_stack.clone(),
+                    self.in_annotation,
+                    (self.scope_stack.clone(), self.parent_stack.clone()),
                 ));
             } else {
-                self.deferred_annotations.push((
+                self.deferred_type_definitions.push((
                     expr,
-                    self.scope_stack.clone(),
-                    self.parent_stack.clone(),
+                    self.in_annotation,
+                    (self.scope_stack.clone(), self.parent_stack.clone()),
                 ));
             }
             return;
@@ -1193,13 +1217,13 @@ where
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...]
-                if !self.in_deferred_string_annotation
+                if !self.in_deferred_string_type_definition
                     && self.settings.enabled.contains(&CheckCode::U007)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && !self.settings.pyupgrade.keep_runtime_typing
                             && self.annotations_future_enabled
-                            && self.in_deferred_annotation))
+                            && self.in_annotation))
                 {
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
@@ -1236,13 +1260,13 @@ where
                 match ctx {
                     ExprContext::Load => {
                         // Ex) List[...]
-                        if !self.in_deferred_string_annotation
+                        if !self.in_deferred_string_type_definition
                             && self.settings.enabled.contains(&CheckCode::U006)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && !self.settings.pyupgrade.keep_runtime_typing
                                     && self.annotations_future_enabled
-                                    && self.in_deferred_annotation))
+                                    && self.in_annotation))
                             && typing::is_pep585_builtin(
                                 expr,
                                 &self.from_imports,
@@ -1277,12 +1301,12 @@ where
             }
             ExprKind::Attribute { attr, .. } => {
                 // Ex) typing.List[...]
-                if !self.in_deferred_string_annotation
+                if !self.in_deferred_string_type_definition
                     && self.settings.enabled.contains(&CheckCode::U006)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.annotations_future_enabled
-                            && self.in_deferred_annotation))
+                            && self.in_annotation))
                     && typing::is_pep585_builtin(expr, &self.from_imports, &self.import_aliases)
                 {
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
@@ -1946,12 +1970,12 @@ where
                 value: Constant::Str(value),
                 ..
             } => {
-                if self.in_annotation && !self.in_literal {
-                    self.deferred_string_annotations.push((
+                if self.in_type_definition && !self.in_literal {
+                    self.deferred_string_type_definitions.push((
                         Range::from_located(expr),
                         value,
-                        self.scope_stack.clone(),
-                        self.parent_stack.clone(),
+                        self.in_annotation,
+                        (self.scope_stack.clone(), self.parent_stack.clone()),
                     ));
                 }
                 if self.settings.enabled.contains(&CheckCode::S104) {
@@ -2028,11 +2052,8 @@ where
         // Recurse.
         match &expr.node {
             ExprKind::Lambda { .. } => {
-                self.deferred_lambdas.push((
-                    expr,
-                    self.scope_stack.clone(),
-                    self.parent_stack.clone(),
-                ));
+                self.deferred_lambdas
+                    .push((expr, (self.scope_stack.clone(), self.parent_stack.clone())));
             }
             ExprKind::Call {
                 func,
@@ -2043,12 +2064,16 @@ where
                 if self.match_typing_call_path(&call_path, "ForwardRef") {
                     self.visit_expr(func);
                     for expr in args {
-                        self.visit_annotation(expr);
+                        self.in_type_definition = true;
+                        self.visit_expr(expr);
+                        self.in_type_definition = prev_in_type_definition;
                     }
                 } else if self.match_typing_call_path(&call_path, "cast") {
                     self.visit_expr(func);
                     if !args.is_empty() {
-                        self.visit_annotation(&args[0]);
+                        self.in_type_definition = true;
+                        self.visit_expr(&args[0]);
+                        self.in_type_definition = prev_in_type_definition;
                     }
                     for expr in args.iter().skip(1) {
                         self.visit_expr(expr);
@@ -2056,22 +2081,28 @@ where
                 } else if self.match_typing_call_path(&call_path, "NewType") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
-                        self.visit_annotation(expr);
+                        self.in_type_definition = true;
+                        self.visit_expr(expr);
+                        self.in_type_definition = prev_in_type_definition;
                     }
                 } else if self.match_typing_call_path(&call_path, "TypeVar") {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
-                        self.visit_annotation(expr);
+                        self.in_type_definition = true;
+                        self.visit_expr(expr);
+                        self.in_type_definition = prev_in_type_definition;
                     }
                     for keyword in keywords {
                         let KeywordData { arg, value } = &keyword.node;
                         if let Some(id) = arg {
                             if id == "bound" {
-                                self.visit_annotation(value);
-                            } else {
-                                self.in_annotation = false;
+                                self.in_type_definition = true;
                                 self.visit_expr(value);
-                                self.in_annotation = prev_in_annotation;
+                                self.in_type_definition = prev_in_type_definition;
+                            } else {
+                                self.in_type_definition = false;
+                                self.visit_expr(value);
+                                self.in_type_definition = prev_in_type_definition;
                             }
                         }
                     }
@@ -2087,11 +2118,13 @@ where
                                         ExprKind::List { elts, .. }
                                         | ExprKind::Tuple { elts, .. } => {
                                             if elts.len() == 2 {
-                                                self.in_annotation = false;
+                                                self.in_type_definition = false;
                                                 self.visit_expr(&elts[0]);
-                                                self.in_annotation = prev_in_annotation;
+                                                self.in_type_definition = prev_in_type_definition;
 
-                                                self.visit_annotation(&elts[1]);
+                                                self.in_type_definition = true;
+                                                self.visit_expr(&elts[1]);
+                                                self.in_type_definition = prev_in_type_definition;
                                             }
                                         }
                                         _ => {}
@@ -2105,7 +2138,9 @@ where
                     // Ex) NamedTuple("a", a=int)
                     for keyword in keywords {
                         let KeywordData { value, .. } = &keyword.node;
-                        self.visit_annotation(value);
+                        self.in_type_definition = true;
+                        self.visit_expr(value);
+                        self.in_type_definition = prev_in_type_definition;
                     }
                 } else if self.match_typing_call_path(&call_path, "TypedDict") {
                     self.visit_expr(func);
@@ -2114,12 +2149,14 @@ where
                     if args.len() > 1 {
                         if let ExprKind::Dict { keys, values } = &args[1].node {
                             for key in keys {
-                                self.in_annotation = false;
+                                self.in_type_definition = false;
                                 self.visit_expr(key);
-                                self.in_annotation = prev_in_annotation;
+                                self.in_type_definition = prev_in_type_definition;
                             }
                             for value in values {
-                                self.visit_annotation(value);
+                                self.in_type_definition = true;
+                                self.visit_expr(value);
+                                self.in_type_definition = prev_in_type_definition;
                             }
                         }
                     }
@@ -2127,7 +2164,9 @@ where
                     // Ex) TypedDict("a", a=int)
                     for keyword in keywords {
                         let KeywordData { value, .. } = &keyword.node;
-                        self.visit_annotation(value);
+                        self.in_type_definition = true;
+                        self.visit_expr(value);
+                        self.in_type_definition = prev_in_type_definition;
                     }
                 } else {
                     visitor::walk_expr(self, expr);
@@ -2157,7 +2196,9 @@ where
                                 // Ex) Optional[int]
                                 SubscriptKind::AnnotatedSubscript => {
                                     self.visit_expr(value);
-                                    self.visit_annotation(slice);
+                                    self.in_type_definition = true;
+                                    self.visit_expr(slice);
+                                    self.in_type_definition = prev_in_type_definition;
                                     self.visit_expr_context(ctx);
                                 }
                                 // Ex) Annotated[int, "Hello, world!"]
@@ -2169,11 +2210,11 @@ where
                                     if let ExprKind::Tuple { elts, ctx } = &slice.node {
                                         if let Some(expr) = elts.first() {
                                             self.visit_expr(expr);
-                                            self.in_annotation = false;
+                                            self.in_type_definition = false;
                                             for expr in elts.iter().skip(1) {
                                                 self.visit_expr(expr);
                                             }
-                                            self.in_annotation = true;
+                                            self.in_type_definition = prev_in_type_definition;
                                             self.visit_expr_context(ctx);
                                         }
                                     } else {
@@ -2205,7 +2246,7 @@ where
             _ => {}
         };
 
-        self.in_annotation = prev_in_annotation;
+        self.in_type_definition = prev_in_type_definition;
         self.in_literal = prev_in_literal;
         self.in_f_string = prev_in_f_string;
     }
@@ -2777,28 +2818,31 @@ impl<'a> Checker<'a> {
         docstring.is_some()
     }
 
-    fn check_deferred_annotations(&mut self) {
-        while let Some((expr, scopes, parents)) = self.deferred_annotations.pop() {
+    fn check_deferred_type_definitions(&mut self) {
+        while let Some((expr, in_annotation, (scopes, parents))) =
+            self.deferred_type_definitions.pop()
+        {
             self.scope_stack = scopes;
             self.parent_stack = parents;
-            self.in_deferred_annotation = true;
+            self.in_annotation = in_annotation;
+            self.in_deferred_type_definition = true;
             self.visit_expr(expr);
-            self.in_deferred_annotation = false;
+            self.in_deferred_type_definition = false;
         }
     }
 
-    fn check_deferred_string_annotations<'b>(&mut self, allocator: &'b mut Vec<Expr>)
+    fn check_deferred_string_type_definitions<'b>(&mut self, allocator: &'b mut Vec<Expr>)
     where
         'b: 'a,
     {
         let mut stacks = vec![];
-        while let Some((range, expression, scopes, parents)) =
-            self.deferred_string_annotations.pop()
+        while let Some((range, expression, in_annotation, context)) =
+            self.deferred_string_type_definitions.pop()
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 relocate_expr(&mut expr, range);
                 allocator.push(expr);
-                stacks.push((scopes, parents));
+                stacks.push((in_annotation, context));
             } else {
                 if self.settings.enabled.contains(&CheckCode::F722) {
                     self.add_check(Check::new(
@@ -2808,19 +2852,20 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        for (expr, (scopes, parents)) in allocator.iter().zip(stacks) {
+        for (expr, (in_annotation, (scopes, parents))) in allocator.iter().zip(stacks) {
             self.scope_stack = scopes;
             self.parent_stack = parents;
-            self.in_deferred_string_annotation = true;
+            self.in_annotation = in_annotation;
+            self.in_deferred_string_type_definition = true;
             self.visit_expr(expr);
-            self.in_deferred_string_annotation = false;
+            self.in_deferred_string_type_definition = false;
         }
     }
 
     fn check_deferred_functions(&mut self) {
-        while let Some((stmt, scopes, parents, visibility)) = self.deferred_functions.pop() {
-            self.parent_stack = parents;
+        while let Some((stmt, (scopes, parents), visibility)) = self.deferred_functions.pop() {
             self.scope_stack = scopes;
+            self.parent_stack = parents;
             self.visible_scope = visibility;
             self.push_scope(Scope::new(ScopeKind::Function(FunctionScope {
                 async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
@@ -2846,9 +2891,9 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_lambdas(&mut self) {
-        while let Some((expr, scopes, parents)) = self.deferred_lambdas.pop() {
-            self.parent_stack = parents;
+        while let Some((expr, (scopes, parents))) = self.deferred_lambdas.pop() {
             self.scope_stack = scopes;
+            self.parent_stack = parents;
             self.push_scope(Scope::new(ScopeKind::Lambda));
 
             if let ExprKind::Lambda { args, body } = &expr.node {
@@ -3185,9 +3230,9 @@ pub fn check_ast(
     checker.check_deferred_functions();
     checker.check_deferred_lambdas();
     checker.check_deferred_assignments();
-    checker.check_deferred_annotations();
+    checker.check_deferred_type_definitions();
     let mut allocator = vec![];
-    checker.check_deferred_string_annotations(&mut allocator);
+    checker.check_deferred_string_type_definitions(&mut allocator);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.scope_stack = vec![GLOBAL_SCOPE_INDEX];
