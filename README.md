@@ -73,17 +73,18 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [pycodestyle (E, W)](#pycodestyle)
    1. [isort (I)](#isort)
    1. [pydocstyle (D)](#pydocstyle)
+   1. [pygrep-hooks (PGH)](#pygrep-hooks)
    1. [pyupgrade (U)](#pyupgrade)
    1. [pep8-naming (N)](#pep8-naming)
    1. [eradicate (ERA)](#eradicate)
    1. [flake8-bandit (S)](#flake8-bandit)
-   1. [flake8-comprehensions (C)](#flake8-comprehensions)
+   1. [flake8-comprehensions (C4)](#flake8-comprehensions)
    1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
    1. [flake8-bugbear (B)](#flake8-bugbear)
    1. [flake8-builtins (A)](#flake8-builtins)
-   1. [flake8-debugger (T)](#flake8-debugger)
+   1. [flake8-debugger (T10)](#flake8-debugger)
    1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
-   1. [flake8-print (T)](#flake8-print)
+   1. [flake8-print (T20)](#flake8-print)
    1. [flake8-quotes (Q)](#flake8-quotes)
    1. [flake8-annotations (ANN)](#flake8-annotations)
    1. [flake8-2020 (YTT)](#flake8-2020)
@@ -498,6 +499,14 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D418 | SkipDocstring | Function decorated with `@overload` shouldn't contain a docstring |  |
 | D419 | NonEmpty | Docstring is empty |  |
 
+### pygrep-hooks
+
+For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitHub.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PGH001 | NoEval | No builtin `eval()` allowed |  |
+
 ### pyupgrade
 
 For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
@@ -903,6 +912,7 @@ natively, including:
 - [`eradicate`](https://pypi.org/project/eradicate/)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
+- [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (1/10)
 
 Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -946,8 +956,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 
-Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa),
-and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33).
+Ruff can also replace [`isort`](https://pypi.org/project/isort/), [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/), [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (1/10), and a subset of the rules implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 
@@ -1261,7 +1270,7 @@ Exclusions are based on globs, and can be either:
   (to exclude any Python files in `directory`). Note that these paths are relative to the
   project root (e.g., the directory containing your `pyproject.toml`).
 
-Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify the excluded
+Note that you'll typically want to use [`extend_exclude`](#extend-exclude) to modify the excluded
 paths.
 
 **Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`

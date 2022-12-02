@@ -37,7 +37,7 @@ use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
     flake8_print, flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pylint, pyupgrade, rules,
+    pygrep_hooks, pylint, pyupgrade, rules,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -1703,6 +1703,11 @@ where
                 // Ruff
                 if self.settings.enabled.contains(&CheckCode::RUF101) {
                     rules::plugins::convert_exit_to_sys_exit(self, func);
+                }
+
+                // Ruff
+                if self.settings.enabled.contains(&CheckCode::PGH001) {
+                    pygrep_hooks::checks::no_eval(self, func);
                 }
             }
             ExprKind::Dict { keys, .. } => {
