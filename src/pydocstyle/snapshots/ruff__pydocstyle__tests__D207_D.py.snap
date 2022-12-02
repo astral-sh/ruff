@@ -19,6 +19,21 @@ expression: checks
       column: 0
 - kind: NoUnderIndentation
   location:
+    row: 244
+    column: 0
+  end_location:
+    row: 244
+    column: 0
+  fix:
+    content: "    "
+    location:
+      row: 244
+      column: 0
+    end_location:
+      row: 244
+      column: 0
+- kind: NoUnderIndentation
+  location:
     row: 440
     column: 0
   end_location:
@@ -31,5 +46,20 @@ expression: checks
       column: 0
     end_location:
       row: 440
+      column: 4
+- kind: NoUnderIndentation
+  location:
+    row: 441
+    column: 0
+  end_location:
+    row: 441
+    column: 0
+  fix:
+    content: "                                    "
+    location:
+      row: 441
+      column: 0
+    end_location:
+      row: 441
       column: 4
 

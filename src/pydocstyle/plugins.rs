@@ -8,6 +8,7 @@ use rustpython_ast::{Constant, ExprKind, Location, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace;
+use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
@@ -126,7 +127,7 @@ pub fn one_liner(checker: &mut Checker, definition: &Definition) {
         {
             let mut line_count = 0;
             let mut non_empty_line_count = 0;
-            for line in string.lines() {
+            for line in LinesWithTrailingNewline::from(string) {
                 line_count += 1;
                 if !line.trim().is_empty() {
                     non_empty_line_count += 1;
@@ -136,7 +137,7 @@ pub fn one_liner(checker: &mut Checker, definition: &Definition) {
                 }
             }
 
-            if non_empty_line_count == 1 && line_count > 1 {
+            if non_empty_line_count == 1 && (line_count > 1) {
                 checker.add_check(Check::new(
                     CheckKind::FitsOnOneLine,
                     Range::from_located(docstring),
@@ -387,12 +388,14 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
             ..
         } = &docstring.node
         {
-            let lines: Vec<&str> = string.lines().collect();
+            // Split the docstring into lines.
+            let lines: Vec<&str> = LinesWithTrailingNewline::from(string).collect();
             if lines.len() <= 1 {
                 return;
             }
 
             let docstring_indent = whitespace::indentation(checker, docstring);
+
             let mut has_seen_tab = docstring_indent.contains('\t');
             let mut is_over_indented = true;
             let mut over_indented_lines = vec![];
@@ -418,7 +421,9 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
                 if checker.settings.enabled.contains(&CheckCode::D207) {
                     // We report under-indentation on every line. This isn't great, but enables
                     // autofix.
-                    if !is_blank && line_indent.len() < docstring_indent.len() {
+                    if (i == lines.len() - 1 || !is_blank)
+                        && line_indent.len() < docstring_indent.len()
+                    {
                         let mut check = Check::new(
                             CheckKind::NoUnderIndentation,
                             Range {
@@ -524,7 +529,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
         } = &docstring.node
         {
             let mut line_count = 0;
-            for line in string.lines() {
+            for line in LinesWithTrailingNewline::from(string) {
                 if !line.trim().is_empty() {
                     line_count += 1;
                 }
@@ -570,7 +575,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
             ..
         } = &docstring.node
         {
-            let mut lines = string.lines();
+            let mut lines = LinesWithTrailingNewline::from(string);
             if let Some(line) = lines.next() {
                 let trimmed = line.trim();
                 if trimmed.is_empty() {
@@ -627,7 +632,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
             ..
         } = &docstring.node
         {
-            if string.lines().nth(1).is_some() {
+            if LinesWithTrailingNewline::from(string).nth(1).is_some() {
                 if let Some(first_line) = checker
                     .locator
                     .slice_source_code_range(&Range::from_located(docstring))
@@ -871,7 +876,7 @@ pub fn sections(checker: &mut Checker, definition: &Definition) {
             ..
         } = &docstring.node
         {
-            let lines: Vec<&str> = string.lines().collect();
+            let lines: Vec<&str> = LinesWithTrailingNewline::from(string).collect();
             if lines.len() < 2 {
                 return;
             }
