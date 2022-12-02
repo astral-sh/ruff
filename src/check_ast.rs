@@ -1191,7 +1191,10 @@ where
         let prev_in_literal = self.in_literal;
         let prev_in_type_definition = self.in_type_definition;
 
-        if self.in_type_definition && self.annotations_future_enabled {
+        if !(self.in_deferred_type_definition || self.in_deferred_string_type_definition)
+            && self.in_type_definition
+            && self.annotations_future_enabled
+        {
             if let ExprKind::Constant {
                 value: Constant::Str(value),
                 ..
@@ -2830,9 +2833,11 @@ impl<'a> Checker<'a> {
             self.scope_stack = scopes;
             self.parent_stack = parents;
             self.in_annotation = in_annotation;
+            self.in_type_definition = true;
             self.in_deferred_type_definition = true;
             self.visit_expr(expr);
             self.in_deferred_type_definition = false;
+            self.in_type_definition = false;
         }
     }
 
@@ -2861,9 +2866,11 @@ impl<'a> Checker<'a> {
             self.scope_stack = scopes;
             self.parent_stack = parents;
             self.in_annotation = in_annotation;
+            self.in_type_definition = true;
             self.in_deferred_string_type_definition = true;
             self.visit_expr(expr);
             self.in_deferred_string_type_definition = false;
+            self.in_type_definition = false;
         }
     }
 
