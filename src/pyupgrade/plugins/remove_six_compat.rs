@@ -8,6 +8,7 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::code_gen::SourceGenerator;
+use crate::SourceCodeLocator;
 
 /// Return `true` if the `Expr` is a reference to `${module}.${any}`.
 fn is_module_member(call_path: &[&str], module: &str) -> bool {
@@ -16,7 +17,7 @@ fn is_module_member(call_path: &[&str], module: &str) -> bool {
         .map_or(false, |module_name| *module_name == module)
 }
 
-fn map_name(name: &str, expr: &Expr, checker: &mut Checker) {
+fn map_name(name: &str, expr: &Expr, patch: bool) -> Option<Check> {
     let replacement = match name {
         "text_type" => Some("str"),
         "binary_type" => Some("bytes"),
@@ -36,14 +37,16 @@ fn map_name(name: &str, expr: &Expr, checker: &mut Checker) {
     };
     if let Some(replacement) = replacement {
         let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
-        if checker.patch(&CheckCode::U016) {
+        if patch {
             check.amend(Fix::replacement(
                 replacement.to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
-        };
-        checker.add_check(check);
+        }
+        Some(check)
+    } else {
+        None
     }
 }
 
@@ -51,16 +54,17 @@ fn replace_by_str_literal(
     arg: &Expr,
     binary: bool,
     expr: &Expr,
-    checker: &Checker,
+    patch: bool,
+    locator: &SourceCodeLocator,
 ) -> Option<Check> {
     match &arg.node {
         ExprKind::Constant { .. } => {
             let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
-            if checker.patch(&CheckCode::U016) {
+            if patch {
                 let content = format!(
                     "{}{}",
                     if binary { "b" } else { "" },
-                    checker.locator.slice_source_code_range(&Range {
+                    locator.slice_source_code_range(&Range {
                         location: arg.location,
                         end_location: arg.end_location.unwrap(),
                     })
@@ -82,14 +86,14 @@ fn replace_call_on_arg_by_arg_attribute(
     attr: &str,
     arg: &Expr,
     expr: &Expr,
-    checker: &Checker,
+    patch: bool,
 ) -> Result<Check> {
     let attribute = ExprKind::Attribute {
         value: Box::new(arg.clone()),
         attr: attr.to_string(),
         ctx: ExprContext::Load,
     };
-    replace_by_expr_kind(attribute, expr, checker)
+    replace_by_expr_kind(attribute, expr, patch)
 }
 
 // `func(arg, **args)` => `arg.method(**args)`
@@ -97,7 +101,7 @@ fn replace_call_on_arg_by_arg_method_call(
     method_name: &str,
     args: &[Expr],
     expr: &Expr,
-    checker: &Checker,
+    patch: bool,
 ) -> Result<Option<Check>> {
     if args.is_empty() {
         bail!("Expected at least one argument");
@@ -115,7 +119,7 @@ fn replace_call_on_arg_by_arg_method_call(
                 .collect(),
             keywords: vec![],
         };
-        let expr = replace_by_expr_kind(call, expr, checker)?;
+        let expr = replace_by_expr_kind(call, expr, patch)?;
         Ok(Some(expr))
     } else {
         Ok(None)
@@ -123,9 +127,9 @@ fn replace_call_on_arg_by_arg_method_call(
 }
 
 // `expr` => `Expr(expr_kind)`
-fn replace_by_expr_kind(node: ExprKind, expr: &Expr, checker: &Checker) -> Result<Check> {
+fn replace_by_expr_kind(node: ExprKind, expr: &Expr, patch: bool) -> Result<Check> {
     let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
-    if checker.patch(&CheckCode::U016) {
+    if patch {
         let mut generator = SourceGenerator::new();
         generator.unparse_expr(&create_expr(node), 0);
         let content = generator.generate()?;
@@ -138,9 +142,9 @@ fn replace_by_expr_kind(node: ExprKind, expr: &Expr, checker: &Checker) -> Resul
     Ok(check)
 }
 
-fn replace_by_stmt_kind(node: StmtKind, expr: &Expr, checker: &Checker) -> Result<Check> {
+fn replace_by_stmt_kind(node: StmtKind, expr: &Expr, patch: bool) -> Result<Check> {
     let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
-    if checker.patch(&CheckCode::U016) {
+    if patch {
         let mut generator = SourceGenerator::new();
         generator.unparse_stmt(&create_stmt(node));
         let content = generator.generate()?;
@@ -158,30 +162,30 @@ fn replace_by_raise_from(
     exc: Option<ExprKind>,
     cause: Option<ExprKind>,
     expr: &Expr,
-    checker: &Checker,
+    patch: bool,
 ) -> Result<Check> {
     let stmt_kind = StmtKind::Raise {
         exc: exc.map(|exc| Box::new(create_expr(exc))),
         cause: cause.map(|cause| Box::new(create_expr(cause))),
     };
-    replace_by_stmt_kind(stmt_kind, expr, checker)
+    replace_by_stmt_kind(stmt_kind, expr, patch)
 }
 
 fn replace_by_index_on_arg(
     arg: &Expr,
     index: &ExprKind,
     expr: &Expr,
-    checker: &Checker,
+    patch: bool,
 ) -> Result<Check> {
     let index = ExprKind::Subscript {
         value: Box::new(create_expr(arg.node.clone())),
         slice: Box::new(create_expr(index.clone())),
         ctx: ExprContext::Load,
     };
-    replace_by_expr_kind(index, expr, checker)
+    replace_by_expr_kind(index, expr, patch)
 }
 
-fn handle_reraise(args: &[Expr], expr: &Expr, checker: &Checker) -> Result<Option<Check>> {
+fn handle_reraise(args: &[Expr], expr: &Expr, patch: bool) -> Result<Option<Check>> {
     if let [_, exc, tb] = args {
         let check = replace_by_raise_from(
             Some(ExprKind::Call {
@@ -195,7 +199,7 @@ fn handle_reraise(args: &[Expr], expr: &Expr, checker: &Checker) -> Result<Optio
             }),
             None,
             expr,
-            checker,
+            patch,
         )?;
         Ok(Some(check))
     } else if let [arg] = args {
@@ -204,7 +208,7 @@ fn handle_reraise(args: &[Expr], expr: &Expr, checker: &Checker) -> Result<Optio
                 if let ExprKind::Attribute { value, attr, .. } = &func.node {
                     if let ExprKind::Name { id, .. } = &value.node {
                         if id == "sys" && attr == "exc_info" {
-                            let check = replace_by_raise_from(None, None, expr, checker)?;
+                            let check = replace_by_raise_from(None, None, expr, patch)?;
                             return Ok(Some(check));
                         };
                     };
@@ -222,86 +226,87 @@ fn handle_func(
     args: &[Expr],
     keywords: &[Keyword],
     expr: &Expr,
-    checker: &mut Checker,
-) -> Result<()> {
+    patch: bool,
+    locator: &SourceCodeLocator,
+) -> Result<Option<Check>> {
     let func_name = match &func.node {
         ExprKind::Attribute { attr, .. } => attr,
         ExprKind::Name { id, .. } => id,
         _ => bail!("Unexpected func: {:?}", func),
     };
     let check = match (func_name.as_str(), args, keywords) {
-        ("b", [arg], []) => replace_by_str_literal(arg, true, expr, checker),
-        ("ensure_binary", [arg], []) => replace_by_str_literal(arg, true, expr, checker),
-        ("u", [arg], []) => replace_by_str_literal(arg, false, expr, checker),
-        ("ensure_str", [arg], []) => replace_by_str_literal(arg, false, expr, checker),
-        ("ensure_text", [arg], []) => replace_by_str_literal(arg, false, expr, checker),
+        ("b", [arg], []) => replace_by_str_literal(arg, true, expr, patch, locator),
+        ("ensure_binary", [arg], []) => replace_by_str_literal(arg, true, expr, patch, locator),
+        ("u", [arg], []) => replace_by_str_literal(arg, false, expr, patch, locator),
+        ("ensure_str", [arg], []) => replace_by_str_literal(arg, false, expr, patch, locator),
+        ("ensure_text", [arg], []) => replace_by_str_literal(arg, false, expr, patch, locator),
         ("iteritems", args, []) => {
-            replace_call_on_arg_by_arg_method_call("items", args, expr, checker)?
+            replace_call_on_arg_by_arg_method_call("items", args, expr, patch)?
         }
         ("viewitems", args, []) => {
-            replace_call_on_arg_by_arg_method_call("items", args, expr, checker)?
+            replace_call_on_arg_by_arg_method_call("items", args, expr, patch)?
         }
         ("iterkeys", args, []) => {
-            replace_call_on_arg_by_arg_method_call("keys", args, expr, checker)?
+            replace_call_on_arg_by_arg_method_call("keys", args, expr, patch)?
         }
         ("viewkeys", args, []) => {
-            replace_call_on_arg_by_arg_method_call("keys", args, expr, checker)?
+            replace_call_on_arg_by_arg_method_call("keys", args, expr, patch)?
         }
         ("itervalues", args, []) => {
-            replace_call_on_arg_by_arg_method_call("values", args, expr, checker)?
+            replace_call_on_arg_by_arg_method_call("values", args, expr, patch)?
         }
         ("viewvalues", args, []) => {
-            replace_call_on_arg_by_arg_method_call("values", args, expr, checker)?
+            replace_call_on_arg_by_arg_method_call("values", args, expr, patch)?
         }
         ("get_method_function", [arg], []) => Some(replace_call_on_arg_by_arg_attribute(
-            "__func__", arg, expr, checker,
+            "__func__", arg, expr, patch,
         )?),
         ("get_method_self", [arg], []) => Some(replace_call_on_arg_by_arg_attribute(
-            "__self__", arg, expr, checker,
+            "__self__", arg, expr, patch,
         )?),
         ("get_function_closure", [arg], []) => Some(replace_call_on_arg_by_arg_attribute(
             "__closure__",
             arg,
             expr,
-            checker,
+            patch,
         )?),
         ("get_function_code", [arg], []) => Some(replace_call_on_arg_by_arg_attribute(
-            "__code__", arg, expr, checker,
+            "__code__", arg, expr, patch,
         )?),
         ("get_function_defaults", [arg], []) => Some(replace_call_on_arg_by_arg_attribute(
             "__defaults__",
             arg,
             expr,
-            checker,
+            patch,
         )?),
         ("get_function_globals", [arg], []) => Some(replace_call_on_arg_by_arg_attribute(
             "__globals__",
             arg,
             expr,
-            checker,
+            patch,
         )?),
         ("create_unbound_method", [arg, _], _) => {
-            Some(replace_by_expr_kind(arg.node.clone(), expr, checker)?)
+            Some(replace_by_expr_kind(arg.node.clone(), expr, patch)?)
         }
         ("get_unbound_function", [arg], []) => {
-            Some(replace_by_expr_kind(arg.node.clone(), expr, checker)?)
+            Some(replace_by_expr_kind(arg.node.clone(), expr, patch)?)
         }
         ("assertCountEqual", args, []) => {
-            replace_call_on_arg_by_arg_method_call("assertCountEqual", args, expr, checker)?
+            replace_call_on_arg_by_arg_method_call("assertCountEqual", args, expr, patch)?
         }
         ("assertRaisesRegex", args, []) => {
-            replace_call_on_arg_by_arg_method_call("assertRaisesRegex", args, expr, checker)?
+            replace_call_on_arg_by_arg_method_call("assertRaisesRegex", args, expr, patch)?
         }
         ("assertRegex", args, []) => {
-            replace_call_on_arg_by_arg_method_call("assertRegex", args, expr, checker)?
+            replace_call_on_arg_by_arg_method_call("assertRegex", args, expr, patch)?
         }
         ("raise_from", [exc, cause], []) => Some(replace_by_raise_from(
             Some(exc.node.clone()),
             Some(cause.node.clone()),
             expr,
-            checker,
+            patch,
         )?),
-        ("reraise", args, []) => handle_reraise(args, expr, checker)?,
+        ("reraise", args, []) => handle_reraise(args, expr, patch)?,
         ("byte2int", [arg], []) => Some(replace_by_index_on_arg(
             arg,
             &ExprKind::Constant {
@@ -309,10 +314,10 @@ fn handle_func(
                 kind: None,
             },
             expr,
-            checker,
+            patch,
         )?),
         ("indexbytes", [arg, index], []) => {
-            Some(replace_by_index_on_arg(arg, &index.node, expr, checker)?)
+            Some(replace_by_index_on_arg(arg, &index.node, expr, patch)?)
         }
         ("int2byte", [arg], []) => Some(replace_by_expr_kind(
             ExprKind::Call {
@@ -327,37 +332,35 @@ fn handle_func(
                 keywords: vec![],
             },
             expr,
-            checker,
+            patch,
         )?),
         _ => None,
     };
-    if let Some(check) = check {
-        checker.add_check(check);
-    }
-    Ok(())
+    Ok(check)
 }
 
 pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
     let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
     if is_module_member(&call_path, "six") {
-        let result = match &expr.node {
+        let patch = checker.patch(&CheckCode::U016);
+        let check = match &expr.node {
             ExprKind::Call {
                 func,
                 args,
                 keywords,
-            } => handle_func(func, args, keywords, expr, checker),
-            ExprKind::Attribute { attr, .. } => {
-                map_name(attr.as_str(), expr, checker);
-                Ok(())
-            }
-            ExprKind::Name { id, .. } => {
-                map_name(id.as_str(), expr, checker);
-                Ok(())
-            }
+            } => match handle_func(func, args, keywords, expr, patch, checker.locator) {
+                Ok(check) => check,
+                Err(err) => {
+                    error!("Failed to remove six compat: {err}");
+                    return;
+                }
+            },
+            ExprKind::Attribute { attr, .. } => map_name(attr.as_str(), expr, patch),
+            ExprKind::Name { id, .. } => map_name(id.as_str(), expr, patch),
             _ => return,
         };
-        if let Err(err) = result {
-            error!("failed to remove six compat: {}", err);
+        if let Some(check) = check {
+            checker.add_check(check);
         }
     }
 }
