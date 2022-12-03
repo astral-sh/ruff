@@ -786,6 +786,12 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLR1722 | ConsiderUsingSysExit | Consider using `sys.exit()` | 🛠 |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 
+### flake8-import-conventions
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| IC001 | ImportAliasIsNotConventional | `...` should be imported as `...` |  |
+
 ### Ruff-specific rules
 
 | Code | Name | Message | Fix |

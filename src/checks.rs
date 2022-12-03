@@ -290,6 +290,8 @@ pub enum CheckCode {
     FBT001,
     FBT002,
     FBT003,
+    // Import conventions
+    IC001,
     // Ruff
     RUF001,
     RUF002,
@@ -324,6 +326,7 @@ pub enum CheckCategory {
     Eradicate,
     PygrepHooks,
     Pylint,
+    ImportConventions,
     Ruff,
 }
 
@@ -367,6 +370,7 @@ impl CheckCategory {
             CheckCategory::PygrepHooks => "pygrep-hooks",
             CheckCategory::Pylint => "Pylint",
             CheckCategory::Pyupgrade => "pyupgrade",
+            CheckCategory::ImportConventions => "flake8-import-conventions",
             CheckCategory::Ruff => "Ruff-specific rules",
         }
     }
@@ -459,6 +463,7 @@ impl CheckCategory {
             CheckCategory::Pyupgrade => {
                 Some(("https://pypi.org/project/pyupgrade/3.2.0/", &Platform::PyPI))
             }
+            CheckCategory::ImportConventions => None,
             CheckCategory::Ruff => None,
         }
     }
@@ -774,6 +779,8 @@ pub enum CheckKind {
     BooleanPositionalValueInFunctionCall,
     // pygrep-hooks
     NoEval,
+    // Import conventions
+    ImportAliasIsNotConventional(String, String),
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -1113,6 +1120,10 @@ impl CheckCode {
             CheckCode::FBT003 => CheckKind::BooleanPositionalValueInFunctionCall,
             // pygrep-hooks
             CheckCode::PGH001 => CheckKind::NoEval,
+            // Import conventions
+            CheckCode::IC001 => {
+                CheckKind::ImportAliasIsNotConventional("...".to_string(), "...".to_string())
+            }
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1365,6 +1376,7 @@ impl CheckCode {
             CheckCode::YTT301 => CheckCategory::Flake82020,
             CheckCode::YTT302 => CheckCategory::Flake82020,
             CheckCode::YTT303 => CheckCategory::Flake82020,
+            CheckCode::IC001 => CheckCategory::ImportConventions,
         }
     }
 }
@@ -1633,6 +1645,8 @@ impl CheckKind {
             CheckKind::BooleanPositionalValueInFunctionCall => &CheckCode::FBT003,
             // pygrep-hooks
             CheckKind::NoEval => &CheckCode::PGH001,
+            // Import conventions
+            CheckKind::ImportAliasIsNotConventional(..) => &CheckCode::IC001,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -2419,6 +2433,10 @@ impl CheckKind {
             }
             // pygrep-hooks
             CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
+            // Import conventions
+            CheckKind::ImportAliasIsNotConventional(name, asname) => {
+                format!("`{name}` should be imported as `{asname}`")
+            }
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(

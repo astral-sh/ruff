@@ -1,0 +1,16 @@
+---
+source: src/flake8_import_conventions/mod.rs
+expression: checks
+---
+- kind:
+    ImportAliasIsNotConventional:
+      - pulumi_aws
+      - aws
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 17
+  fix: ~
+

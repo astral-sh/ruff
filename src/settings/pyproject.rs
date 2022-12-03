@@ -110,7 +110,10 @@ mod tests {
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
-    use crate::{flake8_bugbear, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming};
+    use crate::{
+        flake8_bugbear, flake8_import_conventions, flake8_quotes, flake8_tidy_imports, mccabe,
+        pep8_naming,
+    };
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -157,6 +160,7 @@ mod tests {
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -199,6 +203,7 @@ line-length = 79
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -241,6 +246,7 @@ exclude = ["foo.py"]
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -283,6 +289,7 @@ select = ["E501"]
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -326,6 +333,7 @@ ignore = ["E501"]
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -421,6 +429,12 @@ other-attribute = 1
                 }),
                 flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
                     ban_relative_imports: Some(Strictness::Parents)
+                }),
+                flake8_import_conventions: Some(flake8_import_conventions::settings::Options {
+                    aliases: Some(FxHashMap::from_iter([(
+                        "mylibrary".to_string(),
+                        "mylib".to_string(),
+                    )]))
                 }),
                 isort: None,
                 mccabe: Some(mccabe::settings::Options {
