@@ -9,10 +9,10 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::noqa;
-use crate::noqa::Directive;
+use crate::noqa::{is_file_exempt, Directive};
 use crate::settings::Settings;
 
-// Regex from PEP263
+// Regex from PEP263.
 static CODING_COMMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").unwrap());
 
@@ -58,8 +58,11 @@ pub fn check_lines(
     }
 
     macro_rules! add_if {
-        ($check:expr, $noqa:expr) => {{
-            match $noqa {
+        ($check:expr, $noqa_lineno:expr, $line:expr) => {{
+            match noqa_directives
+                .entry($noqa_lineno)
+                .or_insert_with(|| (noqa::extract_noqa_directive($line), vec![]))
+            {
                 (Directive::All(..), matches) => {
                     matches.push($check.kind.code().as_ref());
                     if ignore_noqa {
@@ -83,6 +86,12 @@ pub fn check_lines(
 
     let lines: Vec<&str> = contents.lines().collect();
     for (lineno, line) in lines.iter().enumerate() {
+        // If we hit an exemption for the entire file, bail.
+        if is_file_exempt(line) {
+            checks.drain(..);
+            return;
+        }
+
         // Grab the noqa (logical) line number for the current (physical) line.
         // If there are newlines at the end of the file, they won't be represented in
         // `noqa_line_for`, so fallback to the current line.
@@ -106,11 +115,7 @@ pub fn check_lines(
                             Location::new(lineno + 2, 0),
                         ));
                     }
-
-                    let noqa = noqa_directives.entry(noqa_lineno).or_insert_with(|| {
-                        (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![])
-                    });
-                    add_if!(check, noqa);
+                    add_if!(check, noqa_lineno, lines[noqa_lineno]);
                 }
             }
         }
@@ -155,11 +160,7 @@ pub fn check_lines(
                         end_location: Location::new(lineno + 1, line_length),
                     },
                 );
-
-                let noqa = noqa_directives
-                    .entry(noqa_lineno)
-                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
-                add_if!(check, noqa);
+                add_if!(check, noqa_lineno, lines[noqa_lineno]);
             }
         }
     }
@@ -179,10 +180,7 @@ pub fn check_lines(
 
             let lineno = lines.len() - 1;
             let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
-            let noqa = noqa_directives
-                .entry(noqa_lineno)
-                .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
-            add_if!(check, noqa);
+            add_if!(check, noqa_lineno, lines[noqa_lineno]);
         }
     }
 
@@ -269,13 +267,12 @@ mod tests {
     #[test]
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
-        let noqa_line_for: IntMap<usize, usize> = IntMap::default();
         let check_with_max_line_length = |line_length: usize| {
             let mut checks: Vec<Check> = vec![];
             check_lines(
                 &mut checks,
                 line,
-                &noqa_line_for,
+                &IntMap::default(),
                 &Settings {
                     line_length,
                     ..Settings::for_rule(CheckCode::E501)

@@ -10,13 +10,25 @@ use regex::Regex;
 
 use crate::checks::{Check, CheckCode};
 
-static NO_QA_REGEX: Lazy<Regex> = Lazy::new(|| {
+static NO_QA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)",
     )
     .unwrap()
 });
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
+
+/// Return `true` if a file is exempt from checking based on the contents of the
+/// given line.
+pub fn is_file_exempt(line: &str) -> bool {
+    let line = line.trim_start();
+    line.starts_with("# flake8: noqa")
+        || line.starts_with("# flake8: NOQA")
+        || line.starts_with("# flake8: NoQA")
+        || line.starts_with("# ruff: noqa")
+        || line.starts_with("# ruff: NOQA")
+        || line.starts_with("# ruff: NoQA")
+}
 
 #[derive(Debug)]
 pub enum Directive<'a> {
@@ -26,7 +38,7 @@ pub enum Directive<'a> {
 }
 
 pub fn extract_noqa_directive(line: &str) -> Directive {
-    match NO_QA_REGEX.captures(line) {
+    match NO_QA_LINE_REGEX.captures(line) {
         Some(caps) => match caps.name("spaces") {
             Some(spaces) => match caps.name("noqa") {
                 Some(noqa) => match caps.name("codes") {
@@ -70,9 +82,13 @@ fn add_noqa_inner(
     noqa_line_for: &IntMap<usize, usize>,
     external: &BTreeSet<String>,
 ) -> (usize, String) {
-    let lines: Vec<&str> = contents.lines().collect();
     let mut matches_by_line: BTreeMap<usize, BTreeSet<&CheckCode>> = BTreeMap::new();
-    for lineno in 0..lines.len() {
+    for (lineno, line) in contents.lines().enumerate() {
+        // If we hit an exemption for the entire file, bail.
+        if is_file_exempt(line) {
+            return (0, contents.to_string());
+        }
+
         let mut codes: BTreeSet<&CheckCode> = BTreeSet::new();
         for check in checks {
             if check.location.row() == lineno + 1 {
@@ -93,7 +109,7 @@ fn add_noqa_inner(
 
     let mut count: usize = 0;
     let mut output = String::new();
-    for (lineno, line) in lines.iter().enumerate() {
+    for (lineno, line) in contents.lines().enumerate() {
         match matches_by_line.get(&lineno) {
             None => {
                 output.push_str(line);
@@ -155,7 +171,7 @@ fn add_noqa_inner(
                         output.push('\n');
 
                         // Only count if the new line is an actual edit.
-                        if &formatted != line {
+                        if formatted != line {
                             count += 1;
                         }
                     }
@@ -176,20 +192,20 @@ mod tests {
 
     use crate::ast::types::Range;
     use crate::checks::{Check, CheckKind};
-    use crate::noqa::{add_noqa_inner, NO_QA_REGEX};
+    use crate::noqa::{add_noqa_inner, NO_QA_LINE_REGEX};
 
     #[test]
     fn regex() {
-        assert!(NO_QA_REGEX.is_match("# noqa"));
-        assert!(NO_QA_REGEX.is_match("# NoQA"));
+        assert!(NO_QA_LINE_REGEX.is_match("# noqa"));
+        assert!(NO_QA_LINE_REGEX.is_match("# NoQA"));
 
-        assert!(NO_QA_REGEX.is_match("# noqa: F401"));
-        assert!(NO_QA_REGEX.is_match("# NoQA: F401"));
-        assert!(NO_QA_REGEX.is_match("# noqa: F401, E501"));
+        assert!(NO_QA_LINE_REGEX.is_match("# noqa: F401"));
+        assert!(NO_QA_LINE_REGEX.is_match("# NoQA: F401"));
+        assert!(NO_QA_LINE_REGEX.is_match("# noqa: F401, E501"));
 
-        assert!(NO_QA_REGEX.is_match("# noqa:F401"));
-        assert!(NO_QA_REGEX.is_match("# NoQA:F401"));
-        assert!(NO_QA_REGEX.is_match("# noqa:F401, E501"));
+        assert!(NO_QA_LINE_REGEX.is_match("# noqa:F401"));
+        assert!(NO_QA_LINE_REGEX.is_match("# NoQA:F401"));
+        assert!(NO_QA_LINE_REGEX.is_match("# noqa:F401, E501"));
     }
 
     #[test]

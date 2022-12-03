@@ -50,4 +50,28 @@ mod tests {
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
+
+    #[test]
+    fn flake8_noqa() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/ruff/flake8_noqa.py"),
+            &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F841]),
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_noqa() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/ruff/ruff_noqa.py"),
+            &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F841]),
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
 }
