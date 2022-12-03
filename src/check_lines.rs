@@ -43,7 +43,7 @@ pub fn check_lines(
     autofix: bool,
     ignore_noqa: bool,
 ) {
-    let enforce_unnecessary_coding_comment = settings.enabled.contains(&CheckCode::U009);
+    let enforce_unnecessary_coding_comment = settings.enabled.contains(&CheckCode::UP009);
     let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
     let enforce_noqa = settings.enabled.contains(&CheckCode::M001);
 
@@ -97,7 +97,7 @@ pub fn check_lines(
         // `noqa_line_for`, so fallback to the current line.
         let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
 
-        // Enforce unnecessary coding comments (U009).
+        // Enforce unnecessary coding comments (UP009).
         if enforce_unnecessary_coding_comment {
             if lineno < 2 {
                 // PEP3120 makes utf-8 the default encoding.

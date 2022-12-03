@@ -74,7 +74,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [mccabe (C90)](#mccabe)
    1. [isort (I)](#isort)
    1. [pydocstyle (D)](#pydocstyle)
-   1. [pyupgrade (U)](#pyupgrade)
+   1. [pyupgrade (UP)](#pyupgrade)
    1. [pep8-naming (N)](#pep8-naming)
    1. [flake8-2020 (YTT)](#flake8-2020)
    1. [flake8-annotations (ANN)](#flake8-annotations)
@@ -524,20 +524,20 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| U001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
-| U003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
-| U004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
-| U005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead | 🛠 |
-| U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
-| U007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
-| U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
-| U009 | PEP3120UnnecessaryCodingComment | UTF-8 encoding declaration is unnecessary | 🛠 |
-| U010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
-| U011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
-| U012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
-| U013 | ConvertTypedDictFunctionalToClass | Convert `...` from `TypedDict` functional to class syntax | 🛠 |
-| U014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
-| U015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
+| UP001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
+| UP003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
+| UP004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
+| UP005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead | 🛠 |
+| UP006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
+| UP007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
+| UP008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
+| UP009 | PEP3120UnnecessaryCodingComment | UTF-8 encoding declaration is unnecessary | 🛠 |
+| UP010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
+| UP011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
+| UP012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
+| UP013 | ConvertTypedDictFunctionalToClass | Convert `...` from `TypedDict` functional to class syntax | 🛠 |
+| UP014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
+| UP015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
 
 ### pep8-naming
 

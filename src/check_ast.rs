@@ -412,7 +412,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::U011)
+                if self.settings.enabled.contains(&CheckCode::UP011)
                     && self.settings.target_version >= PythonVersion::Py38
                 {
                     pyupgrade::plugins::unnecessary_lru_cache_params(self, decorator_list);
@@ -531,7 +531,7 @@ where
                 decorator_list,
                 body,
             } => {
-                if self.settings.enabled.contains(&CheckCode::U004) {
+                if self.settings.enabled.contains(&CheckCode::UP004) {
                     pyupgrade::plugins::useless_object_inheritance(
                         self, stmt, name, bases, keywords,
                     );
@@ -755,7 +755,7 @@ where
                 }
 
                 if let Some("__future__") = module.as_deref() {
-                    if self.settings.enabled.contains(&CheckCode::U010) {
+                    if self.settings.enabled.contains(&CheckCode::UP010) {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
                     }
                 }
@@ -1049,7 +1049,7 @@ where
                         pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::U001) {
+                if self.settings.enabled.contains(&CheckCode::UP001) {
                     pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
                 }
                 if self.settings.enabled.contains(&CheckCode::B003) {
@@ -1062,12 +1062,12 @@ where
                         self.add_check(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::U013) {
+                if self.settings.enabled.contains(&CheckCode::UP013) {
                     pyupgrade::plugins::convert_typed_dict_functional_to_class(
                         self, stmt, targets, value,
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::U014) {
+                if self.settings.enabled.contains(&CheckCode::UP014) {
                     pyupgrade::plugins::convert_named_tuple_functional_to_class(
                         self, stmt, targets, value,
                     );
@@ -1239,7 +1239,7 @@ where
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...]
                 if !self.in_deferred_string_type_definition
-                    && self.settings.enabled.contains(&CheckCode::U007)
+                    && self.settings.enabled.contains(&CheckCode::UP007)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && !self.settings.pyupgrade.keep_runtime_typing
@@ -1282,7 +1282,7 @@ where
                     ExprContext::Load => {
                         // Ex) List[...]
                         if !self.in_deferred_string_type_definition
-                            && self.settings.enabled.contains(&CheckCode::U006)
+                            && self.settings.enabled.contains(&CheckCode::UP006)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && !self.settings.pyupgrade.keep_runtime_typing
@@ -1323,7 +1323,7 @@ where
             ExprKind::Attribute { attr, .. } => {
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
-                    && self.settings.enabled.contains(&CheckCode::U006)
+                    && self.settings.enabled.contains(&CheckCode::UP006)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.annotations_future_enabled
@@ -1417,16 +1417,16 @@ where
                 }
 
                 // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::U005) {
+                if self.settings.enabled.contains(&CheckCode::UP005) {
                     pyupgrade::plugins::deprecated_unittest_alias(self, func);
                 }
 
                 // flake8-super
-                if self.settings.enabled.contains(&CheckCode::U008) {
+                if self.settings.enabled.contains(&CheckCode::UP008) {
                     pyupgrade::plugins::super_call_with_parameters(self, expr, func, args);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::U012) {
+                if self.settings.enabled.contains(&CheckCode::UP012) {
                     pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
                 }
 
@@ -1685,11 +1685,11 @@ where
                 }
 
                 // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::U003) {
+                if self.settings.enabled.contains(&CheckCode::UP003) {
                     pyupgrade::plugins::type_of_primitive(self, expr, func, args);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::U015) {
+                if self.settings.enabled.contains(&CheckCode::UP015) {
                     pyupgrade::plugins::redundant_open_modes(self, expr);
                 }
 

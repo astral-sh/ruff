@@ -8,7 +8,7 @@ use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::types::Primitive;
 use crate::settings::types::PythonVersion;
 
-/// U008
+/// UP008
 pub fn super_args(
     scope: &Scope,
     parents: &[&Stmt],
@@ -74,7 +74,7 @@ pub fn super_args(
     None
 }
 
-/// U001
+/// UP001
 pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -> Option<Check> {
     if targets.len() == 1 {
         if let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() {
@@ -90,7 +90,7 @@ pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -
     None
 }
 
-/// U004
+/// UP004
 pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> Option<Check> {
     for expr in bases {
         if let ExprKind::Name { id, .. } = &expr.node {
@@ -115,7 +115,7 @@ pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> 
     None
 }
 
-/// U003
+/// UP003
 pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
     // Validate the arguments.
     if args.len() == 1 {
@@ -139,7 +139,7 @@ pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<
     None
 }
 
-/// U011
+/// UP011
 pub fn unnecessary_lru_cache_params(
     decorator_list: &[Expr],
     target_version: PythonVersion,

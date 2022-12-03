@@ -33,7 +33,7 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
     "generator_stop",
 ];
 
-/// U010
+/// UP010
 pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Located<AliasData>]) {
     let target_version = checker.settings.target_version;
 

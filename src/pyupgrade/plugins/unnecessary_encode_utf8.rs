@@ -101,7 +101,7 @@ fn replace_with_bytes_literal(
     check
 }
 
-/// U012
+/// UP012
 pub fn unnecessary_encode_utf8(
     checker: &mut Checker,
     expr: &Expr,
@@ -124,7 +124,7 @@ pub fn unnecessary_encode_utf8(
                             expr,
                             variable,
                             checker.locator,
-                            checker.patch(&CheckCode::U012),
+                            checker.patch(&CheckCode::UP012),
                         ));
                     } else {
                         // "unicode text©".encode("utf-8")
@@ -132,7 +132,7 @@ pub fn unnecessary_encode_utf8(
                             expr,
                             args,
                             kwargs,
-                            checker.patch(&CheckCode::U012),
+                            checker.patch(&CheckCode::UP012),
                         ) {
                             checker.add_check(check);
                         }
@@ -146,7 +146,7 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         args,
                         kwargs,
-                        checker.patch(&CheckCode::U012),
+                        checker.patch(&CheckCode::UP012),
                     ) {
                         checker.add_check(check);
                     }

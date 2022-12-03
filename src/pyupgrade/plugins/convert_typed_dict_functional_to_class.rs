@@ -218,7 +218,7 @@ fn convert_to_class(
     ))
 }
 
-/// U013
+/// UP013
 pub fn convert_typed_dict_functional_to_class(
     checker: &mut Checker,
     stmt: &Stmt,
