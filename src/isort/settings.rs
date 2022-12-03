@@ -2,9 +2,10 @@
 
 use std::collections::BTreeSet;
 
+use ruff_macros::ConfigurationOptions;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
     pub combine_as_imports: Option<bool>,

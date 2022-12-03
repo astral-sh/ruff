@@ -1,5 +1,6 @@
 //! Options that the user can provide via pyproject.toml.
 
+use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +11,7 @@ use crate::{
     pep8_naming, pyupgrade,
 };
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
     pub dummy_variable_rgx: Option<String>,

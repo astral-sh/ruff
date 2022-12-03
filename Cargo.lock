@@ -1871,6 +1871,7 @@ dependencies = [
  "rayon",
  "regex",
  "ropey",
+ "ruff_macros",
  "rustc-hash",
  "rustpython-ast",
  "rustpython-common",
@@ -1903,6 +1904,16 @@ dependencies = [
  "rustpython-parser",
  "strum",
  "strum_macros",
+]
+
+[[package]]
+name = "ruff_macros"
+version = "0.0.158"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "textwrap",
 ]
 
 [[package]]
@@ -2172,9 +2183,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.103"
+version = "1.0.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a864042229133ada95abf3b54fdc62ef5ccabe9515b64717bcb9a1919e59445d"
+checksum = "60b9b43d45702de4c839cb9b51d9f529c5dd26a4aff255b42b1ebc03e88ee908"
 dependencies = [
  "proc-macro2",
  "quote",

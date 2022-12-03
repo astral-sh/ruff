@@ -1,8 +1,9 @@
 //! Settings for the `flake-annotations` plugin.
 
+use ruff_macros::ConfigurationOptions;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
     /// Allow omission of a return type hint for `__init__` if at least one
