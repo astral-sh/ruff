@@ -218,4 +218,18 @@ class Foo(A, B):
         let parse_ast = parse_expression(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
+
+    #[test]
+    fn test_parse_boolop_or() {
+        let source = String::from("x or y");
+        let parse_ast = parse_expression(&source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_boolop_and() {
+        let source = String::from("x and y");
+        let parse_ast = parse_expression(&source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }

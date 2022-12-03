@@ -1,0 +1,56 @@
+---
+source: compiler/parser/src/parser.rs
+expression: parse_ast
+---
+Located {
+    location: Location {
+        row: 1,
+        column: 0,
+    },
+    end_location: Some(
+        Location {
+            row: 1,
+            column: 6,
+        },
+    ),
+    custom: (),
+    node: BoolOp {
+        op: Or,
+        values: [
+            Located {
+                location: Location {
+                    row: 1,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 1,
+                    },
+                ),
+                custom: (),
+                node: Name {
+                    id: "x",
+                    ctx: Load,
+                },
+            },
+            Located {
+                location: Location {
+                    row: 1,
+                    column: 5,
+                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 6,
+                    },
+                ),
+                custom: (),
+                node: Name {
+                    id: "y",
+                    ctx: Load,
+                },
+            },
+        ],
+    },
+}
