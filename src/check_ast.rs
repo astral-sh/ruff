@@ -1319,6 +1319,10 @@ where
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::U016) {
+                    pyupgrade::plugins::remove_six_compat(self, expr);
+                }
+
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
@@ -1328,6 +1332,10 @@ where
                 args,
                 keywords,
             } => {
+                if self.settings.enabled.contains(&CheckCode::U016) {
+                    pyupgrade::plugins::remove_six_compat(self, expr);
+                }
+
                 // pyflakes
                 if self.settings.enabled.contains(&CheckCode::F521)
                     || self.settings.enabled.contains(&CheckCode::F522)

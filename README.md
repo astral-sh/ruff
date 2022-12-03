@@ -529,6 +529,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | U013 | ConvertTypedDictFunctionalToClass | Convert `...` from `TypedDict` functional to class syntax | 🛠 |
 | U014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
 | U015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
+| U016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
 
 ### pep8-naming
 
@@ -751,8 +752,8 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
+| PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 
 ### Ruff-specific rules
 

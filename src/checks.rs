@@ -196,6 +196,7 @@ pub enum CheckCode {
     U013,
     U014,
     U015,
+    U016,
     // pydocstyle
     D100,
     D101,
@@ -644,6 +645,7 @@ pub enum CheckKind {
     ConvertTypedDictFunctionalToClass(String),
     ConvertNamedTupleFunctionalToClass(String),
     RedundantOpenModes,
+    RemoveSixCompat,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -950,6 +952,7 @@ impl CheckCode {
             CheckCode::U013 => CheckKind::ConvertTypedDictFunctionalToClass("...".to_string()),
             CheckCode::U014 => CheckKind::ConvertNamedTupleFunctionalToClass("...".to_string()),
             CheckCode::U015 => CheckKind::RedundantOpenModes,
+            CheckCode::U016 => CheckKind::RemoveSixCompat,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1273,6 +1276,7 @@ impl CheckCode {
             CheckCode::U013 => CheckCategory::Pyupgrade,
             CheckCode::U014 => CheckCategory::Pyupgrade,
             CheckCode::U015 => CheckCategory::Pyupgrade,
+            CheckCode::U016 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1457,6 +1461,7 @@ impl CheckKind {
             CheckKind::ConvertTypedDictFunctionalToClass(_) => &CheckCode::U013,
             CheckKind::ConvertNamedTupleFunctionalToClass(_) => &CheckCode::U014,
             CheckKind::RedundantOpenModes => &CheckCode::U015,
+            CheckKind::RemoveSixCompat => &CheckCode::U016,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -2071,6 +2076,7 @@ impl CheckKind {
             }
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
             CheckKind::RedundantOpenModes => "Unnecessary open mode parameters".to_string(),
+            CheckKind::RemoveSixCompat => "Unnecessary `six` compatibility usage".to_string(),
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
             }
@@ -2354,6 +2360,7 @@ impl CheckKind {
                 | CheckKind::ConvertExitToSysExit
                 | CheckKind::ConvertNamedTupleFunctionalToClass(..)
                 | CheckKind::ConvertTypedDictFunctionalToClass(..)
+                | CheckKind::RemoveSixCompat
                 | CheckKind::DashedUnderlineAfterSection(..)
                 | CheckKind::DeprecatedUnittestAlias(..)
                 | CheckKind::DoNotAssertFalse
