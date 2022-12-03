@@ -86,7 +86,7 @@ pub fn consider_merging_isinstance(
                         .or_insert_with(FxHashSet::default)
                         .extend(match &types.node {
                             ExprKind::Tuple { elts, .. } => {
-                                elts.iter().map(|e| e.to_string()).collect()
+                                elts.iter().map(std::string::ToString::to_string).collect()
                             }
                             _ => {
                                 vec![types.to_string()]
