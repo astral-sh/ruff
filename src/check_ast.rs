@@ -441,6 +441,10 @@ where
                     );
                 }
 
+                if self.settings.enabled.contains(&CheckCode::PLE0206) {
+                    pylint::plugins::property_with_parameters(self, stmt, decorator_list, args)
+                }
+
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be
