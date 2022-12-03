@@ -5,7 +5,7 @@ use crate::check_ast::Checker;
 use crate::checks::CheckKind;
 use crate::Check;
 
-/// PLE0206
+/// PLR0206
 pub fn property_with_parameters(
     checker: &mut Checker,
     stmt: &Stmt,

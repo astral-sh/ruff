@@ -441,7 +441,7 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PLE0206) {
+                if self.settings.enabled.contains(&CheckCode::PLR0206) {
                     pylint::plugins::property_with_parameters(self, stmt, decorator_list, args)
                 }
 

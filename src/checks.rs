@@ -91,7 +91,7 @@ pub enum CheckCode {
     F841,
     F901,
     // pylint errors
-    PLE0206,
+    PLR0206,
     PLE1142,
     // flake8-builtins
     A001,
@@ -827,7 +827,7 @@ impl CheckCode {
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
             // pylint errors
-            CheckCode::PLE0206 => CheckKind::PropertyWithParameters,
+            CheckCode::PLR0206 => CheckKind::PropertyWithParameters,
             CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
             // flake8-builtins
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
@@ -1240,7 +1240,7 @@ impl CheckCode {
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
-            CheckCode::PLE0206 => CheckCategory::Pylint,
+            CheckCode::PLR0206 => CheckCategory::Pylint,
             CheckCode::PLE1142 => CheckCategory::Pylint,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
@@ -1354,7 +1354,7 @@ impl CheckKind {
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
             // pylint errors
-            CheckKind::PropertyWithParameters => &CheckCode::PLE0206,
+            CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
