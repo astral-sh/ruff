@@ -751,8 +751,9 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
+| PLR1701 | ConsiderMergingIsinstance | Consider merging these isinstance calls: isinstance(..., (...)) |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
+| PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 
 ### Ruff-specific rules
 
