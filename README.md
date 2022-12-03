@@ -71,24 +71,25 @@ of [Conda](https://docs.conda.io/en/latest/):
 1. [Supported Rules](#supported-rules)
    1. [Pyflakes (F)](#pyflakes)
    1. [pycodestyle (E, W)](#pycodestyle)
+   1. [mccabe (C90)](#mccabe)
    1. [isort (I)](#isort)
    1. [pydocstyle (D)](#pydocstyle)
    1. [pyupgrade (U)](#pyupgrade)
    1. [pep8-naming (N)](#pep8-naming)
-   1. [eradicate (ERA)](#eradicate)
+   1. [flake8-2020 (YTT)](#flake8-2020)
+   1. [flake8-annotations (ANN)](#flake8-annotations)
    1. [flake8-bandit (S)](#flake8-bandit)
-   1. [flake8-comprehensions (C4)](#flake8-comprehensions)
+   1. [flake8-blind-except (BLE)](#flake8-blind-except)
    1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
    1. [flake8-bugbear (B)](#flake8-bugbear)
    1. [flake8-builtins (A)](#flake8-builtins)
+   1. [flake8-comprehensions (C4)](#flake8-comprehensions)
    1. [flake8-debugger (T10)](#flake8-debugger)
-   1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
    1. [flake8-print (T20)](#flake8-print)
    1. [flake8-quotes (Q)](#flake8-quotes)
-   1. [flake8-annotations (ANN)](#flake8-annotations)
-   1. [flake8-2020 (YTT)](#flake8-2020)
-   1. [flake8-blind-except (BLE)](#flake8-blind-except)
-   1. [mccabe (C90)](#mccabe)
+   1. [flake8-return (ET)](#flake8-return)
+   1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
+   1. [eradicate (ERA)](#eradicate)
    1. [pygrep-hooks (PGH)](#pygrep-hooks)
    1. [Pylint (PL)](#pylint)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
@@ -450,6 +451,14 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | W292 | NoNewLineAtEndOfFile | No newline at end of file |  |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' |  |
 
+### mccabe
+
+For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
+
 ### isort
 
 For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
@@ -552,13 +561,40 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyP
 | N817 | CamelcaseImportedAsAcronym | Camelcase `...` imported as acronym `...` |  |
 | N818 | ErrorSuffixOnExceptionName | Exception name `...` should be named with an Error suffix |  |
 
-### eradicate
+### flake8-2020
 
-For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
+For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ERA001 | CommentedOutCode | Found commented-out code | 🛠 |
+| YTT101 | SysVersionSlice3Referenced | `sys.version[:3]` referenced (python3.10), use `sys.version_info` |  |
+| YTT102 | SysVersion2Referenced | `sys.version[2]` referenced (python3.10), use `sys.version_info` |  |
+| YTT103 | SysVersionCmpStr3 | `sys.version` compared to string (python3.10), use `sys.version_info` |  |
+| YTT201 | SysVersionInfo0Eq3Referenced | `sys.version_info[0] == 3` referenced (python4), use `>=` |  |
+| YTT202 | SixPY3Referenced | `six.PY3` referenced (python4), use `not six.PY2` |  |
+| YTT203 | SysVersionInfo1CmpInt | `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT204 | SysVersionInfoMinorCmpInt | `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
+| YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
+| YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
+
+### flake8-annotations
+
+For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2.9.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument `...` |  |
+| ANN002 | MissingTypeArgs | Missing type annotation for `*...` |  |
+| ANN003 | MissingTypeKwargs | Missing type annotation for `**...` |  |
+| ANN101 | MissingTypeSelf | Missing type annotation for `...` in method |  |
+| ANN102 | MissingTypeCls | Missing type annotation for `...` in classmethod |  |
+| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function `...` |  |
+| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function `...` |  |
+| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method `...` |  |
+| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `...` |  |
+| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
+| ANN401 | DynamicallyTypedExpression | Dynamically typed expressions (typing.Any) are disallowed in `...` |  |
 
 ### flake8-bandit
 
@@ -573,36 +609,13 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `"..."` |  |
 | S107 | HardcodedPasswordDefault | Possible hardcoded password: `"..."` |  |
 
-### flake8-comprehensions
+### flake8-blind-except
 
-For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/3.10.1/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| C400 | UnnecessaryGeneratorList | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
-| C401 | UnnecessaryGeneratorSet | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
-| C402 | UnnecessaryGeneratorDict | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
-| C403 | UnnecessaryListComprehensionSet | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
-| C404 | UnnecessaryListComprehensionDict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) | 🛠 |
-| C405 | UnnecessaryLiteralSet | Unnecessary `(list\|tuple)` literal (rewrite as a `set` literal) | 🛠 |
-| C406 | UnnecessaryLiteralDict | Unnecessary `(list\|tuple)` literal (rewrite as a `dict` literal) | 🛠 |
-| C408 | UnnecessaryCollectionCall | Unnecessary `(dict\|list\|tuple)` call (rewrite as a literal) | 🛠 |
-| C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary `(list\|tuple)` literal passed to `tuple()` (remove the outer call to `tuple()`) | 🛠 |
-| C410 | UnnecessaryLiteralWithinListCall | Unnecessary `(list\|tuple)` literal passed to `list()` (rewrite as a `list` literal) | 🛠 |
-| C411 | UnnecessaryListCall | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
-| C413 | UnnecessaryCallAroundSorted | Unnecessary `(list\|reversed)` call around `sorted()` |  |
-| C414 | UnnecessaryDoubleCastOrProcess | Unnecessary `(list\|reversed\|set\|sorted\|tuple)` call within `(list\|set\|sorted\|tuple)()` |  |
-| C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within `(reversed\|set\|sorted)()` |  |
-| C416 | UnnecessaryComprehension | Unnecessary `(list\|set)` comprehension (rewrite using `(list\|set)()`) | 🛠 |
-| C417 | UnnecessaryMap | Unnecessary `map` usage (rewrite using a `(list\|set\|dict)` comprehension) |  |
-
-### flake8-debugger
-
-For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/) on PyPI.
+For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except/0.2.1/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| T100 | Debugger | Import for `...` found |  |
+| BLE001 | BlindExcept | Blind except Exception: statement |  |
 
 ### flake8-boolean-trap
 
@@ -658,13 +671,36 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/)
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |
 
-### flake8-tidy-imports
+### flake8-comprehensions
 
-For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
+For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/3.10.1/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| I252 | BannedRelativeImport | Relative imports are banned |  |
+| C400 | UnnecessaryGeneratorList | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
+| C401 | UnnecessaryGeneratorSet | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
+| C402 | UnnecessaryGeneratorDict | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
+| C403 | UnnecessaryListComprehensionSet | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
+| C404 | UnnecessaryListComprehensionDict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) | 🛠 |
+| C405 | UnnecessaryLiteralSet | Unnecessary `(list\|tuple)` literal (rewrite as a `set` literal) | 🛠 |
+| C406 | UnnecessaryLiteralDict | Unnecessary `(list\|tuple)` literal (rewrite as a `dict` literal) | 🛠 |
+| C408 | UnnecessaryCollectionCall | Unnecessary `(dict\|list\|tuple)` call (rewrite as a literal) | 🛠 |
+| C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary `(list\|tuple)` literal passed to `tuple()` (remove the outer call to `tuple()`) | 🛠 |
+| C410 | UnnecessaryLiteralWithinListCall | Unnecessary `(list\|tuple)` literal passed to `list()` (rewrite as a `list` literal) | 🛠 |
+| C411 | UnnecessaryListCall | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
+| C413 | UnnecessaryCallAroundSorted | Unnecessary `(list\|reversed)` call around `sorted()` |  |
+| C414 | UnnecessaryDoubleCastOrProcess | Unnecessary `(list\|reversed\|set\|sorted\|tuple)` call within `(list\|set\|sorted\|tuple)()` |  |
+| C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within `(reversed\|set\|sorted)()` |  |
+| C416 | UnnecessaryComprehension | Unnecessary `(list\|set)` comprehension (rewrite using `(list\|set)()`) | 🛠 |
+| C417 | UnnecessaryMap | Unnecessary `map` usage (rewrite using a `(list\|set\|dict)` comprehension) |  |
+
+### flake8-debugger
+
+For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| T100 | Debugger | Import for `...` found |  |
 
 ### flake8-print
 
@@ -686,56 +722,36 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on 
 | Q002 | BadQuotesDocstring | Single quote docstring found but double quotes preferred |  |
 | Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes |  |
 
-### flake8-annotations
+### flake8-return
 
-For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2.9.1/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument `...` |  |
-| ANN002 | MissingTypeArgs | Missing type annotation for `*...` |  |
-| ANN003 | MissingTypeKwargs | Missing type annotation for `**...` |  |
-| ANN101 | MissingTypeSelf | Missing type annotation for `...` in method |  |
-| ANN102 | MissingTypeCls | Missing type annotation for `...` in classmethod |  |
-| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function `...` |  |
-| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function `...` |  |
-| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method `...` |  |
-| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `...` |  |
-| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
-| ANN401 | DynamicallyTypedExpression | Dynamically typed expressions (typing.Any) are disallowed in `...` |  |
-
-### flake8-2020
-
-For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI.
+For more, see [flake8-return](https://pypi.org/project/flake8-return/1.2.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| YTT101 | SysVersionSlice3Referenced | `sys.version[:3]` referenced (python3.10), use `sys.version_info` |  |
-| YTT102 | SysVersion2Referenced | `sys.version[2]` referenced (python3.10), use `sys.version_info` |  |
-| YTT103 | SysVersionCmpStr3 | `sys.version` compared to string (python3.10), use `sys.version_info` |  |
-| YTT201 | SysVersionInfo0Eq3Referenced | `sys.version_info[0] == 3` referenced (python4), use `>=` |  |
-| YTT202 | SixPY3Referenced | `six.PY3` referenced (python4), use `not six.PY2` |  |
-| YTT203 | SysVersionInfo1CmpInt | `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple |  |
-| YTT204 | SysVersionInfoMinorCmpInt | `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple |  |
-| YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
-| YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
-| YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
+| RET501 | UnnecessaryReturnNone | Do not explicitly `return None` in function if it is the only possible return value |  |
+| RET502 | ImplicitReturnValue | Do not implicitly `return None` in function able to return non-`None` value |  |
+| RET503 | ImplicitReturn | Missing explicit `return` at the end of function able to return non-`None` value |  |
+| RET504 | UnnecessaryAssign | Unnecessary variable assignment before `return` statement |  |
+| RET505 | SuperfluousElseReturn | Unnecessary `else` after `return` statement |  |
+| RET506 | SuperfluousElseRaise | Unnecessary `else` after `raise` statement |  |
+| RET507 | SuperfluousElseContinue | Unnecessary `else` after `continue` statement |  |
+| RET508 | SuperfluousElseBreak | Unnecessary `else` after `break` statement |  |
 
-### flake8-blind-except
+### flake8-tidy-imports
 
-For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except/0.2.1/) on PyPI.
+For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| BLE001 | BlindExcept | Blind except Exception: statement |  |
+| I252 | BannedRelativeImport | Relative imports are banned |  |
 
-### mccabe
+### eradicate
 
-For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
+For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
+| ERA001 | CommentedOutCode | Found commented-out code | 🛠 |
 
 ### pygrep-hooks
 
@@ -918,6 +934,7 @@ natively, including:
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
+- [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)
@@ -965,6 +982,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
+- [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)
