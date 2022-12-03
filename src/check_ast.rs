@@ -2063,6 +2063,11 @@ where
                 }
                 self.push_scope(Scope::new(ScopeKind::Generator));
             }
+            ExprKind::BoolOp { op, values } => {
+                if self.settings.enabled.contains(&CheckCode::PLR1701) {
+                    pylint::plugins::consider_merging_isinstance(self, expr, op, values);
+                }
+            }
             _ => {}
         };
 
