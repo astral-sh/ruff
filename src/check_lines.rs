@@ -1,6 +1,6 @@
 //! Lint rules based on checking raw physical lines.
 
-use nohash_hasher::{IntMap, IntSet};
+use nohash_hasher::IntMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::Location;
@@ -12,7 +12,7 @@ use crate::noqa;
 use crate::noqa::{is_file_exempt, Directive};
 use crate::settings::Settings;
 
-// Regex from PEP263
+// Regex from PEP263.
 static CODING_COMMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").unwrap());
 
@@ -39,7 +39,6 @@ pub fn check_lines(
     checks: &mut Vec<Check>,
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
-    candidates: &IntSet<usize>,
     settings: &Settings,
     autofix: bool,
     ignore_noqa: bool,
@@ -60,31 +59,27 @@ pub fn check_lines(
 
     macro_rules! add_if {
         ($check:expr, $noqa_lineno:expr, $line:expr) => {{
-            if candidates.contains(&($noqa_lineno + 1)) {
-                match noqa_directives
-                    .entry($noqa_lineno)
-                    .or_insert_with(|| (noqa::extract_noqa_directive($line), vec![]))
-                {
-                    (Directive::All(..), matches) => {
+            match noqa_directives
+                .entry($noqa_lineno)
+                .or_insert_with(|| (noqa::extract_noqa_directive($line), vec![]))
+            {
+                (Directive::All(..), matches) => {
+                    matches.push($check.kind.code().as_ref());
+                    if ignore_noqa {
+                        line_checks.push($check);
+                    }
+                }
+                (Directive::Codes(.., codes), matches) => {
+                    if codes.contains(&$check.kind.code().as_ref()) {
                         matches.push($check.kind.code().as_ref());
                         if ignore_noqa {
                             line_checks.push($check);
                         }
+                    } else {
+                        line_checks.push($check);
                     }
-                    (Directive::Codes(.., codes), matches) => {
-                        if codes.contains(&$check.kind.code().as_ref()) {
-                            matches.push($check.kind.code().as_ref());
-                            if ignore_noqa {
-                                line_checks.push($check);
-                            }
-                        } else {
-                            line_checks.push($check);
-                        }
-                    }
-                    (Directive::None, ..) => line_checks.push($check),
                 }
-            } else {
-                line_checks.push($check);
+                (Directive::None, ..) => line_checks.push($check),
             }
         }};
     }
@@ -92,7 +87,7 @@ pub fn check_lines(
     let lines: Vec<&str> = contents.lines().collect();
     for (lineno, line) in lines.iter().enumerate() {
         // If we hit an exemption for the entire file, bail.
-        if candidates.contains(&(lineno + 1)) && is_file_exempt(line) {
+        if is_file_exempt(line) {
             checks.drain(..);
             return;
         }
@@ -135,24 +130,22 @@ pub fn check_lines(
         while let Some((index, check)) =
             checks_iter.next_if(|(_index, check)| check.location.row() == lineno + 1)
         {
-            if candidates.contains(&(noqa_lineno + 1)) {
-                let noqa = noqa_directives
-                    .entry(noqa_lineno)
-                    .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
+            let noqa = noqa_directives
+                .entry(noqa_lineno)
+                .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
 
-                match noqa {
-                    (Directive::All(..), matches) => {
+            match noqa {
+                (Directive::All(..), matches) => {
+                    matches.push(check.kind.code().as_ref());
+                    ignored.push(index);
+                }
+                (Directive::Codes(.., codes), matches) => {
+                    if codes.contains(&check.kind.code().as_ref()) {
                         matches.push(check.kind.code().as_ref());
                         ignored.push(index);
                     }
-                    (Directive::Codes(.., codes), matches) => {
-                        if codes.contains(&check.kind.code().as_ref()) {
-                            matches.push(check.kind.code().as_ref());
-                            ignored.push(index);
-                        }
-                    }
-                    (Directive::None, ..) => {}
                 }
+                (Directive::None, ..) => {}
             }
         }
 
@@ -265,7 +258,7 @@ pub fn check_lines(
 
 #[cfg(test)]
 mod tests {
-    use nohash_hasher::{IntMap, IntSet};
+    use nohash_hasher::IntMap;
 
     use super::check_lines;
     use crate::checks::{Check, CheckCode};
@@ -280,7 +273,6 @@ mod tests {
                 &mut checks,
                 line,
                 &IntMap::default(),
-                &IntSet::default(),
                 &Settings {
                     line_length,
                     ..Settings::for_rule(CheckCode::E501)

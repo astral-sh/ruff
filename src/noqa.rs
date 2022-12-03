@@ -18,21 +18,16 @@ static NO_QA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
+/// Return `true` if a file is exempt from checking based on the contents of the
+/// given line.
 pub fn is_file_exempt(line: &str) -> bool {
     let line = line.trim_start();
-    if line.starts_with("# flake8: ") {
-        let remainder = &line["# flake8: ".len()..];
-        remainder.starts_with("noqa")
-            || remainder.starts_with("NoQA")
-            || remainder.starts_with("NOQA")
-    } else if line.starts_with("# ruff: ") {
-        let remainder = &line["# ruff: ".len()..];
-        remainder.starts_with("noqa")
-            || remainder.starts_with("NoQA")
-            || remainder.starts_with("NOQA")
-    } else {
-        false
-    }
+    line.starts_with("# flake8: noqa")
+        || line.starts_with("# flake8: NOQA")
+        || line.starts_with("# flake8: NoQA")
+        || line.starts_with("# ruff: noqa")
+        || line.starts_with("# ruff: NOQA")
+        || line.starts_with("# ruff: NoQA")
 }
 
 #[derive(Debug)]
