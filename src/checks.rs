@@ -91,6 +91,7 @@ pub enum CheckCode {
     F841,
     F901,
     // pylint errors
+    PLC3002,
     PLR0206,
     PLE1142,
     // flake8-builtins
@@ -542,6 +543,7 @@ pub enum CheckKind {
     UnusedVariable(String),
     YieldOutsideFunction(DeferralKeyword),
     // pylint errors
+    UnnecessaryDirectLambdaCall,
     PropertyWithParameters,
     AwaitOutsideAsync,
     // flake8-builtins
@@ -829,6 +831,7 @@ impl CheckCode {
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
             // pylint errors
+            CheckCode::PLC3002 => CheckKind::UnnecessaryDirectLambdaCall,
             CheckCode::PLR0206 => CheckKind::PropertyWithParameters,
             CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
             // flake8-builtins
@@ -1243,6 +1246,7 @@ impl CheckCode {
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
+            CheckCode::PLC3002 => CheckCategory::Pylint,
             CheckCode::PLR0206 => CheckCategory::Pylint,
             CheckCode::PLE1142 => CheckCategory::Pylint,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
@@ -1358,6 +1362,7 @@ impl CheckKind {
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
             // pylint errors
+            CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
             // flake8-builtins
@@ -1733,6 +1738,9 @@ impl CheckKind {
                 format!("Invalid escape sequence: '\\{char}'")
             }
             // pylint errors
+            CheckKind::UnnecessaryDirectLambdaCall => "Lambda expression called directly. Execute \
+                                                       the expression inline instead."
+                .to_string(),
             CheckKind::PropertyWithParameters => {
                 "Cannot have defined parameters for properties".to_string()
             }

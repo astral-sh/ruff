@@ -442,7 +442,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::PLR0206) {
-                    pylint::plugins::property_with_parameters(self, stmt, decorator_list, args)
+                    pylint::plugins::property_with_parameters(self, stmt, decorator_list, args);
                 }
 
                 self.check_builtin_shadowing(name, Range::from_located(stmt), true);
@@ -1718,6 +1718,11 @@ where
                 // pygrep-hooks
                 if self.settings.enabled.contains(&CheckCode::PGH001) {
                     pygrep_hooks::checks::no_eval(self, func);
+                }
+
+                // pylint
+                if self.settings.enabled.contains(&CheckCode::PLC3002) {
+                    pylint::plugins::unnecessary_direct_lambda_call(self, expr, func);
                 }
 
                 // Ruff

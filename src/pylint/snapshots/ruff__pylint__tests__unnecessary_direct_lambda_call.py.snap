@@ -1,0 +1,29 @@
+---
+source: src/pylint/mod.rs
+expression: checks
+---
+- kind: UnnecessaryDirectLambdaCall
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 33
+  fix: ~
+- kind: UnnecessaryDirectLambdaCall
+  location:
+    row: 5
+    column: 8
+  end_location:
+    row: 5
+    column: 27
+  fix: ~
+- kind: UnnecessaryDirectLambdaCall
+  location:
+    row: 5
+    column: 29
+  end_location:
+    row: 5
+    column: 47
+  fix: ~
+

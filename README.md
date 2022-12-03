@@ -752,6 +752,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
 | PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 
