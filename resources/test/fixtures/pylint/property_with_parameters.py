@@ -12,7 +12,7 @@ class Cls:
         return param + param1
 
     @property
-    def attribute_pos_only(self, param, param1, /):  # [property-with-parameters]
+    def attribute_positional_only(self, param, param1, /):  # [property-with-parameters]
         return param + param1
 
 
