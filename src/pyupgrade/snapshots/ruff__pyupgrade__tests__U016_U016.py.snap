@@ -40,7 +40,7 @@ expression: checks
     row: 9
     column: 15
   fix:
-    content: "(type,)"
+    content: type
     location:
       row: 9
       column: 0
@@ -55,7 +55,7 @@ expression: checks
     row: 10
     column: 16
   fix:
-    content: "(str,)"
+    content: str
     location:
       row: 10
       column: 0
@@ -70,7 +70,7 @@ expression: checks
     row: 11
     column: 17
   fix:
-    content: "(int,)"
+    content: int
     location:
       row: 11
       column: 0
@@ -220,7 +220,7 @@ expression: checks
     row: 21
     column: 31
   fix:
-    content: "(type,)"
+    content: type
     location:
       row: 21
       column: 16
@@ -235,7 +235,7 @@ expression: checks
     row: 22
     column: 33
   fix:
-    content: "(int,)"
+    content: int
     location:
       row: 22
       column: 16
@@ -250,7 +250,7 @@ expression: checks
     row: 23
     column: 32
   fix:
-    content: "(str,)"
+    content: str
     location:
       row: 23
       column: 16

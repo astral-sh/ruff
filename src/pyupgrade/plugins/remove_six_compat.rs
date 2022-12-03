@@ -21,9 +21,9 @@ fn map_name(name: &str, expr: &Expr, patch: bool) -> Option<Check> {
     let replacement = match name {
         "text_type" => Some("str"),
         "binary_type" => Some("bytes"),
-        "class_types" => Some("(type,)"),
-        "string_types" => Some("(str,)"),
-        "integer_types" => Some("(int,)"),
+        "class_types" => Some("type"),
+        "string_types" => Some("str"),
+        "integer_types" => Some("int"),
         "unichr" => Some("chr"),
         "iterbytes" => Some("iter"),
         "print_" => Some("print"),
