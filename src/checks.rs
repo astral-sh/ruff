@@ -1733,10 +1733,9 @@ impl CheckKind {
                 format!("Invalid escape sequence: '\\{char}'")
             }
             // pylint errors
-            CheckKind::UnnecessaryDirectLambdaCall => {
-                "Lambda expression called directly. Execute the expression inline instead."
-                    .to_string()
-            }
+            CheckKind::UnnecessaryDirectLambdaCall => "Lambda expression called directly. Execute \
+                                                       the expression inline instead."
+                .to_string(),
             CheckKind::PropertyWithParameters => {
                 "Cannot have defined parameters for properties".to_string()
             }
