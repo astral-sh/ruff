@@ -90,8 +90,9 @@ pub enum CheckCode {
     F831,
     F841,
     F901,
-    // pylint errors
+    // pylint
     PLR1701,
+    PLC3002,
     PLR0206,
     PLE1142,
     // flake8-builtins
@@ -541,8 +542,9 @@ pub enum CheckKind {
     UnusedImport(String, bool),
     UnusedVariable(String),
     YieldOutsideFunction(DeferralKeyword),
-    // pylint errors
+    // pylint
     ConsiderMergingIsinstance(String, Vec<String>),
+    UnnecessaryDirectLambdaCall,
     PropertyWithParameters,
     AwaitOutsideAsync,
     // flake8-builtins
@@ -828,12 +830,13 @@ impl CheckCode {
             CheckCode::F831 => CheckKind::DuplicateArgumentName,
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
-            // pylint errors
+            // pylint
+            CheckCode::PLC3002 => CheckKind::UnnecessaryDirectLambdaCall,
+            CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
+            CheckCode::PLR0206 => CheckKind::PropertyWithParameters,
             CheckCode::PLR1701 => {
                 CheckKind::ConsiderMergingIsinstance("...".to_string(), vec!["...".to_string()])
             }
-            CheckCode::PLR0206 => CheckKind::PropertyWithParameters,
-            CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
             // flake8-builtins
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
@@ -1245,9 +1248,10 @@ impl CheckCode {
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
-            CheckCode::PLR1701 => CheckCategory::Pylint,
-            CheckCode::PLR0206 => CheckCategory::Pylint,
+            CheckCode::PLC3002 => CheckCategory::Pylint,
             CheckCode::PLE1142 => CheckCategory::Pylint,
+            CheckCode::PLR0206 => CheckCategory::Pylint,
+            CheckCode::PLR1701 => CheckCategory::Pylint,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
             CheckCode::Q002 => CheckCategory::Flake8Quotes,
@@ -1359,10 +1363,11 @@ impl CheckKind {
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
-            // pylint errors
+            // pylint
+            CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
             CheckKind::ConsiderMergingIsinstance(..) => &CheckCode::PLR1701,
             CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
-            CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
+            CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
@@ -1734,11 +1739,14 @@ impl CheckKind {
             CheckKind::InvalidEscapeSequence(char) => {
                 format!("Invalid escape sequence: '\\{char}'")
             }
-            // pylint errors
+            // pylint
             CheckKind::ConsiderMergingIsinstance(obj, types) => {
                 let types = types.join(", ");
-                format!("Consider merging these isinstance calls: isinstance({obj}, ({types}))")
+                format!("Consider merging these isinstance calls: `isinstance({obj}, ({types}))`")
             }
+            CheckKind::UnnecessaryDirectLambdaCall => "Lambda expression called directly. Execute \
+                                                       the expression inline instead."
+                .to_string(),
             CheckKind::PropertyWithParameters => {
                 "Cannot have defined parameters for properties".to_string()
             }
