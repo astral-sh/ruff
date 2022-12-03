@@ -11,6 +11,7 @@ mod tests {
     use crate::linter::test_path;
     use crate::Settings;
 
+    #[test_case(CheckCode::PLC3002, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
     #[test_case(CheckCode::PLR0206, Path::new("property_with_parameters.py"); "PLR0206")]
     #[test_case(CheckCode::PLE1142, Path::new("await_outside_async.py"); "PLE1142")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {

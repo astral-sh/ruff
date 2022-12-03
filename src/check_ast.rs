@@ -1712,6 +1712,11 @@ where
                     pygrep_hooks::checks::no_eval(self, func);
                 }
 
+                // pylint
+                if self.settings.enabled.contains(&CheckCode::PLC3002) {
+                    pylint::plugins::unnecessary_direct_lambda_call(self, expr, func);
+                }
+
                 // Ruff
                 if self.settings.enabled.contains(&CheckCode::RUF101) {
                     rules::plugins::convert_exit_to_sys_exit(self, func);
