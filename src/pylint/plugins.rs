@@ -16,13 +16,14 @@ pub fn property_with_parameters(
         ExprKind::Name { id, .. } if id == "property" => true,
         _ => false,
     }) {
-        if args
-            .args
-            .iter()
-            .chain(args.posonlyargs.iter())
-            .chain(args.kwonlyargs.iter())
-            .count()
-            > 1
+        if checker.is_builtin("property")
+            && args
+                .args
+                .iter()
+                .chain(args.posonlyargs.iter())
+                .chain(args.kwonlyargs.iter())
+                .count()
+                > 1
         {
             checker.add_check(Check::new(
                 CheckKind::PropertyWithParameters,
