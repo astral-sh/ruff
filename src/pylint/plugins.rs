@@ -12,10 +12,10 @@ pub fn property_with_parameters(
     decorator_list: &[Expr],
     args: &Arguments,
 ) {
-    if decorator_list.iter().any(|d| match &d.node {
-        ExprKind::Name { id, .. } if id == "property" => true,
-        _ => false,
-    }) {
+    if decorator_list
+        .iter()
+        .any(|d| matches!(&d.node, ExprKind::Name { id, .. } if id == "property"))
+    {
         if checker.is_builtin("property")
             && args
                 .args
