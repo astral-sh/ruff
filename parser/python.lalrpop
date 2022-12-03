@@ -756,7 +756,7 @@ LambdaDef: ast::Expr = {
 }
 
 OrTest: ast::Expr = {
-    <e1:AndTest> <location:@L> <e2:("or" AndTest)*> <end_location:@R> => {
+    <location:@L> <e1:AndTest> <e2:("or" AndTest)*> <end_location:@R> => {
         if e2.is_empty() {
             e1
         } else {
@@ -773,7 +773,7 @@ OrTest: ast::Expr = {
 };
 
 AndTest: ast::Expr = {
-    <e1:NotTest> <location:@L> <e2:("and" NotTest)*> <end_location:@R> => {
+    <location:@L> <e1:NotTest> <e2:("and" NotTest)*> <end_location:@R> => {
         if e2.is_empty() {
             e1
         } else {
