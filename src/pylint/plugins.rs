@@ -72,7 +72,7 @@ pub fn consider_merging_isinstance(
     op: &Boolop,
     values: &[Expr],
 ) {
-    if !checker.is_builtin("isinstance") || !matches!(op, Boolop::Or) {
+    if !matches!(op, Boolop::Or) || !checker.is_builtin("isinstance") {
         return;
     }
 
