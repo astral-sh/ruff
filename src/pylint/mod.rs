@@ -17,6 +17,7 @@ mod tests {
     #[test_case(CheckCode::PLR0206, Path::new("property_with_parameters.py"); "PLR0206")]
     #[test_case(CheckCode::PLR0402, Path::new("import_aliasing.py"); "PLR0402")]
     #[test_case(CheckCode::PLR1701, Path::new("consider_merging_isinstance.py"); "PLR1701")]
+    #[test_case(CheckCode::PLW0120, Path::new("useless_else_on_loop.py"); "PLW0120")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let mut checks = test_path(
