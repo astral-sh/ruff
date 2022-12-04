@@ -1896,6 +1896,7 @@ dependencies = [
  "codegen",
  "itertools",
  "libcst",
+ "once_cell",
  "ruff",
  "rustpython-ast",
  "rustpython-common",
