@@ -8,7 +8,7 @@ use nohash_hasher::IntMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::checks::{Check, CheckCode};
+use crate::checks::{Check, CheckCode, REDIRECTS};
 
 static NO_QA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -37,6 +37,7 @@ pub enum Directive<'a> {
     Codes(usize, usize, usize, Vec<&'a str>),
 }
 
+/// Extract the noqa `Directive` from a line of Python source code.
 pub fn extract_noqa_directive(line: &str) -> Directive {
     match NO_QA_LINE_REGEX.captures(line) {
         Some(caps) => match caps.name("spaces") {
@@ -62,6 +63,19 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
         },
         None => Directive::None,
     }
+}
+
+/// Returns `true` if the string list of `codes` includes `code` (or an alias
+/// thereof).
+pub fn includes(needle: &CheckCode, haystack: &[&str]) -> bool {
+    let needle: &str = needle.as_ref();
+    haystack.iter().any(|candidate| {
+        if let Some(candidate) = REDIRECTS.get(candidate) {
+            needle == candidate.as_ref()
+        } else {
+            &needle == candidate
+        }
+    })
 }
 
 pub fn add_noqa(

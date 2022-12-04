@@ -74,4 +74,16 @@ mod tests {
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
+
+    #[test]
+    fn redirects() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/ruff/redirects.py"),
+            &settings::Settings::for_rules(vec![CheckCode::UP007]),
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
 }

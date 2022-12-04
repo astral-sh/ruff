@@ -2,6 +2,8 @@ use std::fmt;
 use std::str::FromStr;
 
 use itertools::Itertools;
+use once_cell::sync::Lazy;
+use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
@@ -2561,6 +2563,27 @@ impl Check {
         self.fix = Some(fix);
     }
 }
+
+/// A hash map from deprecated to latest `CheckCode`.
+pub static REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(|| {
+    FxHashMap::from_iter([
+        // TODO(charlie): Remove by 2023-01-01.
+        ("U001", CheckCode::UP001),
+        ("U003", CheckCode::UP003),
+        ("U004", CheckCode::UP004),
+        ("U005", CheckCode::UP005),
+        ("U006", CheckCode::UP006),
+        ("U007", CheckCode::UP007),
+        ("U008", CheckCode::UP008),
+        ("U009", CheckCode::UP009),
+        ("U010", CheckCode::UP010),
+        ("U011", CheckCode::UP011),
+        ("U012", CheckCode::UP012),
+        ("U013", CheckCode::UP013),
+        ("U014", CheckCode::UP014),
+        ("U015", CheckCode::UP015),
+    ])
+});
 
 #[cfg(test)]
 mod tests {
