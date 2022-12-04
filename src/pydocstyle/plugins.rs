@@ -367,11 +367,24 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
                     Range::from_located(docstring),
                 );
                 if checker.patch(check.kind.code()) {
+                    // Find the "summary" line (defined as the first non-blank line).
+                    let mut summary_line = 0;
+                    for line in string.lines() {
+                        if line.trim().is_empty() {
+                            summary_line += 1;
+                        } else {
+                            break;
+                        }
+                    }
+
                     // Insert one blank line after the summary (replacing any existing lines).
                     check.amend(Fix::replacement(
                         "\n".to_string(),
-                        Location::new(docstring.location.row() + 1, 0),
-                        Location::new(docstring.location.row() + 1 + blanks_count, 0),
+                        Location::new(docstring.location.row() + summary_line + 1, 0),
+                        Location::new(
+                            docstring.location.row() + summary_line + 1 + blanks_count,
+                            0,
+                        ),
                     ));
                 }
                 checker.add_check(check);
