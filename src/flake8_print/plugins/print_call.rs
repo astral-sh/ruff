@@ -19,24 +19,14 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
     };
 
     if checker.patch(check.kind.code()) {
-        let context = checker.binding_context();
-        if matches!(
-            checker.parents[context.defined_by].node,
-            StmtKind::Expr { .. }
-        ) {
-            let deleted: Vec<&Stmt> = checker
-                .deletions
-                .iter()
-                .map(|index| checker.parents[*index])
-                .collect();
-            match helpers::remove_stmt(
-                checker.parents[context.defined_by],
-                context.defined_in.map(|index| checker.parents[index]),
-                &deleted,
-            ) {
+        let defined_by = checker.current_parent();
+        let defined_in = checker.current_grandparent();
+        if matches!(defined_by.0.node, StmtKind::Expr { .. }) {
+            let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
+            match helpers::remove_stmt(defined_by.0, defined_in.map(|node| node.0), &deleted) {
                 Ok(fix) => {
                     if fix.content.is_empty() || fix.content == "pass" {
-                        checker.deletions.insert(context.defined_by);
+                        checker.deletions.insert(defined_by.clone());
                     }
                     check.amend(fix);
                 }

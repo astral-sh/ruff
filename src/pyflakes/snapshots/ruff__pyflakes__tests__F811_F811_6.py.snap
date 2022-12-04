@@ -1,0 +1,16 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    RedefinedWhileUnused:
+      - os
+      - 5
+  location:
+    row: 6
+    column: 11
+  end_location:
+    row: 6
+    column: 13
+  fix: ~
+

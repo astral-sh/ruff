@@ -67,13 +67,13 @@ expression: checks
     row: 32
     column: 17
   fix:
-    content: ""
+    content: pass
     location:
       row: 32
-      column: 0
+      column: 4
     end_location:
-      row: 33
-      column: 0
+      row: 32
+      column: 17
 - kind:
     UnusedImport:
       - importlib
@@ -85,13 +85,13 @@ expression: checks
     row: 33
     column: 20
   fix:
-    content: pass
+    content: ""
     location:
       row: 33
-      column: 4
+      column: 0
     end_location:
-      row: 33
-      column: 20
+      row: 34
+      column: 0
 - kind:
     UnusedImport:
       - pathlib

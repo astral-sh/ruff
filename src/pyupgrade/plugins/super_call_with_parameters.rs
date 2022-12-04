@@ -13,11 +13,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
         return;
     }
     let scope = checker.current_scope();
-    let parents: Vec<&Stmt> = checker
-        .parent_stack
-        .iter()
-        .map(|index| checker.parents[*index])
-        .collect();
+    let parents: Vec<&Stmt> = checker.parents.iter().map(|node| node.0).collect();
     let Some(mut check) = checks::super_args(scope, &parents, expr, func, args) else {
         return;
     };

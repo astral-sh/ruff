@@ -87,6 +87,7 @@ pub enum CheckCode {
     F706,
     F707,
     F722,
+    F811,
     F821,
     F822,
     F823,
@@ -616,6 +617,7 @@ pub enum CheckKind {
     PercentFormatStarRequiresSequence,
     PercentFormatUnsupportedFormatCharacter(char),
     RaiseNotImplemented,
+    RedefinedWhileUnused(String, usize),
     ReturnOutsideFunction,
     StringDotFormatExtraNamedArguments(Vec<String>),
     StringDotFormatExtraPositionalArguments(Vec<String>),
@@ -932,6 +934,7 @@ impl CheckCode {
             CheckCode::F706 => CheckKind::ReturnOutsideFunction,
             CheckCode::F707 => CheckKind::DefaultExceptNotLast,
             CheckCode::F722 => CheckKind::ForwardAnnotationSyntaxError("...".to_string()),
+            CheckCode::F811 => CheckKind::RedefinedWhileUnused("...".to_string(), 1),
             CheckCode::F821 => CheckKind::UndefinedName("...".to_string()),
             CheckCode::F822 => CheckKind::UndefinedExport("...".to_string()),
             CheckCode::F823 => CheckKind::UndefinedLocal("...".to_string()),
@@ -1359,6 +1362,7 @@ impl CheckCode {
             CheckCode::F706 => CheckCategory::Pyflakes,
             CheckCode::F707 => CheckCategory::Pyflakes,
             CheckCode::F722 => CheckCategory::Pyflakes,
+            CheckCode::F811 => CheckCategory::Pyflakes,
             CheckCode::F821 => CheckCategory::Pyflakes,
             CheckCode::F822 => CheckCategory::Pyflakes,
             CheckCode::F823 => CheckCategory::Pyflakes,
@@ -1508,6 +1512,7 @@ impl CheckKind {
             CheckKind::TypeComparison => &CheckCode::E721,
             CheckKind::UndefinedExport(_) => &CheckCode::F822,
             CheckKind::UndefinedLocal(_) => &CheckCode::F823,
+            CheckKind::RedefinedWhileUnused(..) => &CheckCode::F811,
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(..) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
@@ -1845,6 +1850,9 @@ impl CheckKind {
             }
             CheckKind::RaiseNotImplemented => {
                 "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
+            }
+            CheckKind::RedefinedWhileUnused(name, line) => {
+                format!("Redefinition of unused `{name}` from line {line}")
             }
             CheckKind::ReturnOutsideFunction => {
                 "`return` statement outside of a function/method".to_string()

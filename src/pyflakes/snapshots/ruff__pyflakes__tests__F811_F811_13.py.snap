@@ -1,0 +1,6 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+[]
+
