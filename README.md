@@ -1787,7 +1787,7 @@ ban-relative-imports = "all"
 
 ### `isort`
 
-#### [`combine-as-imports`](combine-as-imports)
+#### [`combine-as-imports`](#combine-as-imports)
 
 Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
 option.
@@ -1805,7 +1805,7 @@ combine-as-imports = true
 
 ---
 
-#### [`known-first-party`](known-first-party)
+#### [`known-first-party`](#known-first-party)
 
 A list of modules to consider first-party, regardless of whether they can be identified as such
 via introspection of the local filesystem.
@@ -1823,7 +1823,7 @@ known-first-party = ["src"]
 
 ---
 
-#### [`known-third-party`](known-third-party)
+#### [`known-third-party`](#known-third-party)
 
 A list of modules to consider third-party, regardless of whether they can be identified as such
 via introspection of the local filesystem.
@@ -1841,7 +1841,7 @@ known-third-party = ["fastapi"]
 
 ---
 
-#### [`extra-standard-library`](extra-standard-library)
+#### [`extra-standard-library`](#extra-standard-library)
 
 A list of modules to consider standard-library, in addition to those known to Ruff in advance.
 
