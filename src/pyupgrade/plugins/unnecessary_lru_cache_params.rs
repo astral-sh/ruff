@@ -4,7 +4,7 @@ use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::pyupgrade::checks;
 
-/// U011
+/// UP011
 pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Expr]) {
     if let Some(mut check) = checks::unnecessary_lru_cache_params(
         decorator_list,

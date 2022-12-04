@@ -54,7 +54,7 @@ fn any_arg_is_str(slice: &Expr) -> bool {
     }
 }
 
-/// U007
+/// UP007
 pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
     // Avoid rewriting forward annotations.
     if any_arg_is_str(slice) {

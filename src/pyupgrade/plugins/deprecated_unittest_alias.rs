@@ -27,7 +27,7 @@ static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::n
     ])
 });
 
-/// U005
+/// UP005
 pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, attr, .. } = &expr.node {
         if let Some(&target) = DEPRECATED_ALIASES.get(attr.as_str()) {

@@ -6,7 +6,7 @@ use crate::autofix::helpers;
 use crate::check_ast::Checker;
 use crate::pyupgrade::checks;
 
-/// U001
+/// UP001
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
     if let Some(mut check) =
         checks::useless_metaclass_type(targets, value, Range::from_located(stmt))

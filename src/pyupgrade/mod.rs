@@ -17,25 +17,25 @@ mod tests {
     use crate::settings;
     use crate::settings::types::PythonVersion;
 
-    #[test_case(CheckCode::U001, Path::new("U001.py"); "U001")]
-    #[test_case(CheckCode::U003, Path::new("U003.py"); "U003")]
-    #[test_case(CheckCode::U004, Path::new("U004.py"); "U004")]
-    #[test_case(CheckCode::U005, Path::new("U005.py"); "U005")]
-    #[test_case(CheckCode::U006, Path::new("U006.py"); "U006")]
-    #[test_case(CheckCode::U007, Path::new("U007.py"); "U007")]
-    #[test_case(CheckCode::U008, Path::new("U008.py"); "U008")]
-    #[test_case(CheckCode::U009, Path::new("U009_0.py"); "U009_0")]
-    #[test_case(CheckCode::U009, Path::new("U009_1.py"); "U009_1")]
-    #[test_case(CheckCode::U009, Path::new("U009_2.py"); "U009_2")]
-    #[test_case(CheckCode::U009, Path::new("U009_3.py"); "U009_3")]
-    #[test_case(CheckCode::U009, Path::new("U009_4.py"); "U009_4")]
-    #[test_case(CheckCode::U010, Path::new("U010.py"); "U010")]
-    #[test_case(CheckCode::U011, Path::new("U011_0.py"); "U011_0")]
-    #[test_case(CheckCode::U011, Path::new("U011_1.py"); "U011_1")]
-    #[test_case(CheckCode::U012, Path::new("U012.py"); "U012")]
-    #[test_case(CheckCode::U013, Path::new("U013.py"); "U013")]
-    #[test_case(CheckCode::U014, Path::new("U014.py"); "U014")]
-    #[test_case(CheckCode::U015, Path::new("U015.py"); "U015")]
+    #[test_case(CheckCode::UP001, Path::new("UP001.py"); "UP001")]
+    #[test_case(CheckCode::UP003, Path::new("UP003.py"); "UP003")]
+    #[test_case(CheckCode::UP004, Path::new("UP004.py"); "UP004")]
+    #[test_case(CheckCode::UP005, Path::new("UP005.py"); "UP005")]
+    #[test_case(CheckCode::UP006, Path::new("UP006.py"); "UP006")]
+    #[test_case(CheckCode::UP007, Path::new("UP007.py"); "UP007")]
+    #[test_case(CheckCode::UP008, Path::new("UP008.py"); "UP008")]
+    #[test_case(CheckCode::UP009, Path::new("UP009_0.py"); "UP009_0")]
+    #[test_case(CheckCode::UP009, Path::new("UP009_1.py"); "UP009_1")]
+    #[test_case(CheckCode::UP009, Path::new("UP009_2.py"); "UP009_2")]
+    #[test_case(CheckCode::UP009, Path::new("UP009_3.py"); "UP009_3")]
+    #[test_case(CheckCode::UP009, Path::new("UP009_4.py"); "UP009_4")]
+    #[test_case(CheckCode::UP010, Path::new("UP010.py"); "UP010")]
+    #[test_case(CheckCode::UP011, Path::new("UP011_0.py"); "UP011_0")]
+    #[test_case(CheckCode::UP011, Path::new("UP011_1.py"); "UP011_1")]
+    #[test_case(CheckCode::UP012, Path::new("UP012.py"); "UP012")]
+    #[test_case(CheckCode::UP013, Path::new("UP013.py"); "UP013")]
+    #[test_case(CheckCode::UP014, Path::new("UP014.py"); "UP014")]
+    #[test_case(CheckCode::UP015, Path::new("UP015.py"); "UP015")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let mut checks = test_path(
@@ -56,7 +56,7 @@ mod tests {
             Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(CheckCode::U006)
+                ..settings::Settings::for_rule(CheckCode::UP006)
             },
             true,
         )?;
@@ -71,7 +71,7 @@ mod tests {
             Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py310,
-                ..settings::Settings::for_rule(CheckCode::U006)
+                ..settings::Settings::for_rule(CheckCode::UP006)
             },
             true,
         )?;
@@ -86,7 +86,7 @@ mod tests {
             Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(CheckCode::U007)
+                ..settings::Settings::for_rule(CheckCode::UP007)
             },
             true,
         )?;
@@ -101,7 +101,7 @@ mod tests {
             Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py310,
-                ..settings::Settings::for_rule(CheckCode::U007)
+                ..settings::Settings::for_rule(CheckCode::UP007)
             },
             true,
         )?;

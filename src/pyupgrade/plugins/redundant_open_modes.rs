@@ -146,7 +146,7 @@ fn create_remove_param_fix(
     }
 }
 
-/// U015
+/// UP015
 pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     // If `open` has been rebound, skip this check entirely.
     if !checker.is_builtin(OPEN_FUNC_NAME) {
@@ -177,7 +177,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         value,
                         mode.replacement_value(),
                         checker.locator,
-                        checker.patch(&CheckCode::U015),
+                        checker.patch(&CheckCode::UP015),
                     ));
                 }
             }
@@ -194,7 +194,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(&CheckCode::U015),
+                    checker.patch(&CheckCode::UP015),
                 ));
             }
         }

@@ -181,7 +181,7 @@ fn convert_to_class(
     ))
 }
 
-/// U014
+/// UP014
 pub fn convert_named_tuple_functional_to_class(
     checker: &mut Checker,
     stmt: &Stmt,

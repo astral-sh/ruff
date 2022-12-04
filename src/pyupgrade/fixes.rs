@@ -135,7 +135,7 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
     None
 }
 
-/// U010
+/// UP010
 pub fn remove_unnecessary_future_import(
     locator: &SourceCodeLocator,
     removable: &[usize],
