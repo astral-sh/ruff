@@ -26,70 +26,70 @@ expression: checks
     Debugger:
       Import: builtins.breakpoint
   location:
-    row: 5
+    row: 6
     column: 0
   end_location:
-    row: 5
+    row: 6
     column: 31
   fix: ~
 - kind:
     Debugger:
       Import: pdb.set_trace
   location:
-    row: 6
+    row: 7
     column: 0
   end_location:
-    row: 6
+    row: 7
     column: 31
   fix: ~
 - kind:
     Debugger:
       Import: celery.contrib.rdb.set_trace
   location:
-    row: 7
+    row: 8
     column: 0
   end_location:
-    row: 7
+    row: 8
     column: 40
   fix: ~
 - kind:
     Debugger:
       Import: celery.contrib.rdb
   location:
-    row: 9
+    row: 10
     column: 0
   end_location:
-    row: 9
+    row: 10
     column: 25
   fix: ~
 - kind:
     Debugger:
       Call: breakpoint
   location:
-    row: 12
+    row: 13
     column: 0
   end_location:
-    row: 12
+    row: 13
     column: 12
   fix: ~
 - kind:
     Debugger:
       Call: set_trace
   location:
-    row: 13
+    row: 14
     column: 0
   end_location:
-    row: 13
+    row: 14
     column: 4
   fix: ~
 - kind:
     Debugger:
       Call: set_trace
   location:
-    row: 14
+    row: 15
     column: 0
   end_location:
-    row: 14
+    row: 15
     column: 11
   fix: ~
 
