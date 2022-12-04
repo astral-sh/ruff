@@ -57,13 +57,15 @@ pub fn main(cli: &Cli) -> Result<()> {
         for i in 0..=code_suffix_len {
             let source = code_str[..code_prefix_len + i].to_string();
             let destination = alias[..alias_prefix_len + i].to_string();
-            prefix_to_codes.insert(
-                destination,
-                prefix_to_codes
-                    .get(&source)
-                    .unwrap_or_else(|| panic!("Unknown CheckCode: {source:?}"))
-                    .clone(),
-            );
+            if source != destination {
+                prefix_to_codes.insert(
+                    destination,
+                    prefix_to_codes
+                        .get(&source)
+                        .unwrap_or_else(|| panic!("Unknown CheckCode: {source:?}"))
+                        .clone(),
+                );
+            }
         }
     }
 

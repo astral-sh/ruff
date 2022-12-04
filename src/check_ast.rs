@@ -1737,7 +1737,7 @@ where
                 }
 
                 // Ruff
-                if self.settings.enabled.contains(&CheckCode::RUF101) {
+                if self.settings.enabled.contains(&CheckCode::RUF004) {
                     rules::plugins::convert_exit_to_sys_exit(self, func);
                 }
             }
