@@ -2484,6 +2484,7 @@ impl CheckKind {
                 | CheckKind::ImplicitReturn
                 | CheckKind::ImplicitReturnValue
                 | CheckKind::IsLiteral
+                | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)

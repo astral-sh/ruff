@@ -767,7 +767,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLC2201 | MisplacedComparisonConstant | Comparison should be ... |  |
+| PLC2201 | MisplacedComparisonConstant | Comparison should be ... | 🛠 |
 | PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
 | PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
@@ -782,11 +782,6 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
 | RUF004 | ConvertExitToSysExit | `exit()` is only available in the interpreter, use `sys.exit()` instead | 🛠 |
-
-### Meta rules
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
 | RUF100 | UnusedNOQA | Unused `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
