@@ -45,7 +45,7 @@ pub fn check_lines(
 ) {
     let enforce_unnecessary_coding_comment = settings.enabled.contains(&CheckCode::UP009);
     let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
-    let enforce_noqa = settings.enabled.contains(&CheckCode::M001);
+    let enforce_noqa = settings.enabled.contains(&CheckCode::RUF100);
 
     let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut line_checks = vec![];
@@ -184,7 +184,7 @@ pub fn check_lines(
         }
     }
 
-    // Enforce that the noqa directive was actually used (M001).
+    // Enforce that the noqa directive was actually used (RUF100).
     if enforce_noqa {
         for (row, (directive, matches)) in noqa_directives {
             match directive {

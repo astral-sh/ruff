@@ -291,8 +291,7 @@ pub enum CheckCode {
     RUF002,
     RUF003,
     RUF004,
-    // Meta
-    M001,
+    RUF100,
     // pygrep-hooks
     PGH001,
 }
@@ -323,7 +322,6 @@ pub enum CheckCategory {
     PygrepHooks,
     Pylint,
     Ruff,
-    Meta,
 }
 
 pub enum Platform {
@@ -359,7 +357,6 @@ impl CheckCategory {
             CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
             CheckCategory::Isort => "isort",
             CheckCategory::McCabe => "mccabe",
-            CheckCategory::Meta => "Meta rules",
             CheckCategory::PEP8Naming => "pep8-naming",
             CheckCategory::Pycodestyle => "pycodestyle",
             CheckCategory::Pydocstyle => "pydocstyle",
@@ -434,7 +431,6 @@ impl CheckCategory {
             CheckCategory::McCabe => {
                 Some(("https://pypi.org/project/mccabe/0.7.0/", &Platform::PyPI))
             }
-            CheckCategory::Meta => None,
             CheckCategory::PEP8Naming => Some((
                 "https://pypi.org/project/pep8-naming/0.13.2/",
                 &Platform::PyPI,
@@ -776,7 +772,6 @@ pub enum CheckKind {
     AmbiguousUnicodeCharacterDocstring(char, char),
     AmbiguousUnicodeCharacterComment(char, char),
     ConvertExitToSysExit,
-    // Meta
     UnusedNOQA(Option<Vec<String>>),
 }
 
@@ -785,7 +780,7 @@ impl CheckCode {
     /// physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            CheckCode::E501 | CheckCode::W292 | CheckCode::M001 | CheckCode::UP009 => {
+            CheckCode::E501 | CheckCode::W292 | CheckCode::RUF100 | CheckCode::UP009 => {
                 &LintSource::Lines
             }
             CheckCode::ERA001
@@ -1113,8 +1108,7 @@ impl CheckCode {
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
             CheckCode::RUF003 => CheckKind::AmbiguousUnicodeCharacterComment('𝐁', 'B'),
             CheckCode::RUF004 => CheckKind::ConvertExitToSysExit,
-            // Meta
-            CheckCode::M001 => CheckKind::UnusedNOQA(None),
+            CheckCode::RUF100 => CheckKind::UnusedNOQA(None),
         }
     }
 
@@ -1286,7 +1280,6 @@ impl CheckCode {
             CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
             CheckCode::I001 => CheckCategory::Isort,
             CheckCode::I252 => CheckCategory::Flake8TidyImports,
-            CheckCode::M001 => CheckCategory::Meta,
             CheckCode::N801 => CheckCategory::PEP8Naming,
             CheckCode::N802 => CheckCategory::PEP8Naming,
             CheckCode::N803 => CheckCategory::PEP8Naming,
@@ -1324,6 +1317,7 @@ impl CheckCode {
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
             CheckCode::RUF004 => CheckCategory::Ruff,
+            CheckCode::RUF100 => CheckCategory::Ruff,
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
             CheckCode::S104 => CheckCategory::Flake8Bandit,
@@ -1628,8 +1622,7 @@ impl CheckKind {
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
             CheckKind::AmbiguousUnicodeCharacterComment(..) => &CheckCode::RUF003,
             CheckKind::ConvertExitToSysExit => &CheckCode::RUF004,
-            // Meta
-            CheckKind::UnusedNOQA(_) => &CheckCode::M001,
+            CheckKind::UnusedNOQA(_) => &CheckCode::RUF100,
         }
     }
 
@@ -2420,7 +2413,6 @@ impl CheckKind {
             CheckKind::ConvertExitToSysExit => "`exit()` is only available in the interpreter, \
                                                 use `sys.exit()` instead"
                 .to_string(),
-            // Meta
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),
                 Some(codes) => {

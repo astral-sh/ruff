@@ -355,13 +355,13 @@ For targeted exclusions across entire files (e.g., "Ignore all F841 violations i
 
 Ruff supports several workflows to aid in `noqa` management.
 
-First, Ruff provides a special error code, `M001`, to enforce that your `noqa` directives are
+First, Ruff provides a special error code, `RUF100`, to enforce that your `noqa` directives are
 "valid", in that the errors they _say_ they ignore are actually being triggered on that line (and
-thus suppressed). You can run `ruff /path/to/file.py --extend-select M001` to flag unused `noqa`
+thus suppressed). You can run `ruff /path/to/file.py --extend-select RUF100` to flag unused `noqa`
 directives.
 
 Second, Ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
-You can run `ruff /path/to/file.py --extend-select M001 --fix` to automatically remove unused
+You can run `ruff /path/to/file.py --extend-select RUF100 --fix` to automatically remove unused
 `noqa` directives.
 
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
@@ -786,7 +786,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| M001 | UnusedNOQA | Unused `noqa` directive | 🛠 |
+| RUF100 | UnusedNOQA | Unused `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
 

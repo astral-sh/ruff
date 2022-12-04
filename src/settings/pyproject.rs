@@ -286,7 +286,7 @@ select = ["E501"]
             r#"
 [tool.black]
 [tool.ruff]
-extend-select = ["M001"]
+extend-select = ["RUF100"]
 ignore = ["E501"]
 "#,
         )?;
@@ -298,7 +298,7 @@ ignore = ["E501"]
                     exclude: None,
                     extend_exclude: None,
                     extend_ignore: None,
-                    extend_select: Some(vec![CheckCodePrefix::M001]),
+                    extend_select: Some(vec![CheckCodePrefix::RUF100]),
                     external: None,
                     fix: None,
                     fixable: None,
