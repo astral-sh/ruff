@@ -1,12 +1,7 @@
 exit(0)
-
-
-def exit(e):
-    pass
-
-
-exit(1)
+quit(0)
 
 
 def main():
     exit(2)
+    quit(2)

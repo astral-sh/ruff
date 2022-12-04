@@ -1,35 +1,35 @@
 ---
-source: src/rules/mod.rs
+source: src/pylint/mod.rs
 expression: checks
 ---
-- kind: ConvertExitToSysExit
+- kind: ConsiderUsingSysExit
   location:
-    row: 3
+    row: 4
     column: 0
   end_location:
-    row: 3
+    row: 4
     column: 4
   fix:
-    content: sys2.exit
+    content: exit
     location:
-      row: 3
+      row: 4
       column: 0
     end_location:
-      row: 3
+      row: 4
       column: 4
-- kind: ConvertExitToSysExit
+- kind: ConsiderUsingSysExit
   location:
-    row: 7
+    row: 9
     column: 4
   end_location:
-    row: 7
+    row: 9
     column: 8
   fix:
-    content: sys2.exit
+    content: exit
     location:
-      row: 7
+      row: 9
       column: 4
     end_location:
-      row: 7
+      row: 9
       column: 8
 

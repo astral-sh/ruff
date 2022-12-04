@@ -1,8 +1,8 @@
 ---
-source: src/rules/mod.rs
+source: src/pylint/mod.rs
 expression: checks
 ---
-- kind: ConvertExitToSysExit
+- kind: ConsiderUsingSysExit
   location:
     row: 1
     column: 0
@@ -10,12 +10,12 @@ expression: checks
     row: 1
     column: 4
   fix: ~
-- kind: ConvertExitToSysExit
+- kind: ConsiderUsingSysExit
   location:
-    row: 5
-    column: 4
+    row: 2
+    column: 0
   end_location:
-    row: 5
-    column: 8
+    row: 2
+    column: 4
   fix: ~
 

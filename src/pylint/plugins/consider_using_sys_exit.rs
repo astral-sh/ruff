@@ -19,11 +19,6 @@ fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
     })
 }
 
-/// Return `true` if `exit` is (still) bound as a built-in in the current scope.
-fn has_builtin_exit_in_scope(checker: &Checker) -> bool {
-    !is_module_star_imported(checker, "sys") && checker.is_builtin("exit")
-}
-
 /// Return the appropriate `sys.exit` reference based on the current set of
 /// imports, or `None` is `sys.exit` hasn't been imported.
 fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -> Option<String> {
@@ -65,22 +60,27 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
 }
 
 /// RUF004
-pub fn convert_exit_to_sys_exit(checker: &mut Checker, func: &Expr) {
+pub fn consider_using_sys_exit(checker: &mut Checker, func: &Expr) {
     if let ExprKind::Name { id, .. } = &func.node {
-        if id == "exit" {
-            if has_builtin_exit_in_scope(checker) {
-                let mut check =
-                    Check::new(CheckKind::ConvertExitToSysExit, Range::from_located(func));
-                if checker.patch(check.kind.code()) {
-                    if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {
-                        check.amend(Fix::replacement(
-                            content,
-                            func.location,
-                            func.end_location.unwrap(),
-                        ));
+        for name in ["exit", "quit"] {
+            if id == name {
+                if !(name == "exit" && is_module_star_imported(checker, "sys"))
+                    && checker.is_builtin(name)
+                {
+                    let mut check =
+                        Check::new(CheckKind::ConsiderUsingSysExit, Range::from_located(func));
+                    if checker.patch(check.kind.code()) {
+                        if let Some(content) = get_member_import_name_alias(checker, "sys", "exit")
+                        {
+                            check.amend(Fix::replacement(
+                                content,
+                                func.location,
+                                func.end_location.unwrap(),
+                            ));
+                        }
                     }
+                    checker.add_check(check);
                 }
-                checker.add_check(check);
             }
         }
     }

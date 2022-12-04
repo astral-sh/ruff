@@ -773,6 +773,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
 | PLR0402 | ConsiderUsingFromImport | Consider using `from ... import ...` |  |
 | PLR1701 | ConsiderMergingIsinstance | Consider merging these isinstance calls: `isinstance(..., (...))` |  |
+| PLR1722 | ConsiderUsingSysExit | Consider using `sys.exit()` | 🛠 |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 
 ### Ruff-specific rules
@@ -782,7 +783,6 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
-| RUF004 | ConvertExitToSysExit | `exit()` is only available in the interpreter, use `sys.exit()` instead | 🛠 |
 | RUF100 | UnusedNOQA | Unused `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->

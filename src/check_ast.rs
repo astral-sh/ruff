@@ -37,7 +37,7 @@ use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
     flake8_print, flake8_return, flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle,
-    pyflakes, pygrep_hooks, pylint, pyupgrade, rules,
+    pyflakes, pygrep_hooks, pylint, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -1757,10 +1757,8 @@ where
                 if self.settings.enabled.contains(&CheckCode::PLC3002) {
                     pylint::plugins::unnecessary_direct_lambda_call(self, expr, func);
                 }
-
-                // Ruff
-                if self.settings.enabled.contains(&CheckCode::RUF004) {
-                    rules::plugins::convert_exit_to_sys_exit(self, func);
+                if self.settings.enabled.contains(&CheckCode::PLR1722) {
+                    pylint::plugins::consider_using_sys_exit(self, func);
                 }
             }
             ExprKind::Dict { keys, .. } => {
