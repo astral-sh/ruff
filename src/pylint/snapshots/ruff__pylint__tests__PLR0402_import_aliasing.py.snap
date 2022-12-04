@@ -4,7 +4,7 @@ expression: checks
 ---
 - kind:
     ConsiderUsingFromImport:
-      - path
+      - os
       - path
   location:
     row: 9
@@ -15,7 +15,7 @@ expression: checks
   fix: ~
 - kind:
     ConsiderUsingFromImport:
-      - foobar
+      - foo.bar
       - foobar
   location:
     row: 11

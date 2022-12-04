@@ -1,6 +1,8 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Alias, Arguments, Boolop, Cmpop, Expr, ExprKind, Stmt};
+use rustpython_ast::{
+    Alias, Arguments, Boolop, Cmpop, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
+};
 
 use crate::ast::types::{FunctionScope, Range, ScopeKind};
 use crate::autofix::Fix;
@@ -127,10 +129,10 @@ pub fn property_with_parameters(
 /// PLR0402
 pub fn consider_using_from_import(checker: &mut Checker, alias: &Alias) {
     if let Some(asname) = &alias.node.asname {
-        if let Some((_, module)) = alias.node.name.rsplit_once('.') {
-            if module == asname {
+        if let Some((module, name)) = alias.node.name.rsplit_once('.') {
+            if name == asname {
                 checker.add_check(Check::new(
-                    CheckKind::ConsiderUsingFromImport(module.to_string(), asname.to_string()),
+                    CheckKind::ConsiderUsingFromImport(module.to_string(), name.to_string()),
                     Range::from_located(alias),
                 ));
             }
@@ -177,5 +179,40 @@ pub fn consider_merging_isinstance(
                 Range::from_located(expr),
             ));
         }
+    }
+}
+
+fn loop_exits_early(body: &[Stmt]) -> bool {
+    body.iter().any(|stmt| match &stmt.node {
+        StmtKind::If { body, .. } => loop_exits_early(body),
+        StmtKind::Try {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        } => {
+            loop_exits_early(body)
+                || handlers.iter().any(|handler| match &handler.node {
+                    ExcepthandlerKind::ExceptHandler { body, .. } => loop_exits_early(body),
+                })
+                || loop_exits_early(orelse)
+                || loop_exits_early(finalbody)
+        }
+        StmtKind::For { orelse, .. }
+        | StmtKind::AsyncFor { orelse, .. }
+        | StmtKind::While { orelse, .. } => loop_exits_early(orelse),
+        StmtKind::Break { .. } => true,
+        _ => false,
+    })
+}
+
+/// PLW0120
+pub fn useless_else_on_loop(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
+    if !orelse.is_empty() && !loop_exits_early(body) {
+        checker.add_check(Check::new(
+            CheckKind::UselessElseOnLoop,
+            Range::from_located(stmt),
+        ));
     }
 }

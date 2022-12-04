@@ -61,15 +61,6 @@ pub fn dealias_call_path<'a>(
     }
 }
 
-/// Return `true` if the `Expr` is a name or attribute reference to `${target}`.
-pub fn match_name_or_attr(expr: &Expr, target: &str) -> bool {
-    match &expr.node {
-        ExprKind::Attribute { attr, .. } => target == attr,
-        ExprKind::Name { id, .. } => target == id,
-        _ => false,
-    }
-}
-
 /// Return `true` if the `Expr` is a reference to `${module}.${target}`.
 ///
 /// Useful for, e.g., ensuring that a `Union` reference represents

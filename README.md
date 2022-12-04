@@ -87,13 +87,12 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-debugger (T10)](#flake8-debugger)
    1. [flake8-print (T20)](#flake8-print)
    1. [flake8-quotes (Q)](#flake8-quotes)
-   1. [flake8-return (ET)](#flake8-return)
+   1. [flake8-return (RET)](#flake8-return)
    1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
    1. [eradicate (ERA)](#eradicate)
    1. [pygrep-hooks (PGH)](#pygrep-hooks)
    1. [Pylint (PL)](#pylint)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
-   1. [Meta rules (M)](#meta-rules)
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
 1. [Development](#development)
@@ -774,6 +773,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
 | PLR0402 | ConsiderUsingFromImport | Consider using `from ... import ...` |  |
 | PLR1701 | ConsiderMergingIsinstance | Consider merging these isinstance calls: `isinstance(..., (...))` |  |
+| PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it. |  |
 
 ### Ruff-specific rules
 
@@ -1788,7 +1788,7 @@ ban-relative-imports = "all"
 
 ### `isort`
 
-#### [`combine-as-imports`](combine-as-imports)
+#### [`combine-as-imports`](#combine-as-imports)
 
 Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
 option.
@@ -1806,7 +1806,7 @@ combine-as-imports = true
 
 ---
 
-#### [`known-first-party`](known-first-party)
+#### [`known-first-party`](#known-first-party)
 
 A list of modules to consider first-party, regardless of whether they can be identified as such
 via introspection of the local filesystem.
@@ -1824,7 +1824,7 @@ known-first-party = ["src"]
 
 ---
 
-#### [`known-third-party`](known-third-party)
+#### [`known-third-party`](#known-third-party)
 
 A list of modules to consider third-party, regardless of whether they can be identified as such
 via introspection of the local filesystem.
@@ -1842,7 +1842,7 @@ known-third-party = ["fastapi"]
 
 ---
 
-#### [`extra-standard-library`](extra-standard-library)
+#### [`extra-standard-library`](#extra-standard-library)
 
 A list of modules to consider standard-library, in addition to those known to Ruff in advance.
 

@@ -100,6 +100,7 @@ pub enum CheckCode {
     PLR0206,
     PLR0402,
     PLR1701,
+    PLW0120,
     // flake8-builtins
     A001,
     A002,
@@ -581,6 +582,7 @@ pub enum CheckKind {
     PropertyWithParameters,
     ConsiderUsingFromImport(String, String),
     AwaitOutsideAsync,
+    UselessElseOnLoop,
     // flake8-builtins
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
@@ -884,6 +886,7 @@ impl CheckCode {
             CheckCode::PLR1701 => {
                 CheckKind::ConsiderMergingIsinstance("...".to_string(), vec!["...".to_string()])
             }
+            CheckCode::PLW0120 => CheckKind::UselessElseOnLoop,
             // flake8-builtins
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
@@ -1309,6 +1312,7 @@ impl CheckCode {
             CheckCode::PLR0206 => CheckCategory::Pylint,
             CheckCode::PLR0402 => CheckCategory::Pylint,
             CheckCode::PLR1701 => CheckCategory::Pylint,
+            CheckCode::PLW0120 => CheckCategory::Pylint,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
             CheckCode::Q002 => CheckCategory::Flake8Quotes,
@@ -1437,6 +1441,7 @@ impl CheckKind {
             CheckKind::ConsiderMergingIsinstance(..) => &CheckCode::PLR1701,
             CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::ConsiderUsingFromImport(..) => &CheckCode::PLR0402,
+            CheckKind::UselessElseOnLoop => &CheckCode::PLW0120,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
@@ -1839,6 +1844,9 @@ impl CheckKind {
             CheckKind::AwaitOutsideAsync => {
                 "`await` should be used within an async function".to_string()
             }
+            CheckKind::UselessElseOnLoop => "Else clause on loop without a break statement, \
+                                             remove the else and de-indent all the code inside it"
+                .to_string(),
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
                 format!("Variable `{name}` is shadowing a python builtin")
