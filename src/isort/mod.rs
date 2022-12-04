@@ -145,7 +145,7 @@ fn annotate_imports<'a>(
     annotated
 }
 
-fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
+fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) -> ImportBlock {
     let mut block = ImportBlock::default();
     for import in imports {
         match import {
@@ -191,7 +191,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
             } => {
                 // Associate the comments with the first alias (best effort).
                 if let Some(alias) = names.first() {
-                    if alias.asname.is_none() {
+                    if alias.asname.is_none() || combine_as_imports {
                         let entry = &mut block
                             .import_from
                             .entry(ImportFromData { module, level })
@@ -225,7 +225,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
 
                 // Create an entry for every alias.
                 for alias in names {
-                    if alias.asname.is_none() {
+                    if alias.asname.is_none() || combine_as_imports {
                         let entry = block
                             .import_from
                             .entry(ImportFromData { module, level })
@@ -397,6 +397,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn format_imports(
     block: &[&Stmt],
     comments: Vec<Comment>,
@@ -405,11 +406,12 @@ pub fn format_imports(
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
+    combine_as_imports: bool,
 ) -> String {
     let block = annotate_imports(block, comments);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
-    let block = normalize_imports(block);
+    let block = normalize_imports(block, combine_as_imports);
 
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
@@ -466,9 +468,10 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
-    use crate::Settings;
+    use crate::{isort, Settings};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
+    #[test_case(Path::new("combine_as_imports.py"))]
     #[test_case(Path::new("combine_import_froms.py"))]
     #[test_case(Path::new("comments.py"))]
     #[test_case(Path::new("deduplicate_imports.py"))]
@@ -490,13 +493,35 @@ mod tests {
     #[test_case(Path::new("sort_similar_imports.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
-    fn isort(path: &Path) -> Result<()> {
+    fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
             &Settings {
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("combine_as_imports.py"))]
+    fn combine_as_imports(path: &Path) -> Result<()> {
+        let snapshot = format!("combine_as_imports_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    combine_as_imports: true,
+                    ..isort::settings::Settings::default()
+                },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
                 ..Settings::for_rule(CheckCode::I001)
             },
