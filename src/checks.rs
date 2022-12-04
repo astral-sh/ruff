@@ -2552,6 +2552,7 @@ impl CheckKind {
                 | CheckKind::UnusedNOQA(..)
                 | CheckKind::UsePEP585Annotation(..)
                 | CheckKind::UsePEP604Annotation
+                | CheckKind::UselessImportAlias
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(..)
         )
