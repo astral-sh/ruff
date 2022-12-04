@@ -668,6 +668,11 @@ where
                         }
                     }
 
+                    // pylint
+                    if self.settings.enabled.contains(&CheckCode::PLR0402) {
+                        pylint::plugins::consider_using_from_import(self, alias);
+                    }
+
                     if let Some(asname) = &alias.node.asname {
                         for alias in names {
                             if let Some(asname) = &alias.node.asname {

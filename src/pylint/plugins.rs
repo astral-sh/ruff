@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Arguments, Boolop, Expr, ExprKind, Stmt};
+use rustpython_ast::{Alias, Arguments, Boolop, Expr, ExprKind, Stmt};
 
 use crate::ast::types::{FunctionScope, Range, ScopeKind};
 use crate::check_ast::Checker;
@@ -61,6 +61,20 @@ pub fn property_with_parameters(
                 CheckKind::PropertyWithParameters,
                 Range::from_located(stmt),
             ));
+        }
+    }
+}
+
+/// PLR0402
+pub fn consider_using_from_import(checker: &mut Checker, alias: &Alias) {
+    if let Some(asname) = &alias.node.asname {
+        if let Some((_, module)) = alias.node.name.rsplit_once('.') {
+            if module == asname {
+                checker.add_check(Check::new(
+                    CheckKind::ConsiderUsingFromImport(module.to_string(), asname.to_string()),
+                    Range::from_located(alias),
+                ));
+            }
         }
     }
 }
