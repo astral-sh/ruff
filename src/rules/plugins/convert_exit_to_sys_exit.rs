@@ -64,7 +64,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
     })
 }
 
-/// RUF101
+/// RUF004
 pub fn convert_exit_to_sys_exit(checker: &mut Checker, func: &Expr) {
     if let ExprKind::Name { id, .. } = &func.node {
         if id == "exit" {

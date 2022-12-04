@@ -290,7 +290,7 @@ pub enum CheckCode {
     RUF001,
     RUF002,
     RUF003,
-    RUF101,
+    RUF004,
     // Meta
     M001,
     // pygrep-hooks
@@ -1112,7 +1112,7 @@ impl CheckCode {
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
             CheckCode::RUF003 => CheckKind::AmbiguousUnicodeCharacterComment('𝐁', 'B'),
-            CheckCode::RUF101 => CheckKind::ConvertExitToSysExit,
+            CheckCode::RUF004 => CheckKind::ConvertExitToSysExit,
             // Meta
             CheckCode::M001 => CheckKind::UnusedNOQA(None),
         }
@@ -1323,7 +1323,7 @@ impl CheckCode {
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
-            CheckCode::RUF101 => CheckCategory::Ruff,
+            CheckCode::RUF004 => CheckCategory::Ruff,
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
             CheckCode::S104 => CheckCategory::Flake8Bandit,
@@ -1627,7 +1627,7 @@ impl CheckKind {
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
             CheckKind::AmbiguousUnicodeCharacterComment(..) => &CheckCode::RUF003,
-            CheckKind::ConvertExitToSysExit => &CheckCode::RUF101,
+            CheckKind::ConvertExitToSysExit => &CheckCode::RUF004,
             // Meta
             CheckKind::UnusedNOQA(_) => &CheckCode::M001,
         }

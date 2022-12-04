@@ -780,7 +780,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
-| RUF101 | ConvertExitToSysExit | `exit()` is only available in the interpreter, use `sys.exit()` instead | 🛠 |
+| RUF004 | ConvertExitToSysExit | `exit()` is only available in the interpreter, use `sys.exit()` instead | 🛠 |
 
 ### Meta rules
 

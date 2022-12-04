@@ -18,13 +18,13 @@ mod tests {
     #[test_case(CheckCode::RUF001, Path::new("RUF001.py"); "RUF001")]
     #[test_case(CheckCode::RUF002, Path::new("RUF002.py"); "RUF002")]
     #[test_case(CheckCode::RUF003, Path::new("RUF003.py"); "RUF003")]
-    #[test_case(CheckCode::RUF101, Path::new("RUF101_0.py"); "RUF101_0")]
-    #[test_case(CheckCode::RUF101, Path::new("RUF101_1.py"); "RUF101_1")]
-    #[test_case(CheckCode::RUF101, Path::new("RUF101_2.py"); "RUF101_2")]
-    #[test_case(CheckCode::RUF101, Path::new("RUF101_3.py"); "RUF101_3")]
-    #[test_case(CheckCode::RUF101, Path::new("RUF101_4.py"); "RUF101_4")]
-    #[test_case(CheckCode::RUF101, Path::new("RUF101_5.py"); "RUF101_5")]
-    #[test_case(CheckCode::RUF101, Path::new("RUF101_6.py"); "RUF101_6")]
+    #[test_case(CheckCode::RUF004, Path::new("RUF004_0.py"); "RUF004_0")]
+    #[test_case(CheckCode::RUF004, Path::new("RUF004_1.py"); "RUF004_1")]
+    #[test_case(CheckCode::RUF004, Path::new("RUF004_2.py"); "RUF004_2")]
+    #[test_case(CheckCode::RUF004, Path::new("RUF004_3.py"); "RUF004_3")]
+    #[test_case(CheckCode::RUF004, Path::new("RUF004_4.py"); "RUF004_4")]
+    #[test_case(CheckCode::RUF004, Path::new("RUF004_5.py"); "RUF004_5")]
+    #[test_case(CheckCode::RUF004, Path::new("RUF004_6.py"); "RUF004_6")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let mut checks = test_path(
