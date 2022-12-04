@@ -40,10 +40,14 @@ mod tests {
     }
 
     #[test]
-    fn m001() -> Result<()> {
+    fn ruf100() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/ruff/M001.py"),
-            &settings::Settings::for_rules(vec![CheckCode::M001, CheckCode::E501, CheckCode::F841]),
+            Path::new("./resources/test/fixtures/ruff/RUF100.py"),
+            &settings::Settings::for_rules(vec![
+                CheckCode::RUF100,
+                CheckCode::E501,
+                CheckCode::F841,
+            ]),
             true,
         )?;
         checks.sort_by_key(|check| check.location);
