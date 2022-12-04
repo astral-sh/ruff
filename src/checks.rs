@@ -100,6 +100,7 @@ pub enum CheckCode {
     PLR0206,
     PLR0402,
     PLR1701,
+    PLR1722,
     PLW0120,
     // flake8-builtins
     A001,
@@ -293,7 +294,6 @@ pub enum CheckCode {
     RUF001,
     RUF002,
     RUF003,
-    RUF004,
     RUF100,
     // pygrep-hooks
     PGH001,
@@ -583,6 +583,7 @@ pub enum CheckKind {
     ConsiderUsingFromImport(String, String),
     AwaitOutsideAsync,
     UselessElseOnLoop,
+    ConsiderUsingSysExit,
     // flake8-builtins
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
@@ -777,7 +778,6 @@ pub enum CheckKind {
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
     AmbiguousUnicodeCharacterComment(char, char),
-    ConvertExitToSysExit,
     UnusedNOQA(Option<Vec<String>>),
 }
 
@@ -886,6 +886,7 @@ impl CheckCode {
             CheckCode::PLR1701 => {
                 CheckKind::ConsiderMergingIsinstance("...".to_string(), vec!["...".to_string()])
             }
+            CheckCode::PLR1722 => CheckKind::ConsiderUsingSysExit,
             CheckCode::PLW0120 => CheckKind::UselessElseOnLoop,
             // flake8-builtins
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
@@ -1116,7 +1117,6 @@ impl CheckCode {
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
             CheckCode::RUF003 => CheckKind::AmbiguousUnicodeCharacterComment('𝐁', 'B'),
-            CheckCode::RUF004 => CheckKind::ConvertExitToSysExit,
             CheckCode::RUF100 => CheckKind::UnusedNOQA(None),
         }
     }
@@ -1312,6 +1312,7 @@ impl CheckCode {
             CheckCode::PLR0206 => CheckCategory::Pylint,
             CheckCode::PLR0402 => CheckCategory::Pylint,
             CheckCode::PLR1701 => CheckCategory::Pylint,
+            CheckCode::PLR1722 => CheckCategory::Pylint,
             CheckCode::PLW0120 => CheckCategory::Pylint,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
@@ -1328,7 +1329,6 @@ impl CheckCode {
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
-            CheckCode::RUF004 => CheckCategory::Ruff,
             CheckCode::RUF100 => CheckCategory::Ruff,
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
@@ -1441,6 +1441,7 @@ impl CheckKind {
             CheckKind::ConsiderMergingIsinstance(..) => &CheckCode::PLR1701,
             CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::ConsiderUsingFromImport(..) => &CheckCode::PLR0402,
+            CheckKind::ConsiderUsingSysExit => &CheckCode::PLR1722,
             CheckKind::UselessElseOnLoop => &CheckCode::PLW0120,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
@@ -1636,7 +1637,6 @@ impl CheckKind {
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
             CheckKind::AmbiguousUnicodeCharacterComment(..) => &CheckCode::RUF003,
-            CheckKind::ConvertExitToSysExit => &CheckCode::RUF004,
             CheckKind::UnusedNOQA(_) => &CheckCode::RUF100,
         }
     }
@@ -1847,6 +1847,7 @@ impl CheckKind {
             CheckKind::UselessElseOnLoop => "Else clause on loop without a break statement, \
                                              remove the else and de-indent all the code inside it"
                 .to_string(),
+            CheckKind::ConsiderUsingSysExit => "Consider using `sys.exit()`".to_string(),
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
                 format!("Variable `{name}` is shadowing a python builtin")
@@ -2434,9 +2435,6 @@ impl CheckKind {
                      '{representant}'?)"
                 )
             }
-            CheckKind::ConvertExitToSysExit => "`exit()` is only available in the interpreter, \
-                                                use `sys.exit()` instead"
-                .to_string(),
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused `noqa` directive".to_string(),
                 Some(codes) => {
@@ -2488,7 +2486,7 @@ impl CheckKind {
                 | CheckKind::BlankLineBeforeSection(..)
                 | CheckKind::CapitalizeSectionName(..)
                 | CheckKind::CommentedOutCode
-                | CheckKind::ConvertExitToSysExit
+                | CheckKind::ConsiderUsingSysExit
                 | CheckKind::ConvertNamedTupleFunctionalToClass(..)
                 | CheckKind::ConvertTypedDictFunctionalToClass(..)
                 | CheckKind::DashedUnderlineAfterSection(..)

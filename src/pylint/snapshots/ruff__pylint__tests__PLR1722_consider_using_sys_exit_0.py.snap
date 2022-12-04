@@ -1,0 +1,37 @@
+---
+source: src/pylint/mod.rs
+expression: checks
+---
+- kind: ConsiderUsingSysExit
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 4
+  fix: ~
+- kind: ConsiderUsingSysExit
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 4
+  fix: ~
+- kind: ConsiderUsingSysExit
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 8
+  fix: ~
+- kind: ConsiderUsingSysExit
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 7
+    column: 8
+  fix: ~
+
