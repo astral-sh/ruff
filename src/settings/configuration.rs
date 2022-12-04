@@ -29,6 +29,7 @@ pub struct Configuration {
     pub fixable: Vec<CheckCodePrefix>,
     pub format: SerializationFormat,
     pub ignore: Vec<CheckCodePrefix>,
+    pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub select: Vec<CheckCodePrefix>,
@@ -125,6 +126,7 @@ impl Configuration {
             unfixable: options.unfixable.unwrap_or_default(),
             format: options.format.unwrap_or_default(),
             ignore: options.ignore.unwrap_or_default(),
+            ignore_init_module_imports: options.ignore_init_module_imports.unwrap_or_default(),
             line_length: options.line_length.unwrap_or(88),
             per_file_ignores: options
                 .per_file_ignores

@@ -3095,8 +3095,9 @@ impl<'a> Checker<'a> {
                     let child = self.parents[defined_by];
                     let parent = defined_in.map(|defined_in| self.parents[defined_in]);
 
-                    let in_init_py = self.path.ends_with("__init__.py");
-                    let fix = if !in_init_py && self.patch(&CheckCode::F401) {
+                    let ignore_init = self.settings.ignore_init_module_imports
+                        && self.path.ends_with("__init__.py");
+                    let fix = if !ignore_init && self.patch(&CheckCode::F401) {
                         let deleted: Vec<&Stmt> = self
                             .deletions
                             .iter()
@@ -3126,7 +3127,7 @@ impl<'a> Checker<'a> {
 
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), in_init_py),
+                            CheckKind::UnusedImport(full_name.clone(), ignore_init),
                             *range,
                         );
                         if let Some(fix) = fix.as_ref() {

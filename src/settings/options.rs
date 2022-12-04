@@ -23,6 +23,7 @@ pub struct Options {
     pub fixable: Option<Vec<CheckCodePrefix>>,
     pub format: Option<SerializationFormat>,
     pub ignore: Option<Vec<CheckCodePrefix>>,
+    pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
     pub select: Option<Vec<CheckCodePrefix>>,
     pub show_source: Option<bool>,

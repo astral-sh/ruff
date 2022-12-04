@@ -253,6 +253,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
@@ -295,6 +296,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
             select: Some(vec![
@@ -337,6 +339,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
             select: Some(vec![
@@ -379,6 +382,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
@@ -421,6 +425,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
@@ -471,6 +476,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
@@ -548,6 +554,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
