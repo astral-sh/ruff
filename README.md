@@ -728,9 +728,9 @@ For more, see [flake8-return](https://pypi.org/project/flake8-return/1.2.0/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| RET501 | UnnecessaryReturnNone | Do not explicitly `return None` in function if it is the only possible return value |  |
-| RET502 | ImplicitReturnValue | Do not implicitly `return None` in function able to return non-`None` value |  |
-| RET503 | ImplicitReturn | Missing explicit `return` at the end of function able to return non-`None` value |  |
+| RET501 | UnnecessaryReturnNone | Do not explicitly `return None` in function if it is the only possible return value | 🛠 |
+| RET502 | ImplicitReturnValue | Do not implicitly `return None` in function able to return non-`None` value | 🛠 |
+| RET503 | ImplicitReturn | Missing explicit `return` at the end of function able to return non-`None` value | 🛠 |
 | RET504 | UnnecessaryAssign | Unnecessary variable assignment before `return` statement |  |
 | RET505 | SuperfluousElseReturn | Unnecessary `else` after `return` statement |  |
 | RET506 | SuperfluousElseRaise | Unnecessary `else` after `raise` statement |  |
