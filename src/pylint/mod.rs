@@ -14,6 +14,7 @@ mod tests {
     #[test_case(CheckCode::PLC3002, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
     #[test_case(CheckCode::PLE1142, Path::new("await_outside_async.py"); "PLE1142")]
     #[test_case(CheckCode::PLR0206, Path::new("property_with_parameters.py"); "PLR0206")]
+    #[test_case(CheckCode::PLR0402, Path::new("import_aliasing.py"); "PLR0402")]
     #[test_case(CheckCode::PLR1701, Path::new("consider_merging_isinstance.py"); "PLR1701")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());

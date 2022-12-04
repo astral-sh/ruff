@@ -91,10 +91,11 @@ pub enum CheckCode {
     F841,
     F901,
     // pylint
-    PLR1701,
     PLC3002,
-    PLR0206,
     PLE1142,
+    PLR0206,
+    PLR0402,
+    PLR1701,
     // flake8-builtins
     A001,
     A002,
@@ -576,6 +577,7 @@ pub enum CheckKind {
     ConsiderMergingIsinstance(String, Vec<String>),
     UnnecessaryDirectLambdaCall,
     PropertyWithParameters,
+    ConsiderUsingFromImport(String, String),
     AwaitOutsideAsync,
     // flake8-builtins
     BuiltinVariableShadowing(String),
@@ -872,6 +874,9 @@ impl CheckCode {
             // pylint
             CheckCode::PLC3002 => CheckKind::UnnecessaryDirectLambdaCall,
             CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
+            CheckCode::PLR0402 => {
+                CheckKind::ConsiderUsingFromImport("...".to_string(), "...".to_string())
+            }
             CheckCode::PLR0206 => CheckKind::PropertyWithParameters,
             CheckCode::PLR1701 => {
                 CheckKind::ConsiderMergingIsinstance("...".to_string(), vec!["...".to_string()])
@@ -1299,6 +1304,7 @@ impl CheckCode {
             CheckCode::PLC3002 => CheckCategory::Pylint,
             CheckCode::PLE1142 => CheckCategory::Pylint,
             CheckCode::PLR0206 => CheckCategory::Pylint,
+            CheckCode::PLR0402 => CheckCategory::Pylint,
             CheckCode::PLR1701 => CheckCategory::Pylint,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
@@ -1423,6 +1429,7 @@ impl CheckKind {
             CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
             CheckKind::ConsiderMergingIsinstance(..) => &CheckCode::PLR1701,
             CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
+            CheckKind::ConsiderUsingFromImport(..) => &CheckCode::PLR0402,
             CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
@@ -1814,6 +1821,9 @@ impl CheckKind {
                 .to_string(),
             CheckKind::PropertyWithParameters => {
                 "Cannot have defined parameters for properties".to_string()
+            }
+            CheckKind::ConsiderUsingFromImport(module, name) => {
+                format!("Consider using `from {module} import {name}`")
             }
             CheckKind::AwaitOutsideAsync => {
                 "`await` should be used within an async function".to_string()
