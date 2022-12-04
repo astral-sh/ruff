@@ -1,0 +1,61 @@
+---
+source: src/pylint/mod.rs
+expression: checks
+---
+- kind: UselessElseOnLoop
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 11
+    column: 4
+  fix: ~
+- kind: UselessElseOnLoop
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 20
+    column: 4
+  fix: ~
+- kind: UselessElseOnLoop
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 34
+    column: 0
+  fix: ~
+- kind: UselessElseOnLoop
+  location:
+    row: 34
+    column: 0
+  end_location:
+    row: 40
+    column: 0
+  fix: ~
+- kind: UselessElseOnLoop
+  location:
+    row: 40
+    column: 0
+  end_location:
+    row: 48
+    column: 0
+  fix: ~
+- kind: UselessElseOnLoop
+  location:
+    row: 81
+    column: 4
+  end_location:
+    row: 90
+    column: 4
+  fix: ~
+- kind: UselessElseOnLoop
+  location:
+    row: 96
+    column: 8
+  end_location:
+    row: 101
+    column: 4
+  fix: ~
+

@@ -1009,16 +1009,27 @@ where
                     flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
                 }
             }
-            StmtKind::While { .. } => {
+            StmtKind::While { body, orelse, .. } => {
                 if self.settings.enabled.contains(&CheckCode::B023) {
                     flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
+                if self.settings.enabled.contains(&CheckCode::PLW0120) {
+                    pylint::plugins::useless_else_on_loop(self, stmt, body, orelse);
+                }
             }
             StmtKind::For {
-                target, body, iter, ..
+                target,
+                body,
+                iter,
+                orelse,
+                ..
             }
             | StmtKind::AsyncFor {
-                target, body, iter, ..
+                target,
+                body,
+                iter,
+                orelse,
+                ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::B007) {
                     flake8_bugbear::plugins::unused_loop_control_variable(self, target, body);
@@ -1028,6 +1039,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B023) {
                     flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Stmt(stmt));
+                }
+                if self.settings.enabled.contains(&CheckCode::PLW0120) {
+                    pylint::plugins::useless_else_on_loop(self, stmt, body, orelse);
                 }
             }
             StmtKind::Try { handlers, .. } => {
