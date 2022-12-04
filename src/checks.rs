@@ -1837,7 +1837,7 @@ impl CheckKind {
                 "`await` should be used within an async function".to_string()
             }
             CheckKind::UselessElseOnLoop => "Else clause on loop without a break statement, \
-                                             remove the else and de-indent all the code inside it."
+                                             remove the else and de-indent all the code inside it"
                 .to_string(),
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
