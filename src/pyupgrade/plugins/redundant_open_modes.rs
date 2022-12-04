@@ -6,7 +6,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, KeywordData, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
-use crate::ast::helpers::{self, match_name_or_attr};
+use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
@@ -64,7 +64,7 @@ fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
         keywords,
     } = &expr.node
     {
-        if match_name_or_attr(func, OPEN_FUNC_NAME) {
+        if matches!(&func.node, ExprKind::Name {id, ..} if id == OPEN_FUNC_NAME) {
             // Return the "open mode" parameter and keywords.
             return (args.get(1), keywords.clone());
         }

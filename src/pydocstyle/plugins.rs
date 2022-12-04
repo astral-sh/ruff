@@ -76,7 +76,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
-            if is_overload(stmt) {
+            if is_overload(checker, stmt) {
                 true
             } else {
                 if checker.settings.enabled.contains(&CheckCode::D103) {
@@ -89,7 +89,7 @@ pub fn not_missing(
             }
         }
         DefinitionKind::Method(stmt) => {
-            if is_overload(stmt) || is_override(stmt) {
+            if is_overload(checker, stmt) || is_override(checker, stmt) {
                 true
             } else if is_magic(stmt) {
                 if checker.settings.enabled.contains(&CheckCode::D105) {
@@ -835,7 +835,7 @@ pub fn if_needed(checker: &mut Checker, definition: &Definition) {
         | DefinitionKind::NestedFunction(stmt)
         | DefinitionKind::Method(stmt) = definition.kind
         {
-            if is_overload(stmt) {
+            if is_overload(checker, stmt) {
                 checker.add_check(Check::new(
                     CheckKind::SkipDocstring,
                     Range::from_located(stmt),
@@ -1319,7 +1319,7 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
                     // If this is a non-static method, skip `cls` or `self`.
                     usize::from(
                         matches!(definition.kind, DefinitionKind::Method(_))
-                            && !is_staticmethod(parent),
+                            && !is_staticmethod(checker, parent),
                     ),
                 )
             {
