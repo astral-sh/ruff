@@ -211,7 +211,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 .chain(args.kwonlyargs.iter())
                 .skip(
                     // If this is a non-static method, skip `cls` or `self`.
-                    usize::from(!visibility::is_staticmethod(stmt)),
+                    usize::from(!visibility::is_staticmethod(checker, stmt)),
                 )
             {
                 // ANN401 for dynamically typed arguments
@@ -283,10 +283,10 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             }
 
             // ANN101, ANN102
-            if !visibility::is_staticmethod(stmt) {
+            if !visibility::is_staticmethod(checker, stmt) {
                 if let Some(arg) = args.args.first() {
                     if arg.node.annotation.is_none() {
-                        if visibility::is_classmethod(stmt) {
+                        if visibility::is_classmethod(checker, stmt) {
                             if checker.settings.enabled.contains(&CheckCode::ANN102) {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingTypeCls(arg.node.arg.to_string()),
@@ -319,14 +319,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     return;
                 }
 
-                if visibility::is_classmethod(stmt) {
+                if visibility::is_classmethod(checker, stmt) {
                     if checker.settings.enabled.contains(&CheckCode::ANN206) {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeClassMethod(name.to_string()),
                             Range::from_located(stmt),
                         ));
                     }
-                } else if visibility::is_staticmethod(stmt) {
+                } else if visibility::is_staticmethod(checker, stmt) {
                     if checker.settings.enabled.contains(&CheckCode::ANN205) {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeStaticMethod(name.to_string()),

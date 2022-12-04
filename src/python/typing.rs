@@ -55,6 +55,7 @@ static TYPING_EXTENSIONS: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
         "get_overloads",
         "is_typeddict",
         "overload",
+        "override",
         "reveal_type",
         "runtime_checkable",
     ])
