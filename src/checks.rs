@@ -93,6 +93,7 @@ pub enum CheckCode {
     F841,
     F901,
     // pylint
+    PLC2201,
     PLC3002,
     PLE1142,
     PLR0206,
@@ -573,6 +574,7 @@ pub enum CheckKind {
     YieldOutsideFunction(DeferralKeyword),
     // pylint
     ConsiderMergingIsinstance(String, Vec<String>),
+    MisplacedComparisonConstant(String),
     UnnecessaryDirectLambdaCall,
     PropertyWithParameters,
     ConsiderUsingFromImport(String, String),
@@ -869,6 +871,7 @@ impl CheckCode {
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
             // pylint
+            CheckCode::PLC2201 => CheckKind::MisplacedComparisonConstant("...".to_string()),
             CheckCode::PLC3002 => CheckKind::UnnecessaryDirectLambdaCall,
             CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
             CheckCode::PLR0402 => {
@@ -1296,6 +1299,7 @@ impl CheckCode {
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
+            CheckCode::PLC2201 => CheckCategory::Pylint,
             CheckCode::PLC3002 => CheckCategory::Pylint,
             CheckCode::PLE1142 => CheckCategory::Pylint,
             CheckCode::PLR0206 => CheckCategory::Pylint,
@@ -1422,11 +1426,12 @@ impl CheckKind {
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
             // pylint
+            CheckKind::MisplacedComparisonConstant(..) => &CheckCode::PLC2201,
+            CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
             CheckKind::ConsiderMergingIsinstance(..) => &CheckCode::PLR1701,
             CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::ConsiderUsingFromImport(..) => &CheckCode::PLR0402,
-            CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
@@ -1810,6 +1815,9 @@ impl CheckKind {
             CheckKind::ConsiderMergingIsinstance(obj, types) => {
                 let types = types.join(", ");
                 format!("Consider merging these isinstance calls: `isinstance({obj}, ({types}))`")
+            }
+            CheckKind::MisplacedComparisonConstant(comprison) => {
+                format!("Comparison should be {comprison}")
             }
             CheckKind::UnnecessaryDirectLambdaCall => "Lambda expression called directly. Execute \
                                                        the expression inline instead."
