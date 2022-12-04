@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "ruff"
-version = "0.0.155"
+version = "0.0.156"
 edition = "2021"
 rust-version = "1.65.0"
 
