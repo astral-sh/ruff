@@ -1,0 +1,61 @@
+---
+source: src/flake8_return/mod.rs
+expression: checks
+---
+- kind: UnnecessaryAssign
+  location:
+    row: 6
+    column: 11
+  end_location:
+    row: 6
+    column: 12
+  fix: ~
+- kind: UnnecessaryAssign
+  location:
+    row: 12
+    column: 11
+  end_location:
+    row: 12
+    column: 12
+  fix: ~
+- kind: UnnecessaryAssign
+  location:
+    row: 18
+    column: 11
+  end_location:
+    row: 18
+    column: 12
+  fix: ~
+- kind: UnnecessaryAssign
+  location:
+    row: 25
+    column: 11
+  end_location:
+    row: 25
+    column: 12
+  fix: ~
+- kind: UnnecessaryAssign
+  location:
+    row: 31
+    column: 15
+  end_location:
+    row: 31
+    column: 16
+  fix: ~
+- kind: UnnecessaryAssign
+  location:
+    row: 43
+    column: 11
+  end_location:
+    row: 43
+    column: 17
+  fix: ~
+- kind: UnnecessaryAssign
+  location:
+    row: 51
+    column: 11
+  end_location:
+    row: 51
+    column: 20
+  fix: ~
+

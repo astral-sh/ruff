@@ -1,0 +1,77 @@
+---
+source: src/flake8_return/mod.rs
+expression: checks
+---
+- kind:
+    SuperfluousElseReturn: Elif
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 16
+    column: 0
+  fix: ~
+- kind:
+    SuperfluousElseReturn: Elif
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 27
+    column: 4
+  fix: ~
+- kind:
+    SuperfluousElseReturn: Elif
+  location:
+    row: 38
+    column: 4
+  end_location:
+    row: 49
+    column: 0
+  fix: ~
+- kind:
+    SuperfluousElseReturn: Else
+  location:
+    row: 50
+    column: 4
+  end_location:
+    row: 58
+    column: 0
+  fix: ~
+- kind:
+    SuperfluousElseReturn: Else
+  location:
+    row: 61
+    column: 8
+  end_location:
+    row: 67
+    column: 4
+  fix: ~
+- kind:
+    SuperfluousElseReturn: Else
+  location:
+    row: 73
+    column: 4
+  end_location:
+    row: 81
+    column: 4
+  fix: ~
+- kind:
+    SuperfluousElseReturn: Else
+  location:
+    row: 86
+    column: 8
+  end_location:
+    row: 91
+    column: 4
+  fix: ~
+- kind:
+    SuperfluousElseReturn: Else
+  location:
+    row: 97
+    column: 4
+  end_location:
+    row: 109
+    column: 0
+  fix: ~
+

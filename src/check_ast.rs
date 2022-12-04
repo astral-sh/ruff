@@ -36,8 +36,8 @@ use crate::visibility::{module_visibility, transition_scope, Modifier, Visibilit
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
-    flake8_print, flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pygrep_hooks, pylint, pyupgrade, rules,
+    flake8_print, flake8_return, flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle,
+    pyflakes, pygrep_hooks, pylint, pyupgrade, rules,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -421,9 +421,23 @@ where
                 if self.settings.enabled.contains(&CheckCode::B018) {
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
+
                 if self.settings.enabled.contains(&CheckCode::B019) {
                     flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
                 }
+
+                if self.settings.enabled.contains(&CheckCode::RET501)
+                    || self.settings.enabled.contains(&CheckCode::RET502)
+                    || self.settings.enabled.contains(&CheckCode::RET503)
+                    || self.settings.enabled.contains(&CheckCode::RET504)
+                    || self.settings.enabled.contains(&CheckCode::RET505)
+                    || self.settings.enabled.contains(&CheckCode::RET506)
+                    || self.settings.enabled.contains(&CheckCode::RET507)
+                    || self.settings.enabled.contains(&CheckCode::RET508)
+                {
+                    flake8_return::plugins::function(self, body);
+                }
+
                 if self.settings.enabled.contains(&CheckCode::C901) {
                     if let Some(check) = mccabe::checks::function_is_too_complex(
                         stmt,

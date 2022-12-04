@@ -152,6 +152,15 @@ pub enum CheckCode {
     C901,
     // flake8-tidy-imports
     I252,
+    // flake8-return
+    RET501,
+    RET502,
+    RET503,
+    RET504,
+    RET505,
+    RET506,
+    RET507,
+    RET508,
     // flake8-print
     T201,
     T203,
@@ -289,24 +298,25 @@ pub enum CheckCode {
 pub enum CheckCategory {
     Pyflakes,
     Pycodestyle,
+    McCabe,
     Isort,
     Pydocstyle,
     Pyupgrade,
     PEP8Naming,
-    Eradicate,
+    Flake82020,
+    Flake8Annotations,
     Flake8Bandit,
-    Flake8Comprehensions,
-    Flake8Debugger,
+    Flake8BlindExcept,
     Flake8BooleanTrap,
     Flake8Bugbear,
     Flake8Builtins,
-    Flake8TidyImports,
+    Flake8Comprehensions,
+    Flake8Debugger,
     Flake8Print,
     Flake8Quotes,
-    Flake8Annotations,
-    Flake82020,
-    Flake8BlindExcept,
-    McCabe,
+    Flake8Return,
+    Flake8TidyImports,
+    Eradicate,
     PygrepHooks,
     Pylint,
     Ruff,
@@ -342,6 +352,7 @@ impl CheckCategory {
             CheckCategory::Flake8Debugger => "flake8-debugger",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
+            CheckCategory::Flake8Return => "flake8-return",
             CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
             CheckCategory::Isort => "isort",
             CheckCategory::McCabe => "mccabe",
@@ -350,8 +361,8 @@ impl CheckCategory {
             CheckCategory::Pycodestyle => "pycodestyle",
             CheckCategory::Pydocstyle => "pydocstyle",
             CheckCategory::Pyflakes => "Pyflakes",
-            CheckCategory::Pylint => "Pylint",
             CheckCategory::PygrepHooks => "pygrep-hooks",
+            CheckCategory::Pylint => "Pylint",
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Ruff => "Ruff-specific rules",
         }
@@ -404,6 +415,10 @@ impl CheckCategory {
             )),
             CheckCategory::Flake8Quotes => Some((
                 "https://pypi.org/project/flake8-quotes/3.3.1/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8Return => Some((
+                "https://pypi.org/project/flake8-return/1.2.0/",
                 &Platform::PyPI,
             )),
             CheckCategory::Flake8TidyImports => Some((
@@ -475,6 +490,21 @@ impl fmt::Display for DeferralKeyword {
             DeferralKeyword::Yield => fmt.write_str("yield"),
             DeferralKeyword::YieldFrom => fmt.write_str("yield from"),
             DeferralKeyword::Await => fmt.write_str("await"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Branch {
+    Elif,
+    Else,
+}
+
+impl fmt::Display for Branch {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Branch::Elif => fmt.write_str("elif"),
+            Branch::Else => fmt.write_str("else"),
         }
     }
 }
@@ -602,6 +632,15 @@ pub enum CheckKind {
     Debugger(DebuggerUsingType),
     // flake8-tidy-imports
     BannedRelativeImport(Strictness),
+    // flake8-return
+    UnnecessaryReturnNone,
+    ImplicitReturnValue,
+    ImplicitReturn,
+    UnnecessaryAssign,
+    SuperfluousElseReturn(Branch),
+    SuperfluousElseRaise(Branch),
+    SuperfluousElseContinue(Branch),
+    SuperfluousElseBreak(Branch),
     // flake8-print
     PrintFound,
     PPrintFound,
@@ -907,6 +946,15 @@ impl CheckCode {
             CheckCode::T100 => CheckKind::Debugger(DebuggerUsingType::Import("...".to_string())),
             // flake8-tidy-imports
             CheckCode::I252 => CheckKind::BannedRelativeImport(Strictness::All),
+            // flake8-return
+            CheckCode::RET501 => CheckKind::UnnecessaryReturnNone,
+            CheckCode::RET502 => CheckKind::ImplicitReturnValue,
+            CheckCode::RET503 => CheckKind::ImplicitReturn,
+            CheckCode::RET504 => CheckKind::UnnecessaryAssign,
+            CheckCode::RET505 => CheckKind::SuperfluousElseReturn(Branch::Else),
+            CheckCode::RET506 => CheckKind::SuperfluousElseRaise(Branch::Else),
+            CheckCode::RET507 => CheckKind::SuperfluousElseContinue(Branch::Else),
+            CheckCode::RET508 => CheckKind::SuperfluousElseBreak(Branch::Else),
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
@@ -1256,6 +1304,14 @@ impl CheckCode {
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
             CheckCode::Q002 => CheckCategory::Flake8Quotes,
             CheckCode::Q003 => CheckCategory::Flake8Quotes,
+            CheckCode::RET501 => CheckCategory::Flake8Return,
+            CheckCode::RET502 => CheckCategory::Flake8Return,
+            CheckCode::RET503 => CheckCategory::Flake8Return,
+            CheckCode::RET504 => CheckCategory::Flake8Return,
+            CheckCode::RET505 => CheckCategory::Flake8Return,
+            CheckCode::RET506 => CheckCategory::Flake8Return,
+            CheckCode::RET507 => CheckCategory::Flake8Return,
+            CheckCode::RET508 => CheckCategory::Flake8Return,
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
@@ -1423,6 +1479,15 @@ impl CheckKind {
             CheckKind::Debugger(_) => &CheckCode::T100,
             // flake8-tidy-imports
             CheckKind::BannedRelativeImport(_) => &CheckCode::I252,
+            // flake8-return
+            CheckKind::UnnecessaryReturnNone => &CheckCode::RET501,
+            CheckKind::ImplicitReturnValue => &CheckCode::RET502,
+            CheckKind::ImplicitReturn => &CheckCode::RET503,
+            CheckKind::UnnecessaryAssign => &CheckCode::RET504,
+            CheckKind::SuperfluousElseReturn(_) => &CheckCode::RET505,
+            CheckKind::SuperfluousElseRaise(_) => &CheckCode::RET506,
+            CheckKind::SuperfluousElseContinue(_) => &CheckCode::RET507,
+            CheckKind::SuperfluousElseBreak(_) => &CheckCode::RET508,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
@@ -1963,6 +2028,31 @@ impl CheckKind {
                 }
                 Strictness::All => "Relative imports are banned".to_string(),
             },
+            // flake8-return
+            CheckKind::UnnecessaryReturnNone => "Do not explicitly `return None` in function if \
+                                                 it is the only possible return value"
+                .to_string(),
+            CheckKind::ImplicitReturnValue => "Do not implicitly `return None` in function able \
+                                               to return non-`None` value"
+                .to_string(),
+            CheckKind::ImplicitReturn => "Missing explicit `return` at the end of function able \
+                                          to return non-`None` value"
+                .to_string(),
+            CheckKind::UnnecessaryAssign => {
+                "Unnecessary variable assignment before `return` statement".to_string()
+            }
+            CheckKind::SuperfluousElseReturn(branch) => {
+                format!("Unnecessary `{branch}` after `return` statement")
+            }
+            CheckKind::SuperfluousElseRaise(branch) => {
+                format!("Unnecessary `{branch}` after `raise` statement")
+            }
+            CheckKind::SuperfluousElseContinue(branch) => {
+                format!("Unnecessary `{branch}` after `continue` statement")
+            }
+            CheckKind::SuperfluousElseBreak(branch) => {
+                format!("Unnecessary `{branch}` after `break` statement")
+            }
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),
             CheckKind::PPrintFound => "`pprint` found".to_string(),

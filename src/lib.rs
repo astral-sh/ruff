@@ -51,6 +51,7 @@ mod flake8_comprehensions;
 mod flake8_debugger;
 mod flake8_print;
 pub mod flake8_quotes;
+mod flake8_return;
 pub mod flake8_tidy_imports;
 pub mod fs;
 mod isort;
