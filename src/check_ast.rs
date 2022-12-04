@@ -2001,6 +2001,16 @@ where
                         .into_iter(),
                     );
                 }
+
+                if self.settings.enabled.contains(&CheckCode::PLC2201) {
+                    pylint::plugins::misplaced_comparison_constant(
+                        self,
+                        expr,
+                        left,
+                        ops,
+                        comparators,
+                    );
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),
