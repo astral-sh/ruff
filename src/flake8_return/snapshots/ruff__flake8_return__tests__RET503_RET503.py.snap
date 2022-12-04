@@ -17,7 +17,14 @@ expression: checks
   end_location:
     row: 14
     column: 15
-  fix: ~
+  fix:
+    content: "        return None\n"
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 0
 - kind: ImplicitReturn
   location:
     row: 23
@@ -25,7 +32,14 @@ expression: checks
   end_location:
     row: 23
     column: 11
-  fix: ~
+  fix:
+    content: "    return None\n"
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 24
+      column: 0
 - kind: ImplicitReturn
   location:
     row: 29
@@ -41,5 +55,12 @@ expression: checks
   end_location:
     row: 39
     column: 15
-  fix: ~
+  fix:
+    content: "        return None\n"
+    location:
+      row: 40
+      column: 0
+    end_location:
+      row: 40
+      column: 0
 

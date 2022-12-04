@@ -2469,6 +2469,8 @@ impl CheckKind {
                 | CheckKind::DoNotAssignLambda
                 | CheckKind::DuplicateHandlerException(..)
                 | CheckKind::GetAttrWithConstant
+                | CheckKind::ImplicitReturn
+                | CheckKind::ImplicitReturnValue
                 | CheckKind::IsLiteral
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
@@ -2488,6 +2490,7 @@ impl CheckKind {
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
                 | CheckKind::RaiseNotImplemented
+                | CheckKind::RedundantOpenModes
                 | CheckKind::RedundantTupleInExceptionHandler(..)
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
@@ -2502,7 +2505,6 @@ impl CheckKind {
                 | CheckKind::UnnecessaryComprehension(..)
                 | CheckKind::UnnecessaryEncodeUTF8
                 | CheckKind::UnnecessaryFutureImport(..)
-                | CheckKind::RedundantOpenModes
                 | CheckKind::UnnecessaryGeneratorDict
                 | CheckKind::UnnecessaryGeneratorList
                 | CheckKind::UnnecessaryGeneratorSet
@@ -2514,6 +2516,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryLiteralSet(..)
                 | CheckKind::UnnecessaryLiteralWithinListCall(..)
                 | CheckKind::UnnecessaryLiteralWithinTupleCall(..)
+                | CheckKind::UnnecessaryReturnNone
                 | CheckKind::UnsortedImports
                 | CheckKind::UnusedImport(_, false)
                 | CheckKind::UnusedLoopControlVariable(..)

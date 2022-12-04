@@ -3,6 +3,8 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
+use crate::ast::whitespace::indentation;
+use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Branch, CheckCode, CheckKind};
 use crate::flake8_return::helpers::result_exists;
@@ -20,10 +22,16 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
                     ..
                 }
             ) {
-                checker.add_check(Check::new(
-                    CheckKind::UnnecessaryReturnNone,
-                    Range::from_located(stmt),
-                ));
+                let mut check =
+                    Check::new(CheckKind::UnnecessaryReturnNone, Range::from_located(stmt));
+                if checker.patch(&CheckCode::RET501) {
+                    check.amend(Fix::replacement(
+                        "return".to_string(),
+                        stmt.location,
+                        stmt.end_location.unwrap(),
+                    ));
+                }
+                checker.add_check(check);
             }
         }
     }
@@ -33,10 +41,15 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
 fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     for (stmt, expr) in &stack.returns {
         if expr.is_none() {
-            checker.add_check(Check::new(
-                CheckKind::ImplicitReturnValue,
-                Range::from_located(stmt),
-            ));
+            let mut check = Check::new(CheckKind::ImplicitReturnValue, Range::from_located(stmt));
+            if checker.patch(&CheckCode::RET502) {
+                check.amend(Fix::replacement(
+                    "return None".to_string(),
+                    stmt.location,
+                    stmt.end_location.unwrap(),
+                ));
+            }
+            checker.add_check(check);
         }
     }
 }
@@ -85,10 +98,18 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         | StmtKind::Raise { .. }
         | StmtKind::Try { .. } => {}
         _ => {
-            checker.add_check(Check::new(
-                CheckKind::ImplicitReturn,
-                Range::from_located(last_stmt),
-            ));
+            let mut check = Check::new(CheckKind::ImplicitReturn, Range::from_located(last_stmt));
+            if checker.patch(&CheckCode::RET503) {
+                let mut content = String::new();
+                content.push_str(&indentation(checker, last_stmt));
+                content.push_str("return None");
+                content.push('\n');
+                check.amend(Fix::insertion(
+                    content,
+                    Location::new(last_stmt.end_location.unwrap().row() + 1, 0),
+                ));
+            }
+            checker.add_check(check);
         }
     }
 }
