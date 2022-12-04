@@ -1791,6 +1791,24 @@ ban-relative-imports = "all"
 
 ### `isort`
 
+#### [`combine-as-imports`](combine-as-imports)
+
+Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
+option.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+combine-as-imports = true
+```
+
+---
+
 #### [`known-first-party`](known-first-party)
 
 A list of modules to consider first-party, regardless of whether they can be identified as such
