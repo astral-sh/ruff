@@ -1803,9 +1803,12 @@ impl CheckKind {
             CheckKind::UndefinedName(name) => {
                 format!("Undefined name `{name}`")
             }
-            CheckKind::UnusedImport(name, in_init_py) => {
-                if *in_init_py {
-                    format!("`{name}` imported but unused and missing from `__all__`")
+            CheckKind::UnusedImport(name, ignore_init) => {
+                if *ignore_init {
+                    format!(
+                        "`{name}` imported but unused; consider adding to `__all__` or using a \
+                         redundant alias"
+                    )
                 } else {
                     format!("`{name}` imported but unused")
                 }

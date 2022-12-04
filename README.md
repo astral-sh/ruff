@@ -1270,25 +1270,6 @@ Summary
 
 ### Options
 
-#### [`dummy_variable_rgx`](#dummy_variable_rgx)
-
-A regular expression used to identify "dummy" variables, or those which should be ignored when evaluating
-(e.g.) unused-variable checks.
-
-**Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"` (matches `_`, `__`, and `_var`, but not `_var_`)
-
-**Type**: `Regex`
-
-**Example usage**:
-
-```toml
-[tool.ruff]
-# Only ignore variables named "_".
-dummy_variable_rgx = "^_$"
-```
-
----
-
 #### [`exclude`](#exclude)
 
 A list of file patterns to exclude from linting.
@@ -1302,7 +1283,7 @@ Exclusions are based on globs, and can be either:
   (to exclude any Python files in `directory`). Note that these paths are relative to the
   project root (e.g., the directory containing your `pyproject.toml`).
 
-Note that you'll typically want to use [`extend_exclude`](#extend-exclude) to modify the excluded
+Note that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded
 paths.
 
 **Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
@@ -1505,6 +1486,44 @@ The line length to use when enforcing long-lines violations (like E501).
 [tool.ruff]
 # Allow lines to be as long as 120 characters.
 line-length = 120
+```
+
+---
+
+#### [`dummy-variable-rgx`](#dummy-variable-rgx)
+
+A regular expression used to identify "dummy" variables, or those which should be ignored when evaluating
+(e.g.) unused-variable checks.
+
+**Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"` (matches `_`, `__`, and `_var`, but not `_var_`)
+
+**Type**: `Regex`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Only ignore variables named "_".
+dummy-variable-rgx = "^_$"
+```
+
+---
+
+#### [`ignore-init-module-imports`](#ignore-init-module-imports)
+
+Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be
+flagged, but with a dedicated message suggesting that the import is either added to the module's
+`__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+ignore-init-module-imports = true
 ```
 
 ---
