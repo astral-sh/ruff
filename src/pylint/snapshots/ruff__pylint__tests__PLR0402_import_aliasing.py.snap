@@ -7,10 +7,10 @@ expression: checks
       - os
       - path
   location:
-    row: 8
+    row: 9
     column: 7
   end_location:
-    row: 8
+    row: 9
     column: 22
   fix: ~
 - kind:
@@ -18,10 +18,10 @@ expression: checks
       - foo.bar
       - foobar
   location:
-    row: 10
+    row: 11
     column: 7
   end_location:
-    row: 10
+    row: 11
     column: 31
   fix: ~
 

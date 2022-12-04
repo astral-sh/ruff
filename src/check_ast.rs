@@ -669,6 +669,9 @@ where
                     }
 
                     // pylint
+                    if self.settings.enabled.contains(&CheckCode::PLC0414) {
+                        pylint::plugins::useless_import_alias(self, alias);
+                    }
                     if self.settings.enabled.contains(&CheckCode::PLR0402) {
                         pylint::plugins::consider_using_from_import(self, alias);
                     }
@@ -964,6 +967,11 @@ where
                             ) {
                                 self.add_check(check);
                             }
+                        }
+
+                        // pylint
+                        if self.settings.enabled.contains(&CheckCode::PLC0414) {
+                            pylint::plugins::useless_import_alias(self, alias);
                         }
                     }
                 }

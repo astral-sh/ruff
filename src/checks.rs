@@ -93,6 +93,7 @@ pub enum CheckCode {
     F841,
     F901,
     // pylint
+    PLC0414,
     PLC2201,
     PLC3002,
     PLE1142,
@@ -575,6 +576,7 @@ pub enum CheckKind {
     YieldOutsideFunction(DeferralKeyword),
     // pylint
     ConsiderMergingIsinstance(String, Vec<String>),
+    UselessImportAlias,
     MisplacedComparisonConstant(String),
     UnnecessaryDirectLambdaCall,
     PropertyWithParameters,
@@ -873,6 +875,7 @@ impl CheckCode {
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
             // pylint
+            CheckCode::PLC0414 => CheckKind::UselessImportAlias,
             CheckCode::PLC2201 => CheckKind::MisplacedComparisonConstant("...".to_string()),
             CheckCode::PLC3002 => CheckKind::UnnecessaryDirectLambdaCall,
             CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
@@ -1302,6 +1305,7 @@ impl CheckCode {
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
+            CheckCode::PLC0414 => CheckCategory::Pylint,
             CheckCode::PLC2201 => CheckCategory::Pylint,
             CheckCode::PLC3002 => CheckCategory::Pylint,
             CheckCode::PLE1142 => CheckCategory::Pylint,
@@ -1430,6 +1434,7 @@ impl CheckKind {
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
             // pylint
+            CheckKind::UselessImportAlias => &CheckCode::PLC0414,
             CheckKind::MisplacedComparisonConstant(..) => &CheckCode::PLC2201,
             CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
@@ -1817,6 +1822,9 @@ impl CheckKind {
                 format!("Invalid escape sequence: '\\{char}'")
             }
             // pylint
+            CheckKind::UselessImportAlias => {
+                "Import alias does not rename original package".to_string()
+            }
             CheckKind::ConsiderMergingIsinstance(obj, types) => {
                 let types = types.join(", ");
                 format!("Consider merging these isinstance calls: `isinstance({obj}, ({types}))`")
@@ -2544,6 +2552,7 @@ impl CheckKind {
                 | CheckKind::UnusedNOQA(..)
                 | CheckKind::UsePEP585Annotation(..)
                 | CheckKind::UsePEP604Annotation
+                | CheckKind::UselessImportAlias
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(..)
         )
