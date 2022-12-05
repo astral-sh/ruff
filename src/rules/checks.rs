@@ -1623,41 +1623,45 @@ pub fn ambiguous_unicode_character(
     for current_char in text.chars() {
         // Search for confusing characters.
         if let Some(representant) = CONFUSABLES.get(&(current_char as u32)) {
-            if let Some(representant) = char::from_u32(*representant) {
-                let col = if row_offset == 0 {
-                    start.column() + col_offset
-                } else {
-                    col_offset
-                };
-                let location = Location::new(start.row() + row_offset, col);
-                let end_location = Location::new(location.row(), location.column() + 1);
-                let mut check = Check::new(
-                    match context {
-                        Context::String => {
-                            CheckKind::AmbiguousUnicodeCharacterString(current_char, representant)
-                        }
-                        Context::Docstring => CheckKind::AmbiguousUnicodeCharacterDocstring(
-                            current_char,
-                            representant,
-                        ),
-                        Context::Comment => {
-                            CheckKind::AmbiguousUnicodeCharacterComment(current_char, representant)
-                        }
-                    },
-                    Range {
-                        location,
-                        end_location,
-                    },
-                );
-                if settings.enabled.contains(check.kind.code()) {
-                    if autofix && settings.fixable.contains(check.kind.code()) {
-                        check.amend(Fix::replacement(
-                            representant.to_string(),
+            if !settings.allowed_confusables.contains(&current_char) {
+                if let Some(representant) = char::from_u32(*representant) {
+                    let col = if row_offset == 0 {
+                        start.column() + col_offset
+                    } else {
+                        col_offset
+                    };
+                    let location = Location::new(start.row() + row_offset, col);
+                    let end_location = Location::new(location.row(), location.column() + 1);
+                    let mut check = Check::new(
+                        match context {
+                            Context::String => CheckKind::AmbiguousUnicodeCharacterString(
+                                current_char,
+                                representant,
+                            ),
+                            Context::Docstring => CheckKind::AmbiguousUnicodeCharacterDocstring(
+                                current_char,
+                                representant,
+                            ),
+                            Context::Comment => CheckKind::AmbiguousUnicodeCharacterComment(
+                                current_char,
+                                representant,
+                            ),
+                        },
+                        Range {
                             location,
                             end_location,
-                        ));
+                        },
+                    );
+                    if settings.enabled.contains(check.kind.code()) {
+                        if autofix && settings.fixable.contains(check.kind.code()) {
+                            check.amend(Fix::replacement(
+                                representant.to_string(),
+                                location,
+                                end_location,
+                            ));
+                        }
+                        checks.push(check);
                     }
-                    checks.push(check);
                 }
             }
         }
