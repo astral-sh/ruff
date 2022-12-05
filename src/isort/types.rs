@@ -59,6 +59,9 @@ pub struct ImportBlock<'a> {
     // Set of (module, level, name, asname), used to track re-exported 'from' imports.
     // Ex) `from module import member as member`
     pub import_from_as: FxHashMap<(ImportFromData<'a>, AliasData<'a>), CommentSet<'a>>,
+    // Map from (module, level) to `AliasData`, used to track star imports.
+    // Ex) `from module import *`
+    pub import_from_star: FxHashMap<ImportFromData<'a>, CommentSet<'a>>,
 }
 
 type AliasDataWithComments<'a> = (AliasData<'a>, CommentSet<'a>);

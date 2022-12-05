@@ -191,7 +191,18 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
             } => {
                 // Associate the comments with the first alias (best effort).
                 if let Some(alias) = names.first() {
-                    if alias.asname.is_none() || combine_as_imports {
+                    if alias.name == "*" {
+                        let entry = block
+                            .import_from_star
+                            .entry(ImportFromData { module, level })
+                            .or_default();
+                        for comment in atop {
+                            entry.atop.push(comment.value);
+                        }
+                        for comment in inline {
+                            entry.inline.push(comment.value);
+                        }
+                    } else if alias.asname.is_none() || combine_as_imports {
                         let entry = &mut block
                             .import_from
                             .entry(ImportFromData { module, level })
@@ -225,7 +236,18 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
 
                 // Create an entry for every alias.
                 for alias in names {
-                    if alias.asname.is_none() || combine_as_imports {
+                    if alias.name == "*" {
+                        let entry = block
+                            .import_from_star
+                            .entry(ImportFromData { module, level })
+                            .or_default();
+                        for comment in alias.atop {
+                            entry.atop.push(comment.value);
+                        }
+                        for comment in alias.inline {
+                            entry.inline.push(comment.value);
+                        }
+                    } else if alias.asname.is_none() || combine_as_imports {
                         let entry = block
                             .import_from
                             .entry(ImportFromData { module, level })
@@ -323,6 +345,22 @@ fn categorize_imports<'a>(
             .import_from_as
             .insert((import_from, alias), comments);
     }
+    // Categorize `StmtKind::ImportFrom` (with star).
+    for (import_from, comments) in block.import_from_star {
+        let classification = categorize(
+            &import_from.module_base(),
+            import_from.level,
+            src,
+            known_first_party,
+            known_third_party,
+            extra_standard_library,
+        );
+        block_by_type
+            .entry(classification)
+            .or_default()
+            .import_from_star
+            .insert(import_from, comments);
+    }
     block_by_type
 }
 
@@ -358,6 +396,33 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                 },
                                 FxHashMap::from_iter([(
                                     alias,
+                                    CommentSet {
+                                        atop: vec![],
+                                        inline: comments.inline,
+                                    },
+                                )]),
+                            ),
+                        )
+                    }),
+            )
+            .chain(
+                // Include all star imports.
+                block
+                    .import_from_star
+                    .into_iter()
+                    .map(|(import_from, comments)| {
+                        (
+                            import_from,
+                            (
+                                CommentSet {
+                                    atop: comments.atop,
+                                    inline: vec![],
+                                },
+                                FxHashMap::from_iter([(
+                                    AliasData {
+                                        name: "*",
+                                        asname: None,
+                                    },
                                     CommentSet {
                                         atop: vec![],
                                         inline: comments.inline,
@@ -486,6 +551,7 @@ mod tests {
     #[test_case(Path::new("order_by_type.py"))]
     #[test_case(Path::new("order_relative_imports_by_level.py"))]
     #[test_case(Path::new("preserve_comment_order.py"))]
+    #[test_case(Path::new("preserve_import_star.py"))]
     #[test_case(Path::new("preserve_indentation.py"))]
     #[test_case(Path::new("reorder_within_section.py"))]
     #[test_case(Path::new("separate_first_party_imports.py"))]
