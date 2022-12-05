@@ -1815,6 +1815,98 @@ ban-relative-imports = "all"
 
 ### `isort`
 
+#### [`combine-as-imports`](#combine-as-imports)
+
+Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports) option.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+combine-as-imports = true
+```
+
+---
+
+#### [`force-wrap-aliases`](#force-wrap-aliases)
+
+Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:
+
+```py
+from .utils import (
+    test_directory as test_directory,
+    test_id as test_id
+)
+```
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+force-wrap-aliases = true
+```
+
+---
+
+#### [`known-first-party`](#known-first-party)
+
+A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+known-first-party = ["src"]
+```
+
+---
+
+#### [`known-third-party`](#known-third-party)
+
+A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+known-third-party = ["src"]
+```
+
+---
+
+#### [`extra-standard-library`](#extra-standard-library)
+
+A list of modules to consider standard-library, in addition to those known to Ruff in advance.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+extra-standard-library = ["path"]
+```
+
+---
+
 ### `mccabe`
 
 #### [`max-complexity`](#max-complexity)
