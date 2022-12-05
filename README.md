@@ -1270,26 +1270,6 @@ Summary
 
 ### Options
 
-#### [`allowed-confusables`](#allowed-confusables)
-
-A list of allowed confusable for the rules `RUF001`, `RUF002`, `RUF003`.
-
-**Default value**: `[]`
-
-**Type**: `Vec<char>`
-
-**Example usage**:
-
-```toml
-[tool.ruff]
-# Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1),
-# and greek-small-letter-alpha (U+03B1) which  could
-# be confused for:    ["-", "p", "*"]
-allowed-confusables = ["−", "ρ", "∗"]
-```
-
----
-
 #### [`exclude`](#exclude)
 
 A list of file patterns to exclude from linting.
@@ -1525,6 +1505,26 @@ A regular expression used to identify "dummy" variables, or those which should b
 [tool.ruff]
 # Only ignore variables named "_".
 dummy-variable-rgx = "^_$"
+```
+
+---
+
+#### [`allowed-confusables`](#allowed-confusables)
+
+A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`, `RUF002`,
+and `RUF003`.
+
+**Default value**: `[]`
+
+**Type**: `Vec<char>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and greek-small-letter-alpha (U+03B1),
+# which could be confused for "-", "p", and "*", respectively.
+allowed-confusables = ["−", "ρ", "∗"]
 ```
 
 ---

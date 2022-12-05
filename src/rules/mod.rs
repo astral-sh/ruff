@@ -4,30 +4,31 @@ pub mod checks;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
-    use test_case::test_case;
+    use rustc_hash::FxHashSet;
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::settings;
 
-    #[test_case(CheckCode::RUF001, Path::new("RUF.py"); "RUF001")]
-    #[test_case(CheckCode::RUF002, Path::new("RUF.py"); "RUF002")]
-    #[test_case(CheckCode::RUF003, Path::new("RUF.py"); "RUF003")]
-    fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
+    #[test]
+    fn confusables() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/ruff")
-                .join(path)
-                .as_path(),
-            &settings::Settings::for_rule(check_code),
+            Path::new("./resources/test/fixtures/ruff/confusables.py"),
+            &settings::Settings {
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                ..settings::Settings::for_rules(vec![
+                    CheckCode::RUF001,
+                    CheckCode::RUF002,
+                    CheckCode::RUF003,
+                ])
+            },
             true,
         )?;
         checks.sort_by_key(|check| check.location);
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
