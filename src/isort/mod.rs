@@ -572,7 +572,9 @@ mod tests {
     #[test_case(Path::new("separate_local_folder_imports.py"))]
     #[test_case(Path::new("separate_third_party_imports.py"))]
     #[test_case(Path::new("skip.py"))]
+    #[test_case(Path::new("skip_file.py"))]
     #[test_case(Path::new("sort_similar_imports.py"))]
+    #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
     fn default(path: &Path) -> Result<()> {
