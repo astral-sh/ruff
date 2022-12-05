@@ -561,6 +561,7 @@ mod tests {
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
+    #[test_case(Path::new("no_wrap_star.py"))]
     #[test_case(Path::new("order_by_type.py"))]
     #[test_case(Path::new("order_relative_imports_by_level.py"))]
     #[test_case(Path::new("preserve_comment_order.py"))]
