@@ -187,7 +187,7 @@ pub struct Options {
             and `ignore`, respectively), more specific prefixes override less
             specific prefixes.
         "#,
-        default = r#"["E", "F"]"#,
+        default = r#"`["E", "F"]`"#,
         value_type = "Vec<CheckCodePrefix>",
         example = r#"
             # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
@@ -249,11 +249,17 @@ pub struct Options {
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     #[option_group]
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
+    #[option_group]
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
+    #[option_group]
     pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
+    #[option_group]
     pub isort: Option<isort::settings::Options>,
+    #[option_group]
     pub mccabe: Option<mccabe::settings::Options>,
+    #[option_group]
     pub pep8_naming: Option<pep8_naming::settings::Options>,
+    #[option_group]
     pub pyupgrade: Option<pyupgrade::settings::Options>,
     // Tables are required to go last.
     #[option(

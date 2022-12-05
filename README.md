@@ -1722,29 +1722,6 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 ---
 
-#### [`per-file-ignores`](#per-file-ignores)
-
-A list of mappings from file pattern to check code prefixes to
-exclude, when considering any matching files.
-
-**Default value**: `{}`
-
-**Type**: `HashMap<String, Vec<CheckCodePrefix>>`
-
-**Example usage**:
-
-```toml
-[tool.ruff]
-# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-[tool.ruff.per-file-ignores]
-"__init__.py" = ["E402"]
-"path/to/file.py" = ["E402"]
-```
-
----
-
-<!-- End auto-generated options sections. -->
-
 ### `flake8-quotes`
 
 #### [`inline-quotes`](#inline-quotes)
@@ -1815,6 +1792,41 @@ need to escape quotation marks within strings.
 # Don't bother trying to avoid escapes.
 avoid-escape = false
 ```
+
+---
+
+### `flake8-tidy-imports`
+
+### `isort`
+
+### `mccabe`
+
+### `pep8-naming`
+
+### `pyupgrade`
+
+#### [`per-file-ignores`](#per-file-ignores)
+
+A list of mappings from file pattern to check code prefixes to
+exclude, when considering any matching files.
+
+**Default value**: `{}`
+
+**Type**: `HashMap<String, Vec<CheckCodePrefix>>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["E402"]
+"path/to/file.py" = ["E402"]
+```
+
+---
+
+<!-- End auto-generated options sections. -->
 
 ### `flake8-tidy-imports`
 
