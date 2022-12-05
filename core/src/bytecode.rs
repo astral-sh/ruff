@@ -482,15 +482,15 @@ impl<C: Constant> BorrowedConstant<'_, C> {
     // takes `self` because we need to consume the iterator
     pub fn fmt_display(self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            BorrowedConstant::Integer { value } => write!(f, "{}", value),
-            BorrowedConstant::Float { value } => write!(f, "{}", value),
-            BorrowedConstant::Complex { value } => write!(f, "{}", value),
+            BorrowedConstant::Integer { value } => write!(f, "{value}"),
+            BorrowedConstant::Float { value } => write!(f, "{value}"),
+            BorrowedConstant::Complex { value } => write!(f, "{value}"),
             BorrowedConstant::Boolean { value } => {
                 write!(f, "{}", if value { "True" } else { "False" })
             }
-            BorrowedConstant::Str { value } => write!(f, "{:?}", value),
+            BorrowedConstant::Str { value } => write!(f, "{value:?}"),
             BorrowedConstant::Bytes { value } => write!(f, "b{:?}", value.as_bstr()),
-            BorrowedConstant::Code { code } => write!(f, "{:?}", code),
+            BorrowedConstant::Code { code } => write!(f, "{code:?}"),
             BorrowedConstant::Tuple { elements } => {
                 write!(f, "(")?;
                 let mut first = true;
@@ -852,7 +852,7 @@ impl<C: Constant> fmt::Display for CodeObject<C> {
         self.display_inner(f, false, 1)?;
         for constant in &*self.constants {
             if let BorrowedConstant::Code { code } = constant.borrow_constant() {
-                writeln!(f, "\nDisassembly of {:?}", code)?;
+                writeln!(f, "\nDisassembly of {code:?}")?;
                 code.fmt(f)?;
             }
         }
@@ -1118,14 +1118,14 @@ impl Instruction {
                     }
                 }
             }
-            UnaryOperation { op } => w!(UnaryOperation, format_args!("{:?}", op)),
-            BinaryOperation { op } => w!(BinaryOperation, format_args!("{:?}", op)),
+            UnaryOperation { op } => w!(UnaryOperation, format_args!("{op:?}")),
+            BinaryOperation { op } => w!(BinaryOperation, format_args!("{op:?}")),
             BinaryOperationInplace { op } => {
-                w!(BinaryOperationInplace, format_args!("{:?}", op))
+                w!(BinaryOperationInplace, format_args!("{op:?}"))
             }
             LoadAttr { idx } => w!(LoadAttr, name(*idx)),
-            TestOperation { op } => w!(TestOperation, format_args!("{:?}", op)),
-            CompareOperation { op } => w!(CompareOperation, format_args!("{:?}", op)),
+            TestOperation { op } => w!(TestOperation, format_args!("{op:?}")),
+            CompareOperation { op } => w!(CompareOperation, format_args!("{op:?}")),
             Pop => w!(Pop),
             Rotate2 => w!(Rotate2),
             Rotate3 => w!(Rotate3),
@@ -1139,7 +1139,7 @@ impl Instruction {
             JumpIfFalse { target } => w!(JumpIfFalse, target),
             JumpIfTrueOrPop { target } => w!(JumpIfTrueOrPop, target),
             JumpIfFalseOrPop { target } => w!(JumpIfFalseOrPop, target),
-            MakeFunction(flags) => w!(MakeFunction, format_args!("{:?}", flags)),
+            MakeFunction(flags) => w!(MakeFunction, format_args!("{flags:?}")),
             CallFunctionPositional { nargs } => w!(CallFunctionPositional, nargs),
             CallFunctionKeyword { nargs } => w!(CallFunctionKeyword, nargs),
             CallFunctionEx { has_kwargs } => w!(CallFunctionEx, has_kwargs),
@@ -1163,7 +1163,7 @@ impl Instruction {
             BeforeAsyncWith => w!(BeforeAsyncWith),
             SetupAsyncWith { end } => w!(SetupAsyncWith, end),
             PopBlock => w!(PopBlock),
-            Raise { kind } => w!(Raise, format_args!("{:?}", kind)),
+            Raise { kind } => w!(Raise, format_args!("{kind:?}")),
             BuildString { size } => w!(BuildString, size),
             BuildTuple { size, unpack } => w!(BuildTuple, size, unpack),
             BuildList { size, unpack } => w!(BuildList, size, unpack),
@@ -1182,7 +1182,7 @@ impl Instruction {
             LoadBuildClass => w!(LoadBuildClass),
             UnpackSequence { size } => w!(UnpackSequence, size),
             UnpackEx { before, after } => w!(UnpackEx, before, after),
-            FormatValue { conversion } => w!(FormatValue, format_args!("{:?}", conversion)),
+            FormatValue { conversion } => w!(FormatValue, format_args!("{conversion:?}")),
             PopException => w!(PopException),
             Reverse { amount } => w!(Reverse, amount),
             GetAwaitable => w!(GetAwaitable),

@@ -118,17 +118,17 @@ impl fmt::Display for Tok {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Tok::*;
         match self {
-            Name { name } => write!(f, "'{}'", name),
-            Int { value } => write!(f, "'{}'", value),
-            Float { value } => write!(f, "'{}'", value),
-            Complex { real, imag } => write!(f, "{}j{}", real, imag),
+            Name { name } => write!(f, "'{name}'"),
+            Int { value } => write!(f, "'{value}'"),
+            Float { value } => write!(f, "'{value}'"),
+            Complex { real, imag } => write!(f, "{real}j{imag}"),
             String { value, kind } => {
                 match kind {
                     StringKind::F => f.write_str("f")?,
                     StringKind::U => f.write_str("u")?,
                     StringKind::Normal => {}
                 }
-                write!(f, "{:?}", value)
+                write!(f, "{value:?}")
             }
             Bytes { value } => {
                 write!(f, "b\"")?;
@@ -138,7 +138,7 @@ impl fmt::Display for Tok {
                         10 => f.write_str("\\n")?,
                         13 => f.write_str("\\r")?,
                         32..=126 => f.write_char(*i as char)?,
-                        _ => write!(f, "\\x{:02x}", i)?,
+                        _ => write!(f, "\\x{i:02x}")?,
                     }
                 }
                 f.write_str("\"")

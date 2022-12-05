@@ -344,7 +344,7 @@ impl FStringParser {
 }
 
 fn parse_fstring_expr(source: &str) -> Result<Expr, ParseError> {
-    let fstring_body = format!("({})", source);
+    let fstring_body = format!("({source})");
     parse_expression(&fstring_body, "<fstring>")
 }
 

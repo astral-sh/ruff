@@ -34,7 +34,7 @@ impl fmt::Display for LexicalErrorType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             LexicalErrorType::StringError => write!(f, "Got unexpected string"),
-            LexicalErrorType::FStringError(error) => write!(f, "Got error in f-string: {}", error),
+            LexicalErrorType::FStringError(error) => write!(f, "Got error in f-string: {error}"),
             LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode"),
             LexicalErrorType::NestingError => write!(f, "Got unexpected nesting"),
             LexicalErrorType::IndentationError => {
@@ -56,13 +56,13 @@ impl fmt::Display for LexicalErrorType {
                 write!(f, "positional argument follows keyword argument")
             }
             LexicalErrorType::UnrecognizedToken { tok } => {
-                write!(f, "Got unexpected token {}", tok)
+                write!(f, "Got unexpected token {tok}")
             }
             LexicalErrorType::LineContinuationError => {
                 write!(f, "unexpected character after line continuation character")
             }
             LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
-            LexicalErrorType::OtherError(msg) => write!(f, "{}", msg),
+            LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -97,17 +97,16 @@ impl fmt::Display for FStringErrorType {
             FStringErrorType::UnopenedRbrace => write!(f, "Unopened '}}'"),
             FStringErrorType::ExpectedRbrace => write!(f, "Expected '}}' after conversion flag."),
             FStringErrorType::InvalidExpression(error) => {
-                write!(f, "{}", error)
+                write!(f, "{error}")
             }
             FStringErrorType::InvalidConversionFlag => write!(f, "invalid conversion character"),
             FStringErrorType::EmptyExpression => write!(f, "empty expression not allowed"),
             FStringErrorType::MismatchedDelimiter(first, second) => write!(
                 f,
-                "closing parenthesis '{}' does not match opening parenthesis '{}'",
-                second, first
+                "closing parenthesis '{second}' does not match opening parenthesis '{first}'"
             ),
             FStringErrorType::SingleRbrace => write!(f, "single '}}' is not allowed"),
-            FStringErrorType::Unmatched(delim) => write!(f, "unmatched '{}'", delim),
+            FStringErrorType::Unmatched(delim) => write!(f, "unmatched '{delim}'"),
             FStringErrorType::ExpressionNestedTooDeeply => {
                 write!(f, "expressions nested too deeply")
             }
@@ -118,7 +117,7 @@ impl fmt::Display for FStringErrorType {
                 if *c == '\\' {
                     write!(f, "f-string expression part cannot include a backslash")
                 } else {
-                    write!(f, "f-string expression part cannot include '{}'s", c)
+                    write!(f, "f-string expression part cannot include '{c}'s")
                 }
             }
         }
@@ -198,7 +197,7 @@ impl fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ParseErrorType::Eof => write!(f, "Got unexpected EOF"),
-            ParseErrorType::ExtraToken(ref tok) => write!(f, "Got extraneous token: {:?}", tok),
+            ParseErrorType::ExtraToken(ref tok) => write!(f, "Got extraneous token: {tok:?}"),
             ParseErrorType::InvalidToken => write!(f, "Got invalid token"),
             ParseErrorType::UnrecognizedToken(ref tok, ref expected) => {
                 if *tok == Tok::Indent {
@@ -206,10 +205,10 @@ impl fmt::Display for ParseErrorType {
                 } else if expected.as_deref() == Some("Indent") {
                     write!(f, "expected an indented block")
                 } else {
-                    write!(f, "invalid syntax. Got unexpected token {}", tok)
+                    write!(f, "invalid syntax. Got unexpected token {tok}")
                 }
             }
-            ParseErrorType::Lexical(ref error) => write!(f, "{}", error),
+            ParseErrorType::Lexical(ref error) => write!(f, "{error}"),
         }
     }
 }
