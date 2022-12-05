@@ -6,10 +6,11 @@ use crate::checks::{Check, CheckKind};
 
 /// B016
 pub fn cannot_raise_literal(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Constant { .. } = &expr.node {
-        checker.add_check(Check::new(
-            CheckKind::CannotRaiseLiteral,
-            Range::from_located(expr),
-        ));
-    }
+    let ExprKind::Constant { .. } = &expr.node else {
+        return;
+    };
+    checker.add_check(Check::new(
+        CheckKind::CannotRaiseLiteral,
+        Range::from_located(expr),
+    ));
 }

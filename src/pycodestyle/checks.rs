@@ -51,31 +51,32 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
     let mut checks: Vec<Check> = vec![];
 
     for (op, right) in izip!(ops, comparators) {
-        if matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
-            match &right.node {
-                ExprKind::Call { func, args, .. } => {
-                    if let ExprKind::Name { id, .. } = &func.node {
-                        // Ex) type(False)
-                        if id == "type" {
-                            if let Some(arg) = args.first() {
-                                // Allow comparison for types which are not obvious.
-                                if !matches!(arg.node, ExprKind::Name { .. }) {
-                                    checks.push(Check::new(CheckKind::TypeComparison, location));
-                                }
+        if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
+            continue;
+        }
+        match &right.node {
+            ExprKind::Call { func, args, .. } => {
+                if let ExprKind::Name { id, .. } = &func.node {
+                    // Ex) type(False)
+                    if id == "type" {
+                        if let Some(arg) = args.first() {
+                            // Allow comparison for types which are not obvious.
+                            if !matches!(arg.node, ExprKind::Name { .. }) {
+                                checks.push(Check::new(CheckKind::TypeComparison, location));
                             }
                         }
                     }
                 }
-                ExprKind::Attribute { value, .. } => {
-                    if let ExprKind::Name { id, .. } = &value.node {
-                        // Ex) types.IntType
-                        if id == "types" {
-                            checks.push(Check::new(CheckKind::TypeComparison, location));
-                        }
+            }
+            ExprKind::Attribute { value, .. } => {
+                if let ExprKind::Name { id, .. } = &value.node {
+                    // Ex) types.IntType
+                    if id == "types" {
+                        checks.push(Check::new(CheckKind::TypeComparison, location));
                     }
                 }
-                _ => {}
             }
+            _ => {}
         }
     }
 
@@ -123,42 +124,42 @@ pub fn invalid_escape_sequence(
         for (row_offset, line) in body.lines().enumerate() {
             let chars: Vec<char> = line.chars().collect();
             for col_offset in 0..chars.len() {
-                if chars[col_offset] == '\\' {
-                    // If the previous character was also a backslash, skip.
-                    if col_offset > 0 && chars[col_offset - 1] == '\\' {
-                        continue;
-                    }
-
-                    // If we're at the end of the line, skip.
-                    if col_offset == chars.len() - 1 {
-                        continue;
-                    }
-
-                    // If the next character is a valid escape sequence, skip.
-                    let next_char = chars[col_offset + 1];
-                    if VALID_ESCAPE_SEQUENCES.contains(&next_char) {
-                        continue;
-                    }
-
-                    // Compute the location of the escape sequence by offsetting the location of the
-                    // string token by the characters we've seen thus far.
-                    let location = if row_offset == 0 {
-                        Location::new(
-                            start.row() + row_offset,
-                            start.column() + prefix.len() + quote.len() + col_offset,
-                        )
-                    } else {
-                        Location::new(start.row() + row_offset, col_offset)
-                    };
-                    let end_location = Location::new(location.row(), location.column() + 2);
-                    checks.push(Check::new(
-                        CheckKind::InvalidEscapeSequence(next_char),
-                        Range {
-                            location,
-                            end_location,
-                        },
-                    ));
+                if chars[col_offset] != '\\' {
+                    continue;
                 }
+
+                // If the previous character was also a backslash, skip.
+                if col_offset > 0 && chars[col_offset - 1] == '\\' {
+                    continue;
+                }
+
+                // If we're at the end of the line, skip.
+                if col_offset == chars.len() - 1 {
+                    continue;
+                }
+
+                // If the next character is a valid escape sequence, skip.
+                let next_char = chars[col_offset + 1];
+                if VALID_ESCAPE_SEQUENCES.contains(&next_char) {
+                    continue;
+                }
+
+                // Compute the location of the escape sequence by offsetting the location of the
+                // string token by the characters we've seen thus far.
+                let col = if row_offset == 0 {
+                    start.column() + prefix.len() + quote.len() + col_offset
+                } else {
+                    col_offset
+                };
+                let location = Location::new(start.row() + row_offset, col);
+                let end_location = Location::new(location.row(), location.column() + 2);
+                checks.push(Check::new(
+                    CheckKind::InvalidEscapeSequence(next_char),
+                    Range {
+                        location,
+                        end_location,
+                    },
+                ));
             }
         }
     }

@@ -229,7 +229,7 @@ pub fn convert_typed_dict_functional_to_class(
         match_typed_dict_assign(checker, targets, value)
     {
         match get_properties_and_total(args, keywords) {
-            Err(err) => error!("Failed to parse TypedDict: {}", err),
+            Err(err) => error!("Failed to parse TypedDict: {err}"),
             Ok((body, total_keyword)) => {
                 let mut check = Check::new(
                     CheckKind::ConvertTypedDictFunctionalToClass(class_name.to_string()),
@@ -238,7 +238,7 @@ pub fn convert_typed_dict_functional_to_class(
                 if checker.patch(check.kind.code()) {
                     match convert_to_class(stmt, class_name, body, total_keyword, base_class) {
                         Ok(fix) => check.amend(fix),
-                        Err(err) => error!("Failed to convert TypedDict: {}", err),
+                        Err(err) => error!("Failed to convert TypedDict: {err}"),
                     };
                 }
                 checker.add_check(check);

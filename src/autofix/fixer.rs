@@ -92,7 +92,7 @@ fn apply_fixes<'a>(
     }
 
     // Add the remaining content.
-    let slice = locator.slice_source_code_at(last_pos);
+    let slice = locator.slice_source_code_at(&last_pos);
     output.append(&slice);
 
     (Cow::from(output.finish()), num_fixed)

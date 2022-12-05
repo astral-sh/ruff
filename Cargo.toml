@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "ruff"
-version = "0.0.158"
+version = "0.0.161"
 edition = "2021"
 rust-version = "1.65.0"
 
@@ -33,7 +33,7 @@ itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a8725d161fe8b3ed73a6758b21e177" }
 log = { version = "0.4.17" }
 nohash-hasher = { version = "0.2.0" }
-notify = { version = "4.0.17" }
+notify = { version = "5.0.0" }
 num-bigint = { version = "0.4.3" }
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }

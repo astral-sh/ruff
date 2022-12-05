@@ -46,14 +46,13 @@ impl<'a> Printer<'a> {
 
     fn pre_text(&self, diagnostics: &Diagnostics) {
         if self.log_level >= &LogLevel::Default {
-            if diagnostics.fixed > 0 {
-                println!(
-                    "Found {} error(s) ({} fixed).",
-                    diagnostics.messages.len(),
-                    diagnostics.fixed,
-                );
-            } else if !diagnostics.messages.is_empty() {
-                println!("Found {} error(s).", diagnostics.messages.len());
+            let fixed = diagnostics.fixed;
+            let remaining = diagnostics.messages.len();
+            let total = fixed + remaining;
+            if fixed > 0 {
+                println!("Found {total} error(s) ({fixed} fixed, {remaining} remaining).");
+            } else if remaining > 0 {
+                println!("Found {remaining} error(s).");
             }
         }
     }

@@ -301,6 +301,16 @@ pub fn match_trailing_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool 
     false
 }
 
+/// Return the number of trailing empty lines following a statement.
+pub fn count_trailing_lines(stmt: &Stmt, locator: &SourceCodeLocator) -> usize {
+    let suffix =
+        locator.slice_source_code_at(&Location::new(stmt.end_location.unwrap().row() + 1, 0));
+    suffix
+        .lines()
+        .take_while(|line| line.trim().is_empty())
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;

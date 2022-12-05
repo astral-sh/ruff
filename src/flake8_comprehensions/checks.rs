@@ -62,7 +62,7 @@ pub fn unnecessary_generator_list(
         if fix {
             match fixes::fix_unnecessary_generator_list(locator, expr) {
                 Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to generate fix: {}", e),
+                Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
         return Some(check);
@@ -86,7 +86,7 @@ pub fn unnecessary_generator_set(
         if fix {
             match fixes::fix_unnecessary_generator_set(locator, expr) {
                 Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to generate fix: {}", e),
+                Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
         return Some(check);
@@ -112,7 +112,7 @@ pub fn unnecessary_generator_dict(
                 if fix {
                     match fixes::fix_unnecessary_generator_dict(locator, expr) {
                         Ok(fix) => check.amend(fix),
-                        Err(e) => error!("Failed to generate fix: {}", e),
+                        Err(e) => error!("Failed to generate fix: {e}"),
                     }
                 }
                 return Some(check);
@@ -139,7 +139,7 @@ pub fn unnecessary_list_comprehension_set(
         if fix {
             match fixes::fix_unnecessary_list_comprehension_set(locator, expr) {
                 Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to generate fix: {}", e),
+                Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
         return Some(check);
@@ -158,22 +158,23 @@ pub fn unnecessary_list_comprehension_dict(
     location: Range,
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
-    if let ExprKind::ListComp { elt, .. } = &argument {
-        match &elt.node {
-            ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                let mut check = Check::new(CheckKind::UnnecessaryListComprehensionDict, location);
-                if fix {
-                    match fixes::fix_unnecessary_list_comprehension_dict(locator, expr) {
-                        Ok(fix) => check.amend(fix),
-                        Err(e) => error!("Failed to generate fix: {}", e),
-                    }
-                }
-                return Some(check);
-            }
-            _ => {}
+    let ExprKind::ListComp { elt, .. } = &argument else {
+        return None;
+    };
+    let ExprKind::Tuple { elts, .. } = &elt.node else {
+        return None;
+    };
+    if elts.len() != 2 {
+        return None;
+    }
+    let mut check = Check::new(CheckKind::UnnecessaryListComprehensionDict, location);
+    if fix {
+        match fixes::fix_unnecessary_list_comprehension_dict(locator, expr) {
+            Ok(fix) => check.amend(fix),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    None
+    Some(check)
 }
 
 /// C405 (`set([1, 2])`)
@@ -196,7 +197,7 @@ pub fn unnecessary_literal_set(
     if fix {
         match fixes::fix_unnecessary_literal_set(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -232,7 +233,7 @@ pub fn unnecessary_literal_dict(
     if fix {
         match fixes::fix_unnecessary_literal_dict(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -268,7 +269,7 @@ pub fn unnecessary_collection_call(
     if fix {
         match fixes::fix_unnecessary_collection_call(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -296,7 +297,7 @@ pub fn unnecessary_literal_within_tuple_call(
     if fix {
         match fixes::fix_unnecessary_literal_within_tuple_call(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -324,7 +325,7 @@ pub fn unnecessary_literal_within_list_call(
     if fix {
         match fixes::fix_unnecessary_literal_within_list_call(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -340,17 +341,17 @@ pub fn unnecessary_list_call(
     location: Range,
 ) -> Option<Check> {
     let argument = first_argument_with_matching_function("list", func, args)?;
-    if let ExprKind::ListComp { .. } = argument {
-        let mut check = Check::new(CheckKind::UnnecessaryListCall, location);
-        if fix {
-            match fixes::fix_unnecessary_list_call(locator, expr) {
-                Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to generate fix: {}", e),
-            }
-        }
-        return Some(check);
+    if !matches!(argument, ExprKind::ListComp { .. }) {
+        return None;
     }
-    None
+    let mut check = Check::new(CheckKind::UnnecessaryListCall, location);
+    if fix {
+        match fixes::fix_unnecessary_list_call(locator, expr) {
+            Ok(fix) => check.amend(fix),
+            Err(e) => error!("Failed to generate fix: {e}"),
+        }
+    }
+    Some(check)
 }
 
 /// C413
@@ -366,22 +367,24 @@ pub fn unnecessary_call_around_sorted(
     if !(outer == "list" || outer == "reversed") {
         return None;
     }
-    if let ExprKind::Call { func, .. } = &args.first()?.node {
-        if function_name(func)? == "sorted" {
-            let mut check = Check::new(
-                CheckKind::UnnecessaryCallAroundSorted(outer.to_string()),
-                location,
-            );
-            if fix {
-                match fixes::fix_unnecessary_call_around_sorted(locator, expr) {
-                    Ok(fix) => check.amend(fix),
-                    Err(e) => error!("Failed to generate fix: {}", e),
-                }
-            }
-            return Some(check);
+    let ExprKind::Call { func, .. } = &args.first()?.node else {
+        return None;
+    };
+    if function_name(func)? != "sorted" {
+        return None;
+    }
+
+    let mut check = Check::new(
+        CheckKind::UnnecessaryCallAroundSorted(outer.to_string()),
+        location,
+    );
+    if fix {
+        match fixes::fix_unnecessary_call_around_sorted(locator, expr) {
+            Ok(fix) => check.amend(fix),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    None
+    Some(check)
 }
 
 /// C414
@@ -402,25 +405,28 @@ pub fn unnecessary_double_cast_or_process(
         return None;
     }
 
-    if let ExprKind::Call { func, .. } = &args.first()?.node {
-        let inner = function_name(func)?;
-        // Ex) set(tuple(...))
-        if (outer == "set" || outer == "sorted")
-            && (inner == "list" || inner == "tuple" || inner == "reversed" || inner == "sorted")
-        {
-            return Some(new_check(inner, outer, location));
-        }
+    let ExprKind::Call { func, .. } = &args.first()?.node else {
+        return None;
+    };
 
-        // Ex) list(tuple(...))
-        if (outer == "list" || outer == "tuple") && (inner == "list" || inner == "tuple") {
-            return Some(new_check(inner, outer, location));
-        }
-
-        // Ex) set(set(...))
-        if outer == "set" && inner == "set" {
-            return Some(new_check(inner, outer, location));
-        }
+    let inner = function_name(func)?;
+    // Ex) set(tuple(...))
+    if (outer == "set" || outer == "sorted")
+        && (inner == "list" || inner == "tuple" || inner == "reversed" || inner == "sorted")
+    {
+        return Some(new_check(inner, outer, location));
     }
+
+    // Ex) list(tuple(...))
+    if (outer == "list" || outer == "tuple") && (inner == "list" || inner == "tuple") {
+        return Some(new_check(inner, outer, location));
+    }
+
+    // Ex) set(set(...))
+    if outer == "set" && inner == "set" {
+        return Some(new_check(inner, outer, location));
+    }
+
     None
 }
 
@@ -435,33 +441,34 @@ pub fn unnecessary_subscript_reversal(
     if !["set", "sorted", "reversed"].contains(&id) {
         return None;
     }
-    if let ExprKind::Subscript { slice, .. } = &first_arg.node {
-        if let ExprKind::Slice { lower, upper, step } = &slice.node {
-            if lower.is_none() && upper.is_none() {
-                if let Some(step) = step {
-                    if let ExprKind::UnaryOp {
-                        op: Unaryop::USub,
-                        operand,
-                    } = &step.node
-                    {
-                        if let ExprKind::Constant {
-                            value: Constant::Int(val),
-                            ..
-                        } = &operand.node
-                        {
-                            if *val == BigInt::from(1) {
-                                return Some(Check::new(
-                                    CheckKind::UnnecessarySubscriptReversal(id.to_string()),
-                                    location,
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    let ExprKind::Subscript { slice, .. } = &first_arg.node else {
+        return None;
+    };
+    let ExprKind::Slice { lower, upper, step } = &slice.node else {
+            return None;
+        };
+    if lower.is_some() || upper.is_some() {
+        return None;
     }
-    None
+    let ExprKind::UnaryOp {
+        op: Unaryop::USub,
+        operand,
+    } = &step.as_ref()?.node else {
+        return None;
+    };
+    let ExprKind::Constant {
+        value: Constant::Int(val),
+        ..
+    } = &operand.node else {
+        return None;
+    };
+    if *val != BigInt::from(1) {
+        return None;
+    };
+    Some(Check::new(
+        CheckKind::UnnecessarySubscriptReversal(id.to_string()),
+        location,
+    ))
 }
 
 /// C416
@@ -497,7 +504,7 @@ pub fn unnecessary_comprehension(
     if fix {
         match fixes::fix_unnecessary_comprehension(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)

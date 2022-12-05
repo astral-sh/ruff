@@ -14,6 +14,7 @@ use crate::{
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
+    pub allowed_confusables: Option<Vec<char>>,
     #[option(
         doc = r#"
             A regular expression used to identify "dummy" variables, or those which

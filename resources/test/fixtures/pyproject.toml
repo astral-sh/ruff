@@ -1,4 +1,5 @@
 [tool.ruff]
+allowed-confusables = ["−", "ρ", "∗"]
 line-length = 88
 extend-exclude = [
   "excluded_file.py",
@@ -35,13 +36,8 @@ ignore-names = [
   "longMessage",
   "maxDiff",
 ]
-classmethod-decorators = [
-  "classmethod",
-  "pydantic.validator",
-]
-staticmethod-decorators = [
-  "staticmethod",
-]
+classmethod-decorators = ["classmethod", "pydantic.validator"]
+staticmethod-decorators = ["staticmethod"]
 
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "parents"

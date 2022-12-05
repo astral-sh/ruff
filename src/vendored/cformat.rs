@@ -406,8 +406,7 @@ mod tests {
         let result = fmt.parse::<CFormatString>();
         assert_eq!(
             result, expected,
-            "left = {:#?} \n\n\n right = {:#?}",
-            result, expected
+            "left = {result:#?} \n\n\n right = {expected:#?}"
         );
     }
 }

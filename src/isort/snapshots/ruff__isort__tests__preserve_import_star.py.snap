@@ -1,0 +1,20 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 7
+    column: 0
+  fix:
+    content: "# Above\nfrom some_module import *  # Aside\n\n# Above\nfrom some_module import some_class  # Aside\nfrom some_other_module import *\nfrom some_other_module import some_class\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 7
+      column: 0
+

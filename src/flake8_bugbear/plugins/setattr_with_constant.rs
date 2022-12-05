@@ -35,31 +35,37 @@ fn assignment(obj: &Expr, name: &str, value: &Expr) -> Result<String> {
 
 /// B010
 pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if id == "setattr" {
-            if let [obj, name, value] = args {
-                if let ExprKind::Constant {
-                    value: Constant::Str(name),
-                    ..
-                } = &name.node
-                {
-                    if IDENTIFIER_REGEX.is_match(name) && !KWLIST.contains(&name.as_str()) {
-                        let mut check =
-                            Check::new(CheckKind::SetAttrWithConstant, Range::from_located(expr));
-                        if checker.patch(check.kind.code()) {
-                            match assignment(obj, name, value) {
-                                Ok(content) => check.amend(Fix::replacement(
-                                    content,
-                                    expr.location,
-                                    expr.end_location.unwrap(),
-                                )),
-                                Err(e) => error!("Failed to fix invalid comparison: {}", e),
-                            };
-                        }
-                        checker.add_check(check);
-                    }
-                }
-            }
-        }
+    let ExprKind::Name { id, .. } = &func.node else {
+        return;
+    };
+    if id != "setattr" {
+        return;
     }
+    let [obj, name, value] = args else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(name),
+        ..
+    } = &name.node else {
+        return;
+    };
+    if !IDENTIFIER_REGEX.is_match(name) {
+        return;
+    }
+    if KWLIST.contains(&name.as_str()) {
+        return;
+    }
+    let mut check = Check::new(CheckKind::SetAttrWithConstant, Range::from_located(expr));
+    if checker.patch(check.kind.code()) {
+        match assignment(obj, name, value) {
+            Ok(content) => check.amend(Fix::replacement(
+                content,
+                expr.location,
+                expr.end_location.unwrap(),
+            )),
+            Err(e) => error!("Failed to fix invalid comparison: {e}"),
+        };
+    }
+    checker.add_check(check);
 }

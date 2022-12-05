@@ -10,12 +10,12 @@ expression: checks
     row: 2
     column: 9
   fix:
-    content: "\nimport os\nimport sys\n"
+    content: "\nimport os\nimport sys\n\n"
     location:
       row: 1
       column: 7
     end_location:
-      row: 3
+      row: 4
       column: 0
 - kind: UnsortedImports
   location:

@@ -2617,8 +2617,7 @@ mod tests {
         for check_code in CheckCode::iter() {
             assert!(
                 CheckCode::from_str(check_code.as_ref()).is_ok(),
-                "{:?} could not be round-trip serialized.",
-                check_code
+                "{check_code:?} could not be round-trip serialized."
             );
         }
     }

@@ -29,6 +29,7 @@ pub mod types;
 
 #[derive(Debug)]
 pub struct Settings {
+    pub allowed_confusables: FxHashSet<char>,
     pub dummy_variable_rgx: Regex,
     pub enabled: FxHashSet<CheckCode>,
     pub exclude: GlobSet,
@@ -59,6 +60,7 @@ impl Settings {
         project_root: Option<&PathBuf>,
     ) -> Result<Self> {
         Ok(Self {
+            allowed_confusables: config.allowed_confusables,
             dummy_variable_rgx: config.dummy_variable_rgx,
             enabled: resolve_codes(
                 &config
@@ -96,6 +98,7 @@ impl Settings {
 
     pub fn for_rule(check_code: CheckCode) -> Self {
         Self {
+            allowed_confusables: FxHashSet::from_iter([]),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter([check_code.clone()]),
             exclude: GlobSet::empty(),
@@ -122,6 +125,7 @@ impl Settings {
 
     pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
         Self {
+            allowed_confusables: FxHashSet::from_iter([]),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter(check_codes.clone()),
             exclude: GlobSet::empty(),
@@ -150,6 +154,9 @@ impl Settings {
 impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Add base properties in alphabetical order.
+        for confusable in &self.allowed_confusables {
+            confusable.hash(state);
+        }
         self.dummy_variable_rgx.as_str().hash(state);
         for value in &self.enabled {
             value.hash(state);
