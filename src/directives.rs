@@ -76,9 +76,11 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
 pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) -> IntSet<usize> {
     let mut exclusions: IntSet<usize> = IntSet::default();
     let mut off: Option<Location> = None;
+    let mut last: Option<Location> = None;
     for &(start, ref tok, end) in lxr.iter().flatten() {
-        // TODO(charlie): Modify RustPython to include the comment text in the token.
+        last = Some(end);
         if matches!(tok, Tok::Comment) {
+            // TODO(charlie): Modify RustPython to include the comment text in the token.
             let comment_text = locator.slice_source_code_range(&Range {
                 location: start,
                 end_location: end,
@@ -99,13 +101,13 @@ pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) 
                     off = Some(start);
                 }
             }
-        } else if matches!(tok, Tok::EndOfFile) {
-            if let Some(start) = off {
-                for row in start.row() + 1..=end.row() {
-                    exclusions.insert(row);
-                }
+        }
+    }
+    if let Some(start) = off {
+        if let Some(end) = last {
+            for row in start.row() + 1..=end.row() {
+                exclusions.insert(row);
             }
-            break;
         }
     }
     exclusions
@@ -113,23 +115,22 @@ pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) 
 
 #[cfg(test)]
 mod tests {
-    use nohash_hasher::IntMap;
+    use nohash_hasher::{IntMap, IntSet};
     use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
 
-    use crate::directives::extract_noqa_line_for;
+    use crate::directives::{extract_isort_exclusions, extract_noqa_line_for};
+    use crate::SourceCodeLocator;
 
     #[test]
-    fn extraction() {
-        let empty: IntMap<usize, usize> = IntMap::default();
-
+    fn noqa_extraction() {
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
 y = 2
 z = x + 1",
         )
         .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), empty);
+        assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "
@@ -138,7 +139,7 @@ y = 2
 z = x + 1",
         )
         .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), empty);
+        assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
@@ -147,7 +148,7 @@ z = x + 1
         ",
         )
         .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), empty);
+        assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
@@ -157,7 +158,7 @@ z = x + 1
         ",
         )
         .collect();
-        assert_eq!(extract_noqa_line_for(&lxr), empty);
+        assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = '''abc
@@ -198,6 +199,53 @@ z = x + 1",
         assert_eq!(
             extract_noqa_line_for(&lxr),
             IntMap::from_iter([(2, 5), (3, 5), (4, 5)])
+        );
+    }
+
+    #[test]
+    fn isort_extraction() {
+        let contents = "x = 1
+y = 2
+z = x + 1";
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(extract_isort_exclusions(&lxr, &locator), IntSet::default());
+
+        let contents = "# isort: off
+x = 1
+y = 2
+# isort: on
+z = x + 1";
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            extract_isort_exclusions(&lxr, &locator),
+            IntSet::from_iter([2, 3, 4])
+        );
+
+        let contents = "# isort: off
+x = 1
+# isort: off
+y = 2
+# isort: on
+z = x + 1
+# isort: on";
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            extract_isort_exclusions(&lxr, &locator),
+            IntSet::from_iter([2, 3, 4, 5])
+        );
+
+        let contents = "# isort: off
+x = 1
+y = 2
+z = x + 1";
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            extract_isort_exclusions(&lxr, &locator),
+            IntSet::from_iter([2, 3, 4])
         );
     }
 }
