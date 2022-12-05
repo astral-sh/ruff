@@ -1,4 +1,7 @@
+use rustpython_ast::{Cmpop, Located};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::{BindingKind, Scope};
 
@@ -108,4 +111,149 @@ pub fn is_unpacking_assignment(stmt: &Stmt) -> bool {
         &value.node,
         ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
     )
+}
+
+pub type LocatedCmpop<U = ()> = Located<Cmpop, U>;
+
+/// Extract all `Cmpop` operators from a source code snippet, with appropriate
+/// ranges.
+///
+/// RustPython doesn't include line and column information on `Cmpop` nodes.
+/// (CPython doesn't either.) This method iterates over the token stream and
+/// re-identifies `Cmpop` nodes, annotating them with valid arnges.
+pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
+    let mut tok_iter = lexer::make_tokenizer(contents)
+        .flatten()
+        .into_iter()
+        .peekable();
+    let mut ops: Vec<LocatedCmpop> = vec![];
+    let mut count: usize = 0;
+    loop {
+        let Some((start, tok, end)) = tok_iter.next() else {
+            break;
+        };
+        if matches!(tok, Tok::Lpar) {
+            count += 1;
+            continue;
+        } else if matches!(tok, Tok::Rpar) {
+            count -= 1;
+            continue;
+        }
+        if count == 0 {
+            match tok {
+                Tok::Not => {
+                    if let Some((_, _, end)) =
+                        tok_iter.next_if(|(_, tok, _)| matches!(tok, Tok::In))
+                    {
+                        ops.push(LocatedCmpop::new(start, end, Cmpop::NotIn));
+                    }
+                }
+                Tok::In => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::In));
+                }
+                Tok::Is => {
+                    if let Some((_, _, end)) =
+                        tok_iter.next_if(|(_, tok, _)| matches!(tok, Tok::Not))
+                    {
+                        ops.push(LocatedCmpop::new(start, end, Cmpop::IsNot));
+                    } else {
+                        ops.push(LocatedCmpop::new(start, end, Cmpop::Is));
+                    }
+                }
+                Tok::NotEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::NotEq));
+                }
+                Tok::EqEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::Eq));
+                }
+                Tok::GreaterEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::GtE));
+                }
+                Tok::Greater => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::Gt));
+                }
+                Tok::LessEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::LtE));
+                }
+                Tok::Less => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::Lt));
+                }
+                _ => {}
+            }
+        }
+    }
+    ops
+}
+
+#[cfg(test)]
+mod tests {
+    use rustpython_ast::{Cmpop, Location};
+
+    use crate::ast::operations::{locate_cmpops, LocatedCmpop};
+
+    #[test]
+    fn locates_cmpops() {
+        assert_eq!(
+            locate_cmpops("x == 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::Eq
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x != 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::NotEq
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x is 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::Is
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x is not 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 8),
+                Cmpop::IsNot
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x in 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::In
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x not in 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 8),
+                Cmpop::NotIn
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x != (1 is not 2)"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::NotEq
+            )]
+        );
+    }
 }
