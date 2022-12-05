@@ -1817,6 +1817,24 @@ ban-relative-imports = "all"
 
 ### `mccabe`
 
+#### [`max-complexity`](#max-complexity)
+
+The maximum McCabe complexity to allow before triggering `C901` errors.
+
+**Default value**: `10`
+
+**Type**: `usize`
+
+**Example usage**:
+
+```toml
+[tool.ruff.mccabe]
+# Flag errors (`C901`) whenever the complexity level exceeds 5.
+max-complexity = 5
+```
+
+---
+
 ### `pep8-naming`
 
 ### `pyupgrade`
