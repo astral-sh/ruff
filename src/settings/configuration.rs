@@ -84,7 +84,7 @@ impl Configuration {
         Ok(Configuration {
             dummy_variable_rgx: match options.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
-                    .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
+                    .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
                 None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
             },
             src: options.src.map_or_else(

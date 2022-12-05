@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use common_path::common_path_all;
 use log::debug;
 use path_absolutize::Absolutize;
@@ -82,7 +82,8 @@ pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
 
 pub fn load_options(pyproject: Option<&PathBuf>) -> Result<Options> {
     if let Some(pyproject) = pyproject {
-        Ok(parse_pyproject_toml(pyproject)?
+        Ok(parse_pyproject_toml(pyproject)
+            .map_err(|err| anyhow!("Failed to parse `{}`: {}", pyproject.to_string_lossy(), err))?
             .tool
             .and_then(|tool| tool.ruff)
             .unwrap_or_default())
