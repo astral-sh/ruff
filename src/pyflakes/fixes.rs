@@ -1,14 +1,11 @@
 use anyhow::{bail, Result};
-use libcst_native::{
-    Codegen, CodegenState, CompOp, Comparison, ComparisonTarget, Expr, Expression, ImportNames,
-    SmallStatement, Statement,
-};
+use libcst_native::{Codegen, CodegenState, ImportNames, SmallStatement, Statement};
 use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
 use crate::autofix::{helpers, Fix};
 use crate::cst::helpers::compose_module_path;
-use crate::cst::matchers::{match_expr, match_module};
+use crate::cst::matchers::match_module;
 use crate::source_code_locator::SourceCodeLocator;
 
 /// Generate a Fix to remove any unused imports from an `import` statement.
@@ -75,62 +72,4 @@ pub fn remove_unused_imports(
             stmt.end_location.unwrap(),
         ))
     }
-}
-
-fn match_comparison<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Comparison<'b>> {
-    if let Expression::Comparison(comparison) = &mut expr.value {
-        Ok(comparison)
-    } else {
-        bail!("Expected Expression::Comparison")
-    }
-}
-
-/// Generate a Fix to replace invalid is/is not comparisons with equal/not equal
-pub fn fix_invalid_literal_comparison(locator: &SourceCodeLocator, location: Range) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&location);
-    let mut tree = match_module(&module_text)?;
-    let mut expr = match_expr(&mut tree)?;
-    let cmp = match_comparison(expr)?;
-    let target = cmp
-        .comparisons
-        .get(0)
-        .ok_or_else(|| anyhow::anyhow!("Expected one ComparisonTarget"))?;
-
-    let new_operator = match &target.operator {
-        CompOp::Is {
-            whitespace_before: b,
-            whitespace_after: a,
-        } => CompOp::Equal {
-            whitespace_before: b.clone(),
-            whitespace_after: a.clone(),
-        },
-        CompOp::IsNot {
-            whitespace_before: b,
-            whitespace_after: a,
-            whitespace_between: _,
-        } => CompOp::NotEqual {
-            whitespace_before: b.clone(),
-            whitespace_after: a.clone(),
-        },
-        op => bail!("Unexpected operator: {op:?} (expected CompOp::Is or CompOp::IsNot)"),
-    };
-
-    expr.value = Expression::Comparison(Box::new(Comparison {
-        left: cmp.left.clone(),
-        comparisons: vec![ComparisonTarget {
-            operator: new_operator,
-            comparator: target.comparator.clone(),
-        }],
-        lpar: cmp.lpar.clone(),
-        rpar: cmp.rpar.clone(),
-    }));
-
-    let mut state = CodegenState::default();
-    tree.codegen(&mut state);
-
-    Ok(Fix::replacement(
-        state.to_string(),
-        location.location,
-        location.end_location,
-    ))
 }
