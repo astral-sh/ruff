@@ -10,7 +10,7 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::sorting::{member_key, module_key};
-use crate::isort::track::{Block, Trailer};
+use crate::isort::track::Trailer;
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
 };
@@ -465,7 +465,8 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
 
 #[allow(clippy::too_many_arguments)]
 pub fn format_imports(
-    block: &Block,
+    imports: &[&Stmt],
+    trailer: Option<&Trailer>,
     comments: Vec<Comment>,
     line_length: usize,
     src: &[PathBuf],
@@ -475,8 +476,7 @@ pub fn format_imports(
     combine_as_imports: bool,
     force_wrap_aliases: bool,
 ) -> String {
-    let trailer = &block.trailer;
-    let block = annotate_imports(&block.imports, comments);
+    let block = annotate_imports(imports, comments);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports);

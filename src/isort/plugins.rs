@@ -48,10 +48,16 @@ pub fn check_imports(
         locator,
     );
 
+    let trailer = if indentation.is_empty() {
+        block.trailer.as_ref()
+    } else {
+        None
+    };
+
     // Special-cases: there's leading or trailing content in the import block.
     let has_leading_content = match_leading_content(block.imports.first().unwrap(), locator);
     let has_trailing_content = match_trailing_content(block.imports.last().unwrap(), locator);
-    let num_trailing_lines = if block.trailer.is_none() {
+    let num_trailing_lines = if trailer.is_none() {
         0
     } else {
         count_trailing_lines(block.imports.last().unwrap(), locator)
@@ -59,7 +65,8 @@ pub fn check_imports(
 
     // Generate the sorted import block.
     let expected = format_imports(
-        block,
+        &block.imports,
+        trailer,
         comments,
         settings.line_length - indentation.len(),
         &settings.src,
