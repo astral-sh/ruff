@@ -9,7 +9,7 @@ expression: checks
         - int
   location:
     row: 15
-    column: 31
+    column: 7
   end_location:
     row: 15
     column: 96
@@ -21,7 +21,7 @@ expression: checks
         - int
   location:
     row: 17
-    column: 37
+    column: 13
   end_location:
     row: 17
     column: 103
@@ -33,7 +33,7 @@ expression: checks
         - int
   location:
     row: 19
-    column: 37
+    column: 13
   end_location:
     row: 19
     column: 73
@@ -45,7 +45,7 @@ expression: checks
         - str
   location:
     row: 23
-    column: 38
+    column: 13
   end_location:
     row: 23
     column: 158
@@ -57,7 +57,7 @@ expression: checks
         - int
   location:
     row: 24
-    column: 38
+    column: 13
   end_location:
     row: 24
     column: 95
@@ -70,7 +70,7 @@ expression: checks
         - list
   location:
     row: 30
-    column: 47
+    column: 13
   end_location:
     row: 30
     column: 75
