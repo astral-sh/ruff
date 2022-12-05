@@ -75,17 +75,26 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
 /// Extract a set of lines over which to disable isort.
 pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) -> IntSet<usize> {
     let mut exclusions: IntSet<usize> = IntSet::default();
+    let mut skip_file: bool = false;
     let mut off: Option<Location> = None;
     let mut last: Option<Location> = None;
     for &(start, ref tok, end) in lxr.iter().flatten() {
         last = Some(end);
+
+        // No need to keep processing, but we do need to determine the last token.
+        if skip_file {
+            continue;
+        }
+
         if matches!(tok, Tok::Comment) {
             // TODO(charlie): Modify RustPython to include the comment text in the token.
             let comment_text = locator.slice_source_code_range(&Range {
                 location: start,
                 end_location: end,
             });
-            if off.is_some() {
+            if comment_text == "# isort: skip_file" {
+                skip_file = true;
+            } else if off.is_some() {
                 if comment_text == "# isort: on" {
                     if let Some(start) = off {
                         for row in start.row() + 1..=end.row() {
@@ -95,7 +104,7 @@ pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) 
                     off = None;
                 }
             } else {
-                if comment_text.contains("isort: skip") || comment_text.contains("isort:skip") {
+                if comment_text.contains("isort: skip") {
                     exclusions.insert(start.row());
                 } else if comment_text == "# isort: off" {
                     off = Some(start);
@@ -103,7 +112,15 @@ pub fn extract_isort_exclusions(lxr: &[LexResult], locator: &SourceCodeLocator) 
             }
         }
     }
-    if let Some(start) = off {
+    if skip_file {
+        // Enforce `isort: skip_file`.
+        if let Some(end) = last {
+            for row in 1..=end.row() {
+                exclusions.insert(row);
+            }
+        }
+    } else if let Some(start) = off {
+        // Enforce unterminated `isort: off`.
         if let Some(end) = last {
             for row in start.row() + 1..=end.row() {
                 exclusions.insert(row);
@@ -246,6 +263,30 @@ z = x + 1";
         assert_eq!(
             extract_isort_exclusions(&lxr, &locator),
             IntSet::from_iter([2, 3, 4])
+        );
+
+        let contents = "# isort: skip_file
+x = 1
+y = 2
+z = x + 1";
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            extract_isort_exclusions(&lxr, &locator),
+            IntSet::from_iter([1, 2, 3, 4])
+        );
+
+        let contents = "# isort: off
+x = 1
+# isort: on
+y = 2
+# isort: skip_file
+z = x + 1";
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            extract_isort_exclusions(&lxr, &locator),
+            IntSet::from_iter([1, 2, 3, 4, 5, 6])
         );
     }
 }
