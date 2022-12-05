@@ -20,4 +20,22 @@ expression: checks
     end_location:
       row: 1
       column: 6
+- kind:
+    AmbiguousUnicodeCharacterString:
+      - −
+      - "-"
+  location:
+    row: 2
+    column: 5
+  end_location:
+    row: 2
+    column: 6
+  fix:
+    content: "-"
+    location:
+      row: 2
+      column: 5
+    end_location:
+      row: 2
+      column: 6
 

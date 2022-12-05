@@ -243,6 +243,7 @@ mod tests {
     fn it_converts_empty() -> Result<()> {
         let actual = convert(&HashMap::from([]), None)?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -286,6 +287,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -329,6 +331,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -372,6 +375,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -415,6 +419,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -466,6 +471,7 @@ mod tests {
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -544,6 +550,7 @@ mod tests {
             None,
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,

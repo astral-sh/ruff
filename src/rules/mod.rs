@@ -14,9 +14,9 @@ mod tests {
     use crate::linter::test_path;
     use crate::settings;
 
-    #[test_case(CheckCode::RUF001, Path::new("RUF001.py"); "RUF001")]
-    #[test_case(CheckCode::RUF002, Path::new("RUF002.py"); "RUF002")]
-    #[test_case(CheckCode::RUF003, Path::new("RUF003.py"); "RUF003")]
+    #[test_case(CheckCode::RUF001, Path::new("RUF.py"); "RUF001")]
+    #[test_case(CheckCode::RUF002, Path::new("RUF.py"); "RUF002")]
+    #[test_case(CheckCode::RUF003, Path::new("RUF.py"); "RUF003")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let mut checks = test_path(

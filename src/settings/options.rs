@@ -13,6 +13,7 @@ use crate::{
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
+    pub allowed_confusables: Option<Vec<char>>,
     pub dummy_variable_rgx: Option<String>,
     pub exclude: Option<Vec<String>>,
     pub extend_exclude: Option<Vec<String>>,

@@ -1270,6 +1270,26 @@ Summary
 
 ### Options
 
+#### [`allowed-confusables`](#allowed-confusables)
+
+A list of allowed confusable for the rules `RUF001`, `RUF002`, `RUF003`.
+
+**Default value**: `[]`
+
+**Type**: `Vec<char>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1),
+# and greek-small-letter-alpha (U+03B1) which  could
+# be confused for:    ["-", "p", "*"]
+allowed-confusables = ["−", "ρ", "∗"]
+```
+
+---
+
 #### [`exclude`](#exclude)
 
 A list of file patterns to exclude from linting.
@@ -1295,7 +1315,7 @@ paths.
 ```toml
 [tool.ruff]
 exclude = [".venv"]
-````
+```
 
 ---
 
@@ -1313,7 +1333,7 @@ A list of file patterns to omit from linting, in addition to those specified by 
 [tool.ruff]
 # In addition to the standard set of exclusions, omit all tests, plus a specific file.
 extend-exclude = ["tests", "src/bad.py"]
-````
+```
 
 ---
 

@@ -133,6 +133,7 @@ mod tests {
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend_exclude: None,
@@ -174,6 +175,7 @@ line-length = 79
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend_exclude: None,
@@ -215,6 +217,7 @@ exclude = ["foo.py"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     line_length: None,
                     fix: None,
                     exclude: Some(vec!["foo.py".to_string()]),
@@ -256,6 +259,7 @@ select = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend_exclude: None,
@@ -298,6 +302,7 @@ ignore = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend_exclude: None,
@@ -374,6 +379,7 @@ other-attribute = 1
         assert_eq!(
             config,
             Options {
+                allowed_confusables: Some(vec!['−', 'ρ', '∗']),
                 line_length: Some(88),
                 fix: None,
                 exclude: None,

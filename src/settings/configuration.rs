@@ -8,6 +8,7 @@ use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
+use rustc_hash::FxHashSet;
 
 use crate::checks_gen::{CheckCodePrefix, CATEGORIES};
 use crate::settings::pyproject::load_options;
@@ -19,6 +20,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Configuration {
+    pub allowed_confusables: FxHashSet<char>,
     pub dummy_variable_rgx: Regex,
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
@@ -82,6 +84,9 @@ impl Configuration {
     ) -> Result<Self> {
         let options = load_options(pyproject)?;
         Ok(Configuration {
+            allowed_confusables: FxHashSet::from_iter(
+                options.allowed_confusables.unwrap_or_default(),
+            ),
             dummy_variable_rgx: match options.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
                     .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
