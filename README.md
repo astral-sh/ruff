@@ -1536,7 +1536,7 @@ When breaking ties between enabled and disabled checks (via `select`
 and `ignore`, respectively), more specific prefixes override less
 specific prefixes.
 
-**Default value**: ["E", "F"]
+**Default value**: `["E", "F"]`
 
 **Type**: `Vec<CheckCodePrefix>`
 
@@ -1777,9 +1777,7 @@ docstring-quotes = "single"
 
 #### [`avoid-escape`](#avoid-escape)
 
-Whether to avoid using single quotes if a string contains single quotes, or vice-versa with
-double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the
-need to escape quotation marks within strings.
+Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.
 
 **Default value**: `true`
 
@@ -1796,6 +1794,24 @@ avoid-escape = false
 ---
 
 ### `flake8-tidy-imports`
+
+#### [`ban-relative-imports`](#ban-relative-imports)
+
+Whether to ban all relative imports (`"all"`), or only those imports that extend into the parent module and beyond (`"parents"`).
+
+**Default value**: `"parents"`
+
+**Type**: `Strictness`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-tidy-imports]
+# Disallow all relative imports.
+ban-relative-imports = "all"
+```
+
+---
 
 ### `isort`
 
