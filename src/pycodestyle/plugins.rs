@@ -25,10 +25,7 @@ fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr]) -> Option<String> {
     );
     let mut generator = SourceGenerator::new();
     generator.unparse_expr(&cmp, 0);
-    if let Ok(content) = generator.generate() {
-        return Some(content);
-    }
-    None
+    generator.generate().ok()
 }
 
 /// E711, E712

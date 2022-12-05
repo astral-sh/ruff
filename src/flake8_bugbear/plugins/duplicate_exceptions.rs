@@ -79,33 +79,30 @@ pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Exce
     let mut seen: BTreeSet<Vec<&str>> = BTreeSet::default();
     let mut duplicates: BTreeSet<Vec<&str>> = BTreeSet::default();
     for handler in handlers {
-        match &handler.node {
-            ExcepthandlerKind::ExceptHandler { type_, .. } => {
-                if let Some(type_) = type_ {
-                    match &type_.node {
-                        ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
-                            let call_path = helpers::collect_call_paths(type_);
-                            if !call_path.is_empty() {
-                                if seen.contains(&call_path) {
-                                    duplicates.insert(call_path);
-                                } else {
-                                    seen.insert(call_path);
-                                }
-                            }
-                        }
-                        ExprKind::Tuple { elts, .. } => {
-                            for name in duplicate_handler_exceptions(checker, type_, elts) {
-                                if seen.contains(&name) {
-                                    duplicates.insert(name);
-                                } else {
-                                    seen.insert(name);
-                                }
-                            }
-                        }
-                        _ => {}
+        let ExcepthandlerKind::ExceptHandler { type_: Some(type_), .. } = &handler.node else {
+            continue;
+        };
+        match &type_.node {
+            ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
+                let call_path = helpers::collect_call_paths(type_);
+                if !call_path.is_empty() {
+                    if seen.contains(&call_path) {
+                        duplicates.insert(call_path);
+                    } else {
+                        seen.insert(call_path);
                     }
                 }
             }
+            ExprKind::Tuple { elts, .. } => {
+                for name in duplicate_handler_exceptions(checker, type_, elts) {
+                    if seen.contains(&name) {
+                        duplicates.insert(name);
+                    } else {
+                        seen.insert(name);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
