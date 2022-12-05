@@ -346,15 +346,19 @@ fn inner_main() -> Result<ExitCode> {
         loop {
             match rx.recv() {
                 Ok(e) => {
-                    for path in e?.paths {
-                        if path.to_string_lossy().ends_with(".py") {
-                            printer.clear_screen()?;
-                            printer.write_to_user("File change detected...\n");
+                    let paths = e?.paths;
+                    let py_changed = paths.iter().any(|p| {
+                        p.extension()
+                            .map(|ext| ext.eq_ignore_ascii_case("py"))
+                            .unwrap_or_default()
+                    });
+                    if py_changed {
+                        printer.clear_screen()?;
+                        printer.write_to_user("File change detected...\n");
 
-                            let messages =
-                                run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
-                            printer.write_continuously(&messages)?;
-                        }
+                        let messages =
+                            run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
+                        printer.write_continuously(&messages)?;
                     }
                 }
                 Err(e) => return Err(e.into()),
