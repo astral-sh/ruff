@@ -1,4 +1,3 @@
-use nohash_hasher::IntSet;
 use rustpython_ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
@@ -6,31 +5,32 @@ use rustpython_ast::{
 };
 
 use crate::ast::visitor::Visitor;
+use crate::directives::IsortDirectives;
 
-#[derive(Debug)]
 pub enum Trailer {
     Sibling,
     ClassDef,
     FunctionDef,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Block<'a> {
     pub imports: Vec<&'a Stmt>,
     pub trailer: Option<Trailer>,
 }
 
-#[derive(Debug)]
 pub struct ImportTracker<'a> {
-    exclusions: &'a IntSet<usize>,
     blocks: Vec<Block<'a>>,
+    directives: &'a IsortDirectives,
+    split_index: usize,
 }
 
 impl<'a> ImportTracker<'a> {
-    pub fn new(exclusions: &'a IntSet<usize>) -> Self {
+    pub fn new(directives: &'a IsortDirectives) -> Self {
         Self {
-            exclusions,
+            directives,
             blocks: vec![Block::default()],
+            split_index: 0,
         }
     }
 
@@ -57,11 +57,27 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        // Track manual splits.
+        while self.split_index < self.directives.splits.len() {
+            if stmt.location.row() >= self.directives.splits[self.split_index] {
+                self.finalize(Some(match &stmt.node {
+                    StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                        Trailer::FunctionDef
+                    }
+                    StmtKind::ClassDef { .. } => Trailer::ClassDef,
+                    _ => Trailer::Sibling,
+                }));
+                self.split_index += 1;
+            } else {
+                break;
+            }
+        }
+
         // Track imports.
         if matches!(
             stmt.node,
             StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
-        ) && !self.exclusions.contains(&stmt.location.row())
+        ) && !self.directives.exclusions.contains(&stmt.location.row())
         {
             self.track_import(stmt);
         } else {

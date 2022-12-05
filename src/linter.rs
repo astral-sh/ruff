@@ -89,7 +89,7 @@ pub(crate) fn check_path(
                     checks.extend(check_imports(
                         &python_ast,
                         locator,
-                        &directives.isort_exclusions,
+                        &directives.isort,
                         settings,
                         autofix,
                     ));
@@ -193,7 +193,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &locator,
         &Directives {
             noqa_line_for: IntMap::default(),
-            isort_exclusions: directives.isort_exclusions,
+            isort: directives.isort,
         },
         settings,
         false,
