@@ -1624,11 +1624,12 @@ pub fn ambiguous_unicode_character(
         // Search for confusing characters.
         if let Some(representant) = CONFUSABLES.get(&(current_char as u32)) {
             if let Some(representant) = char::from_u32(*representant) {
-                let location = if row_offset == 0 {
-                    Location::new(start.row() + row_offset, start.column() + col_offset)
+                let col = if row_offset == 0 {
+                    start.column() + col_offset
                 } else {
-                    Location::new(start.row() + row_offset, col_offset)
+                    col_offset
                 };
+                let location = Location::new(start.row() + row_offset, col);
                 let end_location = Location::new(location.row(), location.column() + 1);
                 let mut check = Check::new(
                     match context {

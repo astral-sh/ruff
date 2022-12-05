@@ -52,7 +52,7 @@ pub fn invalid_literal_comparison(
                     },
                 ) {
                     Ok(fix) => check.amend(fix),
-                    Err(e) => error!("Failed to fix invalid comparison: {}", e),
+                    Err(e) => error!("Failed to fix invalid comparison: {e}"),
                 }
             }
             checker.add_check(check);

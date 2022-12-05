@@ -93,20 +93,19 @@ pub fn in_nested_block<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool
 
 /// Check if a node represents an unpacking assignment.
 pub fn is_unpacking_assignment(stmt: &Stmt) -> bool {
-    if let StmtKind::Assign { targets, value, .. } = &stmt.node {
-        if !targets.iter().any(|child| {
-            matches!(
-                child.node,
-                ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
-            )
-        }) {
-            return false;
-        }
-        match &value.node {
-            ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. } => return false,
-            _ => {}
-        }
-        return true;
+    let StmtKind::Assign { targets, value, .. } = &stmt.node else {
+        return false;
+    };
+    if !targets.iter().any(|child| {
+        matches!(
+            child.node,
+            ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+        )
+    }) {
+        return false;
     }
-    false
+    !matches!(
+        &value.node,
+        ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+    )
 }
