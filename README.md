@@ -1702,6 +1702,26 @@ allow-star-arg-any = true
 
 ---
 
+### `flake8-bugbear`
+
+#### [`extend-immutable-calls`](#extend-immutable-calls)
+
+Additional callable functions to consider "immutable" when evaluating, e.g., no-mutable-default-argument checks (`B006`).
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-bugbear]
+# Allow default arguments like, e.g., `data: List[str] = fastapi.Query(None)`.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+```
+
+---
+
 #### [`per-file-ignores`](#per-file-ignores)
 
 A list of mappings from file pattern to check code prefixes to
@@ -1724,25 +1744,6 @@ exclude, when considering any matching files.
 ---
 
 <!-- End auto-generated options sections. -->
-
-### `flake8-bugbear`
-
-#### [`extend-immutable-calls`](#extend-immutable-calls)
-
-Additional callable functions to consider "immutable" when evaluating, e.g., no-mutable-default-argument
-checks (`B006`).
-
-**Default value**: `[]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.flake8-bugbear]
-# Allow default arguments like, e.g., `data: List[str] = fastapi.Query(None)`.
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
-```
 
 ### `flake8-quotes`
 

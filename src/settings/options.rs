@@ -247,6 +247,7 @@ pub struct Options {
     // Plugins
     #[option_group]
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
+    #[option_group]
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
