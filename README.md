@@ -1821,6 +1821,24 @@ ban-relative-imports = "all"
 
 ### `pyupgrade`
 
+#### [`keep-runtime-typing`](#keep-runtime-typing)
+
+Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pyupgrade]
+# Preserve types, even if a file imports `from __future__ import annotations`.
+keep-runtime-typing = true
+```
+
+---
+
 #### [`per-file-ignores`](#per-file-ignores)
 
 A list of mappings from file pattern to check code prefixes to
