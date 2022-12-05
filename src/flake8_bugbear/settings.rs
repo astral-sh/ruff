@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     #[option(
         doc = r#"
-            Additional callable functions to consider "immutable" when evaluating, e.g., no-mutable-default-argument checks (`B006`).
+            Additional callable functions to consider "immutable" when evaluating, e.g.,
+            `no-mutable-default-argument` checks (`B006`).
         "#,
         default = r#"`[]`"#,
         value_type = "Vec<String>",

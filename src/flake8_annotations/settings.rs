@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     #[option(
         doc = r#"
-            Whether to allow the omission of a return type hint for `__init__` if at least one argument is
-            annotated.
+            Whether to allow the omission of a return type hint for `__init__` if at least one
+            argument is annotated.
         "#,
         default = "`false`",
         value_type = "bool",
@@ -18,8 +18,8 @@ pub struct Options {
     pub mypy_init_return: Option<bool>,
     #[option(
         doc = r#"
-            Whether to suppress `ANN000`-level errors for arguments matching the
-            "dummy" variable regex (like `_`).
+            Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable
+            regex (like `_`).
         "#,
         default = "`false`",
         value_type = "bool",
@@ -28,8 +28,8 @@ pub struct Options {
     pub suppress_dummy_args: Option<bool>,
     #[option(
         doc = r#"
-            Whether to suppress `ANN200`-level errors for functions that meet
-            either of the following criteria:
+            Whether to suppress `ANN200`-level errors for functions that meet either of the
+            following criteria:
 
             - Contain no `return` statement.
             - Explicit `return` statement(s) all return `None` (explicitly or implicitly).

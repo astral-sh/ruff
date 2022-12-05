@@ -1630,8 +1630,8 @@ unfixable = ["F401"]
 
 #### [`mypy-init-return`](#mypy-init-return)
 
-Whether to allow the omission of a return type hint for `__init__` if at least one argument is
-annotated.
+Whether to allow the omission of a return type hint for `__init__` if at least one
+argument is annotated.
 
 **Default value**: `false`
 
@@ -1648,8 +1648,8 @@ mypy-init-return = true
 
 #### [`suppress-dummy-args`](#suppress-dummy-args)
 
-Whether to suppress `ANN000`-level errors for arguments matching the
-"dummy" variable regex (like `_`).
+Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable
+regex (like `_`).
 
 **Default value**: `false`
 
@@ -1666,8 +1666,8 @@ suppress-dummy-args = true
 
 #### [`suppress-none-returning`](#suppress-none-returning)
 
-Whether to suppress `ANN200`-level errors for functions that meet
-either of the following criteria:
+Whether to suppress `ANN200`-level errors for functions that meet either of the
+following criteria:
 
 - Contain no `return` statement.
 - Explicit `return` statement(s) all return `None` (explicitly or implicitly).
@@ -1706,7 +1706,8 @@ allow-star-arg-any = true
 
 #### [`extend-immutable-calls`](#extend-immutable-calls)
 
-Additional callable functions to consider "immutable" when evaluating, e.g., no-mutable-default-argument checks (`B006`).
+Additional callable functions to consider "immutable" when evaluating, e.g.,
+`no-mutable-default-argument` checks (`B006`).
 
 **Default value**: `[]`
 
@@ -1777,7 +1778,9 @@ docstring-quotes = "single"
 
 #### [`avoid-escape`](#avoid-escape)
 
-Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.
+Whether to avoid using single quotes if a string contains single quotes, or vice-versa
+with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+This minimizes the need to escape quotation marks within strings.
 
 **Default value**: `true`
 
@@ -1797,7 +1800,8 @@ avoid-escape = false
 
 #### [`ban-relative-imports`](#ban-relative-imports)
 
-Whether to ban all relative imports (`"all"`), or only those imports that extend into the parent module and beyond (`"parents"`).
+Whether to ban all relative imports (`"all"`), or only those imports that extend into
+the parent module and beyond (`"parents"`).
 
 **Default value**: `"parents"`
 
@@ -1817,7 +1821,8 @@ ban-relative-imports = "all"
 
 #### [`combine-as-imports`](#combine-as-imports)
 
-Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports) option.
+Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
+option.
 
 **Default value**: `false`
 
@@ -1834,7 +1839,9 @@ combine-as-imports = true
 
 #### [`force-wrap-aliases`](#force-wrap-aliases)
 
-Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:
+Force `import from` statements with multiple members and at least one alias (e.g.,
+`import A as B`) to wrap such that every line contains exactly one member. For example,
+this formatting would be retained, rather than condensing to a single line:
 
 ```py
 from .utils import (
@@ -1858,7 +1865,8 @@ force-wrap-aliases = true
 
 #### [`known-first-party`](#known-first-party)
 
-A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.
+A list of modules to consider first-party, regardless of whether they can be identified
+as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
@@ -1875,7 +1883,8 @@ known-first-party = ["src"]
 
 #### [`known-third-party`](#known-third-party)
 
-A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.
+A list of modules to consider third-party, regardless of whether they can be identified
+as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
@@ -1892,7 +1901,8 @@ known-third-party = ["src"]
 
 #### [`extra-standard-library`](#extra-standard-library)
 
-A list of modules to consider standard-library, in addition to those known to Ruff in advance.
+A list of modules to consider standard-library, in addition to those known to Ruff in
+advance.
 
 **Default value**: `[]`
 
@@ -1948,7 +1958,9 @@ ignore-names = ["callMethod"]
 
 #### [`classmethod-decorators`](#classmethod-decorators)
 
-A list of decorators that, when applied to a method, indicate that the method should be treated as a class method. For example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.
+A list of decorators that, when applied to a method, indicate that the method should be
+treated as a class method. For example, Ruff will expect that any method decorated by a
+decorator in this list takes a `cls` argument as its first argument.
 
 **Default value**: `["classmethod"]`
 
@@ -1966,7 +1978,9 @@ classmethod-decorators = ["classmethod", "pydantic.validator"]
 
 #### [`staticmethod-decorators`](#staticmethod-decorators)
 
-A list of decorators that, when applied to a method, indicate that the method should be treated as a static method. For example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.
+A list of decorators that, when applied to a method, indicate that the method should be
+treated as a static method. For example, Ruff will expect that any method decorated by a
+decorator in this list has no `self` or `cls` argument.
 
 **Default value**: `["staticmethod"]`
 

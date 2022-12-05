@@ -15,7 +15,8 @@ pub enum Strictness {
 pub struct Options {
     #[option(
         doc = r#"
-            Whether to ban all relative imports (`"all"`), or only those imports that extend into the parent module and beyond (`"parents"`).
+            Whether to ban all relative imports (`"all"`), or only those imports that extend into
+            the parent module and beyond (`"parents"`).
         "#,
         default = r#"`"parents"`"#,
         value_type = "Strictness",
