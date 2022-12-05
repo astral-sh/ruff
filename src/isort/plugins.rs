@@ -51,7 +51,11 @@ pub fn check_imports(
     // Special-cases: there's leading or trailing content in the import block.
     let has_leading_content = match_leading_content(block.imports.first().unwrap(), locator);
     let has_trailing_content = match_trailing_content(block.imports.last().unwrap(), locator);
-    let num_trailing_lines = count_trailing_lines(block.imports.last().unwrap(), locator);
+    let num_trailing_lines = if block.trailer.is_none() {
+        0
+    } else {
+        count_trailing_lines(block.imports.last().unwrap(), locator)
+    };
 
     // Generate the sorted import block.
     let expected = format_imports(
