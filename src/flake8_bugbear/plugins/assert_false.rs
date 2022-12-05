@@ -38,23 +38,24 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
 
 /// B011
 pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
-    if let ExprKind::Constant {
+    let ExprKind::Constant {
         value: Constant::Bool(false),
         ..
-    } = &test.node
-    {
-        let mut check = Check::new(CheckKind::DoNotAssertFalse, Range::from_located(test));
-        if checker.patch(check.kind.code()) {
-            let mut generator = SourceGenerator::new();
-            generator.unparse_stmt(&assertion_error(msg));
-            if let Ok(content) = generator.generate() {
-                check.amend(Fix::replacement(
-                    content,
-                    stmt.location,
-                    stmt.end_location.unwrap(),
-                ));
-            }
+    } = &test.node else {
+        return;
+    };
+
+    let mut check = Check::new(CheckKind::DoNotAssertFalse, Range::from_located(test));
+    if checker.patch(check.kind.code()) {
+        let mut generator = SourceGenerator::new();
+        generator.unparse_stmt(&assertion_error(msg));
+        if let Ok(content) = generator.generate() {
+            check.amend(Fix::replacement(
+                content,
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ));
         }
-        checker.add_check(check);
     }
+    checker.add_check(check);
 }

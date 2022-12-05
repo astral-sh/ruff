@@ -13,29 +13,30 @@ fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
 
 /// B019
 pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
-    if matches!(checker.current_scope().kind, ScopeKind::Class(_)) {
-        for decorator in decorator_list {
-            // TODO(charlie): This should take into account `classmethod-decorators` and
-            // `staticmethod-decorators`.
-            if let ExprKind::Name { id, .. } = &decorator.node {
-                if id == "classmethod" || id == "staticmethod" {
-                    return;
-                }
+    if !matches!(checker.current_scope().kind, ScopeKind::Class(_)) {
+        return;
+    }
+    for decorator in decorator_list {
+        // TODO(charlie): This should take into account `classmethod-decorators` and
+        // `staticmethod-decorators`.
+        if let ExprKind::Name { id, .. } = &decorator.node {
+            if id == "classmethod" || id == "staticmethod" {
+                return;
             }
         }
-        for decorator in decorator_list {
-            if is_cache_func(
-                checker,
-                match &decorator.node {
-                    ExprKind::Call { func, .. } => func,
-                    _ => decorator,
-                },
-            ) {
-                checker.add_check(Check::new(
-                    CheckKind::CachedInstanceMethod,
-                    Range::from_located(decorator),
-                ));
-            }
+    }
+    for decorator in decorator_list {
+        if is_cache_func(
+            checker,
+            match &decorator.node {
+                ExprKind::Call { func, .. } => func,
+                _ => decorator,
+            },
+        ) {
+            checker.add_check(Check::new(
+                CheckKind::CachedInstanceMethod,
+                Range::from_located(decorator),
+            ));
         }
     }
 }

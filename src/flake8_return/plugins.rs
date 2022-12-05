@@ -14,43 +14,45 @@ use crate::Check;
 /// RET501
 fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
     for (stmt, expr) in &stack.returns {
-        if let Some(expr) = expr {
-            if matches!(
-                expr.node,
-                ExprKind::Constant {
-                    value: Constant::None,
-                    ..
-                }
-            ) {
-                let mut check =
-                    Check::new(CheckKind::UnnecessaryReturnNone, Range::from_located(stmt));
-                if checker.patch(&CheckCode::RET501) {
-                    check.amend(Fix::replacement(
-                        "return".to_string(),
-                        stmt.location,
-                        stmt.end_location.unwrap(),
-                    ));
-                }
-                checker.add_check(check);
+        let Some(expr) = expr else {
+            continue;
+        };
+        if !matches!(
+            expr.node,
+            ExprKind::Constant {
+                value: Constant::None,
+                ..
             }
+        ) {
+            continue;
         }
+        let mut check = Check::new(CheckKind::UnnecessaryReturnNone, Range::from_located(stmt));
+        if checker.patch(&CheckCode::RET501) {
+            check.amend(Fix::replacement(
+                "return".to_string(),
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ));
+        }
+        checker.add_check(check);
     }
 }
 
 /// RET502
 fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     for (stmt, expr) in &stack.returns {
-        if expr.is_none() {
-            let mut check = Check::new(CheckKind::ImplicitReturnValue, Range::from_located(stmt));
-            if checker.patch(&CheckCode::RET502) {
-                check.amend(Fix::replacement(
-                    "return None".to_string(),
-                    stmt.location,
-                    stmt.end_location.unwrap(),
-                ));
-            }
-            checker.add_check(check);
+        if expr.is_some() {
+            continue;
         }
+        let mut check = Check::new(CheckKind::ImplicitReturnValue, Range::from_located(stmt));
+        if checker.patch(&CheckCode::RET502) {
+            check.amend(Fix::replacement(
+                "return None".to_string(),
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ));
+        }
+        checker.add_check(check);
     }
 }
 
@@ -210,44 +212,45 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
 
 /// RET505, RET506, RET507, RET508
 fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> bool {
-    if let StmtKind::If { body, .. } = &stmt.node {
-        for child in body {
-            if matches!(child.node, StmtKind::Return { .. }) {
-                if checker.settings.enabled.contains(&CheckCode::RET505) {
-                    checker.add_check(Check::new(
-                        CheckKind::SuperfluousElseReturn(branch),
-                        Range::from_located(stmt),
-                    ));
-                }
-                return true;
+    let StmtKind::If { body, .. } = &stmt.node else {
+        return false;
+    };
+    for child in body {
+        if matches!(child.node, StmtKind::Return { .. }) {
+            if checker.settings.enabled.contains(&CheckCode::RET505) {
+                checker.add_check(Check::new(
+                    CheckKind::SuperfluousElseReturn(branch),
+                    Range::from_located(stmt),
+                ));
             }
-            if matches!(child.node, StmtKind::Break) {
-                if checker.settings.enabled.contains(&CheckCode::RET508) {
-                    checker.add_check(Check::new(
-                        CheckKind::SuperfluousElseBreak(branch),
-                        Range::from_located(stmt),
-                    ));
-                }
-                return true;
+            return true;
+        }
+        if matches!(child.node, StmtKind::Break) {
+            if checker.settings.enabled.contains(&CheckCode::RET508) {
+                checker.add_check(Check::new(
+                    CheckKind::SuperfluousElseBreak(branch),
+                    Range::from_located(stmt),
+                ));
             }
-            if matches!(child.node, StmtKind::Raise { .. }) {
-                if checker.settings.enabled.contains(&CheckCode::RET506) {
-                    checker.add_check(Check::new(
-                        CheckKind::SuperfluousElseRaise(branch),
-                        Range::from_located(stmt),
-                    ));
-                }
-                return true;
+            return true;
+        }
+        if matches!(child.node, StmtKind::Raise { .. }) {
+            if checker.settings.enabled.contains(&CheckCode::RET506) {
+                checker.add_check(Check::new(
+                    CheckKind::SuperfluousElseRaise(branch),
+                    Range::from_located(stmt),
+                ));
             }
-            if matches!(child.node, StmtKind::Continue) {
-                if checker.settings.enabled.contains(&CheckCode::RET507) {
-                    checker.add_check(Check::new(
-                        CheckKind::SuperfluousElseContinue(branch),
-                        Range::from_located(stmt),
-                    ));
-                }
-                return true;
+            return true;
+        }
+        if matches!(child.node, StmtKind::Continue) {
+            if checker.settings.enabled.contains(&CheckCode::RET507) {
+                checker.add_check(Check::new(
+                    CheckKind::SuperfluousElseContinue(branch),
+                    Range::from_located(stmt),
+                ));
             }
+            return true;
         }
     }
     false
@@ -266,12 +269,14 @@ fn superfluous_elif(checker: &mut Checker, stack: &Stack) -> bool {
 /// RET505, RET506, RET507, RET508
 fn superfluous_else(checker: &mut Checker, stack: &Stack) -> bool {
     for stmt in &stack.ifs {
-        if let StmtKind::If { orelse, .. } = &stmt.node {
-            if !orelse.is_empty() {
-                if superfluous_else_node(checker, stmt, Branch::Else) {
-                    return true;
-                }
-            }
+        let StmtKind::If { orelse, .. } = &stmt.node else {
+            continue;
+        };
+        if orelse.is_empty() {
+            continue;
+        }
+        if superfluous_else_node(checker, stmt, Branch::Else) {
+            return true;
         }
     }
     false

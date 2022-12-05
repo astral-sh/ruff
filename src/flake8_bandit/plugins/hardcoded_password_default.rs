@@ -5,16 +5,15 @@ use crate::checks::{Check, CheckKind};
 use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Check> {
-    if let Some(string) = string_literal(default) {
-        let kwarg_name = &arg.node.arg;
-        if matches_password_name(kwarg_name) {
-            return Some(Check::new(
-                CheckKind::HardcodedPasswordDefault(string.to_string()),
-                Range::from_located(default),
-            ));
-        }
+    let string = string_literal(default)?;
+    let kwarg_name = &arg.node.arg;
+    if !matches_password_name(kwarg_name) {
+        return None;
     }
-    None
+    Some(Check::new(
+        CheckKind::HardcodedPasswordDefault(string.to_string()),
+        Range::from_located(default),
+    ))
 }
 
 /// S107

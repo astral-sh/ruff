@@ -3117,7 +3117,7 @@ impl<'a> Checker<'a> {
                                 Some(fix)
                             }
                             Err(e) => {
-                                error!("Failed to remove unused imports: {}", e);
+                                error!("Failed to remove unused imports: {e}");
                                 None
                             }
                         }

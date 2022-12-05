@@ -67,24 +67,28 @@ pub fn abstract_base_class(
     keywords: &[Keyword],
     body: &[Stmt],
 ) {
-    if bases.len() + keywords.len() == 1
-        && is_abc_class(
-            bases,
-            keywords,
-            &checker.from_imports,
-            &checker.import_aliases,
-        )
-    {
-        let mut has_abstract_method = false;
-        for stmt in body {
-            // https://github.com/PyCQA/flake8-bugbear/issues/293
-            // Ignore abc's that declares a class attribute that must be set
-            if let StmtKind::AnnAssign { .. } | StmtKind::Assign { .. } = &stmt.node {
-                has_abstract_method = true;
-                continue;
-            }
+    if bases.len() + keywords.len() != 1 {
+        return;
+    }
+    if !is_abc_class(
+        bases,
+        keywords,
+        &checker.from_imports,
+        &checker.import_aliases,
+    ) {
+        return;
+    }
 
-            if let StmtKind::FunctionDef {
+    let mut has_abstract_method = false;
+    for stmt in body {
+        // https://github.com/PyCQA/flake8-bugbear/issues/293
+        // Ignore abc's that declares a class attribute that must be set
+        if let StmtKind::AnnAssign { .. } | StmtKind::Assign { .. } = &stmt.node {
+            has_abstract_method = true;
+            continue;
+        }
+
+        let (StmtKind::FunctionDef {
                 decorator_list,
                 body,
                 ..
@@ -93,36 +97,38 @@ pub fn abstract_base_class(
                 decorator_list,
                 body,
                 ..
-            } = &stmt.node
-            {
-                let has_abstract_decorator = decorator_list
-                    .iter()
-                    .any(|d| is_abstractmethod(d, &checker.from_imports, &checker.import_aliases));
+            }) = &stmt.node else {
+            continue;
+        };
 
-                has_abstract_method |= has_abstract_decorator;
+        let has_abstract_decorator = decorator_list
+            .iter()
+            .any(|d| is_abstractmethod(d, &checker.from_imports, &checker.import_aliases));
 
-                if checker.settings.enabled.contains(&CheckCode::B027) {
-                    if !has_abstract_decorator
-                        && is_empty_body(body)
-                        && !decorator_list
-                            .iter()
-                            .any(|d| is_overload(d, &checker.from_imports, &checker.import_aliases))
-                    {
-                        checker.add_check(Check::new(
-                            CheckKind::EmptyMethodWithoutAbstractDecorator(name.to_string()),
-                            Range::from_located(stmt),
-                        ));
-                    }
-                }
-            }
+        has_abstract_method |= has_abstract_decorator;
+
+        if !checker.settings.enabled.contains(&CheckCode::B027) {
+            continue;
         }
-        if checker.settings.enabled.contains(&CheckCode::B024) {
-            if !has_abstract_method {
-                checker.add_check(Check::new(
-                    CheckKind::AbstractBaseClassWithoutAbstractMethod(name.to_string()),
-                    Range::from_located(stmt),
-                ));
-            }
+
+        if !has_abstract_decorator
+            && is_empty_body(body)
+            && !decorator_list
+                .iter()
+                .any(|d| is_overload(d, &checker.from_imports, &checker.import_aliases))
+        {
+            checker.add_check(Check::new(
+                CheckKind::EmptyMethodWithoutAbstractDecorator(name.to_string()),
+                Range::from_located(stmt),
+            ));
+        }
+    }
+    if checker.settings.enabled.contains(&CheckCode::B024) {
+        if !has_abstract_method {
+            checker.add_check(Check::new(
+                CheckKind::AbstractBaseClassWithoutAbstractMethod(name.to_string()),
+                Range::from_located(stmt),
+            ));
         }
     }
 }

@@ -201,13 +201,13 @@ pub fn convert_named_tuple_functional_to_class(
                     if checker.patch(check.kind.code()) {
                         match convert_to_class(stmt, typename, properties, base_class) {
                             Ok(fix) => check.amend(fix),
-                            Err(err) => error!("Failed to convert `NamedTuple`: {}", err),
+                            Err(err) => error!("Failed to convert `NamedTuple`: {err}"),
                         }
                     }
                     checker.add_check(check);
                 }
             }
-            Err(err) => error!("Failed to parse defaults: {}", err),
+            Err(err) => error!("Failed to parse defaults: {err}"),
         }
     }
 }

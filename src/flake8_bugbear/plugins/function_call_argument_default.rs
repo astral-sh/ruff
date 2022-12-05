@@ -71,29 +71,26 @@ where
 }
 
 fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
-    if let ExprKind::Name { id, .. } = &expr.node {
-        if id == "float" {
-            if let Some(arg) = args.first() {
-                if let ExprKind::Constant {
-                    value: Constant::Str(value),
-                    ..
-                } = &arg.node
-                {
-                    let lowercased = value.to_lowercase();
-                    return lowercased == "nan"
-                        || lowercased == "+nan"
-                        || lowercased == "-nan"
-                        || lowercased == "inf"
-                        || lowercased == "+inf"
-                        || lowercased == "-inf"
-                        || lowercased == "infinity"
-                        || lowercased == "+infinity"
-                        || lowercased == "-infinity";
-                }
-            }
-        }
+    let ExprKind::Name { id, .. } = &expr.node else {
+        return false;
+    };
+    if id != "float" {
+        return false;
     }
-    false
+    let Some(arg) = args.first() else {
+        return false;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(value),
+        ..
+    } = &arg.node else {
+        return false;
+    };
+    let lowercased = value.to_lowercase();
+    matches!(
+        lowercased.as_str(),
+        "nan" | "+nan" | "-nan" | "inf" | "+inf" | "-inf" | "infinity" | "+infinity" | "-infinity"
+    )
 }
 
 /// B008

@@ -34,7 +34,7 @@ use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use log::{debug, error};
-use notify::{raw_watcher, RecursiveMode, Watcher};
+use notify::{recommended_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use ruff::autofix::fixer;
@@ -338,7 +338,7 @@ fn inner_main() -> Result<ExitCode> {
 
         // Configure the file watcher.
         let (tx, rx) = channel();
-        let mut watcher = raw_watcher(tx)?;
+        let mut watcher = recommended_watcher(tx)?;
         for file in &cli.files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
@@ -346,15 +346,19 @@ fn inner_main() -> Result<ExitCode> {
         loop {
             match rx.recv() {
                 Ok(e) => {
-                    if let Some(path) = e.path {
-                        if path.to_string_lossy().ends_with(".py") {
-                            printer.clear_screen()?;
-                            printer.write_to_user("File change detected...\n");
+                    let paths = e?.paths;
+                    let py_changed = paths.iter().any(|p| {
+                        p.extension()
+                            .map(|ext| ext.eq_ignore_ascii_case("py"))
+                            .unwrap_or_default()
+                    });
+                    if py_changed {
+                        printer.clear_screen()?;
+                        printer.write_to_user("File change detected...\n");
 
-                            let messages =
-                                run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
-                            printer.write_continuously(&messages)?;
-                        }
+                        let messages =
+                            run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
+                        printer.write_continuously(&messages)?;
                     }
                 }
                 Err(e) => return Err(e.into()),

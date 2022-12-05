@@ -11,11 +11,10 @@ const FUNC_NAME_ALLOWLIST: &[&str] = &["get", "setdefault", "pop", "fromkeys"];
 /// `true`, the function name must be explicitly allowed, and the argument must
 /// be either the first or second argument in the call.
 fn allow_boolean_trap(func: &Expr) -> bool {
-    if let ExprKind::Attribute { attr, .. } = &func.node {
-        FUNC_NAME_ALLOWLIST.contains(&attr.as_ref())
-    } else {
-        false
-    }
+    let ExprKind::Attribute { attr, .. } = &func.node else {
+        return false;
+    };
+    FUNC_NAME_ALLOWLIST.contains(&attr.as_ref())
 }
 
 fn is_boolean_arg(arg: &Expr) -> bool {
@@ -39,24 +38,26 @@ pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Argume
         if arg.node.annotation.is_none() {
             continue;
         }
+        let Some(expr) = &arg.node.annotation else {
+            continue;
+        };
 
-        if let Some(expr) = &arg.node.annotation {
-            // check for both bool (python class) and 'bool' (string annotation)
-            let hint = match &expr.node {
-                ExprKind::Name { id, .. } => id == "bool",
-                ExprKind::Constant {
-                    value: Constant::Str(value),
-                    ..
-                } => value == "bool",
-                _ => false,
-            };
-            if hint {
-                checker.add_check(Check::new(
-                    CheckKind::BooleanPositionalArgInFunctionDefinition,
-                    Range::from_located(arg),
-                ));
-            }
+        // check for both bool (python class) and 'bool' (string annotation)
+        let hint = match &expr.node {
+            ExprKind::Name { id, .. } => id == "bool",
+            ExprKind::Constant {
+                value: Constant::Str(value),
+                ..
+            } => value == "bool",
+            _ => false,
+        };
+        if !hint {
+            continue;
         }
+        checker.add_check(Check::new(
+            CheckKind::BooleanPositionalArgInFunctionDefinition,
+            Range::from_located(arg),
+        ));
     }
 }
 
