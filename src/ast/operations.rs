@@ -118,9 +118,9 @@ pub type LocatedCmpop<U = ()> = Located<Cmpop, U>;
 /// Extract all `Cmpop` operators from a source code snippet, with appropriate
 /// ranges.
 ///
-/// RustPython doesn't include line and column information on `Cmpop` nodes.
-/// (CPython doesn't either.) This method iterates over the token stream and
-/// re-identifies `Cmpop` nodes, annotating them with valid arnges.
+/// `RustPython` doesn't include line and column information on `Cmpop` nodes.
+/// `CPython` doesn't either. This method iterates over the token stream and
+/// re-identifies `Cmpop` nodes, annotating them with valid ranges.
 pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
     let mut tok_iter = lexer::make_tokenizer(contents)
         .flatten()
