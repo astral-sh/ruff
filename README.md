@@ -1929,6 +1929,59 @@ max-complexity = 5
 
 ### `pep8-naming`
 
+#### [`ignore-names`](#ignore-names)
+
+A list of names to ignore when considering `pep8-naming` violations.
+
+**Default value**: `["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pep8-naming]
+ignore-names = ["callMethod"]
+```
+
+---
+
+#### [`classmethod-decorators`](#classmethod-decorators)
+
+A list of decorators that, when applied to a method, indicate that the method should be treated as a class method. For example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.
+
+**Default value**: `["classmethod"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pep8-naming]
+# Allow Pydantic's `@validator` decorator to trigger class method treatment.
+classmethod-decorators = ["classmethod", "pydantic.validator"]
+```
+
+---
+
+#### [`staticmethod-decorators`](#staticmethod-decorators)
+
+A list of decorators that, when applied to a method, indicate that the method should be treated as a static method. For example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.
+
+**Default value**: `["staticmethod"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pep8-naming]
+# Allow a shorthand alias, `@stcmthd`, to trigger static method treatment.
+staticmethod-decorators = ["staticmethod", "stcmthd"]
+```
+
+---
+
 ### `pyupgrade`
 
 #### [`keep-runtime-typing`](#keep-runtime-typing)
@@ -1971,217 +2024,6 @@ exclude, when considering any matching files.
 ---
 
 <!-- End auto-generated options sections. -->
-
-### `flake8-tidy-imports`
-
-#### [`ban-relative-imports`](#ban-relative-imports)
-
-Whether to ban all relative imports (`"all"`), or only those imports that extend into the parent
-module and beyond (`"parents"`).
-
-**Default value**: `"parents"`
-
-**Type**: `Strictness`
-
-**Example usage**:
-
-```toml
-[tool.ruff.flake8-tidy-imports]
-# Disallow all relative imports.
-ban-relative-imports = "all"
-```
-
-### `isort`
-
-#### [`known-first-party`](#known-first-party)
-
-A list of modules to consider first-party, regardless of whether they can be identified as such
-via introspection of the local filesystem.
-
-**Default value**: `[]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.isort]
-known-first-party = ["src"]
-```
-
----
-
-#### [`known-third-party`](#known-third-party)
-
-A list of modules to consider third-party, regardless of whether they can be identified as such
-via introspection of the local filesystem.
-
-**Default value**: `[]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.isort]
-known-third-party = ["fastapi"]
-```
-
----
-
-#### [`extra-standard-library`](#extra-standard-library)
-
-A list of modules to consider standard-library, in addition to those known to Ruff in advance.
-
-**Default value**: `[]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.isort]
-extra-standard-library = ["path"]
-```
-
----
-
-#### [`combine-as-imports`](#combine-as-imports)
-
-Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
-option.
-
-**Default value**: `false`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```toml
-[tool.ruff.isort]
-combine-as-imports = true
-```
-
----
-
-#### [`force-wrap-aliases`](#force-wrap-aliases)
-
-Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`)
-to wrap such that every line contains exactly one member. For example, this formatting would be
-retained, rather than condensing to a single line:
-
-```py
-from .utils import (
-    test_directory as test_directory,
-    test_id as test_id
-)
-```
-
-**Default value**: `false`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```toml
-[tool.ruff.isort]
-force-wrap-aliases = true
-```
-
-### `mccabe`
-
-#### [`max-complexity`](#max-complexity)
-
-The maximum McCabe complexity to allow before triggering `C901` errors.
-
-**Default value**: `10`
-
-**Type**: `usize`
-
-**Example usage**:
-
-```toml
-[tool.ruff.mccabe]
-# Flag errors (`C901`) whenever the complexity level exceeds 5.
-max-complexity = 5
-```
-
-### `pep8-naming`
-
-#### [`ignore-names`](#ignore-names)
-
-A list of names to ignore when considering `pep8-naming` violations.
-
-**Default value**: `["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.pep8-naming]
-ignore-names = ["callMethod"]
-```
-
----
-
-#### [`classmethod-decorators`](#classmethod-decorators)
-
-A list of decorators that, when applied to a method, indicate that the method should be treated as
-a class method. For example, Ruff will expect that any method decorated by a decorator in this list
-takes a `cls` argument as its first argument.
-
-**Default value**: `["classmethod"]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.pep8-naming]
-# Allow Pydantic's `@validator` decorator to trigger class method treatment.
-classmethod-decorators = ["classmethod", "pydantic.validator"]
-```
-
----
-
-#### [`staticmethod-decorators`](#staticmethod-decorators)
-
-A list of decorators that, when applied to a method, indicate that the method should be treated as
-a static method. For example, Ruff will expect that any method decorated by a decorator in this list
-has no `self` or `cls` argument.
-
-**Default value**: `["staticmethod"]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.pep8-naming]
-# Allow a shorthand alias, `@stcmthd`, to trigger static method treatment.
-staticmethod-decorators = ["staticmethod", "stcmthd"]
-```
-
-### `pyupgrade`
-
-#### [`keep-runtime-typing`](#keep-runtime-typing)
-
-Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`)
-rewrites even if a file imports `from __future__ import annotations`. Note that this setting is
-only applicable when the target Python version is below 3.9 and 3.10 respectively.
-
-**Default value**: `false`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```toml
-[tool.ruff.pyupgrade]
-# Preserve types, even if a file imports `from __future__ import annotations`.
-keep-runtime-typing = true
-```
 
 ## License
 
