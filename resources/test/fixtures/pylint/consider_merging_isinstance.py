@@ -34,4 +34,5 @@ def isinstances():
     result = isinstance(var[7], int) or not isinstance(var[7], float)
     result = isinstance(var[6], int) or isinstance(var[7], float)
     result = isinstance(var[6], int) or isinstance(var[7], int)
+    result = isinstance(var[6], (float, int)) or False
     return result
