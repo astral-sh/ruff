@@ -42,6 +42,15 @@ pub fn format_import_from(
     force_wrap_aliases: bool,
     is_first: bool,
 ) -> String {
+    if aliases.len() == 1
+        && aliases
+            .iter()
+            .all(|(alias, _)| alias.name == "*" && alias.asname.is_none())
+    {
+        let (single_line, ..) = format_single_line(import_from, comments, aliases, is_first);
+        return single_line;
+    }
+
     // We can only inline if: (1) none of the aliases have atop comments, and (3)
     // only the last alias (if any) has inline comments.
     if aliases
@@ -58,7 +67,7 @@ pub fn format_import_from(
     {
         let (single_line, import_length) =
             format_single_line(import_from, comments, aliases, is_first);
-        if import_length <= line_length {
+        if import_length <= line_length || aliases.iter().any(|(alias, _)| alias.name == "*") {
             return single_line;
         }
     }
