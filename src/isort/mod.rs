@@ -407,6 +407,7 @@ pub fn format_imports(
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
     combine_as_imports: bool,
+    force_wrap_aliases: bool,
 ) -> String {
     let block = annotate_imports(block, comments);
 
@@ -451,6 +452,7 @@ pub fn format_imports(
                 comments,
                 aliases,
                 line_length,
+                force_wrap_aliases,
                 is_first_statement,
             ));
             is_first_statement = false;
@@ -477,6 +479,7 @@ mod tests {
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
+    #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
@@ -519,6 +522,29 @@ mod tests {
                 .as_path(),
             &Settings {
                 isort: isort::settings::Settings {
+                    combine_as_imports: true,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("force_wrap_aliases.py"))]
+    fn force_wrap_aliases(path: &Path) -> Result<()> {
+        let snapshot = format!("force_wrap_aliases_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    force_wrap_aliases: true,
                     combine_as_imports: true,
                     ..isort::settings::Settings::default()
                 },

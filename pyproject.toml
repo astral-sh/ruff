@@ -31,3 +31,7 @@ build-backend = "maturin"
 [tool.maturin]
 bindings = "bin"
 strip = true
+
+[tool.ruff.isort]
+force-wrap-aliases = true
+combine-as-imports = true
