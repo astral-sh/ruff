@@ -321,7 +321,7 @@ where
         let value_text = self.radix_run(radix);
         let end_pos = self.get_pos();
         let value = BigInt::from_str_radix(&value_text, radix).map_err(|e| LexicalError {
-            error: LexicalErrorType::OtherError(format!("{:?}", e)),
+            error: LexicalErrorType::OtherError(format!("{e:?}")),
             location: start_pos,
         })?;
         Ok((start_pos, Tok::Int { value }, end_pos))
