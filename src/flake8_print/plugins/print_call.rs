@@ -37,7 +37,7 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
                         }
                         check.amend(fix);
                     }
-                    Err(e) => error!("Failed to remove print call: {}", e),
+                    Err(e) => error!("Failed to remove print call: {e}"),
                 }
             }
         }

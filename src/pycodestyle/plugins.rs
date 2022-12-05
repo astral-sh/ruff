@@ -322,7 +322,7 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                                 stmt.end_location.unwrap(),
                             ));
                         }
-                        Err(e) => error!("Failed to generate fix: {}", e),
+                        Err(e) => error!("Failed to generate fix: {e}"),
                     }
                 }
             }

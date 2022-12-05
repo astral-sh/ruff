@@ -62,7 +62,7 @@ pub fn unnecessary_generator_list(
         if fix {
             match fixes::fix_unnecessary_generator_list(locator, expr) {
                 Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to generate fix: {}", e),
+                Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
         return Some(check);
@@ -86,7 +86,7 @@ pub fn unnecessary_generator_set(
         if fix {
             match fixes::fix_unnecessary_generator_set(locator, expr) {
                 Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to generate fix: {}", e),
+                Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
         return Some(check);
@@ -112,7 +112,7 @@ pub fn unnecessary_generator_dict(
                 if fix {
                     match fixes::fix_unnecessary_generator_dict(locator, expr) {
                         Ok(fix) => check.amend(fix),
-                        Err(e) => error!("Failed to generate fix: {}", e),
+                        Err(e) => error!("Failed to generate fix: {e}"),
                     }
                 }
                 return Some(check);
@@ -139,7 +139,7 @@ pub fn unnecessary_list_comprehension_set(
         if fix {
             match fixes::fix_unnecessary_list_comprehension_set(locator, expr) {
                 Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to generate fix: {}", e),
+                Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
         return Some(check);
@@ -165,7 +165,7 @@ pub fn unnecessary_list_comprehension_dict(
                 if fix {
                     match fixes::fix_unnecessary_list_comprehension_dict(locator, expr) {
                         Ok(fix) => check.amend(fix),
-                        Err(e) => error!("Failed to generate fix: {}", e),
+                        Err(e) => error!("Failed to generate fix: {e}"),
                     }
                 }
                 return Some(check);
@@ -196,7 +196,7 @@ pub fn unnecessary_literal_set(
     if fix {
         match fixes::fix_unnecessary_literal_set(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -232,7 +232,7 @@ pub fn unnecessary_literal_dict(
     if fix {
         match fixes::fix_unnecessary_literal_dict(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -268,7 +268,7 @@ pub fn unnecessary_collection_call(
     if fix {
         match fixes::fix_unnecessary_collection_call(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -296,7 +296,7 @@ pub fn unnecessary_literal_within_tuple_call(
     if fix {
         match fixes::fix_unnecessary_literal_within_tuple_call(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -324,7 +324,7 @@ pub fn unnecessary_literal_within_list_call(
     if fix {
         match fixes::fix_unnecessary_literal_within_list_call(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)
@@ -345,7 +345,7 @@ pub fn unnecessary_list_call(
         if fix {
             match fixes::fix_unnecessary_list_call(locator, expr) {
                 Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to generate fix: {}", e),
+                Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
         return Some(check);
@@ -375,7 +375,7 @@ pub fn unnecessary_call_around_sorted(
             if fix {
                 match fixes::fix_unnecessary_call_around_sorted(locator, expr) {
                     Ok(fix) => check.amend(fix),
-                    Err(e) => error!("Failed to generate fix: {}", e),
+                    Err(e) => error!("Failed to generate fix: {e}"),
                 }
             }
             return Some(check);
@@ -497,7 +497,7 @@ pub fn unnecessary_comprehension(
     if fix {
         match fixes::fix_unnecessary_comprehension(locator, expr) {
             Ok(fix) => check.amend(fix),
-            Err(e) => error!("Failed to generate fix: {}", e),
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
     Some(check)

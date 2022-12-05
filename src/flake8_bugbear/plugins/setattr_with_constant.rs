@@ -53,7 +53,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 )),
-                                Err(e) => error!("Failed to fix invalid comparison: {}", e),
+                                Err(e) => error!("Failed to fix invalid comparison: {e}"),
                             };
                         }
                         checker.add_check(check);

@@ -72,7 +72,7 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
                                         range.end_location,
                                     ));
                                 }
-                                Err(e) => error!("Failed to locate parentheses: {}", e),
+                                Err(e) => error!("Failed to locate parentheses: {e}"),
                             }
                         }
                     }
