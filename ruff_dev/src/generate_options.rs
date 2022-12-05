@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Args;
 use ruff::settings::options::Options;
-use ruff::settings::options_base::{ConfigurationOptions, RuffOptionEntry, RuffOptionField};
+use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionField};
 
 const BEGIN_PRAGMA: &str = "<!-- Begin auto-generated options sections. -->";
 const END_PRAGMA: &str = "<!-- End auto-generated options sections. -->";
@@ -20,7 +20,7 @@ pub struct Cli {
     dry_run: bool,
 }
 
-fn emit_field(output: &mut String, field: &RuffOptionField, group_name: Option<&str>) {
+fn emit_field(output: &mut String, field: &OptionField, group_name: Option<&str>) {
     output.push_str(&format!("#### [`{0}`](#{0})\n", field.name));
     output.push('\n');
     output.push_str(field.doc);
@@ -46,15 +46,15 @@ pub fn main(cli: &Cli) -> Result<()> {
 
     for entry in Options::get_available_options() {
         match entry {
-            RuffOptionEntry::Field(field) => {
+            OptionEntry::Field(field) => {
                 emit_field(&mut output, &field, None);
                 output.push_str("---\n\n");
             }
-            RuffOptionEntry::Group(group) => {
+            OptionEntry::Group(group) => {
                 output.push_str(&format!("### `{}`\n", group.name));
                 output.push('\n');
                 for e in &group.fields {
-                    if let RuffOptionEntry::Field(f) = e {
+                    if let OptionEntry::Field(f) = e {
                         emit_field(&mut output, f, Some(group.name));
                         output.push_str("---\n\n");
                     }

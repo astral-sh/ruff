@@ -1,5 +1,16 @@
-use proc_macro::TokenStream;
-use proc_macro2::{Ident as Ident2, TokenStream as TokenStream2};
+#![allow(
+    clippy::collapsible_else_if,
+    clippy::collapsible_if,
+    clippy::implicit_hasher,
+    clippy::match_same_arms,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
+
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::token::Comma;
@@ -9,7 +20,7 @@ use syn::{
 };
 
 #[proc_macro_derive(ConfigurationOptions, attributes(option, option_group))]
-pub fn derive(input: TokenStream) -> TokenStream {
+pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     derive_impl(input)
@@ -17,7 +28,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         .into()
 }
 
-fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
+fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let DeriveInput { ident, data, .. } = input;
 
     match data {
@@ -38,11 +49,11 @@ fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
             }
 
             Ok(quote! {
-              use crate::settings::options_base::{RuffOptionEntry, RuffOptionField, RuffOptionGroup, ConfigurationOptions};
+              use crate::settings::options_base::{OptionEntry, OptionField, OptionGroup, ConfigurationOptions};
 
               #[automatically_derived]
               impl ConfigurationOptions for #ident {
-                  fn get_available_options() -> Vec<RuffOptionEntry> {
+                  fn get_available_options() -> Vec<OptionEntry> {
                       vec![#(#output),*]
                   }
               }
@@ -58,7 +69,7 @@ fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
 /// For a field with type `Option<Foobar>` where `Foobar` itself is a struct
 /// deriving `ConfigurationOptions`, create code that calls retrieves options
 /// from that group: `Foobar::get_available_options()`
-fn handle_option_group(field: &Field) -> syn::Result<TokenStream2> {
+fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
     // unwrap is safe because we're only going over named fields
     let ident = field.ident.as_ref().unwrap();
 
@@ -77,7 +88,7 @@ fn handle_option_group(field: &Field) -> syn::Result<TokenStream2> {
                 let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
                 Ok(quote_spanned!(
-                    ident.span() => RuffOptionEntry::Group(RuffOptionGroup {
+                    ident.span() => OptionEntry::Group(OptionGroup {
                         name: #kebab_name,
                         fields: #path::get_available_options(),
                     })
@@ -93,8 +104,8 @@ fn handle_option_group(field: &Field) -> syn::Result<TokenStream2> {
 }
 
 /// Parse an `#[option(doc="...", default="..", value_type="..", example="..")]`
-/// attribute and return data in the form of a `RuffOptionField`.
-fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<TokenStream2> {
+/// attribute and return data in the form of an `OptionField`.
+fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::TokenStream> {
     // unwrap is safe because we're only going over named fields
     let ident = field.ident.as_ref().unwrap();
 
@@ -107,7 +118,7 @@ fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<TokenStream2> {
     let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
     Ok(quote_spanned!(
-        ident.span() => RuffOptionEntry::Field(RuffOptionField {
+        ident.span() => OptionEntry::Field(OptionField {
             name: #kebab_name,
             doc: &#doc,
             default: &#default,
@@ -148,7 +159,7 @@ impl Parse for FieldAttributes {
 }
 
 fn _parse_key_value(input: ParseStream, name: &str) -> syn::Result<String> {
-    let ident: Ident2 = input.parse()?;
+    let ident: proc_macro2::Ident = input.parse()?;
     if ident != name {
         return Err(syn::Error::new(
             ident.span(),
