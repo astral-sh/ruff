@@ -1,11 +1,12 @@
 use rustpython_ast::{Location, Stmt};
 use textwrap::{dedent, indent};
 
-use crate::ast::helpers::{match_leading_content, match_trailing_content};
+use crate::ast::helpers::{count_trailing_lines, match_leading_content, match_trailing_content};
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
 use crate::checks::CheckKind;
+use crate::isort::track::Block;
 use crate::isort::{comments, format_imports};
 use crate::{Check, Settings, SourceCodeLocator};
 
@@ -30,13 +31,13 @@ fn extract_indentation(body: &[&Stmt], locator: &SourceCodeLocator) -> String {
 
 /// I001
 pub fn check_imports(
-    body: &[&Stmt],
+    block: &Block,
     locator: &SourceCodeLocator,
     settings: &Settings,
     autofix: bool,
 ) -> Option<Check> {
-    let range = extract_range(body);
-    let indentation = extract_indentation(body, locator);
+    let range = extract_range(&block.imports);
+    let indentation = extract_indentation(&block.imports, locator);
 
     // Extract comments. Take care to grab any inline comments from the last line.
     let comments = comments::collect_comments(
@@ -48,12 +49,13 @@ pub fn check_imports(
     );
 
     // Special-cases: there's leading or trailing content in the import block.
-    let has_leading_content = match_leading_content(body.first().unwrap(), locator);
-    let has_trailing_content = match_trailing_content(body.last().unwrap(), locator);
+    let has_leading_content = match_leading_content(block.imports.first().unwrap(), locator);
+    let has_trailing_content = match_trailing_content(block.imports.last().unwrap(), locator);
+    let num_trailing_lines = count_trailing_lines(block.imports.last().unwrap(), locator);
 
     // Generate the sorted import block.
     let expected = format_imports(
-        body,
+        block,
         comments,
         settings.line_length - indentation.len(),
         &settings.src,
@@ -81,7 +83,7 @@ pub fn check_imports(
                     Location::new(range.location.row(), 0)
                 },
                 // TODO(charlie): Preserve trailing suffixes. Right now, we strip them.
-                Location::new(range.end_location.row() + 1, 0),
+                Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
             ));
         }
         Some(check)
@@ -89,7 +91,7 @@ pub fn check_imports(
         // Expand the span the entire range, including leading and trailing space.
         let range = Range {
             location: Location::new(range.location.row(), 0),
-            end_location: Location::new(range.end_location.row() + 1, 0),
+            end_location: Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
         };
         let actual = dedent(&locator.slice_source_code_range(&range));
         if actual == expected {

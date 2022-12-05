@@ -10,6 +10,7 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::sorting::{member_key, module_key};
+use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
 };
@@ -464,7 +465,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
 
 #[allow(clippy::too_many_arguments)]
 pub fn format_imports(
-    block: &[&Stmt],
+    block: &Block,
     comments: Vec<Comment>,
     line_length: usize,
     src: &[PathBuf],
@@ -474,7 +475,8 @@ pub fn format_imports(
     combine_as_imports: bool,
     force_wrap_aliases: bool,
 ) -> String {
-    let block = annotate_imports(block, comments);
+    let trailer = &block.trailer;
+    let block = annotate_imports(&block.imports, comments);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports);
@@ -523,6 +525,16 @@ pub fn format_imports(
             is_first_statement = false;
         }
     }
+    match trailer {
+        None => {}
+        Some(Trailer::Sibling) => {
+            output.append("\n");
+        }
+        Some(Trailer::FunctionDef | Trailer::ClassDef) => {
+            output.append("\n");
+            output.append("\n");
+        }
+    }
     output.finish().to_string()
 }
 
@@ -546,6 +558,7 @@ mod tests {
     #[test_case(Path::new("fit_line_length_comment.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
+    #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
     #[test_case(Path::new("order_by_type.py"))]
