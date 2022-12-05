@@ -7,20 +7,20 @@ use crate::visibility::{Modifier, VisibleScope};
 
 /// Extract a docstring from a function or class body.
 pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
-    if let Some(stmt) = suite.first() {
-        if let StmtKind::Expr { value } = &stmt.node {
-            if matches!(
-                &value.node,
-                ExprKind::Constant {
-                    value: Constant::Str(_),
-                    ..
-                }
-            ) {
-                return Some(value);
-            }
+    let stmt = suite.first()?;
+    let StmtKind::Expr { value } = &stmt.node else {
+        return None;
+    };
+    if !matches!(
+        &value.node,
+        ExprKind::Constant {
+            value: Constant::Str(_),
+            ..
         }
+    ) {
+        return None;
     }
-    None
+    Some(value)
 }
 
 /// Extract a `Definition` from the AST node defined by a `Stmt`.
