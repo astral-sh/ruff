@@ -94,23 +94,99 @@ pub fn in_nested_block<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool
     })
 }
 
-/// Check if a node represents an unpacking assignment.
-pub fn is_unpacking_assignment(stmt: &Stmt) -> bool {
-    let StmtKind::Assign { targets, value, .. } = &stmt.node else {
-        return false;
-    };
-    if !targets.iter().any(|child| {
-        matches!(
-            child.node,
-            ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
-        )
-    }) {
-        return false;
+/// Returns `true` if `parent` contains `child`.
+fn contains(parent: &Expr, child: &Expr) -> bool {
+    match &parent.node {
+        ExprKind::BoolOp { values, .. } => values.iter().any(|parent| contains(parent, child)),
+        ExprKind::NamedExpr { target, value } => contains(target, child) || contains(value, child),
+        ExprKind::BinOp { left, right, .. } => contains(left, child) || contains(right, child),
+        ExprKind::UnaryOp { operand, .. } => contains(operand, child),
+        ExprKind::Lambda { body, .. } => contains(body, child),
+        ExprKind::IfExp { test, body, orelse } => {
+            contains(test, child) || contains(body, child) || contains(orelse, child)
+        }
+        ExprKind::Dict { keys, values } => keys
+            .iter()
+            .chain(values.iter())
+            .any(|parent| contains(parent, child)),
+        ExprKind::Set { elts } => elts.iter().any(|parent| contains(parent, child)),
+        ExprKind::ListComp { elt, .. } => contains(elt, child),
+        ExprKind::SetComp { elt, .. } => contains(elt, child),
+        ExprKind::DictComp { key, value, .. } => contains(key, child) || contains(value, child),
+        ExprKind::GeneratorExp { elt, .. } => contains(elt, child),
+        ExprKind::Await { value } => contains(value, child),
+        ExprKind::Yield { value } => value.as_ref().map_or(false, |value| contains(value, child)),
+        ExprKind::YieldFrom { value } => contains(value, child),
+        ExprKind::Compare {
+            left, comparators, ..
+        } => contains(left, child) || comparators.iter().any(|parent| contains(parent, child)),
+        ExprKind::Call {
+            func,
+            args,
+            keywords,
+        } => {
+            contains(func, child)
+                || args.iter().any(|parent| contains(parent, child))
+                || keywords
+                    .iter()
+                    .any(|keyword| contains(&keyword.node.value, child))
+        }
+        ExprKind::FormattedValue {
+            value, format_spec, ..
+        } => {
+            contains(value, child)
+                || format_spec
+                    .as_ref()
+                    .map_or(false, |value| contains(value, child))
+        }
+        ExprKind::JoinedStr { values } => values.iter().any(|parent| contains(parent, child)),
+        ExprKind::Constant { .. } => false,
+        ExprKind::Attribute { value, .. } => contains(value, child),
+        ExprKind::Subscript { value, slice, .. } => {
+            contains(value, child) || contains(slice, child)
+        }
+        ExprKind::Starred { value, .. } => contains(value, child),
+        ExprKind::Name { .. } => parent == child,
+        ExprKind::List { elts, .. } => elts.iter().any(|parent| contains(parent, child)),
+        ExprKind::Tuple { elts, .. } => elts.iter().any(|parent| contains(parent, child)),
+        ExprKind::Slice { lower, upper, step } => {
+            lower.as_ref().map_or(false, |value| contains(value, child))
+                || upper.as_ref().map_or(false, |value| contains(value, child))
+                || step.as_ref().map_or(false, |value| contains(value, child))
+        }
     }
-    !matches!(
-        &value.node,
-        ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
-    )
+}
+
+/// Check if a node represents an unpacking assignment.
+pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
+    match &parent.node {
+        StmtKind::With { items, .. } => items.iter().any(|item| {
+            if let Some(optional_vars) = &item.optional_vars {
+                if matches!(optional_vars.node, ExprKind::Tuple { .. }) {
+                    if contains(optional_vars, child) {
+                        return true;
+                    }
+                }
+            }
+            false
+        }),
+        StmtKind::Assign { targets, value, .. } => {
+            // TODO(charlie): Match based on `child`.
+            if !targets.iter().any(|child| {
+                matches!(
+                    child.node,
+                    ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+                )
+            }) {
+                return false;
+            }
+            !matches!(
+                &value.node,
+                ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+            )
+        }
+        _ => false,
+    }
 }
 
 pub type LocatedCmpop<U = ()> = Located<Cmpop, U>;
