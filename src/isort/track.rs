@@ -60,12 +60,17 @@ where
         // Track manual splits.
         while self.split_index < self.directives.splits.len() {
             if stmt.location.row() >= self.directives.splits[self.split_index] {
-                self.finalize(Some(match &stmt.node {
-                    StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                        Trailer::FunctionDef
+                // TODO(charlie): Track nesting semantically, rather than via column index.
+                self.finalize(Some(if stmt.location.column() == 0 {
+                    match &stmt.node {
+                        StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                            Trailer::FunctionDef
+                        }
+                        StmtKind::ClassDef { .. } => Trailer::ClassDef,
+                        _ => Trailer::Sibling,
                     }
-                    StmtKind::ClassDef { .. } => Trailer::ClassDef,
-                    _ => Trailer::Sibling,
+                } else {
+                    Trailer::Sibling
                 }));
                 self.split_index += 1;
             } else {
@@ -81,12 +86,17 @@ where
         {
             self.track_import(stmt);
         } else {
-            self.finalize(Some(match &stmt.node {
-                StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                    Trailer::FunctionDef
+            // TODO(charlie): Track nesting semantically, rather than via column index.
+            self.finalize(Some(if stmt.location.column() == 0 {
+                match &stmt.node {
+                    StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                        Trailer::FunctionDef
+                    }
+                    StmtKind::ClassDef { .. } => Trailer::ClassDef,
+                    _ => Trailer::Sibling,
                 }
-                StmtKind::ClassDef { .. } => Trailer::ClassDef,
-                _ => Trailer::Sibling,
+            } else {
+                Trailer::Sibling
             }));
         }
 
