@@ -91,7 +91,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
    1. [eradicate (ERA)](#eradicate)
    1. [pygrep-hooks (PGH)](#pygrep-hooks)
-   1. [Pylint (PL)](#pylint)
+   1. [Pylint (PLC, PLE, PLR, PLW)](#pylint)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
