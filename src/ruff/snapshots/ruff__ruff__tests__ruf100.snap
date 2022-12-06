@@ -1,0 +1,185 @@
+---
+source: src/ruff/mod.rs
+expression: checks
+---
+- kind:
+    UnusedNOQA: ~
+  location:
+    row: 9
+    column: 11
+  end_location:
+    row: 9
+    column: 17
+  fix:
+    content: ""
+    location:
+      row: 9
+      column: 9
+    end_location:
+      row: 9
+      column: 17
+- kind:
+    UnusedNOQA:
+      - E501
+  location:
+    row: 13
+    column: 11
+  end_location:
+    row: 13
+    column: 23
+  fix:
+    content: ""
+    location:
+      row: 13
+      column: 9
+    end_location:
+      row: 13
+      column: 23
+- kind:
+    UnusedNOQA:
+      - F841
+      - E501
+  location:
+    row: 16
+    column: 11
+  end_location:
+    row: 16
+    column: 29
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 9
+    end_location:
+      row: 16
+      column: 29
+- kind:
+    UnusedNOQA:
+      - F841
+      - W191
+  location:
+    row: 19
+    column: 11
+  end_location:
+    row: 19
+    column: 29
+  fix:
+    content: ""
+    location:
+      row: 19
+      column: 9
+    end_location:
+      row: 19
+      column: 29
+- kind:
+    UnusedNOQA:
+      - F841
+      - V101
+  location:
+    row: 22
+    column: 11
+  end_location:
+    row: 22
+    column: 29
+  fix:
+    content: ""
+    location:
+      row: 22
+      column: 9
+    end_location:
+      row: 22
+      column: 29
+- kind:
+    UnusedNOQA:
+      - E501
+  location:
+    row: 26
+    column: 9
+  end_location:
+    row: 26
+    column: 21
+  fix:
+    content: ""
+    location:
+      row: 26
+      column: 9
+    end_location:
+      row: 26
+      column: 21
+- kind:
+    UnusedVariable: d
+  location:
+    row: 29
+    column: 4
+  end_location:
+    row: 29
+    column: 5
+  fix: ~
+- kind:
+    UnusedNOQA:
+      - E501
+  location:
+    row: 29
+    column: 32
+  end_location:
+    row: 29
+    column: 44
+  fix:
+    content: ""
+    location:
+      row: 29
+      column: 9
+    end_location:
+      row: 29
+      column: 44
+- kind:
+    UnusedNOQA:
+      - F841
+  location:
+    row: 55
+    column: 5
+  end_location:
+    row: 55
+    column: 23
+  fix:
+    content: "# noqa: E501"
+    location:
+      row: 55
+      column: 5
+    end_location:
+      row: 55
+      column: 23
+- kind:
+    UnusedNOQA:
+      - E501
+  location:
+    row: 63
+    column: 5
+  end_location:
+    row: 63
+    column: 17
+  fix:
+    content: ""
+    location:
+      row: 63
+      column: 3
+    end_location:
+      row: 63
+      column: 17
+- kind:
+    UnusedNOQA: ~
+  location:
+    row: 71
+    column: 5
+  end_location:
+    row: 71
+    column: 11
+  fix:
+    content: ""
+    location:
+      row: 71
+      column: 3
+    end_location:
+      row: 71
+      column: 11
+

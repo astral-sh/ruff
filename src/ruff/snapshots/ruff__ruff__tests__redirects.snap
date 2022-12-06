@@ -1,0 +1,6 @@
+---
+source: src/ruff/mod.rs
+expression: checks
+---
+[]
+
