@@ -14,6 +14,19 @@ use crate::{
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
+    #[option(
+        doc = r#"
+            A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`,
+            `RUF002`, and `RUF003`.
+        "#,
+        default = r#"`[]`"#,
+        value_type = "Vec<char>",
+        example = r#"
+            # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and greek-small-letter-alpha (U+03B1),
+            # which could be confused for "-", "p", and "*", respectively.
+            allowed-confusables = ["−", "ρ", "∗"]
+        "#
+    )]
     pub allowed_confusables: Option<Vec<char>>,
     #[option(
         doc = r#"
@@ -121,10 +134,9 @@ pub struct Options {
     pub fixable: Option<Vec<CheckCodePrefix>>,
     #[option(
         doc = r#"
-            The style in which violation messages should be formatted: `"text"`
-            (default), `"grouped"` (group messages by file), `"json"`
-            (machine-readable), `"junit"` (machine-readable XML), or `"github"`
-            (GitHub Actions annotations).
+            The style in which violation messages should be formatted: `"text"` (default),
+            `"grouped"` (group messages by file), `"json"` (machine-readable), `"junit"`
+            (machine-readable XML), or `"github"` (GitHub Actions annotations).
         "#,
         default = r#"`"text"`"#,
         value_type = "SerializationType",
@@ -136,13 +148,11 @@ pub struct Options {
     pub format: Option<SerializationFormat>,
     #[option(
         doc = r"
-            A list of check code prefixes to ignore. Prefixes can specify exact
-            checks (like `F841`), entire categories (like `F`), or anything in
-            between.
+            A list of check code prefixes to ignore. Prefixes can specify exact checks (like
+            `F841`), entire categories (like `F`), or anything in between.
 
-            When breaking ties between enabled and disabled checks (via `select` and
-            `ignore`, respectively), more specific prefixes override less specific
-            prefixes.
+            When breaking ties between enabled and disabled checks (via `select` and `ignore`,
+            respectively), more specific prefixes override less specific prefixes.
         ",
         default = "`[]`",
         value_type = "Vec<CheckCodePrefix>",
@@ -154,11 +164,10 @@ pub struct Options {
     pub ignore: Option<Vec<CheckCodePrefix>>,
     #[option(
         doc = r#"
-            Avoid automatically removing unused imports in `__init__.py` files.
-            Such imports will still be +flagged, but with a dedicated message
-            suggesting that the import is either added to the module' +`__all__`
-            symbol, or re-exported with a redundant alias (e.g., `import os as
-            os`).
+            Avoid automatically removing unused imports in `__init__.py` files. Such imports will
+            still be +flagged, but with a dedicated message suggesting that the import is either
+            added to the module' +`__all__` symbol, or re-exported with a redundant alias (e.g.,
+            `import os as os`).
         "#,
         default = "`false`",
         value_type = "bool",
@@ -179,13 +188,11 @@ pub struct Options {
     pub line_length: Option<usize>,
     #[option(
         doc = r#"
-            A list of check code prefixes to enable. Prefixes can specify exact
-            checks (like `F841`), entire categories (like `F`), or anything in
-            between.
+            A list of check code prefixes to enable. Prefixes can specify exact checks (like
+            `F841`), entire categories (like `F`), or anything in between.
 
-            When breaking ties between enabled and disabled checks (via `select`
-            and `ignore`, respectively), more specific prefixes override less
-            specific prefixes.
+            When breaking ties between enabled and disabled checks (via `select` and `ignore`,
+            respectively), more specific prefixes override less specific prefixes.
         "#,
         default = r#"`["E", "F"]`"#,
         value_type = "Vec<CheckCodePrefix>",
@@ -197,8 +204,8 @@ pub struct Options {
     pub select: Option<Vec<CheckCodePrefix>>,
     #[option(
         doc = r#"
-            Whether to show source code snippets when reporting lint error
-            violations (overridden by the `--show-source` command-line flag).
+            Whether to show source code snippets when reporting lint error violations (overridden by
+            the `--show-source` command-line flag).
         "#,
         default = "`false`",
         value_type = "bool",
@@ -221,10 +228,9 @@ pub struct Options {
     pub src: Option<Vec<String>>,
     #[option(
         doc = r#"
-            The Python version to target, e.g., when considering automatic code
-            upgrades, like rewriting type annotations. Note that the target version
-            will _not_ be inferred from the _current_ Python version, and instead
-            must be specified explicitly (as seen below).
+            The Python version to target, e.g., when considering automatic code upgrades, like
+            rewriting type annotations. Note that the target version will _not_ be inferred from the
+            _current_ Python version, and instead must be specified explicitly (as seen below).
         "#,
         default = r#"`"py310"`"#,
         value_type = "PythonVersion",
@@ -264,8 +270,8 @@ pub struct Options {
     // Tables are required to go last.
     #[option(
         doc = r#"
-            A list of mappings from file pattern to check code prefixes to
-            exclude, when considering any matching files.
+            A list of mappings from file pattern to check code prefixes to exclude, when considering
+            any matching files.
         "#,
         default = "`{}`",
         value_type = "HashMap<String, Vec<CheckCodePrefix>>",
