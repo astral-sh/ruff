@@ -133,7 +133,7 @@ pub(crate) fn check_path(
     Ok(checks)
 }
 
-const MAX_ITERATIONS: usize = 100;
+const MAX_ITERATIONS: usize = 1;
 
 /// Lint the source code at the given `Path`.
 pub fn lint_path(

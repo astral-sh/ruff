@@ -507,7 +507,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D214 | SectionNotOverIndented | Section is over-indented ("Returns") | 🛠 |
 | D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("Returns") | 🛠 |
 | D300 | UsesTripleQuotes | Use """triple double quotes""" |  |
-| D400 | EndsInPeriod | First line should end with a period |  |
+| D400 | EndsInPeriod | First line should end with a period | 🛠 |
 | D402 | NoSignature | First line should not be the function's signature |  |
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |
 | D404 | NoThisPrefix | First word of the docstring should not be "This" |  |
@@ -521,7 +521,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D412 | NoBlankLinesBetweenHeaderAndContent | No blank lines allowed between a section header and its content ("Returns") | 🛠 |
 | D413 | BlankLineAfterLastSection | Missing blank line after last section ("Returns") | 🛠 |
 | D414 | NonEmptySection | Section has no content ("Returns") |  |
-| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |
+| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point | 🛠 |
 | D416 | SectionNameEndsInColon | Section name should end with a colon ("Returns") | 🛠 |
 | D417 | DocumentAllArguments | Missing argument descriptions in the docstring: `x`, `y` |  |
 | D418 | SkipDocstring | Function decorated with `@overload` shouldn't contain a docstring |  |
