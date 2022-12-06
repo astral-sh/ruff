@@ -43,4 +43,4 @@ staticmethod-decorators = ["staticmethod"]
 ban-relative-imports = "parents"
 
 [tool.ruff.flake8-import-conventions.aliases]
-mylibrary = "mylib"
+"dask.dataframe" = "dd"

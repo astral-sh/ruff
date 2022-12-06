@@ -1782,7 +1782,7 @@ A mapping of modules to their conventional import aliases.
 [tool.ruff.flake8-import-conventions]
 # Declare a custom alias for the `matplotlib` module.
 [tool.ruff.flake8-import-conventions.aliases]
-matplotlib = "mpl"
+"dask.dataframe" = "dd"
 ```
 
 ---

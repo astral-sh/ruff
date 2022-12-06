@@ -4,13 +4,24 @@ expression: checks
 ---
 - kind:
     ImportAliasIsNotConventional:
-      - pulumi_aws
-      - aws
+      - dask.array
+      - da
   location:
     row: 13
     column: 0
   end_location:
     row: 13
     column: 17
+  fix: ~
+- kind:
+    ImportAliasIsNotConventional:
+      - dask.dataframe
+      - dd
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 21
   fix: ~
 

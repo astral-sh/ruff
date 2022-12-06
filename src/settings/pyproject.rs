@@ -432,8 +432,8 @@ other-attribute = 1
                 }),
                 flake8_import_conventions: Some(flake8_import_conventions::settings::Options {
                     aliases: Some(FxHashMap::from_iter([(
-                        "mylibrary".to_string(),
-                        "mylib".to_string(),
+                        "dask.dataframe".to_string(),
+                        "dd".to_string(),
                     )]))
                 }),
                 isort: None,

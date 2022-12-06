@@ -30,7 +30,10 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_import_conventions/IC001.py"),
             &Settings {
                 flake8_import_conventions: flake8_import_conventions::settings::Settings {
-                    aliases: FxHashMap::from_iter([("pulumi_aws".to_string(), "aws".to_string())]),
+                    aliases: FxHashMap::from_iter([
+                        ("dask.array".to_string(), "da".to_string()),
+                        ("dask.dataframe".to_string(), "dd".to_string()),
+                    ]),
                 },
                 ..Settings::for_rule(CheckCode::IC001)
             },
