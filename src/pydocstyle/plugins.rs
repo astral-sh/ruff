@@ -388,15 +388,17 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
                 }
             }
 
-            // Insert one blank line after the summary (replacing any existing lines).
-            check.amend(Fix::replacement(
-                "\n".to_string(),
-                Location::new(docstring.location.row() + summary_line + 1, 0),
-                Location::new(
-                    docstring.location.row() + summary_line + 1 + blanks_count,
-                    0,
-                ),
-            ));
+            if blanks_count > 1 {
+                // Insert one blank line after the summary (replacing any existing lines).
+                check.amend(Fix::replacement(
+                    "\n".to_string(),
+                    Location::new(docstring.location.row() + summary_line + 1, 0),
+                    Location::new(
+                        docstring.location.row() + summary_line + 1 + blanks_count,
+                        0,
+                    ),
+                ));
+            }
         }
         checker.add_check(check);
     }
