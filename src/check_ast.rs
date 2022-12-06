@@ -3132,6 +3132,8 @@ impl<'a> Checker<'a> {
     }
 
     fn check_definitions(&mut self) {
+        let mut overloaded_name: Option<String> = None;
+        self.definitions.reverse();
         while let Some((definition, visibility)) = self.definitions.pop() {
             // flake8-annotations
             if self.settings.enabled.contains(&CheckCode::ANN001)
@@ -3146,7 +3148,21 @@ impl<'a> Checker<'a> {
                 || self.settings.enabled.contains(&CheckCode::ANN206)
                 || self.settings.enabled.contains(&CheckCode::ANN401)
             {
-                flake8_annotations::plugins::definition(self, &definition, &visibility);
+                // TODO(charlie): This should be even stricter, in that an overload
+                // implementation should come immediately after the overloaded
+                // interfaces, without any AST nodes in between. Right now, we
+                // only error when traversing definition boundaries (functions,
+                // classes, etc.).
+                if !overloaded_name.map_or(false, |overloaded_name| {
+                    flake8_annotations::helpers::is_overload_impl(
+                        self,
+                        &definition,
+                        &overloaded_name,
+                    )
+                }) {
+                    flake8_annotations::plugins::definition(self, &definition, &visibility);
+                }
+                overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
 
             // pydocstyle
