@@ -24,8 +24,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: Options) -> Self {
+    pub fn from_options(options: &Options) -> Self {
         Self {
             max_complexity: options.max_complexity.unwrap_or_default(),
         }

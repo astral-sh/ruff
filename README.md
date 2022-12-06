@@ -195,6 +195,13 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # Assume Python 3.10.
 target-version = "py310"
 
+[tool.ruff.flake8-import-conventions.aliases]
+altair = "alt"
+"matplotlib.pyplot" = "plt"
+numpy = "np"
+pandas = "pd"
+seaborn = "sns"
+
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
@@ -786,6 +793,12 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLR1722 | ConsiderUsingSysExit | Consider using `sys.exit()` | 🛠 |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 
+### flake8-import-conventions
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ICN001 | ImportAliasIsNotConventional | `...` should be imported as `...` |  |
+
 ### Ruff-specific rules
 
 | Code | Name | Message | Fix |
@@ -940,6 +953,7 @@ natively, including:
 - [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
+- [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
@@ -988,6 +1002,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
+- [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
@@ -1754,6 +1769,48 @@ Additional callable functions to consider "immutable" when evaluating, e.g.,
 [tool.ruff.flake8-bugbear]
 # Allow default arguments like, e.g., `data: List[str] = fastapi.Query(None)`.
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+```
+
+---
+
+### `flake8-import-conventions`
+
+#### [`aliases`](#aliases)
+
+The conventional aliases for imports. These aliases can be extended by the `extend_aliases` option.
+
+**Default value**: `{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}`
+
+**Type**: `FxHashMap<String, String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-import-conventions]
+# Declare the default aliases.
+altair = "alt"
+matplotlib.pyplot = "plt"
+numpy = "np"
+pandas = "pd"
+seaborn = "sns"
+```
+
+---
+
+#### [`extend-aliases`](#extend-aliases)
+
+A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.
+
+**Default value**: `{}`
+
+**Type**: `FxHashMap<String, String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-import-conventions]
+# Declare a custom alias for the `matplotlib` module.
+"dask.dataframe" = "dd"
 ```
 
 ---

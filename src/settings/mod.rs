@@ -17,8 +17,8 @@ use crate::checks_gen::{CheckCodePrefix, SuffixLength};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
-    pep8_naming, pyupgrade,
+    flake8_annotations, flake8_bugbear, flake8_import_conventions, flake8_quotes,
+    flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
 };
 
 pub mod configuration;
@@ -46,6 +46,7 @@ pub struct Settings {
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
+    pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub isort: isort::settings::Settings,
@@ -81,6 +82,7 @@ impl Settings {
             format: config.format,
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
+            flake8_import_conventions: config.flake8_import_conventions,
             flake8_quotes: config.flake8_quotes,
             flake8_tidy_imports: config.flake8_tidy_imports,
             ignore_init_module_imports: config.ignore_init_module_imports,
@@ -114,6 +116,7 @@ impl Settings {
             target_version: PythonVersion::Py310,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
+            flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             isort: isort::settings::Settings::default(),
@@ -141,6 +144,7 @@ impl Settings {
             target_version: PythonVersion::Py310,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
+            flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             isort: isort::settings::Settings::default(),
@@ -176,6 +180,7 @@ impl Hash for Settings {
         // Add plugin properties in alphabetical order.
         self.flake8_annotations.hash(state);
         self.flake8_bugbear.hash(state);
+        self.flake8_import_conventions.hash(state);
         self.flake8_quotes.hash(state);
         self.flake8_tidy_imports.hash(state);
         self.isort.hash(state);

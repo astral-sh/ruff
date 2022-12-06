@@ -35,8 +35,8 @@ use crate::visibility::{module_visibility, transition_scope, Modifier, Visibilit
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
-    flake8_print, flake8_return, flake8_tidy_imports, mccabe, pep8_naming, pycodestyle, pydocstyle,
-    pyflakes, pygrep_hooks, pylint, pyupgrade,
+    flake8_import_conventions, flake8_print, flake8_return, flake8_tidy_imports, mccabe,
+    pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -725,6 +725,19 @@ where
                             ) {
                                 self.add_check(check);
                             }
+                        }
+                    }
+
+                    if self.settings.enabled.contains(&CheckCode::ICN001) {
+                        if let Some(check) =
+                            flake8_import_conventions::checks::check_conventional_import(
+                                stmt,
+                                &alias.node.name,
+                                alias.node.asname.as_deref(),
+                                &self.settings.flake8_import_conventions.aliases,
+                            )
+                        {
+                            self.add_check(check);
                         }
                     }
                 }
