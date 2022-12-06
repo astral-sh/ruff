@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Args;
+use itertools::Itertools;
 use ruff::checks::{CheckCategory, CheckCode};
 use strum::IntoEnumIterator;
 
@@ -24,7 +25,11 @@ pub fn main(cli: &Cli) -> Result<()> {
     // Generate the table string.
     let mut output = String::new();
     for check_category in CheckCategory::iter() {
-        output.push_str(&format!("### {}", check_category.title()));
+        output.push_str(&format!(
+            "### {} ({})",
+            check_category.title(),
+            check_category.codes().iter().join(", ")
+        ));
         output.push('\n');
         output.push('\n');
 

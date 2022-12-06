@@ -2,11 +2,13 @@
 
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumString;
+use strum_macros::{Display, EnumString};
 
 use crate::checks::CheckCode;
 
-#[derive(EnumString, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+#[derive(
+    EnumString, Display, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize,
+)]
 pub enum CheckCodePrefix {
     A,
     A0,

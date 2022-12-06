@@ -10,6 +10,7 @@ use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checks_gen::CheckCodePrefix;
 use crate::flake8_debugger::types::DebuggerUsingType;
 use crate::flake8_quotes::settings::Quote;
 use crate::flake8_tidy_imports::settings::Strictness;
@@ -372,6 +373,41 @@ impl CheckCategory {
             CheckCategory::Pylint => "Pylint",
             CheckCategory::Pyupgrade => "pyupgrade",
             CheckCategory::Ruff => "Ruff-specific rules",
+        }
+    }
+
+    pub fn codes(&self) -> Vec<CheckCodePrefix> {
+        match self {
+            CheckCategory::Eradicate => vec![CheckCodePrefix::ERA],
+            CheckCategory::Flake82020 => vec![CheckCodePrefix::YTT],
+            CheckCategory::Flake8Annotations => vec![CheckCodePrefix::ANN],
+            CheckCategory::Flake8Bandit => vec![CheckCodePrefix::S],
+            CheckCategory::Flake8BlindExcept => vec![CheckCodePrefix::BLE],
+            CheckCategory::Flake8BooleanTrap => vec![CheckCodePrefix::FBT],
+            CheckCategory::Flake8Bugbear => vec![CheckCodePrefix::B],
+            CheckCategory::Flake8Builtins => vec![CheckCodePrefix::A],
+            CheckCategory::Flake8Comprehensions => vec![CheckCodePrefix::C4],
+            CheckCategory::Flake8Debugger => vec![CheckCodePrefix::T10],
+            CheckCategory::Flake8Print => vec![CheckCodePrefix::T20],
+            CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
+            CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
+            CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::I25],
+            CheckCategory::Isort => vec![CheckCodePrefix::I],
+            CheckCategory::McCabe => vec![CheckCodePrefix::C90],
+            CheckCategory::PEP8Naming => vec![CheckCodePrefix::N],
+            CheckCategory::Pycodestyle => vec![CheckCodePrefix::E, CheckCodePrefix::W],
+            CheckCategory::Pydocstyle => vec![CheckCodePrefix::D],
+            CheckCategory::Pyflakes => vec![CheckCodePrefix::F],
+            CheckCategory::PygrepHooks => vec![CheckCodePrefix::PGH],
+            CheckCategory::Pylint => vec![
+                CheckCodePrefix::PLC,
+                CheckCodePrefix::PLE,
+                CheckCodePrefix::PLR,
+                CheckCodePrefix::PLW,
+            ],
+            CheckCategory::Pyupgrade => vec![CheckCodePrefix::UP],
+            CheckCategory::Flake8ImportConventions => vec![CheckCodePrefix::ICN],
+            CheckCategory::Ruff => vec![CheckCodePrefix::RUF],
         }
     }
 
