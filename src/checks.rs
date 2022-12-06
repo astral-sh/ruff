@@ -32,6 +32,7 @@ use crate::pyupgrade::types::Primitive;
 )]
 pub enum CheckCode {
     // pycodestyle errors
+    E201,
     E402,
     E501,
     E711,
@@ -528,6 +529,7 @@ pub enum CheckKind {
     SyntaxError(String),
     TrueFalseComparison(bool, RejectedCmpop),
     TypeComparison,
+    WhiteSpaceAfter(char),
     // pycodestyle warnings
     NoNewLineAtEndOfFile,
     InvalidEscapeSequence(char),
@@ -808,6 +810,7 @@ impl CheckCode {
     pub fn kind(&self) -> CheckKind {
         match self {
             // pycodestyle errors
+            CheckCode::E201 => CheckKind::WhiteSpaceAfter('c'),
             CheckCode::E402 => CheckKind::ModuleImportNotAtTopOfFile,
             CheckCode::E501 => CheckKind::LineTooLong(89, 88),
             CheckCode::E711 => CheckKind::NoneComparison(RejectedCmpop::Eq),
@@ -1227,6 +1230,7 @@ impl CheckCode {
             CheckCode::D417 => CheckCategory::Pydocstyle,
             CheckCode::D418 => CheckCategory::Pydocstyle,
             CheckCode::D419 => CheckCategory::Pydocstyle,
+            CheckCode::E201 => CheckCategory::Pycodestyle,
             CheckCode::E402 => CheckCategory::Pycodestyle,
             CheckCode::E501 => CheckCategory::Pycodestyle,
             CheckCode::E711 => CheckCategory::Pycodestyle,
@@ -1374,6 +1378,7 @@ impl CheckKind {
     pub fn code(&self) -> &'static CheckCode {
         match self {
             // pycodestyle errors
+            CheckKind::WhiteSpaceAfter(_) => &CheckCode::E201,
             CheckKind::AmbiguousClassName(_) => &CheckCode::E742,
             CheckKind::AmbiguousFunctionName(_) => &CheckCode::E743,
             CheckKind::AmbiguousVariableName(_) => &CheckCode::E741,
