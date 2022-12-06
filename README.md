@@ -1787,8 +1787,7 @@ The conventional aliases for imports. These aliases can be extended by the `exte
 
 ```toml
 [tool.ruff.flake8-import-conventions]
-# Declare the default aliases
-[tool.ruff.flake8-import-conventions.aliases]
+# Declare the default aliases.
 altair = "alt"
 matplotlib.pyplot = "plt"
 numpy = "np"
@@ -1811,7 +1810,6 @@ A mapping of modules to their conventional import aliases. These aliases will be
 ```toml
 [tool.ruff.flake8-import-conventions]
 # Declare a custom alias for the `matplotlib` module.
-[tool.ruff.flake8-import-conventions.extend-aliases]
 "dask.dataframe" = "dd"
 ```
 
