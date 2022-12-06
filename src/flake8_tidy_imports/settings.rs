@@ -18,7 +18,7 @@ pub struct Options {
             Whether to ban all relative imports (`"all"`), or only those imports that extend into
             the parent module and beyond (`"parents"`).
         "#,
-        default = r#"`"parents"`"#,
+        default = r#""parents""#,
         value_type = "Strictness",
         example = r#"
             # Disallow all relative imports.

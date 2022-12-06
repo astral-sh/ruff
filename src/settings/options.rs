@@ -19,10 +19,10 @@ pub struct Options {
             A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`,
             `RUF002`, and `RUF003`.
         "#,
-        default = r#"`[]`"#,
+        default = r#"[]"#,
         value_type = "Vec<char>",
         example = r#"
-            # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and greek-small-letter-alpha (U+03B1),
+            # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
             # which could be confused for "-", "p", and "*", respectively.
             allowed-confusables = ["−", "ρ", "∗"]
         "#
@@ -30,10 +30,11 @@ pub struct Options {
     pub allowed_confusables: Option<Vec<char>>,
     #[option(
         doc = r#"
-            A regular expression used to identify "dummy" variables, or those which
-            should be ignored when evaluating (e.g.) unused-variable checks.
+            A regular expression used to identify "dummy" variables, or those which should be
+            ignored when evaluating (e.g.) unused-variable checks. The default expression matches
+            `_`, `__`, and `_var`, but not `_var_`.
         "#,
-        default = r#"`"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"` (matches `_`, `__`, and `_var`, but not `_var_`)"#,
+        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
         value_type = "Regex",
         example = r#"
             # Only ignore variables named "_".
@@ -54,10 +55,10 @@ pub struct Options {
               (to exclude any Python files in `directory`). Note that these paths are relative to the
               project root (e.g., the directory containing your `pyproject.toml`).
 
-            Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify the excluded
-            paths.
+            Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify
+            the excluded paths.
         "#,
-        default = r#"`[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`"#,
+        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
         value_type = "Vec<FilePattern>",
         example = r#"
             exclude = [".venv"]
@@ -67,7 +68,7 @@ pub struct Options {
     #[option(
         doc = "A list of file patterns to omit from linting, in addition to those specified by \
                `exclude`.",
-        default = "`[]`",
+        default = "[]",
         value_type = "Vec<FilePattern>",
         example = r#"
             # In addition to the standard set of exclusions, omit all tests, plus a specific file.
@@ -78,7 +79,7 @@ pub struct Options {
     #[option(
         doc = "A list of check code prefixes to ignore, in addition to those specified by \
                `ignore`.",
-        default = "`[]`",
+        default = "[]",
         value_type = "Vec<CheckCodePrefix>",
         example = r#"
             # Skip unused variable checks (`F841`).
@@ -89,7 +90,7 @@ pub struct Options {
     #[option(
         doc = "A list of check code prefixes to enable, in addition to those specified by \
                `select`.",
-        default = "`[]`",
+        default = "[]",
         value_type = "Vec<CheckCodePrefix>",
         example = r#"
             # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
@@ -103,7 +104,7 @@ pub struct Options {
             validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not
             yet implemented in Ruff.
         "#,
-        default = "`[]`",
+        default = "[]",
         value_type = "Vec<String>",
         example = r#"
             # Avoiding flagging (and removing) `V101` from any `# noqa`
@@ -117,14 +118,14 @@ pub struct Options {
             Enable autofix behavior by-default when running `ruff` (overridden
             by the `--fix` and `--no-fix` command-line flags).
         "#,
-        default = "`false`",
+        default = "false",
         value_type = "bool",
         example = "fix = true"
     )]
     pub fix: Option<bool>,
     #[option(
         doc = "A list of check code prefixes to consider autofix-able.",
-        default = r#"`["A", "ANN", "B", "BLE", "C", "D", "E", "F", "FBT", "I", "M", "N", "Q", "RUF", "S", "T", "U", "W", "YTT"]`"#,
+        default = r#"["A", "ANN", "B", "BLE", "C", "D", "E", "F", "FBT", "I", "M", "N", "Q", "RUF", "S", "T", "U", "W", "YTT"]"#,
         value_type = "Vec<CheckCodePrefix>",
         example = r#"
             # Only allow autofix behavior for `E` and `F` checks.
@@ -138,7 +139,7 @@ pub struct Options {
             `"grouped"` (group messages by file), `"json"` (machine-readable), `"junit"`
             (machine-readable XML), or `"github"` (GitHub Actions annotations).
         "#,
-        default = r#"`"text"`"#,
+        default = r#""text""#,
         value_type = "SerializationType",
         example = r#"
             # Group violations by containing file.
@@ -154,7 +155,7 @@ pub struct Options {
             When breaking ties between enabled and disabled checks (via `select` and `ignore`,
             respectively), more specific prefixes override less specific prefixes.
         ",
-        default = "`[]`",
+        default = "[]",
         value_type = "Vec<CheckCodePrefix>",
         example = r#"
             # Skip unused variable checks (`F841`).
@@ -169,7 +170,7 @@ pub struct Options {
             added to the module' +`__all__` symbol, or re-exported with a redundant alias (e.g.,
             `import os as os`).
         "#,
-        default = "`false`",
+        default = "false",
         value_type = "bool",
         example = r#"
             ignore-init-module-imports = true
@@ -178,7 +179,7 @@ pub struct Options {
     pub ignore_init_module_imports: Option<bool>,
     #[option(
         doc = "The line length to use when enforcing long-lines violations (like E501).",
-        default = "`88`",
+        default = "88",
         value_type = "usize",
         example = r#"
             # Allow lines to be as long as 120 characters.
@@ -194,7 +195,7 @@ pub struct Options {
             When breaking ties between enabled and disabled checks (via `select` and `ignore`,
             respectively), more specific prefixes override less specific prefixes.
         "#,
-        default = r#"`["E", "F"]`"#,
+        default = r#"["E", "F"]"#,
         value_type = "Vec<CheckCodePrefix>",
         example = r#"
             # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
@@ -207,7 +208,7 @@ pub struct Options {
             Whether to show source code snippets when reporting lint error violations (overridden by
             the `--show-source` command-line flag).
         "#,
-        default = "`false`",
+        default = "false",
         value_type = "bool",
         example = r#"
             # By default, always show source code snippets.
@@ -218,7 +219,7 @@ pub struct Options {
     #[option(
         doc = "The source code paths to consider, e.g., when resolving first- vs. third-party \
                imports.",
-        default = r#"`["."]`"#,
+        default = r#"["."]"#,
         value_type = "Vec<PathBuf>",
         example = r#"
             # Allow imports relative to the "src" and "test" directories.
@@ -232,7 +233,7 @@ pub struct Options {
             rewriting type annotations. Note that the target version will _not_ be inferred from the
             _current_ Python version, and instead must be specified explicitly (as seen below).
         "#,
-        default = r#"`"py310"`"#,
+        default = r#""py310""#,
         value_type = "PythonVersion",
         example = r#"
             # Always generate Python 3.7-compatible code.
@@ -242,7 +243,7 @@ pub struct Options {
     pub target_version: Option<PythonVersion>,
     #[option(
         doc = "A list of check code prefixes to consider un-autofix-able.",
-        default = "`[]`",
+        default = "[]",
         value_type = "Vec<CheckCodePrefix>",
         example = r#"
             # Disable autofix for unused imports (`F401`).
@@ -273,7 +274,7 @@ pub struct Options {
             A list of mappings from file pattern to check code prefixes to exclude, when considering
             any matching files.
         "#,
-        default = "`{}`",
+        default = "{}",
         value_type = "HashMap<String, Vec<CheckCodePrefix>>",
         example = r#"
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.

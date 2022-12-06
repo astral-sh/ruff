@@ -29,7 +29,7 @@ pub struct Options {
         doc = r#"
             A list of names to ignore when considering `pep8-naming` violations.
         "#,
-        default = r#"`["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]`"#,
+        default = r#"["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]"#,
         value_type = "Vec<String>",
         example = r#"
             ignore-names = ["callMethod"]
@@ -42,7 +42,7 @@ pub struct Options {
             treated as a class method. For example, Ruff will expect that any method decorated by a
             decorator in this list takes a `cls` argument as its first argument.
         "#,
-        default = r#"`["classmethod"]`"#,
+        default = r#"["classmethod"]"#,
         value_type = "Vec<String>",
         example = r#"
             # Allow Pydantic's `@validator` decorator to trigger class method treatment.
@@ -56,7 +56,7 @@ pub struct Options {
             treated as a static method. For example, Ruff will expect that any method decorated by a
             decorator in this list has no `self` or `cls` argument.
         "#,
-        default = r#"`["staticmethod"]`"#,
+        default = r#"["staticmethod"]"#,
         value_type = "Vec<String>",
         example = r#"
             # Allow a shorthand alias, `@stcmthd`, to trigger static method treatment.

@@ -25,7 +25,7 @@ fn emit_field(output: &mut String, field: &OptionField, group_name: Option<&str>
     output.push('\n');
     output.push_str(field.doc);
     output.push_str("\n\n");
-    output.push_str(&format!("**Default value**: {}\n", field.default));
+    output.push_str(&format!("**Default value**: `{}`\n", field.default));
     output.push('\n');
     output.push_str(&format!("**Type**: `{}`\n", field.value_type));
     output.push('\n');

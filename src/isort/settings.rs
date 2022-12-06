@@ -13,7 +13,7 @@ pub struct Options {
             Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
             option.
         "#,
-        default = r#"`false`"#,
+        default = r#"false"#,
         value_type = "bool",
         example = r#"
             combine-as-imports = true
@@ -33,7 +33,7 @@ pub struct Options {
             )
             ```
         "#,
-        default = r#"`false`"#,
+        default = r#"false"#,
         value_type = "bool",
         example = r#"
             force-wrap-aliases = true
@@ -45,7 +45,7 @@ pub struct Options {
             A list of modules to consider first-party, regardless of whether they can be identified
             as such via introspection of the local filesystem.
         "#,
-        default = r#"`[]`"#,
+        default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
             known-first-party = ["src"]
@@ -57,7 +57,7 @@ pub struct Options {
             A list of modules to consider third-party, regardless of whether they can be identified
             as such via introspection of the local filesystem.
         "#,
-        default = r#"`[]`"#,
+        default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
             known-third-party = ["src"]
@@ -69,7 +69,7 @@ pub struct Options {
             A list of modules to consider standard-library, in addition to those known to Ruff in
             advance.
         "#,
-        default = r#"`[]`"#,
+        default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
             extra-standard-library = ["path"]

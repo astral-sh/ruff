@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     #[option(
         doc = "The maximum McCabe complexity to allow before triggering `C901` errors.",
-        default = "`10`",
+        default = "10",
         value_type = "usize",
         example = r#"
             # Flag errors (`C901`) whenever the complexity level exceeds 5.

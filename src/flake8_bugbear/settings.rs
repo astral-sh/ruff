@@ -11,7 +11,7 @@ pub struct Options {
             Additional callable functions to consider "immutable" when evaluating, e.g.,
             `no-mutable-default-argument` checks (`B006`).
         "#,
-        default = r#"`[]`"#,
+        default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
             # Allow default arguments like, e.g., `data: List[str] = fastapi.Query(None)`.

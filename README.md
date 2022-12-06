@@ -1296,7 +1296,7 @@ A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF0
 
 ```toml
 [tool.ruff]
-# Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and greek-small-letter-alpha (U+03B1),
+# Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
 # which could be confused for "-", "p", and "*", respectively.
 allowed-confusables = ["−", "ρ", "∗"]
 ```
@@ -1305,10 +1305,11 @@ allowed-confusables = ["−", "ρ", "∗"]
 
 #### [`dummy-variable-rgx`](#dummy-variable-rgx)
 
-A regular expression used to identify "dummy" variables, or those which
-should be ignored when evaluating (e.g.) unused-variable checks.
+A regular expression used to identify "dummy" variables, or those which should be
+ignored when evaluating (e.g.) unused-variable checks. The default expression matches
+`_`, `__`, and `_var`, but not `_var_`.
 
-**Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"` (matches `_`, `__`, and `_var`, but not `_var_`)
+**Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"`
 
 **Type**: `Regex`
 
@@ -1335,8 +1336,8 @@ Exclusions are based on globs, and can be either:
   (to exclude any Python files in `directory`). Note that these paths are relative to the
   project root (e.g., the directory containing your `pyproject.toml`).
 
-Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify the excluded
-paths.
+Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify
+the excluded paths.
 
 **Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
 

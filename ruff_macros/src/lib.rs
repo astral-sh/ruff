@@ -103,8 +103,8 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
     }
 }
 
-/// Parse an `#[option(doc="...", default="..", value_type="..", example="..")]`
-/// attribute and return data in the form of an `OptionField`.
+/// Parse an `#[option(doc="...", default="...", value_type="...",
+/// example="...")]` attribute and return data in the form of an `OptionField`.
 fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::TokenStream> {
     // unwrap is safe because we're only going over named fields
     let ident = field.ident.as_ref().unwrap();

@@ -11,7 +11,7 @@ pub struct Options {
             Whether to allow the omission of a return type hint for `__init__` if at least one
             argument is annotated.
         "#,
-        default = "`false`",
+        default = "false",
         value_type = "bool",
         example = "mypy-init-return = true"
     )]
@@ -21,7 +21,7 @@ pub struct Options {
             Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable
             regex (like `_`).
         "#,
-        default = "`false`",
+        default = "false",
         value_type = "bool",
         example = "suppress-dummy-args = true"
     )]
@@ -34,7 +34,7 @@ pub struct Options {
             - Contain no `return` statement.
             - Explicit `return` statement(s) all return `None` (explicitly or implicitly).
         "#,
-        default = "`false`",
+        default = "false",
         value_type = "bool",
         example = "suppress-none-returning = true"
     )]
@@ -42,7 +42,7 @@ pub struct Options {
     #[option(
         doc = "Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` \
                arguments.",
-        default = "`false`",
+        default = "false",
         value_type = "bool",
         example = "allow-star-arg-any = true"
     )]
