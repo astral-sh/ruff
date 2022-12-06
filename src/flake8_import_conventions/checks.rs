@@ -14,7 +14,7 @@ pub fn check_conventional_import(
     let mut is_valid_import = true;
 
     if let Some(expected_alias) = conventions.get(name) {
-        if expected_alias != "" {
+        if !expected_alias.is_empty() {
             if let Some(alias) = asname {
                 if expected_alias != alias {
                     is_valid_import = false;

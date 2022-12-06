@@ -50,7 +50,7 @@ impl Hash for Settings {
 fn merge(defaults: &mut FxHashMap<String, String>, overrides: &FxHashMap<String, String>) {
     defaults.extend(
         overrides
-            .into_iter()
+            .iter()
             .map(|(k, v)| (k.to_string(), v.to_string())),
     );
 }
