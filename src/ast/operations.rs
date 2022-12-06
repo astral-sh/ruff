@@ -94,6 +94,7 @@ pub fn in_nested_block<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool
     })
 }
 
+<<<<<<< HEAD
 /// Returns `true` if `parent` contains `child`.
 fn contains(parent: &Expr, child: &Expr) -> bool {
     match &parent.node {
@@ -154,6 +155,36 @@ fn contains(parent: &Expr, child: &Expr) -> bool {
                 || upper.as_ref().map_or(false, |value| contains(value, child))
                 || step.as_ref().map_or(false, |value| contains(value, child))
         }
+=======
+pub fn contains(parent: &Expr, child: &Expr) -> bool {
+    match &parent.node {
+        ExprKind::BoolOp { values, .. } => values.iter().any(|parent| contains(parent, child)),
+        ExprKind::NamedExpr {} => {}
+        ExprKind::BinOp {} => {}
+        ExprKind::UnaryOp {} => {}
+        ExprKind::Lambda {} => {}
+        ExprKind::IfExp {} => {}
+        ExprKind::Dict {} => {}
+        ExprKind::Set {} => {}
+        ExprKind::ListComp {} => {}
+        ExprKind::SetComp {} => {}
+        ExprKind::DictComp {} => {}
+        ExprKind::GeneratorExp {} => {}
+        ExprKind::Await {} => {}
+        ExprKind::Yield {} => {}
+        ExprKind::YieldFrom {} => {}
+        ExprKind::Compare {} => {}
+        ExprKind::Call {} => {}
+        ExprKind::FormattedValue {} => {}
+        ExprKind::JoinedStr {} => {}
+        ExprKind::Constant {} => {}
+        ExprKind::Attribute {} => {}
+        ExprKind::Subscript {} => {}
+        ExprKind::Starred {} => {}
+        ExprKind::Name {} => {}
+        ExprKind::List {} => {}
+        ExprKind::Tuple {} => {}
+        ExprKind::Slice {} => {}
     }
 }
 
