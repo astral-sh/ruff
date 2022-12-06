@@ -790,7 +790,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| IC001 | ImportAliasIsNotConventional | `...` should be imported as `...` |  |
+| ICN001 | ImportAliasIsNotConventional | `...` should be imported as `...` |  |
 
 ### Ruff-specific rules
 

@@ -728,7 +728,7 @@ where
                         }
                     }
 
-                    if self.settings.enabled.contains(&CheckCode::IC001) {
+                    if self.settings.enabled.contains(&CheckCode::ICN001) {
                         if let Some(check) =
                             flake8_import_conventions::checks::check_conventional_import(
                                 stmt,

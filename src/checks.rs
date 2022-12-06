@@ -291,7 +291,7 @@ pub enum CheckCode {
     FBT002,
     FBT003,
     // Import conventions
-    IC001,
+    ICN001,
     // Ruff
     RUF001,
     RUF002,
@@ -1121,7 +1121,7 @@ impl CheckCode {
             // pygrep-hooks
             CheckCode::PGH001 => CheckKind::NoEval,
             // Import conventions
-            CheckCode::IC001 => {
+            CheckCode::ICN001 => {
                 CheckKind::ImportAliasIsNotConventional("...".to_string(), "...".to_string())
             }
             // Ruff
@@ -1376,7 +1376,7 @@ impl CheckCode {
             CheckCode::YTT301 => CheckCategory::Flake82020,
             CheckCode::YTT302 => CheckCategory::Flake82020,
             CheckCode::YTT303 => CheckCategory::Flake82020,
-            CheckCode::IC001 => CheckCategory::ImportConventions,
+            CheckCode::ICN001 => CheckCategory::ImportConventions,
         }
     }
 }
@@ -1646,7 +1646,7 @@ impl CheckKind {
             // pygrep-hooks
             CheckKind::NoEval => &CheckCode::PGH001,
             // Import conventions
-            CheckKind::ImportAliasIsNotConventional(..) => &CheckCode::IC001,
+            CheckKind::ImportAliasIsNotConventional(..) => &CheckCode::ICN001,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,

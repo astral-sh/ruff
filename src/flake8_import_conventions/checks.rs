@@ -4,7 +4,7 @@ use rustpython_ast::Stmt;
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
 
-/// IC001
+/// ICO001
 pub fn check_conventional_import(
     import_from: &Stmt,
     name: &str,
@@ -16,7 +16,7 @@ pub fn check_conventional_import(
     if let Some(expected_alias) = conventions.get(name) {
         if expected_alias != "" {
             if let Some(alias) = asname {
-                if expected_alias != "" && expected_alias != alias {
+                if expected_alias != alias {
                     is_valid_import = false;
                 }
             } else {
