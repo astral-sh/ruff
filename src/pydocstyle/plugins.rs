@@ -633,17 +633,25 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
                 .chain(constants::SINGLE_QUOTE_PREFIXES)
             {
                 if first_line.starts_with(pattern) {
-                    check.amend(Fix::replacement(
-                        trimmed.to_string(),
-                        Location::new(
-                            docstring.location.row(),
-                            docstring.location.column() + pattern.len(),
-                        ),
-                        Location::new(
-                            docstring.location.row(),
-                            docstring.location.column() + pattern.len() + line.chars().count(),
-                        ),
-                    ));
+                    if let Some(quote) = pattern.chars().last() {
+                        // If removing whitespace would lead to an invalid string of quote
+                        // characters, avoid applying the fix.
+                        if !trimmed.ends_with(quote) {
+                            check.amend(Fix::replacement(
+                                trimmed.to_string(),
+                                Location::new(
+                                    docstring.location.row(),
+                                    docstring.location.column() + pattern.len(),
+                                ),
+                                Location::new(
+                                    docstring.location.row(),
+                                    docstring.location.column()
+                                        + pattern.len()
+                                        + line.chars().count(),
+                                ),
+                            ));
+                        }
+                    }
                     break;
                 }
             }

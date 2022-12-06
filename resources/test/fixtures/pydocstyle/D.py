@@ -571,3 +571,11 @@ def multiline_trailing_and_leading_space():
     """
 
     pass
+
+
+@expect('D210: No whitespaces allowed surrounding docstring text')
+@expect("D400: First line should end with a period (not '\"')")
+@expect("D415: First line should end with a period, question mark, "
+        "or exclamation point (not '\"')")
+def endswith_quote():
+    """Whitespace at the end, but also a quote" """

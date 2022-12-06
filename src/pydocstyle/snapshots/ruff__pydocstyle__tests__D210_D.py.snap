@@ -47,4 +47,12 @@ expression: checks
     end_location:
       row: 299
       column: 36
+- kind: NoSurroundingWhitespace
+  location:
+    row: 581
+    column: 4
+  end_location:
+    row: 581
+    column: 51
+  fix: ~
 
