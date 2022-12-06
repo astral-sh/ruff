@@ -1,3 +1,4 @@
+mod helpers;
 pub mod plugins;
 
 #[cfg(test)]
@@ -36,7 +37,8 @@ mod tests {
     #[test_case(CheckCode::D214, Path::new("sections.py"); "D214")]
     #[test_case(CheckCode::D215, Path::new("sections.py"); "D215")]
     #[test_case(CheckCode::D300, Path::new("D.py"); "D300")]
-    #[test_case(CheckCode::D400, Path::new("D.py"); "D400")]
+    #[test_case(CheckCode::D400, Path::new("D.py"); "D400_0")]
+    #[test_case(CheckCode::D400, Path::new("D400.py"); "D400_1")]
     #[test_case(CheckCode::D402, Path::new("D.py"); "D402")]
     #[test_case(CheckCode::D403, Path::new("D.py"); "D403")]
     #[test_case(CheckCode::D404, Path::new("D.py"); "D404")]
