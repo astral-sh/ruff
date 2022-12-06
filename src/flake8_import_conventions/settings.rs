@@ -42,7 +42,7 @@ impl Settings {
             aliases: options.aliases.unwrap_or_else(|| {
                 CONVENTIONAL_ALIASES
                     .iter()
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
                     .collect()
             }),
         }
@@ -54,7 +54,7 @@ impl Default for Settings {
         Self {
             aliases: CONVENTIONAL_ALIASES
                 .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
                 .collect(),
         }
     }
