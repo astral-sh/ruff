@@ -1,3 +1,4 @@
+pub mod helpers;
 pub mod plugins;
 pub mod settings;
 
@@ -127,6 +128,26 @@ mod tests {
                     allow_star_arg_any: true,
                 },
                 ..Settings::for_rules(vec![CheckCode::ANN401])
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn allow_overload() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/flake8_annotations/allow_overload.py"),
+            &Settings {
+                ..Settings::for_rules(vec![
+                    CheckCode::ANN201,
+                    CheckCode::ANN202,
+                    CheckCode::ANN204,
+                    CheckCode::ANN205,
+                    CheckCode::ANN206,
+                ])
             },
             true,
         )?;

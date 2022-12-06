@@ -1,4 +1,4 @@
-use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::visitor;
@@ -6,6 +6,7 @@ use crate::ast::visitor::Visitor;
 use crate::check_ast::Checker;
 use crate::checks::{CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind};
+use crate::flake8_annotations::helpers::match_function_def;
 use crate::visibility::Visibility;
 use crate::{visibility, Check};
 
@@ -59,26 +60,6 @@ where
             Range::from_located(annotation),
         ));
     };
-}
-
-fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, &Option<Box<Expr>>, &Vec<Stmt>) {
-    match &stmt.node {
-        StmtKind::FunctionDef {
-            name,
-            args,
-            returns,
-            body,
-            ..
-        }
-        | StmtKind::AsyncFunctionDef {
-            name,
-            args,
-            returns,
-            body,
-            ..
-        } => (name, args, returns, body),
-        _ => panic!("Found non-FunctionDef in match_name"),
-    }
 }
 
 /// Generate flake8-annotation checks for a given `Definition`.
