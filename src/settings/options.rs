@@ -260,6 +260,7 @@ pub struct Options {
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     #[option_group]
     pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
+    #[option_group]
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
     #[option_group]
     pub isort: Option<isort::settings::Options>,

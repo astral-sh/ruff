@@ -1766,6 +1766,27 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 ---
 
+### `flake8-import-conventions`
+
+#### [`aliases`](#aliases)
+
+A mapping of modules to their conventional import aliases.
+
+**Default value**: `{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}`
+
+**Type**: `FxHashMap<String, String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-import-conventions]
+# Declare a custom alias for the `matplotlib` module.
+[tool.ruff.flake8-import-conventions.aliases]
+matplotlib = "mpl"
+```
+
+---
+
 ### `flake8-quotes`
 
 #### [`avoid-escape`](#avoid-escape)
