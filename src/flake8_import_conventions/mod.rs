@@ -15,7 +15,7 @@ mod tests {
     #[test]
     fn defaults() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/flake8_import_conventions/ICN001_defaults.py"),
+            Path::new("./resources/test/fixtures/flake8_import_conventions/defaults.py"),
             &Settings::for_rule(CheckCode::ICN001),
             true,
         )?;
@@ -27,7 +27,7 @@ mod tests {
     #[test]
     fn custom() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/flake8_import_conventions/ICN001_custom.py"),
+            Path::new("./resources/test/fixtures/flake8_import_conventions/custom.py"),
             &Settings {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
@@ -51,9 +51,7 @@ mod tests {
     #[test]
     fn remove_defaults() -> Result<()> {
         let mut checks = test_path(
-            Path::new(
-                "./resources/test/fixtures/flake8_import_conventions/ICN001_remove_default.py",
-            ),
+            Path::new("./resources/test/fixtures/flake8_import_conventions/remove_default.py"),
             &Settings {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
@@ -79,9 +77,7 @@ mod tests {
     #[test]
     fn override_defaults() -> Result<()> {
         let mut checks = test_path(
-            Path::new(
-                "./resources/test/fixtures/flake8_import_conventions/ICN001_override_default.py",
-            ),
+            Path::new("./resources/test/fixtures/flake8_import_conventions/override_default.py"),
             &Settings {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
