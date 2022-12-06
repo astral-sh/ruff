@@ -171,19 +171,52 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
             false
         }),
         StmtKind::Assign { targets, value, .. } => {
-            // TODO(charlie): Match based on `child`.
-            if !targets.iter().any(|child| {
-                matches!(
-                    child.node,
-                    ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
-                )
-            }) {
-                return false;
-            }
-            !matches!(
+            // In `(a, b) = (1, 2)`, `(1, 2)` is the target, and it is a tuple.
+            let value_is_tuple = matches!(
                 &value.node,
                 ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
-            )
+            );
+            // In `(a, b) = coords = (1, 2)`, `(a, b)` and `coords` are the targets, and
+            // `(a, b`) is a tuple. (We use "tuple" as a placeholder for any
+            // unpackable expression.)
+            let targets_are_tuples = targets.iter().all(|item| {
+                matches!(
+                    item.node,
+                    ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+                )
+            });
+            // If we're looking at `a` in `(a, b) = coords = (1, 2)`, then we should
+            // identify that the current expression is in a tuple.
+            let child_in_tuple = targets_are_tuples
+                || targets.iter().any(|item| {
+                    matches!(
+                        item.node,
+                        ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+                    ) && contains(item, child)
+                });
+
+            // If our child is a tuple, and value is not, it's always an unpacking
+            // expression. Ex) `x, y = tup`
+            if child_in_tuple && !value_is_tuple {
+                return true;
+            }
+
+            // If our child isn't a tuple, but value is, it's never an unpacking expression.
+            // Ex) `coords = (1, 2)`
+            if !child_in_tuple && value_is_tuple {
+                return false;
+            }
+
+            // If our target and the value are both tuples, then it's an unpacking
+            // expression assuming there's at least one non-tuple child.
+            // Ex) Given `(x, y) = coords = 1, 2`, `(x, y)` is considered an unpacking
+            // expression. Ex) Given `(x, y) = (a, b) = 1, 2`, `(x, y)` isn't
+            // considered an unpacking expression.
+            if child_in_tuple && value_is_tuple {
+                return !targets_are_tuples;
+            }
+
+            false
         }
         _ => false,
     }

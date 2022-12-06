@@ -71,7 +71,8 @@ mod tests {
     #[test_case(CheckCode::F822, Path::new("F822.py"); "F822")]
     #[test_case(CheckCode::F823, Path::new("F823.py"); "F823")]
     #[test_case(CheckCode::F831, Path::new("F831.py"); "F831")]
-    #[test_case(CheckCode::F841, Path::new("F841.py"); "F841")]
+    #[test_case(CheckCode::F841, Path::new("F841_0.py"); "F841_0")]
+    #[test_case(CheckCode::F841, Path::new("F841_1.py"); "F841_1")]
     #[test_case(CheckCode::F901, Path::new("F901.py"); "F901")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
@@ -90,7 +91,7 @@ mod tests {
     #[test]
     fn f841_dummy_variable_rgx() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/pyflakes/F841.py"),
+            Path::new("./resources/test/fixtures/pyflakes/F841_0.py"),
             &settings::Settings {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
                 ..settings::Settings::for_rule(CheckCode::F841)

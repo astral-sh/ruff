@@ -48,6 +48,15 @@ expression: checks
     column: 9
   fix: ~
 - kind:
+    UnusedVariable: baz
+  location:
+    row: 26
+    column: 13
+  end_location:
+    row: 26
+    column: 16
+  fix: ~
+- kind:
     UnusedVariable: b
   location:
     row: 51
