@@ -1,5 +1,6 @@
 //! Settings for the `flake8-tidy-imports` plugin.
 
+use ruff_macros::ConfigurationOptions;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -9,9 +10,21 @@ pub enum Strictness {
     All,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
+    #[option(
+        doc = r#"
+            Whether to ban all relative imports (`"all"`), or only those imports that extend into
+            the parent module and beyond (`"parents"`).
+        "#,
+        default = r#""parents""#,
+        value_type = "Strictness",
+        example = r#"
+            # Disallow all relative imports.
+            ban-relative-imports = "all"
+        "#
+    )]
     pub ban_relative_imports: Option<Strictness>,
 }
 

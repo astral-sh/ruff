@@ -1855,6 +1855,7 @@ dependencies = [
  "rayon",
  "regex",
  "ropey",
+ "ruff_macros",
  "rustc-hash",
  "rustpython-ast",
  "rustpython-common",
@@ -1887,6 +1888,16 @@ dependencies = [
  "rustpython-parser",
  "strum",
  "strum_macros",
+]
+
+[[package]]
+name = "ruff_macros"
+version = "0.0.161"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "textwrap",
 ]
 
 [[package]]
