@@ -17,7 +17,8 @@ use crate::ast::helpers::{
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, ClassScope, FunctionScope, Node, Range, Scope, ScopeKind,
+    Binding, BindingContext, BindingKind, ClassDef, FunctionDef, Lambda, Node, Range, Scope,
+    ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
@@ -35,8 +36,9 @@ use crate::visibility::{module_visibility, transition_scope, Modifier, Visibilit
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
-    flake8_import_conventions, flake8_print, flake8_return, flake8_tidy_imports, mccabe,
-    pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
+    flake8_import_conventions, flake8_print, flake8_return, flake8_tidy_imports,
+    flake8_unused_arguments, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks,
+    pylint, pyupgrade,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -71,7 +73,7 @@ pub struct Checker<'a> {
     deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext)>,
     deferred_functions: Vec<(&'a Stmt, DeferralContext, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, DeferralContext)>,
-    deferred_assignments: Vec<usize>,
+    deferred_assignments: Vec<(usize, DeferralContext)>,
     // Internal, derivative state.
     visible_scope: VisibleScope,
     in_f_string: Option<Range>,
@@ -580,7 +582,7 @@ where
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
-                self.push_scope(Scope::new(ScopeKind::Class(ClassScope {
+                self.push_scope(Scope::new(ScopeKind::Class(ClassDef {
                     name,
                     bases,
                     keywords,
@@ -1406,20 +1408,18 @@ where
                                     }
                                     Ok(summary) => {
                                         if self.settings.enabled.contains(&CheckCode::F522) {
-                                            if let Some(check) =
-                                                pyflakes::checks::string_dot_format_extra_named_arguments(
-                                                    &summary, keywords, location,
-                                                )
+                                            if let Some(check) = pyflakes::checks::string_dot_format_extra_named_arguments(
+                                                &summary, keywords, location,
+                                            )
                                             {
                                                 self.add_check(check);
                                             }
                                         }
 
                                         if self.settings.enabled.contains(&CheckCode::F523) {
-                                            if let Some(check) =
-                                                pyflakes::checks::string_dot_format_extra_positional_arguments(
-                                                    &summary, args, location,
-                                                )
+                                            if let Some(check) = pyflakes::checks::string_dot_format_extra_positional_arguments(
+                                                &summary, args, location,
+                                            )
                                             {
                                                 self.add_check(check);
                                             }
@@ -1486,7 +1486,7 @@ where
                         .scope_stack
                         .iter()
                         .rev()
-                        .any(|index| matches!(self.scopes[*index].kind, ScopeKind::Lambda))
+                        .any(|index| matches!(self.scopes[*index].kind, ScopeKind::Lambda(..)))
                     {
                         flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
                     }
@@ -1747,9 +1747,7 @@ where
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = &mut self.scopes
                             [*(self.scope_stack.last().expect("No current scope found"))];
-                        if let ScopeKind::Function(inner) = &mut scope.kind {
-                            inner.uses_locals = true;
-                        }
+                        scope.uses_locals = true;
                     }
                 }
 
@@ -2070,7 +2068,7 @@ where
                     }
                 }
             }
-            ExprKind::Lambda { args, .. } => {
+            ExprKind::Lambda { args, body, .. } => {
                 // Visit the arguments, but avoid the body, which will be deferred.
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
@@ -2103,7 +2101,7 @@ where
                 for expr in &args.defaults {
                     self.visit_expr(expr);
                 }
-                self.push_scope(Scope::new(ScopeKind::Lambda));
+                self.push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&CheckCode::C416) {
@@ -2958,27 +2956,44 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_functions(&mut self) {
         while let Some((stmt, (scopes, parents), visibility)) = self.deferred_functions.pop() {
-            self.scope_stack = scopes;
-            self.parent_stack = parents;
+            self.scope_stack = scopes.clone();
+            self.parent_stack = parents.clone();
             self.visible_scope = visibility;
-            self.push_scope(Scope::new(ScopeKind::Function(FunctionScope {
-                async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
-                uses_locals: false,
-            })));
 
             match &stmt.node {
-                StmtKind::FunctionDef { body, args, .. }
-                | StmtKind::AsyncFunctionDef { body, args, .. } => {
+                StmtKind::FunctionDef {
+                    name,
+                    body,
+                    args,
+                    decorator_list,
+                    ..
+                }
+                | StmtKind::AsyncFunctionDef {
+                    name,
+                    body,
+                    args,
+                    decorator_list,
+                    ..
+                } => {
+                    self.push_scope(Scope::new(ScopeKind::Function(FunctionDef {
+                        name,
+                        body,
+                        args,
+                        decorator_list,
+                        async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
+                    })));
                     self.visit_arguments(args);
                     for stmt in body {
                         self.visit_stmt(stmt);
                     }
                 }
-                _ => {}
+                _ => unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef"),
             }
 
-            self.deferred_assignments
-                .push(*self.scope_stack.last().expect("No current scope found"));
+            self.deferred_assignments.push((
+                *self.scope_stack.last().expect("No current scope found"),
+                (scopes, parents),
+            ));
 
             self.pop_scope();
         }
@@ -2986,29 +3001,50 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_lambdas(&mut self) {
         while let Some((expr, (scopes, parents))) = self.deferred_lambdas.pop() {
-            self.scope_stack = scopes;
-            self.parent_stack = parents;
-            self.push_scope(Scope::new(ScopeKind::Lambda));
+            self.scope_stack = scopes.clone();
+            self.parent_stack = parents.clone();
 
             if let ExprKind::Lambda { args, body } = &expr.node {
+                self.push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
                 self.visit_arguments(args);
                 self.visit_expr(body);
+            } else {
+                unreachable!("Expected ExprKind::Lambda");
             }
 
-            self.deferred_assignments
-                .push(*self.scope_stack.last().expect("No current scope found"));
+            self.deferred_assignments.push((
+                *self.scope_stack.last().expect("No current scope found"),
+                (scopes, parents),
+            ));
 
             self.pop_scope();
         }
     }
 
     fn check_deferred_assignments(&mut self) {
-        if self.settings.enabled.contains(&CheckCode::F841) {
-            while let Some(index) = self.deferred_assignments.pop() {
+        while let Some((index, (scopes, _parents))) = self.deferred_assignments.pop() {
+            if self.settings.enabled.contains(&CheckCode::F841) {
                 self.add_checks(
                     pyflakes::checks::unused_variables(
                         &self.scopes[index],
                         &self.settings.dummy_variable_rgx,
+                    )
+                    .into_iter(),
+                );
+            }
+            if self.settings.enabled.contains(&CheckCode::ARG001)
+                || self.settings.enabled.contains(&CheckCode::ARG002)
+                || self.settings.enabled.contains(&CheckCode::ARG003)
+                || self.settings.enabled.contains(&CheckCode::ARG004)
+                || self.settings.enabled.contains(&CheckCode::ARG005)
+            {
+                self.add_checks(
+                    flake8_unused_arguments::plugins::unused_arguments(
+                        self,
+                        &self.scopes[*scopes
+                            .last()
+                            .expect("Expected parent scope above function scope")],
+                        &self.scopes[index],
                     )
                     .into_iter(),
                 );
@@ -3092,7 +3128,7 @@ impl<'a> Checker<'a> {
                 for (name, binding) in &scope.values {
                     let (BindingKind::Importation(_, full_name, context)
                     | BindingKind::SubmoduleImportation(_, full_name, context)
-                    | BindingKind::FromImportation(_, full_name, context)) = &binding.kind else { continue };
+                    | BindingKind::FromImportation(_, full_name, context)) = &binding.kind else { continue; };
 
                     // Skip used exports from `__all__`
                     if binding.used.is_some()

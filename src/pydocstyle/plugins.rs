@@ -7,8 +7,8 @@ use rustc_hash::FxHashSet;
 use rustpython_ast::{Constant, ExprKind, Location, StmtKind};
 
 use crate::ast::types::Range;
-use crate::ast::whitespace;
 use crate::ast::whitespace::LinesWithTrailingNewline;
+use crate::ast::{cast, whitespace};
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
@@ -77,7 +77,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
-            if is_overload(checker, stmt) {
+            if is_overload(checker, cast::decorator_list(stmt)) {
                 true
             } else {
                 if checker.settings.enabled.contains(&CheckCode::D103) {
@@ -90,7 +90,9 @@ pub fn not_missing(
             }
         }
         DefinitionKind::Method(stmt) => {
-            if is_overload(checker, stmt) || is_override(checker, stmt) {
+            if is_overload(checker, cast::decorator_list(stmt))
+                || is_override(checker, cast::decorator_list(stmt))
+            {
                 true
             } else if is_magic(stmt) {
                 if checker.settings.enabled.contains(&CheckCode::D105) {
@@ -916,7 +918,7 @@ pub fn if_needed(checker: &mut Checker, definition: &Definition) {
     ) = definition.kind else {
         return
     };
-    if !is_overload(checker, stmt) {
+    if !is_overload(checker, cast::decorator_list(stmt)) {
         return;
     }
     checker.add_check(Check::new(
@@ -1410,7 +1412,7 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 matches!(definition.kind, DefinitionKind::Method(_))
-                    && !is_staticmethod(checker, parent),
+                    && !is_staticmethod(checker, cast::decorator_list(parent)),
             ),
         )
     {

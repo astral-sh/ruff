@@ -292,6 +292,12 @@ pub enum CheckCode {
     FBT001,
     FBT002,
     FBT003,
+    // flake8-unused-arguments
+    ARG001,
+    ARG002,
+    ARG003,
+    ARG004,
+    ARG005,
     // flake8-import-conventions
     ICN001,
     // Ruff
@@ -326,6 +332,7 @@ pub enum CheckCategory {
     Flake8Quotes,
     Flake8Return,
     Flake8TidyImports,
+    Flake8UnusedArguments,
     Eradicate,
     PygrepHooks,
     Pylint,
@@ -364,6 +371,7 @@ impl CheckCategory {
             CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Flake8Return => "flake8-return",
             CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
+            CheckCategory::Flake8UnusedArguments => "flake8-unused-arguments",
             CheckCategory::Isort => "isort",
             CheckCategory::McCabe => "mccabe",
             CheckCategory::PEP8Naming => "pep8-naming",
@@ -393,6 +401,7 @@ impl CheckCategory {
             CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
             CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
             CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::I25],
+            CheckCategory::Flake8UnusedArguments => vec![CheckCodePrefix::ARG],
             CheckCategory::Isort => vec![CheckCodePrefix::I00],
             CheckCategory::McCabe => vec![CheckCodePrefix::C90],
             CheckCategory::PEP8Naming => vec![CheckCodePrefix::N],
@@ -468,6 +477,10 @@ impl CheckCategory {
             )),
             CheckCategory::Flake8TidyImports => Some((
                 "https://pypi.org/project/flake8-tidy-imports/4.8.0/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8UnusedArguments => Some((
+                "https://pypi.org/project/flake8-unused-arguments/0.0.12/",
                 &Platform::PyPI,
             )),
             CheckCategory::Isort => {
@@ -817,6 +830,12 @@ pub enum CheckKind {
     BooleanPositionalValueInFunctionCall,
     // pygrep-hooks
     NoEval,
+    // flake8-unused-arguments
+    UnusedFunctionArgument(String),
+    UnusedMethodArgument(String),
+    UnusedClassMethodArgument(String),
+    UnusedStaticMethodArgument(String),
+    UnusedLambdaArgument(String),
     // flake8-import-conventions
     ImportAliasIsNotConventional(String, String),
     // Ruff
@@ -1159,6 +1178,12 @@ impl CheckCode {
             CheckCode::FBT003 => CheckKind::BooleanPositionalValueInFunctionCall,
             // pygrep-hooks
             CheckCode::PGH001 => CheckKind::NoEval,
+            // flake8-unused-arguments
+            CheckCode::ARG001 => CheckKind::UnusedFunctionArgument("...".to_string()),
+            CheckCode::ARG002 => CheckKind::UnusedMethodArgument("...".to_string()),
+            CheckCode::ARG003 => CheckKind::UnusedClassMethodArgument("...".to_string()),
+            CheckCode::ARG004 => CheckKind::UnusedStaticMethodArgument("...".to_string()),
+            CheckCode::ARG005 => CheckKind::UnusedLambdaArgument("...".to_string()),
             // flake8-import-conventions
             CheckCode::ICN001 => {
                 CheckKind::ImportAliasIsNotConventional("...".to_string(), "...".to_string())
@@ -1188,6 +1213,11 @@ impl CheckCode {
             CheckCode::ANN205 => CheckCategory::Flake8Annotations,
             CheckCode::ANN206 => CheckCategory::Flake8Annotations,
             CheckCode::ANN401 => CheckCategory::Flake8Annotations,
+            CheckCode::ARG001 => CheckCategory::Flake8UnusedArguments,
+            CheckCode::ARG002 => CheckCategory::Flake8UnusedArguments,
+            CheckCode::ARG003 => CheckCategory::Flake8UnusedArguments,
+            CheckCode::ARG004 => CheckCategory::Flake8UnusedArguments,
+            CheckCode::ARG005 => CheckCategory::Flake8UnusedArguments,
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
             CheckCode::B003 => CheckCategory::Flake8Bugbear,
             CheckCode::B004 => CheckCategory::Flake8Bugbear,
@@ -1339,8 +1369,8 @@ impl CheckCode {
             CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
             CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
             CheckCode::I001 => CheckCategory::Isort,
-            CheckCode::ICN001 => CheckCategory::Flake8ImportConventions,
             CheckCode::I252 => CheckCategory::Flake8TidyImports,
+            CheckCode::ICN001 => CheckCategory::Flake8ImportConventions,
             CheckCode::N801 => CheckCategory::PEP8Naming,
             CheckCode::N802 => CheckCategory::PEP8Naming,
             CheckCode::N803 => CheckCategory::PEP8Naming,
@@ -1686,6 +1716,12 @@ impl CheckKind {
             CheckKind::BooleanPositionalValueInFunctionCall => &CheckCode::FBT003,
             // pygrep-hooks
             CheckKind::NoEval => &CheckCode::PGH001,
+            // flake8-unused-arguments
+            CheckKind::UnusedFunctionArgument(..) => &CheckCode::ARG001,
+            CheckKind::UnusedMethodArgument(..) => &CheckCode::ARG002,
+            CheckKind::UnusedClassMethodArgument(..) => &CheckCode::ARG003,
+            CheckKind::UnusedStaticMethodArgument(..) => &CheckCode::ARG004,
+            CheckKind::UnusedLambdaArgument(..) => &CheckCode::ARG005,
             // flake8-import-conventions
             CheckKind::ImportAliasIsNotConventional(..) => &CheckCode::ICN001,
             // Ruff
@@ -2477,6 +2513,18 @@ impl CheckKind {
             }
             // pygrep-hooks
             CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
+            // flake8-unused-arguments
+            CheckKind::UnusedFunctionArgument(name) => {
+                format!("Unused function argument: `{name}`")
+            }
+            CheckKind::UnusedMethodArgument(name) => format!("Unused method argument: `{name}`"),
+            CheckKind::UnusedClassMethodArgument(name) => {
+                format!("Unused class method argument: `{name}`")
+            }
+            CheckKind::UnusedStaticMethodArgument(name) => {
+                format!("Unused static method argument: `{name}`")
+            }
+            CheckKind::UnusedLambdaArgument(name) => format!("Unused lambda argument: `{name}`"),
             // flake8-import-conventions
             CheckKind::ImportAliasIsNotConventional(name, asname) => {
                 format!("`{name}` should be imported as `{asname}`")

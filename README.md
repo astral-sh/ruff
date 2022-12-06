@@ -90,6 +90,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
    1. [flake8-tidy-imports (I25)](#flake8-tidy-imports-i25)
+   1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
    1. [eradicate (ERA)](#eradicate-era)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
@@ -767,6 +768,18 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | I252 | BannedRelativeImport | Relative imports are banned |  |
+
+### flake8-unused-arguments (ARG)
+
+For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/0.0.12/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ARG001 | UnusedFunctionArgument | Unused function argument: `...` |  |
+| ARG002 | UnusedMethodArgument | Unused method argument: `...` |  |
+| ARG003 | UnusedClassMethodArgument | Unused class method argument: `...` |  |
+| ARG004 | UnusedStaticMethodArgument | Unused static method argument: `...` |  |
+| ARG005 | UnusedLambdaArgument | Unused lambda argument: `...` |  |
 
 ### eradicate (ERA)
 

@@ -1,10 +1,10 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
+use crate::ast::function_type;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 use crate::pep8_naming::helpers;
-use crate::pep8_naming::helpers::FunctionType;
 use crate::pep8_naming::settings::Settings;
 use crate::python::string::{self};
 
@@ -58,15 +58,16 @@ pub fn invalid_first_argument_name_for_class_method(
     settings: &Settings,
 ) -> Option<Check> {
     if !matches!(
-        helpers::function_type(
+        function_type::classify(
             scope,
             name,
             decorator_list,
             from_imports,
             import_aliases,
-            settings,
+            &settings.classmethod_decorators,
+            &settings.staticmethod_decorators,
         ),
-        FunctionType::ClassMethod
+        function_type::FunctionType::ClassMethod
     ) {
         return None;
     }
@@ -99,15 +100,16 @@ pub fn invalid_first_argument_name_for_method(
     settings: &Settings,
 ) -> Option<Check> {
     if !matches!(
-        helpers::function_type(
+        function_type::classify(
             scope,
             name,
             decorator_list,
             from_imports,
             import_aliases,
-            settings,
+            &settings.classmethod_decorators,
+            &settings.staticmethod_decorators,
         ),
-        FunctionType::Method
+        function_type::FunctionType::Method
     ) {
         return None;
     }
