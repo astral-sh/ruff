@@ -1,21 +1,17 @@
 //! Settings for import conventions.
 
-use std::hash::{Hash, Hasher};
+use std::collections::BTreeMap;
 
-use once_cell::sync::Lazy;
 use ruff_macros::ConfigurationOptions;
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-static CONVENTIONAL_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::new(|| {
-    FxHashMap::from_iter([
-        ("altair", "alt"),
-        ("matplotlib.pyplot", "plt"),
-        ("numpy", "np"),
-        ("pandas", "pd"),
-        ("seaborn", "sns"),
-    ])
-});
+const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
+    ("altair", "alt"),
+    ("matplotlib.pyplot", "plt"),
+    ("numpy", "np"),
+    ("pandas", "pd"),
+    ("seaborn", "sns"),
+];
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -24,7 +20,7 @@ pub struct Options {
         doc = "The conventional aliases for imports. These aliases can be extended by the \
                `extend_aliases` option.",
         default = r#"{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}"#,
-        value_type = "FxHashMap<String, String>",
+        value_type = "BTreeMap<String, String>",
         example = r#"
             # Declare the default aliases.
             altair = "alt"
@@ -34,56 +30,39 @@ pub struct Options {
             seaborn = "sns"
         "#
     )]
-    pub aliases: Option<FxHashMap<String, String>>,
+    pub aliases: Option<BTreeMap<String, String>>,
     #[option(
         doc = "A mapping of modules to their conventional import aliases. These aliases will be \
                added to the `aliases` mapping.",
         default = r#"{}"#,
-        value_type = "FxHashMap<String, String>",
+        value_type = "BTreeMap<String, String>",
         example = r#"
             # Declare a custom alias for the `matplotlib` module.
             "dask.dataframe" = "dd"
         "#
     )]
-    pub extend_aliases: Option<FxHashMap<String, String>>,
+    pub extend_aliases: Option<BTreeMap<String, String>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Settings {
-    pub aliases: FxHashMap<String, String>,
+    pub aliases: BTreeMap<String, String>,
 }
 
-impl Hash for Settings {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.aliases.iter().for_each(|(k, v)| {
-            k.hash(state);
-            v.hash(state);
-        });
-    }
-}
-
-fn default_aliases() -> FxHashMap<String, String> {
+fn default_aliases() -> BTreeMap<String, String> {
     CONVENTIONAL_ALIASES
         .iter()
         .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-        .collect::<FxHashMap<_, _>>()
+        .collect::<BTreeMap<_, _>>()
 }
 
-fn merge(defaults: &mut FxHashMap<String, String>, overrides: &FxHashMap<String, String>) {
-    defaults.extend(
-        overrides
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string())),
-    );
-}
-
-fn resolve_aliases(options: Options) -> FxHashMap<String, String> {
+fn resolve_aliases(options: Options) -> BTreeMap<String, String> {
     let mut aliases = match options.aliases {
         Some(options_aliases) => options_aliases,
         None => default_aliases(),
     };
-    if let Some(extend_aliases) = &options.extend_aliases {
-        merge(&mut aliases, extend_aliases);
+    if let Some(extend_aliases) = options.extend_aliases {
+        aliases.extend(extend_aliases);
     }
     aliases
 }

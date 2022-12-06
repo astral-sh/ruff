@@ -733,7 +733,7 @@ where
                             flake8_import_conventions::checks::check_conventional_import(
                                 stmt,
                                 &alias.node.name,
-                                alias.node.asname.as_ref().map(String::as_str),
+                                alias.node.asname.as_deref(),
                                 &self.settings.flake8_import_conventions.aliases,
                             )
                         {

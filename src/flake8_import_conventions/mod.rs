@@ -3,10 +3,10 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::path::Path;
 
     use anyhow::Result;
-    use rustc_hash::FxHashMap;
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
@@ -33,7 +33,7 @@ mod tests {
                     flake8_import_conventions::settings::Settings::from_options(
                         flake8_import_conventions::settings::Options {
                             aliases: None,
-                            extend_aliases: Some(FxHashMap::from_iter([
+                            extend_aliases: Some(BTreeMap::from([
                                 ("dask.array".to_string(), "da".to_string()),
                                 ("dask.dataframe".to_string(), "dd".to_string()),
                             ])),
@@ -58,7 +58,7 @@ mod tests {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
                         flake8_import_conventions::settings::Options {
-                            aliases: Some(FxHashMap::from_iter([
+                            aliases: Some(BTreeMap::from([
                                 ("altair".to_string(), "alt".to_string()),
                                 ("matplotlib.pyplot".to_string(), "plt".to_string()),
                                 ("pandas".to_string(), "pd".to_string()),
@@ -87,7 +87,7 @@ mod tests {
                     flake8_import_conventions::settings::Settings::from_options(
                         flake8_import_conventions::settings::Options {
                             aliases: None,
-                            extend_aliases: Some(FxHashMap::from_iter([(
+                            extend_aliases: Some(BTreeMap::from([(
                                 "numpy".to_string(),
                                 "nmp".to_string(),
                             )])),

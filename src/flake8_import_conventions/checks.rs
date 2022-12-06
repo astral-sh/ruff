@@ -1,4 +1,5 @@
-use rustc_hash::FxHashMap;
+use std::collections::BTreeMap;
+
 use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
@@ -9,7 +10,7 @@ pub fn check_conventional_import(
     import_from: &Stmt,
     name: &str,
     asname: Option<&str>,
-    conventions: &FxHashMap<String, String>,
+    conventions: &BTreeMap<String, String>,
 ) -> Option<Check> {
     let mut is_valid_import = true;
     if let Some(expected_alias) = conventions.get(name) {
