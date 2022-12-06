@@ -23,6 +23,7 @@ pub struct ImportTracker<'a> {
     blocks: Vec<Block<'a>>,
     directives: &'a IsortDirectives,
     split_index: usize,
+    nested: bool,
 }
 
 impl<'a> ImportTracker<'a> {
@@ -31,6 +32,7 @@ impl<'a> ImportTracker<'a> {
             directives,
             blocks: vec![Block::default()],
             split_index: 0,
+            nested: false,
         }
     }
 
@@ -60,8 +62,9 @@ where
         // Track manual splits.
         while self.split_index < self.directives.splits.len() {
             if stmt.location.row() >= self.directives.splits[self.split_index] {
-                // TODO(charlie): Track nesting semantically, rather than via column index.
-                self.finalize(Some(if stmt.location.column() == 0 {
+                self.finalize(Some(if self.nested {
+                    Trailer::Sibling
+                } else {
                     match &stmt.node {
                         StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
                             Trailer::FunctionDef
@@ -69,8 +72,6 @@ where
                         StmtKind::ClassDef { .. } => Trailer::ClassDef,
                         _ => Trailer::Sibling,
                     }
-                } else {
-                    Trailer::Sibling
                 }));
                 self.split_index += 1;
             } else {
@@ -86,8 +87,9 @@ where
         {
             self.track_import(stmt);
         } else {
-            // TODO(charlie): Track nesting semantically, rather than via column index.
-            self.finalize(Some(if stmt.location.column() == 0 {
+            self.finalize(Some(if self.nested {
+                Trailer::Sibling
+            } else {
                 match &stmt.node {
                     StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
                         Trailer::FunctionDef
@@ -95,12 +97,12 @@ where
                     StmtKind::ClassDef { .. } => Trailer::ClassDef,
                     _ => Trailer::Sibling,
                 }
-            } else {
-                Trailer::Sibling
             }));
         }
 
         // Track scope.
+        let prev_nested = self.nested;
+        self.nested = true;
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } => {
                 for stmt in body {
@@ -208,6 +210,7 @@ where
             }
             _ => {}
         }
+        self.nested = prev_nested;
     }
 
     fn visit_annotation(&mut self, _: &'b Expr) {}
@@ -229,11 +232,16 @@ where
     fn visit_comprehension(&mut self, _: &'b Comprehension) {}
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
+        let prev_nested = self.nested;
+        self.nested = true;
+
         let ExcepthandlerKind::ExceptHandler { body, .. } = &excepthandler.node;
         for stmt in body {
             self.visit_stmt(stmt);
         }
         self.finalize(None);
+
+        self.nested = prev_nested;
     }
 
     fn visit_arguments(&mut self, _: &'b Arguments) {}
