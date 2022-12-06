@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Args;
+use itertools::Itertools;
 use ruff::settings::options::Options;
 use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionField};
 
@@ -45,24 +46,49 @@ pub fn main(cli: &Cli) -> Result<()> {
     let mut output = String::new();
 
     // Generate all the top-level fields.
-    for entry in Options::get_available_options() {
-        if let OptionEntry::Field(field) = entry {
-            emit_field(&mut output, &field, None);
-            output.push_str("---\n\n");
-        }
+    for field in Options::get_available_options()
+        .into_iter()
+        .filter_map(|entry| {
+            if let OptionEntry::Field(field) = entry {
+                Some(field)
+            } else {
+                None
+            }
+        })
+        .sorted_by_key(|field| field.name)
+    {
+        emit_field(&mut output, &field, None);
+        output.push_str("---\n\n");
     }
 
     // Generate all the sub-groups.
-    for entry in Options::get_available_options() {
-        if let OptionEntry::Group(group) = entry {
-            output.push_str(&format!("### `{}`\n", group.name));
-            output.push('\n');
-            for e in &group.fields {
-                if let OptionEntry::Field(f) = e {
-                    emit_field(&mut output, f, Some(group.name));
-                    output.push_str("---\n\n");
-                }
+    for group in Options::get_available_options()
+        .into_iter()
+        .filter_map(|entry| {
+            if let OptionEntry::Group(group) = entry {
+                Some(group)
+            } else {
+                None
             }
+        })
+        .sorted_by_key(|group| group.name)
+    {
+        output.push_str(&format!("### `{}`\n", group.name));
+        output.push('\n');
+        for field in group
+            .fields
+            .iter()
+            .filter_map(|entry| {
+                if let OptionEntry::Field(field) = entry {
+                    Some(field)
+                } else {
+                    None
+                }
+            })
+            .sorted_by_key(|field| field.name)
+        {
+            emit_field(&mut output, field, Some(group.name));
+            output.push_str("---\n\n");
         }
     }
 

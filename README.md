@@ -1543,6 +1543,27 @@ line-length = 120
 
 ---
 
+#### [`per-file-ignores`](#per-file-ignores)
+
+A list of mappings from file pattern to check code prefixes to exclude, when considering
+any matching files.
+
+**Default value**: `{}`
+
+**Type**: `HashMap<String, Vec<CheckCodePrefix>>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["E402"]
+"path/to/file.py" = ["E402"]
+```
+
+---
+
 #### [`select`](#select)
 
 A list of check code prefixes to enable. Prefixes can specify exact checks (like
@@ -1640,28 +1661,24 @@ unfixable = ["F401"]
 
 ---
 
-#### [`per-file-ignores`](#per-file-ignores)
+### `flake8-annotations`
 
-A list of mappings from file pattern to check code prefixes to exclude, when considering
-any matching files.
+#### [`allow-star-arg-any`](#allow-star-arg-any)
 
-**Default value**: `{}`
+Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.
 
-**Type**: `HashMap<String, Vec<CheckCodePrefix>>`
+**Default value**: `false`
+
+**Type**: `bool`
 
 **Example usage**:
 
 ```toml
-[tool.ruff]
-# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-[tool.ruff.per-file-ignores]
-"__init__.py" = ["E402"]
-"path/to/file.py" = ["E402"]
+[tool.ruff.flake8-annotations]
+allow-star-arg-any = true
 ```
 
 ---
-
-### `flake8-annotations`
 
 #### [`mypy-init-return`](#mypy-init-return)
 
@@ -1720,23 +1737,6 @@ suppress-none-returning = true
 
 ---
 
-#### [`allow-star-arg-any`](#allow-star-arg-any)
-
-Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.
-
-**Default value**: `false`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```toml
-[tool.ruff.flake8-annotations]
-allow-star-arg-any = true
-```
-
----
-
 ### `flake8-bugbear`
 
 #### [`extend-immutable-calls`](#extend-immutable-calls)
@@ -1759,6 +1759,43 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 ---
 
 ### `flake8-quotes`
+
+#### [`avoid-escape`](#avoid-escape)
+
+Whether to avoid using single quotes if a string contains single quotes, or vice-versa
+with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+This minimizes the need to escape quotation marks within strings.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-quotes]
+# Don't bother trying to avoid escapes.
+avoid-escape = false
+```
+
+---
+
+#### [`docstring-quotes`](#docstring-quotes)
+
+Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
+
+**Default value**: `"double"`
+
+**Type**: `Quote`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-quotes]
+docstring-quotes = "single"
+```
+
+---
 
 #### [`inline-quotes`](#inline-quotes)
 
@@ -1790,43 +1827,6 @@ Quote style to prefer for multiline strings (either "single" (`'`) or "double" (
 ```toml
 [tool.ruff.flake8-quotes]
 multiline-quotes = "single"
-```
-
----
-
-#### [`docstring-quotes`](#docstring-quotes)
-
-Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
-
-**Default value**: `"double"`
-
-**Type**: `Quote`
-
-**Example usage**:
-
-```toml
-[tool.ruff.flake8-quotes]
-docstring-quotes = "single"
-```
-
----
-
-#### [`avoid-escape`](#avoid-escape)
-
-Whether to avoid using single quotes if a string contains single quotes, or vice-versa
-with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
-This minimizes the need to escape quotation marks within strings.
-
-**Default value**: `true`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```toml
-[tool.ruff.flake8-quotes]
-# Don't bother trying to avoid escapes.
-avoid-escape = false
 ```
 
 ---
@@ -1868,6 +1868,24 @@ option.
 ```toml
 [tool.ruff.isort]
 combine-as-imports = true
+```
+
+---
+
+#### [`extra-standard-library`](#extra-standard-library)
+
+A list of modules to consider standard-library, in addition to those known to Ruff in
+advance.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+extra-standard-library = ["path"]
 ```
 
 ---
@@ -1934,24 +1952,6 @@ known-third-party = ["src"]
 
 ---
 
-#### [`extra-standard-library`](#extra-standard-library)
-
-A list of modules to consider standard-library, in addition to those known to Ruff in
-advance.
-
-**Default value**: `[]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.isort]
-extra-standard-library = ["path"]
-```
-
----
-
 ### `mccabe`
 
 #### [`max-complexity`](#max-complexity)
@@ -1974,23 +1974,6 @@ max-complexity = 5
 
 ### `pep8-naming`
 
-#### [`ignore-names`](#ignore-names)
-
-A list of names to ignore when considering `pep8-naming` violations.
-
-**Default value**: `["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.pep8-naming]
-ignore-names = ["callMethod"]
-```
-
----
-
 #### [`classmethod-decorators`](#classmethod-decorators)
 
 A list of decorators that, when applied to a method, indicate that the method should be
@@ -2007,6 +1990,23 @@ decorator in this list takes a `cls` argument as its first argument.
 [tool.ruff.pep8-naming]
 # Allow Pydantic's `@validator` decorator to trigger class method treatment.
 classmethod-decorators = ["classmethod", "pydantic.validator"]
+```
+
+---
+
+#### [`ignore-names`](#ignore-names)
+
+A list of names to ignore when considering `pep8-naming` violations.
+
+**Default value**: `["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pep8-naming]
+ignore-names = ["callMethod"]
 ```
 
 ---
