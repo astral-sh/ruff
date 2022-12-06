@@ -39,7 +39,7 @@ pub struct Options {
     #[option(
         doc = "A mapping of modules to their conventional import aliases. These aliases will be \
                added to the `aliases` mapping.",
-        default = r#"{"dask.dataframe": "dd"}"#,
+        default = r#"{}"#,
         value_type = "FxHashMap<String, String>",
         example = r#"
             # Declare a custom alias for the `matplotlib` module.
@@ -79,9 +79,9 @@ fn merge(defaults: &mut FxHashMap<String, String>, overrides: &FxHashMap<String,
     );
 }
 
-fn resolve_aliases(options: &Options) -> FxHashMap<String, String> {
-    let mut aliases = match &options.aliases {
-        Some(options_aliases) => options_aliases.clone(),
+fn resolve_aliases(options: Options) -> FxHashMap<String, String> {
+    let mut aliases = match options.aliases {
+        Some(options_aliases) => options_aliases,
         None => default_aliases(),
     };
     if let Some(extend_aliases) = &options.extend_aliases {
@@ -93,7 +93,7 @@ fn resolve_aliases(options: &Options) -> FxHashMap<String, String> {
 impl Settings {
     pub fn from_options(options: Options) -> Self {
         Self {
-            aliases: resolve_aliases(&options),
+            aliases: resolve_aliases(options),
         }
     }
 }

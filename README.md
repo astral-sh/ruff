@@ -1802,7 +1802,7 @@ seaborn = "sns"
 
 A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.
 
-**Default value**: `{"dask.dataframe": "dd"}`
+**Default value**: `{}`
 
 **Type**: `FxHashMap<String, String>`
 

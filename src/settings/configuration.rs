@@ -171,6 +171,7 @@ impl Configuration {
                 .unwrap_or_default(),
             mccabe: options
                 .mccabe
+                .as_ref()
                 .map(mccabe::settings::Settings::from_options)
                 .unwrap_or_default(),
             pep8_naming: options
