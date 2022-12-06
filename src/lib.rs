@@ -70,7 +70,7 @@ mod pygrep_hooks;
 mod pylint;
 mod python;
 mod pyupgrade;
-mod rules;
+mod ruff;
 mod rustpython_helpers;
 pub mod settings;
 pub mod source_code_locator;
