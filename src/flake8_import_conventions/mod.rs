@@ -32,7 +32,8 @@ mod tests {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
                         flake8_import_conventions::settings::Options {
-                            aliases: Some(FxHashMap::from_iter([
+                            aliases: None,
+                            extend_aliases: Some(FxHashMap::from_iter([
                                 ("dask.array".to_string(), "da".to_string()),
                                 ("dask.dataframe".to_string(), "dd".to_string()),
                             ])),
@@ -57,10 +58,13 @@ mod tests {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
                         flake8_import_conventions::settings::Options {
-                            aliases: Some(FxHashMap::from_iter([(
-                                "numpy".to_string(),
-                                "".to_string(),
-                            )])),
+                            aliases: Some(FxHashMap::from_iter([
+                                ("altair".to_string(), "alt".to_string()),
+                                ("matplotlib.pyplot".to_string(), "plt".to_string()),
+                                ("pandas".to_string(), "pd".to_string()),
+                                ("seaborn".to_string(), "sns".to_string()),
+                            ])),
+                            extend_aliases: None,
                         },
                     ),
                 ..Settings::for_rule(CheckCode::ICN001)
@@ -82,7 +86,8 @@ mod tests {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
                         flake8_import_conventions::settings::Options {
-                            aliases: Some(FxHashMap::from_iter([(
+                            aliases: None,
+                            extend_aliases: Some(FxHashMap::from_iter([(
                                 "numpy".to_string(),
                                 "nmp".to_string(),
                             )])),

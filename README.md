@@ -195,6 +195,13 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # Assume Python 3.10.
 target-version = "py310"
 
+[tool.ruff.flake8-import-conventions.aliases]
+altair = "alt"
+"matplotlib.pyplot" = "plt"
+numpy = "np"
+pandas = "pd"
+seaborn = "sns"
+
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
@@ -1770,7 +1777,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 #### [`aliases`](#aliases)
 
-A mapping of modules to their conventional import aliases.
+The conventional aliases for imports. These aliases can be extended by the `extend_aliases` option.
 
 **Default value**: `{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}`
 
@@ -1780,8 +1787,31 @@ A mapping of modules to their conventional import aliases.
 
 ```toml
 [tool.ruff.flake8-import-conventions]
-# Declare a custom alias for the `matplotlib` module.
+# Declare the default aliases
 [tool.ruff.flake8-import-conventions.aliases]
+altair = "alt"
+matplotlib.pyplot = "plt"
+numpy = "np"
+pandas = "pd"
+seaborn = "sns"
+```
+
+---
+
+#### [`extend-aliases`](#extend-aliases)
+
+A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.
+
+**Default value**: `{"dask.dataframe": "dd"}`
+
+**Type**: `FxHashMap<String, String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-import-conventions]
+# Declare a custom alias for the `matplotlib` module.
+[tool.ruff.flake8-import-conventions.extend-aliases]
 "dask.dataframe" = "dd"
 ```
 

@@ -432,9 +432,13 @@ other-attribute = 1
                 }),
                 flake8_import_conventions: Some(flake8_import_conventions::settings::Options {
                     aliases: Some(FxHashMap::from_iter([(
+                        "pandas".to_string(),
+                        "pd".to_string(),
+                    )])),
+                    extend_aliases: Some(FxHashMap::from_iter([(
                         "dask.dataframe".to_string(),
                         "dd".to_string(),
-                    )]))
+                    )])),
                 }),
                 isort: None,
                 mccabe: Some(mccabe::settings::Options {

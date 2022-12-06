@@ -21,16 +21,33 @@ static CONVENTIONAL_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy:
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
     #[option(
-        doc = "A mapping of modules to their conventional import aliases.",
+        doc = "The conventional aliases for imports. These aliases can be extended by the \
+               `extend_aliases` option.",
         default = r#"{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}"#,
         value_type = "FxHashMap<String, String>",
         example = r#"
-            # Declare a custom alias for the `matplotlib` module.
+            # Declare the default aliases
             [tool.ruff.flake8-import-conventions.aliases]
-            "dask.dataframe" = "dd"
+            altair = "alt"
+            matplotlib.pyplot = "plt"
+            numpy = "np"
+            pandas = "pd"
+            seaborn = "sns"
         "#
     )]
     pub aliases: Option<FxHashMap<String, String>>,
+    #[option(
+        doc = "A mapping of modules to their conventional import aliases. These aliases will be \
+               added to the `aliases` mapping.",
+        default = r#"{"dask.dataframe": "dd"}"#,
+        value_type = "FxHashMap<String, String>",
+        example = r#"
+            # Declare a custom alias for the `matplotlib` module.
+            [tool.ruff.flake8-import-conventions.extend-aliases]
+            "dask.dataframe" = "dd"
+        "#
+    )]
+    pub extend_aliases: Option<FxHashMap<String, String>>,
 }
 
 #[derive(Debug)]
@@ -47,6 +64,13 @@ impl Hash for Settings {
     }
 }
 
+fn default_aliases() -> FxHashMap<String, String> {
+    CONVENTIONAL_ALIASES
+        .iter()
+        .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+        .collect::<FxHashMap<_, _>>()
+}
+
 fn merge(defaults: &mut FxHashMap<String, String>, overrides: &FxHashMap<String, String>) {
     defaults.extend(
         overrides
@@ -56,12 +80,12 @@ fn merge(defaults: &mut FxHashMap<String, String>, overrides: &FxHashMap<String,
 }
 
 fn resolve_aliases(options: &Options) -> FxHashMap<String, String> {
-    let mut aliases = CONVENTIONAL_ALIASES
-        .iter()
-        .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-        .collect::<FxHashMap<_, _>>();
-    if let Some(options_aliases) = &options.aliases {
-        merge(&mut aliases, options_aliases);
+    let mut aliases = match &options.aliases {
+        Some(options_aliases) => options_aliases.clone(),
+        None => default_aliases(),
+    };
+    if let Some(extend_aliases) = &options.extend_aliases {
+        merge(&mut aliases, extend_aliases);
     }
     aliases
 }
@@ -77,10 +101,7 @@ impl Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            aliases: CONVENTIONAL_ALIASES
-                .iter()
-                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                .collect(),
+            aliases: default_aliases(),
         }
     }
 }

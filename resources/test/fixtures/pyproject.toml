@@ -43,4 +43,7 @@ staticmethod-decorators = ["staticmethod"]
 ban-relative-imports = "parents"
 
 [tool.ruff.flake8-import-conventions.aliases]
+pandas = "pd"
+
+[tool.ruff.flake8-import-conventions.extend-aliases]
 "dask.dataframe" = "dd"
