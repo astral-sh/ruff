@@ -44,20 +44,23 @@ fn emit_field(output: &mut String, field: &OptionField, group_name: Option<&str>
 pub fn main(cli: &Cli) -> Result<()> {
     let mut output = String::new();
 
+    // Generate all the top-level fields.
     for entry in Options::get_available_options() {
-        match entry {
-            OptionEntry::Field(field) => {
-                emit_field(&mut output, &field, None);
-                output.push_str("---\n\n");
-            }
-            OptionEntry::Group(group) => {
-                output.push_str(&format!("### `{}`\n", group.name));
-                output.push('\n');
-                for e in &group.fields {
-                    if let OptionEntry::Field(f) = e {
-                        emit_field(&mut output, f, Some(group.name));
-                        output.push_str("---\n\n");
-                    }
+        if let OptionEntry::Field(field) = entry {
+            emit_field(&mut output, &field, None);
+            output.push_str("---\n\n");
+        }
+    }
+
+    // Generate all the sub-groups.
+    for entry in Options::get_available_options() {
+        if let OptionEntry::Group(group) = entry {
+            output.push_str(&format!("### `{}`\n", group.name));
+            output.push('\n');
+            for e in &group.fields {
+                if let OptionEntry::Field(f) = e {
+                    emit_field(&mut output, f, Some(group.name));
+                    output.push_str("---\n\n");
                 }
             }
         }

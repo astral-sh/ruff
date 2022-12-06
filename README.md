@@ -1640,6 +1640,27 @@ unfixable = ["F401"]
 
 ---
 
+#### [`per-file-ignores`](#per-file-ignores)
+
+A list of mappings from file pattern to check code prefixes to exclude, when considering
+any matching files.
+
+**Default value**: `{}`
+
+**Type**: `HashMap<String, Vec<CheckCodePrefix>>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["E402"]
+"path/to/file.py" = ["E402"]
+```
+
+---
+
 ### `flake8-annotations`
 
 #### [`mypy-init-return`](#mypy-init-return)
@@ -2026,27 +2047,6 @@ Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str
 [tool.ruff.pyupgrade]
 # Preserve types, even if a file imports `from __future__ import annotations`.
 keep-runtime-typing = true
-```
-
----
-
-#### [`per-file-ignores`](#per-file-ignores)
-
-A list of mappings from file pattern to check code prefixes to exclude, when considering
-any matching files.
-
-**Default value**: `{}`
-
-**Type**: `HashMap<String, Vec<CheckCodePrefix>>`
-
-**Example usage**:
-
-```toml
-[tool.ruff]
-# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-[tool.ruff.per-file-ignores]
-"__init__.py" = ["E402"]
-"path/to/file.py" = ["E402"]
 ```
 
 ---
