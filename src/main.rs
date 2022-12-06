@@ -17,8 +17,10 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
+use ::ruff::autofix::fixer;
 use ::ruff::checks::{CheckCode, CheckKind};
 use ::ruff::cli::{collect_per_file_ignores, extract_log_level, Cli};
+use ::ruff::fs;
 use ::ruff::fs::iter_python_files;
 use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use ::ruff::logging::{set_up_logging, LogLevel};
@@ -37,7 +39,6 @@ use log::{debug, error};
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff::autofix::fixer;
 use rustpython_ast::Location;
 use walkdir::DirEntry;
 
@@ -210,10 +211,12 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     // Find the project root and pyproject.toml.
-    let project_root = pyproject::find_project_root(&cli.files);
-    let pyproject = cli
-        .config
-        .or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
+    let config: Option<PathBuf> = cli.config;
+    let project_root = config.as_ref().map_or_else(
+        || pyproject::find_project_root(&cli.files),
+        |config| config.parent().map(fs::normalize_path),
+    );
+    let pyproject = config.or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
 
     // Reconcile configuration from pyproject.toml and command-line arguments.
     let mut configuration =

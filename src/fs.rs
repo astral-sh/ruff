@@ -97,7 +97,7 @@ pub(crate) fn ignores_from_path<'a>(
 
 /// Convert any path to an absolute path (based on the current working
 /// directory).
-pub(crate) fn normalize_path(path: &Path) -> PathBuf {
+pub fn normalize_path(path: &Path) -> PathBuf {
     if let Ok(path) = path.absolutize() {
         return path.to_path_buf();
     }
@@ -105,7 +105,7 @@ pub(crate) fn normalize_path(path: &Path) -> PathBuf {
 }
 
 /// Convert any path to an absolute path (based on the specified project root).
-pub(crate) fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
+pub fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
     if let Ok(path) = path.absolutize_from(project_root) {
         return path.to_path_buf();
     }
@@ -113,7 +113,7 @@ pub(crate) fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
 }
 
 /// Convert an absolute path to be relative to the current working directory.
-pub(crate) fn relativize_path(path: &Path) -> Cow<str> {
+pub fn relativize_path(path: &Path) -> Cow<str> {
     if let Ok(path) = path.strip_prefix(&*path_dedot::CWD) {
         return path.to_string_lossy();
     }
