@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -1402,7 +1400,7 @@ fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args:
     };
 
     // Look for arguments that weren't included in the docstring.
-    let mut missing_arg_names: BTreeSet<String> = BTreeSet::default();
+    let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
     for arg in arguments
         .args
         .iter()

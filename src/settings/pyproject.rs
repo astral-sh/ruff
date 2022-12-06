@@ -96,7 +96,6 @@ pub fn load_options(pyproject: Option<&PathBuf>) -> Result<Options> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::env::current_dir;
     use std::path::PathBuf;
     use std::str::FromStr;
@@ -432,8 +431,11 @@ other-attribute = 1
                     ban_relative_imports: Some(Strictness::Parents)
                 }),
                 flake8_import_conventions: Some(flake8_import_conventions::settings::Options {
-                    aliases: Some(BTreeMap::from([("pandas".to_string(), "pd".to_string(),)])),
-                    extend_aliases: Some(BTreeMap::from([(
+                    aliases: Some(FxHashMap::from_iter([(
+                        "pandas".to_string(),
+                        "pd".to_string(),
+                    )])),
+                    extend_aliases: Some(FxHashMap::from_iter([(
                         "dask.dataframe".to_string(),
                         "dd".to_string(),
                     )])),

@@ -1,6 +1,6 @@
-use std::collections::BTreeSet;
-
+use itertools::Itertools;
 use log::error;
+use rustc_hash::FxHashSet;
 use rustpython_ast::{AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
@@ -38,7 +38,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
     let target_version = checker.settings.target_version;
 
     let mut removable_index: Vec<usize> = vec![];
-    let mut removable_names: BTreeSet<&str> = BTreeSet::new();
+    let mut removable_names: FxHashSet<&str> = FxHashSet::default();
     for (index, alias) in names.iter().enumerate() {
         let name = alias.node.name.as_str();
         if (target_version >= PythonVersion::Py33 && PY33_PLUS_REMOVE_FUTURES.contains(&name))
@@ -53,7 +53,13 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         return;
     }
     let mut check = Check::new(
-        CheckKind::UnnecessaryFutureImport(removable_names.into_iter().map(String::from).collect()),
+        CheckKind::UnnecessaryFutureImport(
+            removable_names
+                .into_iter()
+                .map(String::from)
+                .sorted()
+                .collect(),
+        ),
         Range::from_located(stmt),
     );
     if checker.patch(check.kind.code()) {

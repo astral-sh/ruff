@@ -2,12 +2,12 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use globset::{Glob, GlobMatcher, GlobSet};
+use itertools::Itertools;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
@@ -34,12 +34,12 @@ pub struct Settings {
     pub enabled: FxHashSet<CheckCode>,
     pub exclude: GlobSet,
     pub extend_exclude: GlobSet,
-    pub external: BTreeSet<String>,
+    pub external: FxHashSet<String>,
     pub fixable: FxHashSet<CheckCode>,
     pub format: SerializationFormat,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
-    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)>,
+    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>,
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
@@ -77,7 +77,7 @@ impl Settings {
             ),
             exclude: resolve_globset(config.exclude, project_root)?,
             extend_exclude: resolve_globset(config.extend_exclude, project_root)?,
-            external: BTreeSet::from_iter(config.external),
+            external: FxHashSet::from_iter(config.external),
             fixable: resolve_codes(&config.fixable, &config.unfixable),
             format: config.format,
             flake8_annotations: config.flake8_annotations,
@@ -105,7 +105,7 @@ impl Settings {
             enabled: FxHashSet::from_iter([check_code.clone()]),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
-            external: BTreeSet::default(),
+            external: FxHashSet::default(),
             fixable: FxHashSet::from_iter([check_code]),
             format: SerializationFormat::Text,
             ignore_init_module_imports: false,
@@ -133,7 +133,7 @@ impl Settings {
             enabled: FxHashSet::from_iter(check_codes.clone()),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
-            external: BTreeSet::default(),
+            external: FxHashSet::default(),
             fixable: FxHashSet::from_iter(check_codes),
             format: SerializationFormat::Text,
             ignore_init_module_imports: false,
@@ -162,18 +162,23 @@ impl Hash for Settings {
             confusable.hash(state);
         }
         self.dummy_variable_rgx.as_str().hash(state);
-        for value in &self.enabled {
+        for value in self.enabled.iter().sorted() {
             value.hash(state);
         }
-        self.external.hash(state);
-        for value in &self.fixable {
+        for value in self.external.iter().sorted() {
             value.hash(state);
         }
+        for value in self.fixable.iter().sorted() {
+            value.hash(state);
+        }
+        self.ignore_init_module_imports.hash(state);
         self.line_length.hash(state);
         for (absolute, basename, codes) in &self.per_file_ignores {
             absolute.glob().hash(state);
             basename.glob().hash(state);
-            codes.hash(state);
+            for value in codes.iter().sorted() {
+                value.hash(state);
+            }
         }
         self.show_source.hash(state);
         self.target_version.hash(state);
@@ -206,7 +211,7 @@ pub fn resolve_globset(
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
     project_root: Option<&PathBuf>,
-) -> Result<Vec<(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)>> {
+) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>> {
     per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {

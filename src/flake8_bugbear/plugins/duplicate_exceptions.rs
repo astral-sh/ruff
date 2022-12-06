@@ -1,6 +1,5 @@
-use std::collections::BTreeSet;
-
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
 use rustpython_ast::{
     Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location, Stmt,
 };
@@ -27,9 +26,9 @@ fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
-) -> BTreeSet<Vec<&'a str>> {
-    let mut seen: BTreeSet<Vec<&str>> = BTreeSet::default();
-    let mut duplicates: BTreeSet<Vec<&str>> = BTreeSet::default();
+) -> FxHashSet<Vec<&'a str>> {
+    let mut seen: FxHashSet<Vec<&str>> = FxHashSet::default();
+    let mut duplicates: FxHashSet<Vec<&str>> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
         let call_path = helpers::collect_call_paths(type_);
@@ -76,8 +75,8 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Excepthandler]) {
-    let mut seen: BTreeSet<Vec<&str>> = BTreeSet::default();
-    let mut duplicates: BTreeSet<Vec<&str>> = BTreeSet::default();
+    let mut seen: FxHashSet<Vec<&str>> = FxHashSet::default();
+    let mut duplicates: FxHashSet<Vec<&str>> = FxHashSet::default();
     for handler in handlers {
         let ExcepthandlerKind::ExceptHandler { type_: Some(type_), .. } = &handler.node else {
             continue;
