@@ -82,7 +82,7 @@ impl Settings {
             format: config.format,
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
-            flake8_import_conventions: config.import_conventions,
+            flake8_import_conventions: config.flake8_import_conventions,
             flake8_quotes: config.flake8_quotes,
             flake8_tidy_imports: config.flake8_tidy_imports,
             ignore_init_module_imports: config.ignore_init_module_imports,

@@ -47,15 +47,29 @@ impl Hash for Settings {
     }
 }
 
+fn merge(defaults: &mut FxHashMap<String, String>, overrides: &FxHashMap<String, String>) {
+    defaults.extend(
+        overrides
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string())),
+    );
+}
+
+fn resolve_aliases(options: &Options) -> FxHashMap<String, String> {
+    let mut aliases = CONVENTIONAL_ALIASES
+        .iter()
+        .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+        .collect::<FxHashMap<_, _>>();
+    if let Some(options_aliases) = &options.aliases {
+        merge(&mut aliases, options_aliases);
+    }
+    aliases
+}
+
 impl Settings {
     pub fn from_options(options: Options) -> Self {
         Self {
-            aliases: options.aliases.unwrap_or_else(|| {
-                CONVENTIONAL_ALIASES
-                    .iter()
-                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                    .collect()
-            }),
+            aliases: resolve_aliases(&options),
         }
     }
 }

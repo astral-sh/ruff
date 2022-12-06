@@ -42,9 +42,9 @@ pub struct Configuration {
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
+    pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
-    pub import_conventions: flake8_import_conventions::settings::Settings,
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
@@ -153,6 +153,10 @@ impl Configuration {
                 .flake8_bugbear
                 .map(flake8_bugbear::settings::Settings::from_options)
                 .unwrap_or_default(),
+            flake8_import_conventions: options
+                .flake8_import_conventions
+                .map(flake8_import_conventions::settings::Settings::from_options)
+                .unwrap_or_default(),
             flake8_quotes: options
                 .flake8_quotes
                 .map(flake8_quotes::settings::Settings::from_options)
@@ -160,10 +164,6 @@ impl Configuration {
             flake8_tidy_imports: options
                 .flake8_tidy_imports
                 .map(flake8_tidy_imports::settings::Settings::from_options)
-                .unwrap_or_default(),
-            import_conventions: options
-                .flake8_import_conventions
-                .map(flake8_import_conventions::settings::Settings::from_options)
                 .unwrap_or_default(),
             isort: options
                 .isort

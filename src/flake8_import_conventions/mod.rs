@@ -15,7 +15,7 @@ mod tests {
     #[test]
     fn defaults() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/flake8_import_conventions/IC001.py"),
+            Path::new("./resources/test/fixtures/flake8_import_conventions/IC001_defaults.py"),
             &Settings::for_rule(CheckCode::IC001),
             true,
         )?;
@@ -27,20 +27,64 @@ mod tests {
     #[test]
     fn custom() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/flake8_import_conventions/IC001.py"),
+            Path::new("./resources/test/fixtures/flake8_import_conventions/IC001_custom.py"),
             &Settings {
-                flake8_import_conventions: flake8_import_conventions::settings::Settings {
-                    aliases: FxHashMap::from_iter([
-                        ("dask.array".to_string(), "da".to_string()),
-                        ("dask.dataframe".to_string(), "dd".to_string()),
-                    ]),
-                },
+                flake8_import_conventions: flake8_import_conventions::settings::Settings::from_options(
+                    flake8_import_conventions::settings::Options {
+                        aliases: Some(FxHashMap::from_iter([
+                            ("dask.array".to_string(), "da".to_string()),
+                            ("dask.dataframe".to_string(), "dd".to_string()),
+                        ])),
+                    },
+                ),
                 ..Settings::for_rule(CheckCode::IC001)
             },
             true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("custom", checks);
+        Ok(())
+    }
+
+    #[test]
+    fn remove_defaults() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/flake8_import_conventions/IC001_remove_default.py"),
+            &Settings {
+                flake8_import_conventions: flake8_import_conventions::settings::Settings::from_options(
+                    flake8_import_conventions::settings::Options {
+                        aliases: Some(FxHashMap::from_iter([
+                            ("numpy".to_string(), "".to_string()),
+                        ])),
+                    },
+                ),
+                ..Settings::for_rule(CheckCode::IC001)
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!("remove_default", checks);
+        Ok(())
+    }
+
+    #[test]
+    fn override_defaults() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/flake8_import_conventions/IC001_override_default.py"),
+            &Settings {
+                flake8_import_conventions: flake8_import_conventions::settings::Settings::from_options(
+                    flake8_import_conventions::settings::Options {
+                        aliases: Some(FxHashMap::from_iter([
+                            ("numpy".to_string(), "nmp".to_string()),
+                        ])),
+                    },
+                ),
+                ..Settings::for_rule(CheckCode::IC001)
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!("override_default", checks);
         Ok(())
     }
 }
