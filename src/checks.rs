@@ -290,7 +290,7 @@ pub enum CheckCode {
     FBT001,
     FBT002,
     FBT003,
-    // Import conventions
+    // flake8-import-conventions
     ICN001,
     // Ruff
     RUF001,
@@ -779,7 +779,7 @@ pub enum CheckKind {
     BooleanPositionalValueInFunctionCall,
     // pygrep-hooks
     NoEval,
-    // Import conventions
+    // flake8-import-conventions
     ImportAliasIsNotConventional(String, String),
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
@@ -1120,7 +1120,7 @@ impl CheckCode {
             CheckCode::FBT003 => CheckKind::BooleanPositionalValueInFunctionCall,
             // pygrep-hooks
             CheckCode::PGH001 => CheckKind::NoEval,
-            // Import conventions
+            // flake8-import-conventions
             CheckCode::ICN001 => {
                 CheckKind::ImportAliasIsNotConventional("...".to_string(), "...".to_string())
             }
@@ -1645,7 +1645,7 @@ impl CheckKind {
             CheckKind::BooleanPositionalValueInFunctionCall => &CheckCode::FBT003,
             // pygrep-hooks
             CheckKind::NoEval => &CheckCode::PGH001,
-            // Import conventions
+            // flake8-import-conventions
             CheckKind::ImportAliasIsNotConventional(..) => &CheckCode::ICN001,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
@@ -2433,7 +2433,7 @@ impl CheckKind {
             }
             // pygrep-hooks
             CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
-            // Import conventions
+            // flake8-import-conventions
             CheckKind::ImportAliasIsNotConventional(name, asname) => {
                 format!("`{name}` should be imported as `{asname}`")
             }
