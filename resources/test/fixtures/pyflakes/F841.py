@@ -65,3 +65,8 @@ def f7():
 
     with connect() as (connection, cursor):
         cursor.execute("SELECT * FROM users")
+
+
+def f8():
+    with open("file") as f, open("") as ((a, b)):
+        print("hello")

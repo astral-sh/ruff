@@ -2497,6 +2497,8 @@ impl CheckKind {
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DoNotAssignLambda
                 | CheckKind::DuplicateHandlerException(..)
+                | CheckKind::EndsInPeriod
+                | CheckKind::EndsInPunctuation
                 | CheckKind::GetAttrWithConstant
                 | CheckKind::ImplicitReturn
                 | CheckKind::ImplicitReturnValue

@@ -16,6 +16,7 @@ use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
+use crate::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
@@ -388,15 +389,17 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
                 }
             }
 
-            // Insert one blank line after the summary (replacing any existing lines).
-            check.amend(Fix::replacement(
-                "\n".to_string(),
-                Location::new(docstring.location.row() + summary_line + 1, 0),
-                Location::new(
-                    docstring.location.row() + summary_line + 1 + blanks_count,
-                    0,
-                ),
-            ));
+            if blanks_count > 1 {
+                // Insert one blank line after the summary (replacing any existing lines).
+                check.amend(Fix::replacement(
+                    "\n".to_string(),
+                    Location::new(docstring.location.row() + summary_line + 1, 0),
+                    Location::new(
+                        docstring.location.row() + summary_line + 1 + blanks_count,
+                        0,
+                    ),
+                ));
+            }
         }
         checker.add_check(check);
     }
@@ -619,18 +622,11 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
         Range::from_located(docstring),
     );
     if checker.patch(check.kind.code()) {
-        if let Some(first_line) = checker
-            .locator
-            .slice_source_code_range(&Range::from_located(docstring))
-            .lines()
-            .next()
-            .map(str::to_lowercase)
-        {
-            for pattern in constants::TRIPLE_QUOTE_PREFIXES
-                .iter()
-                .chain(constants::SINGLE_QUOTE_PREFIXES)
-            {
-                if first_line.starts_with(pattern) {
+        if let Some(pattern) = leading_quote(docstring, checker.locator) {
+            if let Some(quote) = pattern.chars().last() {
+                // If removing whitespace would lead to an invalid string of quote
+                // characters, avoid applying the fix.
+                if !trimmed.ends_with(quote) {
                     check.amend(Fix::replacement(
                         trimmed.to_string(),
                         Location::new(
@@ -642,7 +638,6 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
                             docstring.location.column() + pattern.len() + line.chars().count(),
                         ),
                     ));
-                    break;
                 }
             }
         }
@@ -741,16 +736,30 @@ pub fn ends_with_period(checker: &mut Checker, definition: &Definition) {
     } = &docstring.node else {
         return;
     };
-    let Some(string) = string.trim().lines().next() else {
-        return;
-    };
-    if string.ends_with('.') {
-        return;
-    };
-    checker.add_check(Check::new(
-        CheckKind::EndsInPeriod,
-        Range::from_located(docstring),
-    ));
+    if let Some(index) = logical_line(string) {
+        let line = string.lines().nth(index).unwrap();
+        let trimmed = line.trim_end();
+        if !trimmed.ends_with('.') {
+            let mut check = Check::new(CheckKind::EndsInPeriod, Range::from_located(docstring));
+            // Best-effort autofix: avoid adding a period after other punctuation marks.
+            if checker.patch(&CheckCode::D400) && !trimmed.ends_with(':') && !trimmed.ends_with(';')
+            {
+                if let Some((row, column)) = if index == 0 {
+                    leading_quote(docstring, checker.locator).map(|pattern| {
+                        (
+                            docstring.location.row(),
+                            docstring.location.column() + pattern.len() + trimmed.chars().count(),
+                        )
+                    })
+                } else {
+                    Some((docstring.location.row() + index, trimmed.chars().count()))
+                } {
+                    check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
+                }
+            }
+            checker.add_check(check);
+        };
+    }
 }
 
 /// D402
@@ -868,16 +877,31 @@ pub fn ends_with_punctuation(checker: &mut Checker, definition: &Definition) {
     } = &docstring.node else {
         return
     };
-    let Some(string) = string.trim().lines().next() else {
-        return
-    };
-    if string.ends_with('.') || string.ends_with('!') || string.ends_with('?') {
-        return;
+    if let Some(index) = logical_line(string) {
+        let line = string.lines().nth(index).unwrap();
+        let trimmed = line.trim_end();
+        if !(trimmed.ends_with('.') || trimmed.ends_with('!') || trimmed.ends_with('?')) {
+            let mut check =
+                Check::new(CheckKind::EndsInPunctuation, Range::from_located(docstring));
+            // Best-effort autofix: avoid adding a period after other punctuation marks.
+            if checker.patch(&CheckCode::D415) && !trimmed.ends_with(':') && !trimmed.ends_with(';')
+            {
+                if let Some((row, column)) = if index == 0 {
+                    leading_quote(docstring, checker.locator).map(|pattern| {
+                        (
+                            docstring.location.row(),
+                            docstring.location.column() + pattern.len() + trimmed.chars().count(),
+                        )
+                    })
+                } else {
+                    Some((docstring.location.row() + index, trimmed.chars().count()))
+                } {
+                    check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
+                }
+            }
+            checker.add_check(check);
+        };
     }
-    checker.add_check(Check::new(
-        CheckKind::EndsInPunctuation,
-        Range::from_located(docstring),
-    ));
 }
 
 /// D418

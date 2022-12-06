@@ -5,7 +5,6 @@ use std::path::Path;
 
 use log::error;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::Withitem;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -20,7 +19,7 @@ use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
     Binding, BindingContext, BindingKind, ClassScope, FunctionScope, Node, Range, Scope, ScopeKind,
 };
-use crate::ast::visitor::{walk_excepthandler, walk_withitem, Visitor};
+use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{helpers, operations, visitor};
 use crate::checks::{Check, CheckCode, CheckKind, DeferralKeyword};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
@@ -82,7 +81,6 @@ pub struct Checker<'a> {
     in_deferred_type_definition: bool,
     in_literal: bool,
     in_subscript: bool,
-    in_withitem: bool,
     seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
@@ -130,7 +128,6 @@ impl<'a> Checker<'a> {
             in_deferred_type_definition: false,
             in_literal: false,
             in_subscript: false,
-            in_withitem: false,
             seen_import_boundary: false,
             futures_allowed: true,
             annotations_future_enabled: false,
@@ -2485,13 +2482,6 @@ where
 
         self.check_builtin_arg_shadowing(&arg.node.arg, Range::from_located(arg));
     }
-
-    fn visit_withitem(&mut self, withitem: &'b Withitem) {
-        let prev_in_withitem = self.in_withitem;
-        self.in_withitem = true;
-        walk_withitem(self, withitem);
-        self.in_withitem = prev_in_withitem;
-    }
 }
 
 fn try_mark_used(scope: &mut Scope, scope_id: usize, id: &str, expr: &Expr) -> bool {
@@ -2798,7 +2788,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        if self.in_withitem || operations::is_unpacking_assignment(parent) {
+        if operations::is_unpacking_assignment(parent, expr) {
             self.add_binding(
                 id,
                 Binding {

@@ -1,0 +1,20 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 2
+    column: 0
+  fix:
+    content: "from .subscription import *  # type: ignore  # some very long comment explaining why this needs a type ignore\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 2
+      column: 0
+
