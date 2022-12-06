@@ -20,7 +20,6 @@ use std::time::Instant;
 use ::ruff::autofix::fixer;
 use ::ruff::checks::{CheckCode, CheckKind};
 use ::ruff::cli::{collect_per_file_ignores, extract_log_level, Cli};
-use ::ruff::fs;
 use ::ruff::fs::iter_python_files;
 use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use ::ruff::logging::{set_up_logging, LogLevel};
@@ -31,7 +30,7 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
-use ::ruff::{cache, commands};
+use ::ruff::{cache, commands, fs};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
