@@ -4,7 +4,7 @@ use rustpython_ast::Stmt;
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
 
-/// ICO001
+/// ICN001
 pub fn check_conventional_import(
     import_from: &Stmt,
     name: &str,
