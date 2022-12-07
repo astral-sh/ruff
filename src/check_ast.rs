@@ -904,7 +904,7 @@ where
                         );
                     }
 
-                    if self.settings.enabled.contains(&CheckCode::I252) {
+                    if self.settings.enabled.contains(&CheckCode::TID252) {
                         if let Some(check) = flake8_tidy_imports::checks::banned_relative_import(
                             stmt,
                             level.as_ref(),

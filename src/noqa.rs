@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::checks::{Check, CheckCode, REDIRECTS};
+use crate::checks::{Check, CheckCode, CODE_REDIRECTS};
 
 static NO_QA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -70,7 +70,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 pub fn includes(needle: &CheckCode, haystack: &[&str]) -> bool {
     let needle: &str = needle.as_ref();
     haystack.iter().any(|candidate| {
-        if let Some(candidate) = REDIRECTS.get(candidate) {
+        if let Some(candidate) = CODE_REDIRECTS.get(candidate) {
             needle == candidate.as_ref()
         } else {
             &needle == candidate

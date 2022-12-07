@@ -72,7 +72,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [Pyflakes (F)](#pyflakes-f)
    1. [pycodestyle (E, W)](#pycodestyle-e-w)
    1. [mccabe (C90)](#mccabe-c90)
-   1. [isort (I00)](#isort-i00)
+   1. [isort (I)](#isort-i)
    1. [pydocstyle (D)](#pydocstyle-d)
    1. [pyupgrade (UP)](#pyupgrade-up)
    1. [pep8-naming (N)](#pep8-naming-n)
@@ -89,7 +89,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-print (T20)](#flake8-print-t20)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
-   1. [flake8-tidy-imports (I25)](#flake8-tidy-imports-i25)
+   1. [flake8-tidy-imports (TID)](#flake8-tidy-imports-tid)
    1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
    1. [eradicate (ERA)](#eradicate-era)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
@@ -476,7 +476,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
 | ---- | ---- | ------- | --- |
 | C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
 
-### isort (I00)
+### isort (I)
 
 For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
 
@@ -761,13 +761,13 @@ For more, see [flake8-return](https://pypi.org/project/flake8-return/1.2.0/) on 
 | RET507 | SuperfluousElseContinue | Unnecessary `else` after `continue` statement |  |
 | RET508 | SuperfluousElseBreak | Unnecessary `else` after `break` statement |  |
 
-### flake8-tidy-imports (I25)
+### flake8-tidy-imports (TID)
 
 For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| I252 | BannedRelativeImport | Relative imports are banned |  |
+| TID252 | BannedRelativeImport | Relative imports are banned |  |
 
 ### flake8-unused-arguments (ARG)
 
@@ -979,6 +979,12 @@ natively, including:
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (1/10)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
+
+Note that, in some cases, Ruff uses different error code prefixes than would be found in the
+originating Flake8 plugins. For example, Ruff uses `TID252` to represent the `I252` rule from
+`flake8-tidy-imports`. This helps minimize conflicts across plugins and allows any individual plugin
+to be toggled on or off with a single (e.g.) `--select TID`, as opposed to `--select I2` (to avoid
+conflicts with the `isort` rules, like `I001`).
 
 Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -1478,7 +1484,7 @@ fix = true
 
 A list of check code prefixes to consider autofix-able.
 
-**Default value**: `["A", "ANN", "B", "BLE", "C", "D", "E", "F", "FBT", "I", "M", "N", "Q", "RUF", "S", "T", "U", "W", "YTT"]`
+**Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]`
 
 **Type**: `Vec<CheckCodePrefix>`
 
@@ -1795,7 +1801,7 @@ The conventional aliases for imports. These aliases can be extended by the `exte
 
 **Default value**: `{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}`
 
-**Type**: `BTreeMap<String, String>`
+**Type**: `FxHashMap<String, String>`
 
 **Example usage**:
 
@@ -1817,7 +1823,7 @@ A mapping of modules to their conventional import aliases. These aliases will be
 
 **Default value**: `{}`
 
-**Type**: `BTreeMap<String, String>`
+**Type**: `FxHashMap<String, String>`
 
 **Example usage**:
 

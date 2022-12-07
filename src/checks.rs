@@ -160,7 +160,7 @@ pub enum CheckCode {
     // mccabe
     C901,
     // flake8-tidy-imports
-    I252,
+    TID252,
     // flake8-return
     RET501,
     RET502,
@@ -400,9 +400,9 @@ impl CheckCategory {
             CheckCategory::Flake8Print => vec![CheckCodePrefix::T20],
             CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
             CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
-            CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::I25],
+            CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::TID],
             CheckCategory::Flake8UnusedArguments => vec![CheckCodePrefix::ARG],
-            CheckCategory::Isort => vec![CheckCodePrefix::I00],
+            CheckCategory::Isort => vec![CheckCodePrefix::I],
             CheckCategory::McCabe => vec![CheckCodePrefix::C90],
             CheckCategory::PEP8Naming => vec![CheckCodePrefix::N],
             CheckCategory::Pycodestyle => vec![CheckCodePrefix::E, CheckCodePrefix::W],
@@ -1022,7 +1022,7 @@ impl CheckCode {
             // flake8-debugger
             CheckCode::T100 => CheckKind::Debugger(DebuggerUsingType::Import("...".to_string())),
             // flake8-tidy-imports
-            CheckCode::I252 => CheckKind::BannedRelativeImport(Strictness::All),
+            CheckCode::TID252 => CheckKind::BannedRelativeImport(Strictness::All),
             // flake8-return
             CheckCode::RET501 => CheckKind::UnnecessaryReturnNone,
             CheckCode::RET502 => CheckKind::ImplicitReturnValue,
@@ -1369,7 +1369,7 @@ impl CheckCode {
             CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
             CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
             CheckCode::I001 => CheckCategory::Isort,
-            CheckCode::I252 => CheckCategory::Flake8TidyImports,
+            CheckCode::TID252 => CheckCategory::Flake8TidyImports,
             CheckCode::ICN001 => CheckCategory::Flake8ImportConventions,
             CheckCode::N801 => CheckCategory::PEP8Naming,
             CheckCode::N802 => CheckCategory::PEP8Naming,
@@ -1580,7 +1580,7 @@ impl CheckKind {
             // flake8-debugger
             CheckKind::Debugger(_) => &CheckCode::T100,
             // flake8-tidy-imports
-            CheckKind::BannedRelativeImport(_) => &CheckCode::I252,
+            CheckKind::BannedRelativeImport(_) => &CheckCode::TID252,
             // flake8-return
             CheckKind::UnnecessaryReturnNone => &CheckCode::RET501,
             CheckKind::ImplicitReturnValue => &CheckCode::RET502,
@@ -2696,7 +2696,7 @@ impl Check {
 }
 
 /// A hash map from deprecated to latest `CheckCode`.
-pub static REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(|| {
+pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(|| {
     FxHashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
         ("U001", CheckCode::UP001),
@@ -2713,6 +2713,25 @@ pub static REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(|| {
         ("U013", CheckCode::UP013),
         ("U014", CheckCode::UP014),
         ("U015", CheckCode::UP015),
+        // TODO(charlie): Remove by 2023-02-01.
+        ("I252", CheckCode::TID252),
+        ("M001", CheckCode::RUF100),
+    ])
+});
+
+/// A hash map from deprecated `CheckCodePrefix` to latest `CheckCodePrefix`.
+pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::new(|| {
+    FxHashMap::from_iter([
+        // TODO(charlie): Remove by 2023-01-01.
+        ("U", "UP"),
+        ("U0", "UP0"),
+        ("U00", "UP00"),
+        ("U01", "UP01"),
+        // TODO(charlie): Remove by 2023-02-01.
+        ("I2", "TID2"),
+        ("I25", "TID25"),
+        ("M", "RUF100"),
+        ("M0", "RUF100"),
     ])
 });
 
