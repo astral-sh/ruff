@@ -28,7 +28,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         output.push_str(&format!(
             "### {} ({})",
             check_category.title(),
-            check_category.codes().iter().join(", ")
+            check_category.codes().iter().map(AsRef::as_ref).join(", ")
         ));
         output.push('\n');
         output.push('\n');

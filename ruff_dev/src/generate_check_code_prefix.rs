@@ -76,6 +76,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         .new_enum("CheckCodePrefix")
         .vis("pub")
         .derive("EnumString")
+        .derive("AsRefStr")
         .derive("Debug")
         .derive("PartialEq")
         .derive("Eq")
@@ -170,9 +171,9 @@ pub fn main(cli: &Cli) -> Result<()> {
     output.push('\n');
     output.push_str("use colored::Colorize;");
     output.push('\n');
-    output.push_str("use serde::{{Serialize, Deserialize}};");
+    output.push_str("use serde::{Deserialize, Serialize};");
     output.push('\n');
-    output.push_str("use strum_macros::EnumString;");
+    output.push_str("use strum_macros::{AsRefStr, EnumString};");
     output.push('\n');
     output.push('\n');
     output.push_str("use crate::checks::CheckCode;");
