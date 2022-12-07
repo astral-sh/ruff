@@ -8,7 +8,7 @@ use anyhow::Result;
 use clap::Parser;
 use codegen::{Scope, Type, Variant};
 use itertools::Itertools;
-use ruff::checks::{CheckCode, REDIRECTS};
+use ruff::checks::{CheckCode, CODE_REDIRECTS, PREFIX_REDIRECTS};
 use strum::IntoEnumIterator;
 
 const FILE: &str = "src/checks_gen.rs";
@@ -39,34 +39,26 @@ pub fn main(cli: &Cli) -> Result<()> {
         }
     }
 
-    // Add any aliases (e.g., "U001" to "UP001").
-    for (alias, check_code) in REDIRECTS.iter() {
-        // Compute the length of the prefix and suffix for both codes.
-        let code_str: String = check_code.as_ref().to_string();
-        let code_prefix_len = code_str
-            .chars()
-            .take_while(|char| char.is_alphabetic())
-            .count();
-        let code_suffix_len = code_str.len() - code_prefix_len;
-        let alias_prefix_len = alias
-            .chars()
-            .take_while(|char| char.is_alphabetic())
-            .count();
-        let alias_suffix_len = alias.len() - alias_prefix_len;
-        assert_eq!(code_suffix_len, alias_suffix_len);
-        for i in 0..=code_suffix_len {
-            let source = code_str[..code_prefix_len + i].to_string();
-            let destination = alias[..alias_prefix_len + i].to_string();
-            if source != destination {
-                prefix_to_codes.insert(
-                    destination,
-                    prefix_to_codes
-                        .get(&source)
-                        .unwrap_or_else(|| panic!("Unknown CheckCode: {source:?}"))
-                        .clone(),
-                );
-            }
-        }
+    // Add any prefix aliases (e.g., "U" to "UP").
+    for (alias, source) in PREFIX_REDIRECTS.iter() {
+        prefix_to_codes.insert(
+            (*alias).to_string(),
+            prefix_to_codes
+                .get(&(*source).to_string())
+                .unwrap_or_else(|| panic!("Unknown CheckCode: {source:?}"))
+                .clone(),
+        );
+    }
+
+    // Add any check code aliases (e.g., "U001" to "UP001").
+    for (alias, check_code) in CODE_REDIRECTS.iter() {
+        prefix_to_codes.insert(
+            (*alias).to_string(),
+            prefix_to_codes
+                .get(&check_code.as_ref().to_string())
+                .unwrap_or_else(|| panic!("Unknown CheckCode: {alias:?}"))
+                .clone(),
+        );
     }
 
     let mut scope = Scope::new();
@@ -113,13 +105,25 @@ pub fn main(cli: &Cli) -> Result<()> {
         .line("#[allow(clippy::match_same_arms)]")
         .line("match self {");
     for (prefix, codes) in &prefix_to_codes {
-        if let Some(target) = REDIRECTS.get(&prefix.as_str()) {
+        if let Some(target) = CODE_REDIRECTS.get(&prefix.as_str()) {
             gen = gen.line(format!(
                 "CheckCodePrefix::{prefix} => {{ eprintln!(\"{{}}{{}} {{}}\", \
-                 \"warning\".yellow().bold(), \":\".bold(), \"`{}` has been renamed to \
+                 \"warning\".yellow().bold(), \":\".bold(), \"`{}` has been remapped to \
                  `{}`\".bold()); \n vec![{}] }}",
                 prefix,
                 target.as_ref(),
+                codes
+                    .iter()
+                    .map(|code| format!("CheckCode::{}", code.as_ref()))
+                    .join(", ")
+            ));
+        } else if let Some(target) = PREFIX_REDIRECTS.get(&prefix.as_str()) {
+            gen = gen.line(format!(
+                "CheckCodePrefix::{prefix} => {{ eprintln!(\"{{}}{{}} {{}}\", \
+                 \"warning\".yellow().bold(), \":\".bold(), \"`{}` has been remapped to \
+                 `{}`\".bold()); \n vec![{}] }}",
+                prefix,
+                target,
                 codes
                     .iter()
                     .map(|code| format!("CheckCode::{}", code.as_ref()))
@@ -187,7 +191,9 @@ pub fn main(cli: &Cli) -> Result<()> {
     output.push_str("pub const CATEGORIES: &[CheckCodePrefix] = &[");
     output.push('\n');
     for prefix in prefix_to_codes.keys() {
-        if prefix.chars().all(char::is_alphabetic) {
+        if prefix.chars().all(char::is_alphabetic)
+            && !PREFIX_REDIRECTS.contains_key(&prefix.as_str())
+        {
             output.push_str(&format!("CheckCodePrefix::{prefix},"));
             output.push('\n');
         }

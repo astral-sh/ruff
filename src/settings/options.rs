@@ -125,7 +125,7 @@ pub struct Options {
     pub fix: Option<bool>,
     #[option(
         doc = "A list of check code prefixes to consider autofix-able.",
-        default = r#"["A", "ANN", "B", "BLE", "C", "D", "E", "F", "FBT", "I", "M", "N", "Q", "RUF", "S", "T", "U", "W", "YTT"]"#,
+        default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]"#,
         value_type = "Vec<CheckCodePrefix>",
         example = r#"
             # Only allow autofix behavior for `E` and `F` checks.

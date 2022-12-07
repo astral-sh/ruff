@@ -7,7 +7,7 @@ use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checks::{Check, CheckCode, CheckKind, REDIRECTS};
+use crate::checks::{Check, CheckCode, CheckKind, CODE_REDIRECTS};
 use crate::noqa;
 use crate::noqa::{is_file_exempt, Directive};
 use crate::settings::Settings;
@@ -209,7 +209,7 @@ pub fn check_lines(
                     let mut invalid_codes = vec![];
                     let mut valid_codes = vec![];
                     for code in codes {
-                        let code = REDIRECTS.get(code).map_or(code, AsRef::as_ref);
+                        let code = CODE_REDIRECTS.get(code).map_or(code, AsRef::as_ref);
                         if matches.contains(&code) || settings.external.contains(code) {
                             valid_codes.push(code.to_string());
                         } else {

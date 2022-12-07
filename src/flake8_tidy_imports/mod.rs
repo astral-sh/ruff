@@ -15,12 +15,12 @@ mod tests {
     #[test]
     fn ban_parent_imports() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/flake8_tidy_imports/I252.py"),
+            Path::new("./resources/test/fixtures/flake8_tidy_imports/TID252.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     ban_relative_imports: Strictness::Parents,
                 },
-                ..Settings::for_rules(vec![CheckCode::I252])
+                ..Settings::for_rules(vec![CheckCode::TID252])
             },
             true,
         )?;
@@ -32,12 +32,12 @@ mod tests {
     #[test]
     fn ban_all_imports() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/flake8_tidy_imports/I252.py"),
+            Path::new("./resources/test/fixtures/flake8_tidy_imports/TID252.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     ban_relative_imports: Strictness::All,
                 },
-                ..Settings::for_rules(vec![CheckCode::I252])
+                ..Settings::for_rules(vec![CheckCode::TID252])
             },
             true,
         )?;
