@@ -1,5 +1,6 @@
 use rustpython_ast::{Arguments, Expr, Stmt, StmtKind};
 
+use crate::ast::cast;
 use crate::check_ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::visibility;
@@ -32,7 +33,7 @@ pub fn overloaded_name(checker: &Checker, definition: &Definition) -> Option<Str
     | DefinitionKind::NestedFunction(stmt)
     | DefinitionKind::Method(stmt) = definition.kind
     {
-        if visibility::is_overload(checker, stmt) {
+        if visibility::is_overload(checker, cast::decorator_list(stmt)) {
             let (name, ..) = match_function_def(stmt);
             Some(name.to_string())
         } else {
@@ -50,7 +51,7 @@ pub fn is_overload_impl(checker: &Checker, definition: &Definition, overloaded_n
     | DefinitionKind::NestedFunction(stmt)
     | DefinitionKind::Method(stmt) = definition.kind
     {
-        if visibility::is_overload(checker, stmt) {
+        if visibility::is_overload(checker, cast::decorator_list(stmt)) {
             false
         } else {
             let (name, ..) = match_function_def(stmt);

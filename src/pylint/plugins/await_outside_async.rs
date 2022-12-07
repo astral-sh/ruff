@@ -1,6 +1,6 @@
 use rustpython_ast::Expr;
 
-use crate::ast::types::{FunctionScope, Range, ScopeKind};
+use crate::ast::types::{FunctionDef, Range, ScopeKind};
 use crate::check_ast::Checker;
 use crate::checks::CheckKind;
 use crate::Check;
@@ -10,7 +10,7 @@ pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
     if !checker
         .current_scopes()
         .find_map(|scope| {
-            if let ScopeKind::Function(FunctionScope { async_, .. }) = &scope.kind {
+            if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
                 Some(*async_)
             } else {
                 None

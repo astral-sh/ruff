@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Expr, Keyword, Stmt};
+use rustpython_ast::{Arguments, Expr, Keyword, Stmt};
 use rustpython_parser::ast::{Located, Location};
 
 fn id() -> usize {
@@ -30,35 +30,49 @@ impl Range {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct FunctionScope {
+#[derive(Debug)]
+pub struct FunctionDef<'a> {
+    pub name: &'a str,
+    pub args: &'a Arguments,
+    pub body: &'a [Stmt],
+    pub decorator_list: &'a [Expr],
+    // pub returns: Option<&'a Expr>,
+    // pub type_comment: Option<&'a str>,
+    // TODO(charlie): Create AsyncFunctionDef to mirror the AST.
     pub async_: bool,
-    pub uses_locals: bool,
 }
 
-#[derive(Clone, Debug)]
-pub struct ClassScope<'a> {
+#[derive(Debug)]
+pub struct ClassDef<'a> {
     pub name: &'a str,
     pub bases: &'a [Expr],
     pub keywords: &'a [Keyword],
+    // pub body: &'a [Stmt],
     pub decorator_list: &'a [Expr],
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
+pub struct Lambda<'a> {
+    pub args: &'a Arguments,
+    pub body: &'a Expr,
+}
+
+#[derive(Debug)]
 pub enum ScopeKind<'a> {
-    Class(ClassScope<'a>),
-    Function(FunctionScope),
+    Class(ClassDef<'a>),
+    Function(FunctionDef<'a>),
     Generator,
     Module,
     Arg,
-    Lambda,
+    Lambda(Lambda<'a>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Scope<'a> {
     pub id: usize,
     pub kind: ScopeKind<'a>,
     pub import_starred: bool,
+    pub uses_locals: bool,
     pub values: FxHashMap<&'a str, Binding>,
 }
 
@@ -68,6 +82,7 @@ impl<'a> Scope<'a> {
             id: id(),
             kind,
             import_starred: false,
+            uses_locals: false,
             values: FxHashMap::default(),
         }
     }

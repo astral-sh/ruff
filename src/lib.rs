@@ -54,6 +54,7 @@ mod flake8_print;
 pub mod flake8_quotes;
 mod flake8_return;
 pub mod flake8_tidy_imports;
+mod flake8_unused_arguments;
 pub mod fs;
 mod isort;
 mod lex;

@@ -7,7 +7,7 @@ use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
-use crate::ast::types::{BindingKind, FunctionScope, Range, Scope, ScopeKind};
+use crate::ast::types::{BindingKind, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 use crate::pyflakes::cformat::CFormatSummary;
 use crate::pyflakes::format::FormatSummary;
@@ -391,13 +391,7 @@ pub fn undefined_local(scopes: &[&Scope], name: &str) -> Option<Check> {
 pub fn unused_variables(scope: &Scope, dummy_variable_rgx: &Regex) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
-    if matches!(
-        scope.kind,
-        ScopeKind::Function(FunctionScope {
-            uses_locals: true,
-            ..
-        })
-    ) {
+    if scope.uses_locals && matches!(scope.kind, ScopeKind::Function(..)) {
         return checks;
     }
 

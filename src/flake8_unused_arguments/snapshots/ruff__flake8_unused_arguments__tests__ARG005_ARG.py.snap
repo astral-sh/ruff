@@ -1,0 +1,14 @@
+---
+source: src/flake8_unused_arguments/mod.rs
+expression: checks
+---
+- kind:
+    UnusedLambdaArgument: x
+  location:
+    row: 27
+    column: 7
+  end_location:
+    row: 27
+    column: 8
+  fix: ~
+

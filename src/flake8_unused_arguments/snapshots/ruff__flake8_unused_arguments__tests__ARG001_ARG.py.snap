@@ -1,0 +1,77 @@
+---
+source: src/flake8_unused_arguments/mod.rs
+expression: checks
+---
+- kind:
+    UnusedFunctionArgument: self
+  location:
+    row: 8
+    column: 6
+  end_location:
+    row: 8
+    column: 10
+  fix: ~
+- kind:
+    UnusedFunctionArgument: x
+  location:
+    row: 8
+    column: 12
+  end_location:
+    row: 8
+    column: 13
+  fix: ~
+- kind:
+    UnusedFunctionArgument: cls
+  location:
+    row: 12
+    column: 6
+  end_location:
+    row: 12
+    column: 9
+  fix: ~
+- kind:
+    UnusedFunctionArgument: x
+  location:
+    row: 12
+    column: 11
+  end_location:
+    row: 12
+    column: 12
+  fix: ~
+- kind:
+    UnusedFunctionArgument: self
+  location:
+    row: 16
+    column: 6
+  end_location:
+    row: 16
+    column: 10
+  fix: ~
+- kind:
+    UnusedFunctionArgument: x
+  location:
+    row: 16
+    column: 12
+  end_location:
+    row: 16
+    column: 13
+  fix: ~
+- kind:
+    UnusedFunctionArgument: cls
+  location:
+    row: 20
+    column: 6
+  end_location:
+    row: 20
+    column: 9
+  fix: ~
+- kind:
+    UnusedFunctionArgument: x
+  location:
+    row: 20
+    column: 11
+  end_location:
+    row: 20
+    column: 12
+  fix: ~
+
