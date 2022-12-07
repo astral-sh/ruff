@@ -1458,14 +1458,13 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP005) {
                     pyupgrade::plugins::deprecated_unittest_alias(self, func);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP012) {
+                    pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
+                }
 
                 // flake8-super
                 if self.settings.enabled.contains(&CheckCode::UP008) {
                     pyupgrade::plugins::super_call_with_parameters(self, expr, func, args);
-                }
-
-                if self.settings.enabled.contains(&CheckCode::UP012) {
-                    pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
                 }
 
                 // flake8-print
@@ -1475,6 +1474,7 @@ where
                     flake8_print::plugins::print_call(self, expr, func);
                 }
 
+                // flake8-bugbear
                 if self.settings.enabled.contains(&CheckCode::B004) {
                     flake8_bugbear::plugins::unreliable_callable_check(self, expr, func, args);
                 }
@@ -1502,6 +1502,15 @@ where
                         self, args, keywords,
                     );
                 }
+                if self.settings.enabled.contains(&CheckCode::B905)
+                    && self.settings.target_version >= PythonVersion::Py310
+                {
+                    flake8_bugbear::plugins::zip_without_explicit_strict(
+                        self, expr, func, keywords,
+                    );
+                }
+
+                // flake8-bandit
                 if self.settings.enabled.contains(&CheckCode::S102) {
                     if let Some(check) = flake8_bandit::plugins::exec_used(expr, func) {
                         self.add_check(check);

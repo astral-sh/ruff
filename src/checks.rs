@@ -135,6 +135,7 @@ pub enum CheckCode {
     B026,
     B027,
     B904,
+    B905,
     // flake8-blind-except
     BLE001,
     // flake8-comprehensions
@@ -659,6 +660,7 @@ pub enum CheckKind {
     UselessComparison,
     UselessContextlibSuppress,
     UselessExpression,
+    ZipWithoutExplicitStrict,
     // flake8-comprehensions
     UnnecessaryGeneratorList,
     UnnecessaryGeneratorSet,
@@ -967,6 +969,7 @@ impl CheckCode {
             CheckCode::B026 => CheckKind::StarArgUnpackingAfterKeywordArg,
             CheckCode::B027 => CheckKind::EmptyMethodWithoutAbstractDecorator("...".to_string()),
             CheckCode::B904 => CheckKind::RaiseWithoutFromInsideExcept,
+            CheckCode::B905 => CheckKind::ZipWithoutExplicitStrict,
             // flake8-comprehensions
             CheckCode::C400 => CheckKind::UnnecessaryGeneratorList,
             CheckCode::C401 => CheckKind::UnnecessaryGeneratorSet,
@@ -1212,6 +1215,7 @@ impl CheckCode {
             CheckCode::B026 => CheckCategory::Flake8Bugbear,
             CheckCode::B027 => CheckCategory::Flake8Bugbear,
             CheckCode::B904 => CheckCategory::Flake8Bugbear,
+            CheckCode::B905 => CheckCategory::Flake8Bugbear,
             CheckCode::BLE001 => CheckCategory::Flake8BlindExcept,
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
@@ -1513,6 +1517,7 @@ impl CheckKind {
             CheckKind::MutableArgumentDefault => &CheckCode::B006,
             CheckKind::NoAssertRaisesException => &CheckCode::B017,
             CheckKind::RaiseWithoutFromInsideExcept => &CheckCode::B904,
+            CheckKind::ZipWithoutExplicitStrict => &CheckCode::B905,
             CheckKind::RedundantTupleInExceptionHandler(_) => &CheckCode::B013,
             CheckKind::SetAttrWithConstant => &CheckCode::B010,
             CheckKind::StarArgUnpackingAfterKeywordArg => &CheckCode::B026,
@@ -2025,6 +2030,9 @@ impl CheckKind {
                 "Within an except clause, raise exceptions with raise ... from err or raise ... \
                  from None to distinguish them from errors in exception handling"
                     .to_string()
+            }
+            CheckKind::ZipWithoutExplicitStrict => {
+                "`zip()` without an explicit `strict=` parameter".to_string()
             }
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => {
