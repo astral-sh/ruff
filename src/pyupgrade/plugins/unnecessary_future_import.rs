@@ -49,36 +49,35 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         }
     }
 
-    if !removable_index.is_empty() {
-        let mut check = Check::new(
-            CheckKind::UnnecessaryFutureImport(
-                removable_names.into_iter().map(String::from).collect(),
-            ),
-            Range::from_located(stmt),
-        );
-        if checker.patch(check.kind.code()) {
-            let context = checker.binding_context();
-            let deleted: Vec<&Stmt> = checker
-                .deletions
-                .iter()
-                .map(|index| checker.parents[*index])
-                .collect();
-            match fixes::remove_unnecessary_future_import(
-                checker.locator,
-                &removable_index,
-                checker.parents[context.defined_by],
-                context.defined_in.map(|index| checker.parents[index]),
-                &deleted,
-            ) {
-                Ok(fix) => {
-                    if fix.content.is_empty() || fix.content == "pass" {
-                        checker.deletions.insert(context.defined_by);
-                    }
-                    check.amend(fix);
-                }
-                Err(e) => error!("Failed to remove __future__ import: {e}"),
-            }
-        }
-        checker.add_check(check);
+    if removable_index.is_empty() {
+        return;
     }
+    let mut check = Check::new(
+        CheckKind::UnnecessaryFutureImport(removable_names.into_iter().map(String::from).collect()),
+        Range::from_located(stmt),
+    );
+    if checker.patch(check.kind.code()) {
+        let context = checker.binding_context();
+        let deleted: Vec<&Stmt> = checker
+            .deletions
+            .iter()
+            .map(|index| checker.parents[*index])
+            .collect();
+        match fixes::remove_unnecessary_future_import(
+            checker.locator,
+            &removable_index,
+            checker.parents[context.defined_by],
+            context.defined_in.map(|index| checker.parents[index]),
+            &deleted,
+        ) {
+            Ok(fix) => {
+                if fix.content.is_empty() || fix.content == "pass" {
+                    checker.deletions.insert(context.defined_by);
+                }
+                check.amend(fix);
+            }
+            Err(e) => error!("Failed to remove __future__ import: {e}"),
+        }
+    }
+    checker.add_check(check);
 }

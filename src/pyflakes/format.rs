@@ -43,30 +43,31 @@ impl TryFrom<&str> for FormatSummary {
         let mut keywords = FxHashSet::default();
 
         for format_part in format_string.format_parts {
-            if let FormatPart::Field {
+            let FormatPart::Field {
                 field_name,
                 format_spec,
                 ..
-            } = format_part
-            {
+            } = format_part else {
+                continue;
+            };
+            let parsed = FieldName::parse(&field_name)?;
+            match parsed.field_type {
+                FieldType::Auto => autos.insert(autos.len()),
+                FieldType::Index(i) => indexes.insert(i),
+                FieldType::Keyword(k) => keywords.insert(k),
+            };
+
+            let nested = FormatString::from_str(&format_spec)?;
+            for nested_part in nested.format_parts {
+                let FormatPart::Field { field_name, .. } = nested_part else {
+                    continue;
+                };
                 let parsed = FieldName::parse(&field_name)?;
                 match parsed.field_type {
                     FieldType::Auto => autos.insert(autos.len()),
                     FieldType::Index(i) => indexes.insert(i),
                     FieldType::Keyword(k) => keywords.insert(k),
                 };
-
-                let nested = FormatString::from_str(&format_spec)?;
-                for nested_part in nested.format_parts {
-                    if let FormatPart::Field { field_name, .. } = nested_part {
-                        let parsed = FieldName::parse(&field_name)?;
-                        match parsed.field_type {
-                            FieldType::Auto => autos.insert(autos.len()),
-                            FieldType::Index(i) => indexes.insert(i),
-                            FieldType::Keyword(k) => keywords.insert(k),
-                        };
-                    }
-                }
             }
         }
 

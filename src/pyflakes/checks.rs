@@ -77,43 +77,39 @@ pub(crate) fn percent_format_extra_named_arguments(
     if summary.num_positional > 0 {
         return None;
     }
-
-    if let ExprKind::Dict { keys, values } = &right.node {
-        if values.len() > keys.len() {
-            return None; // contains **x splat
-        }
-
-        let missing: Vec<&String> = keys
-            .iter()
-            .filter_map(|k| match &k.node {
-                // We can only check that string literals exist
-                ExprKind::Constant {
-                    value: Constant::Str(value),
-                    ..
-                } => {
-                    if summary.keywords.contains(value) {
-                        None
-                    } else {
-                        Some(value)
-                    }
-                }
-                _ => None,
-            })
-            .collect();
-
-        if missing.is_empty() {
-            None
-        } else {
-            Some(Check::new(
-                CheckKind::PercentFormatExtraNamedArguments(
-                    missing.iter().map(|&s| s.clone()).collect(),
-                ),
-                location,
-            ))
-        }
-    } else {
-        None
+    let ExprKind::Dict { keys, values } = &right.node else {
+        return None;
+    };
+    if values.len() > keys.len() {
+        return None; // contains **x splat
     }
+
+    let missing: Vec<&String> = keys
+        .iter()
+        .filter_map(|k| match &k.node {
+            // We can only check that string literals exist
+            ExprKind::Constant {
+                value: Constant::Str(value),
+                ..
+            } => {
+                if summary.keywords.contains(value) {
+                    None
+                } else {
+                    Some(value)
+                }
+            }
+            _ => None,
+        })
+        .collect();
+
+    if missing.is_empty() {
+        return None;
+    }
+
+    Some(Check::new(
+        CheckKind::PercentFormatExtraNamedArguments(missing.iter().map(|&s| s.clone()).collect()),
+        location,
+    ))
 }
 
 /// F505

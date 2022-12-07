@@ -142,15 +142,16 @@ impl<'a> Checker<'a> {
         // If we're in an f-string, override the location. RustPython doesn't produce
         // reliable locations for expressions within f-strings, so we use the
         // span of the f-string itself as a best-effort default.
-        if let Some(range) = self.in_f_string {
-            self.checks.push(Check {
+        let check = if let Some(range) = self.in_f_string {
+            Check {
                 location: range.location,
                 end_location: range.end_location,
                 ..check
-            });
+            }
         } else {
-            self.checks.push(check);
-        }
+            check
+        };
+        self.checks.push(check);
     }
 
     /// Add multiple `Check` items to the `Checker`.

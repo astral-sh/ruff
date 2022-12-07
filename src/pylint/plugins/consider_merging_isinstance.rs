@@ -20,25 +20,28 @@ pub fn consider_merging_isinstance(
 
     let mut obj_to_types: FxHashMap<String, (usize, FxHashSet<String>)> = FxHashMap::default();
     for value in values {
-        if let ExprKind::Call { func, args, .. } = &value.node {
-            if matches!(&func.node, ExprKind::Name { id, .. } if id == "isinstance") {
-                if let [obj, types] = &args[..] {
-                    let (num_calls, matches) = obj_to_types
-                        .entry(obj.to_string())
-                        .or_insert_with(|| (0, FxHashSet::default()));
-
-                    *num_calls += 1;
-                    matches.extend(match &types.node {
-                        ExprKind::Tuple { elts, .. } => {
-                            elts.iter().map(std::string::ToString::to_string).collect()
-                        }
-                        _ => {
-                            vec![types.to_string()]
-                        }
-                    });
-                }
-            }
+        let ExprKind::Call { func, args, .. } = &value.node else {
+            continue;
+        };
+        if !matches!(&func.node, ExprKind::Name { id, .. } if id == "isinstance") {
+            continue;
         }
+        let [obj, types] = &args[..] else {
+            continue;
+        };
+        let (num_calls, matches) = obj_to_types
+            .entry(obj.to_string())
+            .or_insert_with(|| (0, FxHashSet::default()));
+
+        *num_calls += 1;
+        matches.extend(match &types.node {
+            ExprKind::Tuple { elts, .. } => {
+                elts.iter().map(std::string::ToString::to_string).collect()
+            }
+            _ => {
+                vec![types.to_string()]
+            }
+        });
     }
 
     for (obj, (num_calls, types)) in obj_to_types {
