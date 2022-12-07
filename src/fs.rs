@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -8,6 +7,7 @@ use anyhow::{anyhow, Result};
 use globset::GlobMatcher;
 use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
+use rustc_hash::FxHashSet;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::checks::CheckCode;
@@ -83,8 +83,8 @@ pub fn iter_python_files<'a>(
 /// Create tree set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path<'a>(
     path: &Path,
-    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)],
-) -> Result<BTreeSet<&'a CheckCode>> {
+    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)],
+) -> Result<FxHashSet<&'a CheckCode>> {
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
         .iter()
