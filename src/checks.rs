@@ -631,7 +631,7 @@ pub enum CheckKind {
     BuiltinArgumentShadowing(String),
     BuiltinAttributeShadowing(String),
     // flake8-blind-except
-    BlindExcept,
+    BlindExcept(String),
     // flake8-bugbear
     AbstractBaseClassWithoutAbstractMethod(String),
     AssignmentToOsEnviron,
@@ -1045,7 +1045,7 @@ impl CheckCode {
             CheckCode::YTT302 => CheckKind::SysVersionCmpStr10,
             CheckCode::YTT303 => CheckKind::SysVersionSlice1Referenced,
             // flake8-blind-except
-            CheckCode::BLE001 => CheckKind::BlindExcept,
+            CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // pyupgrade
             CheckCode::UP001 => CheckKind::UselessMetaclassType,
             CheckCode::UP003 => CheckKind::TypeOfPrimitive(Primitive::Str),
@@ -1529,7 +1529,7 @@ impl CheckKind {
             CheckKind::UselessContextlibSuppress => &CheckCode::B022,
             CheckKind::UselessExpression => &CheckCode::B018,
             // flake8-blind-except
-            CheckKind::BlindExcept => &CheckCode::BLE001,
+            CheckKind::BlindExcept(_) => &CheckCode::BLE001,
             // flake8-comprehensions
             CheckKind::UnnecessaryGeneratorList => &CheckCode::C400,
             CheckKind::UnnecessaryGeneratorSet => &CheckCode::C401,
@@ -2460,7 +2460,7 @@ impl CheckKind {
                 format!("Possible hardcoded password: `\"{string}\"`")
             }
             // flake8-blind-except
-            CheckKind::BlindExcept => "Blind except Exception: statement".to_string(),
+            CheckKind::BlindExcept(name) => format!("Do not catch blind exception: `{name}`"),
             // mccabe
             CheckKind::FunctionIsTooComplex(name, complexity) => {
                 format!("`{name}` is too complex ({complexity})")

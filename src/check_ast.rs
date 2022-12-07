@@ -1077,9 +1077,6 @@ where
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
                 }
-                if self.settings.enabled.contains(&CheckCode::BLE001) {
-                    flake8_blind_except::plugins::blind_except(self, handlers);
-                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
@@ -2347,16 +2344,25 @@ where
             ExcepthandlerKind::ExceptHandler {
                 type_, name, body, ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::E722) && type_.is_none() {
-                    self.add_check(Check::new(
-                        CheckKind::DoNotUseBareExcept,
+                if self.settings.enabled.contains(&CheckCode::E722) {
+                    if let Some(check) = pycodestyle::checks::do_not_use_bare_except(
+                        type_.as_deref(),
+                        body,
                         Range::from_located(excepthandler),
-                    ));
+                    ) {
+                        self.add_check(check);
+                    }
                 }
                 if self.settings.enabled.contains(&CheckCode::B904) {
-                    {
-                        flake8_bugbear::plugins::raise_without_from_inside_except(self, body);
-                    }
+                    flake8_bugbear::plugins::raise_without_from_inside_except(self, body);
+                }
+                if self.settings.enabled.contains(&CheckCode::BLE001) {
+                    flake8_blind_except::plugins::blind_except(
+                        self,
+                        type_.as_deref(),
+                        name.as_ref().map(String::as_str),
+                        body,
+                    );
                 }
                 match name {
                     Some(name) => {

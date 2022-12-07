@@ -631,7 +631,7 @@ For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| BLE001 | BlindExcept | Blind except Exception: statement |  |
+| BLE001 | BlindExcept | Do not catch blind exception: `Exception` |  |
 
 ### flake8-boolean-trap (FBT)
 

@@ -1,10 +1,64 @@
 use itertools::izip;
-use rustpython_ast::Location;
+use rustpython_ast::{Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
+
+/// E721
+pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+
+    for (op, right) in izip!(ops, comparators) {
+        if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
+            continue;
+        }
+        match &right.node {
+            ExprKind::Call { func, args, .. } => {
+                if let ExprKind::Name { id, .. } = &func.node {
+                    // Ex) type(False)
+                    if id == "type" {
+                        if let Some(arg) = args.first() {
+                            // Allow comparison for types which are not obvious.
+                            if !matches!(arg.node, ExprKind::Name { .. }) {
+                                checks.push(Check::new(CheckKind::TypeComparison, location));
+                            }
+                        }
+                    }
+                }
+            }
+            ExprKind::Attribute { value, .. } => {
+                if let ExprKind::Name { id, .. } = &value.node {
+                    // Ex) types.IntType
+                    if id == "types" {
+                        checks.push(Check::new(CheckKind::TypeComparison, location));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    checks
+}
+
+/// E722
+pub fn do_not_use_bare_except(
+    type_: Option<&Expr>,
+    body: &[Stmt],
+    location: Range,
+) -> Option<Check> {
+    if type_.is_none()
+        && !body
+            .iter()
+            .any(|stmt| matches!(stmt.node, StmtKind::Raise { exc: None, .. }))
+    {
+        Some(Check::new(CheckKind::DoNotUseBareExcept, location))
+    } else {
+        None
+    }
+}
 
 fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -44,43 +98,6 @@ pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
     } else {
         None
     }
-}
-
-/// E721
-pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
-
-    for (op, right) in izip!(ops, comparators) {
-        if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
-            continue;
-        }
-        match &right.node {
-            ExprKind::Call { func, args, .. } => {
-                if let ExprKind::Name { id, .. } = &func.node {
-                    // Ex) type(False)
-                    if id == "type" {
-                        if let Some(arg) = args.first() {
-                            // Allow comparison for types which are not obvious.
-                            if !matches!(arg.node, ExprKind::Name { .. }) {
-                                checks.push(Check::new(CheckKind::TypeComparison, location));
-                            }
-                        }
-                    }
-                }
-            }
-            ExprKind::Attribute { value, .. } => {
-                if let ExprKind::Name { id, .. } = &value.node {
-                    // Ex) types.IntType
-                    if id == "types" {
-                        checks.push(Check::new(CheckKind::TypeComparison, location));
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    checks
 }
 
 // See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
