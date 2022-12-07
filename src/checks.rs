@@ -392,7 +392,7 @@ impl CheckCategory {
             CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
             CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
             CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::I25],
-            CheckCategory::Isort => vec![CheckCodePrefix::I],
+            CheckCategory::Isort => vec![CheckCodePrefix::I00],
             CheckCategory::McCabe => vec![CheckCodePrefix::C90],
             CheckCategory::PEP8Naming => vec![CheckCodePrefix::N],
             CheckCategory::Pycodestyle => vec![CheckCodePrefix::E, CheckCodePrefix::W],

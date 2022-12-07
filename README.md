@@ -72,7 +72,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [Pyflakes (F)](#pyflakes-f)
    1. [pycodestyle (E, W)](#pycodestyle-e-w)
    1. [mccabe (C90)](#mccabe-c90)
-   1. [isort (I)](#isort-i)
+   1. [isort (I00)](#isort-i00)
    1. [pydocstyle (D)](#pydocstyle-d)
    1. [pyupgrade (UP)](#pyupgrade-up)
    1. [pep8-naming (N)](#pep8-naming-n)
@@ -476,7 +476,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
 | ---- | ---- | ------- | --- |
 | C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
 
-### isort (I)
+### isort (I00)
 
 For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
 
