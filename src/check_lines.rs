@@ -20,19 +20,18 @@ static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwra
 
 /// Whether the given line is too long and should be reported.
 fn should_enforce_line_length(line: &str, length: usize, limit: usize) -> bool {
-    if length > limit {
-        let mut chunks = line.split_whitespace();
-        if let (Some(first), Some(_)) = (chunks.next(), chunks.next()) {
-            // Do not enforce the line length for commented lines that end with a URL
-            // or contain only a single word.
-            !(first == "#" && chunks.last().map_or(true, |c| URL_REGEX.is_match(c)))
-        } else {
-            // Single word / no printable chars - no way to make the line shorter
-            false
-        }
-    } else {
-        false
+    if length <= limit {
+        return false;
     }
+    let mut chunks = line.split_whitespace();
+    let (Some(first), Some(_)) = (chunks.next(), chunks.next()) else {
+        // Single word / no printable chars - no way to make the line shorter
+        return false;
+    };
+
+    // Do not enforce the line length for commented lines that end with a URL
+    // or contain only a single word.
+    !(first == "#" && chunks.last().map_or(true, |c| URL_REGEX.is_match(c)))
 }
 
 pub fn check_lines(

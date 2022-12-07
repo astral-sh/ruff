@@ -12,23 +12,24 @@ pub fn property_with_parameters(
     decorator_list: &[Expr],
     args: &Arguments,
 ) {
-    if decorator_list
+    if !decorator_list
         .iter()
         .any(|d| matches!(&d.node, ExprKind::Name { id, .. } if id == "property"))
     {
-        if checker.is_builtin("property")
-            && args
-                .args
-                .iter()
-                .chain(args.posonlyargs.iter())
-                .chain(args.kwonlyargs.iter())
-                .count()
-                > 1
-        {
-            checker.add_check(Check::new(
-                CheckKind::PropertyWithParameters,
-                Range::from_located(stmt),
-            ));
-        }
+        return;
+    }
+    if checker.is_builtin("property")
+        && args
+            .args
+            .iter()
+            .chain(args.posonlyargs.iter())
+            .chain(args.kwonlyargs.iter())
+            .count()
+            > 1
+    {
+        checker.add_check(Check::new(
+            CheckKind::PropertyWithParameters,
+            Range::from_located(stmt),
+        ));
     }
 }

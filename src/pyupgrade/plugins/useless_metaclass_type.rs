@@ -8,31 +8,31 @@ use crate::pyupgrade::checks;
 
 /// UP001
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
-    if let Some(mut check) =
-        checks::useless_metaclass_type(targets, value, Range::from_located(stmt))
-    {
-        if checker.patch(check.kind.code()) {
-            let context = checker.binding_context();
-            let deleted: Vec<&Stmt> = checker
-                .deletions
-                .iter()
-                .map(|index| checker.parents[*index])
-                .collect();
+    let Some(mut check) =
+        checks::useless_metaclass_type(targets, value, Range::from_located(stmt)) else {
+            return;
+        };
+    if checker.patch(check.kind.code()) {
+        let context = checker.binding_context();
+        let deleted: Vec<&Stmt> = checker
+            .deletions
+            .iter()
+            .map(|index| checker.parents[*index])
+            .collect();
 
-            match helpers::remove_stmt(
-                checker.parents[context.defined_by],
-                context.defined_in.map(|index| checker.parents[index]),
-                &deleted,
-            ) {
-                Ok(fix) => {
-                    if fix.content.is_empty() || fix.content == "pass" {
-                        checker.deletions.insert(context.defined_by);
-                    }
-                    check.amend(fix);
+        match helpers::remove_stmt(
+            checker.parents[context.defined_by],
+            context.defined_in.map(|index| checker.parents[index]),
+            &deleted,
+        ) {
+            Ok(fix) => {
+                if fix.content.is_empty() || fix.content == "pass" {
+                    checker.deletions.insert(context.defined_by);
                 }
-                Err(e) => error!("Failed to fix remove metaclass type: {e}"),
+                check.amend(fix);
             }
+            Err(e) => error!("Failed to fix remove metaclass type: {e}"),
         }
-        checker.add_check(check);
     }
+    checker.add_check(check);
 }
