@@ -319,6 +319,7 @@ pub enum CheckCategory {
     Flake8Builtins,
     Flake8Comprehensions,
     Flake8Debugger,
+    Flake8ImportConventions,
     Flake8Print,
     Flake8Quotes,
     Flake8Return,
@@ -326,7 +327,6 @@ pub enum CheckCategory {
     Eradicate,
     PygrepHooks,
     Pylint,
-    ImportConventions,
     Ruff,
 }
 
@@ -357,6 +357,7 @@ impl CheckCategory {
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
             CheckCategory::Flake8Debugger => "flake8-debugger",
+            CheckCategory::Flake8ImportConventions => "flake8-import-conventions",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Flake8Return => "flake8-return",
@@ -370,7 +371,6 @@ impl CheckCategory {
             CheckCategory::PygrepHooks => "pygrep-hooks",
             CheckCategory::Pylint => "Pylint",
             CheckCategory::Pyupgrade => "pyupgrade",
-            CheckCategory::ImportConventions => "flake8-import-conventions",
             CheckCategory::Ruff => "Ruff-specific rules",
         }
     }
@@ -416,6 +416,7 @@ impl CheckCategory {
                 "https://pypi.org/project/flake8-debugger/4.1.2/",
                 &Platform::PyPI,
             )),
+            CheckCategory::Flake8ImportConventions => None,
             CheckCategory::Flake8Print => Some((
                 "https://pypi.org/project/flake8-print/5.0.0/",
                 &Platform::PyPI,
@@ -463,7 +464,6 @@ impl CheckCategory {
             CheckCategory::Pyupgrade => {
                 Some(("https://pypi.org/project/pyupgrade/3.2.0/", &Platform::PyPI))
             }
-            CheckCategory::ImportConventions => None,
             CheckCategory::Ruff => None,
         }
     }
@@ -1299,6 +1299,7 @@ impl CheckCode {
             CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
             CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
             CheckCode::I001 => CheckCategory::Isort,
+            CheckCode::ICN001 => CheckCategory::Flake8ImportConventions,
             CheckCode::I252 => CheckCategory::Flake8TidyImports,
             CheckCode::N801 => CheckCategory::PEP8Naming,
             CheckCode::N802 => CheckCategory::PEP8Naming,
@@ -1376,7 +1377,6 @@ impl CheckCode {
             CheckCode::YTT301 => CheckCategory::Flake82020,
             CheckCode::YTT302 => CheckCategory::Flake82020,
             CheckCode::YTT303 => CheckCategory::Flake82020,
-            CheckCode::ICN001 => CheckCategory::ImportConventions,
         }
     }
 }

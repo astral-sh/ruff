@@ -85,6 +85,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-builtins (A)](#flake8-builtins)
    1. [flake8-comprehensions (C4)](#flake8-comprehensions)
    1. [flake8-debugger (T10)](#flake8-debugger)
+   1. [flake8-import-conventions](#flake8-import-conventions)
    1. [flake8-print (T20)](#flake8-print)
    1. [flake8-quotes (Q)](#flake8-quotes)
    1. [flake8-return (RET)](#flake8-return)
@@ -718,6 +719,12 @@ For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/)
 | ---- | ---- | ------- | --- |
 | T100 | Debugger | Import for `...` found |  |
 
+### flake8-import-conventions
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ICN001 | ImportAliasIsNotConventional | `...` should be imported as `...` |  |
+
 ### flake8-print
 
 For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on PyPI.
@@ -792,12 +799,6 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLR1701 | ConsiderMergingIsinstance | Consider merging these isinstance calls: `isinstance(..., (...))` |  |
 | PLR1722 | ConsiderUsingSysExit | Consider using `sys.exit()` | 🛠 |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
-
-### flake8-import-conventions
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| ICN001 | ImportAliasIsNotConventional | `...` should be imported as `...` |  |
 
 ### Ruff-specific rules
 
@@ -1781,7 +1782,7 @@ The conventional aliases for imports. These aliases can be extended by the `exte
 
 **Default value**: `{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}`
 
-**Type**: `FxHashMap<String, String>`
+**Type**: `BTreeMap<String, String>`
 
 **Example usage**:
 
@@ -1803,7 +1804,7 @@ A mapping of modules to their conventional import aliases. These aliases will be
 
 **Default value**: `{}`
 
-**Type**: `FxHashMap<String, String>`
+**Type**: `BTreeMap<String, String>`
 
 **Example usage**:
 
