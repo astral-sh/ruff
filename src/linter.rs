@@ -92,6 +92,7 @@ pub(crate) fn check_path(
                         &directives.isort,
                         settings,
                         autofix,
+                        path,
                     ));
                 }
             }

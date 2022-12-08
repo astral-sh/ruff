@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use rustpython_ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
@@ -20,16 +22,18 @@ pub struct Block<'a> {
 }
 
 pub struct ImportTracker<'a> {
-    blocks: Vec<Block<'a>>,
     directives: &'a IsortDirectives,
+    pyi: bool,
+    blocks: Vec<Block<'a>>,
     split_index: usize,
     nested: bool,
 }
 
 impl<'a> ImportTracker<'a> {
-    pub fn new(directives: &'a IsortDirectives) -> Self {
+    pub fn new(directives: &'a IsortDirectives, path: &'a Path) -> Self {
         Self {
             directives,
+            pyi: path.extension().map_or(false, |ext| ext == "pyi"),
             blocks: vec![Block::default()],
             split_index: 0,
             nested: false,
@@ -39,6 +43,34 @@ impl<'a> ImportTracker<'a> {
     fn track_import(&mut self, stmt: &'a Stmt) {
         let index = self.blocks.len() - 1;
         self.blocks[index].imports.push(stmt);
+    }
+
+    fn trailer_for(&self, stmt: &'a Stmt) -> Option<Trailer> {
+        if self.pyi {
+            // Black treats interface files differently, limiting to one newline
+            // (`Trailing::Sibling`), and avoiding inserting any newlines in nested function
+            // blocks.
+            if self.nested
+                && matches!(
+                    stmt.node,
+                    StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. }
+                )
+            {
+                None
+            } else {
+                Some(Trailer::Sibling)
+            }
+        } else if self.nested {
+            Some(Trailer::Sibling)
+        } else {
+            Some(match &stmt.node {
+                StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                    Trailer::FunctionDef
+                }
+                StmtKind::ClassDef { .. } => Trailer::ClassDef,
+                _ => Trailer::Sibling,
+            })
+        }
     }
 
     fn finalize(&mut self, trailer: Option<Trailer>) {
@@ -62,17 +94,7 @@ where
         // Track manual splits.
         while self.split_index < self.directives.splits.len() {
             if stmt.location.row() >= self.directives.splits[self.split_index] {
-                self.finalize(Some(if self.nested {
-                    Trailer::Sibling
-                } else {
-                    match &stmt.node {
-                        StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                            Trailer::FunctionDef
-                        }
-                        StmtKind::ClassDef { .. } => Trailer::ClassDef,
-                        _ => Trailer::Sibling,
-                    }
-                }));
+                self.finalize(self.trailer_for(stmt));
                 self.split_index += 1;
             } else {
                 break;
@@ -87,17 +109,7 @@ where
         {
             self.track_import(stmt);
         } else {
-            self.finalize(Some(if self.nested {
-                Trailer::Sibling
-            } else {
-                match &stmt.node {
-                    StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                        Trailer::FunctionDef
-                    }
-                    StmtKind::ClassDef { .. } => Trailer::ClassDef,
-                    _ => Trailer::Sibling,
-                }
-            }));
+            self.finalize(self.trailer_for(stmt));
         }
 
         // Track scope.
