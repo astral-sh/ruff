@@ -1892,7 +1892,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.161"
+version = "0.0.168"
 dependencies = [
  "proc-macro2",
  "quote",
