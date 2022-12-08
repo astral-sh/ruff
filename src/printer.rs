@@ -9,7 +9,7 @@ use itertools::iterate;
 use rustpython_parser::ast::Location;
 use serde::Serialize;
 
-use crate::autofix::Fix;
+use crate::autofix::{fixer, Fix};
 use crate::checks::CheckCode;
 use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
@@ -57,15 +57,15 @@ impl<'a> Printer<'a> {
         }
     }
 
-    fn post_text(&self, num_fixable: usize) {
+    fn post_text(&self, num_fixable: usize, autofix: &fixer::Mode) {
         if self.log_level >= &LogLevel::Default {
-            if num_fixable > 0 {
+            if num_fixable > 0 && !matches!(autofix, fixer::Mode::Apply) {
                 println!("{num_fixable} potentially fixable with the --fix option.");
             }
         }
     }
 
-    pub fn write_once(&self, diagnostics: &Diagnostics) -> Result<()> {
+    pub fn write_once(&self, diagnostics: &Diagnostics, autofix: &fixer::Mode) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
                     print_message(message);
                 }
 
-                self.post_text(num_fixable);
+                self.post_text(num_fixable, autofix);
             }
             SerializationFormat::Grouped => {
                 self.pre_text(diagnostics);
@@ -190,7 +190,7 @@ impl<'a> Printer<'a> {
                     println!();
                 }
 
-                self.post_text(num_fixable);
+                self.post_text(num_fixable, autofix);
             }
             SerializationFormat::Github => {
                 self.pre_text(diagnostics);
