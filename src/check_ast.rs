@@ -39,6 +39,12 @@ use crate::{
     pyflakes, pygrep_hooks, pylint, pyupgrade,
 };
 
+use once_cell::sync::Lazy;
+use regex::Regex;
+
+static EXTRANEOUS_WHITESPACE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"[\[({][ \t]|[ \t][\]}),;:]").unwrap());
+
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
 type DeferralContext = (Vec<usize>, Vec<usize>);
@@ -197,6 +203,38 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         self.push_parent(stmt);
+
+        // some stuff for whitespace
+        if self.settings.enabled.contains(&CheckCode::E201) {
+            // need to put this inside above if statement
+            println!("checking whitespace");
+            let logical_line = self
+                .locator
+                .slice_source_code_range(&Range::from_located(stmt));
+            println!("logical line: {}", logical_line);
+
+            for regex_match in EXTRANEOUS_WHITESPACE_REGEX.find_iter(&logical_line) {
+                let text = regex_match.as_str();
+                let character = text.trim().chars().next().unwrap();
+                let found = regex_match.start();
+                println!("found position: {}", found + 1);
+
+                println!(
+                    "line bounds: row {}, column {}",
+                    stmt.location.row(),
+                    stmt.location.column()
+                );
+                println!("end location {:?}", stmt.end_location.unwrap());
+                println!("end location added {}", stmt.location.column() + found + 1);
+                if text.ends_with(' ') {
+                    // assert char in '([{'
+                    self.add_check(Check::new(
+                        CheckKind::WhiteSpaceAfter(character),
+                        Range::from_located(stmt),
+                    ))
+                }
+            }
+        }
 
         // Track whether we've seen docstrings, non-imports, etc.
         match &stmt.node {
