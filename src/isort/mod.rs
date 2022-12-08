@@ -559,6 +559,7 @@ mod tests {
     #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("insert_empty_lines.py"))]
+    #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
     #[test_case(Path::new("no_wrap_star.py"))]

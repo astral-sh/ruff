@@ -1,9 +1,10 @@
+use std::path::Path;
+
 use rustpython_ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
     Unaryop, Withitem,
 };
-use std::path::Path;
 
 use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
@@ -44,17 +45,31 @@ impl<'a> ImportTracker<'a> {
         self.blocks[index].imports.push(stmt);
     }
 
-    fn trailer_for(&self, stmt: &'a Stmt) -> Trailer {
-        if self.pyi || self.nested {
-            Trailer::Sibling
+    fn trailer_for(&self, stmt: &'a Stmt) -> Option<Trailer> {
+        if self.pyi {
+            // Black treats interface files differently, limiting to one newline
+            // (`Trailing::Sibling`), and avoiding inserting any newlines in nested function
+            // blocks.
+            if self.nested
+                && matches!(
+                    stmt.node,
+                    StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. }
+                )
+            {
+                None
+            } else {
+                Some(Trailer::Sibling)
+            }
+        } else if self.nested {
+            Some(Trailer::Sibling)
         } else {
-            match &stmt.node {
+            Some(match &stmt.node {
                 StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
                     Trailer::FunctionDef
                 }
                 StmtKind::ClassDef { .. } => Trailer::ClassDef,
                 _ => Trailer::Sibling,
-            }
+            })
         }
     }
 
@@ -79,7 +94,7 @@ where
         // Track manual splits.
         while self.split_index < self.directives.splits.len() {
             if stmt.location.row() >= self.directives.splits[self.split_index] {
-                self.finalize(Some(self.trailer_for(stmt)));
+                self.finalize(self.trailer_for(stmt));
                 self.split_index += 1;
             } else {
                 break;
@@ -94,7 +109,7 @@ where
         {
             self.track_import(stmt);
         } else {
-            self.finalize(Some(self.trailer_for(stmt)));
+            self.finalize(self.trailer_for(stmt));
         }
 
         // Track scope.

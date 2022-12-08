@@ -1,7 +1,8 @@
 //! Lint rules based on import analysis.
 
-use rustpython_parser::ast::Suite;
 use std::path::Path;
+
+use rustpython_parser::ast::Suite;
 
 use crate::ast::visitor::Visitor;
 use crate::checks::Check;
