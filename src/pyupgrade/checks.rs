@@ -101,7 +101,12 @@ pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -
 }
 
 /// UP004
-pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> Option<Check> {
+pub fn useless_object_inheritance(
+    name: &str,
+    bases: &[Expr],
+    scope: &Scope,
+    bindings: &[Binding],
+) -> Option<Check> {
     for expr in bases {
         let ExprKind::Name { id, .. } = &expr.node else {
             continue;
@@ -110,7 +115,10 @@ pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> 
             continue;
         }
         if !matches!(
-            scope.values.get(&id.as_str()),
+            scope
+                .values
+                .get(&id.as_str())
+                .map(|index| &bindings[*index]),
             None | Some(Binding {
                 kind: BindingKind::Builtin,
                 ..

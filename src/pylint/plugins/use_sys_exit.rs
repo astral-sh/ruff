@@ -9,8 +9,8 @@ use crate::checks::{Check, CheckKind};
 /// sys import *`).
 fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
     checker.current_scopes().any(|scope| {
-        scope.values.values().any(|binding| {
-            if let BindingKind::StarImportation(_, name) = &binding.kind {
+        scope.values.values().any(|index| {
+            if let BindingKind::StarImportation(_, name) = &checker.bindings[*index].kind {
                 name.as_ref().map(|name| name == module).unwrap_or_default()
             } else {
                 false
@@ -26,7 +26,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
         scope
             .values
             .values()
-            .find_map(|binding| match &binding.kind {
+            .find_map(|index| match &checker.bindings[*index].kind {
                 // e.g. module=sys object=exit
                 // `import sys`         -> `sys.exit`
                 // `import sys as sys2` -> `sys2.exit`

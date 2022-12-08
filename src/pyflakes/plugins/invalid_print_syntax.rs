@@ -1,6 +1,6 @@
 use rustpython_ast::{Expr, ExprKind};
 
-use crate::ast::types::{Binding, BindingKind, Range};
+use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
@@ -12,12 +12,7 @@ pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     if id != "print" {
         return;
     }
-    let scope = checker.current_scope();
-    let Some(Binding {
-        kind: BindingKind::Builtin,
-        ..
-    }) = scope.values.get("print") else
-    {
+    if !checker.is_builtin("print") {
         return;
     };
     checker.add_check(Check::new(

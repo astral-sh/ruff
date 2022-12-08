@@ -66,6 +66,7 @@ pub struct Checker<'a> {
     // at various points in time.
     pub(crate) parents: Vec<&'a Stmt>,
     pub(crate) parent_stack: Vec<usize>,
+    pub(crate) bindings: Vec<Binding>,
     scopes: Vec<Scope<'a>>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
@@ -110,6 +111,7 @@ impl<'a> Checker<'a> {
             import_aliases: FxHashMap::default(),
             parents: vec![],
             parent_stack: vec![],
+            bindings: vec![],
             scopes: vec![],
             scope_stack: vec![],
             dead_scopes: vec![],
@@ -188,8 +190,8 @@ impl<'a> Checker<'a> {
     pub fn is_builtin(&self, member: &str) -> bool {
         self.current_scopes()
             .find_map(|scope| scope.values.get(member))
-            .map_or(false, |binding| {
-                matches!(binding.kind, BindingKind::Builtin)
+            .map_or(false, |index| {
+                matches!(self.bindings[*index].kind, BindingKind::Builtin)
             })
     }
 }
@@ -242,23 +244,21 @@ where
                     let usage = Some((scope.id, Range::from_located(stmt)));
                     for name in names {
                         // Add a binding to the current scope.
-                        scope.values.insert(
-                            name,
-                            Binding {
-                                kind: BindingKind::Global,
-                                used: usage,
-                                range: Range::from_located(stmt),
-                            },
-                        );
+                        let index = self.bindings.len();
+                        self.bindings.push(Binding {
+                            kind: BindingKind::Global,
+                            used: usage,
+                            range: Range::from_located(stmt),
+                        });
+                        scope.values.insert(name, index);
                     }
 
                     // Mark the binding in the global scope as used.
                     for name in names {
-                        if let Some(mut existing) = self.scopes[GLOBAL_SCOPE_INDEX]
-                            .values
-                            .get_mut(&name.as_str())
+                        if let Some(index) =
+                            self.scopes[GLOBAL_SCOPE_INDEX].values.get(&name.as_str())
                         {
-                            existing.used = usage;
+                            self.bindings[*index].used = usage;
                         }
                     }
                 }
@@ -282,24 +282,21 @@ where
                     let usage = Some((scope.id, Range::from_located(stmt)));
                     for name in names {
                         // Add a binding to the current scope.
-                        scope.values.insert(
-                            name,
-                            Binding {
-                                kind: BindingKind::Global,
-                                used: usage,
-                                range: Range::from_located(stmt),
-                            },
-                        );
+                        let index = self.bindings.len();
+                        self.bindings.push(Binding {
+                            kind: BindingKind::Nonlocal,
+                            used: usage,
+                            range: Range::from_located(stmt),
+                        });
+                        scope.values.insert(name, index);
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
                     // and the current scope.)
                     for name in names {
                         for index in self.scope_stack.iter().skip(1).rev().skip(1) {
-                            if let Some(mut existing) =
-                                self.scopes[*index].values.get_mut(&name.as_str())
-                            {
-                                existing.used = usage;
+                            if let Some(index) = self.scopes[*index].values.get(&name.as_str()) {
+                                self.bindings[*index].used = usage;
                             }
                         }
                     }
@@ -2394,7 +2391,7 @@ where
                             );
                         }
 
-                        let definition = self.current_scope().values.get(&name.as_str()).cloned();
+                        let definition = self.current_scope().values.get(&name.as_str()).copied();
                         self.handle_node_store(
                             name,
                             &Expr::new(
@@ -2410,12 +2407,12 @@ where
 
                         walk_excepthandler(self, excepthandler);
 
-                        if let Some(binding) = {
+                        if let Some(index) = {
                             let scope = &mut self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found"))];
                             &scope.values.remove(&name.as_str())
                         } {
-                            if binding.used.is_none() {
+                            if self.bindings[*index].used.is_none() {
                                 if self.settings.enabled.contains(&CheckCode::F841) {
                                     self.add_check(Check::new(
                                         CheckKind::UnusedVariable(name.to_string()),
@@ -2425,10 +2422,10 @@ where
                             }
                         }
 
-                        if let Some(binding) = definition {
+                        if let Some(index) = definition {
                             let scope = &mut self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found"))];
-                            scope.values.insert(name, binding);
+                            scope.values.insert(name, index);
                         }
                     }
                     None => walk_excepthandler(self, excepthandler),
@@ -2511,48 +2508,6 @@ where
     }
 }
 
-fn try_mark_used(scope: &mut Scope, scope_id: usize, id: &str, expr: &Expr) -> bool {
-    let alias = if let Some(binding) = scope.values.get_mut(id) {
-        // Mark the binding as used.
-        binding.used = Some((scope_id, Range::from_located(expr)));
-
-        // If the name of the sub-importation is the same as an alias of another
-        // importation and the alias is used, that sub-importation should be
-        // marked as used too.
-        //
-        // This handles code like:
-        //   import pyarrow as pa
-        //   import pyarrow.csv
-        //   print(pa.csv.read_csv("test.csv"))
-        if let BindingKind::Importation(name, full_name, _)
-        | BindingKind::FromImportation(name, full_name, _)
-        | BindingKind::SubmoduleImportation(name, full_name, _) = &binding.kind
-        {
-            let has_alias = full_name
-                .split('.')
-                .last()
-                .map(|segment| segment != name)
-                .unwrap_or_default();
-            if has_alias {
-                // Clone the alias. (We'll mutate it below.)
-                full_name.to_string()
-            } else {
-                return true;
-            }
-        } else {
-            return true;
-        }
-    } else {
-        return false;
-    };
-
-    // Mark the sub-importation as used.
-    if let Some(binding) = scope.values.get_mut(alias.as_str()) {
-        binding.used = Some((scope_id, Range::from_located(expr)));
-    }
-    true
-}
-
 impl<'a> Checker<'a> {
     fn push_parent(&mut self, parent: &'a Stmt) {
         self.parent_stack.push(self.parents.len());
@@ -2580,26 +2535,14 @@ impl<'a> Checker<'a> {
 
     fn bind_builtins(&mut self) {
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-
-        for builtin in BUILTINS {
-            scope.values.insert(
-                builtin,
-                Binding {
-                    kind: BindingKind::Builtin,
-                    range: Range::default(),
-                    used: None,
-                },
-            );
-        }
-        for builtin in MAGIC_GLOBALS {
-            scope.values.insert(
-                builtin,
-                Binding {
-                    kind: BindingKind::Builtin,
-                    range: Range::default(),
-                    used: None,
-                },
-            );
+        for builtin in BUILTINS.iter().chain(MAGIC_GLOBALS.iter()) {
+            let index = self.bindings.len();
+            self.bindings.push(Binding {
+                kind: BindingKind::Builtin,
+                range: Range::default(),
+                used: None,
+            });
+            scope.values.insert(builtin, index);
         }
     }
 
@@ -2631,7 +2574,8 @@ impl<'a> Checker<'a> {
     {
         if self.settings.enabled.contains(&CheckCode::F402) {
             let scope = self.current_scope();
-            if let Some(existing) = scope.values.get(&name) {
+            if let Some(index) = scope.values.get(&name) {
+                let existing = &self.bindings[*index];
                 if matches!(binding.kind, BindingKind::LoopVar)
                     && matches!(
                         existing.kind,
@@ -2658,15 +2602,18 @@ impl<'a> Checker<'a> {
         let scope = self.current_scope();
         let binding = match scope.values.get(&name) {
             None => binding,
-            Some(existing) => Binding {
+            Some(index) => Binding {
                 kind: binding.kind,
                 range: binding.range,
-                used: existing.used,
+                used: self.bindings[*index].used,
             },
         };
 
+        let index = self.bindings.len();
+        self.bindings.push(binding);
+
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-        scope.values.insert(name, binding);
+        scope.values.insert(name, index);
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
@@ -2677,7 +2624,7 @@ impl<'a> Checker<'a> {
             let mut in_generator = false;
             let mut import_starred = false;
             for scope_index in self.scope_stack.iter().rev() {
-                let scope = &mut self.scopes[*scope_index];
+                let scope = &self.scopes[*scope_index];
 
                 if matches!(scope.kind, ScopeKind::Class(_)) {
                     if id == "__class__" {
@@ -2687,7 +2634,37 @@ impl<'a> Checker<'a> {
                     }
                 }
 
-                if try_mark_used(scope, scope_id, id, expr) {
+                if let Some(index) = scope.values.get(&id.as_str()) {
+                    // Mark the binding as used.
+                    self.bindings[*index].used = Some((scope_id, Range::from_located(expr)));
+
+                    // If the name of the sub-importation is the same as an alias of another
+                    // importation and the alias is used, that sub-importation should be
+                    // marked as used too.
+                    //
+                    // This handles code like:
+                    //   import pyarrow as pa
+                    //   import pyarrow.csv
+                    //   print(pa.csv.read_csv("test.csv"))
+                    if let BindingKind::Importation(name, full_name, _)
+                    | BindingKind::FromImportation(name, full_name, _)
+                    | BindingKind::SubmoduleImportation(name, full_name, _) =
+                        &self.bindings[*index].kind
+                    {
+                        let has_alias = full_name
+                            .split('.')
+                            .last()
+                            .map(|segment| segment != name)
+                            .unwrap_or_default();
+                        if has_alias {
+                            // Mark the sub-importation as used.
+                            if let Some(index) = scope.values.get(full_name.as_str()) {
+                                self.bindings[*index].used =
+                                    Some((scope_id, Range::from_located(expr)));
+                            }
+                        }
+                    }
+
                     return;
                 }
 
@@ -2701,7 +2678,7 @@ impl<'a> Checker<'a> {
                     let mut from_list = vec![];
                     for scope_index in self.scope_stack.iter().rev() {
                         let scope = &self.scopes[*scope_index];
-                        for binding in scope.values.values() {
+                        for binding in scope.values.values().map(|index| &self.bindings[*index]) {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
@@ -2754,7 +2731,7 @@ impl<'a> Checker<'a> {
                 .iter()
                 .map(|index| &self.scopes[*index])
                 .collect();
-            if let Some(check) = pyflakes::checks::undefined_local(&scopes, id) {
+            if let Some(check) = pyflakes::checks::undefined_local(id, &scopes, &self.bindings) {
                 self.add_check(check);
             }
         }
@@ -2762,12 +2739,9 @@ impl<'a> Checker<'a> {
         if self.settings.enabled.contains(&CheckCode::N806) {
             if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
                 // Ignore globals.
-                if !self
-                    .current_scope()
-                    .values
-                    .get(id)
-                    .map_or(false, |binding| matches!(binding.kind, BindingKind::Global))
-                {
+                if !self.current_scope().values.get(id).map_or(false, |index| {
+                    matches!(self.bindings[*index].kind, BindingKind::Global)
+                }) {
                     pep8_naming::plugins::non_lowercase_variable_in_function(
                         self, expr, parent, id,
                     );
@@ -2838,7 +2812,7 @@ impl<'a> Checker<'a> {
             self.add_binding(
                 id,
                 Binding {
-                    kind: BindingKind::Export(extract_all_names(parent, current)),
+                    kind: BindingKind::Export(extract_all_names(parent, current, &self.bindings)),
                     used: None,
                     range: Range::from_located(expr),
                 },
@@ -3027,6 +3001,7 @@ impl<'a> Checker<'a> {
                 self.add_checks(
                     pyflakes::checks::unused_variables(
                         &self.scopes[index],
+                        &self.bindings,
                         &self.settings.dummy_variable_rgx,
                     )
                     .into_iter(),
@@ -3045,6 +3020,7 @@ impl<'a> Checker<'a> {
                             .last()
                             .expect("Expected parent scope above function scope")],
                         &self.scopes[index],
+                        &self.bindings,
                     )
                     .into_iter(),
                 );
@@ -3062,7 +3038,10 @@ impl<'a> Checker<'a> {
 
         let mut checks: Vec<Check> = vec![];
         for scope in self.dead_scopes.iter().map(|index| &self.scopes[*index]) {
-            let all_binding: Option<&Binding> = scope.values.get("__all__");
+            let all_binding: Option<&Binding> = scope
+                .values
+                .get("__all__")
+                .map(|index| &self.bindings[*index]);
             let all_names: Option<Vec<&str>> =
                 all_binding.and_then(|binding| match &binding.kind {
                     BindingKind::Export(names) => Some(names.iter().map(String::as_str).collect()),
@@ -3091,7 +3070,8 @@ impl<'a> Checker<'a> {
                     if let Some(all_binding) = all_binding {
                         if let Some(names) = &all_names {
                             let mut from_list = vec![];
-                            for binding in scope.values.values() {
+                            for binding in scope.values.values().map(|index| &self.bindings[*index])
+                            {
                                 if let BindingKind::StarImportation(level, module) = &binding.kind {
                                     from_list.push(helpers::format_import_from(
                                         level.as_ref(),
@@ -3125,7 +3105,8 @@ impl<'a> Checker<'a> {
                 let mut unused: BTreeMap<(usize, Option<usize>), Vec<UnusedImport>> =
                     BTreeMap::new();
 
-                for (name, binding) in &scope.values {
+                for (name, index) in &scope.values {
+                    let binding = &self.bindings[*index];
                     let (BindingKind::Importation(_, full_name, context)
                     | BindingKind::SubmoduleImportation(_, full_name, context)
                     | BindingKind::FromImportation(_, full_name, context)) = &binding.kind else { continue; };

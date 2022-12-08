@@ -3,10 +3,10 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
-use crate::ast::types::{BindingKind, Scope};
+use crate::ast::types::{Binding, BindingKind, Scope};
 
 /// Extract the names bound to a given __all__ assignment.
-pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
+pub fn extract_all_names(stmt: &Stmt, scope: &Scope, bindings: &[Binding]) -> Vec<String> {
     fn add_to_names(names: &mut Vec<String>, elts: &[Expr]) {
         for elt in elts {
             if let ExprKind::Constant {
@@ -23,8 +23,8 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope) -> Vec<String> {
 
     // Grab the existing bound __all__ values.
     if let StmtKind::AugAssign { .. } = &stmt.node {
-        if let Some(binding) = scope.values.get("__all__") {
-            if let BindingKind::Export(existing) = &binding.kind {
+        if let Some(index) = scope.values.get("__all__") {
+            if let BindingKind::Export(existing) = &bindings[*index].kind {
                 names.extend_from_slice(existing);
             }
         }
