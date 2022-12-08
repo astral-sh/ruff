@@ -1829,6 +1829,9 @@ impl CheckKind {
             CheckKind::InvalidEscapeSequence(char) => {
                 format!("Invalid escape sequence: '\\{char}'")
             }
+            CheckKind::WhiteSpaceAfter(char) => {
+                format!("Whitespace after '{char}'")
+            }
             // pylint
             CheckKind::UselessImportAlias => {
                 "Import alias does not rename original package".to_string()
