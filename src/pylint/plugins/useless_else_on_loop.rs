@@ -7,7 +7,7 @@ use crate::Check;
 
 fn loop_exits_early(body: &[Stmt]) -> bool {
     body.iter().any(|stmt| match &stmt.node {
-        StmtKind::If { body, .. } => loop_exits_early(body),
+        StmtKind::If { body, orelse, .. } => loop_exits_early(body) || loop_exits_early(orelse),
         StmtKind::Try {
             body,
             handlers,
@@ -16,11 +16,11 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
             ..
         } => {
             loop_exits_early(body)
+                || loop_exits_early(orelse)
+                || loop_exits_early(finalbody)
                 || handlers.iter().any(|handler| match &handler.node {
                     ExcepthandlerKind::ExceptHandler { body, .. } => loop_exits_early(body),
                 })
-                || loop_exits_early(orelse)
-                || loop_exits_early(finalbody)
         }
         StmtKind::For { orelse, .. }
         | StmtKind::AsyncFor { orelse, .. }
