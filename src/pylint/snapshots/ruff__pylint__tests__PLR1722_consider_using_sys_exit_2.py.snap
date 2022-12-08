@@ -2,7 +2,8 @@
 source: src/pylint/mod.rs
 expression: checks
 ---
-- kind: ConsiderUsingSysExit
+- kind:
+    UseSysExit: exit
   location:
     row: 3
     column: 0
@@ -17,7 +18,8 @@ expression: checks
     end_location:
       row: 3
       column: 4
-- kind: ConsiderUsingSysExit
+- kind:
+    UseSysExit: quit
   location:
     row: 4
     column: 0
@@ -32,7 +34,8 @@ expression: checks
     end_location:
       row: 4
       column: 4
-- kind: ConsiderUsingSysExit
+- kind:
+    UseSysExit: exit
   location:
     row: 8
     column: 4
@@ -47,7 +50,8 @@ expression: checks
     end_location:
       row: 8
       column: 8
-- kind: ConsiderUsingSysExit
+- kind:
+    UseSysExit: quit
   location:
     row: 9
     column: 4
