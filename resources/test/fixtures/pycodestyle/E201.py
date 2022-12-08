@@ -21,3 +21,7 @@ fun( 1, 3)
 
 my_dict = {'key': 'value'}
 my_dict2 = { 'key': 'value' }
+# trailing whitespace after '{' below
+my_dict3 = { 
+    'key': 'value'
+}
