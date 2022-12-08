@@ -117,7 +117,8 @@ pub struct Binding<'a> {
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used.
     pub used: Option<(usize, Range)>,
-    pub redefined: Vec<RefEquality<'a, Stmt>>,
+    /// A list of pointers to `Binding` instances that redefined this binding.
+    pub redefined: Vec<usize>,
 }
 
 // Pyflakes defines the following binding hierarchy (via inheritance):
@@ -153,7 +154,6 @@ impl<'a> Binding<'a> {
     }
 
     pub fn redefines(&self, existing: &'a Binding) -> bool {
-        println!("redefines: {:?} vs {:?}", self, existing);
         match &self.kind {
             BindingKind::Importation(_, full_name) | BindingKind::FromImportation(_, full_name) => {
                 if let BindingKind::SubmoduleImportation(_, existing_full_name) = &existing.kind {

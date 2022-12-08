@@ -2584,6 +2584,8 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
+        let index = self.bindings.len();
+
         if let Some((stack_index, scope_index)) = self
             .scope_stack
             .iter()
@@ -2591,11 +2593,8 @@ impl<'a> Checker<'a> {
             .enumerate()
             .find(|(_, scope_index)| self.scopes[**scope_index].values.contains_key(&name))
         {
-            let existing = self.scopes[*scope_index]
-                .values
-                .get(&name)
-                .map(|index| &self.bindings[*index])
-                .unwrap();
+            let existing_index = self.scopes[*scope_index].values.get(&name).unwrap();
+            let existing = &self.bindings[*existing_index];
             let in_current_scope = stack_index == 0;
             if !matches!(existing.kind, BindingKind::Builtin)
                 && existing.source.as_ref().map_or(true, |left| {
@@ -2648,28 +2647,22 @@ impl<'a> Checker<'a> {
                         }
                     }
                 } else if existing_is_import && binding.redefines(existing) {
-                    if let Some(source) = binding.source.clone() {
-                        let existing = self.scopes[*scope_index].values.get_mut(&name).unwrap();
-                        existing.redefined.push(source);
-                    }
+                    self.bindings[*existing_index].redefined.push(index);
                 }
             }
         }
 
-        // STOPSHIP(charlie): What do we need this for?
-        // // TODO(charlie): Don't treat annotations as assignments if there is an existing
-        // // value.
-        // let scope = self.current_scope();
-        // let binding = match scope.values.get(&name) {
-        //     None => binding,
-        //     Some(index) => Binding {
-        //         kind: binding.kind,
-        //         range: binding.range,
-        //         used: self.bindings[*index].used,
-        //     },
-        // };
+        // TODO(charlie): Don't treat annotations as assignments if there is an existing
+        // value.
+        let scope = self.current_scope();
+        let binding = match scope.values.get(&name) {
+            None => binding,
+            Some(index) => Binding {
+                used: self.bindings[*index].used,
+                ..binding
+            },
+        };
 
-        let index = self.bindings.len();
         self.bindings.push(binding);
 
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
@@ -3141,7 +3134,9 @@ impl<'a> Checker<'a> {
             }
 
             if self.settings.enabled.contains(&CheckCode::F811) {
-                for (name, binding) in &scope.values {
+                for (name, index) in &scope.values {
+                    let binding = &self.bindings[*index];
+
                     if matches!(
                         binding.kind,
                         BindingKind::Importation(..)
@@ -3160,13 +3155,13 @@ impl<'a> Checker<'a> {
                             continue;
                         }
 
-                        for node in &binding.redefined {
+                        for index in &binding.redefined {
                             checks.push(Check::new(
                                 CheckKind::RedefinedWhileUnused(
-                                    name.to_string(),
+                                    (*name).to_string(),
                                     binding.range.location.row(),
                                 ),
-                                Range::from_located(node.0),
+                                self.bindings[*index].range,
                             ));
                         }
                     }
@@ -3216,6 +3211,7 @@ impl<'a> Checker<'a> {
 
                 for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
+
                     let (BindingKind::Importation(_, full_name)
                     | BindingKind::SubmoduleImportation(_, full_name)
                     | BindingKind::FromImportation(_, full_name)) = &binding.kind else { continue; };

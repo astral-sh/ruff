@@ -84,7 +84,8 @@ fn descendant_of<'a>(
     })
 }
 
-/// Return `true` if `left` and `right` are on different branches of an `if` or `try` statement.
+/// Return `true` if `left` and `right` are on different branches of an `if` or
+/// `try` statement.
 pub fn different_forks<'a>(
     left: &RefEquality<'a, Stmt>,
     right: &RefEquality<'a, Stmt>,

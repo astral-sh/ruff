@@ -135,7 +135,6 @@ fn tokenize_files_to_codes_mapping(value: &str) -> Vec<Token> {
 }
 
 /// Parse a 'files-to-codes' mapping, mimicking Flake8's internal logic.
-///
 /// See: <https://github.com/PyCQA/flake8/blob/7dfe99616fc2f07c0017df2ba5fa884158f3ea8a/src/flake8/utils.py#L45>
 pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair>> {
     if value.trim().is_empty() {
