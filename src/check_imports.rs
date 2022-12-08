@@ -1,6 +1,7 @@
 //! Lint rules based on import analysis.
 
 use rustpython_parser::ast::Suite;
+use std::path::Path;
 
 use crate::ast::visitor::Visitor;
 use crate::checks::Check;
@@ -33,8 +34,9 @@ pub fn check_imports(
     directives: &IsortDirectives,
     settings: &Settings,
     autofix: bool,
+    path: &Path,
 ) -> Vec<Check> {
-    let mut tracker = ImportTracker::new(directives);
+    let mut tracker = ImportTracker::new(directives, path);
     for stmt in python_ast {
         tracker.visit_stmt(stmt);
     }
