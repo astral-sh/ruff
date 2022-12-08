@@ -6,7 +6,7 @@ use crate::checks::CheckKind;
 use crate::Check;
 
 /// PLR0402
-pub fn consider_using_from_import(checker: &mut Checker, alias: &Alias) {
+pub fn use_from_import(checker: &mut Checker, alias: &Alias) {
     let Some(asname) = &alias.node.asname else {
         return;
     };

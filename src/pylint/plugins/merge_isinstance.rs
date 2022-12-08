@@ -8,12 +8,7 @@ use crate::checks::CheckKind;
 use crate::Check;
 
 /// PLR1701
-pub fn consider_merging_isinstance(
-    checker: &mut Checker,
-    expr: &Expr,
-    op: &Boolop,
-    values: &[Expr],
-) {
+pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values: &[Expr]) {
     if !matches!(op, Boolop::Or) || !checker.is_builtin("isinstance") {
         return;
     }

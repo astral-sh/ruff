@@ -808,9 +808,9 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
 | PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
-| PLR0402 | ConsiderUsingFromImport | Consider using `from ... import ...` |  |
-| PLR1701 | ConsiderMergingIsinstance | Consider merging these isinstance calls: `isinstance(..., (...))` |  |
-| PLR1722 | ConsiderUsingSysExit | Consider using `sys.exit()` | 🛠 |
+| PLR0402 | ConsiderUsingFromImport | Use `from ... import ...` in lieu of alias |  |
+| PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance(..., (...))` |  |
+| PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 
 ### Ruff-specific rules (RUF)

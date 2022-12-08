@@ -673,7 +673,7 @@ where
                         pylint::plugins::useless_import_alias(self, alias);
                     }
                     if self.settings.enabled.contains(&CheckCode::PLR0402) {
-                        pylint::plugins::consider_using_from_import(self, alias);
+                        pylint::plugins::use_from_import(self, alias);
                     }
 
                     if let Some(asname) = &alias.node.asname {
@@ -1773,7 +1773,7 @@ where
                     pylint::plugins::unnecessary_direct_lambda_call(self, expr, func);
                 }
                 if self.settings.enabled.contains(&CheckCode::PLR1722) {
-                    pylint::plugins::consider_using_sys_exit(self, func);
+                    pylint::plugins::use_sys_exit(self, func);
                 }
             }
             ExprKind::Dict { keys, .. } => {
@@ -2129,7 +2129,7 @@ where
             }
             ExprKind::BoolOp { op, values } => {
                 if self.settings.enabled.contains(&CheckCode::PLR1701) {
-                    pylint::plugins::consider_merging_isinstance(self, expr, op, values);
+                    pylint::plugins::merge_isinstance(self, expr, op, values);
                 }
             }
             _ => {}

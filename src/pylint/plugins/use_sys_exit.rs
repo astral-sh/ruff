@@ -60,7 +60,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
 }
 
 /// RUF004
-pub fn consider_using_sys_exit(checker: &mut Checker, func: &Expr) {
+pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
     };
@@ -74,7 +74,10 @@ pub fn consider_using_sys_exit(checker: &mut Checker, func: &Expr) {
         if !checker.is_builtin(name) {
             continue;
         }
-        let mut check = Check::new(CheckKind::ConsiderUsingSysExit, Range::from_located(func));
+        let mut check = Check::new(
+            CheckKind::UseSysExit(name.to_string()),
+            Range::from_located(func),
+        );
         if checker.patch(check.kind.code()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {
                 check.amend(Fix::replacement(

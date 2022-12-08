@@ -638,7 +638,7 @@ pub enum CheckKind {
     ConsiderUsingFromImport(String, String),
     AwaitOutsideAsync,
     UselessElseOnLoop,
-    ConsiderUsingSysExit,
+    UseSysExit(String),
     // flake8-builtins
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
@@ -950,7 +950,7 @@ impl CheckCode {
             CheckCode::PLR1701 => {
                 CheckKind::ConsiderMergingIsinstance("...".to_string(), vec!["...".to_string()])
             }
-            CheckCode::PLR1722 => CheckKind::ConsiderUsingSysExit,
+            CheckCode::PLR1722 => CheckKind::UseSysExit("exit".to_string()),
             CheckCode::PLW0120 => CheckKind::UselessElseOnLoop,
             // flake8-builtins
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
@@ -1523,7 +1523,7 @@ impl CheckKind {
             CheckKind::ConsiderMergingIsinstance(..) => &CheckCode::PLR1701,
             CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::ConsiderUsingFromImport(..) => &CheckCode::PLR0402,
-            CheckKind::ConsiderUsingSysExit => &CheckCode::PLR1722,
+            CheckKind::UseSysExit(_) => &CheckCode::PLR1722,
             CheckKind::UselessElseOnLoop => &CheckCode::PLW0120,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
@@ -1921,7 +1921,7 @@ impl CheckKind {
             }
             CheckKind::ConsiderMergingIsinstance(obj, types) => {
                 let types = types.join(", ");
-                format!("Consider merging these isinstance calls: `isinstance({obj}, ({types}))`")
+                format!("Merge these isinstance calls: `isinstance({obj}, ({types}))`")
             }
             CheckKind::MisplacedComparisonConstant(comprison) => {
                 format!("Comparison should be {comprison}")
@@ -1933,7 +1933,7 @@ impl CheckKind {
                 "Cannot have defined parameters for properties".to_string()
             }
             CheckKind::ConsiderUsingFromImport(module, name) => {
-                format!("Consider using `from {module} import {name}`")
+                format!("Use `from {module} import {name}` in lieu of alias")
             }
             CheckKind::AwaitOutsideAsync => {
                 "`await` should be used within an async function".to_string()
@@ -1941,7 +1941,7 @@ impl CheckKind {
             CheckKind::UselessElseOnLoop => "Else clause on loop without a break statement, \
                                              remove the else and de-indent all the code inside it"
                 .to_string(),
-            CheckKind::ConsiderUsingSysExit => "Consider using `sys.exit()`".to_string(),
+            CheckKind::UseSysExit(name) => format!("Use `sys.exit()` instead of `{name}`"),
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(name) => {
                 format!("Variable `{name}` is shadowing a python builtin")
@@ -2599,7 +2599,6 @@ impl CheckKind {
                 | CheckKind::BlankLineBeforeSection(..)
                 | CheckKind::CapitalizeSectionName(..)
                 | CheckKind::CommentedOutCode
-                | CheckKind::ConsiderUsingSysExit
                 | CheckKind::ConvertNamedTupleFunctionalToClass(..)
                 | CheckKind::ConvertTypedDictFunctionalToClass(..)
                 | CheckKind::DashedUnderlineAfterSection(..)
@@ -2665,6 +2664,7 @@ impl CheckKind {
                 | CheckKind::UnusedNOQA(..)
                 | CheckKind::UsePEP585Annotation(..)
                 | CheckKind::UsePEP604Annotation
+                | CheckKind::UseSysExit(..)
                 | CheckKind::UselessImportAlias
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(..)
