@@ -392,7 +392,7 @@ fn inner_main() -> Result<ExitCode> {
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, fixer::Mode::Apply)) {
-            printer.write_once(&diagnostics)?;
+            printer.write_once(&diagnostics, &autofix)?;
         }
 
         // Check for updates if we're in a non-silent log level.
