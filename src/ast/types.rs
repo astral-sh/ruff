@@ -73,7 +73,7 @@ pub struct Scope<'a> {
     pub kind: ScopeKind<'a>,
     pub import_starred: bool,
     pub uses_locals: bool,
-    pub values: FxHashMap<&'a str, Binding>,
+    pub values: FxHashMap<&'a str, usize>,
 }
 
 impl<'a> Scope<'a> {

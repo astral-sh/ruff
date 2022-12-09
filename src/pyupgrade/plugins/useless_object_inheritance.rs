@@ -12,8 +12,7 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let scope = checker.current_scope();
-    let Some(mut check) = checks::useless_object_inheritance(name, bases, scope) else {
+    let Some(mut check) = checks::useless_object_inheritance(name, bases, checker.current_scope(), &checker.bindings) else {
         return;
     };
     if checker.patch(check.kind.code()) {
