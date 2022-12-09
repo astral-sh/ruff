@@ -554,12 +554,13 @@ pub fn starred_expressions(
 }
 
 /// F701
-pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]) -> Option<Check> {
+pub fn break_outside_loop<'a>(
+    stmt: &'a Stmt,
+    parents: &mut impl Iterator<Item = &'a Stmt>,
+) -> Option<Check> {
     let mut allowed: bool = false;
-    let mut parent = stmt;
-    for index in parent_stack.iter().rev() {
-        let child = parent;
-        parent = parents[*index];
+    let mut child = stmt;
+    for parent in parents {
         match &parent.node {
             StmtKind::For { orelse, .. }
             | StmtKind::AsyncFor { orelse, .. }
@@ -569,7 +570,6 @@ pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]
                     break;
                 }
             }
-
             StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }
             | StmtKind::ClassDef { .. } => {
@@ -577,6 +577,7 @@ pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]
             }
             _ => {}
         }
+        child = parent;
     }
 
     if allowed {
@@ -590,16 +591,13 @@ pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]
 }
 
 /// F702
-pub fn continue_outside_loop(
-    stmt: &Stmt,
-    parents: &[&Stmt],
-    parent_stack: &[usize],
+pub fn continue_outside_loop<'a>(
+    stmt: &'a Stmt,
+    parents: &mut impl Iterator<Item = &'a Stmt>,
 ) -> Option<Check> {
     let mut allowed: bool = false;
-    let mut parent = stmt;
-    for index in parent_stack.iter().rev() {
-        let child = parent;
-        parent = parents[*index];
+    let mut child = stmt;
+    for parent in parents {
         match &parent.node {
             StmtKind::For { orelse, .. }
             | StmtKind::AsyncFor { orelse, .. }
@@ -609,7 +607,6 @@ pub fn continue_outside_loop(
                     break;
                 }
             }
-
             StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }
             | StmtKind::ClassDef { .. } => {
@@ -617,6 +614,7 @@ pub fn continue_outside_loop(
             }
             _ => {}
         }
+        child = parent;
     }
 
     if allowed {

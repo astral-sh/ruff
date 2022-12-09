@@ -948,7 +948,7 @@ automatically convert your existing configuration.)
 Ruff can be used as a drop-in replacement for Flake8 when used (1) without or with a small number of
 plugins, (2) alongside Black, and (3) on Python 3 code.
 
-Under those conditions, Ruff implements every rule in Flake8, with the exception of `F811`.
+Under those conditions, Ruff implements every rule in Flake8.
 
 Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
 natively, including:

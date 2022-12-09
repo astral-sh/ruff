@@ -1,6 +1,5 @@
 //! Lint rules based on AST traversal.
 
-use std::collections::BTreeMap;
 use std::path::Path;
 
 use log::error;
@@ -17,11 +16,10 @@ use crate::ast::helpers::{
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingContext, BindingKind, ClassDef, FunctionDef, Lambda, Node, Range, Scope,
-    ScopeKind,
+    Binding, BindingKind, ClassDef, FunctionDef, Lambda, Node, Range, RefEquality, Scope, ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
-use crate::ast::{helpers, operations, visitor};
+use crate::ast::{branch_detection, cast, helpers, operations, visitor};
 use crate::checks::{Check, CheckCode, CheckKind, DeferralKeyword};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -38,12 +36,12 @@ use crate::{
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
     flake8_import_conventions, flake8_print, flake8_return, flake8_tidy_imports,
     flake8_unused_arguments, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks,
-    pylint, pyupgrade,
+    pylint, pyupgrade, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
-type DeferralContext = (Vec<usize>, Vec<usize>);
+type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
@@ -58,23 +56,24 @@ pub struct Checker<'a> {
     definitions: Vec<(Definition<'a>, Visibility)>,
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
-    pub(crate) deletions: FxHashSet<usize>,
+    pub(crate) deletions: FxHashSet<RefEquality<'a, Stmt>>,
     // Import tracking.
     pub(crate) from_imports: FxHashMap<&'a str, FxHashSet<&'a str>>,
     pub(crate) import_aliases: FxHashMap<&'a str, &'a str>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
     // at various points in time.
-    pub(crate) parents: Vec<&'a Stmt>,
-    pub(crate) parent_stack: Vec<usize>,
-    pub(crate) bindings: Vec<Binding>,
+    pub(crate) parents: Vec<RefEquality<'a, Stmt>>,
+    pub(crate) depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
+    pub(crate) child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
+    pub(crate) bindings: Vec<Binding<'a>>,
     scopes: Vec<Scope<'a>>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
-    deferred_string_type_definitions: Vec<(Range, &'a str, bool, DeferralContext)>,
-    deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext)>,
-    deferred_functions: Vec<(&'a Stmt, DeferralContext, VisibleScope)>,
-    deferred_lambdas: Vec<(&'a Expr, DeferralContext)>,
-    deferred_assignments: Vec<(usize, DeferralContext)>,
+    deferred_string_type_definitions: Vec<(Range, &'a str, bool, DeferralContext<'a>)>,
+    deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext<'a>)>,
+    deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
+    deferred_lambdas: Vec<(&'a Expr, DeferralContext<'a>)>,
+    deferred_assignments: Vec<(usize, DeferralContext<'a>)>,
     // Internal, derivative state.
     visible_scope: VisibleScope,
     in_f_string: Option<Range>,
@@ -110,7 +109,8 @@ impl<'a> Checker<'a> {
             from_imports: FxHashMap::default(),
             import_aliases: FxHashMap::default(),
             parents: vec![],
-            parent_stack: vec![],
+            depths: FxHashMap::default(),
+            child_to_parent: FxHashMap::default(),
             bindings: vec![],
             scopes: vec![],
             scope_stack: vec![],
@@ -223,11 +223,7 @@ where
                 if !self.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(node)
                     && !operations::in_nested_block(
-                        &mut self
-                            .parent_stack
-                            .iter()
-                            .rev()
-                            .map(|index| self.parents[*index]),
+                        &mut self.parents.iter().rev().map(|node| node.0),
                     )
                 {
                     self.seen_import_boundary = true;
@@ -249,6 +245,8 @@ where
                             kind: BindingKind::Global,
                             used: usage,
                             range: Range::from_located(stmt),
+                            source: None,
+                            redefined: vec![],
                         });
                         scope.values.insert(name, index);
                     }
@@ -287,6 +285,8 @@ where
                             kind: BindingKind::Nonlocal,
                             used: usage,
                             range: Range::from_located(stmt),
+                            source: None,
+                            redefined: vec![],
                         });
                         scope.values.insert(name, index);
                     }
@@ -318,8 +318,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::F701) {
                     if let Some(check) = pyflakes::checks::break_outside_loop(
                         stmt,
-                        &self.parents,
-                        &self.parent_stack,
+                        &mut self.parents.iter().rev().map(|node| node.0).skip(1),
                     ) {
                         self.add_check(check);
                     }
@@ -329,8 +328,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::F702) {
                     if let Some(check) = pyflakes::checks::continue_outside_loop(
                         stmt,
-                        &self.parents,
-                        &self.parent_stack,
+                        &mut self.parents.iter().rev().map(|node| node.0).skip(1),
                     ) {
                         self.add_check(check);
                     }
@@ -500,9 +498,11 @@ where
                 self.add_binding(
                     name,
                     Binding {
-                        kind: BindingKind::Definition,
+                        kind: BindingKind::FunctionDefinition,
                         used: None,
                         range: Range::from_located(stmt),
+                        source: Some(self.current_parent().clone()),
+                        redefined: vec![],
                     },
                 );
             }
@@ -608,10 +608,11 @@ where
                                 kind: BindingKind::SubmoduleImportation(
                                     name.to_string(),
                                     full_name.to_string(),
-                                    self.binding_context(),
                                 ),
                                 used: None,
                                 range: Range::from_located(alias),
+                                source: Some(self.current_parent().clone()),
+                                redefined: vec![],
                             },
                         );
                     } else {
@@ -630,7 +631,6 @@ where
                                 kind: BindingKind::Importation(
                                     name.to_string(),
                                     full_name.to_string(),
-                                    self.binding_context(),
                                 ),
                                 // Treat explicit re-export as usage (e.g., `import applications
                                 // as applications`).
@@ -652,6 +652,8 @@ where
                                     None
                                 },
                                 range: Range::from_located(alias),
+                                source: Some(self.current_parent().clone()),
+                                redefined: vec![],
                             },
                         );
                     }
@@ -795,6 +797,8 @@ where
                                     Range::from_located(alias),
                                 )),
                                 range: Range::from_located(alias),
+                                source: Some(self.current_parent().clone()),
+                                redefined: vec![],
                             },
                         );
 
@@ -825,6 +829,8 @@ where
                                 kind: BindingKind::StarImportation(*level, module.clone()),
                                 used: None,
                                 range: Range::from_located(stmt),
+                                source: Some(self.current_parent().clone()),
+                                redefined: vec![],
                             },
                         );
 
@@ -872,11 +878,7 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::FromImportation(
-                                    name.to_string(),
-                                    full_name,
-                                    self.binding_context(),
-                                ),
+                                kind: BindingKind::FromImportation(name.to_string(), full_name),
                                 // Treat explicit re-export as usage (e.g., `from .applications
                                 // import FastAPI as FastAPI`).
                                 used: if alias
@@ -897,6 +899,8 @@ where
                                     None
                                 },
                                 range,
+                                source: Some(self.current_parent().clone()),
+                                redefined: vec![],
                             },
                         );
                     }
@@ -1143,7 +1147,7 @@ where
 
                 self.deferred_functions.push((
                     stmt,
-                    (self.scope_stack.clone(), self.parent_stack.clone()),
+                    (self.scope_stack.clone(), self.parents.clone()),
                     self.visible_scope.clone(),
                 ));
             }
@@ -1221,6 +1225,8 @@ where
                     kind: BindingKind::ClassDefinition,
                     used: None,
                     range: Range::from_located(stmt),
+                    source: Some(self.current_parent().clone()),
+                    redefined: vec![],
                 },
             );
         };
@@ -1256,13 +1262,13 @@ where
                     Range::from_located(expr),
                     value,
                     self.in_annotation,
-                    (self.scope_stack.clone(), self.parent_stack.clone()),
+                    (self.scope_stack.clone(), self.parents.clone()),
                 ));
             } else {
                 self.deferred_type_definitions.push((
                     expr,
                     self.in_annotation,
-                    (self.scope_stack.clone(), self.parent_stack.clone()),
+                    (self.scope_stack.clone(), self.parents.clone()),
                 ));
             }
             return;
@@ -1345,7 +1351,7 @@ where
 
                         self.check_builtin_shadowing(id, Range::from_located(expr), true);
 
-                        self.handle_node_store(id, expr, self.current_parent());
+                        self.handle_node_store(id, expr);
                     }
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
@@ -2053,7 +2059,7 @@ where
                         Range::from_located(expr),
                         value,
                         self.in_annotation,
-                        (self.scope_stack.clone(), self.parent_stack.clone()),
+                        (self.scope_stack.clone(), self.parents.clone()),
                     ));
                 }
                 if self.settings.enabled.contains(&CheckCode::S104) {
@@ -2136,7 +2142,7 @@ where
         match &expr.node {
             ExprKind::Lambda { .. } => {
                 self.deferred_lambdas
-                    .push((expr, (self.scope_stack.clone(), self.parent_stack.clone())));
+                    .push((expr, (self.scope_stack.clone(), self.parents.clone())));
             }
             ExprKind::Call {
                 func,
@@ -2387,7 +2393,6 @@ where
                                         ctx: ExprContext::Store,
                                     },
                                 ),
-                                self.current_parent(),
                             );
                         }
 
@@ -2402,7 +2407,6 @@ where
                                     ctx: ExprContext::Store,
                                 },
                             ),
-                            self.current_parent(),
                         );
 
                         walk_excepthandler(self, excepthandler);
@@ -2484,6 +2488,8 @@ where
                 kind: BindingKind::Argument,
                 used: None,
                 range: Range::from_located(arg),
+                source: Some(self.current_parent().clone()),
+                redefined: vec![],
             },
         );
 
@@ -2510,14 +2516,20 @@ where
 
 impl<'a> Checker<'a> {
     fn push_parent(&mut self, parent: &'a Stmt) {
-        self.parent_stack.push(self.parents.len());
-        self.parents.push(parent);
+        let num_existing = self.parents.len();
+        self.parents.push(RefEquality(parent));
+        self.depths
+            .insert(self.parents[num_existing].clone(), num_existing);
+        if num_existing > 0 {
+            self.child_to_parent.insert(
+                self.parents[num_existing].clone(),
+                self.parents[num_existing - 1].clone(),
+            );
+        }
     }
 
     fn pop_parent(&mut self) {
-        self.parent_stack
-            .pop()
-            .expect("Attempted to pop without scope");
+        self.parents.pop().expect("Attempted to pop without scope");
     }
 
     fn push_scope(&mut self, scope: Scope<'a>) {
@@ -2535,12 +2547,15 @@ impl<'a> Checker<'a> {
 
     fn bind_builtins(&mut self) {
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
+
         for builtin in BUILTINS.iter().chain(MAGIC_GLOBALS.iter()) {
             let index = self.bindings.len();
             self.bindings.push(Binding {
                 kind: BindingKind::Builtin,
                 range: Range::default(),
                 used: None,
+                source: None,
+                redefined: vec![],
             });
             scope.values.insert(builtin, index);
         }
@@ -2551,48 +2566,88 @@ impl<'a> Checker<'a> {
     }
 
     pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
-        self.scope_stack.iter().rev().map(|s| &self.scopes[*s])
+        self.scope_stack
+            .iter()
+            .rev()
+            .map(|index| &self.scopes[*index])
     }
 
-    pub fn current_parent(&self) -> &'a Stmt {
-        self.parents[*(self.parent_stack.last().expect("No parent found"))]
+    pub fn current_parent(&self) -> &RefEquality<'a, Stmt> {
+        self.parents.iter().rev().next().expect("No parent found")
     }
 
-    pub fn binding_context(&self) -> BindingContext {
-        let mut rev = self.parent_stack.iter().rev().fuse();
-        let defined_by = *rev.next().expect("Expected to bind within a statement");
-        let defined_in = rev.next().copied();
-        BindingContext {
-            defined_by,
-            defined_in,
-        }
+    pub fn current_grandparent(&self) -> Option<&RefEquality<'a, Stmt>> {
+        self.parents.iter().rev().nth(1)
     }
 
-    fn add_binding<'b>(&mut self, name: &'b str, binding: Binding)
+    fn add_binding<'b>(&mut self, name: &'b str, binding: Binding<'a>)
     where
         'b: 'a,
     {
-        if self.settings.enabled.contains(&CheckCode::F402) {
-            let scope = self.current_scope();
-            if let Some(index) = scope.values.get(&name) {
-                let existing = &self.bindings[*index];
-                if matches!(binding.kind, BindingKind::LoopVar)
-                    && matches!(
-                        existing.kind,
-                        BindingKind::Importation(..)
-                            | BindingKind::FromImportation(..)
-                            | BindingKind::SubmoduleImportation(..)
-                            | BindingKind::StarImportation(..)
-                            | BindingKind::FutureImportation
-                    )
-                {
-                    self.add_check(Check::new(
-                        CheckKind::ImportShadowedByLoopVar(
-                            name.to_string(),
-                            existing.range.location.row(),
-                        ),
-                        binding.range,
-                    ));
+        let index = self.bindings.len();
+
+        if let Some((stack_index, scope_index)) = self
+            .scope_stack
+            .iter()
+            .rev()
+            .enumerate()
+            .find(|(_, scope_index)| self.scopes[**scope_index].values.contains_key(&name))
+        {
+            let existing_index = self.scopes[*scope_index].values.get(&name).unwrap();
+            let existing = &self.bindings[*existing_index];
+            let in_current_scope = stack_index == 0;
+            if !matches!(existing.kind, BindingKind::Builtin)
+                && existing.source.as_ref().map_or(true, |left| {
+                    binding.source.as_ref().map_or(true, |right| {
+                        !branch_detection::different_forks(
+                            left,
+                            right,
+                            &self.depths,
+                            &self.child_to_parent,
+                        )
+                    })
+                })
+            {
+                let existing_is_import = matches!(
+                    existing.kind,
+                    BindingKind::Importation(..)
+                        | BindingKind::FromImportation(..)
+                        | BindingKind::SubmoduleImportation(..)
+                        | BindingKind::StarImportation(..)
+                        | BindingKind::FutureImportation
+                );
+                if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
+                    if self.settings.enabled.contains(&CheckCode::F402) {
+                        self.add_check(Check::new(
+                            CheckKind::ImportShadowedByLoopVar(
+                                name.to_string(),
+                                existing.range.location.row(),
+                            ),
+                            binding.range,
+                        ));
+                    }
+                } else if in_current_scope {
+                    if existing.used.is_none()
+                        && binding.redefines(existing)
+                        && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
+                        && !(matches!(existing.kind, BindingKind::FunctionDefinition)
+                            && visibility::is_overload(
+                                self,
+                                cast::decorator_list(existing.source.as_ref().unwrap().0),
+                            ))
+                    {
+                        if self.settings.enabled.contains(&CheckCode::F811) {
+                            self.add_check(Check::new(
+                                CheckKind::RedefinedWhileUnused(
+                                    name.to_string(),
+                                    existing.range.location.row(),
+                                ),
+                                binding.range,
+                            ));
+                        }
+                    }
+                } else if existing_is_import && binding.redefines(existing) {
+                    self.bindings[*existing_index].redefined.push(index);
                 }
             }
         }
@@ -2603,13 +2658,11 @@ impl<'a> Checker<'a> {
         let binding = match scope.values.get(&name) {
             None => binding,
             Some(index) => Binding {
-                kind: binding.kind,
-                range: binding.range,
                 used: self.bindings[*index].used,
+                ..binding
             },
         };
 
-        let index = self.bindings.len();
         self.bindings.push(binding);
 
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
@@ -2646,9 +2699,9 @@ impl<'a> Checker<'a> {
                     //   import pyarrow as pa
                     //   import pyarrow.csv
                     //   print(pa.csv.read_csv("test.csv"))
-                    if let BindingKind::Importation(name, full_name, _)
-                    | BindingKind::FromImportation(name, full_name, _)
-                    | BindingKind::SubmoduleImportation(name, full_name, _) =
+                    if let BindingKind::Importation(name, full_name)
+                    | BindingKind::FromImportation(name, full_name)
+                    | BindingKind::SubmoduleImportation(name, full_name) =
                         &self.bindings[*index].kind
                     {
                         let has_alias = full_name
@@ -2728,10 +2781,12 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn handle_node_store<'b>(&mut self, id: &'b str, expr: &Expr, parent: &Stmt)
+    fn handle_node_store<'b>(&mut self, id: &'b str, expr: &Expr)
     where
         'b: 'a,
     {
+        let parent = self.current_parent().0;
+
         if self.settings.enabled.contains(&CheckCode::F823) {
             let scopes: Vec<&Scope> = self
                 .scope_stack
@@ -2775,6 +2830,8 @@ impl<'a> Checker<'a> {
                     kind: BindingKind::Annotation,
                     used: None,
                     range: Range::from_located(expr),
+                    source: Some(self.current_parent().clone()),
+                    redefined: vec![],
                 },
             );
             return;
@@ -2791,6 +2848,8 @@ impl<'a> Checker<'a> {
                     kind: BindingKind::LoopVar,
                     used: None,
                     range: Range::from_located(expr),
+                    source: Some(self.current_parent().clone()),
+                    redefined: vec![],
                 },
             );
             return;
@@ -2803,6 +2862,8 @@ impl<'a> Checker<'a> {
                     kind: BindingKind::Binding,
                     used: None,
                     range: Range::from_located(expr),
+                    source: Some(self.current_parent().clone()),
+                    redefined: vec![],
                 },
             );
             return;
@@ -2822,6 +2883,8 @@ impl<'a> Checker<'a> {
                     kind: BindingKind::Export(extract_all_names(parent, current, &self.bindings)),
                     used: None,
                     range: Range::from_located(expr),
+                    source: Some(self.current_parent().clone()),
+                    redefined: vec![],
                 },
             );
             return;
@@ -2833,6 +2896,8 @@ impl<'a> Checker<'a> {
                 kind: BindingKind::Assignment,
                 used: None,
                 range: Range::from_located(expr),
+                source: Some(self.current_parent().clone()),
+                redefined: vec![],
             },
         );
     }
@@ -2842,13 +2907,8 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         if let ExprKind::Name { id, .. } = &expr.node {
-            if operations::on_conditional_branch(
-                &mut self
-                    .parent_stack
-                    .iter()
-                    .rev()
-                    .map(|index| self.parents[*index]),
-            ) {
+            if operations::on_conditional_branch(&mut self.parents.iter().rev().map(|node| node.0))
+            {
                 return;
             }
 
@@ -2892,7 +2952,7 @@ impl<'a> Checker<'a> {
             self.deferred_type_definitions.pop()
         {
             self.scope_stack = scopes;
-            self.parent_stack = parents;
+            self.parents = parents;
             self.in_annotation = in_annotation;
             self.in_type_definition = true;
             self.in_deferred_type_definition = true;
@@ -2925,7 +2985,7 @@ impl<'a> Checker<'a> {
         }
         for (expr, (in_annotation, (scopes, parents))) in allocator.iter().zip(stacks) {
             self.scope_stack = scopes;
-            self.parent_stack = parents;
+            self.parents = parents;
             self.in_annotation = in_annotation;
             self.in_type_definition = true;
             self.in_deferred_string_type_definition = true;
@@ -2938,7 +2998,7 @@ impl<'a> Checker<'a> {
     fn check_deferred_functions(&mut self) {
         while let Some((stmt, (scopes, parents), visibility)) = self.deferred_functions.pop() {
             self.scope_stack = scopes.clone();
-            self.parent_stack = parents.clone();
+            self.parents = parents.clone();
             self.visible_scope = visibility;
 
             match &stmt.node {
@@ -2983,7 +3043,7 @@ impl<'a> Checker<'a> {
     fn check_deferred_lambdas(&mut self) {
         while let Some((expr, (scopes, parents))) = self.deferred_lambdas.pop() {
             self.scope_stack = scopes.clone();
-            self.parent_stack = parents.clone();
+            self.parents = parents.clone();
 
             if let ExprKind::Lambda { args, body } = &expr.node {
                 self.push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
@@ -3038,6 +3098,7 @@ impl<'a> Checker<'a> {
     fn check_dead_scopes(&mut self) {
         if !self.settings.enabled.contains(&CheckCode::F401)
             && !self.settings.enabled.contains(&CheckCode::F405)
+            && !self.settings.enabled.contains(&CheckCode::F811)
             && !self.settings.enabled.contains(&CheckCode::F822)
         {
             return;
@@ -3067,6 +3128,41 @@ impl<'a> Checker<'a> {
                                     ));
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            if self.settings.enabled.contains(&CheckCode::F811) {
+                for (name, index) in &scope.values {
+                    let binding = &self.bindings[*index];
+
+                    if matches!(
+                        binding.kind,
+                        BindingKind::Importation(..)
+                            | BindingKind::FromImportation(..)
+                            | BindingKind::SubmoduleImportation(..)
+                            | BindingKind::StarImportation(..)
+                            | BindingKind::FutureImportation
+                    ) {
+                        // Skip used exports from `__all__`
+                        if binding.used.is_some()
+                            || all_names
+                                .as_ref()
+                                .map(|names| names.contains(name))
+                                .unwrap_or_default()
+                        {
+                            continue;
+                        }
+
+                        for index in &binding.redefined {
+                            checks.push(Check::new(
+                                CheckKind::RedefinedWhileUnused(
+                                    (*name).to_string(),
+                                    binding.range.location.row(),
+                                ),
+                                self.bindings[*index].range,
+                            ));
                         }
                     }
                 }
@@ -3108,15 +3204,17 @@ impl<'a> Checker<'a> {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
                 type UnusedImport<'a> = (&'a String, &'a Range);
+                type BindingContext<'a, 'b> =
+                    (&'a RefEquality<'b, Stmt>, Option<&'a RefEquality<'b, Stmt>>);
 
-                let mut unused: BTreeMap<(usize, Option<usize>), Vec<UnusedImport>> =
-                    BTreeMap::new();
+                let mut unused: FxHashMap<BindingContext, Vec<UnusedImport>> = FxHashMap::default();
 
                 for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
-                    let (BindingKind::Importation(_, full_name, context)
-                    | BindingKind::SubmoduleImportation(_, full_name, context)
-                    | BindingKind::FromImportation(_, full_name, context)) = &binding.kind else { continue; };
+
+                    let (BindingKind::Importation(_, full_name)
+                    | BindingKind::SubmoduleImportation(_, full_name)
+                    | BindingKind::FromImportation(_, full_name)) = &binding.kind else { continue; };
 
                     // Skip used exports from `__all__`
                     if binding.used.is_some()
@@ -3128,24 +3226,23 @@ impl<'a> Checker<'a> {
                         continue;
                     }
 
+                    let defined_by = binding.source.as_ref().unwrap();
+                    let defined_in = self.child_to_parent.get(defined_by);
                     unused
-                        .entry((context.defined_by, context.defined_in))
+                        .entry((defined_by, defined_in))
                         .or_default()
                         .push((full_name, &binding.range));
                 }
 
                 for ((defined_by, defined_in), unused_imports) in unused {
-                    let child = self.parents[defined_by];
-                    let parent = defined_in.map(|defined_in| self.parents[defined_in]);
+                    let child = defined_by.0;
+                    let parent = defined_in.map(|defined_in| defined_in.0);
 
                     let ignore_init = self.settings.ignore_init_module_imports
                         && self.path.ends_with("__init__.py");
                     let fix = if !ignore_init && self.patch(&CheckCode::F401) {
-                        let deleted: Vec<&Stmt> = self
-                            .deletions
-                            .iter()
-                            .map(|index| self.parents[*index])
-                            .collect();
+                        let deleted: Vec<&Stmt> =
+                            self.deletions.iter().map(|node| node.0).collect();
                         match pyflakes::fixes::remove_unused_imports(
                             self.locator,
                             &unused_imports,
@@ -3155,7 +3252,7 @@ impl<'a> Checker<'a> {
                         ) {
                             Ok(fix) => {
                                 if fix.content.is_empty() || fix.content == "pass" {
-                                    self.deletions.insert(defined_by);
+                                    self.deletions.insert(defined_by.clone());
                                 }
                                 Some(fix)
                             }

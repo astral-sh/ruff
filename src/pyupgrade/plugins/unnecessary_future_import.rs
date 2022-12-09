@@ -62,23 +62,21 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         ),
         Range::from_located(stmt),
     );
+
     if checker.patch(check.kind.code()) {
-        let context = checker.binding_context();
-        let deleted: Vec<&Stmt> = checker
-            .deletions
-            .iter()
-            .map(|index| checker.parents[*index])
-            .collect();
+        let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
+        let defined_by = checker.current_parent();
+        let defined_in = checker.current_grandparent();
         match fixes::remove_unnecessary_future_import(
             checker.locator,
             &removable_index,
-            checker.parents[context.defined_by],
-            context.defined_in.map(|index| checker.parents[index]),
+            defined_by.0,
+            defined_in.map(|node| node.0),
             &deleted,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {
-                    checker.deletions.insert(context.defined_by);
+                    checker.deletions.insert(defined_by.clone());
                 }
                 check.amend(fix);
             }

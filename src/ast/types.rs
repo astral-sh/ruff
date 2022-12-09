@@ -89,37 +89,116 @@ impl<'a> Scope<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct BindingContext {
-    pub defined_by: usize,
-    pub defined_in: Option<usize>,
-}
-
-#[derive(Clone, Debug)]
 pub enum BindingKind {
     Annotation,
     Argument,
     Assignment,
-    // TODO(charlie): This seems to be a catch-all.
     Binding,
     LoopVar,
     Global,
     Nonlocal,
     Builtin,
     ClassDefinition,
-    Definition,
+    FunctionDefinition,
     Export(Vec<String>),
     FutureImportation,
     StarImportation(Option<usize>, Option<String>),
-    Importation(String, String, BindingContext),
-    FromImportation(String, String, BindingContext),
-    SubmoduleImportation(String, String, BindingContext),
+    Importation(String, String),
+    FromImportation(String, String),
+    SubmoduleImportation(String, String),
 }
 
 #[derive(Clone, Debug)]
-pub struct Binding {
+pub struct Binding<'a> {
     pub kind: BindingKind,
     pub range: Range,
+    /// The statement in which the `Binding` was defined.
+    pub source: Option<RefEquality<'a, Stmt>>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used.
     pub used: Option<(usize, Range)>,
+    /// A list of pointers to `Binding` instances that redefined this binding.
+    pub redefined: Vec<usize>,
 }
+
+// Pyflakes defines the following binding hierarchy (via inheritance):
+//   Binding
+//    ExportBinding
+//    Annotation
+//    Argument
+//    Assignment
+//      NamedExprAssignment
+//    Definition
+//      FunctionDefinition
+//      ClassDefinition
+//      Builtin
+//      Importation
+//        SubmoduleImportation
+//        ImportationFrom
+//        StarImportation
+//        FutureImportation
+
+impl<'a> Binding<'a> {
+    pub fn is_definition(&self) -> bool {
+        matches!(
+            self.kind,
+            BindingKind::ClassDefinition
+                | BindingKind::FunctionDefinition
+                | BindingKind::Builtin
+                | BindingKind::FutureImportation
+                | BindingKind::StarImportation(..)
+                | BindingKind::Importation(..)
+                | BindingKind::FromImportation(..)
+                | BindingKind::SubmoduleImportation(..)
+        )
+    }
+
+    pub fn redefines(&self, existing: &'a Binding) -> bool {
+        match &self.kind {
+            BindingKind::Importation(_, full_name) | BindingKind::FromImportation(_, full_name) => {
+                if let BindingKind::SubmoduleImportation(_, existing_full_name) = &existing.kind {
+                    return full_name == existing_full_name;
+                }
+            }
+            BindingKind::SubmoduleImportation(_, full_name) => {
+                if let BindingKind::Importation(_, existing_full_name)
+                | BindingKind::FromImportation(_, existing_full_name)
+                | BindingKind::SubmoduleImportation(_, existing_full_name) = &existing.kind
+                {
+                    return full_name == existing_full_name;
+                }
+            }
+            BindingKind::Annotation => {
+                return false;
+            }
+            BindingKind::FutureImportation => {
+                return false;
+            }
+            BindingKind::StarImportation(..) => {
+                return false;
+            }
+            _ => {}
+        }
+        existing.is_definition()
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct RefEquality<'a, T>(pub &'a T);
+
+impl<'a, T> std::hash::Hash for RefEquality<'a, T> {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        (self.0 as *const T).hash(state);
+    }
+}
+
+impl<'a, 'b, T> PartialEq<RefEquality<'b, T>> for RefEquality<'a, T> {
+    fn eq(&self, other: &RefEquality<'b, T>) -> bool {
+        std::ptr::eq(self.0, other.0)
+    }
+}
+
+impl<'a, T> Eq for RefEquality<'a, T> {}
