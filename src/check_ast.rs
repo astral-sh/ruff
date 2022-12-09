@@ -236,10 +236,28 @@ where
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
                 if scope_index != GLOBAL_SCOPE_INDEX {
+                    // If the binding doesn't already exist in the global scope, add it.
+                    for name in names {
+                        if !self.scopes[GLOBAL_SCOPE_INDEX]
+                            .values
+                            .contains_key(&name.as_str())
+                        {
+                            let index = self.bindings.len();
+                            self.bindings.push(Binding {
+                                kind: BindingKind::Assignment,
+                                used: None,
+                                range: Range::from_located(stmt),
+                                source: None,
+                                redefined: vec![],
+                            });
+                            self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
+                        }
+                    }
+
+                    // Add the binding to the current scope.
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
                     for name in names {
-                        // Add a binding to the current scope.
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Global,
@@ -249,15 +267,6 @@ where
                             redefined: vec![],
                         });
                         scope.values.insert(name, index);
-                    }
-
-                    // Mark the binding in the global scope as used.
-                    for name in names {
-                        if let Some(index) =
-                            self.scopes[GLOBAL_SCOPE_INDEX].values.get(&name.as_str())
-                        {
-                            self.bindings[*index].used = usage;
-                        }
                     }
                 }
 
@@ -2948,6 +2957,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_type_definitions(&mut self) {
+        self.deferred_type_definitions.reverse();
         while let Some((expr, in_annotation, (scopes, parents))) =
             self.deferred_type_definitions.pop()
         {
@@ -2967,6 +2977,7 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         let mut stacks = vec![];
+        self.deferred_string_type_definitions.reverse();
         while let Some((range, expression, in_annotation, context)) =
             self.deferred_string_type_definitions.pop()
         {
@@ -2996,6 +3007,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_functions(&mut self) {
+        self.deferred_functions.reverse();
         while let Some((stmt, (scopes, parents), visibility)) = self.deferred_functions.pop() {
             self.scope_stack = scopes.clone();
             self.parents = parents.clone();
@@ -3041,6 +3053,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_lambdas(&mut self) {
+        self.deferred_lambdas.reverse();
         while let Some((expr, (scopes, parents))) = self.deferred_lambdas.pop() {
             self.scope_stack = scopes.clone();
             self.parents = parents.clone();
@@ -3063,6 +3076,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_assignments(&mut self) {
+        self.deferred_assignments.reverse();
         while let Some((index, (scopes, _parents))) = self.deferred_assignments.pop() {
             if self.settings.enabled.contains(&CheckCode::F841) {
                 self.add_checks(
@@ -3105,7 +3119,12 @@ impl<'a> Checker<'a> {
         }
 
         let mut checks: Vec<Check> = vec![];
-        for scope in self.dead_scopes.iter().map(|index| &self.scopes[*index]) {
+        for scope in self
+            .dead_scopes
+            .iter()
+            .rev()
+            .map(|index| &self.scopes[*index])
+        {
             let all_binding: Option<&Binding> = scope
                 .values
                 .get("__all__")

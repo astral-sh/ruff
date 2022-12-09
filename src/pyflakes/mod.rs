@@ -392,11 +392,9 @@ mod tests {
         Ok(())
     }
 
-    // TODO(charlie): Bubble global assignments up to the module scope.
-    #[ignore]
     #[test]
     fn defined_by_global() -> Result<()> {
-        // global" can make an otherwise undefined name in another function
+        // "global" can make an otherwise undefined name in another function
         // defined.
         flakes(
             r#"
@@ -405,21 +403,20 @@ mod tests {
         "#,
             &[],
         )?;
-        flakes(
-            r#"
-        def c(): bar
-        def b(): global bar; bar = 1
-        "#,
-            &[],
-        )?;
+        // Pyflakes allows this, but it causes other issues.
+        // flakes(
+        //     r#"
+        // def c(): bar
+        // def b(): global bar; bar = 1
+        // "#,
+        //     &[],
+        // )?;
         Ok(())
     }
 
-    // TODO(charlie): Bubble global assignments up to the module scope.
-    #[ignore]
     #[test]
     fn defined_by_global_multiple_names() -> Result<()> {
-        // global" can accept multiple names.
+        // "global" can accept multiple names.
         flakes(
             r#"
         def a(): global fu, bar; fu = 1; bar = 2
@@ -1391,8 +1388,8 @@ mod tests {
         "#,
             &[
                 CheckCode::F401,
-                CheckCode::F401,
                 CheckCode::F811,
+                CheckCode::F401,
                 CheckCode::F811,
             ],
         )?;
@@ -1981,7 +1978,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[test]
     fn used_in_global() -> Result<()> {
         // A 'global' statement shadowing an unused import should not prevent it
@@ -2013,7 +2009,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[test]
     fn assigned_to_global() -> Result<()> {
         // Binding an import to a declared global should not cause it to be
