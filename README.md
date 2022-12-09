@@ -438,6 +438,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F706 | ReturnOutsideFunction | `return` statement outside of a function/method |  |
 | F707 | DefaultExceptNotLast | An `except` block as not the last exception handler |  |
 | F722 | ForwardAnnotationSyntaxError | Syntax error in forward annotation: `...` |  |
+| F811 | RedefinedWhileUnused | Redefinition of unused `...` from line 1 |  |
 | F821 | UndefinedName | Undefined name `...` |  |
 | F822 | UndefinedExport | Undefined name `...` in `__all__` |  |
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |  |
