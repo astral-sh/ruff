@@ -159,8 +159,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             orelse,
             ..
         } => {
-            visitor.visit_expr(target);
             visitor.visit_expr(iter);
+            visitor.visit_expr(target);
             for stmt in body {
                 visitor.visit_stmt(stmt);
             }
@@ -175,8 +175,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             orelse,
             ..
         } => {
-            visitor.visit_expr(target);
             visitor.visit_expr(iter);
+            visitor.visit_expr(target);
             for stmt in body {
                 visitor.visit_stmt(stmt);
             }

@@ -2703,6 +2703,13 @@ impl<'a> Checker<'a> {
                     return;
                 }
 
+                // Allow "__module__" and "__qualname__" in class scopes.
+                if (id == "__module__" || id == "__qualname__")
+                    && matches!(self.current_scope().kind, ScopeKind::Class(..))
+                {
+                    return;
+                }
+
                 // Avoid flagging if NameError is handled.
                 if let Some(handler_names) = self.except_handlers.last() {
                     if handler_names
