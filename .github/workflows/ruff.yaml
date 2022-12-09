@@ -1,9 +1,8 @@
 name: "[ruff] Release"
 
 on:
-  create:
-    tags:
-      - v*
+  release:
+    types: [published]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
