@@ -244,6 +244,7 @@ pub enum CheckCode {
     D214,
     D215,
     D300,
+    D301,
     D400,
     D402,
     D403,
@@ -798,6 +799,7 @@ pub enum CheckKind {
     SectionUnderlineMatchesSectionLength(String),
     SectionUnderlineNotOverIndented(String),
     SkipDocstring,
+    UsesRPrefixForBackslashedContent,
     UsesTripleQuotes,
     // pep8-naming
     InvalidClassName(String),
@@ -1115,6 +1117,7 @@ impl CheckCode {
             CheckCode::D214 => CheckKind::SectionNotOverIndented("Returns".to_string()),
             CheckCode::D215 => CheckKind::SectionUnderlineNotOverIndented("Returns".to_string()),
             CheckCode::D300 => CheckKind::UsesTripleQuotes,
+            CheckCode::D301 => CheckKind::UsesRPrefixForBackslashedContent,
             CheckCode::D400 => CheckKind::EndsInPeriod,
             CheckCode::D402 => CheckKind::NoSignature,
             CheckCode::D403 => CheckKind::FirstLineCapitalized,
@@ -1295,6 +1298,7 @@ impl CheckCode {
             CheckCode::D214 => CheckCategory::Pydocstyle,
             CheckCode::D215 => CheckCategory::Pydocstyle,
             CheckCode::D300 => CheckCategory::Pydocstyle,
+            CheckCode::D301 => CheckCategory::Pydocstyle,
             CheckCode::D400 => CheckCategory::Pydocstyle,
             CheckCode::D402 => CheckCategory::Pydocstyle,
             CheckCode::D403 => CheckCategory::Pydocstyle,
@@ -1690,6 +1694,7 @@ impl CheckKind {
             CheckKind::SectionUnderlineMatchesSectionLength(_) => &CheckCode::D409,
             CheckKind::SectionUnderlineNotOverIndented(_) => &CheckCode::D215,
             CheckKind::SkipDocstring => &CheckCode::D418,
+            CheckKind::UsesRPrefixForBackslashedContent => &CheckCode::D301,
             CheckKind::UsesTripleQuotes => &CheckCode::D300,
             // pep8-naming
             CheckKind::InvalidClassName(_) => &CheckCode::N801,
@@ -2347,6 +2352,9 @@ impl CheckKind {
                 .to_string(),
             CheckKind::FirstLineCapitalized => {
                 "First word of the first line should be properly capitalized".to_string()
+            }
+            CheckKind::UsesRPrefixForBackslashedContent => {
+                r#"Use r""" if any backslashes in a docstring"#.to_string()
             }
             CheckKind::UsesTripleQuotes => r#"Use """triple double quotes""""#.to_string(),
             CheckKind::MultiLineSummaryFirstLine => {

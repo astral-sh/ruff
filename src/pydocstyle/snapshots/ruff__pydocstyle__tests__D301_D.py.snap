@@ -1,0 +1,29 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind: UsesRPrefixForBackslashedContent
+  location:
+    row: 328
+    column: 4
+  end_location:
+    row: 328
+    column: 16
+  fix: ~
+- kind: UsesRPrefixForBackslashedContent
+  location:
+    row: 333
+    column: 4
+  end_location:
+    row: 333
+    column: 20
+  fix: ~
+- kind: UsesRPrefixForBackslashedContent
+  location:
+    row: 338
+    column: 4
+  end_location:
+    row: 338
+    column: 21
+  fix: ~
+

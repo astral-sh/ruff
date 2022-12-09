@@ -701,6 +701,31 @@ pub fn triple_quotes(checker: &mut Checker, definition: &Definition) {
     }
 }
 
+static BACKSLASH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\[^\nuN]").unwrap());
+
+/// D301
+pub fn backslashes(checker: &mut Checker, definition: &Definition) {
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+
+    // Docstring is already raw.
+    if contents.starts_with('r') || contents.starts_with("ur") {
+        return;
+    }
+
+    if BACKSLASH_REGEX.is_match(&contents) {
+        checker.add_check(Check::new(
+            CheckKind::UsesRPrefixForBackslashedContent,
+            Range::from_located(docstring),
+        ));
+    }
+}
+
 /// D400
 pub fn ends_with_period(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = definition.docstring else {

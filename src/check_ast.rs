@@ -3431,6 +3431,9 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::D300) {
                 pydocstyle::plugins::triple_quotes(self, &definition);
             }
+            if self.settings.enabled.contains(&CheckCode::D301) {
+                pydocstyle::plugins::backslashes(self, &definition);
+            }
             if self.settings.enabled.contains(&CheckCode::D400) {
                 pydocstyle::plugins::ends_with_period(self, &definition);
             }
