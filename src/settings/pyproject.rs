@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use common_path::common_path_all;
 use log::debug;
 use path_absolutize::Absolutize;
@@ -82,7 +82,8 @@ pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
 
 pub fn load_options(pyproject: Option<&PathBuf>) -> Result<Options> {
     if let Some(pyproject) = pyproject {
-        Ok(parse_pyproject_toml(pyproject)?
+        Ok(parse_pyproject_toml(pyproject)
+            .map_err(|err| anyhow!("Failed to parse `{}`: {}", pyproject.to_string_lossy(), err))?
             .tool
             .and_then(|tool| tool.ruff)
             .unwrap_or_default())
@@ -109,7 +110,10 @@ mod tests {
         find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
-    use crate::{flake8_bugbear, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming};
+    use crate::{
+        flake8_bugbear, flake8_import_conventions, flake8_quotes, flake8_tidy_imports, mccabe,
+        pep8_naming,
+    };
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -133,6 +137,7 @@ mod tests {
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend_exclude: None,
@@ -142,6 +147,7 @@ mod tests {
                     fix: None,
                     fixable: None,
                     ignore: None,
+                    ignore_init_module_imports: None,
                     line_length: None,
                     per_file_ignores: None,
                     select: None,
@@ -154,6 +160,7 @@ mod tests {
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -173,6 +180,7 @@ line-length = 79
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend_exclude: None,
@@ -182,6 +190,7 @@ line-length = 79
                     fix: None,
                     fixable: None,
                     ignore: None,
+                    ignore_init_module_imports: None,
                     line_length: Some(79),
                     per_file_ignores: None,
                     select: None,
@@ -194,6 +203,7 @@ line-length = 79
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -213,6 +223,7 @@ exclude = ["foo.py"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     line_length: None,
                     fix: None,
                     exclude: Some(vec!["foo.py".to_string()]),
@@ -221,6 +232,7 @@ exclude = ["foo.py"]
                     extend_select: None,
                     external: None,
                     ignore: None,
+                    ignore_init_module_imports: None,
                     extend_ignore: None,
                     fixable: None,
                     format: None,
@@ -234,6 +246,7 @@ exclude = ["foo.py"]
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -253,6 +266,7 @@ select = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend_exclude: None,
@@ -262,6 +276,7 @@ select = ["E501"]
                     fix: None,
                     fixable: None,
                     ignore: None,
+                    ignore_init_module_imports: None,
                     line_length: None,
                     per_file_ignores: None,
                     select: Some(vec![CheckCodePrefix::E501]),
@@ -274,6 +289,7 @@ select = ["E501"]
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -286,7 +302,7 @@ select = ["E501"]
             r#"
 [tool.black]
 [tool.ruff]
-extend-select = ["M001"]
+extend-select = ["RUF100"]
 ignore = ["E501"]
 "#,
         )?;
@@ -294,15 +310,17 @@ ignore = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
+                    allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend_exclude: None,
                     extend_ignore: None,
-                    extend_select: Some(vec![CheckCodePrefix::M001]),
+                    extend_select: Some(vec![CheckCodePrefix::RUF100]),
                     external: None,
                     fix: None,
                     fixable: None,
                     ignore: Some(vec![CheckCodePrefix::E501]),
+                    ignore_init_module_imports: None,
                     line_length: None,
                     per_file_ignores: None,
                     select: None,
@@ -315,6 +333,7 @@ ignore = ["E501"]
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
+                    flake8_import_conventions: None,
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
@@ -369,6 +388,7 @@ other-attribute = 1
         assert_eq!(
             config,
             Options {
+                allowed_confusables: Some(vec!['−', 'ρ', '∗']),
                 line_length: Some(88),
                 fix: None,
                 exclude: None,
@@ -381,6 +401,7 @@ other-attribute = 1
                 extend_select: None,
                 external: Some(vec!["V101".to_string()]),
                 ignore: None,
+                ignore_init_module_imports: None,
                 extend_ignore: None,
                 fixable: None,
                 format: None,
@@ -408,6 +429,16 @@ other-attribute = 1
                 }),
                 flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
                     ban_relative_imports: Some(Strictness::Parents)
+                }),
+                flake8_import_conventions: Some(flake8_import_conventions::settings::Options {
+                    aliases: Some(FxHashMap::from_iter([(
+                        "pandas".to_string(),
+                        "pd".to_string(),
+                    )])),
+                    extend_aliases: Some(FxHashMap::from_iter([(
+                        "dask.dataframe".to_string(),
+                        "dd".to_string(),
+                    )])),
                 }),
                 isort: None,
                 mccabe: Some(mccabe::settings::Options {

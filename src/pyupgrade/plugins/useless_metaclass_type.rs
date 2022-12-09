@@ -6,33 +6,25 @@ use crate::autofix::helpers;
 use crate::check_ast::Checker;
 use crate::pyupgrade::checks;
 
-/// U001
+/// UP001
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
-    if let Some(mut check) =
-        checks::useless_metaclass_type(targets, value, Range::from_located(stmt))
-    {
-        if checker.patch(check.kind.code()) {
-            let context = checker.binding_context();
-            let deleted: Vec<&Stmt> = checker
-                .deletions
-                .iter()
-                .map(|index| checker.parents[*index])
-                .collect();
-
-            match helpers::remove_stmt(
-                checker.parents[context.defined_by],
-                context.defined_in.map(|index| checker.parents[index]),
-                &deleted,
-            ) {
-                Ok(fix) => {
-                    if fix.content.is_empty() || fix.content == "pass" {
-                        checker.deletions.insert(context.defined_by);
-                    }
-                    check.amend(fix);
+    let Some(mut check) =
+        checks::useless_metaclass_type(targets, value, Range::from_located(stmt)) else {
+            return;
+        };
+    if checker.patch(check.kind.code()) {
+        let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
+        let defined_by = checker.current_parent();
+        let defined_in = checker.current_grandparent();
+        match helpers::remove_stmt(defined_by.0, defined_in.map(|node| node.0), &deleted) {
+            Ok(fix) => {
+                if fix.content.is_empty() || fix.content == "pass" {
+                    checker.deletions.insert(defined_by.clone());
                 }
-                Err(e) => error!("Failed to fix remove metaclass type: {}", e),
+                check.amend(fix);
             }
+            Err(e) => error!("Failed to fix remove metaclass type: {e}"),
         }
-        checker.add_check(check);
     }
+    checker.add_check(check);
 }

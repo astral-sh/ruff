@@ -1,0 +1,78 @@
+---
+source: src/pylint/mod.rs
+expression: checks
+---
+- kind:
+    ConsiderMergingIsinstance:
+      - "var[3]"
+      - - float
+        - int
+  location:
+    row: 15
+    column: 7
+  end_location:
+    row: 15
+    column: 96
+  fix: ~
+- kind:
+    ConsiderMergingIsinstance:
+      - "var[4]"
+      - - float
+        - int
+  location:
+    row: 17
+    column: 13
+  end_location:
+    row: 17
+    column: 103
+  fix: ~
+- kind:
+    ConsiderMergingIsinstance:
+      - "var[5]"
+      - - float
+        - int
+  location:
+    row: 19
+    column: 13
+  end_location:
+    row: 19
+    column: 73
+  fix: ~
+- kind:
+    ConsiderMergingIsinstance:
+      - "var[10]"
+      - - list
+        - str
+  location:
+    row: 23
+    column: 13
+  end_location:
+    row: 23
+    column: 158
+  fix: ~
+- kind:
+    ConsiderMergingIsinstance:
+      - "var[11]"
+      - - float
+        - int
+  location:
+    row: 24
+    column: 13
+  end_location:
+    row: 24
+    column: 95
+  fix: ~
+- kind:
+    ConsiderMergingIsinstance:
+      - "var[12]"
+      - - float
+        - int
+        - list
+  location:
+    row: 30
+    column: 13
+  end_location:
+    row: 30
+    column: 75
+  fix: ~
+

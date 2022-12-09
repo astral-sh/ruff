@@ -1,4 +1,3 @@
-use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
@@ -7,8 +6,9 @@ use itertools::Itertools;
 use nohash_hasher::IntMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::checks::{Check, CheckCode};
+use crate::checks::{Check, CheckCode, CODE_REDIRECTS};
 
 static NO_QA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -37,6 +37,7 @@ pub enum Directive<'a> {
     Codes(usize, usize, usize, Vec<&'a str>),
 }
 
+/// Extract the noqa `Directive` from a line of Python source code.
 pub fn extract_noqa_directive(line: &str) -> Directive {
     match NO_QA_LINE_REGEX.captures(line) {
         Some(caps) => match caps.name("spaces") {
@@ -64,12 +65,25 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
     }
 }
 
+/// Returns `true` if the string list of `codes` includes `code` (or an alias
+/// thereof).
+pub fn includes(needle: &CheckCode, haystack: &[&str]) -> bool {
+    let needle: &str = needle.as_ref();
+    haystack.iter().any(|candidate| {
+        if let Some(candidate) = CODE_REDIRECTS.get(candidate) {
+            needle == candidate.as_ref()
+        } else {
+            &needle == candidate
+        }
+    })
+}
+
 pub fn add_noqa(
     path: &Path,
     checks: &[Check],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
-    external: &BTreeSet<String>,
+    external: &FxHashSet<String>,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(checks, contents, noqa_line_for, external);
     fs::write(path, output)?;
@@ -80,16 +94,16 @@ fn add_noqa_inner(
     checks: &[Check],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
-    external: &BTreeSet<String>,
+    external: &FxHashSet<String>,
 ) -> (usize, String) {
-    let mut matches_by_line: BTreeMap<usize, BTreeSet<&CheckCode>> = BTreeMap::new();
+    let mut matches_by_line: FxHashMap<usize, FxHashSet<&CheckCode>> = FxHashMap::default();
     for (lineno, line) in contents.lines().enumerate() {
         // If we hit an exemption for the entire file, bail.
         if is_file_exempt(line) {
             return (0, contents.to_string());
         }
 
-        let mut codes: BTreeSet<&CheckCode> = BTreeSet::new();
+        let mut codes: FxHashSet<&CheckCode> = FxHashSet::default();
         for check in checks {
             if check.location.row() == lineno + 1 {
                 codes.insert(check.kind.code());
@@ -103,7 +117,7 @@ fn add_noqa_inner(
 
         if !codes.is_empty() {
             let matches = matches_by_line.entry(noqa_lineno).or_default();
-            matches.append(&mut codes);
+            matches.extend(codes);
         }
     }
 
@@ -185,9 +199,9 @@ fn add_noqa_inner(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
 
     use nohash_hasher::IntMap;
+    use rustc_hash::FxHashSet;
     use rustpython_parser::ast::Location;
 
     use crate::ast::types::Range;
@@ -213,7 +227,7 @@ mod tests {
         let checks = vec![];
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
-        let external = BTreeSet::default();
+        let external = FxHashSet::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for, &external);
         assert_eq!(count, 0);
         assert_eq!(output.trim(), contents.trim());
@@ -227,7 +241,7 @@ mod tests {
         )];
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
-        let external = BTreeSet::default();
+        let external = FxHashSet::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for, &external);
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: F841".trim());
@@ -250,7 +264,7 @@ mod tests {
         ];
         let contents = "x = 1  # noqa: E741";
         let noqa_line_for = IntMap::default();
-        let external = BTreeSet::default();
+        let external = FxHashSet::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for, &external);
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());
@@ -273,7 +287,7 @@ mod tests {
         ];
         let contents = "x = 1  # noqa";
         let noqa_line_for = IntMap::default();
-        let external = BTreeSet::default();
+        let external = FxHashSet::default();
         let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for, &external);
         assert_eq!(count, 1);
         assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());

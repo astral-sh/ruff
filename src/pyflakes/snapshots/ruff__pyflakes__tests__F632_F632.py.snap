@@ -10,13 +10,13 @@ expression: checks
     row: 1
     column: 13
   fix:
-    content: "x == \"abc\""
+    content: "=="
     location:
       row: 1
-      column: 3
+      column: 5
     end_location:
       row: 1
-      column: 13
+      column: 7
 - kind: IsLiteral
   location:
     row: 4
@@ -25,26 +25,86 @@ expression: checks
     row: 4
     column: 15
   fix:
-    content: 123 != y
+    content: "!="
     location:
       row: 4
-      column: 3
+      column: 7
     end_location:
       row: 4
-      column: 15
+      column: 13
 - kind: IsLiteral
   location:
     row: 7
     column: 3
   end_location:
-    row: 7
-    column: 17
+    row: 8
+    column: 13
   fix:
-    content: "\"123\" == x"
+    content: "!="
     location:
       row: 7
-      column: 3
+      column: 7
     end_location:
-      row: 7
-      column: 13
+      row: 8
+      column: 11
+- kind: IsLiteral
+  location:
+    row: 11
+    column: 3
+  end_location:
+    row: 11
+    column: 17
+  fix:
+    content: "=="
+    location:
+      row: 11
+      column: 9
+    end_location:
+      row: 11
+      column: 11
+- kind: IsLiteral
+  location:
+    row: 14
+    column: 3
+  end_location:
+    row: 14
+    column: 18
+  fix:
+    content: "=="
+    location:
+      row: 14
+      column: 14
+    end_location:
+      row: 14
+      column: 16
+- kind: IsLiteral
+  location:
+    row: 17
+    column: 3
+  end_location:
+    row: 17
+    column: 20
+  fix:
+    content: "=="
+    location:
+      row: 17
+      column: 16
+    end_location:
+      row: 17
+      column: 18
+- kind: IsLiteral
+  location:
+    row: 20
+    column: 13
+  end_location:
+    row: 20
+    column: 19
+  fix:
+    content: "=="
+    location:
+      row: 20
+      column: 15
+    end_location:
+      row: 20
+      column: 17
 

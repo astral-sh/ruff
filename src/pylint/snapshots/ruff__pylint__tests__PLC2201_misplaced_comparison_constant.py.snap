@@ -1,0 +1,101 @@
+---
+source: src/pylint/mod.rs
+expression: checks
+---
+- kind:
+    MisplacedComparisonConstant: i >= 5
+  location:
+    row: 20
+    column: 11
+  end_location:
+    row: 20
+    column: 17
+  fix:
+    content: i >= 5
+    location:
+      row: 20
+      column: 11
+    end_location:
+      row: 20
+      column: 17
+- kind:
+    MisplacedComparisonConstant: i == 1
+  location:
+    row: 22
+    column: 11
+  end_location:
+    row: 22
+    column: 17
+  fix:
+    content: i == 1
+    location:
+      row: 22
+      column: 11
+    end_location:
+      row: 22
+      column: 17
+- kind:
+    MisplacedComparisonConstant: dummy_return() > 3
+  location:
+    row: 24
+    column: 11
+  end_location:
+    row: 24
+    column: 29
+  fix:
+    content: dummy_return() > 3
+    location:
+      row: 24
+      column: 11
+    end_location:
+      row: 24
+      column: 29
+- kind:
+    MisplacedComparisonConstant: instance.dummy_return() != 4
+  location:
+    row: 26
+    column: 11
+  end_location:
+    row: 26
+    column: 39
+  fix:
+    content: instance.dummy_return() != 4
+    location:
+      row: 26
+      column: 11
+    end_location:
+      row: 26
+      column: 39
+- kind:
+    MisplacedComparisonConstant: instance.attr == 1
+  location:
+    row: 28
+    column: 11
+  end_location:
+    row: 28
+    column: 29
+  fix:
+    content: instance.attr == 1
+    location:
+      row: 28
+      column: 11
+    end_location:
+      row: 28
+      column: 29
+- kind:
+    MisplacedComparisonConstant: "instance.attr == 'aaa'"
+  location:
+    row: 30
+    column: 11
+  end_location:
+    row: 30
+    column: 33
+  fix:
+    content: "instance.attr == 'aaa'"
+    location:
+      row: 30
+      column: 11
+    end_location:
+      row: 30
+      column: 33
+

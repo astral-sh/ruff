@@ -1,10 +1,10 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
+use crate::ast::function_type;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 use crate::pep8_naming::helpers;
-use crate::pep8_naming::helpers::FunctionType;
 use crate::pep8_naming::settings::Settings;
 use crate::python::string::{self};
 
@@ -57,31 +57,33 @@ pub fn invalid_first_argument_name_for_class_method(
     import_aliases: &FxHashMap<&str, &str>,
     settings: &Settings,
 ) -> Option<Check> {
-    if matches!(
-        helpers::function_type(
+    if !matches!(
+        function_type::classify(
             scope,
             name,
             decorator_list,
             from_imports,
             import_aliases,
-            settings,
+            &settings.classmethod_decorators,
+            &settings.staticmethod_decorators,
         ),
-        FunctionType::ClassMethod
+        function_type::FunctionType::ClassMethod
     ) {
-        if let Some(arg) = args.posonlyargs.first() {
-            if arg.node.arg != "cls" {
-                return Some(Check::new(
-                    CheckKind::InvalidFirstArgumentNameForClassMethod,
-                    Range::from_located(arg),
-                ));
-            }
-        } else if let Some(arg) = args.args.first() {
-            if arg.node.arg != "cls" {
-                return Some(Check::new(
-                    CheckKind::InvalidFirstArgumentNameForClassMethod,
-                    Range::from_located(arg),
-                ));
-            }
+        return None;
+    }
+    if let Some(arg) = args.posonlyargs.first() {
+        if arg.node.arg != "cls" {
+            return Some(Check::new(
+                CheckKind::InvalidFirstArgumentNameForClassMethod,
+                Range::from_located(arg),
+            ));
+        }
+    } else if let Some(arg) = args.args.first() {
+        if arg.node.arg != "cls" {
+            return Some(Check::new(
+                CheckKind::InvalidFirstArgumentNameForClassMethod,
+                Range::from_located(arg),
+            ));
         }
     }
     None
@@ -97,27 +99,28 @@ pub fn invalid_first_argument_name_for_method(
     import_aliases: &FxHashMap<&str, &str>,
     settings: &Settings,
 ) -> Option<Check> {
-    if matches!(
-        helpers::function_type(
+    if !matches!(
+        function_type::classify(
             scope,
             name,
             decorator_list,
             from_imports,
             import_aliases,
-            settings,
+            &settings.classmethod_decorators,
+            &settings.staticmethod_decorators,
         ),
-        FunctionType::Method
+        function_type::FunctionType::Method
     ) {
-        if let Some(arg) = args.args.first() {
-            if arg.node.arg != "self" {
-                return Some(Check::new(
-                    CheckKind::InvalidFirstArgumentNameForMethod,
-                    Range::from_located(arg),
-                ));
-            }
-        }
+        return None;
     }
-    None
+    let arg = args.args.first()?;
+    if arg.node.arg == "self" {
+        return None;
+    }
+    Some(Check::new(
+        CheckKind::InvalidFirstArgumentNameForMethod,
+        Range::from_located(arg),
+    ))
 }
 
 /// N807
@@ -125,18 +128,18 @@ pub fn dunder_function_name(scope: &Scope, stmt: &Stmt, name: &str) -> Option<Ch
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
     }
-    if name.starts_with("__") && name.ends_with("__") {
-        // Allowed under PEP 562 (https://peps.python.org/pep-0562/).
-        if matches!(scope.kind, ScopeKind::Module) && (name == "__getattr__" || name == "__dir__") {
-            return None;
-        }
-
-        return Some(Check::new(
-            CheckKind::DunderFunctionName,
-            Range::from_located(stmt),
-        ));
+    if !(name.starts_with("__") && name.ends_with("__")) {
+        return None;
     }
-    None
+    // Allowed under PEP 562 (https://peps.python.org/pep-0562/).
+    if matches!(scope.kind, ScopeKind::Module) && (name == "__getattr__" || name == "__dir__") {
+        return None;
+    }
+
+    Some(Check::new(
+        CheckKind::DunderFunctionName,
+        Range::from_located(stmt),
+    ))
 }
 
 /// N811
@@ -228,19 +231,21 @@ pub fn error_suffix_on_exception_name(
     bases: &[Expr],
     name: &str,
 ) -> Option<Check> {
-    if bases.iter().any(|base| {
+    if !bases.iter().any(|base| {
         if let ExprKind::Name { id, .. } = &base.node {
             id == "Exception" || id.ends_with("Error")
         } else {
             false
         }
     }) {
-        if !name.ends_with("Error") {
-            return Some(Check::new(
-                CheckKind::ErrorSuffixOnExceptionName(name.to_string()),
-                Range::from_located(class_def),
-            ));
-        }
+        return None;
     }
-    None
+
+    if name.ends_with("Error") {
+        return None;
+    }
+    Some(Check::new(
+        CheckKind::ErrorSuffixOnExceptionName(name.to_string()),
+        Range::from_located(class_def),
+    ))
 }

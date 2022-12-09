@@ -1,6 +1,5 @@
-use std::collections::BTreeSet;
-
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
 use rustpython_ast::{
     Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location, Stmt,
 };
@@ -27,9 +26,9 @@ fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
-) -> BTreeSet<Vec<&'a str>> {
-    let mut seen: BTreeSet<Vec<&str>> = BTreeSet::default();
-    let mut duplicates: BTreeSet<Vec<&str>> = BTreeSet::default();
+) -> FxHashSet<Vec<&'a str>> {
+    let mut seen: FxHashSet<Vec<&str>> = FxHashSet::default();
+    let mut duplicates: FxHashSet<Vec<&str>> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
         let call_path = helpers::collect_call_paths(type_);
@@ -76,36 +75,33 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Excepthandler]) {
-    let mut seen: BTreeSet<Vec<&str>> = BTreeSet::default();
-    let mut duplicates: BTreeSet<Vec<&str>> = BTreeSet::default();
+    let mut seen: FxHashSet<Vec<&str>> = FxHashSet::default();
+    let mut duplicates: FxHashSet<Vec<&str>> = FxHashSet::default();
     for handler in handlers {
-        match &handler.node {
-            ExcepthandlerKind::ExceptHandler { type_, .. } => {
-                if let Some(type_) = type_ {
-                    match &type_.node {
-                        ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
-                            let call_path = helpers::collect_call_paths(type_);
-                            if !call_path.is_empty() {
-                                if seen.contains(&call_path) {
-                                    duplicates.insert(call_path);
-                                } else {
-                                    seen.insert(call_path);
-                                }
-                            }
-                        }
-                        ExprKind::Tuple { elts, .. } => {
-                            for name in duplicate_handler_exceptions(checker, type_, elts) {
-                                if seen.contains(&name) {
-                                    duplicates.insert(name);
-                                } else {
-                                    seen.insert(name);
-                                }
-                            }
-                        }
-                        _ => {}
+        let ExcepthandlerKind::ExceptHandler { type_: Some(type_), .. } = &handler.node else {
+            continue;
+        };
+        match &type_.node {
+            ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
+                let call_path = helpers::collect_call_paths(type_);
+                if !call_path.is_empty() {
+                    if seen.contains(&call_path) {
+                        duplicates.insert(call_path);
+                    } else {
+                        seen.insert(call_path);
                     }
                 }
             }
+            ExprKind::Tuple { elts, .. } => {
+                for name in duplicate_handler_exceptions(checker, type_, elts) {
+                    if seen.contains(&name) {
+                        duplicates.insert(name);
+                    } else {
+                        seen.insert(name);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 

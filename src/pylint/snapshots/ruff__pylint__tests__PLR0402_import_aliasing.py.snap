@@ -1,0 +1,27 @@
+---
+source: src/pylint/mod.rs
+expression: checks
+---
+- kind:
+    ConsiderUsingFromImport:
+      - os
+      - path
+  location:
+    row: 9
+    column: 7
+  end_location:
+    row: 9
+    column: 22
+  fix: ~
+- kind:
+    ConsiderUsingFromImport:
+      - foo.bar
+      - foobar
+  location:
+    row: 11
+    column: 7
+  end_location:
+    row: 11
+    column: 31
+  fix: ~
+

@@ -1,0 +1,77 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    UnusedVariable: e
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 7
+    column: 0
+  fix: ~
+- kind:
+    UnusedVariable: z
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 5
+  fix: ~
+- kind:
+    UnusedVariable: foo
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 20
+    column: 7
+  fix: ~
+- kind:
+    UnusedVariable: a
+  location:
+    row: 21
+    column: 5
+  end_location:
+    row: 21
+    column: 6
+  fix: ~
+- kind:
+    UnusedVariable: b
+  location:
+    row: 21
+    column: 8
+  end_location:
+    row: 21
+    column: 9
+  fix: ~
+- kind:
+    UnusedVariable: baz
+  location:
+    row: 26
+    column: 13
+  end_location:
+    row: 26
+    column: 16
+  fix: ~
+- kind:
+    UnusedVariable: b
+  location:
+    row: 51
+    column: 8
+  end_location:
+    row: 51
+    column: 9
+  fix: ~
+- kind:
+    UnusedVariable: f
+  location:
+    row: 71
+    column: 25
+  end_location:
+    row: 71
+    column: 26
+  fix: ~
+

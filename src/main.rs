@@ -17,6 +17,7 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
+use ::ruff::autofix::fixer;
 use ::ruff::checks::{CheckCode, CheckKind};
 use ::ruff::cli::{collect_per_file_ignores, extract_log_level, Cli};
 use ::ruff::fs::iter_python_files;
@@ -29,15 +30,14 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
-use ::ruff::{cache, commands};
+use ::ruff::{cache, commands, fs};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use log::{debug, error};
-use notify::{raw_watcher, RecursiveMode, Watcher};
+use notify::{recommended_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff::autofix::fixer;
 use rustpython_ast::Location;
 use walkdir::DirEntry;
 
@@ -210,10 +210,12 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     // Find the project root and pyproject.toml.
-    let project_root = pyproject::find_project_root(&cli.files);
-    let pyproject = cli
-        .config
-        .or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
+    let config: Option<PathBuf> = cli.config;
+    let project_root = config.as_ref().map_or_else(
+        || pyproject::find_project_root(&cli.files),
+        |config| config.parent().map(fs::normalize_path),
+    );
+    let pyproject = config.or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
 
     // Reconcile configuration from pyproject.toml and command-line arguments.
     let mut configuration =
@@ -338,7 +340,7 @@ fn inner_main() -> Result<ExitCode> {
 
         // Configure the file watcher.
         let (tx, rx) = channel();
-        let mut watcher = raw_watcher(tx)?;
+        let mut watcher = recommended_watcher(tx)?;
         for file in &cli.files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
@@ -346,15 +348,19 @@ fn inner_main() -> Result<ExitCode> {
         loop {
             match rx.recv() {
                 Ok(e) => {
-                    if let Some(path) = e.path {
-                        if path.to_string_lossy().ends_with(".py") {
-                            printer.clear_screen()?;
-                            printer.write_to_user("File change detected...\n");
+                    let paths = e?.paths;
+                    let py_changed = paths.iter().any(|p| {
+                        p.extension()
+                            .map(|ext| ext.eq_ignore_ascii_case("py"))
+                            .unwrap_or_default()
+                    });
+                    if py_changed {
+                        printer.clear_screen()?;
+                        printer.write_to_user("File change detected...\n");
 
-                            let messages =
-                                run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
-                            printer.write_continuously(&messages)?;
-                        }
+                        let messages =
+                            run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
+                        printer.write_continuously(&messages)?;
                     }
                 }
                 Err(e) => return Err(e.into()),
@@ -386,7 +392,7 @@ fn inner_main() -> Result<ExitCode> {
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, fixer::Mode::Apply)) {
-            printer.write_once(&diagnostics)?;
+            printer.write_once(&diagnostics, &autofix)?;
         }
 
         // Check for updates if we're in a non-silent log level.

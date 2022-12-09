@@ -1,24 +1,22 @@
 use rustpython_ast::{Expr, ExprKind};
 
-use crate::ast::types::{Binding, BindingKind, Range};
+use crate::ast::types::Range;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 /// F633
 pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
-    if let ExprKind::Name { id, .. } = &left.node {
-        if id == "print" {
-            let scope = checker.current_scope();
-            if let Some(Binding {
-                kind: BindingKind::Builtin,
-                ..
-            }) = scope.values.get("print")
-            {
-                checker.add_check(Check::new(
-                    CheckKind::InvalidPrintSyntax,
-                    Range::from_located(left),
-                ));
-            }
-        }
+    let ExprKind::Name { id, .. } = &left.node else {
+        return;
+    };
+    if id != "print" {
+        return;
     }
+    if !checker.is_builtin("print") {
+        return;
+    };
+    checker.add_check(Check::new(
+        CheckKind::InvalidPrintSyntax,
+        Range::from_located(left),
+    ));
 }

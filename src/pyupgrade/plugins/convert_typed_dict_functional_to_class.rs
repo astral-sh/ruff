@@ -20,27 +20,27 @@ fn match_typed_dict_assign<'a>(
     targets: &'a [Expr],
     value: &'a Expr,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a ExprKind)> {
-    if let Some(target) = targets.get(0) {
-        if let ExprKind::Name { id: class_name, .. } = &target.node {
-            if let ExprKind::Call {
-                func,
-                args,
-                keywords,
-            } = &value.node
-            {
-                if match_module_member(
-                    func,
-                    "typing",
-                    "TypedDict",
-                    &checker.from_imports,
-                    &checker.import_aliases,
-                ) {
-                    return Some((class_name, args, keywords, &func.node));
-                }
-            }
-        }
+    let target = targets.get(0)?;
+    let ExprKind::Name { id: class_name, .. } = &target.node else {
+        return None;
+    };
+    let ExprKind::Call {
+        func,
+        args,
+        keywords,
+    } = &value.node else {
+        return None;
+    };
+    if !match_module_member(
+        func,
+        "typing",
+        "TypedDict",
+        &checker.from_imports,
+        &checker.import_aliases,
+    ) {
+        return None;
     }
-    None
+    Some((class_name, args, keywords, &func.node))
 }
 
 /// Generate a `StmtKind::AnnAssign` representing the provided property
@@ -127,15 +127,13 @@ fn get_properties_from_dict_literal(keys: &[Expr], values: &[Expr]) -> Result<Ve
 }
 
 fn get_properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<Stmt>> {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if id == "dict" {
-            get_properties_from_keywords(keywords)
-        } else {
-            bail!("Expected `id` to be `\"dict\"`")
-        }
-    } else {
+    let ExprKind::Name { id, .. } = &func.node else {
         bail!("Expected `func` to be `ExprKind::Name`")
+    };
+    if id != "dict" {
+        bail!("Expected `id` to be `\"dict\"`")
     }
+    get_properties_from_keywords(keywords)
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
@@ -158,15 +156,11 @@ fn get_properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
 // The only way to have the `total` keyword is to use the args version, like:
 // (`TypedDict('name', {'a': int}, total=True)`)
 fn get_total_from_only_keyword(keywords: &[Keyword]) -> Option<&KeywordData> {
-    match keywords.get(0) {
-        Some(keyword) => match &keyword.node.arg {
-            Some(arg) => match arg.as_str() {
-                "total" => Some(&keyword.node),
-                _ => None,
-            },
-            None => None,
-        },
-        None => None,
+    let keyword = keywords.get(0)?;
+    let arg = &keyword.node.arg.as_ref()?;
+    match arg.as_str() {
+        "total" => Some(&keyword.node),
+        _ => None,
     }
 }
 
@@ -218,31 +212,34 @@ fn convert_to_class(
     ))
 }
 
-/// U013
+/// UP013
 pub fn convert_typed_dict_functional_to_class(
     checker: &mut Checker,
     stmt: &Stmt,
     targets: &[Expr],
     value: &Expr,
 ) {
-    if let Some((class_name, args, keywords, base_class)) =
-        match_typed_dict_assign(checker, targets, value)
+    let Some((class_name, args, keywords, base_class)) =
+        match_typed_dict_assign(checker, targets, value) else
     {
-        match get_properties_and_total(args, keywords) {
-            Err(err) => error!("Failed to parse TypedDict: {}", err),
-            Ok((body, total_keyword)) => {
-                let mut check = Check::new(
-                    CheckKind::ConvertTypedDictFunctionalToClass(class_name.to_string()),
-                    Range::from_located(stmt),
-                );
-                if checker.patch(check.kind.code()) {
-                    match convert_to_class(stmt, class_name, body, total_keyword, base_class) {
-                        Ok(fix) => check.amend(fix),
-                        Err(err) => error!("Failed to convert TypedDict: {}", err),
-                    };
-                }
-                checker.add_check(check);
-            }
+        return;
+    };
+    let (body, total_keyword) = match get_properties_and_total(args, keywords) {
+        Err(err) => {
+            error!("Failed to parse TypedDict: {err}");
+            return;
         }
+        Ok(args) => args,
+    };
+    let mut check = Check::new(
+        CheckKind::ConvertTypedDictFunctionalToClass(class_name.to_string()),
+        Range::from_located(stmt),
+    );
+    if checker.patch(check.kind.code()) {
+        match convert_to_class(stmt, class_name, body, total_keyword, base_class) {
+            Ok(fix) => check.amend(fix),
+            Err(err) => error!("Failed to convert TypedDict: {err}"),
+        };
     }
+    checker.add_check(check);
 }

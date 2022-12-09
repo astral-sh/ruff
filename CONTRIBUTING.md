@@ -105,6 +105,8 @@ You may also want to add the new configuration option to the `flake8-to-ruff` to
 responsible for converting `flake8` configuration files to Ruff's TOML format. This logic
 lives in `flake8_to_ruff/src/converter.rs`.
 
+To update the documentation for supported configuration options, run `cargo dev generate-options`.
+
 ## Release process
 
 As of now, Ruff has an ad hoc release process: releases are cut with high frequency via GitHub

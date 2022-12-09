@@ -6,7 +6,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, KeywordData, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
-use crate::ast::helpers::{self, match_name_or_attr};
+use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
@@ -64,7 +64,7 @@ fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
         keywords,
     } = &expr.node
     {
-        if match_name_or_attr(func, OPEN_FUNC_NAME) {
+        if matches!(&func.node, ExprKind::Name {id, ..} if id == OPEN_FUNC_NAME) {
             // Return the "open mode" parameter and keywords.
             return (args.get(1), keywords.clone());
         }
@@ -90,7 +90,7 @@ fn create_check(
         } else {
             match create_remove_param_fix(locator, expr, mode_param) {
                 Ok(fix) => check.amend(fix),
-                Err(e) => error!("Failed to remove parameter: {}", e),
+                Err(e) => error!("Failed to remove parameter: {e}"),
             }
         }
     }
@@ -146,7 +146,7 @@ fn create_remove_param_fix(
     }
 }
 
-/// U015
+/// UP015
 pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     // If `open` has been rebound, skip this check entirely.
     if !checker.is_builtin(OPEN_FUNC_NAME) {
@@ -177,7 +177,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         value,
                         mode.replacement_value(),
                         checker.locator,
-                        checker.patch(&CheckCode::U015),
+                        checker.patch(&CheckCode::UP015),
                     ));
                 }
             }
@@ -194,7 +194,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(&CheckCode::U015),
+                    checker.patch(&CheckCode::UP015),
                 ));
             }
         }

@@ -25,29 +25,30 @@ impl TryFrom<&str> for CFormatSummary {
         let mut keywords = FxHashSet::default();
 
         for format_part in format_string.parts {
-            if let CFormatPart::Spec(CFormatSpec {
+            let CFormatPart::Spec(CFormatSpec {
                 mapping_key,
                 min_field_width,
                 precision,
                 ..
-            }) = format_part.1
+            }) = format_part.1 else
             {
-                match mapping_key {
-                    Some(k) => {
-                        keywords.insert(k);
-                    }
-                    None => {
-                        num_positional += 1;
-                    }
-                };
-                if min_field_width == Some(CFormatQuantity::FromValuesTuple) {
-                    num_positional += 1;
-                    starred = true;
+                continue;
+            };
+            match mapping_key {
+                Some(k) => {
+                    keywords.insert(k);
                 }
-                if precision == Some(CFormatQuantity::FromValuesTuple) {
+                None => {
                     num_positional += 1;
-                    starred = true;
                 }
+            };
+            if min_field_width == Some(CFormatQuantity::FromValuesTuple) {
+                num_positional += 1;
+                starred = true;
+            }
+            if precision == Some(CFormatQuantity::FromValuesTuple) {
+                num_positional += 1;
+                starred = true;
             }
         }
 

@@ -26,15 +26,16 @@ fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
 
 /// F901
 pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
-    if let Some(expr) = match_not_implemented(expr) {
-        let mut check = Check::new(CheckKind::RaiseNotImplemented, Range::from_located(expr));
-        if checker.patch(check.kind.code()) {
-            check.amend(Fix::replacement(
-                "NotImplementedError".to_string(),
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
-        }
-        checker.add_check(check);
+    let Some(expr) = match_not_implemented(expr) else {
+        return;
+    };
+    let mut check = Check::new(CheckKind::RaiseNotImplemented, Range::from_located(expr));
+    if checker.patch(check.kind.code()) {
+        check.amend(Fix::replacement(
+            "NotImplementedError".to_string(),
+            expr.location,
+            expr.end_location.unwrap(),
+        ));
     }
+    checker.add_check(check);
 }

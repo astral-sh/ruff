@@ -9,17 +9,17 @@ use crate::source_code_locator::SourceCodeLocator;
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
 fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
-    if let ExprKind::Attribute {
+    let ExprKind::Attribute {
         value: variable,
         attr,
         ..
-    } = &func.node
-    {
-        if attr == "encode" {
-            return Some(variable);
-        }
+    } = &func.node else {
+        return None;
+    };
+    if attr != "encode" {
+        return None;
     }
-    None
+    Some(variable)
 }
 
 fn is_utf8_encoding_arg(arg: &Expr) -> bool {
@@ -101,7 +101,7 @@ fn replace_with_bytes_literal(
     check
 }
 
-/// U012
+/// UP012
 pub fn unnecessary_encode_utf8(
     checker: &mut Checker,
     expr: &Expr,
@@ -109,50 +109,51 @@ pub fn unnecessary_encode_utf8(
     args: &Vec<Expr>,
     kwargs: &Vec<Keyword>,
 ) {
-    if let Some(variable) = match_encoded_variable(func) {
-        match &variable.node {
-            ExprKind::Constant {
-                value: Constant::Str(literal),
-                ..
-            } => {
-                // "str".encode()
-                // "str".encode("utf-8")
-                if is_default_encode(args, kwargs) {
-                    if literal.is_ascii() {
-                        // "foo".encode()
-                        checker.add_check(replace_with_bytes_literal(
-                            expr,
-                            variable,
-                            checker.locator,
-                            checker.patch(&CheckCode::U012),
-                        ));
-                    } else {
-                        // "unicode text©".encode("utf-8")
-                        if let Some(check) = delete_default_encode_arg_or_kwarg(
-                            expr,
-                            args,
-                            kwargs,
-                            checker.patch(&CheckCode::U012),
-                        ) {
-                            checker.add_check(check);
-                        }
-                    }
-                }
-            }
-            // f"foo{bar}".encode(*args, **kwargs)
-            ExprKind::JoinedStr { .. } => {
-                if is_default_encode(args, kwargs) {
+    let Some(variable) = match_encoded_variable(func) else {
+        return;
+    };
+    match &variable.node {
+        ExprKind::Constant {
+            value: Constant::Str(literal),
+            ..
+        } => {
+            // "str".encode()
+            // "str".encode("utf-8")
+            if is_default_encode(args, kwargs) {
+                if literal.is_ascii() {
+                    // "foo".encode()
+                    checker.add_check(replace_with_bytes_literal(
+                        expr,
+                        variable,
+                        checker.locator,
+                        checker.patch(&CheckCode::UP012),
+                    ));
+                } else {
+                    // "unicode text©".encode("utf-8")
                     if let Some(check) = delete_default_encode_arg_or_kwarg(
                         expr,
                         args,
                         kwargs,
-                        checker.patch(&CheckCode::U012),
+                        checker.patch(&CheckCode::UP012),
                     ) {
                         checker.add_check(check);
                     }
                 }
             }
-            _ => {}
         }
+        // f"foo{bar}".encode(*args, **kwargs)
+        ExprKind::JoinedStr { .. } => {
+            if is_default_encode(args, kwargs) {
+                if let Some(check) = delete_default_encode_arg_or_kwarg(
+                    expr,
+                    args,
+                    kwargs,
+                    checker.patch(&CheckCode::UP012),
+                ) {
+                    checker.add_check(check);
+                }
+            }
+        }
+        _ => {}
     }
 }

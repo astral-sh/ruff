@@ -8,7 +8,7 @@ use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::types::Primitive;
 use crate::settings::types::PythonVersion;
 
-/// U008
+/// UP008
 pub fn super_args(
     scope: &Scope,
     parents: &[&Stmt],
@@ -30,116 +30,134 @@ pub fn super_args(
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
-    if let [first_arg, second_arg] = args {
-        // Find the enclosing function definition (if any).
-        if let Some(StmtKind::FunctionDef {
-            args: parent_args, ..
-        }) = parents
-            .find(|stmt| matches!(stmt.node, StmtKind::FunctionDef { .. }))
-            .map(|stmt| &stmt.node)
-        {
-            // Extract the name of the first argument to the enclosing function.
-            if let Some(ArgData {
-                arg: parent_arg, ..
-            }) = parent_args.args.first().map(|expr| &expr.node)
-            {
-                // Find the enclosing class definition (if any).
-                if let Some(StmtKind::ClassDef {
-                    name: parent_name, ..
-                }) = parents
-                    .find(|stmt| matches!(stmt.node, StmtKind::ClassDef { .. }))
-                    .map(|stmt| &stmt.node)
-                {
-                    if let (
-                        ExprKind::Name {
-                            id: first_arg_id, ..
-                        },
-                        ExprKind::Name {
-                            id: second_arg_id, ..
-                        },
-                    ) = (&first_arg.node, &second_arg.node)
-                    {
-                        if first_arg_id == parent_name && second_arg_id == parent_arg {
-                            return Some(Check::new(
-                                CheckKind::SuperCallWithParameters,
-                                Range::from_located(expr),
-                            ));
-                        }
-                    }
-                }
-            }
-        }
+    let [first_arg, second_arg] = args else {
+        return None;
+    };
+
+    // Find the enclosing function definition (if any).
+    let Some(StmtKind::FunctionDef {
+        args: parent_args, ..
+    }) = parents
+        .find(|stmt| matches!(stmt.node, StmtKind::FunctionDef { .. }))
+        .map(|stmt| &stmt.node) else {
+        return None;
+    };
+
+    // Extract the name of the first argument to the enclosing function.
+    let Some(ArgData {
+        arg: parent_arg, ..
+    }) = parent_args.args.first().map(|expr| &expr.node) else {
+        return None;
+    };
+
+    // Find the enclosing class definition (if any).
+    let Some(StmtKind::ClassDef {
+        name: parent_name, ..
+    }) = parents
+        .find(|stmt| matches!(stmt.node, StmtKind::ClassDef { .. }))
+        .map(|stmt| &stmt.node) else {
+        return None;
+    };
+
+    let (
+        ExprKind::Name {
+            id: first_arg_id, ..
+        },
+        ExprKind::Name {
+            id: second_arg_id, ..
+        },
+    ) = (&first_arg.node, &second_arg.node) else {
+        return None;
+    };
+
+    if first_arg_id == parent_name && second_arg_id == parent_arg {
+        return Some(Check::new(
+            CheckKind::SuperCallWithParameters,
+            Range::from_located(expr),
+        ));
     }
 
     None
 }
 
-/// U001
+/// UP001
 pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -> Option<Check> {
-    if targets.len() == 1 {
-        if let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() {
-            if id == "__metaclass__" {
-                if let ExprKind::Name { id, .. } = &value.node {
-                    if id == "type" {
-                        return Some(Check::new(CheckKind::UselessMetaclassType, location));
-                    }
-                }
-            }
-        }
+    if targets.len() != 1 {
+        return None;
     }
-    None
+    let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() else {
+        return None;
+    };
+    if id != "__metaclass__" {
+        return None;
+    }
+    let ExprKind::Name { id, .. } = &value.node else {
+        return None;
+    };
+    if id != "type" {
+        return None;
+    }
+    Some(Check::new(CheckKind::UselessMetaclassType, location))
 }
 
-/// U004
-pub fn useless_object_inheritance(name: &str, bases: &[Expr], scope: &Scope) -> Option<Check> {
+/// UP004
+pub fn useless_object_inheritance(
+    name: &str,
+    bases: &[Expr],
+    scope: &Scope,
+    bindings: &[Binding],
+) -> Option<Check> {
     for expr in bases {
-        if let ExprKind::Name { id, .. } = &expr.node {
-            if id == "object" {
-                match scope.values.get(&id.as_str()) {
-                    None
-                    | Some(Binding {
-                        kind: BindingKind::Builtin,
-                        ..
-                    }) => {
-                        return Some(Check::new(
-                            CheckKind::UselessObjectInheritance(name.to_string()),
-                            Range::from_located(expr),
-                        ));
-                    }
-                    _ => {}
-                }
-            }
+        let ExprKind::Name { id, .. } = &expr.node else {
+            continue;
+        };
+        if id != "object" {
+            continue;
         }
+        if !matches!(
+            scope
+                .values
+                .get(&id.as_str())
+                .map(|index| &bindings[*index]),
+            None | Some(Binding {
+                kind: BindingKind::Builtin,
+                ..
+            })
+        ) {
+            continue;
+        }
+        return Some(Check::new(
+            CheckKind::UselessObjectInheritance(name.to_string()),
+            Range::from_located(expr),
+        ));
     }
 
     None
 }
 
-/// U003
+/// UP003
 pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
     // Validate the arguments.
-    if args.len() == 1 {
-        match &func.node {
-            ExprKind::Attribute { attr: id, .. } | ExprKind::Name { id, .. } => {
-                if id == "type" {
-                    if let ExprKind::Constant { value, .. } = &args[0].node {
-                        if let Some(primitive) = Primitive::from_constant(value) {
-                            return Some(Check::new(
-                                CheckKind::TypeOfPrimitive(primitive),
-                                location,
-                            ));
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
+    if args.len() != 1 {
+        return None;
     }
 
-    None
+    let (ExprKind::Attribute { attr: id, .. } | ExprKind::Name { id, .. }) = &func.node else {
+        return None;
+    };
+    if id != "type" {
+        return None;
+    }
+
+    let ExprKind::Constant { value, .. } = &args[0].node else {
+        return None;
+    };
+
+    let primitive = Primitive::from_constant(value)?;
+    Some(Check::new(CheckKind::TypeOfPrimitive(primitive), location))
 }
 
-/// U011
+/// UP011
 pub fn unnecessary_lru_cache_params(
     decorator_list: &[Expr],
     target_version: PythonVersion,
@@ -147,46 +165,53 @@ pub fn unnecessary_lru_cache_params(
     import_aliases: &FxHashMap<&str, &str>,
 ) -> Option<Check> {
     for expr in decorator_list.iter() {
-        if let ExprKind::Call {
+        let ExprKind::Call {
             func,
             args,
             keywords,
         } = &expr.node
+        else {
+            continue;
+        };
+
+        if !(args.is_empty()
+            && helpers::match_module_member(
+                func,
+                "functools",
+                "lru_cache",
+                from_imports,
+                import_aliases,
+            ))
         {
-            if args.is_empty()
-                && helpers::match_module_member(
-                    func,
-                    "functools",
-                    "lru_cache",
-                    from_imports,
-                    import_aliases,
-                )
-            {
-                let range = Range {
-                    location: func.end_location.unwrap(),
-                    end_location: expr.end_location.unwrap(),
-                };
-                // Ex) `functools.lru_cache()`
-                if keywords.is_empty() {
-                    return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
-                }
-                // Ex) `functools.lru_cache(maxsize=None)`
-                if target_version >= PythonVersion::Py39 && keywords.len() == 1 {
-                    let KeywordData { arg, value } = &keywords[0].node;
-                    if arg.as_ref().map(|arg| arg == "maxsize").unwrap_or_default()
-                        && matches!(
-                            value.node,
-                            ExprKind::Constant {
-                                value: Constant::None,
-                                kind: None,
-                            }
-                        )
-                    {
-                        return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
-                    }
-                }
-            }
+            continue;
         }
+
+        let range = Range {
+            location: func.end_location.unwrap(),
+            end_location: expr.end_location.unwrap(),
+        };
+        // Ex) `functools.lru_cache()`
+        if keywords.is_empty() {
+            return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
+        }
+        // Ex) `functools.lru_cache(maxsize=None)`
+        if !(target_version >= PythonVersion::Py39 && keywords.len() == 1) {
+            continue;
+        }
+
+        let KeywordData { arg, value } = &keywords[0].node;
+        if !(arg.as_ref().map(|arg| arg == "maxsize").unwrap_or_default()
+            && matches!(
+                value.node,
+                ExprKind::Constant {
+                    value: Constant::None,
+                    kind: None,
+                }
+            ))
+        {
+            continue;
+        }
+        return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
     }
     None
 }

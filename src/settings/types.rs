@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::env;
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
@@ -7,6 +6,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, bail, Result};
 use clap::ValueEnum;
 use globset::{Glob, GlobSetBuilder};
+use rustc_hash::FxHashSet;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::checks::CheckCode;
@@ -89,10 +89,10 @@ impl FromStr for FilePattern {
     }
 }
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone)]
 pub struct PerFileIgnore {
     pub pattern: String,
-    pub codes: BTreeSet<CheckCode>,
+    pub codes: FxHashSet<CheckCode>,
 }
 
 impl PerFileIgnore {

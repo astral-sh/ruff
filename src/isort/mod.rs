@@ -10,6 +10,7 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::sorting::{member_key, module_key};
+use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
 };
@@ -145,7 +146,7 @@ fn annotate_imports<'a>(
     annotated
 }
 
-fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
+fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) -> ImportBlock {
     let mut block = ImportBlock::default();
     for import in imports {
         match import {
@@ -191,7 +192,18 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
             } => {
                 // Associate the comments with the first alias (best effort).
                 if let Some(alias) = names.first() {
-                    if alias.asname.is_none() {
+                    if alias.name == "*" {
+                        let entry = block
+                            .import_from_star
+                            .entry(ImportFromData { module, level })
+                            .or_default();
+                        for comment in atop {
+                            entry.atop.push(comment.value);
+                        }
+                        for comment in inline {
+                            entry.inline.push(comment.value);
+                        }
+                    } else if alias.asname.is_none() || combine_as_imports {
                         let entry = &mut block
                             .import_from
                             .entry(ImportFromData { module, level })
@@ -225,7 +237,18 @@ fn normalize_imports(imports: Vec<AnnotatedImport>) -> ImportBlock {
 
                 // Create an entry for every alias.
                 for alias in names {
-                    if alias.asname.is_none() {
+                    if alias.name == "*" {
+                        let entry = block
+                            .import_from_star
+                            .entry(ImportFromData { module, level })
+                            .or_default();
+                        for comment in alias.atop {
+                            entry.atop.push(comment.value);
+                        }
+                        for comment in alias.inline {
+                            entry.inline.push(comment.value);
+                        }
+                    } else if alias.asname.is_none() || combine_as_imports {
                         let entry = block
                             .import_from
                             .entry(ImportFromData { module, level })
@@ -323,6 +346,22 @@ fn categorize_imports<'a>(
             .import_from_as
             .insert((import_from, alias), comments);
     }
+    // Categorize `StmtKind::ImportFrom` (with star).
+    for (import_from, comments) in block.import_from_star {
+        let classification = categorize(
+            &import_from.module_base(),
+            import_from.level,
+            src,
+            known_first_party,
+            known_third_party,
+            extra_standard_library,
+        );
+        block_by_type
+            .entry(classification)
+            .or_default()
+            .import_from_star
+            .insert(import_from, comments);
+    }
     block_by_type
 }
 
@@ -367,6 +406,33 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                         )
                     }),
             )
+            .chain(
+                // Include all star imports.
+                block
+                    .import_from_star
+                    .into_iter()
+                    .map(|(import_from, comments)| {
+                        (
+                            import_from,
+                            (
+                                CommentSet {
+                                    atop: comments.atop,
+                                    inline: vec![],
+                                },
+                                FxHashMap::from_iter([(
+                                    AliasData {
+                                        name: "*",
+                                        asname: None,
+                                    },
+                                    CommentSet {
+                                        atop: vec![],
+                                        inline: comments.inline,
+                                    },
+                                )]),
+                            ),
+                        )
+                    }),
+            )
             .map(|(import_from, (comments, aliases))| {
                 // Within each `StmtKind::ImportFrom`, sort the members.
                 (
@@ -397,19 +463,23 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn format_imports(
-    block: &[&Stmt],
+    block: &Block,
     comments: Vec<Comment>,
     line_length: usize,
     src: &[PathBuf],
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
+    combine_as_imports: bool,
+    force_wrap_aliases: bool,
 ) -> String {
-    let block = annotate_imports(block, comments);
+    let trailer = &block.trailer;
+    let block = annotate_imports(&block.imports, comments);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
-    let block = normalize_imports(block);
+    let block = normalize_imports(block, combine_as_imports);
 
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
@@ -449,9 +519,20 @@ pub fn format_imports(
                 comments,
                 aliases,
                 line_length,
+                force_wrap_aliases,
                 is_first_statement,
             ));
             is_first_statement = false;
+        }
+    }
+    match trailer {
+        None => {}
+        Some(Trailer::Sibling) => {
+            output.append("\n");
+        }
+        Some(Trailer::FunctionDef | Trailer::ClassDef) => {
+            output.append("\n");
+            output.append("\n");
         }
     }
     output.finish().to_string()
@@ -466,20 +547,26 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
-    use crate::Settings;
+    use crate::{isort, Settings};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
+    #[test_case(Path::new("combine_as_imports.py"))]
     #[test_case(Path::new("combine_import_froms.py"))]
     #[test_case(Path::new("comments.py"))]
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
+    #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
+    #[test_case(Path::new("insert_empty_lines.py"))]
+    #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
+    #[test_case(Path::new("no_wrap_star.py"))]
     #[test_case(Path::new("order_by_type.py"))]
     #[test_case(Path::new("order_relative_imports_by_level.py"))]
     #[test_case(Path::new("preserve_comment_order.py"))]
+    #[test_case(Path::new("preserve_import_star.py"))]
     #[test_case(Path::new("preserve_indentation.py"))]
     #[test_case(Path::new("reorder_within_section.py"))]
     #[test_case(Path::new("separate_first_party_imports.py"))]
@@ -487,16 +574,63 @@ mod tests {
     #[test_case(Path::new("separate_local_folder_imports.py"))]
     #[test_case(Path::new("separate_third_party_imports.py"))]
     #[test_case(Path::new("skip.py"))]
+    #[test_case(Path::new("skip_file.py"))]
     #[test_case(Path::new("sort_similar_imports.py"))]
+    #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
-    fn isort(path: &Path) -> Result<()> {
+    fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
             &Settings {
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("combine_as_imports.py"))]
+    fn combine_as_imports(path: &Path) -> Result<()> {
+        let snapshot = format!("combine_as_imports_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    combine_as_imports: true,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("force_wrap_aliases.py"))]
+    fn force_wrap_aliases(path: &Path) -> Result<()> {
+        let snapshot = format!("force_wrap_aliases_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    force_wrap_aliases: true,
+                    combine_as_imports: true,
+                    ..isort::settings::Settings::default()
+                },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
                 ..Settings::for_rule(CheckCode::I001)
             },

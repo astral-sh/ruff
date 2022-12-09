@@ -1,22 +1,51 @@
 //! Settings for the `flake-annotations` plugin.
 
+use ruff_macros::ConfigurationOptions;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
-    /// Allow omission of a return type hint for `__init__` if at least one
-    /// argument is annotated.
+    #[option(
+        doc = r#"
+            Whether to allow the omission of a return type hint for `__init__` if at least one
+            argument is annotated.
+        "#,
+        default = "false",
+        value_type = "bool",
+        example = "mypy-init-return = true"
+    )]
     pub mypy_init_return: Option<bool>,
-    /// Suppress ANN000-level errors for dummy arguments, like `_`.
+    #[option(
+        doc = r#"
+            Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable
+            regex (like `_`).
+        "#,
+        default = "false",
+        value_type = "bool",
+        example = "suppress-dummy-args = true"
+    )]
     pub suppress_dummy_args: Option<bool>,
-    /// Suppress ANN200-level errors for functions that meet one of the
-    /// following criteria:
-    /// - Contain no `return` statement
-    /// - Explicit `return` statement(s) all return `None` (explicitly or
-    ///   implicitly).
+    #[option(
+        doc = r#"
+            Whether to suppress `ANN200`-level errors for functions that meet either of the
+            following criteria:
+
+            - Contain no `return` statement.
+            - Explicit `return` statement(s) all return `None` (explicitly or implicitly).
+        "#,
+        default = "false",
+        value_type = "bool",
+        example = "suppress-none-returning = true"
+    )]
     pub suppress_none_returning: Option<bool>,
-    /// Suppress ANN401 for dynamically typed *args and **kwargs.
+    #[option(
+        doc = "Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` \
+               arguments.",
+        default = "false",
+        value_type = "bool",
+        example = "allow-star-arg-any = true"
+    )]
     pub allow_star_arg_any: Option<bool>,
 }
 

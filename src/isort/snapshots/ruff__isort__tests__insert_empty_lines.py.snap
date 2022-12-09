@@ -1,0 +1,80 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 3
+    column: 0
+  fix:
+    content: "import a\nimport b\n\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 3
+      column: 0
+- kind: UnsortedImports
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 6
+    column: 0
+  fix:
+    content: "import os\nimport sys\n\n\n"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 6
+      column: 0
+- kind: UnsortedImports
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 16
+    column: 0
+  fix:
+    content: "import os\nimport sys\n\n"
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 16
+      column: 0
+- kind: UnsortedImports
+  location:
+    row: 33
+    column: 0
+  end_location:
+    row: 35
+    column: 0
+  fix:
+    content: "    import collections\n    import typing\n\n"
+    location:
+      row: 33
+      column: 0
+    end_location:
+      row: 35
+      column: 0
+- kind: UnsortedImports
+  location:
+    row: 39
+    column: 0
+  end_location:
+    row: 41
+    column: 0
+  fix:
+    content: "    import collections\n    import typing\n\n"
+    location:
+      row: 39
+      column: 0
+    end_location:
+      row: 41
+      column: 0
+

@@ -41,6 +41,12 @@ pub fn debugger_call(
 
 /// Checks for the presence of a debugger import.
 pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Check> {
+    // Special-case: allow `import builtins`, which is far more general than (e.g.)
+    // `import celery.contrib.rdb`).
+    if module.is_none() && name == "builtins" {
+        return None;
+    }
+
     if let Some(module) = module {
         if let Some((module_name, member)) = DEBUGGERS
             .iter()

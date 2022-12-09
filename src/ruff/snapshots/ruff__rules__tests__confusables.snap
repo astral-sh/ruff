@@ -1,0 +1,59 @@
+---
+source: src/rules/mod.rs
+expression: checks
+---
+- kind:
+    AmbiguousUnicodeCharacterString:
+      - 𝐁
+      - B
+  location:
+    row: 1
+    column: 5
+  end_location:
+    row: 1
+    column: 6
+  fix:
+    content: B
+    location:
+      row: 1
+      column: 5
+    end_location:
+      row: 1
+      column: 6
+- kind:
+    AmbiguousUnicodeCharacterDocstring:
+      - ）
+      - )
+  location:
+    row: 6
+    column: 55
+  end_location:
+    row: 6
+    column: 56
+  fix:
+    content: )
+    location:
+      row: 6
+      column: 55
+    end_location:
+      row: 6
+      column: 56
+- kind:
+    AmbiguousUnicodeCharacterComment:
+      - ᜵
+      - /
+  location:
+    row: 7
+    column: 61
+  end_location:
+    row: 7
+    column: 62
+  fix:
+    content: /
+    location:
+      row: 7
+      column: 61
+    end_location:
+      row: 7
+      column: 62
+

@@ -1,0 +1,20 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 4
+    column: 0
+  fix:
+    content: "from .a import a1 as a1\nfrom .a import a2 as a2\nfrom .b import b1 as b1\nfrom .c import c1\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 4
+      column: 0
+

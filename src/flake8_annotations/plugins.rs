@@ -1,11 +1,12 @@
-use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
-use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
+use crate::ast::{cast, visitor};
 use crate::check_ast::Checker;
 use crate::checks::{CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind};
+use crate::flake8_annotations::helpers::match_function_def;
 use crate::visibility::Visibility;
 use crate::{visibility, Check};
 
@@ -59,26 +60,6 @@ where
             Range::from_located(annotation),
         ));
     };
-}
-
-fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, &Option<Box<Expr>>, &Vec<Stmt>) {
-    match &stmt.node {
-        StmtKind::FunctionDef {
-            name,
-            args,
-            returns,
-            body,
-            ..
-        }
-        | StmtKind::AsyncFunctionDef {
-            name,
-            args,
-            returns,
-            body,
-            ..
-        } => (name, args, returns, body),
-        _ => panic!("Found non-FunctionDef in match_name"),
-    }
 }
 
 /// Generate flake8-annotation checks for a given `Definition`.
@@ -211,7 +192,10 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 .chain(args.kwonlyargs.iter())
                 .skip(
                     // If this is a non-static method, skip `cls` or `self`.
-                    usize::from(!visibility::is_staticmethod(stmt)),
+                    usize::from(!visibility::is_staticmethod(
+                        checker,
+                        cast::decorator_list(stmt),
+                    )),
                 )
             {
                 // ANN401 for dynamically typed arguments
@@ -283,10 +267,10 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             }
 
             // ANN101, ANN102
-            if !visibility::is_staticmethod(stmt) {
+            if !visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
                 if let Some(arg) = args.args.first() {
                     if arg.node.annotation.is_none() {
-                        if visibility::is_classmethod(stmt) {
+                        if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
                             if checker.settings.enabled.contains(&CheckCode::ANN102) {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingTypeCls(arg.node.arg.to_string()),
@@ -319,14 +303,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     return;
                 }
 
-                if visibility::is_classmethod(stmt) {
+                if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
                     if checker.settings.enabled.contains(&CheckCode::ANN206) {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeClassMethod(name.to_string()),
                             Range::from_located(stmt),
                         ));
                     }
-                } else if visibility::is_staticmethod(stmt) {
+                } else if visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
                     if checker.settings.enabled.contains(&CheckCode::ANN205) {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeStaticMethod(name.to_string()),

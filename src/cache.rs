@@ -139,20 +139,21 @@ pub fn get(
         return None;
     };
 
-    if let Ok(encoded) = read_sync(cache_key(path, settings, autofix)) {
-        match bincode::deserialize::<CheckResult>(&encoded[..]) {
-            Ok(CheckResult {
-                metadata: CacheMetadata { mtime },
-                messages,
-            }) => {
-                if FileTime::from_last_modification_time(metadata).unix_seconds() == mtime {
-                    return Some(messages);
-                }
-            }
-            Err(e) => error!("Failed to deserialize encoded cache entry: {e:?}"),
+    let encoded = read_sync(cache_key(path, settings, autofix)).ok()?;
+    let (mtime, messages) = match bincode::deserialize::<CheckResult>(&encoded[..]) {
+        Ok(CheckResult {
+            metadata: CacheMetadata { mtime },
+            messages,
+        }) => (mtime, messages),
+        Err(e) => {
+            error!("Failed to deserialize encoded cache entry: {e:?}");
+            return None;
         }
+    };
+    if FileTime::from_last_modification_time(metadata).unix_seconds() != mtime {
+        return None;
     }
-    None
+    Some(messages)
 }
 
 /// Set a value in the cache.

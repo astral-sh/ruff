@@ -1,0 +1,37 @@
+---
+source: src/pylint/mod.rs
+expression: checks
+---
+- kind:
+    UseSysExit: quit
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 4
+  fix:
+    content: exit
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 4
+- kind:
+    UseSysExit: quit
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 8
+  fix:
+    content: exit
+    location:
+      row: 9
+      column: 4
+    end_location:
+      row: 9
+      column: 8
+

@@ -4,7 +4,7 @@ use regex::Regex;
 
 static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?i)pylint|pyright|noqa|nosec|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|TODO|FIXME|XXX"
+        r"^(?i)(?:pylint|pyright|noqa|nosec|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|TODO|FIXME|XXX)"
     ).unwrap()
 });
 static BRACKET_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[()\[\]{}\s]+$").unwrap());

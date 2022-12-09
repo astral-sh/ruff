@@ -243,6 +243,7 @@ mod tests {
     fn it_converts_empty() -> Result<()> {
         let actual = convert(&HashMap::from([]), None)?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -253,6 +254,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
@@ -268,6 +270,7 @@ mod tests {
             flake8_bugbear: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
+            flake8_import_conventions: None,
             isort: None,
             mccabe: None,
             pep8_naming: None,
@@ -285,6 +288,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -295,6 +299,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
             select: Some(vec![
@@ -310,6 +315,7 @@ mod tests {
             flake8_bugbear: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
+            flake8_import_conventions: None,
             isort: None,
             mccabe: None,
             pep8_naming: None,
@@ -327,6 +333,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -337,6 +344,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
             select: Some(vec![
@@ -352,6 +360,7 @@ mod tests {
             flake8_bugbear: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
+            flake8_import_conventions: None,
             isort: None,
             mccabe: None,
             pep8_naming: None,
@@ -369,6 +378,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -379,6 +389,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
@@ -394,6 +405,7 @@ mod tests {
             flake8_bugbear: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
+            flake8_import_conventions: None,
             isort: None,
             mccabe: None,
             pep8_naming: None,
@@ -411,6 +423,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -421,6 +434,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
@@ -441,6 +455,7 @@ mod tests {
                 avoid_escape: None,
             }),
             flake8_tidy_imports: None,
+            flake8_import_conventions: None,
             isort: None,
             mccabe: None,
             pep8_naming: None,
@@ -461,6 +476,7 @@ mod tests {
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -471,6 +487,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
@@ -521,6 +538,7 @@ mod tests {
             flake8_bugbear: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
+            flake8_import_conventions: None,
             isort: None,
             mccabe: None,
             pep8_naming: None,
@@ -538,6 +556,7 @@ mod tests {
             None,
         )?;
         let expected = Pyproject::new(Options {
+            allowed_confusables: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend_exclude: None,
@@ -548,6 +567,7 @@ mod tests {
             fixable: None,
             format: None,
             ignore: Some(vec![]),
+            ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
             select: Some(vec![
@@ -569,6 +589,7 @@ mod tests {
                 avoid_escape: None,
             }),
             flake8_tidy_imports: None,
+            flake8_import_conventions: None,
             isort: None,
             mccabe: None,
             pep8_naming: None,

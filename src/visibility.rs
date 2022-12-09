@@ -3,9 +3,10 @@
 
 use std::path::Path;
 
-use rustpython_ast::{Stmt, StmtKind};
+use rustpython_ast::{Expr, Stmt, StmtKind};
 
-use crate::ast::helpers::match_name_or_attr;
+use crate::ast::helpers::match_module_member;
+use crate::check_ast::Checker;
 use crate::docstrings::definition::Documentable;
 
 #[derive(Debug, Clone)]
@@ -28,47 +29,56 @@ pub struct VisibleScope {
 }
 
 /// Returns `true` if a function is a "static method".
-pub fn is_staticmethod(stmt: &Stmt) -> bool {
-    match &stmt.node {
-        StmtKind::FunctionDef { decorator_list, .. }
-        | StmtKind::AsyncFunctionDef { decorator_list, .. } => decorator_list
-            .iter()
-            .any(|expr| match_name_or_attr(expr, "staticmethod")),
-        _ => panic!("Found non-FunctionDef in is_staticmethod"),
-    }
+pub fn is_staticmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
+    decorator_list.iter().any(|expr| {
+        match_module_member(
+            expr,
+            "",
+            "staticmethod",
+            &checker.from_imports,
+            &checker.import_aliases,
+        )
+    })
 }
 
 /// Returns `true` if a function is a "class method".
-pub fn is_classmethod(stmt: &Stmt) -> bool {
-    match &stmt.node {
-        StmtKind::FunctionDef { decorator_list, .. }
-        | StmtKind::AsyncFunctionDef { decorator_list, .. } => decorator_list
-            .iter()
-            .any(|expr| match_name_or_attr(expr, "classmethod")),
-        _ => panic!("Found non-FunctionDef in is_classmethod"),
-    }
+pub fn is_classmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
+    decorator_list.iter().any(|expr| {
+        match_module_member(
+            expr,
+            "",
+            "classmethod",
+            &checker.from_imports,
+            &checker.import_aliases,
+        )
+    })
 }
 
 /// Returns `true` if a function definition is an `@overload`.
-pub fn is_overload(stmt: &Stmt) -> bool {
-    match &stmt.node {
-        StmtKind::FunctionDef { decorator_list, .. }
-        | StmtKind::AsyncFunctionDef { decorator_list, .. } => decorator_list
-            .iter()
-            .any(|expr| match_name_or_attr(expr, "overload")),
-        _ => panic!("Found non-FunctionDef in is_overload"),
-    }
+pub fn is_overload(checker: &Checker, decorator_list: &[Expr]) -> bool {
+    decorator_list
+        .iter()
+        .any(|expr| checker.match_typing_expr(expr, "overload"))
 }
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
-pub fn is_override(stmt: &Stmt) -> bool {
-    match &stmt.node {
-        StmtKind::FunctionDef { decorator_list, .. }
-        | StmtKind::AsyncFunctionDef { decorator_list, .. } => decorator_list
-            .iter()
-            .any(|expr| match_name_or_attr(expr, "override")),
-        _ => panic!("Found non-FunctionDef in is_override"),
-    }
+pub fn is_override(checker: &Checker, decorator_list: &[Expr]) -> bool {
+    decorator_list
+        .iter()
+        .any(|expr| checker.match_typing_expr(expr, "override"))
+}
+
+/// Returns `true` if a function definition is an `@abstractmethod`.
+pub fn is_abstract(checker: &Checker, decorator_list: &[Expr]) -> bool {
+    decorator_list.iter().any(|expr| {
+        match_module_member(
+            expr,
+            "abc",
+            "abstractmethod",
+            &checker.from_imports,
+            &checker.import_aliases,
+        )
+    })
 }
 
 /// Returns `true` if a function is a "magic method".

@@ -1,0 +1,32 @@
+---
+source: src/flake8_unused_arguments/mod.rs
+expression: checks
+---
+- kind:
+    UnusedMethodArgument: x
+  location:
+    row: 34
+    column: 16
+  end_location:
+    row: 34
+    column: 17
+  fix: ~
+- kind:
+    UnusedMethodArgument: x
+  location:
+    row: 37
+    column: 19
+  end_location:
+    row: 37
+    column: 20
+  fix: ~
+- kind:
+    UnusedMethodArgument: x
+  location:
+    row: 40
+    column: 15
+  end_location:
+    row: 40
+    column: 16
+  fix: ~
+

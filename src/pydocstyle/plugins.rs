@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -7,8 +5,8 @@ use rustc_hash::FxHashSet;
 use rustpython_ast::{Constant, ExprKind, Location, StmtKind};
 
 use crate::ast::types::Range;
-use crate::ast::whitespace;
 use crate::ast::whitespace::LinesWithTrailingNewline;
+use crate::ast::{cast, whitespace};
 use crate::autofix::Fix;
 use crate::check_ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
@@ -16,6 +14,7 @@ use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
+use crate::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
@@ -76,7 +75,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
-            if is_overload(stmt) {
+            if is_overload(checker, cast::decorator_list(stmt)) {
                 true
             } else {
                 if checker.settings.enabled.contains(&CheckCode::D103) {
@@ -89,7 +88,9 @@ pub fn not_missing(
             }
         }
         DefinitionKind::Method(stmt) => {
-            if is_overload(stmt) || is_override(stmt) {
+            if is_overload(checker, cast::decorator_list(stmt))
+                || is_override(checker, cast::decorator_list(stmt))
+            {
                 true
             } else if is_magic(stmt) {
                 if checker.settings.enabled.contains(&CheckCode::D105) {
@@ -119,31 +120,33 @@ pub fn not_missing(
 
 /// D200
 pub fn one_liner(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = &definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            let mut line_count = 0;
-            let mut non_empty_line_count = 0;
-            for line in LinesWithTrailingNewline::from(string) {
-                line_count += 1;
-                if !line.trim().is_empty() {
-                    non_empty_line_count += 1;
-                }
-                if non_empty_line_count > 1 {
-                    break;
-                }
-            }
+    let Some(docstring) = &definition.docstring else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return;
+    };
 
-            if non_empty_line_count == 1 && (line_count > 1) {
-                checker.add_check(Check::new(
-                    CheckKind::FitsOnOneLine,
-                    Range::from_located(docstring),
-                ));
-            }
+    let mut line_count = 0;
+    let mut non_empty_line_count = 0;
+    for line in LinesWithTrailingNewline::from(string) {
+        line_count += 1;
+        if !line.trim().is_empty() {
+            non_empty_line_count += 1;
         }
+        if non_empty_line_count > 1 {
+            break;
+        }
+    }
+
+    if non_empty_line_count == 1 && (line_count > 1) {
+        checker.add_check(Check::new(
+            CheckKind::FitsOnOneLine,
+            Range::from_located(docstring),
+        ));
     }
 }
 
@@ -154,224 +157,386 @@ static INNER_FUNCTION_OR_CLASS_REGEX: Lazy<Regex> =
 
 /// D201, D202
 pub fn blank_before_after_function(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let DefinitionKind::Function(parent)
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+    let (
+        DefinitionKind::Function(parent)
         | DefinitionKind::NestedFunction(parent)
-        | DefinitionKind::Method(parent) = &definition.kind
-        {
-            if let ExprKind::Constant {
-                value: Constant::Str(_),
-                ..
-            } = &docstring.node
-            {
-                if checker.settings.enabled.contains(&CheckCode::D201) {
-                    let (before, ..) = checker.locator.partition_source_code_at(
-                        &Range::from_located(parent),
-                        &Range::from_located(docstring),
-                    );
+        | DefinitionKind::Method(parent)
+    ) = &definition.kind else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(_),
+        ..
+    } = &docstring.node else {
+        return;
+    };
 
-                    let blank_lines_before = before
-                        .lines()
-                        .rev()
-                        .skip(1)
-                        .take_while(|line| line.trim().is_empty())
-                        .count();
-                    if blank_lines_before != 0 {
-                        let mut check = Check::new(
-                            CheckKind::NoBlankLineBeforeFunction(blank_lines_before),
-                            Range::from_located(docstring),
-                        );
-                        if checker.patch(check.kind.code()) {
-                            // Delete the blank line before the docstring.
-                            check.amend(Fix::deletion(
-                                Location::new(docstring.location.row() - blank_lines_before, 0),
-                                Location::new(docstring.location.row(), 0),
-                            ));
-                        }
-                        checker.add_check(check);
-                    }
-                }
+    if checker.settings.enabled.contains(&CheckCode::D201) {
+        let (before, ..) = checker.locator.partition_source_code_at(
+            &Range::from_located(parent),
+            &Range::from_located(docstring),
+        );
 
-                if checker.settings.enabled.contains(&CheckCode::D202) {
-                    let (_, _, after) = checker.locator.partition_source_code_at(
-                        &Range::from_located(parent),
-                        &Range::from_located(docstring),
-                    );
-
-                    let all_blank_after = after
-                        .lines()
-                        .skip(1)
-                        .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
-                    if all_blank_after {
-                        return;
-                    }
-
-                    let blank_lines_after = after
-                        .lines()
-                        .skip(1)
-                        .take_while(|line| line.trim().is_empty())
-                        .count();
-
-                    // Avoid D202 violations for blank lines followed by inner functions or classes.
-                    if blank_lines_after == 1 && INNER_FUNCTION_OR_CLASS_REGEX.is_match(&after) {
-                        return;
-                    }
-
-                    if blank_lines_after != 0 {
-                        let mut check = Check::new(
-                            CheckKind::NoBlankLineAfterFunction(blank_lines_after),
-                            Range::from_located(docstring),
-                        );
-                        if checker.patch(check.kind.code()) {
-                            // Delete the blank line after the docstring.
-                            check.amend(Fix::deletion(
-                                Location::new(docstring.end_location.unwrap().row() + 1, 0),
-                                Location::new(
-                                    docstring.end_location.unwrap().row() + 1 + blank_lines_after,
-                                    0,
-                                ),
-                            ));
-                        }
-                        checker.add_check(check);
-                    }
-                }
+        let blank_lines_before = before
+            .lines()
+            .rev()
+            .skip(1)
+            .take_while(|line| line.trim().is_empty())
+            .count();
+        if blank_lines_before != 0 {
+            let mut check = Check::new(
+                CheckKind::NoBlankLineBeforeFunction(blank_lines_before),
+                Range::from_located(docstring),
+            );
+            if checker.patch(check.kind.code()) {
+                // Delete the blank line before the docstring.
+                check.amend(Fix::deletion(
+                    Location::new(docstring.location.row() - blank_lines_before, 0),
+                    Location::new(docstring.location.row(), 0),
+                ));
             }
+            checker.add_check(check);
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D202) {
+        let (_, _, after) = checker.locator.partition_source_code_at(
+            &Range::from_located(parent),
+            &Range::from_located(docstring),
+        );
+
+        let all_blank_after = after
+            .lines()
+            .skip(1)
+            .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
+        if all_blank_after {
+            return;
+        }
+
+        let blank_lines_after = after
+            .lines()
+            .skip(1)
+            .take_while(|line| line.trim().is_empty())
+            .count();
+
+        // Avoid D202 violations for blank lines followed by inner functions or classes.
+        if blank_lines_after == 1 && INNER_FUNCTION_OR_CLASS_REGEX.is_match(&after) {
+            return;
+        }
+
+        if blank_lines_after != 0 {
+            let mut check = Check::new(
+                CheckKind::NoBlankLineAfterFunction(blank_lines_after),
+                Range::from_located(docstring),
+            );
+            if checker.patch(check.kind.code()) {
+                // Delete the blank line after the docstring.
+                check.amend(Fix::deletion(
+                    Location::new(docstring.end_location.unwrap().row() + 1, 0),
+                    Location::new(
+                        docstring.end_location.unwrap().row() + 1 + blank_lines_after,
+                        0,
+                    ),
+                ));
+            }
+            checker.add_check(check);
         }
     }
 }
 
 /// D203, D204, D211
 pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = &definition.docstring {
-        if let DefinitionKind::Class(parent) | DefinitionKind::NestedClass(parent) =
-            &definition.kind
-        {
-            if let ExprKind::Constant {
-                value: Constant::Str(_),
-                ..
-            } = &docstring.node
-            {
-                if checker.settings.enabled.contains(&CheckCode::D203)
-                    || checker.settings.enabled.contains(&CheckCode::D211)
-                {
-                    let (before, ..) = checker.locator.partition_source_code_at(
-                        &Range::from_located(parent),
-                        &Range::from_located(docstring),
-                    );
+    let Some(docstring) = &definition.docstring else {
+        return;
+    };
+    let (DefinitionKind::Class(parent) | DefinitionKind::NestedClass(parent)) = &definition.kind else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(_),
+        ..
+    } = &docstring.node else {
+        return;
+    };
 
-                    let blank_lines_before = before
-                        .lines()
-                        .rev()
-                        .skip(1)
-                        .take_while(|line| line.trim().is_empty())
-                        .count();
-                    if checker.settings.enabled.contains(&CheckCode::D211) {
-                        if blank_lines_before != 0 {
-                            let mut check = Check::new(
-                                CheckKind::NoBlankLineBeforeClass(blank_lines_before),
-                                Range::from_located(docstring),
-                            );
-                            if checker.patch(check.kind.code()) {
-                                // Delete the blank line before the class.
-                                check.amend(Fix::deletion(
-                                    Location::new(docstring.location.row() - blank_lines_before, 0),
-                                    Location::new(docstring.location.row(), 0),
-                                ));
-                            }
-                            checker.add_check(check);
-                        }
-                    }
-                    if checker.settings.enabled.contains(&CheckCode::D203) {
-                        if blank_lines_before != 1 {
-                            let mut check = Check::new(
-                                CheckKind::OneBlankLineBeforeClass(blank_lines_before),
-                                Range::from_located(docstring),
-                            );
-                            if checker.patch(check.kind.code()) {
-                                // Insert one blank line before the class.
-                                check.amend(Fix::replacement(
-                                    "\n".to_string(),
-                                    Location::new(docstring.location.row() - blank_lines_before, 0),
-                                    Location::new(docstring.location.row(), 0),
-                                ));
-                            }
-                            checker.add_check(check);
-                        }
-                    }
+    if checker.settings.enabled.contains(&CheckCode::D203)
+        || checker.settings.enabled.contains(&CheckCode::D211)
+    {
+        let (before, ..) = checker.locator.partition_source_code_at(
+            &Range::from_located(parent),
+            &Range::from_located(docstring),
+        );
+
+        let blank_lines_before = before
+            .lines()
+            .rev()
+            .skip(1)
+            .take_while(|line| line.trim().is_empty())
+            .count();
+        if checker.settings.enabled.contains(&CheckCode::D211) {
+            if blank_lines_before != 0 {
+                let mut check = Check::new(
+                    CheckKind::NoBlankLineBeforeClass(blank_lines_before),
+                    Range::from_located(docstring),
+                );
+                if checker.patch(check.kind.code()) {
+                    // Delete the blank line before the class.
+                    check.amend(Fix::deletion(
+                        Location::new(docstring.location.row() - blank_lines_before, 0),
+                        Location::new(docstring.location.row(), 0),
+                    ));
                 }
-
-                if checker.settings.enabled.contains(&CheckCode::D204) {
-                    let (_, _, after) = checker.locator.partition_source_code_at(
-                        &Range::from_located(parent),
-                        &Range::from_located(docstring),
-                    );
-
-                    let all_blank_after = after
-                        .lines()
-                        .skip(1)
-                        .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
-                    if all_blank_after {
-                        return;
-                    }
-
-                    let blank_lines_after = after
-                        .lines()
-                        .skip(1)
-                        .take_while(|line| line.trim().is_empty())
-                        .count();
-                    if blank_lines_after != 1 {
-                        let mut check = Check::new(
-                            CheckKind::OneBlankLineAfterClass(blank_lines_after),
-                            Range::from_located(docstring),
-                        );
-                        if checker.patch(check.kind.code()) {
-                            // Insert a blank line before the class (replacing any existing lines).
-                            check.amend(Fix::replacement(
-                                "\n".to_string(),
-                                Location::new(docstring.end_location.unwrap().row() + 1, 0),
-                                Location::new(
-                                    docstring.end_location.unwrap().row() + 1 + blank_lines_after,
-                                    0,
-                                ),
-                            ));
-                        }
-                        checker.add_check(check);
-                    }
-                }
+                checker.add_check(check);
             }
+        }
+        if checker.settings.enabled.contains(&CheckCode::D203) {
+            if blank_lines_before != 1 {
+                let mut check = Check::new(
+                    CheckKind::OneBlankLineBeforeClass(blank_lines_before),
+                    Range::from_located(docstring),
+                );
+                if checker.patch(check.kind.code()) {
+                    // Insert one blank line before the class.
+                    check.amend(Fix::replacement(
+                        "\n".to_string(),
+                        Location::new(docstring.location.row() - blank_lines_before, 0),
+                        Location::new(docstring.location.row(), 0),
+                    ));
+                }
+                checker.add_check(check);
+            }
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D204) {
+        let (_, _, after) = checker.locator.partition_source_code_at(
+            &Range::from_located(parent),
+            &Range::from_located(docstring),
+        );
+
+        let all_blank_after = after
+            .lines()
+            .skip(1)
+            .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
+        if all_blank_after {
+            return;
+        }
+
+        let blank_lines_after = after
+            .lines()
+            .skip(1)
+            .take_while(|line| line.trim().is_empty())
+            .count();
+        if blank_lines_after != 1 {
+            let mut check = Check::new(
+                CheckKind::OneBlankLineAfterClass(blank_lines_after),
+                Range::from_located(docstring),
+            );
+            if checker.patch(check.kind.code()) {
+                // Insert a blank line before the class (replacing any existing lines).
+                check.amend(Fix::replacement(
+                    "\n".to_string(),
+                    Location::new(docstring.end_location.unwrap().row() + 1, 0),
+                    Location::new(
+                        docstring.end_location.unwrap().row() + 1 + blank_lines_after,
+                        0,
+                    ),
+                ));
+            }
+            checker.add_check(check);
         }
     }
 }
 
 /// D205
 pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            let mut lines_count = 1;
-            let mut blanks_count = 0;
-            for line in string.trim().lines().skip(1) {
-                lines_count += 1;
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return;
+    };
+
+    let mut lines_count = 1;
+    let mut blanks_count = 0;
+    for line in string.trim().lines().skip(1) {
+        lines_count += 1;
+        if line.trim().is_empty() {
+            blanks_count += 1;
+        } else {
+            break;
+        }
+    }
+    if lines_count > 1 && blanks_count != 1 {
+        let mut check = Check::new(
+            CheckKind::BlankLineAfterSummary,
+            Range::from_located(docstring),
+        );
+        if checker.patch(check.kind.code()) {
+            // Find the "summary" line (defined as the first non-blank line).
+            let mut summary_line = 0;
+            for line in string.lines() {
                 if line.trim().is_empty() {
-                    blanks_count += 1;
+                    summary_line += 1;
                 } else {
                     break;
                 }
             }
-            if lines_count > 1 && blanks_count != 1 {
+
+            if blanks_count > 1 {
+                // Insert one blank line after the summary (replacing any existing lines).
+                check.amend(Fix::replacement(
+                    "\n".to_string(),
+                    Location::new(docstring.location.row() + summary_line + 1, 0),
+                    Location::new(
+                        docstring.location.row() + summary_line + 1 + blanks_count,
+                        0,
+                    ),
+                ));
+            }
+        }
+        checker.add_check(check);
+    }
+}
+
+/// D206, D207, D208
+pub fn indent(checker: &mut Checker, definition: &Definition) {
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return;
+    };
+
+    // Split the docstring into lines.
+    let lines: Vec<&str> = LinesWithTrailingNewline::from(string).collect();
+    if lines.len() <= 1 {
+        return;
+    }
+
+    let docstring_indent = whitespace::indentation(checker, docstring);
+
+    let mut has_seen_tab = docstring_indent.contains('\t');
+    let mut is_over_indented = true;
+    let mut over_indented_lines = vec![];
+    for i in 0..lines.len() {
+        // First lines and continuations doesn't need any indentation.
+        if i == 0 || lines[i - 1].ends_with('\\') {
+            continue;
+        }
+
+        // Omit empty lines, except for the last line, which is non-empty by way of
+        // containing the closing quotation marks.
+        let is_blank = lines[i].trim().is_empty();
+        if i < lines.len() - 1 && is_blank {
+            continue;
+        }
+
+        let line_indent = whitespace::leading_space(lines[i]);
+
+        // We only report tab indentation once, so only check if we haven't seen a tab
+        // yet.
+        has_seen_tab = has_seen_tab || line_indent.contains('\t');
+
+        if checker.settings.enabled.contains(&CheckCode::D207) {
+            // We report under-indentation on every line. This isn't great, but enables
+            // autofix.
+            if (i == lines.len() - 1 || !is_blank) && line_indent.len() < docstring_indent.len() {
                 let mut check = Check::new(
-                    CheckKind::BlankLineAfterSummary,
-                    Range::from_located(docstring),
+                    CheckKind::NoUnderIndentation,
+                    Range {
+                        location: Location::new(docstring.location.row() + i, 0),
+                        end_location: Location::new(docstring.location.row() + i, 0),
+                    },
                 );
                 if checker.patch(check.kind.code()) {
-                    // Insert one blank line after the summary (replacing any existing lines).
                     check.amend(Fix::replacement(
-                        "\n".to_string(),
-                        Location::new(docstring.location.row() + 1, 0),
-                        Location::new(docstring.location.row() + 1 + blanks_count, 0),
+                        whitespace::clean(&docstring_indent),
+                        Location::new(docstring.location.row() + i, 0),
+                        Location::new(docstring.location.row() + i, line_indent.len()),
+                    ));
+                }
+                checker.add_check(check);
+            }
+        }
+
+        // Like pydocstyle, we only report over-indentation if either: (1) every line
+        // (except, optionally, the last line) is over-indented, or (2) the last line
+        // (which contains the closing quotation marks) is
+        // over-indented. We can't know if we've achieved that condition
+        // until we've viewed all the lines, so for now, just track
+        // the over-indentation status of every line.
+        if i < lines.len() - 1 {
+            if line_indent.len() > docstring_indent.len() {
+                over_indented_lines.push(i);
+            } else {
+                is_over_indented = false;
+            }
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D206) {
+        if has_seen_tab {
+            checker.add_check(Check::new(
+                CheckKind::IndentWithSpaces,
+                Range::from_located(docstring),
+            ));
+        }
+    }
+
+    if checker.settings.enabled.contains(&CheckCode::D208) {
+        // If every line (except the last) is over-indented...
+        if is_over_indented {
+            for i in over_indented_lines {
+                let line_indent = whitespace::leading_space(lines[i]);
+                if line_indent.len() > docstring_indent.len() {
+                    // We report over-indentation on every line. This isn't great, but
+                    // enables autofix.
+                    let mut check = Check::new(
+                        CheckKind::NoOverIndentation,
+                        Range {
+                            location: Location::new(docstring.location.row() + i, 0),
+                            end_location: Location::new(docstring.location.row() + i, 0),
+                        },
+                    );
+                    if checker.patch(check.kind.code()) {
+                        check.amend(Fix::replacement(
+                            whitespace::clean(&docstring_indent),
+                            Location::new(docstring.location.row() + i, 0),
+                            Location::new(docstring.location.row() + i, line_indent.len()),
+                        ));
+                    }
+                    checker.add_check(check);
+                }
+            }
+        }
+
+        // If the last line is over-indented...
+        if !lines.is_empty() {
+            let i = lines.len() - 1;
+            let line_indent = whitespace::leading_space(lines[i]);
+            if line_indent.len() > docstring_indent.len() {
+                let mut check = Check::new(
+                    CheckKind::NoOverIndentation,
+                    Range {
+                        location: Location::new(docstring.location.row() + i, 0),
+                        end_location: Location::new(docstring.location.row() + i, 0),
+                    },
+                );
+                if checker.patch(check.kind.code()) {
+                    check.amend(Fix::replacement(
+                        whitespace::clean(&docstring_indent),
+                        Location::new(docstring.location.row() + i, 0),
+                        Location::new(docstring.location.row() + i, line_indent.len()),
                     ));
                 }
                 checker.add_check(check);
@@ -380,369 +545,254 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
     }
 }
 
-/// D206, D207, D208
-pub fn indent(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            // Split the docstring into lines.
-            let lines: Vec<&str> = LinesWithTrailingNewline::from(string).collect();
-            if lines.len() <= 1 {
-                return;
-            }
-
-            let docstring_indent = whitespace::indentation(checker, docstring);
-
-            let mut has_seen_tab = docstring_indent.contains('\t');
-            let mut is_over_indented = true;
-            let mut over_indented_lines = vec![];
-            for i in 0..lines.len() {
-                // First lines and continuations doesn't need any indentation.
-                if i == 0 || lines[i - 1].ends_with('\\') {
-                    continue;
-                }
-
-                // Omit empty lines, except for the last line, which is non-empty by way of
-                // containing the closing quotation marks.
-                let is_blank = lines[i].trim().is_empty();
-                if i < lines.len() - 1 && is_blank {
-                    continue;
-                }
-
-                let line_indent = whitespace::leading_space(lines[i]);
-
-                // We only report tab indentation once, so only check if we haven't seen a tab
-                // yet.
-                has_seen_tab = has_seen_tab || line_indent.contains('\t');
-
-                if checker.settings.enabled.contains(&CheckCode::D207) {
-                    // We report under-indentation on every line. This isn't great, but enables
-                    // autofix.
-                    if (i == lines.len() - 1 || !is_blank)
-                        && line_indent.len() < docstring_indent.len()
-                    {
-                        let mut check = Check::new(
-                            CheckKind::NoUnderIndentation,
-                            Range {
-                                location: Location::new(docstring.location.row() + i, 0),
-                                end_location: Location::new(docstring.location.row() + i, 0),
-                            },
-                        );
-                        if checker.patch(check.kind.code()) {
-                            check.amend(Fix::replacement(
-                                whitespace::clean(&docstring_indent),
-                                Location::new(docstring.location.row() + i, 0),
-                                Location::new(docstring.location.row() + i, line_indent.len()),
-                            ));
-                        }
-                        checker.add_check(check);
-                    }
-                }
-
-                // Like pydocstyle, we only report over-indentation if either: (1) every line
-                // (except, optionally, the last line) is over-indented, or (2) the last line
-                // (which contains the closing quotation marks) is
-                // over-indented. We can't know if we've achieved that condition
-                // until we've viewed all the lines, so for now, just track
-                // the over-indentation status of every line.
-                if i < lines.len() - 1 {
-                    if line_indent.len() > docstring_indent.len() {
-                        over_indented_lines.push(i);
-                    } else {
-                        is_over_indented = false;
-                    }
-                }
-            }
-
-            if checker.settings.enabled.contains(&CheckCode::D206) {
-                if has_seen_tab {
-                    checker.add_check(Check::new(
-                        CheckKind::IndentWithSpaces,
-                        Range::from_located(docstring),
-                    ));
-                }
-            }
-
-            if checker.settings.enabled.contains(&CheckCode::D208) {
-                // If every line (except the last) is over-indented...
-                if is_over_indented {
-                    for i in over_indented_lines {
-                        let line_indent = whitespace::leading_space(lines[i]);
-                        if line_indent.len() > docstring_indent.len() {
-                            // We report over-indentation on every line. This isn't great, but
-                            // enables autofix.
-                            let mut check = Check::new(
-                                CheckKind::NoOverIndentation,
-                                Range {
-                                    location: Location::new(docstring.location.row() + i, 0),
-                                    end_location: Location::new(docstring.location.row() + i, 0),
-                                },
-                            );
-                            if checker.patch(check.kind.code()) {
-                                check.amend(Fix::replacement(
-                                    whitespace::clean(&docstring_indent),
-                                    Location::new(docstring.location.row() + i, 0),
-                                    Location::new(docstring.location.row() + i, line_indent.len()),
-                                ));
-                            }
-                            checker.add_check(check);
-                        }
-                    }
-                }
-
-                // If the last line is over-indented...
-                if !lines.is_empty() {
-                    let i = lines.len() - 1;
-                    let line_indent = whitespace::leading_space(lines[i]);
-                    if line_indent.len() > docstring_indent.len() {
-                        let mut check = Check::new(
-                            CheckKind::NoOverIndentation,
-                            Range {
-                                location: Location::new(docstring.location.row() + i, 0),
-                                end_location: Location::new(docstring.location.row() + i, 0),
-                            },
-                        );
-                        if checker.patch(check.kind.code()) {
-                            check.amend(Fix::replacement(
-                                whitespace::clean(&docstring_indent),
-                                Location::new(docstring.location.row() + i, 0),
-                                Location::new(docstring.location.row() + i, line_indent.len()),
-                            ));
-                        }
-                        checker.add_check(check);
-                    }
-                }
-            }
-        }
-    }
-}
-
 /// D209
 pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            let mut line_count = 0;
-            for line in LinesWithTrailingNewline::from(string) {
-                if !line.trim().is_empty() {
-                    line_count += 1;
-                }
-                if line_count > 1 {
-                    let content = checker
-                        .locator
-                        .slice_source_code_range(&Range::from_located(docstring));
-                    if let Some(last_line) = content.lines().last().map(str::trim) {
-                        if last_line != "\"\"\"" && last_line != "'''" {
-                            let mut check = Check::new(
-                                CheckKind::NewLineAfterLastParagraph,
-                                Range::from_located(docstring),
-                            );
-                            if checker.patch(check.kind.code()) {
-                                // Insert a newline just before the end-quote(s).
-                                let content = format!(
-                                    "\n{}",
-                                    whitespace::clean(&whitespace::indentation(checker, docstring))
-                                );
-                                check.amend(Fix::insertion(
-                                    content,
-                                    Location::new(
-                                        docstring.end_location.unwrap().row(),
-                                        docstring.end_location.unwrap().column() - "\"\"\"".len(),
-                                    ),
-                                ));
-                            }
-                            checker.add_check(check);
-                        }
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return;
+    };
+
+    let mut line_count = 0;
+    for line in LinesWithTrailingNewline::from(string) {
+        if !line.trim().is_empty() {
+            line_count += 1;
+        }
+        if line_count > 1 {
+            let content = checker
+                .locator
+                .slice_source_code_range(&Range::from_located(docstring));
+            if let Some(last_line) = content.lines().last().map(str::trim) {
+                if last_line != "\"\"\"" && last_line != "'''" {
+                    let mut check = Check::new(
+                        CheckKind::NewLineAfterLastParagraph,
+                        Range::from_located(docstring),
+                    );
+                    if checker.patch(check.kind.code()) {
+                        // Insert a newline just before the end-quote(s).
+                        let content = format!(
+                            "\n{}",
+                            whitespace::clean(&whitespace::indentation(checker, docstring))
+                        );
+                        check.amend(Fix::insertion(
+                            content,
+                            Location::new(
+                                docstring.end_location.unwrap().row(),
+                                docstring.end_location.unwrap().column() - "\"\"\"".len(),
+                            ),
+                        ));
                     }
-                    return;
+                    checker.add_check(check);
                 }
             }
+            return;
         }
     }
 }
 
 /// D210
 pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            let mut lines = LinesWithTrailingNewline::from(string);
-            if let Some(line) = lines.next() {
-                let trimmed = line.trim();
-                if trimmed.is_empty() {
-                    return;
-                }
-                if line != trimmed {
-                    let mut check = Check::new(
-                        CheckKind::NoSurroundingWhitespace,
-                        Range::from_located(docstring),
-                    );
-                    if checker.patch(check.kind.code()) {
-                        if let Some(first_line) = checker
-                            .locator
-                            .slice_source_code_range(&Range::from_located(docstring))
-                            .lines()
-                            .next()
-                            .map(str::to_lowercase)
-                        {
-                            for pattern in constants::TRIPLE_QUOTE_PREFIXES
-                                .iter()
-                                .chain(constants::SINGLE_QUOTE_PREFIXES)
-                            {
-                                if first_line.starts_with(pattern) {
-                                    check.amend(Fix::replacement(
-                                        trimmed.to_string(),
-                                        Location::new(
-                                            docstring.location.row(),
-                                            docstring.location.column() + pattern.len(),
-                                        ),
-                                        Location::new(
-                                            docstring.location.row(),
-                                            docstring.location.column()
-                                                + pattern.len()
-                                                + line.chars().count(),
-                                        ),
-                                    ));
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    checker.add_check(check);
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return;
+    };
+
+    let mut lines = LinesWithTrailingNewline::from(string);
+    let Some(line) = lines.next() else {
+        return;
+    };
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if line == trimmed {
+        return;
+    }
+    let mut check = Check::new(
+        CheckKind::NoSurroundingWhitespace,
+        Range::from_located(docstring),
+    );
+    if checker.patch(check.kind.code()) {
+        if let Some(pattern) = leading_quote(docstring, checker.locator) {
+            if let Some(quote) = pattern.chars().last() {
+                // If removing whitespace would lead to an invalid string of quote
+                // characters, avoid applying the fix.
+                if !trimmed.ends_with(quote) {
+                    check.amend(Fix::replacement(
+                        trimmed.to_string(),
+                        Location::new(
+                            docstring.location.row(),
+                            docstring.location.column() + pattern.len(),
+                        ),
+                        Location::new(
+                            docstring.location.row(),
+                            docstring.location.column() + pattern.len() + line.chars().count(),
+                        ),
+                    ));
                 }
             }
         }
     }
+    checker.add_check(check);
 }
 
 /// D212, D213
 pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+    let ExprKind::Constant {
             value: Constant::Str(string),
             ..
-        } = &docstring.node
+        } = &docstring.node else
         {
-            if LinesWithTrailingNewline::from(string).nth(1).is_some() {
-                if let Some(first_line) = checker
-                    .locator
-                    .slice_source_code_range(&Range::from_located(docstring))
-                    .lines()
-                    .next()
-                    .map(str::to_lowercase)
-                {
-                    if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
-                        if checker.settings.enabled.contains(&CheckCode::D212) {
-                            checker.add_check(Check::new(
-                                CheckKind::MultiLineSummaryFirstLine,
-                                Range::from_located(docstring),
-                            ));
-                        }
-                    } else {
-                        if checker.settings.enabled.contains(&CheckCode::D213) {
-                            checker.add_check(Check::new(
-                                CheckKind::MultiLineSummarySecondLine,
-                                Range::from_located(docstring),
-                            ));
-                        }
-                    }
-                }
-            }
+            return;
+        };
+    if LinesWithTrailingNewline::from(string).nth(1).is_none() {
+        return;
+    };
+    let Some(first_line) = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring))
+        .lines()
+        .next()
+        .map(str::to_lowercase) else
+    {
+        return;
+    };
+    if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
+        if checker.settings.enabled.contains(&CheckCode::D212) {
+            checker.add_check(Check::new(
+                CheckKind::MultiLineSummaryFirstLine,
+                Range::from_located(docstring),
+            ));
+        }
+    } else {
+        if checker.settings.enabled.contains(&CheckCode::D213) {
+            checker.add_check(Check::new(
+                CheckKind::MultiLineSummarySecondLine,
+                Range::from_located(docstring),
+            ));
         }
     }
 }
 
 /// D300
 pub fn triple_quotes(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            if let Some(first_line) = checker
-                .locator
-                .slice_source_code_range(&Range::from_located(docstring))
-                .lines()
-                .next()
-                .map(str::to_lowercase)
-            {
-                let starts_with_triple = if string.contains("\"\"\"") {
-                    first_line.starts_with("'''")
-                        || first_line.starts_with("u'''")
-                        || first_line.starts_with("r'''")
-                        || first_line.starts_with("ur'''")
-                } else {
-                    first_line.starts_with("\"\"\"")
-                        || first_line.starts_with("u\"\"\"")
-                        || first_line.starts_with("r\"\"\"")
-                        || first_line.starts_with("ur\"\"\"")
-                };
-                if !starts_with_triple {
-                    checker.add_check(Check::new(
-                        CheckKind::UsesTripleQuotes,
-                        Range::from_located(docstring),
-                    ));
-                }
-            }
-        }
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return;
+    };
+    let Some(first_line) = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring))
+        .lines()
+        .next()
+        .map(str::to_lowercase) else
+    {
+        return;
+    };
+    let starts_with_triple = if string.contains("\"\"\"") {
+        first_line.starts_with("'''")
+            || first_line.starts_with("u'''")
+            || first_line.starts_with("r'''")
+            || first_line.starts_with("ur'''")
+    } else {
+        first_line.starts_with("\"\"\"")
+            || first_line.starts_with("u\"\"\"")
+            || first_line.starts_with("r\"\"\"")
+            || first_line.starts_with("ur\"\"\"")
+    };
+    if !starts_with_triple {
+        checker.add_check(Check::new(
+            CheckKind::UsesTripleQuotes,
+            Range::from_located(docstring),
+        ));
     }
 }
 
 /// D400
 pub fn ends_with_period(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            if let Some(string) = string.trim().lines().next() {
-                if !string.ends_with('.') {
-                    checker.add_check(Check::new(
-                        CheckKind::EndsInPeriod,
-                        Range::from_located(docstring),
-                    ));
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return;
+    };
+    if let Some(index) = logical_line(string) {
+        let line = string.lines().nth(index).unwrap();
+        let trimmed = line.trim_end();
+        if !trimmed.ends_with('.') {
+            let mut check = Check::new(CheckKind::EndsInPeriod, Range::from_located(docstring));
+            // Best-effort autofix: avoid adding a period after other punctuation marks.
+            if checker.patch(&CheckCode::D400) && !trimmed.ends_with(':') && !trimmed.ends_with(';')
+            {
+                if let Some((row, column)) = if index == 0 {
+                    leading_quote(docstring, checker.locator).map(|pattern| {
+                        (
+                            docstring.location.row(),
+                            docstring.location.column() + pattern.len() + trimmed.chars().count(),
+                        )
+                    })
+                } else {
+                    Some((docstring.location.row() + index, trimmed.chars().count()))
+                } {
+                    check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
-        }
+            checker.add_check(check);
+        };
     }
 }
 
 /// D402
 pub fn no_signature(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let DefinitionKind::Function(parent)
+    let Some(docstring) = definition.docstring else {
+        return;
+    };
+    let (
+        DefinitionKind::Function(parent)
         | DefinitionKind::NestedFunction(parent)
-        | DefinitionKind::Method(parent) = definition.kind
-        {
-            if let StmtKind::FunctionDef { name, .. } = &parent.node {
-                if let ExprKind::Constant {
-                    value: Constant::Str(string),
-                    ..
-                } = &docstring.node
-                {
-                    if let Some(first_line) = string.lines().next() {
-                        if first_line.contains(&format!("{name}(")) {
-                            checker.add_check(Check::new(
-                                CheckKind::NoSignature,
-                                Range::from_located(docstring),
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-    }
+        | DefinitionKind::Method(parent)
+    ) = definition.kind else {
+        return;
+    };
+    let StmtKind::FunctionDef { name, .. } = &parent.node else {
+        return;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return;
+    };
+    let Some(first_line) = string.lines().next() else {
+        return;
+    };
+    if !first_line.contains(&format!("{name}(")) {
+        return;
+    };
+    checker.add_check(Check::new(
+        CheckKind::NoSignature,
+        Range::from_located(docstring),
+    ));
 }
 
 /// D403
@@ -751,149 +801,183 @@ pub fn capitalized(checker: &mut Checker, definition: &Definition) {
         return;
     }
 
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            if let Some(first_word) = string.split(' ').next() {
-                if first_word == first_word.to_uppercase() {
-                    return;
-                }
-                for char in first_word.chars() {
-                    if !char.is_ascii_alphabetic() && char != '\'' {
-                        return;
-                    }
-                }
-                if let Some(first_char) = first_word.chars().next() {
-                    if !first_char.is_uppercase() {
-                        checker.add_check(Check::new(
-                            CheckKind::FirstLineCapitalized,
-                            Range::from_located(docstring),
-                        ));
-                    }
-                }
-            }
+    let Some(docstring) = definition.docstring else {
+        return
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return
+    };
+    let Some(first_word) = string.split(' ').next() else {
+        return
+    };
+    if first_word == first_word.to_uppercase() {
+        return;
+    }
+    for char in first_word.chars() {
+        if !char.is_ascii_alphabetic() && char != '\'' {
+            return;
         }
     }
+    let Some(first_char) = first_word.chars().next() else {
+        return;
+    };
+    if first_char.is_uppercase() {
+        return;
+    };
+    checker.add_check(Check::new(
+        CheckKind::FirstLineCapitalized,
+        Range::from_located(docstring),
+    ));
 }
 
 /// D404
 pub fn starts_with_this(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            let trimmed = string.trim();
-            if trimmed.is_empty() {
-                return;
-            }
+    let Some(docstring) = definition.docstring else {
+        return
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return
+    };
 
-            if let Some(first_word) = string.split(' ').next() {
-                if first_word
-                    .replace(|c: char| !c.is_alphanumeric(), "")
-                    .to_lowercase()
-                    == "this"
-                {
-                    checker.add_check(Check::new(
-                        CheckKind::NoThisPrefix,
-                        Range::from_located(docstring),
-                    ));
-                }
-            }
-        }
+    let trimmed = string.trim();
+    if trimmed.is_empty() {
+        return;
     }
+
+    let Some(first_word) = string.split(' ').next() else {
+        return
+    };
+    if first_word
+        .replace(|c: char| !c.is_alphanumeric(), "")
+        .to_lowercase()
+        != "this"
+    {
+        return;
+    }
+    checker.add_check(Check::new(
+        CheckKind::NoThisPrefix,
+        Range::from_located(docstring),
+    ));
 }
 
 /// D415
 pub fn ends_with_punctuation(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            if let Some(string) = string.trim().lines().next() {
-                if !(string.ends_with('.') || string.ends_with('!') || string.ends_with('?')) {
-                    checker.add_check(Check::new(
-                        CheckKind::EndsInPunctuation,
-                        Range::from_located(docstring),
-                    ));
+    let Some(docstring) = definition.docstring else {
+        return
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return
+    };
+    if let Some(index) = logical_line(string) {
+        let line = string.lines().nth(index).unwrap();
+        let trimmed = line.trim_end();
+        if !(trimmed.ends_with('.') || trimmed.ends_with('!') || trimmed.ends_with('?')) {
+            let mut check =
+                Check::new(CheckKind::EndsInPunctuation, Range::from_located(docstring));
+            // Best-effort autofix: avoid adding a period after other punctuation marks.
+            if checker.patch(&CheckCode::D415) && !trimmed.ends_with(':') && !trimmed.ends_with(';')
+            {
+                if let Some((row, column)) = if index == 0 {
+                    leading_quote(docstring, checker.locator).map(|pattern| {
+                        (
+                            docstring.location.row(),
+                            docstring.location.column() + pattern.len() + trimmed.chars().count(),
+                        )
+                    })
+                } else {
+                    Some((docstring.location.row() + index, trimmed.chars().count()))
+                } {
+                    check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
-        }
+            checker.add_check(check);
+        };
     }
 }
 
 /// D418
 pub fn if_needed(checker: &mut Checker, definition: &Definition) {
-    if definition.docstring.is_some() {
-        if let DefinitionKind::Function(stmt)
-        | DefinitionKind::NestedFunction(stmt)
-        | DefinitionKind::Method(stmt) = definition.kind
-        {
-            if is_overload(stmt) {
-                checker.add_check(Check::new(
-                    CheckKind::SkipDocstring,
-                    Range::from_located(stmt),
-                ));
-            }
-        }
+    if definition.docstring.is_none() {
+        return;
     }
+    let (
+        DefinitionKind::Function(stmt)
+        | DefinitionKind::NestedFunction(stmt)
+        | DefinitionKind::Method(stmt)
+    ) = definition.kind else {
+        return
+    };
+    if !is_overload(checker, cast::decorator_list(stmt)) {
+        return;
+    }
+    checker.add_check(Check::new(
+        CheckKind::SkipDocstring,
+        Range::from_located(stmt),
+    ));
 }
 
 /// D419
 pub fn not_empty(checker: &mut Checker, definition: &Definition) -> bool {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            if string.trim().is_empty() {
-                if checker.settings.enabled.contains(&CheckCode::D419) {
-                    checker.add_check(Check::new(
-                        CheckKind::NonEmpty,
-                        Range::from_located(docstring),
-                    ));
-                }
-                return false;
-            }
-        }
+    let Some(docstring) = definition.docstring else {
+        return true;
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return true;
+    };
+    if !string.trim().is_empty() {
+        return true;
     }
-    true
+
+    if checker.settings.enabled.contains(&CheckCode::D419) {
+        checker.add_check(Check::new(
+            CheckKind::NonEmpty,
+            Range::from_located(docstring),
+        ));
+    }
+    false
 }
 
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
 pub fn sections(checker: &mut Checker, definition: &Definition) {
-    if let Some(docstring) = definition.docstring {
-        if let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node
-        {
-            let lines: Vec<&str> = LinesWithTrailingNewline::from(string).collect();
-            if lines.len() < 2 {
-                return;
-            }
+    let Some(docstring) = definition.docstring else {
+        return
+    };
+    let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &docstring.node else {
+        return;
+    };
 
-            // First, interpret as NumPy-style sections.
-            let mut found_numpy_section = false;
-            for context in &section_contexts(&lines, &SectionStyle::NumPy) {
-                found_numpy_section = true;
-                numpy_section(checker, definition, context);
-            }
+    let lines: Vec<&str> = LinesWithTrailingNewline::from(string).collect();
+    if lines.len() < 2 {
+        return;
+    }
 
-            // If no such sections were identified, interpret as Google-style sections.
-            if !found_numpy_section {
-                for context in &section_contexts(&lines, &SectionStyle::Google) {
-                    google_section(checker, definition, context);
-                }
-            }
+    // First, interpret as NumPy-style sections.
+    let mut found_numpy_section = false;
+    for context in &section_contexts(&lines, &SectionStyle::NumPy) {
+        found_numpy_section = true;
+        numpy_section(checker, definition, context);
+    }
+
+    // If no such sections were identified, interpret as Google-style sections.
+    if !found_numpy_section {
+        for context in &section_contexts(&lines, &SectionStyle::Google) {
+            google_section(checker, definition, context);
         }
     }
 }
@@ -1297,69 +1381,74 @@ fn common_section(
 }
 
 fn missing_args(checker: &mut Checker, definition: &Definition, docstrings_args: &FxHashSet<&str>) {
-    if let DefinitionKind::Function(parent)
-    | DefinitionKind::NestedFunction(parent)
-    | DefinitionKind::Method(parent) = definition.kind
-    {
-        if let StmtKind::FunctionDef {
+    let (
+        DefinitionKind::Function(parent)
+        | DefinitionKind::NestedFunction(parent)
+        | DefinitionKind::Method(parent)
+    ) = definition.kind else {
+        return
+    };
+    let (
+        StmtKind::FunctionDef {
             args: arguments, ..
         }
         | StmtKind::AsyncFunctionDef {
             args: arguments, ..
-        } = &parent.node
-        {
-            // Look for arguments that weren't included in the docstring.
-            let mut missing_arg_names: BTreeSet<String> = BTreeSet::default();
-            for arg in arguments
-                .args
-                .iter()
-                .chain(arguments.posonlyargs.iter())
-                .chain(arguments.kwonlyargs.iter())
-                .skip(
-                    // If this is a non-static method, skip `cls` or `self`.
-                    usize::from(
-                        matches!(definition.kind, DefinitionKind::Method(_))
-                            && !is_staticmethod(parent),
-                    ),
-                )
-            {
-                let arg_name = arg.node.arg.as_str();
-                if !arg_name.starts_with('_') && !docstrings_args.contains(&arg_name) {
-                    missing_arg_names.insert(arg_name.to_string());
-                }
-            }
-
-            // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
-            // single or double star, respectively.
-            if let Some(arg) = &arguments.vararg {
-                let arg_name = arg.node.arg.as_str();
-                let starred_arg_name = format!("*{arg_name}");
-                if !arg_name.starts_with('_')
-                    && !docstrings_args.contains(&arg_name)
-                    && !docstrings_args.contains(&starred_arg_name.as_str())
-                {
-                    missing_arg_names.insert(starred_arg_name);
-                }
-            }
-            if let Some(arg) = &arguments.kwarg {
-                let arg_name = arg.node.arg.as_str();
-                let starred_arg_name = format!("**{arg_name}");
-                if !arg_name.starts_with('_')
-                    && !docstrings_args.contains(&arg_name)
-                    && !docstrings_args.contains(&starred_arg_name.as_str())
-                {
-                    missing_arg_names.insert(starred_arg_name);
-                }
-            }
-
-            if !missing_arg_names.is_empty() {
-                let names = missing_arg_names.into_iter().sorted().collect();
-                checker.add_check(Check::new(
-                    CheckKind::DocumentAllArguments(names),
-                    Range::from_located(parent),
-                ));
-            }
         }
+    ) = &parent.node else {
+        return
+    };
+
+    // Look for arguments that weren't included in the docstring.
+    let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
+    for arg in arguments
+        .args
+        .iter()
+        .chain(arguments.posonlyargs.iter())
+        .chain(arguments.kwonlyargs.iter())
+        .skip(
+            // If this is a non-static method, skip `cls` or `self`.
+            usize::from(
+                matches!(definition.kind, DefinitionKind::Method(_))
+                    && !is_staticmethod(checker, cast::decorator_list(parent)),
+            ),
+        )
+    {
+        let arg_name = arg.node.arg.as_str();
+        if !arg_name.starts_with('_') && !docstrings_args.contains(&arg_name) {
+            missing_arg_names.insert(arg_name.to_string());
+        }
+    }
+
+    // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
+    // single or double star, respectively.
+    if let Some(arg) = &arguments.vararg {
+        let arg_name = arg.node.arg.as_str();
+        let starred_arg_name = format!("*{arg_name}");
+        if !arg_name.starts_with('_')
+            && !docstrings_args.contains(&arg_name)
+            && !docstrings_args.contains(&starred_arg_name.as_str())
+        {
+            missing_arg_names.insert(starred_arg_name);
+        }
+    }
+    if let Some(arg) = &arguments.kwarg {
+        let arg_name = arg.node.arg.as_str();
+        let starred_arg_name = format!("**{arg_name}");
+        if !arg_name.starts_with('_')
+            && !docstrings_args.contains(&arg_name)
+            && !docstrings_args.contains(&starred_arg_name.as_str())
+        {
+            missing_arg_names.insert(starred_arg_name);
+        }
+    }
+
+    if !missing_arg_names.is_empty() {
+        let names = missing_arg_names.into_iter().sorted().collect();
+        checker.add_check(Check::new(
+            CheckKind::DocumentAllArguments(names),
+            Range::from_located(parent),
+        ));
     }
 }
 

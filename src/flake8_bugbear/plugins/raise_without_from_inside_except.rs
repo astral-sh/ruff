@@ -13,21 +13,18 @@ struct RaiseVisitor {
 impl<'a> Visitor<'a> for RaiseVisitor {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match &stmt.node {
-            StmtKind::Raise { exc, cause } => {
-                if cause.is_none() {
-                    if let Some(exc) = exc {
-                        match &exc.node {
-                            ExprKind::Name { id, .. } if is_lower(id) => {}
-                            _ => {
-                                self.checks.push(Check::new(
-                                    CheckKind::RaiseWithoutFromInsideExcept,
-                                    Range::from_located(stmt),
-                                ));
-                            }
-                        }
-                    }
+            StmtKind::Raise {
+                exc: Some(exc),
+                cause: None,
+            } => match &exc.node {
+                ExprKind::Name { id, .. } if is_lower(id) => {}
+                _ => {
+                    self.checks.push(Check::new(
+                        CheckKind::RaiseWithoutFromInsideExcept,
+                        Range::from_located(stmt),
+                    ));
                 }
-            }
+            },
             StmtKind::ClassDef { .. }
             | StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }

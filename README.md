@@ -68,31 +68,33 @@ of [Conda](https://docs.conda.io/en/latest/):
 
 1. [Installation and Usage](#installation-and-usage)
 1. [Configuration](#configuration)
-1. [Supported Rules](#supported-rules)
-   1. [Pyflakes (F)](#pyflakes)
-   1. [pycodestyle (E, W)](#pycodestyle)
-   1. [isort (I)](#isort)
-   1. [pydocstyle (D)](#pydocstyle)
-   1. [pyupgrade (U)](#pyupgrade)
-   1. [pep8-naming (N)](#pep8-naming)
-   1. [eradicate (ERA)](#eradicate)
-   1. [flake8-bandit (S)](#flake8-bandit)
-   1. [flake8-comprehensions (C4)](#flake8-comprehensions)
-   1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap)
-   1. [flake8-bugbear (B)](#flake8-bugbear)
-   1. [flake8-builtins (A)](#flake8-builtins)
-   1. [flake8-debugger (T10)](#flake8-debugger)
-   1. [flake8-tidy-imports (I25)](#flake8-tidy-imports)
-   1. [flake8-print (T20)](#flake8-print)
-   1. [flake8-quotes (Q)](#flake8-quotes)
-   1. [flake8-annotations (ANN)](#flake8-annotations)
-   1. [flake8-2020 (YTT)](#flake8-2020)
-   1. [flake8-blind-except (BLE)](#flake8-blind-except)
-   1. [mccabe (C90)](#mccabe)
-   1. [pygrep-hooks (PGH)](#pygrep-hooks)
-   1. [Pylint (PL)](#pylint)
-   1. [Ruff-specific rules (RUF)](#ruff-specific-rules)
-   1. [Meta rules (M)](#meta-rules)
+1. [Supported Rules](#supported-rules) <!-- Begin auto-generated table of contents. -->
+   1. [Pyflakes (F)](#pyflakes-f)
+   1. [pycodestyle (E, W)](#pycodestyle-e-w)
+   1. [mccabe (C90)](#mccabe-c90)
+   1. [isort (I)](#isort-i)
+   1. [pydocstyle (D)](#pydocstyle-d)
+   1. [pyupgrade (UP)](#pyupgrade-up)
+   1. [pep8-naming (N)](#pep8-naming-n)
+   1. [flake8-2020 (YTT)](#flake8-2020-ytt)
+   1. [flake8-annotations (ANN)](#flake8-annotations-ann)
+   1. [flake8-bandit (S)](#flake8-bandit-s)
+   1. [flake8-blind-except (BLE)](#flake8-blind-except-ble)
+   1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap-fbt)
+   1. [flake8-bugbear (B)](#flake8-bugbear-b)
+   1. [flake8-builtins (A)](#flake8-builtins-a)
+   1. [flake8-comprehensions (C4)](#flake8-comprehensions-c4)
+   1. [flake8-debugger (T10)](#flake8-debugger-t10)
+   1. [flake8-import-conventions (ICN)](#flake8-import-conventions-icn)
+   1. [flake8-print (T20)](#flake8-print-t20)
+   1. [flake8-quotes (Q)](#flake8-quotes-q)
+   1. [flake8-return (RET)](#flake8-return-ret)
+   1. [flake8-tidy-imports (TID)](#flake8-tidy-imports-tid)
+   1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
+   1. [eradicate (ERA)](#eradicate-era)
+   1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
+   1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
+   1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
 1. [Development](#development)
@@ -145,7 +147,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.152
+    rev: v0.0.171
     hooks:
       - id: ruff
 ```
@@ -194,6 +196,13 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 # Assume Python 3.10.
 target-version = "py310"
+
+[tool.ruff.flake8-import-conventions.aliases]
+altair = "alt"
+"matplotlib.pyplot" = "plt"
+numpy = "np"
+pandas = "pd"
+seaborn = "sns"
 
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
@@ -350,17 +359,27 @@ error reporting for the entire file.
 For targeted exclusions across entire files (e.g., "Ignore all F841 violations in
 `/path/to/file.py`"), see the [`per-file-ignores`](#per-file-ignores) configuration setting.
 
+### "Action Comments"
+
+Ruff respects `isort`'s ["Action Comments"](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+(`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `isort: split`), which
+enable selectively enabling and disabling import sorting for blocks of code and other inline
+configuration.
+
+See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+for more.
+
 ### Automating `noqa` Directives
 
 Ruff supports several workflows to aid in `noqa` management.
 
-First, Ruff provides a special error code, `M001`, to enforce that your `noqa` directives are
+First, Ruff provides a special error code, `RUF100`, to enforce that your `noqa` directives are
 "valid", in that the errors they _say_ they ignore are actually being triggered on that line (and
-thus suppressed). You can run `ruff /path/to/file.py --extend-select M001` to flag unused `noqa`
+thus suppressed). You can run `ruff /path/to/file.py --extend-select RUF100` to flag unused `noqa`
 directives.
 
 Second, Ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
-You can run `ruff /path/to/file.py --extend-select M001 --fix` to automatically remove unused
+You can run `ruff /path/to/file.py --extend-select RUF100 --fix` to automatically remove unused
 `noqa` directives.
 
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
@@ -377,8 +396,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 
 <!-- Sections automatically generated by `cargo dev generate-rules-table`. -->
 <!-- Begin auto-generated sections. -->
-
-### Pyflakes
+### Pyflakes (F)
 
 For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 
@@ -420,6 +438,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F706 | ReturnOutsideFunction | `return` statement outside of a function/method |  |
 | F707 | DefaultExceptNotLast | An `except` block as not the last exception handler |  |
 | F722 | ForwardAnnotationSyntaxError | Syntax error in forward annotation: `...` |  |
+| F811 | RedefinedWhileUnused | Redefinition of unused `...` from line 1 |  |
 | F821 | UndefinedName | Undefined name `...` |  |
 | F822 | UndefinedExport | Undefined name `...` in `__all__` |  |
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |  |
@@ -427,7 +446,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
-### pycodestyle
+### pycodestyle (E, W)
 
 For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI.
 
@@ -450,7 +469,15 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | W292 | NoNewLineAtEndOfFile | No newline at end of file |  |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' |  |
 
-### isort
+### mccabe (C90)
+
+For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
+
+### isort (I)
 
 For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
 
@@ -458,7 +485,7 @@ For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
 | ---- | ---- | ------- | --- |
 | I001 | UnsortedImports | Import block is un-sorted or un-formatted | 🛠 |
 
-### pydocstyle
+### pydocstyle (D)
 
 For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 
@@ -489,7 +516,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D214 | SectionNotOverIndented | Section is over-indented ("Returns") | 🛠 |
 | D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("Returns") | 🛠 |
 | D300 | UsesTripleQuotes | Use """triple double quotes""" |  |
-| D400 | EndsInPeriod | First line should end with a period |  |
+| D400 | EndsInPeriod | First line should end with a period | 🛠 |
 | D402 | NoSignature | First line should not be the function's signature |  |
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |
 | D404 | NoThisPrefix | First word of the docstring should not be "This" |  |
@@ -503,35 +530,35 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D412 | NoBlankLinesBetweenHeaderAndContent | No blank lines allowed between a section header and its content ("Returns") | 🛠 |
 | D413 | BlankLineAfterLastSection | Missing blank line after last section ("Returns") | 🛠 |
 | D414 | NonEmptySection | Section has no content ("Returns") |  |
-| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point |  |
+| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point | 🛠 |
 | D416 | SectionNameEndsInColon | Section name should end with a colon ("Returns") | 🛠 |
 | D417 | DocumentAllArguments | Missing argument descriptions in the docstring: `x`, `y` |  |
 | D418 | SkipDocstring | Function decorated with `@overload` shouldn't contain a docstring |  |
 | D419 | NonEmpty | Docstring is empty |  |
 
-### pyupgrade
+### pyupgrade (UP)
 
 For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| U001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
-| U003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
-| U004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
-| U005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead | 🛠 |
-| U006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
-| U007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
-| U008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
-| U009 | PEP3120UnnecessaryCodingComment | UTF-8 encoding declaration is unnecessary | 🛠 |
-| U010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
-| U011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
-| U012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
-| U013 | ConvertTypedDictFunctionalToClass | Convert `...` from `TypedDict` functional to class syntax | 🛠 |
-| U014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
-| U015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
-| U016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
+| UP001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
+| UP003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
+| UP004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
+| UP005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead | 🛠 |
+| UP006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
+| UP007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
+| UP008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
+| UP009 | PEP3120UnnecessaryCodingComment | UTF-8 encoding declaration is unnecessary | 🛠 |
+| UP010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
+| UP011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
+| UP012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
+| UP013 | ConvertTypedDictFunctionalToClass | Convert `...` from `TypedDict` functional to class syntax | 🛠 |
+| UP014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
+| UP015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
+| UP016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
 
-### pep8-naming
+### pep8-naming (N)
 
 For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyPI.
 
@@ -553,15 +580,42 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyP
 | N817 | CamelcaseImportedAsAcronym | Camelcase `...` imported as acronym `...` |  |
 | N818 | ErrorSuffixOnExceptionName | Exception name `...` should be named with an Error suffix |  |
 
-### eradicate
+### flake8-2020 (YTT)
 
-For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
+For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ERA001 | CommentedOutCode | Found commented-out code | 🛠 |
+| YTT101 | SysVersionSlice3Referenced | `sys.version[:3]` referenced (python3.10), use `sys.version_info` |  |
+| YTT102 | SysVersion2Referenced | `sys.version[2]` referenced (python3.10), use `sys.version_info` |  |
+| YTT103 | SysVersionCmpStr3 | `sys.version` compared to string (python3.10), use `sys.version_info` |  |
+| YTT201 | SysVersionInfo0Eq3Referenced | `sys.version_info[0] == 3` referenced (python4), use `>=` |  |
+| YTT202 | SixPY3Referenced | `six.PY3` referenced (python4), use `not six.PY2` |  |
+| YTT203 | SysVersionInfo1CmpInt | `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT204 | SysVersionInfoMinorCmpInt | `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
+| YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
+| YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
 
-### flake8-bandit
+### flake8-annotations (ANN)
+
+For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2.9.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument `...` |  |
+| ANN002 | MissingTypeArgs | Missing type annotation for `*...` |  |
+| ANN003 | MissingTypeKwargs | Missing type annotation for `**...` |  |
+| ANN101 | MissingTypeSelf | Missing type annotation for `...` in method |  |
+| ANN102 | MissingTypeCls | Missing type annotation for `...` in classmethod |  |
+| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function `...` |  |
+| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function `...` |  |
+| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method `...` |  |
+| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `...` |  |
+| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
+| ANN401 | DynamicallyTypedExpression | Dynamically typed expressions (typing.Any) are disallowed in `...` |  |
+
+### flake8-bandit (S)
 
 For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on PyPI.
 
@@ -574,38 +628,15 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `"..."` |  |
 | S107 | HardcodedPasswordDefault | Possible hardcoded password: `"..."` |  |
 
-### flake8-comprehensions
+### flake8-blind-except (BLE)
 
-For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/3.10.1/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| C400 | UnnecessaryGeneratorList | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
-| C401 | UnnecessaryGeneratorSet | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
-| C402 | UnnecessaryGeneratorDict | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
-| C403 | UnnecessaryListComprehensionSet | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
-| C404 | UnnecessaryListComprehensionDict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) | 🛠 |
-| C405 | UnnecessaryLiteralSet | Unnecessary `(list\|tuple)` literal (rewrite as a `set` literal) | 🛠 |
-| C406 | UnnecessaryLiteralDict | Unnecessary `(list\|tuple)` literal (rewrite as a `dict` literal) | 🛠 |
-| C408 | UnnecessaryCollectionCall | Unnecessary `(dict\|list\|tuple)` call (rewrite as a literal) | 🛠 |
-| C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary `(list\|tuple)` literal passed to `tuple()` (remove the outer call to `tuple()`) | 🛠 |
-| C410 | UnnecessaryLiteralWithinListCall | Unnecessary `(list\|tuple)` literal passed to `list()` (rewrite as a `list` literal) | 🛠 |
-| C411 | UnnecessaryListCall | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
-| C413 | UnnecessaryCallAroundSorted | Unnecessary `(list\|reversed)` call around `sorted()` |  |
-| C414 | UnnecessaryDoubleCastOrProcess | Unnecessary `(list\|reversed\|set\|sorted\|tuple)` call within `(list\|set\|sorted\|tuple)()` |  |
-| C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within `(reversed\|set\|sorted)()` |  |
-| C416 | UnnecessaryComprehension | Unnecessary `(list\|set)` comprehension (rewrite using `(list\|set)()`) | 🛠 |
-| C417 | UnnecessaryMap | Unnecessary `map` usage (rewrite using a `(list\|set\|dict)` comprehension) |  |
-
-### flake8-debugger
-
-For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/) on PyPI.
+For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except/0.2.1/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| T100 | Debugger | Import for `...` found |  |
+| BLE001 | BlindExcept | Do not catch blind exception: `Exception` |  |
 
-### flake8-boolean-trap
+### flake8-boolean-trap (FBT)
 
 For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/0.1.0/) on PyPI.
 
@@ -615,7 +646,7 @@ For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap
 | FBT002 | BooleanDefaultValueInFunctionDefinition | Boolean default value in function definition |  |
 | FBT003 | BooleanPositionalValueInFunctionCall | Boolean positional value in function call |  |
 
-### flake8-bugbear
+### flake8-bugbear (B)
 
 For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/) on PyPI.
 
@@ -648,8 +679,9 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged |  |
 | B027 | EmptyMethodWithoutAbstractDecorator | `...` is an empty method in an abstract base class, but has no abstract decorator |  |
 | B904 | RaiseWithoutFromInsideExcept | Within an except clause, raise exceptions with raise ... from err or raise ... from None to distinguish them from errors in exception handling |  |
+| B905 | ZipWithoutExplicitStrict | `zip()` without an explicit `strict=` parameter |  |
 
-### flake8-builtins
+### flake8-builtins (A)
 
 For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/) on PyPI.
 
@@ -659,15 +691,44 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/)
 | A002 | BuiltinArgumentShadowing | Argument `...` is shadowing a python builtin |  |
 | A003 | BuiltinAttributeShadowing | Class attribute `...` is shadowing a python builtin |  |
 
-### flake8-tidy-imports
+### flake8-comprehensions (C4)
 
-For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
+For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/3.10.1/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| I252 | BannedRelativeImport | Relative imports are banned |  |
+| C400 | UnnecessaryGeneratorList | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
+| C401 | UnnecessaryGeneratorSet | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
+| C402 | UnnecessaryGeneratorDict | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
+| C403 | UnnecessaryListComprehensionSet | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
+| C404 | UnnecessaryListComprehensionDict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) | 🛠 |
+| C405 | UnnecessaryLiteralSet | Unnecessary `(list\|tuple)` literal (rewrite as a `set` literal) | 🛠 |
+| C406 | UnnecessaryLiteralDict | Unnecessary `(list\|tuple)` literal (rewrite as a `dict` literal) | 🛠 |
+| C408 | UnnecessaryCollectionCall | Unnecessary `(dict\|list\|tuple)` call (rewrite as a literal) | 🛠 |
+| C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary `(list\|tuple)` literal passed to `tuple()` (remove the outer call to `tuple()`) | 🛠 |
+| C410 | UnnecessaryLiteralWithinListCall | Unnecessary `(list\|tuple)` literal passed to `list()` (rewrite as a `list` literal) | 🛠 |
+| C411 | UnnecessaryListCall | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
+| C413 | UnnecessaryCallAroundSorted | Unnecessary `(list\|reversed)` call around `sorted()` |  |
+| C414 | UnnecessaryDoubleCastOrProcess | Unnecessary `(list\|reversed\|set\|sorted\|tuple)` call within `(list\|set\|sorted\|tuple)()` |  |
+| C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within `(reversed\|set\|sorted)()` |  |
+| C416 | UnnecessaryComprehension | Unnecessary `(list\|set)` comprehension (rewrite using `(list\|set)()`) | 🛠 |
+| C417 | UnnecessaryMap | Unnecessary `map` usage (rewrite using a `(list\|set\|dict)` comprehension) |  |
 
-### flake8-print
+### flake8-debugger (T10)
+
+For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| T100 | Debugger | Import for `...` found |  |
+
+### flake8-import-conventions (ICN)
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ICN001 | ImportAliasIsNotConventional | `...` should be imported as `...` |  |
+
+### flake8-print (T20)
 
 For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on PyPI.
 
@@ -676,7 +737,7 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on Py
 | T201 | PrintFound | `print` found | 🛠 |
 | T203 | PPrintFound | `pprint` found | 🛠 |
 
-### flake8-quotes
+### flake8-quotes (Q)
 
 For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on PyPI.
 
@@ -687,58 +748,50 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on 
 | Q002 | BadQuotesDocstring | Single quote docstring found but double quotes preferred |  |
 | Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes |  |
 
-### flake8-annotations
+### flake8-return (RET)
 
-For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2.9.1/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument `...` |  |
-| ANN002 | MissingTypeArgs | Missing type annotation for `*...` |  |
-| ANN003 | MissingTypeKwargs | Missing type annotation for `**...` |  |
-| ANN101 | MissingTypeSelf | Missing type annotation for `...` in method |  |
-| ANN102 | MissingTypeCls | Missing type annotation for `...` in classmethod |  |
-| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function `...` |  |
-| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function `...` |  |
-| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method `...` |  |
-| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `...` |  |
-| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
-| ANN401 | DynamicallyTypedExpression | Dynamically typed expressions (typing.Any) are disallowed in `...` |  |
-
-### flake8-2020
-
-For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI.
+For more, see [flake8-return](https://pypi.org/project/flake8-return/1.2.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| YTT101 | SysVersionSlice3Referenced | `sys.version[:3]` referenced (python3.10), use `sys.version_info` |  |
-| YTT102 | SysVersion2Referenced | `sys.version[2]` referenced (python3.10), use `sys.version_info` |  |
-| YTT103 | SysVersionCmpStr3 | `sys.version` compared to string (python3.10), use `sys.version_info` |  |
-| YTT201 | SysVersionInfo0Eq3Referenced | `sys.version_info[0] == 3` referenced (python4), use `>=` |  |
-| YTT202 | SixPY3Referenced | `six.PY3` referenced (python4), use `not six.PY2` |  |
-| YTT203 | SysVersionInfo1CmpInt | `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple |  |
-| YTT204 | SysVersionInfoMinorCmpInt | `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple |  |
-| YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
-| YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
-| YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
+| RET501 | UnnecessaryReturnNone | Do not explicitly `return None` in function if it is the only possible return value | 🛠 |
+| RET502 | ImplicitReturnValue | Do not implicitly `return None` in function able to return non-`None` value | 🛠 |
+| RET503 | ImplicitReturn | Missing explicit `return` at the end of function able to return non-`None` value | 🛠 |
+| RET504 | UnnecessaryAssign | Unnecessary variable assignment before `return` statement |  |
+| RET505 | SuperfluousElseReturn | Unnecessary `else` after `return` statement |  |
+| RET506 | SuperfluousElseRaise | Unnecessary `else` after `raise` statement |  |
+| RET507 | SuperfluousElseContinue | Unnecessary `else` after `continue` statement |  |
+| RET508 | SuperfluousElseBreak | Unnecessary `else` after `break` statement |  |
 
-### flake8-blind-except
+### flake8-tidy-imports (TID)
 
-For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except/0.2.1/) on PyPI.
+For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| BLE001 | BlindExcept | Blind except Exception: statement |  |
+| TID252 | BannedRelativeImport | Relative imports are banned |  |
 
-### mccabe
+### flake8-unused-arguments (ARG)
 
-For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
+For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/0.0.12/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C901 | FunctionIsTooComplex | `...` is too complex (10) |  |
+| ARG001 | UnusedFunctionArgument | Unused function argument: `...` |  |
+| ARG002 | UnusedMethodArgument | Unused method argument: `...` |  |
+| ARG003 | UnusedClassMethodArgument | Unused class method argument: `...` |  |
+| ARG004 | UnusedStaticMethodArgument | Unused static method argument: `...` |  |
+| ARG005 | UnusedLambdaArgument | Unused lambda argument: `...` |  |
 
-### pygrep-hooks
+### eradicate (ERA)
+
+For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ERA001 | CommentedOutCode | Found commented-out code | 🛠 |
+
+### pygrep-hooks (PGH)
 
 For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitHub.
 
@@ -746,30 +799,30 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 | ---- | ---- | ------- | --- |
 | PGH001 | NoEval | No builtin `eval()` allowed |  |
 
-### Pylint
+### Pylint (PLC, PLE, PLR, PLW)
 
 For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| PLC0414 | UselessImportAlias | Import alias does not rename original package | 🛠 |
+| PLC2201 | MisplacedComparisonConstant | Comparison should be ... | 🛠 |
 | PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
-| PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
 | PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
+| PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
+| PLR0402 | ConsiderUsingFromImport | Use `from ... import ...` in lieu of alias |  |
+| PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance(..., (...))` |  |
+| PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
+| PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 
-### Ruff-specific rules
+### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
-| RUF101 | ConvertExitToSysExit | `exit()` is only available in the interpreter, use `sys.exit()` instead | 🛠 |
-
-### Meta rules
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| M001 | UnusedNOQA | Unused `noqa` directive | 🛠 |
+| RUF100 | UnusedNOQA | Unused `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
 
@@ -897,7 +950,7 @@ automatically convert your existing configuration.)
 Ruff can be used as a drop-in replacement for Flake8 when used (1) without or with a small number of
 plugins, (2) alongside Black, and (3) on Python 3 code.
 
-Under those conditions, Ruff implements every rule in Flake8, with the exception of `F811`.
+Under those conditions, Ruff implements every rule in Flake8.
 
 Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
 natively, including:
@@ -916,8 +969,10 @@ natively, including:
 - [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
+- [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
+- [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)
@@ -926,6 +981,12 @@ natively, including:
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (1/10)
 - [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
+
+Note that, in some cases, Ruff uses different error code prefixes than would be found in the
+originating Flake8 plugins. For example, Ruff uses `TID252` to represent the `I252` rule from
+`flake8-tidy-imports`. This helps minimize conflicts across plugins and allows any individual plugin
+to be toggled on or off with a single (e.g.) `--select TID`, as opposed to `--select I2` (to avoid
+conflicts with the `isort` rules, like `I001`).
 
 Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -963,8 +1024,10 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
+- [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
+- [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)
@@ -1254,12 +1317,36 @@ Summary
 
 ### Options
 
-#### [`dummy_variable_rgx`](#dummy_variable_rgx)
+<!-- Sections automatically generated by `cargo dev generate-options`. -->
+<!-- Begin auto-generated options sections. -->
 
-A regular expression used to identify "dummy" variables, or those which should be ignored when evaluating
-(e.g.) unused-variable checks.
+#### [`allowed-confusables`](#allowed-confusables)
 
-**Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"` (matches `_`, `__`, and `_var`, but not `_var_`)
+A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`,
+`RUF002`, and `RUF003`.
+
+**Default value**: `[]`
+
+**Type**: `Vec<char>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
+# which could be confused for "-", "p", and "*", respectively.
+allowed-confusables = ["−", "ρ", "∗"]
+```
+
+---
+
+#### [`dummy-variable-rgx`](#dummy-variable-rgx)
+
+A regular expression used to identify "dummy" variables, or those which should be
+ignored when evaluating (e.g.) unused-variable checks. The default expression matches
+`_`, `__`, and `_var`, but not `_var_`.
+
+**Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"`
 
 **Type**: `Regex`
 
@@ -1286,8 +1373,8 @@ Exclusions are based on globs, and can be either:
   (to exclude any Python files in `directory`). Note that these paths are relative to the
   project root (e.g., the directory containing your `pyproject.toml`).
 
-Note that you'll typically want to use [`extend_exclude`](#extend-exclude) to modify the excluded
-paths.
+Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify
+the excluded paths.
 
 **Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
 
@@ -1298,7 +1385,7 @@ paths.
 ```toml
 [tool.ruff]
 exclude = [".venv"]
-````
+```
 
 ---
 
@@ -1316,28 +1403,6 @@ A list of file patterns to omit from linting, in addition to those specified by 
 [tool.ruff]
 # In addition to the standard set of exclusions, omit all tests, plus a specific file.
 extend-exclude = ["tests", "src/bad.py"]
-````
-
----
-
-#### [`ignore`](#ignore)
-
-A list of check code prefixes to ignore. Prefixes can specify exact checks (like `F841`), entire
-categories (like `F`), or anything in between.
-
-When breaking ties between enabled and disabled checks (via `select` and `ignore`, respectively),
-more specific prefixes override less specific prefixes.
-
-**Default value**: `[]`
-
-**Type**: `Vec<CheckCodePrefix>`
-
-**Example usage**:
-
-```toml
-[tool.ruff]
-# Skip unused variable checks (`F841`).
-ignore = ["F841"]
 ```
 
 ---
@@ -1356,28 +1421,6 @@ A list of check code prefixes to ignore, in addition to those specified by `igno
 [tool.ruff]
 # Skip unused variable checks (`F841`).
 extend-ignore = ["F841"]
-```
-
----
-
-#### [`select`](#select)
-
-A list of check code prefixes to enable. Prefixes can specify exact checks (like `F841`), entire
-categories (like `F`), or anything in between.
-
-When breaking ties between enabled and disabled checks (via `select` and `ignore`, respectively),
-more specific prefixes override less specific prefixes.
-
-**Default value**: `["E", "F"]`
-
-**Type**: `Vec<CheckCodePrefix>`
-
-**Example usage**:
-
-```toml
-[tool.ruff]
-# On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-select = ["E", "F", "B", "Q"]
 ```
 
 ---
@@ -1414,8 +1457,8 @@ yet implemented in Ruff.
 
 ```toml
 [tool.ruff]
-# Avoiding flagging (and removing) `V101` from any `# noqa` directives, despite Ruff's lack of
-# support for `vulture`.
+# Avoiding flagging (and removing) `V101` from any `# noqa`
+# directives, despite Ruff's lack of support for `vulture`.
 external = ["V101"]
 ```
 
@@ -1423,8 +1466,8 @@ external = ["V101"]
 
 #### [`fix`](#fix)
 
-Enable autofix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix`
-command-line flags).
+Enable autofix behavior by-default when running `ruff` (overridden
+by the `--fix` and `--no-fix` command-line flags).
 
 **Default value**: `false`
 
@@ -1443,7 +1486,7 @@ fix = true
 
 A list of check code prefixes to consider autofix-able.
 
-**Default value**: `["A", "ANN", "B", "BLE", "C", "D", "E", "F", "FBT", "I", "M", "N", "Q", "RUF", "S", "T", "U", "W", "YTT"]`
+**Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]`
 
 **Type**: `Vec<CheckCodePrefix>`
 
@@ -1457,9 +1500,33 @@ fixable = ["E", "F"]
 
 ---
 
-#### [`unfixable`](#unfixable)
+#### [`format`](#format)
 
-A list of check code prefixes to consider un-autofix-able.
+The style in which violation messages should be formatted: `"text"` (default),
+`"grouped"` (group messages by file), `"json"` (machine-readable), `"junit"`
+(machine-readable XML), or `"github"` (GitHub Actions annotations).
+
+**Default value**: `"text"`
+
+**Type**: `SerializationType`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Group violations by containing file.
+format = "grouped"
+```
+
+---
+
+#### [`ignore`](#ignore)
+
+A list of check code prefixes to ignore. Prefixes can specify exact checks (like
+`F841`), entire categories (like `F`), or anything in between.
+
+When breaking ties between enabled and disabled checks (via `select` and `ignore`,
+respectively), more specific prefixes override less specific prefixes.
 
 **Default value**: `[]`
 
@@ -1469,8 +1536,28 @@ A list of check code prefixes to consider un-autofix-able.
 
 ```toml
 [tool.ruff]
-# Disable autofix for unused imports (`F401`).
-unfixable = ["F401"]
+# Skip unused variable checks (`F841`).
+ignore = ["F841"]
+```
+
+---
+
+#### [`ignore-init-module-imports`](#ignore-init-module-imports)
+
+Avoid automatically removing unused imports in `__init__.py` files. Such imports will
+still be +flagged, but with a dedicated message suggesting that the import is either
+added to the module' +`__all__` symbol, or re-exported with a redundant alias (e.g.,
+`import os as os`).
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+ignore-init-module-imports = true
 ```
 
 ---
@@ -1493,29 +1580,10 @@ line-length = 120
 
 ---
 
-#### [`format`](#format)
-
-The style in which violation messages should be formatted: `"text"` (default), `"grouped"`
-(group messages by file), `"json"` (machine-readable), `"junit"` (machine-readable XML), or `"github"` (GitHub Actions annotations).
-
-**Default value**: `"text"`
-
-**Type**: `SerializationFormat`
-
-**Example usage**:
-
-```toml
-[tool.ruff]
-# Group violations by containing file.
-format = "grouped"
-```
-
----
-
 #### [`per-file-ignores`](#per-file-ignores)
 
-A list of mappings from file pattern to check code prefixes to exclude, when considering any
-matching files.
+A list of mappings from file pattern to check code prefixes to exclude, when considering
+any matching files.
 
 **Default value**: `{}`
 
@@ -1533,10 +1601,32 @@ matching files.
 
 ---
 
+#### [`select`](#select)
+
+A list of check code prefixes to enable. Prefixes can specify exact checks (like
+`F841`), entire categories (like `F`), or anything in between.
+
+When breaking ties between enabled and disabled checks (via `select` and `ignore`,
+respectively), more specific prefixes override less specific prefixes.
+
+**Default value**: `["E", "F"]`
+
+**Type**: `Vec<CheckCodePrefix>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+select = ["E", "F", "B", "Q"]
+```
+
+---
+
 #### [`show-source`](#show-source)
 
-Whether to show source code snippets when reporting lint error violations (overridden by the
-`--show-source` command-line flag).
+Whether to show source code snippets when reporting lint error violations (overridden by
+the `--show-source` command-line flag).
 
 **Default value**: `false`
 
@@ -1572,9 +1662,9 @@ src = ["src", "test"]
 
 #### [`target-version`](#target-version)
 
-The Python version to target, e.g., when considering automatic code upgrades, like rewriting type
-annotations. Note that the target version will _not_ be inferred from the _current_ Python version,
-and instead must be specified explicitly (as seen below).
+The Python version to target, e.g., when considering automatic code upgrades, like
+rewriting type annotations. Note that the target version will _not_ be inferred from the
+_current_ Python version, and instead must be specified explicitly (as seen below).
 
 **Default value**: `"py310"`
 
@@ -1588,12 +1678,49 @@ and instead must be specified explicitly (as seen below).
 target-version = "py37"
 ```
 
+---
+
+#### [`unfixable`](#unfixable)
+
+A list of check code prefixes to consider un-autofix-able.
+
+**Default value**: `[]`
+
+**Type**: `Vec<CheckCodePrefix>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Disable autofix for unused imports (`F401`).
+unfixable = ["F401"]
+```
+
+---
+
 ### `flake8-annotations`
+
+#### [`allow-star-arg-any`](#allow-star-arg-any)
+
+Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-annotations]
+allow-star-arg-any = true
+```
+
+---
 
 #### [`mypy-init-return`](#mypy-init-return)
 
-Whether to allow the omission of a return type hint for `__init__` if at least one argument is
-annotated.
+Whether to allow the omission of a return type hint for `__init__` if at least one
+argument is annotated.
 
 **Default value**: `false`
 
@@ -1610,8 +1737,8 @@ mypy-init-return = true
 
 #### [`suppress-dummy-args`](#suppress-dummy-args)
 
-Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable regex (like
-`_`).
+Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable
+regex (like `_`).
 
 **Default value**: `false`
 
@@ -1628,7 +1755,8 @@ suppress-dummy-args = true
 
 #### [`suppress-none-returning`](#suppress-none-returning)
 
-Whether to suppress `ANN200`-level errors for functions that meet either of the following criteria:
+Whether to suppress `ANN200`-level errors for functions that meet either of the
+following criteria:
 
 - Contain no `return` statement.
 - Explicit `return` statement(s) all return `None` (explicitly or implicitly).
@@ -1646,27 +1774,12 @@ suppress-none-returning = true
 
 ---
 
-#### [`allow-star-arg-any`](#allow-star-arg-any)
-
-Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.
-
-**Default value**: `false`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```toml
-[tool.ruff.flake8-annotations]
-allow-star-arg-any = true
-```
-
 ### `flake8-bugbear`
 
 #### [`extend-immutable-calls`](#extend-immutable-calls)
 
-Additional callable functions to consider "immutable" when evaluating, e.g., no-mutable-default-argument
-checks (`B006`).
+Additional callable functions to consider "immutable" when evaluating, e.g.,
+`no-mutable-default-argument` checks (`B006`).
 
 **Default value**: `[]`
 
@@ -1680,7 +1793,88 @@ checks (`B006`).
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 ```
 
+---
+
+### `flake8-import-conventions`
+
+#### [`aliases`](#aliases)
+
+The conventional aliases for imports. These aliases can be extended by the `extend_aliases` option.
+
+**Default value**: `{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}`
+
+**Type**: `FxHashMap<String, String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-import-conventions]
+# Declare the default aliases.
+altair = "alt"
+matplotlib.pyplot = "plt"
+numpy = "np"
+pandas = "pd"
+seaborn = "sns"
+```
+
+---
+
+#### [`extend-aliases`](#extend-aliases)
+
+A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.
+
+**Default value**: `{}`
+
+**Type**: `FxHashMap<String, String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-import-conventions]
+# Declare a custom alias for the `matplotlib` module.
+"dask.dataframe" = "dd"
+```
+
+---
+
 ### `flake8-quotes`
+
+#### [`avoid-escape`](#avoid-escape)
+
+Whether to avoid using single quotes if a string contains single quotes, or vice-versa
+with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+This minimizes the need to escape quotation marks within strings.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-quotes]
+# Don't bother trying to avoid escapes.
+avoid-escape = false
+```
+
+---
+
+#### [`docstring-quotes`](#docstring-quotes)
+
+Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
+
+**Default value**: `"double"`
+
+**Type**: `Quote`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-quotes]
+docstring-quotes = "single"
+```
+
+---
 
 #### [`inline-quotes`](#inline-quotes)
 
@@ -1716,47 +1910,12 @@ multiline-quotes = "single"
 
 ---
 
-#### [`docstring-quotes`](#docstring-quotes)
-
-Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
-
-**Default value**: `"double"`
-
-**Type**: `Quote`
-
-**Example usage**:
-
-```toml
-[tool.ruff.flake8-quotes]
-docstring-quotes = "single"
-```
-
----
-
-#### [`avoid-escape`](#avoid-escape)
-
-Whether to avoid using single quotes if a string contains single quotes, or vice-versa with
-double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the
-need to escape quotation marks within strings.
-
-**Default value**: `true`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```toml
-[tool.ruff.flake8-quotes]
-# Don't bother trying to avoid escapes.
-avoid-escape = false
-```
-
 ### `flake8-tidy-imports`
 
 #### [`ban-relative-imports`](#ban-relative-imports)
 
-Whether to ban all relative imports (`"all"`), or only those imports that extend into the parent
-module and beyond (`"parents"`).
+Whether to ban all relative imports (`"all"`), or only those imports that extend into
+the parent module and beyond (`"parents"`).
 
 **Default value**: `"parents"`
 
@@ -1770,12 +1929,76 @@ module and beyond (`"parents"`).
 ban-relative-imports = "all"
 ```
 
+---
+
 ### `isort`
 
-#### [`known-first-party`](known-first-party)
+#### [`combine-as-imports`](#combine-as-imports)
 
-A list of modules to consider first-party, regardless of whether they can be identified as such
-via introspection of the local filesystem.
+Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
+option.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+combine-as-imports = true
+```
+
+---
+
+#### [`extra-standard-library`](#extra-standard-library)
+
+A list of modules to consider standard-library, in addition to those known to Ruff in
+advance.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+extra-standard-library = ["path"]
+```
+
+---
+
+#### [`force-wrap-aliases`](#force-wrap-aliases)
+
+Force `import from` statements with multiple members and at least one alias (e.g.,
+`import A as B`) to wrap such that every line contains exactly one member. For example,
+this formatting would be retained, rather than condensing to a single line:
+
+```py
+from .utils import (
+    test_directory as test_directory,
+    test_id as test_id
+)
+```
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+force-wrap-aliases = true
+```
+
+---
+
+#### [`known-first-party`](#known-first-party)
+
+A list of modules to consider first-party, regardless of whether they can be identified
+as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
@@ -1790,10 +2013,10 @@ known-first-party = ["src"]
 
 ---
 
-#### [`known-third-party`](known-third-party)
+#### [`known-third-party`](#known-third-party)
 
-A list of modules to consider third-party, regardless of whether they can be identified as such
-via introspection of the local filesystem.
+A list of modules to consider third-party, regardless of whether they can be identified
+as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
@@ -1803,25 +2026,10 @@ via introspection of the local filesystem.
 
 ```toml
 [tool.ruff.isort]
-known-third-party = ["fastapi"]
+known-third-party = ["src"]
 ```
 
 ---
-
-#### [`extra-standard-library`](extra-standard-library)
-
-A list of modules to consider standard-library, in addition to those known to Ruff in advance.
-
-**Default value**: `[]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.isort]
-extra-standard-library = ["path"]
-```
 
 ### `mccabe`
 
@@ -1841,7 +2049,29 @@ The maximum McCabe complexity to allow before triggering `C901` errors.
 max-complexity = 5
 ```
 
+---
+
 ### `pep8-naming`
+
+#### [`classmethod-decorators`](#classmethod-decorators)
+
+A list of decorators that, when applied to a method, indicate that the method should be
+treated as a class method. For example, Ruff will expect that any method decorated by a
+decorator in this list takes a `cls` argument as its first argument.
+
+**Default value**: `["classmethod"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pep8-naming]
+# Allow Pydantic's `@validator` decorator to trigger class method treatment.
+classmethod-decorators = ["classmethod", "pydantic.validator"]
+```
+
+---
 
 #### [`ignore-names`](#ignore-names)
 
@@ -1860,31 +2090,11 @@ ignore-names = ["callMethod"]
 
 ---
 
-#### [`classmethod-decorators`](#classmethod-decorators)
-
-A list of decorators that, when applied to a method, indicate that the method should be treated as
-a class method. For example, Ruff will expect that any method decorated by a decorator in this list
-takes a `cls` argument as its first argument.
-
-**Default value**: `["classmethod"]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff.pep8-naming]
-# Allow Pydantic's `@validator` decorator to trigger class method treatment.
-classmethod-decorators = ["classmethod", "pydantic.validator"]
-```
-
----
-
 #### [`staticmethod-decorators`](#staticmethod-decorators)
 
-A list of decorators that, when applied to a method, indicate that the method should be treated as
-a static method. For example, Ruff will expect that any method decorated by a decorator in this list
-has no `self` or `cls` argument.
+A list of decorators that, when applied to a method, indicate that the method should be
+treated as a static method. For example, Ruff will expect that any method decorated by a
+decorator in this list has no `self` or `cls` argument.
 
 **Default value**: `["staticmethod"]`
 
@@ -1898,13 +2108,13 @@ has no `self` or `cls` argument.
 staticmethod-decorators = ["staticmethod", "stcmthd"]
 ```
 
+---
+
 ### `pyupgrade`
 
 #### [`keep-runtime-typing`](#keep-runtime-typing)
 
-Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`)
-rewrites even if a file imports `from __future__ import annotations`. Note that this setting is
-only applicable when the target Python version is below 3.9 and 3.10 respectively.
+Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively.
 
 **Default value**: `false`
 
@@ -1917,6 +2127,10 @@ only applicable when the target Python version is below 3.9 and 3.10 respectivel
 # Preserve types, even if a file imports `from __future__ import annotations`.
 keep-runtime-typing = true
 ```
+
+---
+
+<!-- End auto-generated options sections. -->
 
 ## License
 

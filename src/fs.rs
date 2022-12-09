@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -8,6 +7,7 @@ use anyhow::{anyhow, Result};
 use globset::GlobMatcher;
 use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
+use rustc_hash::FxHashSet;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::checks::CheckCode;
@@ -83,8 +83,8 @@ pub fn iter_python_files<'a>(
 /// Create tree set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path<'a>(
     path: &Path,
-    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)],
-) -> Result<BTreeSet<&'a CheckCode>> {
+    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)],
+) -> Result<FxHashSet<&'a CheckCode>> {
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
         .iter()
@@ -97,7 +97,7 @@ pub(crate) fn ignores_from_path<'a>(
 
 /// Convert any path to an absolute path (based on the current working
 /// directory).
-pub(crate) fn normalize_path(path: &Path) -> PathBuf {
+pub fn normalize_path(path: &Path) -> PathBuf {
     if let Ok(path) = path.absolutize() {
         return path.to_path_buf();
     }
@@ -105,7 +105,7 @@ pub(crate) fn normalize_path(path: &Path) -> PathBuf {
 }
 
 /// Convert any path to an absolute path (based on the specified project root).
-pub(crate) fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
+pub fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
     if let Ok(path) = path.absolutize_from(project_root) {
         return path.to_path_buf();
     }
@@ -113,7 +113,7 @@ pub(crate) fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
 }
 
 /// Convert an absolute path to be relative to the current working directory.
-pub(crate) fn relativize_path(path: &Path) -> Cow<str> {
+pub fn relativize_path(path: &Path) -> Cow<str> {
     if let Ok(path) = path.strip_prefix(&*path_dedot::CWD) {
         return path.to_string_lossy();
     }

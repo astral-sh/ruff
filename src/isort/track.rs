@@ -1,4 +1,5 @@
-use nohash_hasher::IntSet;
+use std::path::Path;
+
 use rustpython_ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
@@ -6,34 +7,81 @@ use rustpython_ast::{
 };
 
 use crate::ast::visitor::Visitor;
+use crate::directives::IsortDirectives;
 
-#[derive(Debug)]
+pub enum Trailer {
+    Sibling,
+    ClassDef,
+    FunctionDef,
+}
+
+#[derive(Default)]
+pub struct Block<'a> {
+    pub imports: Vec<&'a Stmt>,
+    pub trailer: Option<Trailer>,
+}
+
 pub struct ImportTracker<'a> {
-    exclusions: &'a IntSet<usize>,
-    blocks: Vec<Vec<&'a Stmt>>,
+    directives: &'a IsortDirectives,
+    pyi: bool,
+    blocks: Vec<Block<'a>>,
+    split_index: usize,
+    nested: bool,
 }
 
 impl<'a> ImportTracker<'a> {
-    pub fn new(exclusions: &'a IntSet<usize>) -> Self {
+    pub fn new(directives: &'a IsortDirectives, path: &'a Path) -> Self {
         Self {
-            exclusions,
-            blocks: vec![vec![]],
+            directives,
+            pyi: path.extension().map_or(false, |ext| ext == "pyi"),
+            blocks: vec![Block::default()],
+            split_index: 0,
+            nested: false,
         }
     }
 
     fn track_import(&mut self, stmt: &'a Stmt) {
         let index = self.blocks.len() - 1;
-        self.blocks[index].push(stmt);
+        self.blocks[index].imports.push(stmt);
     }
 
-    fn finalize(&mut self) {
-        let index = self.blocks.len() - 1;
-        if !self.blocks[index].is_empty() {
-            self.blocks.push(vec![]);
+    fn trailer_for(&self, stmt: &'a Stmt) -> Option<Trailer> {
+        if self.pyi {
+            // Black treats interface files differently, limiting to one newline
+            // (`Trailing::Sibling`), and avoiding inserting any newlines in nested function
+            // blocks.
+            if self.nested
+                && matches!(
+                    stmt.node,
+                    StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. }
+                )
+            {
+                None
+            } else {
+                Some(Trailer::Sibling)
+            }
+        } else if self.nested {
+            Some(Trailer::Sibling)
+        } else {
+            Some(match &stmt.node {
+                StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                    Trailer::FunctionDef
+                }
+                StmtKind::ClassDef { .. } => Trailer::ClassDef,
+                _ => Trailer::Sibling,
+            })
         }
     }
 
-    pub fn into_iter(self) -> impl IntoIterator<Item = Vec<&'a Stmt>> {
+    fn finalize(&mut self, trailer: Option<Trailer>) {
+        let index = self.blocks.len() - 1;
+        if !self.blocks[index].imports.is_empty() {
+            self.blocks[index].trailer = trailer;
+            self.blocks.push(Block::default());
+        }
+    }
+
+    pub fn into_iter(self) -> impl IntoIterator<Item = Block<'a>> {
         self.blocks.into_iter()
     }
 }
@@ -43,92 +91,104 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        // Track manual splits.
+        while self.split_index < self.directives.splits.len() {
+            if stmt.location.row() >= self.directives.splits[self.split_index] {
+                self.finalize(self.trailer_for(stmt));
+                self.split_index += 1;
+            } else {
+                break;
+            }
+        }
+
         // Track imports.
         if matches!(
             stmt.node,
             StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
-        ) && !self.exclusions.contains(&stmt.location.row())
+        ) && !self.directives.exclusions.contains(&stmt.location.row())
         {
             self.track_import(stmt);
         } else {
-            self.finalize();
+            self.finalize(self.trailer_for(stmt));
         }
 
         // Track scope.
+        let prev_nested = self.nested;
+        self.nested = true;
         match &stmt.node {
             StmtKind::FunctionDef { body, .. } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             StmtKind::AsyncFunctionDef { body, .. } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             StmtKind::ClassDef { body, .. } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             StmtKind::For { body, orelse, .. } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
 
                 for stmt in orelse {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             StmtKind::AsyncFor { body, orelse, .. } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
 
                 for stmt in orelse {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             StmtKind::While { body, orelse, .. } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
 
                 for stmt in orelse {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             StmtKind::If { body, orelse, .. } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
 
                 for stmt in orelse {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             StmtKind::With { body, .. } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             StmtKind::AsyncWith { body, .. } => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             StmtKind::Match { cases, .. } => {
                 for match_case in cases {
@@ -148,20 +208,21 @@ where
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
 
                 for stmt in orelse {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
 
                 for stmt in finalbody {
                     self.visit_stmt(stmt);
                 }
-                self.finalize();
+                self.finalize(None);
             }
             _ => {}
         }
+        self.nested = prev_nested;
     }
 
     fn visit_annotation(&mut self, _: &'b Expr) {}
@@ -183,11 +244,16 @@ where
     fn visit_comprehension(&mut self, _: &'b Comprehension) {}
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
+        let prev_nested = self.nested;
+        self.nested = true;
+
         let ExcepthandlerKind::ExceptHandler { body, .. } = &excepthandler.node;
         for stmt in body {
             self.visit_stmt(stmt);
         }
-        self.finalize();
+        self.finalize(None);
+
+        self.nested = prev_nested;
     }
 
     fn visit_arguments(&mut self, _: &'b Arguments) {}
@@ -204,7 +270,7 @@ where
         for stmt in &match_case.body {
             self.visit_stmt(stmt);
         }
-        self.finalize();
+        self.finalize(None);
     }
 
     fn visit_pattern(&mut self, _: &'b Pattern) {}

@@ -89,9 +89,10 @@ pub(crate) fn check_path(
                     checks.extend(check_imports(
                         &python_ast,
                         locator,
-                        &directives.isort_exclusions,
+                        &directives.isort,
                         settings,
                         autofix,
+                        path,
                     ));
                 }
             }
@@ -151,79 +152,17 @@ pub fn lint_path(
     }
 
     // Read the file from disk.
-    let mut contents = fs::read_file(path)?;
+    let contents = fs::read_file(path)?;
 
-    // Track the number of fixed errors across iterations.
-    let mut fixed = 0;
-
-    // As an escape hatch, bail after 100 iterations.
-    let mut iterations = 0;
-
-    // Continuously autofix until the source code stabilizes.
-    let messages = loop {
-        // Tokenize once.
-        let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
-
-        // Initialize the SourceCodeLocator (which computes offsets lazily).
-        let locator = SourceCodeLocator::new(&contents);
-
-        // Determine the noqa and isort exclusions.
-        let directives = directives::extract_directives(
-            &tokens,
-            &locator,
-            directives::Flags::from_settings(settings),
-        );
-
-        // Generate checks.
-        let checks = check_path(
-            path,
-            &contents,
-            tokens,
-            &locator,
-            &directives,
-            settings,
-            autofix.into(),
-            false,
-        )?;
-
-        // Apply autofix.
-        if matches!(autofix, fixer::Mode::Apply) && iterations < MAX_ITERATIONS {
-            if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
-                // Count the number of fixed errors.
-                fixed += applied;
-
-                // Store the fixed contents.
-                contents = fixed_contents.to_string();
-
-                // Increment the iteration count.
-                iterations += 1;
-
-                // Re-run the linter pass (by avoiding the break).
-                continue;
-            }
-        }
-
-        // Convert to messages.
-        let filename = path.to_string_lossy().to_string();
-        break checks
-            .into_iter()
-            .map(|check| {
-                let source = if settings.show_source {
-                    Some(Source::from_check(&check, &locator))
-                } else {
-                    None
-                };
-                Message::from_check(check, filename.clone(), source)
-            })
-            .collect::<Vec<_>>();
-    };
+    // Lint the file.
+    let (contents, fixed, messages) = lint(contents, path, settings, autofix)?;
 
     // Re-populate the cache.
     cache::set(path, &metadata, settings, autofix, &messages, mode);
 
     // If we applied any fixes, write the contents back to disk.
     if fixed > 0 {
-        write(path, &contents)?;
+        write(path, contents)?;
     }
 
     Ok(Diagnostics { messages, fixed })
@@ -255,7 +194,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &locator,
         &Directives {
             noqa_line_for: IntMap::default(),
-            isort_exclusions: directives.isort_exclusions,
+            isort: directives.isort,
         },
         settings,
         false,
@@ -297,14 +236,32 @@ pub fn lint_stdin(
     autofix: &fixer::Mode,
 ) -> Result<Diagnostics> {
     // Read the file from disk.
-    let mut contents = stdin.to_string();
+    let contents = stdin.to_string();
 
+    // Lint the file.
+    let (contents, fixed, messages) = lint(contents, path, settings, autofix)?;
+
+    // Write the fixed contents to stdout.
+    if matches!(autofix, fixer::Mode::Apply) {
+        io::stdout().write_all(contents.as_bytes())?;
+    }
+
+    Ok(Diagnostics { messages, fixed })
+}
+
+fn lint(
+    mut contents: String,
+    path: &Path,
+    settings: &Settings,
+    autofix: &fixer::Mode,
+) -> Result<(String, usize, Vec<Message>)> {
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;
 
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;
 
+    // Continuously autofix until the source code stabilizes.
     let messages = loop {
         // Tokenize once.
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
@@ -363,12 +320,7 @@ pub fn lint_stdin(
             .collect();
     };
 
-    // Write the fixed contents to stdout.
-    if matches!(autofix, fixer::Mode::Apply) {
-        io::stdout().write_all(contents.as_bytes())?;
-    }
-
-    Ok(Diagnostics { messages, fixed })
+    Ok((contents, fixed, messages))
 }
 
 #[cfg(test)]

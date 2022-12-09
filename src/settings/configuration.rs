@@ -8,17 +8,19 @@ use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
+use rustc_hash::FxHashSet;
 
 use crate::checks_gen::{CheckCodePrefix, CATEGORIES};
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
-    pep8_naming, pyupgrade,
+    flake8_annotations, flake8_bugbear, flake8_import_conventions, flake8_quotes,
+    flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
 };
 
 #[derive(Debug)]
 pub struct Configuration {
+    pub allowed_confusables: FxHashSet<char>,
     pub dummy_variable_rgx: Regex,
     pub exclude: Vec<FilePattern>,
     pub extend_exclude: Vec<FilePattern>,
@@ -29,6 +31,7 @@ pub struct Configuration {
     pub fixable: Vec<CheckCodePrefix>,
     pub format: SerializationFormat,
     pub ignore: Vec<CheckCodePrefix>,
+    pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub per_file_ignores: Vec<PerFileIgnore>,
     pub select: Vec<CheckCodePrefix>,
@@ -39,6 +42,7 @@ pub struct Configuration {
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
+    pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub isort: isort::settings::Settings,
@@ -81,9 +85,12 @@ impl Configuration {
     ) -> Result<Self> {
         let options = load_options(pyproject)?;
         Ok(Configuration {
+            allowed_confusables: FxHashSet::from_iter(
+                options.allowed_confusables.unwrap_or_default(),
+            ),
             dummy_variable_rgx: match options.dummy_variable_rgx {
                 Some(pattern) => Regex::new(&pattern)
-                    .map_err(|e| anyhow!("Invalid dummy-variable-rgx value: {e}"))?,
+                    .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
                 None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
             },
             src: options.src.map_or_else(
@@ -125,6 +132,7 @@ impl Configuration {
             unfixable: options.unfixable.unwrap_or_default(),
             format: options.format.unwrap_or_default(),
             ignore: options.ignore.unwrap_or_default(),
+            ignore_init_module_imports: options.ignore_init_module_imports.unwrap_or_default(),
             line_length: options.line_length.unwrap_or(88),
             per_file_ignores: options
                 .per_file_ignores
@@ -145,6 +153,10 @@ impl Configuration {
                 .flake8_bugbear
                 .map(flake8_bugbear::settings::Settings::from_options)
                 .unwrap_or_default(),
+            flake8_import_conventions: options
+                .flake8_import_conventions
+                .map(flake8_import_conventions::settings::Settings::from_options)
+                .unwrap_or_default(),
             flake8_quotes: options
                 .flake8_quotes
                 .map(flake8_quotes::settings::Settings::from_options)
@@ -159,6 +171,7 @@ impl Configuration {
                 .unwrap_or_default(),
             mccabe: options
                 .mccabe
+                .as_ref()
                 .map(mccabe::settings::Settings::from_options)
                 .unwrap_or_default(),
             pep8_naming: options

@@ -1,0 +1,66 @@
+---
+source: src/flake8_return/mod.rs
+expression: checks
+---
+- kind: ImplicitReturn
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 12
+    column: 0
+  fix: ~
+- kind: ImplicitReturn
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 15
+  fix:
+    content: "        return None\n"
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 0
+- kind: ImplicitReturn
+  location:
+    row: 23
+    column: 4
+  end_location:
+    row: 23
+    column: 11
+  fix:
+    content: "    return None\n"
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 24
+      column: 0
+- kind: ImplicitReturn
+  location:
+    row: 29
+    column: 8
+  end_location:
+    row: 34
+    column: 0
+  fix: ~
+- kind: ImplicitReturn
+  location:
+    row: 39
+    column: 8
+  end_location:
+    row: 39
+    column: 15
+  fix:
+    content: "        return None\n"
+    location:
+      row: 40
+      column: 0
+    end_location:
+      row: 40
+      column: 0
+

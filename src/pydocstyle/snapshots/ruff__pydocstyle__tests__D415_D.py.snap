@@ -9,7 +9,14 @@ expression: checks
   end_location:
     row: 355
     column: 17
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 355
+      column: 14
+    end_location:
+      row: 355
+      column: 14
 - kind: EndsInPunctuation
   location:
     row: 406
@@ -17,7 +24,14 @@ expression: checks
   end_location:
     row: 406
     column: 39
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 406
+      column: 36
+    end_location:
+      row: 406
+      column: 36
 - kind: EndsInPunctuation
   location:
     row: 410
@@ -25,7 +39,14 @@ expression: checks
   end_location:
     row: 410
     column: 24
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 410
+      column: 21
+    end_location:
+      row: 410
+      column: 21
 - kind: EndsInPunctuation
   location:
     row: 416
@@ -33,7 +54,14 @@ expression: checks
   end_location:
     row: 416
     column: 24
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 416
+      column: 21
+    end_location:
+      row: 416
+      column: 21
 - kind: EndsInPunctuation
   location:
     row: 422
@@ -41,7 +69,14 @@ expression: checks
   end_location:
     row: 422
     column: 49
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 422
+      column: 46
+    end_location:
+      row: 422
+      column: 46
 - kind: EndsInPunctuation
   location:
     row: 429
@@ -49,7 +84,14 @@ expression: checks
   end_location:
     row: 429
     column: 63
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 429
+      column: 60
+    end_location:
+      row: 429
+      column: 60
 - kind: EndsInPunctuation
   location:
     row: 470
@@ -57,7 +99,14 @@ expression: checks
   end_location:
     row: 470
     column: 24
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 470
+      column: 21
+    end_location:
+      row: 470
+      column: 21
 - kind: EndsInPunctuation
   location:
     row: 475
@@ -65,7 +114,14 @@ expression: checks
   end_location:
     row: 475
     column: 24
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 475
+      column: 21
+    end_location:
+      row: 475
+      column: 21
 - kind: EndsInPunctuation
   location:
     row: 480
@@ -73,7 +129,14 @@ expression: checks
   end_location:
     row: 480
     column: 24
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 480
+      column: 21
+    end_location:
+      row: 480
+      column: 21
 - kind: EndsInPunctuation
   location:
     row: 487
@@ -81,7 +144,14 @@ expression: checks
   end_location:
     row: 487
     column: 24
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 487
+      column: 21
+    end_location:
+      row: 487
+      column: 21
 - kind: EndsInPunctuation
   location:
     row: 509
@@ -89,7 +159,14 @@ expression: checks
   end_location:
     row: 509
     column: 34
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 509
+      column: 31
+    end_location:
+      row: 509
+      column: 31
 - kind: EndsInPunctuation
   location:
     row: 520
@@ -97,5 +174,27 @@ expression: checks
   end_location:
     row: 520
     column: 32
-  fix: ~
+  fix:
+    content: "."
+    location:
+      row: 520
+      column: 29
+    end_location:
+      row: 520
+      column: 29
+- kind: EndsInPunctuation
+  location:
+    row: 581
+    column: 4
+  end_location:
+    row: 581
+    column: 51
+  fix:
+    content: "."
+    location:
+      row: 581
+      column: 47
+    end_location:
+      row: 581
+      column: 47
 

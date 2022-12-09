@@ -27,26 +27,30 @@ static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::n
     ])
 });
 
-/// U005
+/// UP005
 pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Attribute { value, attr, .. } = &expr.node {
-        if let Some(&target) = DEPRECATED_ALIASES.get(attr.as_str()) {
-            if let ExprKind::Name { id, .. } = &value.node {
-                if id == "self" {
-                    let mut check = Check::new(
-                        CheckKind::DeprecatedUnittestAlias(attr.to_string(), target.to_string()),
-                        Range::from_located(expr),
-                    );
-                    if checker.patch(check.kind.code()) {
-                        check.amend(Fix::replacement(
-                            format!("self.{target}"),
-                            expr.location,
-                            expr.end_location.unwrap(),
-                        ));
-                    }
-                    checker.add_check(check);
-                }
-            }
-        }
+    let ExprKind::Attribute { value, attr, .. } = &expr.node else {
+        return;
+    };
+    let Some(&target) = DEPRECATED_ALIASES.get(attr.as_str()) else {
+        return;
+    };
+    let ExprKind::Name { id, .. } = &value.node else {
+        return;
+    };
+    if id != "self" {
+        return;
     }
+    let mut check = Check::new(
+        CheckKind::DeprecatedUnittestAlias(attr.to_string(), target.to_string()),
+        Range::from_located(expr),
+    );
+    if checker.patch(check.kind.code()) {
+        check.amend(Fix::replacement(
+            format!("self.{target}"),
+            expr.location,
+            expr.end_location.unwrap(),
+        ));
+    }
+    checker.add_check(check);
 }

@@ -7,7 +7,7 @@ use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
-use crate::ast::types::{BindingKind, FunctionScope, Range, Scope, ScopeKind};
+use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 use crate::pyflakes::cformat::CFormatSummary;
 use crate::pyflakes::format::FormatSummary;
@@ -77,43 +77,39 @@ pub(crate) fn percent_format_extra_named_arguments(
     if summary.num_positional > 0 {
         return None;
     }
-
-    if let ExprKind::Dict { keys, values } = &right.node {
-        if values.len() > keys.len() {
-            return None; // contains **x splat
-        }
-
-        let missing: Vec<&String> = keys
-            .iter()
-            .filter_map(|k| match &k.node {
-                // We can only check that string literals exist
-                ExprKind::Constant {
-                    value: Constant::Str(value),
-                    ..
-                } => {
-                    if summary.keywords.contains(value) {
-                        None
-                    } else {
-                        Some(value)
-                    }
-                }
-                _ => None,
-            })
-            .collect();
-
-        if missing.is_empty() {
-            None
-        } else {
-            Some(Check::new(
-                CheckKind::PercentFormatExtraNamedArguments(
-                    missing.iter().map(|&s| s.clone()).collect(),
-                ),
-                location,
-            ))
-        }
-    } else {
-        None
+    let ExprKind::Dict { keys, values } = &right.node else {
+        return None;
+    };
+    if values.len() > keys.len() {
+        return None; // contains **x splat
     }
+
+    let missing: Vec<&String> = keys
+        .iter()
+        .filter_map(|k| match &k.node {
+            // We can only check that string literals exist
+            ExprKind::Constant {
+                value: Constant::Str(value),
+                ..
+            } => {
+                if summary.keywords.contains(value) {
+                    None
+                } else {
+                    Some(value)
+                }
+            }
+            _ => None,
+        })
+        .collect();
+
+    if missing.is_empty() {
+        return None;
+    }
+
+    Some(Check::new(
+        CheckKind::PercentFormatExtraNamedArguments(missing.iter().map(|&s| s.clone()).collect()),
+        location,
+    ))
 }
 
 /// F505
@@ -370,12 +366,12 @@ pub fn if_tuple(test: &Expr, location: Range) -> Option<Check> {
 }
 
 /// F821
-pub fn undefined_local(scopes: &[&Scope], name: &str) -> Option<Check> {
+pub fn undefined_local(name: &str, scopes: &[&Scope], bindings: &[Binding]) -> Option<Check> {
     let current = &scopes.last().expect("No current scope found");
     if matches!(current.kind, ScopeKind::Function(_)) && !current.values.contains_key(name) {
         for scope in scopes.iter().rev().skip(1) {
             if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
-                if let Some(binding) = scope.values.get(name) {
+                if let Some(binding) = scope.values.get(name).map(|index| &bindings[*index]) {
                     if let Some((scope_id, location)) = binding.used {
                         if scope_id == current.id {
                             return Some(Check::new(
@@ -392,29 +388,31 @@ pub fn undefined_local(scopes: &[&Scope], name: &str) -> Option<Check> {
 }
 
 /// F841
-pub fn unused_variables(scope: &Scope, dummy_variable_rgx: &Regex) -> Vec<Check> {
+pub fn unused_variables(
+    scope: &Scope,
+    bindings: &[Binding],
+    dummy_variable_rgx: &Regex,
+) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 
-    if matches!(
-        scope.kind,
-        ScopeKind::Function(FunctionScope {
-            uses_locals: true,
-            ..
-        })
-    ) {
+    if scope.uses_locals && matches!(scope.kind, ScopeKind::Function(..)) {
         return checks;
     }
 
-    for (&name, binding) in &scope.values {
+    for (name, binding) in scope
+        .values
+        .iter()
+        .map(|(name, index)| (name, &bindings[*index]))
+    {
         if binding.used.is_none()
             && matches!(binding.kind, BindingKind::Assignment)
             && !dummy_variable_rgx.is_match(name)
-            && name != "__tracebackhide__"
-            && name != "__traceback_info__"
-            && name != "__traceback_supplement__"
+            && name != &"__tracebackhide__"
+            && name != &"__traceback_info__"
+            && name != &"__traceback_supplement__"
         {
             checks.push(Check::new(
-                CheckKind::UnusedVariable(name.to_string()),
+                CheckKind::UnusedVariable((*name).to_string()),
                 binding.range,
             ));
         }
@@ -556,12 +554,13 @@ pub fn starred_expressions(
 }
 
 /// F701
-pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]) -> Option<Check> {
+pub fn break_outside_loop<'a>(
+    stmt: &'a Stmt,
+    parents: &mut impl Iterator<Item = &'a Stmt>,
+) -> Option<Check> {
     let mut allowed: bool = false;
-    let mut parent = stmt;
-    for index in parent_stack.iter().rev() {
-        let child = parent;
-        parent = parents[*index];
+    let mut child = stmt;
+    for parent in parents {
         match &parent.node {
             StmtKind::For { orelse, .. }
             | StmtKind::AsyncFor { orelse, .. }
@@ -571,7 +570,6 @@ pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]
                     break;
                 }
             }
-
             StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }
             | StmtKind::ClassDef { .. } => {
@@ -579,6 +577,7 @@ pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]
             }
             _ => {}
         }
+        child = parent;
     }
 
     if allowed {
@@ -592,16 +591,13 @@ pub fn break_outside_loop(stmt: &Stmt, parents: &[&Stmt], parent_stack: &[usize]
 }
 
 /// F702
-pub fn continue_outside_loop(
-    stmt: &Stmt,
-    parents: &[&Stmt],
-    parent_stack: &[usize],
+pub fn continue_outside_loop<'a>(
+    stmt: &'a Stmt,
+    parents: &mut impl Iterator<Item = &'a Stmt>,
 ) -> Option<Check> {
     let mut allowed: bool = false;
-    let mut parent = stmt;
-    for index in parent_stack.iter().rev() {
-        let child = parent;
-        parent = parents[*index];
+    let mut child = stmt;
+    for parent in parents {
         match &parent.node {
             StmtKind::For { orelse, .. }
             | StmtKind::AsyncFor { orelse, .. }
@@ -611,7 +607,6 @@ pub fn continue_outside_loop(
                     break;
                 }
             }
-
             StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }
             | StmtKind::ClassDef { .. } => {
@@ -619,6 +614,7 @@ pub fn continue_outside_loop(
             }
             _ => {}
         }
+        child = parent;
     }
 
     if allowed {

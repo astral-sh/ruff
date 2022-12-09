@@ -39,6 +39,15 @@ expression: checks
     column: 9
   fix: ~
 - kind:
+    UnusedVariable: baz
+  location:
+    row: 26
+    column: 13
+  end_location:
+    row: 26
+    column: 16
+  fix: ~
+- kind:
     UnusedVariable: _
   location:
     row: 35
@@ -73,5 +82,14 @@ expression: checks
   end_location:
     row: 51
     column: 9
+  fix: ~
+- kind:
+    UnusedVariable: f
+  location:
+    row: 71
+    column: 25
+  end_location:
+    row: 71
+    column: 26
   fix: ~
 

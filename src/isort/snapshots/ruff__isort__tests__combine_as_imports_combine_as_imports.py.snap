@@ -1,0 +1,20 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 5
+    column: 0
+  fix:
+    content: "from module import CONSTANT, Class as C, function, function as f\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 5
+      column: 0
+

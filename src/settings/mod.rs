@@ -2,12 +2,12 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use globset::{Glob, GlobMatcher, GlobSet};
+use itertools::Itertools;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
@@ -17,32 +17,36 @@ use crate::checks_gen::{CheckCodePrefix, SuffixLength};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, fs, isort, mccabe,
-    pep8_naming, pyupgrade,
+    flake8_annotations, flake8_bugbear, flake8_import_conventions, flake8_quotes,
+    flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
 };
 
 pub mod configuration;
 pub mod options;
+pub mod options_base;
 pub mod pyproject;
 pub mod types;
 
 #[derive(Debug)]
 pub struct Settings {
+    pub allowed_confusables: FxHashSet<char>,
     pub dummy_variable_rgx: Regex,
     pub enabled: FxHashSet<CheckCode>,
     pub exclude: GlobSet,
     pub extend_exclude: GlobSet,
-    pub external: BTreeSet<String>,
+    pub external: FxHashSet<String>,
     pub fixable: FxHashSet<CheckCode>,
     pub format: SerializationFormat,
+    pub ignore_init_module_imports: bool,
     pub line_length: usize,
-    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)>,
+    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>,
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
+    pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub isort: isort::settings::Settings,
@@ -57,6 +61,7 @@ impl Settings {
         project_root: Option<&PathBuf>,
     ) -> Result<Self> {
         Ok(Self {
+            allowed_confusables: config.allowed_confusables,
             dummy_variable_rgx: config.dummy_variable_rgx,
             enabled: resolve_codes(
                 &config
@@ -72,13 +77,15 @@ impl Settings {
             ),
             exclude: resolve_globset(config.exclude, project_root)?,
             extend_exclude: resolve_globset(config.extend_exclude, project_root)?,
-            external: BTreeSet::from_iter(config.external),
+            external: FxHashSet::from_iter(config.external),
             fixable: resolve_codes(&config.fixable, &config.unfixable),
             format: config.format,
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
+            flake8_import_conventions: config.flake8_import_conventions,
             flake8_quotes: config.flake8_quotes,
             flake8_tidy_imports: config.flake8_tidy_imports,
+            ignore_init_module_imports: config.ignore_init_module_imports,
             isort: config.isort,
             mccabe: config.mccabe,
             line_length: config.line_length,
@@ -93,13 +100,15 @@ impl Settings {
 
     pub fn for_rule(check_code: CheckCode) -> Self {
         Self {
+            allowed_confusables: FxHashSet::from_iter([]),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter([check_code.clone()]),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
-            external: BTreeSet::default(),
+            external: FxHashSet::default(),
             fixable: FxHashSet::from_iter([check_code]),
             format: SerializationFormat::Text,
+            ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
             show_source: false,
@@ -107,6 +116,7 @@ impl Settings {
             target_version: PythonVersion::Py310,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
+            flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             isort: isort::settings::Settings::default(),
@@ -118,13 +128,15 @@ impl Settings {
 
     pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
         Self {
+            allowed_confusables: FxHashSet::from_iter([]),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter(check_codes.clone()),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
-            external: BTreeSet::default(),
+            external: FxHashSet::default(),
             fixable: FxHashSet::from_iter(check_codes),
             format: SerializationFormat::Text,
+            ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
             show_source: false,
@@ -132,6 +144,7 @@ impl Settings {
             target_version: PythonVersion::Py310,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
+            flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             isort: isort::settings::Settings::default(),
@@ -145,25 +158,34 @@ impl Settings {
 impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Add base properties in alphabetical order.
+        for confusable in &self.allowed_confusables {
+            confusable.hash(state);
+        }
         self.dummy_variable_rgx.as_str().hash(state);
-        for value in &self.enabled {
+        for value in self.enabled.iter().sorted() {
             value.hash(state);
         }
-        self.external.hash(state);
-        for value in &self.fixable {
+        for value in self.external.iter().sorted() {
             value.hash(state);
         }
+        for value in self.fixable.iter().sorted() {
+            value.hash(state);
+        }
+        self.ignore_init_module_imports.hash(state);
         self.line_length.hash(state);
         for (absolute, basename, codes) in &self.per_file_ignores {
             absolute.glob().hash(state);
             basename.glob().hash(state);
-            codes.hash(state);
+            for value in codes.iter().sorted() {
+                value.hash(state);
+            }
         }
         self.show_source.hash(state);
         self.target_version.hash(state);
         // Add plugin properties in alphabetical order.
         self.flake8_annotations.hash(state);
         self.flake8_bugbear.hash(state);
+        self.flake8_import_conventions.hash(state);
         self.flake8_quotes.hash(state);
         self.flake8_tidy_imports.hash(state);
         self.isort.hash(state);
@@ -189,7 +211,7 @@ pub fn resolve_globset(
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
     project_root: Option<&PathBuf>,
-) -> Result<Vec<(GlobMatcher, GlobMatcher, BTreeSet<CheckCode>)>> {
+) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>> {
     per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {

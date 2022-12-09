@@ -342,7 +342,7 @@ fn handle_func(
 pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
     let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
     if is_module_member(&call_path, "six") {
-        let patch = checker.patch(&CheckCode::U016);
+        let patch = checker.patch(&CheckCode::UP016);
         let check = match &expr.node {
             ExprKind::Call {
                 func,

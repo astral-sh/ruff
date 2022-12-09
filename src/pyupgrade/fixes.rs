@@ -21,7 +21,7 @@ pub fn remove_class_def_base(
     bases: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Fix> {
-    let contents = locator.slice_source_code_at(stmt_at);
+    let contents = locator.slice_source_code_at(&stmt_at);
 
     // Case 1: `object` is the only base.
     if bases.len() == 1 && keywords.is_empty() {
@@ -113,29 +113,31 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
 
     let mut tree = libcst_native::parse_module(&contents, None).ok()?;
 
-    if let Some(Statement::Simple(body)) = tree.body.first_mut() {
-        if let Some(SmallStatement::Expr(body)) = body.body.first_mut() {
-            if let Expression::Call(body) = &mut body.value {
-                body.args = vec![];
-                body.whitespace_before_args = ParenthesizableWhitespace::default();
-                body.whitespace_after_func = ParenthesizableWhitespace::default();
+    let Statement::Simple(body) = tree.body.first_mut()? else {
+        return None;
+    };
+    let SmallStatement::Expr(body) = body.body.first_mut()? else {
+        return None;
+    };
+    let Expression::Call(body) = &mut body.value else {
+        return None;
+    };
 
-                let mut state = CodegenState::default();
-                tree.codegen(&mut state);
+    body.args = vec![];
+    body.whitespace_before_args = ParenthesizableWhitespace::default();
+    body.whitespace_after_func = ParenthesizableWhitespace::default();
 
-                return Some(Fix::replacement(
-                    state.to_string(),
-                    range.location,
-                    range.end_location,
-                ));
-            }
-        }
-    }
+    let mut state = CodegenState::default();
+    tree.codegen(&mut state);
 
-    None
+    Some(Fix::replacement(
+        state.to_string(),
+        range.location,
+        range.end_location,
+    ))
 }
 
-/// U010
+/// UP010
 pub fn remove_unnecessary_future_import(
     locator: &SourceCodeLocator,
     removable: &[usize],

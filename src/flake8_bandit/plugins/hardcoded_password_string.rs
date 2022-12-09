@@ -29,15 +29,14 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
     comparators
         .iter()
         .filter_map(|comp| {
-            if let Some(string) = string_literal(comp) {
-                if is_password_target(left) {
-                    return Some(Check::new(
-                        CheckKind::HardcodedPasswordString(string.to_string()),
-                        Range::from_located(comp),
-                    ));
-                }
+            let string = string_literal(comp)?;
+            if !is_password_target(left) {
+                return None;
             }
-            None
+            Some(Check::new(
+                CheckKind::HardcodedPasswordString(string.to_string()),
+                Range::from_located(comp),
+            ))
         })
         .collect()
 }

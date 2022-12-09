@@ -53,3 +53,11 @@ try:
         raise e
 except Exception:
     pass
+
+
+try:
+    pass
+except Exception as e:
+    raise bad
+except BaseException:
+    pass
