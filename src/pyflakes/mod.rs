@@ -153,7 +153,7 @@ mod tests {
     }
 
     /// A re-implementation of the Pyflakes test runner.
-    /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_undefined_names.py>
+    /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[CheckCode]) -> Result<()> {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(CheckCodePrefix::F.codes());
@@ -183,6 +183,7 @@ mod tests {
         Ok(())
     }
 
+    /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_undefined_names.py>
     #[test]
     fn undefined() -> Result<()> {
         flakes("bar", &[CheckCode::F821])?;
@@ -233,7 +234,7 @@ mod tests {
         flakes(
             r#"
         try:
-            raise ValueError('ve")
+            raise ValueError('ve')
         except ValueError as exc:
             e = exc
         e
@@ -395,7 +396,7 @@ mod tests {
     #[ignore]
     #[test]
     fn defined_by_global() -> Result<()> {
-        // "global" can make an otherwise undefined name in another function
+        // global" can make an otherwise undefined name in another function
         // defined.
         flakes(
             r#"
@@ -418,7 +419,7 @@ mod tests {
     #[ignore]
     #[test]
     fn defined_by_global_multiple_names() -> Result<()> {
-        // "global" can accept multiple names.
+        // global" can accept multiple names.
         flakes(
             r#"
         def a(): global fu, bar; fu = 1; bar = 2
@@ -1072,6 +1073,1706 @@ mod tests {
         "#,
             &[],
         )?;
+        Ok(())
+    }
+
+    /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_imports.py>
+    #[test]
+    fn unused_import() -> Result<()> {
+        flakes("import fu, bar", &[CheckCode::F401, CheckCode::F401])?;
+        flakes(
+            "from baz import fu, bar",
+            &[CheckCode::F401, CheckCode::F401],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn unused_import_relative() -> Result<()> {
+        flakes("from . import fu", &[CheckCode::F401])?;
+        flakes("from . import fu as baz", &[CheckCode::F401])?;
+        flakes("from .. import fu", &[CheckCode::F401])?;
+        flakes("from ... import fu", &[CheckCode::F401])?;
+        flakes("from .. import fu as baz", &[CheckCode::F401])?;
+        flakes("from .bar import fu", &[CheckCode::F401])?;
+        flakes("from ..bar import fu", &[CheckCode::F401])?;
+        flakes("from ...bar import fu", &[CheckCode::F401])?;
+        flakes("from ...bar import fu as baz", &[CheckCode::F401])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn aliased_import() -> Result<()> {
+        flakes(
+            "import fu as FU, bar as FU",
+            &[CheckCode::F811, CheckCode::F401],
+        )?;
+        flakes(
+            "from moo import fu as FU, bar as FU",
+            &[CheckCode::F811, CheckCode::F401],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn aliased_import_shadow_module() -> Result<()> {
+        // Imported aliases can shadow the source of the import.
+        flakes("from moo import fu as moo; moo", &[])?;
+        flakes("import fu as fu; fu", &[])?;
+        flakes("import fu.bar as fu; fu", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_import() -> Result<()> {
+        flakes("import fu; print(fu)", &[])?;
+        flakes("from baz import fu; print(fu)", &[])?;
+        flakes("import fu; del fu", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_import_relative() -> Result<()> {
+        flakes("from . import fu; assert fu", &[])?;
+        flakes("from .bar import fu; assert fu", &[])?;
+        flakes("from .. import fu; assert fu", &[])?;
+        flakes("from ..bar import fu as baz; assert baz", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_while_unused() -> Result<()> {
+        flakes("import fu; fu = 3", &[CheckCode::F811])?;
+        flakes("import fu; fu, bar = 3", &[CheckCode::F811])?;
+        flakes("import fu; [fu, bar] = 3", &[CheckCode::F811])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_if() -> Result<()> {
+        // Test that importing a module twice within an if
+        // block does raise a warning.
+        flakes(
+            r#"
+        i = 2
+        if i==1:
+            import os
+            import os
+        os.path
+        "#,
+            &[CheckCode::F811],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_if_else() -> Result<()> {
+        // Test that importing a module twice in if
+        // and else blocks does not raise a warning.
+        flakes(
+            r#"
+        i = 2
+        if i==1:
+            import os
+        else:
+            import os
+        os.path
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_try() -> Result<()> {
+        // Test that importing a module twice in a try block
+        // does raise a warning.
+        flakes(
+            r#"
+        try:
+            import os
+            import os
+        except:
+            pass
+        os.path
+        "#,
+            &[CheckCode::F811],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_try_except() -> Result<()> {
+        // Test that importing a module twice in a try
+        // and except block does not raise a warning.
+        flakes(
+            r#"
+        try:
+            import os
+        except:
+            import os
+        os.path
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_try_nested() -> Result<()> {
+        // Test that importing a module twice using a nested
+        // try/except and if blocks does not issue a warning.
+        flakes(
+            r#"
+        try:
+            if True:
+                if True:
+                    import os
+        except:
+            import os
+        os.path
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_try_except_multi() -> Result<()> {
+        flakes(
+            r#"
+        try:
+            from aa import mixer
+        except AttributeError:
+            from bb import mixer
+        except RuntimeError:
+            from cc import mixer
+        except:
+            from dd import mixer
+        mixer(123)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_try_else() -> Result<()> {
+        flakes(
+            r#"
+        try:
+            from aa import mixer
+        except ImportError:
+            pass
+        else:
+            from bb import mixer
+        mixer(123)
+        "#,
+            &[CheckCode::F811],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_try_except_else() -> Result<()> {
+        flakes(
+            r#"
+        try:
+            import funca
+        except ImportError:
+            from bb import funca
+            from bb import funcb
+        else:
+            from bbb import funcb
+        print(funca, funcb)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_try_except_finally() -> Result<()> {
+        flakes(
+            r#"
+        try:
+            from aa import a
+        except ImportError:
+            from bb import a
+        finally:
+            a = 42
+        print(a)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_try_except_else_finally() -> Result<()> {
+        flakes(
+            r#"
+        try:
+            import b
+        except ImportError:
+            b = Ellipsis
+            from bb import a
+        else:
+            from aa import a
+        finally:
+            a = 42
+        print(a, b)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_by_function() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        def fu():
+            pass
+        "#,
+            &[CheckCode::F811],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_in_nested_function() -> Result<()> {
+        // Test that shadowing a global name with a nested function definition
+        // generates a warning.
+        flakes(
+            r#"
+        import fu
+        def bar():
+            def baz():
+                def fu():
+                    pass
+        "#,
+            &[CheckCode::F401, CheckCode::F811],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_in_nested_function_twice() -> Result<()> {
+        // Test that shadowing a global name with a nested function definition
+        // generates a warning.
+        flakes(
+            r#"
+        import fu
+        def bar():
+            import fu
+            def baz():
+                def fu():
+                    pass
+        "#,
+            &[
+                CheckCode::F401,
+                CheckCode::F401,
+                CheckCode::F811,
+                CheckCode::F811,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_but_used_later() -> Result<()> {
+        // Test that a global import which is redefined locally,
+        // but used later in another scope does not generate a warning.
+        flakes(
+            r#"
+        import unittest, transport
+
+        class GetTransportTestCase(unittest.TestCase):
+            def test_get_transport(self):
+                transport = 'transport'
+                self.assertIsNotNone(transport)
+
+        class TestTransportMethodArgs(unittest.TestCase):
+            def test_send_defaults(self):
+                transport.Transport()"#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_by_class() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        class fu:
+            pass
+        "#,
+            &[CheckCode::F811],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_by_subclass() -> Result<()> {
+        // If an imported name is redefined by a class statement which also uses
+        // that name in the bases list, no warning is emitted.
+        flakes(
+            r#"
+        from fu import bar
+        class bar(bar):
+            pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_in_class() -> Result<()> {
+        // Test that shadowing a global with a class attribute does not produce a
+        // warning.
+        flakes(
+            r#"
+        import fu
+        class bar:
+            fu = 1
+        print(fu)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn import_in_class() -> Result<()> {
+        // Test that import within class is a locally scoped attribute.
+        flakes(
+            r#"
+        class bar:
+            import fu
+        "#,
+            &[CheckCode::F401],
+        )?;
+
+        flakes(
+            r#"
+        class bar:
+            import fu
+
+        fu
+        "#,
+            &[CheckCode::F401, CheckCode::F821],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_function() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        def fun():
+            print(fu)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn shadowed_by_parameter() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        def fun(fu):
+            print(fu)
+        "#,
+            &[CheckCode::F401, CheckCode::F811],
+        )?;
+
+        flakes(
+            r#"
+        import fu
+        def fun(fu):
+            print(fu)
+        print(fu)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn new_assignment() -> Result<()> {
+        flakes("fu = None", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_getattr() -> Result<()> {
+        flakes("import fu; fu.bar.baz", &[])?;
+        flakes("import fu; \"bar\".fu.baz", &[CheckCode::F401])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_slice() -> Result<()> {
+        flakes("import fu; print(fu.bar[1:])", &[])?;
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_if_body() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        if True: print(fu)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_if_conditional() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        if fu: pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_elif_conditional() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        if False: pass
+        elif fu: pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_else() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        if False: pass
+        else: print(fu)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_call() -> Result<()> {
+        flakes("import fu; fu.bar()", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_class() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        class bar:
+            bar = fu
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_class_base() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        class bar(object, fu.baz):
+            pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_used_in_nested_scope() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        def bleh():
+            pass
+        print(fu)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_for() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        for bar in range(9):
+            print(fu)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_for_else() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        for bar in range(10):
+            pass
+        else:
+            print(fu)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_by_for() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        for fu in range(2):
+            pass
+        "#,
+            &[CheckCode::F402],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn shadowed_by_for() -> Result<()> {
+        // Test that shadowing a global name with a for loop variable generates a
+        // warning.
+        flakes(
+            r#"
+        import fu
+        fu.bar()
+        for fu in ():
+            pass
+        "#,
+            &[CheckCode::F402],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn shadowed_by_for_deep() -> Result<()> {
+        // Test that shadowing a global name with a for loop variable nested in a
+        // tuple unpack generates a warning.
+        flakes(
+            r#"
+        import fu
+        fu.bar()
+        for (x, y, z, (a, b, c, (fu,))) in ():
+            pass
+        "#,
+            &[CheckCode::F402],
+        )?;
+        flakes(
+            r#"
+        import fu
+        fu.bar()
+        for [x, y, z, (a, b, c, (fu,))] in ():
+            pass
+        "#,
+            &[CheckCode::F402],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_return() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        def fun():
+            return fu
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_operators() -> Result<()> {
+        flakes("import fu; 3 + fu.bar", &[])?;
+        flakes("import fu; 3 % fu.bar", &[])?;
+        flakes("import fu; 3 - fu.bar", &[])?;
+        flakes("import fu; 3 * fu.bar", &[])?;
+        flakes("import fu; 3 ** fu.bar", &[])?;
+        flakes("import fu; 3 / fu.bar", &[])?;
+        flakes("import fu; 3 // fu.bar", &[])?;
+        flakes("import fu; -fu.bar", &[])?;
+        flakes("import fu; ~fu.bar", &[])?;
+        flakes("import fu; 1 == fu.bar", &[])?;
+        flakes("import fu; 1 | fu.bar", &[])?;
+        flakes("import fu; 1 & fu.bar", &[])?;
+        flakes("import fu; 1 ^ fu.bar", &[])?;
+        flakes("import fu; 1 >> fu.bar", &[])?;
+        flakes("import fu; 1 << fu.bar", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_assert() -> Result<()> {
+        flakes("import fu; assert fu.bar", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_subscript() -> Result<()> {
+        flakes("import fu; fu.bar[1]", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_logic() -> Result<()> {
+        flakes("import fu; fu and False", &[])?;
+        flakes("import fu; fu or False", &[])?;
+        flakes("import fu; not fu.bar", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_list() -> Result<()> {
+        flakes("import fu; [fu]", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_tuple() -> Result<()> {
+        flakes("import fu; (fu,)", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_try() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        try: fu
+        except: pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_except() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        try: fu
+        except: pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_by_except() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        try: pass
+        except Exception as fu: pass
+        "#,
+            &[CheckCode::F811, CheckCode::F841],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_raise() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        raise fu.bar
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_yield() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        def gen():
+            yield fu
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_dict() -> Result<()> {
+        flakes("import fu; {fu:None}", &[])?;
+        flakes("import fu; {1:fu}", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_parameter_default() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        def f(bar=fu):
+            pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_attribute_assign() -> Result<()> {
+        flakes("import fu; fu.bar = 1", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_keyword_arg() -> Result<()> {
+        flakes("import fu; fu.bar(stuff=fu)", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_assignment() -> Result<()> {
+        flakes("import fu; bar=fu", &[])?;
+        flakes("import fu; n=0; n+=fu", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_list_comp() -> Result<()> {
+        flakes("import fu; [fu for _ in range(1)]", &[])?;
+        flakes("import fu; [1 for _ in range(1) if fu]", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_try_finally() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        try: pass
+        finally: fu
+        "#,
+            &[],
+        )?;
+
+        flakes(
+            r#"
+        import fu
+        try: fu
+        finally: pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_while() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        while 0:
+            fu
+        "#,
+            &[],
+        )?;
+
+        flakes(
+            r#"
+        import fu
+        while fu: pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[ignore]
+    #[test]
+    fn used_in_global() -> Result<()> {
+        // A 'global' statement shadowing an unused import should not prevent it
+        // from being reported.
+        flakes(
+            r#"
+        import fu
+        def f(): global fu
+        "#,
+            &[CheckCode::F401],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_and_global() -> Result<()> {
+        // A 'global' statement shadowing a used import should not cause it to be
+        // reported as unused.
+        flakes(
+            r#"
+            import foo
+            def f(): global foo
+            def g(): foo.is_used()
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[ignore]
+    #[test]
+    fn assigned_to_global() -> Result<()> {
+        // Binding an import to a declared global should not cause it to be
+        // reported as unused.
+        flakes(
+            r#"
+            def f(): global foo; import foo
+            def g(): foo.is_used()
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_exec() -> Result<()> {
+        flakes("import fu; exec('print(1)', fu.bar)", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_lambda() -> Result<()> {
+        flakes(
+            r#"import fu;
+        lambda: fu
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn shadowed_by_lambda() -> Result<()> {
+        flakes(
+            "import fu; lambda fu: fu",
+            &[CheckCode::F401, CheckCode::F811],
+        )?;
+        flakes("import fu; lambda fu: fu\nfu()", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_slice_obj() -> Result<()> {
+        flakes(
+            r#"import fu;
+        "meow"[::fu]
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn unused_in_nested_scope() -> Result<()> {
+        flakes(
+            r#"
+        def bar():
+            import fu
+        fu
+        "#,
+            &[CheckCode::F401, CheckCode::F821],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn methods_dont_use_class_scope() -> Result<()> {
+        flakes(
+            r#"
+        class bar:
+            import fu
+            def fun(self):
+                fu
+        "#,
+            &[CheckCode::F401, CheckCode::F821],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn nested_functions_nest_scope() -> Result<()> {
+        flakes(
+            r#"
+        def a():
+            def b():
+                fu
+            import fu
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn nested_class_and_function_scope() -> Result<()> {
+        flakes(
+            r#"
+        def a():
+            import fu
+            class b:
+                def c(self):
+                    print(fu)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn package_import() -> Result<()> {
+        // If a dotted name is imported and used, no warning is reported.
+        flakes(
+            r#"
+        import fu.bar
+        fu.bar
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn unused_package_import() -> Result<()> {
+        // If a dotted name is imported and not used, an unused import warning is
+        // reported.
+        flakes("import fu.bar", &[CheckCode::F401])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_submodule_import() -> Result<()> {
+        // If a submodule of a package is imported twice, an unused import warning and a
+        // redefined while unused warning are reported.
+        flakes(
+            r#"
+        import fu.bar, fu.bar
+        fu.bar
+        "#,
+            &[CheckCode::F811],
+        )?;
+        flakes(
+            r#"
+        import fu.bar
+        import fu.bar
+        fu.bar
+        "#,
+            &[CheckCode::F811],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn different_submodule_import() -> Result<()> {
+        // If two different submodules of a package are imported, no duplicate import
+        // warning is reported for the package.
+        flakes(
+            r#"
+        import fu.bar, fu.baz
+        fu.bar, fu.baz
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        import fu.bar
+        import fu.baz
+        fu.bar, fu.baz
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_package_with_submodule_import() -> Result<()> {
+        // Usage of package marks submodule imports as used.
+        flakes(
+            r#"
+        import fu
+        import fu.bar
+        fu.x
+        "#,
+            &[],
+        )?;
+
+        flakes(
+            r#"
+        import fu.bar
+        import fu
+        fu.x
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_package_with_submodule_import_of_alias() -> Result<()> {
+        // Usage of package by alias marks submodule imports as used.
+        flakes(
+            r#"
+        import foo as f
+        import foo.bar
+        f.bar.do_something()
+        "#,
+            &[],
+        )?;
+
+        flakes(
+            r#"
+        import foo as f
+        import foo.bar.blah
+        f.bar.blah.do_something()
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn unused_package_with_submodule_import() -> Result<()> {
+        // When a package and its submodule are imported, only report once.
+        flakes(
+            r#"
+        import fu
+        import fu.bar
+        "#,
+            &[CheckCode::F401],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn assign_rhs_first() -> Result<()> {
+        flakes("import fu; fu = fu", &[])?;
+        flakes("import fu; fu, bar = fu", &[])?;
+        flakes("import fu; [fu, bar] = fu", &[])?;
+        flakes("import fu; fu += fu", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn trying_multiple_imports() -> Result<()> {
+        flakes(
+            r#"
+        try:
+            import fu
+        except ImportError:
+            import bar as fu
+        fu
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn non_global_does_not_redefine() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        def a():
+            fu = 3
+            return fu
+        fu
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn functions_run_later() -> Result<()> {
+        flakes(
+            r#"
+        def a():
+            fu
+        import fu
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn function_names_are_bound_now() -> Result<()> {
+        flakes(
+            r#"
+        import fu
+        def fu():
+            fu
+        fu
+        "#,
+            &[CheckCode::F811],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn ignore_non_import_redefinitions() -> Result<()> {
+        flakes("a = 1; a = 2", &[])?;
+
+        Ok(())
+    }
+
+    #[ignore]
+    #[test]
+    fn imported_in_class() -> Result<()> {
+        // Imports in class scope can be used through self.
+        flakes(
+            r#"
+        class c:
+            import i
+            def __init__(self):
+                self.i
+        "#,
+            &[CheckCode::F401],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn import_used_in_method_definition() -> Result<()> {
+        // Method named 'foo' with default args referring to module named 'foo'.
+        flakes(
+            r#"
+        import foo
+
+        class Thing(object):
+            def foo(self, parser=foo.parse_foo):
+                pass
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn future_import() -> Result<()> {
+        // __future__ is special.
+        flakes("from __future__ import division", &[])?;
+        flakes(
+            r#"
+        "docstring is allowed before future import"
+        from __future__ import division
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn future_import_first() -> Result<()> {
+        // __future__ imports must come before anything else.
+        flakes(
+            r#"
+        x = 5
+        from __future__ import division
+        "#,
+            &[CheckCode::F404],
+        )?;
+        flakes(
+            r#"
+        from foo import bar
+        from __future__ import division
+        bar
+        "#,
+            &[CheckCode::F404],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn future_import_used() -> Result<()> {
+        // __future__ is special, but names are injected in the namespace.
+        flakes(
+            r#"
+        from __future__ import division
+        from __future__ import print_function
+
+        assert print_function is not division
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn future_import_undefined() -> Result<()> {
+        // Importing undefined names from __future__ fails.
+        flakes(
+            r#"
+        from __future__ import print_statement
+        "#,
+            &[CheckCode::F407],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn future_import_star() -> Result<()> {
+        // Importing '*' from __future__ fails.
+        flakes(
+            r#"
+        from __future__ import *
+        "#,
+            &[CheckCode::F407],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn ignored_in_function() -> Result<()> {
+        // An C{__all__} definition does not suppress unused import warnings in a
+        // function scope.
+        flakes(
+            r#"
+        def foo():
+            import bar
+            __all__ = ["bar"]
+        "#,
+            &[CheckCode::F401, CheckCode::F841],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn ignored_in_class() -> Result<()> {
+        // An C{__all__} definition in a class does not suppress unused import warnings.
+        flakes(
+            r#"
+        import bar
+        class foo:
+            __all__ = ["bar"]
+        "#,
+            &[CheckCode::F401],
+        )?;
+
+        Ok(())
+    }
+
+    #[ignore]
+    #[test]
+    fn ignored_when_not_directly_assigned() -> Result<()> {
+        flakes(
+            r#"
+        import bar
+        (__all__,) = ("foo",)
+        "#,
+            &[CheckCode::F401],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn warning_suppressed() -> Result<()> {
+        // If a name is imported and unused but is named in C{__all__}, no warning
+        // is reported.
+        flakes(
+            r#"
+        import foo
+        __all__ = ["foo"]
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        import foo
+        __all__ = ("foo",)
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn augmented_assignment() -> Result<()> {
+        // The C{__all__} variable is defined incrementally.
+        flakes(
+            r#"
+        import a
+        import c
+        __all__ = ['a']
+        __all__ += ['b']
+        if 1 < 3:
+            __all__ += ['c', 'd']
+        "#,
+            &[CheckCode::F822, CheckCode::F822],
+        )?;
+
+        Ok(())
+    }
+
+    #[ignore]
+    #[test]
+    fn list_concatenation_assignment() -> Result<()> {
+        // The C{__all__} variable is defined through list concatenation.
+        flakes(
+            r#"
+        import sys
+        __all__ = ['a'] + ['b'] + ['c']
+        "#,
+            &[
+                CheckCode::F822,
+                CheckCode::F822,
+                CheckCode::F822,
+                CheckCode::F401,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    #[ignore]
+    #[test]
+    fn tuple_concatenation_assignment() -> Result<()> {
+        // The C{__all__} variable is defined through tuple concatenation.
+        flakes(
+            r#"
+        import sys
+        __all__ = ('a',) + ('b',) + ('c',)
+        "#,
+            &[
+                CheckCode::F822,
+                CheckCode::F822,
+                CheckCode::F822,
+                CheckCode::F401,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn all_with_attributes() -> Result<()> {
+        flakes(
+            r#"
+        from foo import bar
+        __all__ = [bar.__name__]
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn all_with_names() -> Result<()> {
+        flakes(
+            r#"
+        from foo import bar
+        __all__ = [bar]
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn all_with_attributes_added() -> Result<()> {
+        flakes(
+            r#"
+        from foo import bar
+        from bar import baz
+        __all__ = [bar.__name__] + [baz.__name__]
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn all_mixed_attributes_and_strings() -> Result<()> {
+        flakes(
+            r#"
+        from foo import bar
+        from foo import baz
+        __all__ = ['bar', baz.__name__]
+        "#,
+            &[],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn unbound_exported() -> Result<()> {
+        // If C{__all__} includes a name which is not bound, a warning is emitted.
+        flakes(
+            r#"
+        __all__ = ["foo"]
+        "#,
+            &[CheckCode::F822],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn import_star_exported() -> Result<()> {
+        // Report undefined if import * is used
+        flakes(
+            r#"
+        from math import *
+        __all__ = ['sin', 'cos']
+        csc(1)
+        "#,
+            &[
+                CheckCode::F403,
+                CheckCode::F405,
+                CheckCode::F405,
+                CheckCode::F405,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    #[ignore]
+    #[test]
+    fn import_star_not_exported() -> Result<()> {
+        // Report unused import when not needed to satisfy __all__.
+        flakes(
+            r#"
+        from foolib import *
+        a = 1
+        __all__ = ['a']
+        "#,
+            &[CheckCode::F403, CheckCode::F401],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_in_gen_exp() -> Result<()> {
+        // Using a global in a generator expression results in no warnings.
+        flakes("import fu; (fu for _ in range(1))", &[])?;
+        flakes("import fu; (1 for _ in range(1) if fu)", &[])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn redefined_by_gen_exp() -> Result<()> {
+        // Re-using a global name as the loop variable for a generator
+        // expression results in a redefinition warning.
+        flakes(
+            "import fu; (1 for fu in range(1))",
+            &[CheckCode::F401, CheckCode::F811],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_as_decorator() -> Result<()> {
+        // Using a global name in a decorator statement results in no warnings,
+        // but using an undefined name in a decorator statement results in an
+        // undefined name warning.
+        flakes(
+            r#"
+        from interior import decorate
+        @decorate
+        def f():
+            return "hello"
+        "#,
+            &[],
+        )?;
+
+        flakes(
+            r#"
+        from interior import decorate
+        @decorate('value", &[])?;
+        def f():
+            return "hello"
+        "#,
+            &[],
+        )?;
+
+        flakes(
+            r#"
+        @decorate
+        def f():
+            return "hello"
+        "#,
+            &[CheckCode::F821],
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn used_as_class_decorator() -> Result<()> {
+        // Using an imported name as a class decorator results in no warnings,
+        // but using an undefined name as a class decorator results in an
+        // undefined name warning.
+        flakes(
+            r#"
+        from interior import decorate
+        @decorate
+        class foo:
+            pass
+        "#,
+            &[],
+        )?;
+
+        flakes(
+            r#"
+        from interior import decorate
+        @decorate("foo")
+        class bar:
+            pass
+        "#,
+            &[],
+        )?;
+
+        flakes(
+            r#"
+        @decorate
+        class foo:
+            pass
+        "#,
+            &[CheckCode::F821],
+        )?;
+
         Ok(())
     }
 }
