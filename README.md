@@ -1981,6 +1981,10 @@ from .utils import (
 )
 ```
 
+Note that this setting is only effective when combined with `combine-as-imports = true`.
+When `combine-as-imports` isn't enabled, every aliased `import from` will be given its
+own line, in which case, wrapping is not necessary.
+
 **Default value**: `false`
 
 **Type**: `bool`
@@ -1990,6 +1994,7 @@ from .utils import (
 ```toml
 [tool.ruff.isort]
 force-wrap-aliases = true
+combine-as-imports = true
 ```
 
 ---
