@@ -2887,17 +2887,48 @@ impl<'a> Checker<'a> {
                 StmtKind::Assign { .. } | StmtKind::AugAssign { .. } | StmtKind::AnnAssign { .. }
             )
         {
-            self.add_binding(
-                id,
-                Binding {
-                    kind: BindingKind::Export(extract_all_names(parent, current, &self.bindings)),
-                    used: None,
-                    range: Range::from_located(expr),
-                    source: Some(self.current_parent().clone()),
-                    redefined: vec![],
-                },
-            );
-            return;
+            if match &parent.node {
+                StmtKind::Assign { targets, .. } => {
+                    if let Some(ExprKind::Name { id, .. }) =
+                        targets.first().map(|target| &target.node)
+                    {
+                        id == "__all__"
+                    } else {
+                        false
+                    }
+                }
+                StmtKind::AugAssign { target, .. } => {
+                    if let ExprKind::Name { id, .. } = &target.node {
+                        id == "__all__"
+                    } else {
+                        false
+                    }
+                }
+                StmtKind::AnnAssign { target, .. } => {
+                    if let ExprKind::Name { id, .. } = &target.node {
+                        id == "__all__"
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            } {
+                self.add_binding(
+                    id,
+                    Binding {
+                        kind: BindingKind::Export(extract_all_names(
+                            parent,
+                            current,
+                            &self.bindings,
+                        )),
+                        used: None,
+                        range: Range::from_located(expr),
+                        source: Some(self.current_parent().clone()),
+                        redefined: vec![],
+                    },
+                );
+                return;
+            }
         }
 
         self.add_binding(

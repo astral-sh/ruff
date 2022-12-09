@@ -2479,7 +2479,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[test]
     fn ignored_when_not_directly_assigned() -> Result<()> {
         flakes(
@@ -2533,7 +2532,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[test]
     fn list_concatenation_assignment() -> Result<()> {
         // The C{__all__} variable is defined through list concatenation.
@@ -2543,17 +2541,16 @@ mod tests {
         __all__ = ['a'] + ['b'] + ['c']
         "#,
             &[
-                CheckCode::F822,
-                CheckCode::F822,
-                CheckCode::F822,
                 CheckCode::F401,
+                CheckCode::F822,
+                CheckCode::F822,
+                CheckCode::F822,
             ],
         )?;
 
         Ok(())
     }
 
-    #[ignore]
     #[test]
     fn tuple_concatenation_assignment() -> Result<()> {
         // The C{__all__} variable is defined through tuple concatenation.
@@ -2563,10 +2560,10 @@ mod tests {
         __all__ = ('a',) + ('b',) + ('c',)
         "#,
             &[
-                CheckCode::F822,
-                CheckCode::F822,
-                CheckCode::F822,
                 CheckCode::F401,
+                CheckCode::F822,
+                CheckCode::F822,
+                CheckCode::F822,
             ],
         )?;
 
