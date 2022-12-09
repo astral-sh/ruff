@@ -2,7 +2,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Constant, ExprKind, Location, StmtKind};
+use rustpython_ast::{Location, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
@@ -14,6 +14,7 @@ use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
+use crate::pydocstyle::helpers;
 use crate::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
 
@@ -123,12 +124,11 @@ pub fn one_liner(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = &definition.docstring else {
         return;
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return;
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
 
     let mut line_count = 0;
     let mut non_empty_line_count = 0;
@@ -165,12 +165,6 @@ pub fn blank_before_after_function(checker: &mut Checker, definition: &Definitio
         | DefinitionKind::NestedFunction(parent)
         | DefinitionKind::Method(parent)
     ) = &definition.kind else {
-        return;
-    };
-    let ExprKind::Constant {
-        value: Constant::Str(_),
-        ..
-    } = &docstring.node else {
         return;
     };
 
@@ -253,12 +247,6 @@ pub fn blank_before_after_class(checker: &mut Checker, definition: &Definition) 
         return;
     };
     let (DefinitionKind::Class(parent) | DefinitionKind::NestedClass(parent)) = &definition.kind else {
-        return;
-    };
-    let ExprKind::Constant {
-        value: Constant::Str(_),
-        ..
-    } = &docstring.node else {
         return;
     };
 
@@ -356,12 +344,11 @@ pub fn blank_after_summary(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = definition.docstring else {
         return;
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return;
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
 
     let mut lines_count = 1;
     let mut blanks_count = 0;
@@ -410,12 +397,11 @@ pub fn indent(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = definition.docstring else {
         return;
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return;
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
 
     // Split the docstring into lines.
     let lines: Vec<&str> = LinesWithTrailingNewline::from(string).collect();
@@ -550,12 +536,11 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
     let Some(docstring) = definition.docstring else {
         return;
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return;
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
 
     let mut line_count = 0;
     for line in LinesWithTrailingNewline::from(string) {
@@ -563,10 +548,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, definition: &Definiti
             line_count += 1;
         }
         if line_count > 1 {
-            let content = checker
-                .locator
-                .slice_source_code_range(&Range::from_located(docstring));
-            if let Some(last_line) = content.lines().last().map(str::trim) {
+            if let Some(last_line) = contents.lines().last().map(str::trim) {
                 if last_line != "\"\"\"" && last_line != "'''" {
                     let mut check = Check::new(
                         CheckKind::NewLineAfterLastParagraph,
@@ -599,12 +581,11 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, definition: &Definition)
     let Some(docstring) = definition.docstring else {
         return;
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return;
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
 
     let mut lines = LinesWithTrailingNewline::from(string);
     let Some(line) = lines.next() else {
@@ -650,26 +631,23 @@ pub fn multi_line_summary_start(checker: &mut Checker, definition: &Definition) 
     let Some(docstring) = definition.docstring else {
         return;
     };
-    let ExprKind::Constant {
-            value: Constant::Str(string),
-            ..
-        } = &docstring.node else
-        {
-            return;
-        };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
+
     if LinesWithTrailingNewline::from(string).nth(1).is_none() {
         return;
     };
-    let Some(first_line) = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(docstring))
+    let Some(first_line) = contents
         .lines()
         .next()
-        .map(str::to_lowercase) else
+         else
     {
         return;
     };
-    if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line.as_str()) {
+    if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
         if checker.settings.enabled.contains(&CheckCode::D212) {
             checker.add_check(Check::new(
                 CheckKind::MultiLineSummaryFirstLine,
@@ -691,15 +669,13 @@ pub fn triple_quotes(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = definition.docstring else {
         return;
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return;
-    };
-    let Some(first_line) = checker
+
+    let contents = checker
         .locator
-        .slice_source_code_range(&Range::from_located(docstring))
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
+
+    let Some(first_line) = contents
         .lines()
         .next()
         .map(str::to_lowercase) else
@@ -730,12 +706,12 @@ pub fn ends_with_period(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = definition.docstring else {
         return;
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return;
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
+
     if let Some(index) = logical_line(string) {
         let line = string.lines().nth(index).unwrap();
         let trimmed = line.trim_end();
@@ -777,12 +753,12 @@ pub fn no_signature(checker: &mut Checker, definition: &Definition) {
     let StmtKind::FunctionDef { name, .. } = &parent.node else {
         return;
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return;
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
+
     let Some(first_line) = string.lines().next() else {
         return;
     };
@@ -804,12 +780,11 @@ pub fn capitalized(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = definition.docstring else {
         return
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return
-    };
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
+
     let Some(first_word) = string.split(' ').next() else {
         return
     };
@@ -838,12 +813,11 @@ pub fn starts_with_this(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = definition.docstring else {
         return
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
 
     let trimmed = string.trim();
     if trimmed.is_empty() {
@@ -871,12 +845,12 @@ pub fn ends_with_punctuation(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = definition.docstring else {
         return
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
+
     if let Some(index) = logical_line(string) {
         let line = string.lines().nth(index).unwrap();
         let trimmed = line.trim_end();
@@ -930,12 +904,12 @@ pub fn not_empty(checker: &mut Checker, definition: &Definition) -> bool {
     let Some(docstring) = definition.docstring else {
         return true;
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return true;
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
+
     if !string.trim().is_empty() {
         return true;
     }
@@ -955,12 +929,11 @@ pub fn sections(checker: &mut Checker, definition: &Definition) {
     let Some(docstring) = definition.docstring else {
         return
     };
-    let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &docstring.node else {
-        return;
-    };
+
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(docstring));
+    let string = helpers::raw_contents(&contents);
 
     let lines: Vec<&str> = LinesWithTrailingNewline::from(string).collect();
     if lines.len() < 2 {
@@ -1495,10 +1468,15 @@ fn parameters_section(checker: &mut Checker, definition: &Definition, context: &
     // Collect the list of arguments documented in the docstring.
     let mut docstring_args: FxHashSet<&str> = FxHashSet::default();
     let section_level_indent = whitespace::leading_space(context.line);
-    for i in 1..context.following_lines.len() {
-        let current_line = context.following_lines[i - 1];
+
+    // Join line continuations, then resplit by line.
+    let adjusted_following_lines = context.following_lines.join("\n").replace("\\\n", "");
+    let lines: Vec<&str> = LinesWithTrailingNewline::from(&adjusted_following_lines).collect();
+
+    for i in 1..lines.len() {
+        let current_line = lines[i - 1];
         let current_leading_space = whitespace::leading_space(current_line);
-        let next_line = context.following_lines[i];
+        let next_line = lines[i];
         if current_leading_space == section_level_indent
             && (whitespace::leading_space(next_line).len() > current_leading_space.len())
             && !next_line.trim().is_empty()
