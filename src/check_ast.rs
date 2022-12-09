@@ -2283,7 +2283,6 @@ where
                     self.in_subscript = true;
                     visitor::walk_expr(self, expr);
                 } else {
-                    self.in_subscript = true;
                     match typing::match_annotated_subscript(
                         value,
                         &self.from_imports,
@@ -2303,8 +2302,7 @@ where
                                 // Ex) Annotated[int, "Hello, world!"]
                                 SubscriptKind::PEP593AnnotatedSubscript => {
                                     // First argument is a type (including forward references); the
-                                    // rest are arbitrary Python
-                                    // objects.
+                                    // rest are arbitrary Python objects.
                                     self.visit_expr(value);
                                     if let ExprKind::Tuple { elts, ctx } = &slice.node {
                                         if let Some(expr) = elts.first() {
@@ -2662,8 +2660,7 @@ impl<'a> Checker<'a> {
             }
         }
 
-        // TODO(charlie): Don't treat annotations as assignments if there is an existing
-        // value.
+        // Assume the rebound name is used as a global or within a loop.
         let scope = self.current_scope();
         let binding = match scope.values.get(&name) {
             None => binding,
@@ -2673,10 +2670,14 @@ impl<'a> Checker<'a> {
             },
         };
 
-        self.bindings.push(binding);
-
+        // Don't treat annotations as assignments if there is an existing value
+        // in scope.
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-        scope.values.insert(name, index);
+        if !(matches!(binding.kind, BindingKind::Annotation) && scope.values.contains_key(name)) {
+            scope.values.insert(name, index);
+        }
+
+        self.bindings.push(binding);
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
@@ -2700,6 +2701,13 @@ impl<'a> Checker<'a> {
                 if let Some(index) = scope.values.get(&id.as_str()) {
                     // Mark the binding as used.
                     self.bindings[*index].used = Some((scope_id, Range::from_located(expr)));
+
+                    if matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                        && !self.in_deferred_string_type_definition
+                        && !self.in_deferred_type_definition
+                    {
+                        continue;
+                    }
 
                     // If the name of the sub-importation is the same as an alias of another
                     // importation and the alias is used, that sub-importation should be
