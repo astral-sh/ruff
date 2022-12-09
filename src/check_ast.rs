@@ -3112,7 +3112,17 @@ impl<'a> Checker<'a> {
         while let Some((index, (scopes, _parents))) = self.deferred_assignments.pop() {
             if self.settings.enabled.contains(&CheckCode::F841) {
                 self.add_checks(
-                    pyflakes::checks::unused_variables(
+                    pyflakes::checks::unused_variable(
+                        &self.scopes[index],
+                        &self.bindings,
+                        &self.settings.dummy_variable_rgx,
+                    )
+                    .into_iter(),
+                );
+            }
+            if self.settings.enabled.contains(&CheckCode::F842) {
+                self.add_checks(
+                    pyflakes::checks::unused_annotation(
                         &self.scopes[index],
                         &self.bindings,
                         &self.settings.dummy_variable_rgx,

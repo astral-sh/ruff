@@ -93,6 +93,7 @@ pub enum CheckCode {
     F823,
     F831,
     F841,
+    F842,
     F901,
     // pylint
     PLC0414,
@@ -627,6 +628,7 @@ pub enum CheckKind {
     TwoStarredExpressions,
     UndefinedExport(String),
     UndefinedLocal(String),
+    UnusedAnnotation(String),
     UndefinedName(String),
     UnusedImport(String, bool),
     UnusedVariable(String),
@@ -940,6 +942,7 @@ impl CheckCode {
             CheckCode::F823 => CheckKind::UndefinedLocal("...".to_string()),
             CheckCode::F831 => CheckKind::DuplicateArgumentName,
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
+            CheckCode::F842 => CheckKind::UnusedAnnotation("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
             // pylint
             CheckCode::PLC0414 => CheckKind::UselessImportAlias,
@@ -1368,6 +1371,7 @@ impl CheckCode {
             CheckCode::F823 => CheckCategory::Pyflakes,
             CheckCode::F831 => CheckCategory::Pyflakes,
             CheckCode::F841 => CheckCategory::Pyflakes,
+            CheckCode::F842 => CheckCategory::Pyflakes,
             CheckCode::F901 => CheckCategory::Pyflakes,
             CheckCode::FBT001 => CheckCategory::Flake8BooleanTrap,
             CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
@@ -1516,6 +1520,7 @@ impl CheckKind {
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(..) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
+            CheckKind::UnusedAnnotation(_) => &CheckCode::F842,
             CheckKind::YieldOutsideFunction(_) => &CheckCode::F704,
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
@@ -1902,6 +1907,9 @@ impl CheckKind {
             CheckKind::UndefinedName(name) => {
                 format!("Undefined name `{name}`")
             }
+            CheckKind::UnusedAnnotation(name) => {
+                format!("Local variable `{name}` is annotated but never used")
+            }
             CheckKind::UnusedImport(name, ignore_init) => {
                 if *ignore_init {
                     format!(
@@ -1931,8 +1939,8 @@ impl CheckKind {
                 let types = types.join(", ");
                 format!("Merge these isinstance calls: `isinstance({obj}, ({types}))`")
             }
-            CheckKind::MisplacedComparisonConstant(comprison) => {
-                format!("Comparison should be {comprison}")
+            CheckKind::MisplacedComparisonConstant(comparison) => {
+                format!("Comparison should be {comparison}")
             }
             CheckKind::UnnecessaryDirectLambdaCall => "Lambda expression called directly. Execute \
                                                        the expression inline instead."
