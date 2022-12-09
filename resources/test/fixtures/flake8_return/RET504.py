@@ -130,6 +130,12 @@ def x():
     return val
 
 
+def x():
+    a = 1
+    print(f"a={a}")
+    return a
+
+
 # Test cases for using value for assignment then returning it
 # See:https://github.com/afonasev/flake8-return/issues/47
 def resolve_from_url(self, url: str) -> dict:
