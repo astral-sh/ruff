@@ -132,7 +132,7 @@ mod tests {
     }
 
     /// A re-implementation of the Pyflakes test runner.
-    /// See: https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_undefined_names.py
+    /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_undefined_names.py>
     fn flakes(contents: &str, expected: &[CheckCode]) -> Result<()> {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(CheckCodePrefix::F.codes());
