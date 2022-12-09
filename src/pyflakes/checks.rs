@@ -388,7 +388,7 @@ pub fn undefined_local(name: &str, scopes: &[&Scope], bindings: &[Binding]) -> O
 }
 
 /// F841
-pub fn unused_variables(
+pub fn unused_variable(
     scope: &Scope,
     bindings: &[Binding],
     dummy_variable_rgx: &Regex,
@@ -418,6 +418,31 @@ pub fn unused_variables(
         }
     }
 
+    checks
+}
+
+/// F842
+pub fn unused_annotation(
+    scope: &Scope,
+    bindings: &[Binding],
+    dummy_variable_rgx: &Regex,
+) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+    for (name, binding) in scope
+        .values
+        .iter()
+        .map(|(name, index)| (name, &bindings[*index]))
+    {
+        if binding.used.is_none()
+            && matches!(binding.kind, BindingKind::Annotation)
+            && !dummy_variable_rgx.is_match(name)
+        {
+            checks.push(Check::new(
+                CheckKind::UnusedAnnotation((*name).to_string()),
+                binding.range,
+            ));
+        }
+    }
     checks
 }
 

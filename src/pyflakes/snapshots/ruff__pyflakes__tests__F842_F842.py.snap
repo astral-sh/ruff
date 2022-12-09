@@ -1,0 +1,23 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    UnusedAnnotation: name
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 8
+  fix: ~
+- kind:
+    UnusedAnnotation: age
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 7
+  fix: ~
+
