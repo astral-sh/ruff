@@ -517,6 +517,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D214 | SectionNotOverIndented | Section is over-indented ("Returns") | 🛠 |
 | D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("Returns") | 🛠 |
 | D300 | UsesTripleQuotes | Use """triple double quotes""" |  |
+| D301 | UsesRPrefixForBackslashedContent | Use r""" if any backslashes in a docstring |  |
 | D400 | EndsInPeriod | First line should end with a period | 🛠 |
 | D402 | NoSignature | First line should not be the function's signature |  |
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |

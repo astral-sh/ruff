@@ -512,6 +512,7 @@ mod tests {
                 CheckCodePrefix::D214,
                 CheckCodePrefix::D215,
                 CheckCodePrefix::D300,
+                CheckCodePrefix::D301,
                 CheckCodePrefix::D400,
                 CheckCodePrefix::D403,
                 CheckCodePrefix::D404,
