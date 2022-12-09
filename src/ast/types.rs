@@ -32,23 +32,29 @@ impl Range {
 
 #[derive(Debug)]
 pub struct FunctionDef<'a> {
+    // Properties derived from StmtKind::FunctionDef.
     pub name: &'a str,
     pub args: &'a Arguments,
     pub body: &'a [Stmt],
     pub decorator_list: &'a [Expr],
     // pub returns: Option<&'a Expr>,
     // pub type_comment: Option<&'a str>,
+    // Scope-specific properties.
     // TODO(charlie): Create AsyncFunctionDef to mirror the AST.
     pub async_: bool,
+    pub globals: FxHashMap<&'a str, &'a Stmt>,
 }
 
 #[derive(Debug)]
 pub struct ClassDef<'a> {
+    // Properties derived from StmtKind::ClassDef.
     pub name: &'a str,
     pub bases: &'a [Expr],
     pub keywords: &'a [Keyword],
     // pub body: &'a [Stmt],
     pub decorator_list: &'a [Expr],
+    // Scope-specific properties.
+    pub globals: FxHashMap<&'a str, &'a Stmt>,
 }
 
 #[derive(Debug)]

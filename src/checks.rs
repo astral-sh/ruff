@@ -99,6 +99,7 @@ pub enum CheckCode {
     PLC0414,
     PLC2201,
     PLC3002,
+    PLE0118,
     PLE1142,
     PLR0206,
     PLR0402,
@@ -635,15 +636,16 @@ pub enum CheckKind {
     UnusedVariable(String),
     YieldOutsideFunction(DeferralKeyword),
     // pylint
-    ConsiderMergingIsinstance(String, Vec<String>),
-    UselessImportAlias,
-    MisplacedComparisonConstant(String),
-    UnnecessaryDirectLambdaCall,
-    PropertyWithParameters,
-    ConsiderUsingFromImport(String, String),
     AwaitOutsideAsync,
-    UselessElseOnLoop,
+    ConsiderMergingIsinstance(String, Vec<String>),
+    ConsiderUsingFromImport(String, String),
+    MisplacedComparisonConstant(String),
+    PropertyWithParameters,
+    UnnecessaryDirectLambdaCall,
     UseSysExit(String),
+    UsedPriorGlobalDeclaration(String, usize),
+    UselessElseOnLoop,
+    UselessImportAlias,
     // flake8-builtins
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
@@ -950,6 +952,7 @@ impl CheckCode {
             CheckCode::PLC0414 => CheckKind::UselessImportAlias,
             CheckCode::PLC2201 => CheckKind::MisplacedComparisonConstant("...".to_string()),
             CheckCode::PLC3002 => CheckKind::UnnecessaryDirectLambdaCall,
+            CheckCode::PLE0118 => CheckKind::UsedPriorGlobalDeclaration("...".to_string(), 1),
             CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
             CheckCode::PLR0402 => {
                 CheckKind::ConsiderUsingFromImport("...".to_string(), "...".to_string())
@@ -1402,6 +1405,7 @@ impl CheckCode {
             CheckCode::PLC0414 => CheckCategory::Pylint,
             CheckCode::PLC2201 => CheckCategory::Pylint,
             CheckCode::PLC3002 => CheckCategory::Pylint,
+            CheckCode::PLE0118 => CheckCategory::Pylint,
             CheckCode::PLE1142 => CheckCategory::Pylint,
             CheckCode::PLR0206 => CheckCategory::Pylint,
             CheckCode::PLR0402 => CheckCategory::Pylint,
@@ -1530,15 +1534,16 @@ impl CheckKind {
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
             // pylint
-            CheckKind::UselessImportAlias => &CheckCode::PLC0414,
-            CheckKind::MisplacedComparisonConstant(..) => &CheckCode::PLC2201,
-            CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
             CheckKind::ConsiderMergingIsinstance(..) => &CheckCode::PLR1701,
-            CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::ConsiderUsingFromImport(..) => &CheckCode::PLR0402,
+            CheckKind::MisplacedComparisonConstant(..) => &CheckCode::PLC2201,
+            CheckKind::UsedPriorGlobalDeclaration(..) => &CheckCode::PLE0118,
+            CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
+            CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             CheckKind::UseSysExit(_) => &CheckCode::PLR1722,
             CheckKind::UselessElseOnLoop => &CheckCode::PLW0120,
+            CheckKind::UselessImportAlias => &CheckCode::PLC0414,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
@@ -1955,6 +1960,9 @@ impl CheckKind {
             }
             CheckKind::ConsiderUsingFromImport(module, name) => {
                 format!("Use `from {module} import {name}` in lieu of alias")
+            }
+            CheckKind::UsedPriorGlobalDeclaration(name, line) => {
+                format!("Name `{name}` is used prior to global declaration on line {line}")
             }
             CheckKind::AwaitOutsideAsync => {
                 "`await` should be used within an async function".to_string()

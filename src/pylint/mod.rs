@@ -14,6 +14,7 @@ mod tests {
     #[test_case(CheckCode::PLC0414, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(CheckCode::PLC2201, Path::new("misplaced_comparison_constant.py"); "PLC2201")]
     #[test_case(CheckCode::PLC3002, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
+    #[test_case(CheckCode::PLE0118, Path::new("used_prior_global_declaration.py"); "PLE0118")]
     #[test_case(CheckCode::PLE1142, Path::new("await_outside_async.py"); "PLE1142")]
     #[test_case(CheckCode::PLR0206, Path::new("property_with_parameters.py"); "PLR0206")]
     #[test_case(CheckCode::PLR0402, Path::new("import_aliasing.py"); "PLR0402")]
