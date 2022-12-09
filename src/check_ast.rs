@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use itertools::Itertools;
 use log::error;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
@@ -3253,7 +3254,10 @@ impl<'a> Checker<'a> {
                         .push((full_name, &binding.range));
                 }
 
-                for ((defined_by, defined_in), unused_imports) in unused {
+                for ((defined_by, defined_in), unused_imports) in unused
+                    .into_iter()
+                    .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
+                {
                     let child = defined_by.0;
                     let parent = defined_in.map(|defined_in| defined_in.0);
 
