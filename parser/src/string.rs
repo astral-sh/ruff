@@ -82,18 +82,16 @@ pub fn parse_strings(
         deduped.push(take_current(&mut current));
     }
 
-    Ok(if has_fstring {
-        Expr::new(
-            initial_start,
-            last_end,
-            ExprKind::JoinedStr { values: deduped },
-        )
+    let node = if has_fstring {
+        ExprKind::JoinedStr { values: deduped }
     } else {
         deduped
             .into_iter()
             .exactly_one()
             .expect("String must be concatenated to a single element.")
-    })
+            .node
+    };
+    Ok(Expr::new(initial_start, last_end, node))
 }
 
 #[cfg(test)]

@@ -24,7 +24,7 @@ expression: parse_ast
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 8,
+                        column: 16,
                     },
                 ),
                 custom: (),
