@@ -5,6 +5,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_ast::Location;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -22,7 +23,7 @@ use crate::ast::types::{
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, visitor};
 use crate::checks::{Check, CheckCode, CheckKind, DeferralKeyword};
-use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
+use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
@@ -3354,22 +3355,68 @@ impl<'a> Checker<'a> {
     }
 
     fn check_definitions(&mut self) {
+        let enforce_annotations = self.settings.enabled.contains(&CheckCode::ANN001)
+            || self.settings.enabled.contains(&CheckCode::ANN002)
+            || self.settings.enabled.contains(&CheckCode::ANN003)
+            || self.settings.enabled.contains(&CheckCode::ANN101)
+            || self.settings.enabled.contains(&CheckCode::ANN102)
+            || self.settings.enabled.contains(&CheckCode::ANN201)
+            || self.settings.enabled.contains(&CheckCode::ANN202)
+            || self.settings.enabled.contains(&CheckCode::ANN204)
+            || self.settings.enabled.contains(&CheckCode::ANN205)
+            || self.settings.enabled.contains(&CheckCode::ANN206)
+            || self.settings.enabled.contains(&CheckCode::ANN401);
+        let enforce_docstrings = self.settings.enabled.contains(&CheckCode::D100)
+            || self.settings.enabled.contains(&CheckCode::D101)
+            || self.settings.enabled.contains(&CheckCode::D102)
+            || self.settings.enabled.contains(&CheckCode::D103)
+            || self.settings.enabled.contains(&CheckCode::D104)
+            || self.settings.enabled.contains(&CheckCode::D105)
+            || self.settings.enabled.contains(&CheckCode::D106)
+            || self.settings.enabled.contains(&CheckCode::D107)
+            || self.settings.enabled.contains(&CheckCode::D200)
+            || self.settings.enabled.contains(&CheckCode::D201)
+            || self.settings.enabled.contains(&CheckCode::D202)
+            || self.settings.enabled.contains(&CheckCode::D203)
+            || self.settings.enabled.contains(&CheckCode::D204)
+            || self.settings.enabled.contains(&CheckCode::D205)
+            || self.settings.enabled.contains(&CheckCode::D206)
+            || self.settings.enabled.contains(&CheckCode::D207)
+            || self.settings.enabled.contains(&CheckCode::D208)
+            || self.settings.enabled.contains(&CheckCode::D209)
+            || self.settings.enabled.contains(&CheckCode::D210)
+            || self.settings.enabled.contains(&CheckCode::D211)
+            || self.settings.enabled.contains(&CheckCode::D212)
+            || self.settings.enabled.contains(&CheckCode::D213)
+            || self.settings.enabled.contains(&CheckCode::D214)
+            || self.settings.enabled.contains(&CheckCode::D215)
+            || self.settings.enabled.contains(&CheckCode::D300)
+            || self.settings.enabled.contains(&CheckCode::D301)
+            || self.settings.enabled.contains(&CheckCode::D400)
+            || self.settings.enabled.contains(&CheckCode::D402)
+            || self.settings.enabled.contains(&CheckCode::D403)
+            || self.settings.enabled.contains(&CheckCode::D404)
+            || self.settings.enabled.contains(&CheckCode::D405)
+            || self.settings.enabled.contains(&CheckCode::D406)
+            || self.settings.enabled.contains(&CheckCode::D407)
+            || self.settings.enabled.contains(&CheckCode::D408)
+            || self.settings.enabled.contains(&CheckCode::D409)
+            || self.settings.enabled.contains(&CheckCode::D410)
+            || self.settings.enabled.contains(&CheckCode::D411)
+            || self.settings.enabled.contains(&CheckCode::D412)
+            || self.settings.enabled.contains(&CheckCode::D413)
+            || self.settings.enabled.contains(&CheckCode::D414)
+            || self.settings.enabled.contains(&CheckCode::D415)
+            || self.settings.enabled.contains(&CheckCode::D416)
+            || self.settings.enabled.contains(&CheckCode::D417)
+            || self.settings.enabled.contains(&CheckCode::D418)
+            || self.settings.enabled.contains(&CheckCode::D419);
+
         let mut overloaded_name: Option<String> = None;
         self.definitions.reverse();
         while let Some((definition, visibility)) = self.definitions.pop() {
             // flake8-annotations
-            if self.settings.enabled.contains(&CheckCode::ANN001)
-                || self.settings.enabled.contains(&CheckCode::ANN002)
-                || self.settings.enabled.contains(&CheckCode::ANN003)
-                || self.settings.enabled.contains(&CheckCode::ANN101)
-                || self.settings.enabled.contains(&CheckCode::ANN102)
-                || self.settings.enabled.contains(&CheckCode::ANN201)
-                || self.settings.enabled.contains(&CheckCode::ANN202)
-                || self.settings.enabled.contains(&CheckCode::ANN204)
-                || self.settings.enabled.contains(&CheckCode::ANN205)
-                || self.settings.enabled.contains(&CheckCode::ANN206)
-                || self.settings.enabled.contains(&CheckCode::ANN401)
-            {
+            if enforce_annotations {
                 // TODO(charlie): This should be even stricter, in that an overload
                 // implementation should come immediately after the overloaded
                 // interfaces, without any AST nodes in between. Right now, we
@@ -3388,87 +3435,110 @@ impl<'a> Checker<'a> {
             }
 
             // pydocstyle
-            if !pydocstyle::plugins::not_empty(self, &definition) {
-                continue;
-            }
-            if !pydocstyle::plugins::not_missing(self, &definition, &visibility) {
-                continue;
-            }
-            if self.settings.enabled.contains(&CheckCode::D200) {
-                pydocstyle::plugins::one_liner(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D201)
-                || self.settings.enabled.contains(&CheckCode::D202)
-            {
-                pydocstyle::plugins::blank_before_after_function(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D203)
-                || self.settings.enabled.contains(&CheckCode::D204)
-                || self.settings.enabled.contains(&CheckCode::D211)
-            {
-                pydocstyle::plugins::blank_before_after_class(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D205) {
-                pydocstyle::plugins::blank_after_summary(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D206)
-                || self.settings.enabled.contains(&CheckCode::D207)
-                || self.settings.enabled.contains(&CheckCode::D208)
-            {
-                pydocstyle::plugins::indent(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D209) {
-                pydocstyle::plugins::newline_after_last_paragraph(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D210) {
-                pydocstyle::plugins::no_surrounding_whitespace(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D212)
-                || self.settings.enabled.contains(&CheckCode::D213)
-            {
-                pydocstyle::plugins::multi_line_summary_start(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D300) {
-                pydocstyle::plugins::triple_quotes(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D301) {
-                pydocstyle::plugins::backslashes(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D400) {
-                pydocstyle::plugins::ends_with_period(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D402) {
-                pydocstyle::plugins::no_signature(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D403) {
-                pydocstyle::plugins::capitalized(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D404) {
-                pydocstyle::plugins::starts_with_this(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D415) {
-                pydocstyle::plugins::ends_with_punctuation(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D418) {
-                pydocstyle::plugins::if_needed(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D212)
-                || self.settings.enabled.contains(&CheckCode::D214)
-                || self.settings.enabled.contains(&CheckCode::D215)
-                || self.settings.enabled.contains(&CheckCode::D405)
-                || self.settings.enabled.contains(&CheckCode::D406)
-                || self.settings.enabled.contains(&CheckCode::D407)
-                || self.settings.enabled.contains(&CheckCode::D408)
-                || self.settings.enabled.contains(&CheckCode::D409)
-                || self.settings.enabled.contains(&CheckCode::D410)
-                || self.settings.enabled.contains(&CheckCode::D411)
-                || self.settings.enabled.contains(&CheckCode::D412)
-                || self.settings.enabled.contains(&CheckCode::D413)
-                || self.settings.enabled.contains(&CheckCode::D414)
-                || self.settings.enabled.contains(&CheckCode::D416)
-                || self.settings.enabled.contains(&CheckCode::D417)
-            {
-                pydocstyle::plugins::sections(self, &definition);
+            if enforce_docstrings {
+                if definition.docstring.is_none() {
+                    pydocstyle::plugins::not_missing(self, &definition, &visibility);
+                    continue;
+                }
+
+                // Extract a `Docstring` from a `Definition`.
+                let expr = definition.docstring.unwrap();
+                let content = self
+                    .locator
+                    .slice_source_code_range(&Range::from_located(expr));
+                let indentation = self.locator.slice_source_code_range(&Range {
+                    location: Location::new(expr.location.row(), 0),
+                    end_location: Location::new(expr.location.row(), expr.location.column()),
+                });
+                let body = pydocstyle::helpers::raw_contents(&content);
+                let docstring = Docstring {
+                    kind: definition.kind,
+                    expr,
+                    contents: &content,
+                    indentation: &indentation,
+                    body,
+                };
+
+                if !pydocstyle::plugins::not_empty(self, &docstring) {
+                    continue;
+                }
+
+                if self.settings.enabled.contains(&CheckCode::D200) {
+                    pydocstyle::plugins::one_liner(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D201)
+                    || self.settings.enabled.contains(&CheckCode::D202)
+                {
+                    pydocstyle::plugins::blank_before_after_function(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D203)
+                    || self.settings.enabled.contains(&CheckCode::D204)
+                    || self.settings.enabled.contains(&CheckCode::D211)
+                {
+                    pydocstyle::plugins::blank_before_after_class(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D205) {
+                    pydocstyle::plugins::blank_after_summary(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D206)
+                    || self.settings.enabled.contains(&CheckCode::D207)
+                    || self.settings.enabled.contains(&CheckCode::D208)
+                {
+                    pydocstyle::plugins::indent(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D209) {
+                    pydocstyle::plugins::newline_after_last_paragraph(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D210) {
+                    pydocstyle::plugins::no_surrounding_whitespace(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D212)
+                    || self.settings.enabled.contains(&CheckCode::D213)
+                {
+                    pydocstyle::plugins::multi_line_summary_start(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D300) {
+                    pydocstyle::plugins::triple_quotes(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D301) {
+                    pydocstyle::plugins::backslashes(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D400) {
+                    pydocstyle::plugins::ends_with_period(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D402) {
+                    pydocstyle::plugins::no_signature(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D403) {
+                    pydocstyle::plugins::capitalized(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D404) {
+                    pydocstyle::plugins::starts_with_this(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D415) {
+                    pydocstyle::plugins::ends_with_punctuation(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D418) {
+                    pydocstyle::plugins::if_needed(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D212)
+                    || self.settings.enabled.contains(&CheckCode::D214)
+                    || self.settings.enabled.contains(&CheckCode::D215)
+                    || self.settings.enabled.contains(&CheckCode::D405)
+                    || self.settings.enabled.contains(&CheckCode::D406)
+                    || self.settings.enabled.contains(&CheckCode::D407)
+                    || self.settings.enabled.contains(&CheckCode::D408)
+                    || self.settings.enabled.contains(&CheckCode::D409)
+                    || self.settings.enabled.contains(&CheckCode::D410)
+                    || self.settings.enabled.contains(&CheckCode::D411)
+                    || self.settings.enabled.contains(&CheckCode::D412)
+                    || self.settings.enabled.contains(&CheckCode::D413)
+                    || self.settings.enabled.contains(&CheckCode::D414)
+                    || self.settings.enabled.contains(&CheckCode::D416)
+                    || self.settings.enabled.contains(&CheckCode::D417)
+                {
+                    pydocstyle::plugins::sections(self, &docstring);
+                }
             }
         }
     }
