@@ -12,6 +12,7 @@ pub fn parse_strings(
     // Preserve the initial location and kind.
     let initial_start = values[0].0;
     let initial_end = values[0].2;
+    let last_end = values.last().unwrap().2;
     let initial_kind = (values[0].1 .1 == StringKind::U).then(|| "u".to_owned());
 
     // Optimization: fast-track the common case of a single string.
@@ -84,7 +85,7 @@ pub fn parse_strings(
     Ok(if has_fstring {
         Expr::new(
             initial_start,
-            initial_end,
+            last_end,
             ExprKind::JoinedStr { values: deduped },
         )
     } else {
