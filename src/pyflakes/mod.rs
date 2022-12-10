@@ -1345,6 +1345,7 @@ mod tests {
 
     #[test]
     fn redefined_by_function() -> Result<()> {
+        // TODO(charlie): Why does this differ from the next test assertion?
         flakes(
             r#"
         import fu
