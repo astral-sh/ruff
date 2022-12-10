@@ -29,7 +29,7 @@ pub fn is_upper(s: &str) -> bool {
 }
 
 /// Remove prefixes (u, r, b) and quotes around a string. This expects the given
-/// string to be a valid python string representation, it doesn't do any
+/// string to be a valid Python string representation, it doesn't do any
 /// validation.
 pub fn strip_quotes_and_prefixes(s: &str) -> &str {
     match STRING_QUOTE_PREFIX_REGEX.captures(s) {
