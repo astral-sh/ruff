@@ -3202,6 +3202,9 @@ impl<'a> Checker<'a> {
                 }
             }
 
+            // Look for any bindings that were redefined in another scope, and remain unused.
+            // Note that we only store references in `redefinitions` if the bindings are in
+            // different scopes.
             if self.settings.enabled.contains(&CheckCode::F811) {
                 for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
