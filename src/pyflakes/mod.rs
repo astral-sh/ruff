@@ -1105,11 +1105,11 @@ mod tests {
     fn aliased_import() -> Result<()> {
         flakes(
             "import fu as FU, bar as FU",
-            &[CheckCode::F811, CheckCode::F401],
+            &[CheckCode::F401, CheckCode::F811, CheckCode::F401],
         )?;
         flakes(
             "from moo import fu as FU, bar as FU",
-            &[CheckCode::F811, CheckCode::F401],
+            &[CheckCode::F401, CheckCode::F811, CheckCode::F401],
         )?;
 
         Ok(())
@@ -1146,9 +1146,15 @@ mod tests {
 
     #[test]
     fn redefined_while_unused() -> Result<()> {
-        flakes("import fu; fu = 3", &[CheckCode::F811])?;
-        flakes("import fu; fu, bar = 3", &[CheckCode::F811])?;
-        flakes("import fu; [fu, bar] = 3", &[CheckCode::F811])?;
+        flakes("import fu; fu = 3", &[CheckCode::F401, CheckCode::F811])?;
+        flakes(
+            "import fu; fu, bar = 3",
+            &[CheckCode::F401, CheckCode::F811],
+        )?;
+        flakes(
+            "import fu; [fu, bar] = 3",
+            &[CheckCode::F401, CheckCode::F811],
+        )?;
 
         Ok(())
     }
@@ -1165,7 +1171,7 @@ mod tests {
             import os
         os.path
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1203,7 +1209,7 @@ mod tests {
             pass
         os.path
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1279,7 +1285,7 @@ mod tests {
             from bb import mixer
         mixer(123)
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1345,14 +1351,13 @@ mod tests {
 
     #[test]
     fn redefined_by_function() -> Result<()> {
-        // TODO(charlie): Why does this differ from the next test assertion?
         flakes(
             r#"
         import fu
         def fu():
             pass
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1430,7 +1435,7 @@ mod tests {
         class fu:
             pass
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1694,7 +1699,7 @@ mod tests {
         for fu in range(2):
             pass
         "#,
-            &[CheckCode::F402],
+            &[CheckCode::F401, CheckCode::F402],
         )?;
 
         Ok(())
@@ -1851,7 +1856,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         "#,
-            &[CheckCode::F811, CheckCode::F841],
+            &[CheckCode::F401, CheckCode::F811, CheckCode::F841],
         )?;
 
         Ok(())
@@ -2161,7 +2166,7 @@ mod tests {
         import fu.bar, fu.bar
         fu.bar
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
         flakes(
             r#"
@@ -2169,7 +2174,7 @@ mod tests {
         import fu.bar
         fu.bar
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -2325,7 +2330,7 @@ mod tests {
             fu
         fu
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
