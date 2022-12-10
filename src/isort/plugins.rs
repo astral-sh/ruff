@@ -19,14 +19,12 @@ fn extract_range(body: &[&Stmt]) -> Range {
     }
 }
 
-fn extract_indentation(body: &[&Stmt], locator: &SourceCodeLocator) -> String {
+fn extract_indentation_range(body: &[&Stmt]) -> Range {
     let location = body.first().unwrap().location;
-    let range = Range {
+    Range {
         location: Location::new(location.row(), 0),
         end_location: location,
-    };
-    let existing = locator.slice_source_code_range(&range);
-    leading_space(&existing)
+    }
 }
 
 /// I001
@@ -36,8 +34,10 @@ pub fn check_imports(
     settings: &Settings,
     autofix: bool,
 ) -> Option<Check> {
+    let indentation = locator.slice_source_code_range(&extract_indentation_range(&block.imports));
+    let indentation = leading_space(&indentation);
+
     let range = extract_range(&block.imports);
-    let indentation = extract_indentation(&block.imports, locator);
 
     // Extract comments. Take care to grab any inline comments from the last line.
     let comments = comments::collect_comments(
@@ -77,7 +77,7 @@ pub fn check_imports(
             if has_leading_content {
                 content.push('\n');
             }
-            content.push_str(&indent(&expected, &indentation));
+            content.push_str(&indent(&expected, indentation));
             check.amend(Fix::replacement(
                 content,
                 // Preserve leading prefix (but put the imports on a new line).
@@ -104,7 +104,7 @@ pub fn check_imports(
             let mut check = Check::new(CheckKind::UnsortedImports, range);
             if autofix && settings.fixable.contains(check.kind.code()) {
                 check.amend(Fix::replacement(
-                    indent(&expected, &indentation),
+                    indent(&expected, indentation),
                     range.location,
                     range.end_location,
                 ));
