@@ -1481,36 +1481,28 @@ where
                                     }
                                     Ok(summary) => {
                                         if self.settings.enabled.contains(&CheckCode::F522) {
-                                            pyflakes::checks::string_dot_format_extra_named_arguments(self,
+                                            pyflakes::plugins::string_dot_format_extra_named_arguments(self,
                                                 &summary, keywords, location,
                                             );
                                         }
 
                                         if self.settings.enabled.contains(&CheckCode::F523) {
-                                            pyflakes::checks::string_dot_format_extra_positional_arguments(
+                                            pyflakes::plugins::string_dot_format_extra_positional_arguments(
                                                 self,
                                                 &summary, args, location,
                                             );
                                         }
 
                                         if self.settings.enabled.contains(&CheckCode::F524) {
-                                            if let Some(check) =
-                                                pyflakes::checks::string_dot_format_missing_argument(
-                                                    &summary, args, keywords, location,
-                                                )
-                                            {
-                                                self.add_check(check);
-                                            }
+                                            pyflakes::plugins::string_dot_format_missing_argument(
+                                                self, &summary, args, keywords, location,
+                                            );
                                         }
 
                                         if self.settings.enabled.contains(&CheckCode::F525) {
-                                            if let Some(check) =
-                                                pyflakes::checks::string_dot_format_mixing_automatic(
-                                                    &summary, location,
-                                                )
-                                            {
-                                                self.add_check(check);
-                                            }
+                                            pyflakes::plugins::string_dot_format_mixing_automatic(
+                                                self, &summary, location,
+                                            );
                                         }
                                     }
                                 }
@@ -1961,63 +1953,39 @@ where
                             }
                             Ok(summary) => {
                                 if self.settings.enabled.contains(&CheckCode::F502) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_expected_mapping(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_expected_mapping(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F503) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_expected_sequence(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_expected_sequence(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F504) {
-                                    pyflakes::checks::percent_format_extra_named_arguments(
+                                    pyflakes::plugins::percent_format_extra_named_arguments(
                                         self, &summary, right, location,
                                     );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F505) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_missing_arguments(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_missing_arguments(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F506) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_mixed_positional_and_named(
-                                            &summary, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_mixed_positional_and_named(
+                                        self, &summary, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F507) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_positional_count_mismatch(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_positional_count_mismatch(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F508) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_star_requires_sequence(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_star_requires_sequence(
+                                        self, &summary, right, location,
+                                    );
                                 }
                             }
                         }
