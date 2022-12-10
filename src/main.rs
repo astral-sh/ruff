@@ -286,6 +286,7 @@ fn inner_main() -> Result<ExitCode> {
     } else {
         fixer::Mode::None
     };
+    let format = configuration.format;
     let settings = Settings::from_configuration(configuration, project_root.as_ref())?;
 
     // Now that we've inferred the appropriate log level, add some debug
@@ -300,7 +301,7 @@ fn inner_main() -> Result<ExitCode> {
     };
 
     if let Some(code) = cli.explain {
-        commands::explain(&code, settings.format)?;
+        commands::explain(&code, format)?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -316,7 +317,7 @@ fn inner_main() -> Result<ExitCode> {
         cache_enabled = false;
     }
 
-    let printer = Printer::new(&settings.format, &log_level);
+    let printer = Printer::new(&format, &log_level);
     if cli.watch {
         if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
             eprintln!("Warning: --fix is not enabled in watch mode.");
@@ -327,7 +328,7 @@ fn inner_main() -> Result<ExitCode> {
         if cli.autoformat {
             eprintln!("Warning: --autoformat is not enabled in watch mode.");
         }
-        if settings.format != SerializationFormat::Text {
+        if format != SerializationFormat::Text {
             eprintln!("Warning: --format 'text' is used in watch mode.");
         }
 
