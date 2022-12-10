@@ -11,7 +11,14 @@ expression: checks
   end_location:
     row: 1
     column: 21
-  fix: ~
+  fix:
+    content: "\"{}\".format(1, )"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 21
 - kind:
     StringDotFormatExtraNamedArguments:
       - spam
@@ -21,7 +28,14 @@ expression: checks
   end_location:
     row: 2
     column: 34
-  fix: ~
+  fix:
+    content: "\"{bar}{}\".format(1, bar=2, )"
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 34
 - kind:
     StringDotFormatExtraNamedArguments:
       - eggs
@@ -32,5 +46,12 @@ expression: checks
   end_location:
     row: 4
     column: 51
-  fix: ~
+  fix:
+    content: "\"{bar:{spam}}\".format(bar=2, spam=3, )"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 51
 

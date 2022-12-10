@@ -419,14 +419,14 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F501 | PercentFormatInvalidFormat | '...' % ... has invalid format string: ... |  |
 | F502 | PercentFormatExpectedMapping | '...' % ... expected mapping but got sequence |  |
 | F503 | PercentFormatExpectedSequence | '...' % ... expected sequence but got mapping |  |
-| F504 | PercentFormatExtraNamedArguments | '...' % ... has unused named argument(s): ... |  |
+| F504 | PercentFormatExtraNamedArguments | '...' % ... has unused named argument(s): ... | 🛠 |
 | F505 | PercentFormatMissingArgument | '...' % ... is missing argument(s) for placeholder(s): ... |  |
 | F506 | PercentFormatMixedPositionalAndNamed | '...' % ... has mixed positional and named placeholders |  |
 | F507 | PercentFormatPositionalCountMismatch | '...' % ... has 4 placeholder(s) but 2 substitution(s) |  |
 | F508 | PercentFormatStarRequiresSequence | '...' % ... `*` specifier requires sequence |  |
 | F509 | PercentFormatUnsupportedFormatCharacter | '...' % ... has unsupported format character 'c' |  |
 | F521 | StringDotFormatInvalidFormat | '...'.format(...) has invalid format string: ... |  |
-| F522 | StringDotFormatExtraNamedArguments | '...'.format(...) has unused named argument(s): ... |  |
+| F522 | StringDotFormatExtraNamedArguments | '...'.format(...) has unused named argument(s): ... | 🛠 |
 | F523 | StringDotFormatExtraPositionalArguments | '...'.format(...) has unused arguments at position(s): ... |  |
 | F524 | StringDotFormatMissingArguments | '...'.format(...) is missing argument(s) for placeholder(s): ... |  |
 | F525 | StringDotFormatMixingAutomatic | '...'.format(...) mixes automatic and manual numbering |  |
@@ -816,6 +816,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLC0414 | UselessImportAlias | Import alias does not rename original package | 🛠 |
 | PLC2201 | MisplacedComparisonConstant | Comparison should be ... | 🛠 |
 | PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
+| PLE0117 | NonlocalWithoutBinding | Nonlocal name `...` found without binding |  |
 | PLE0118 | UsedPriorGlobalDeclaration | Name `...` is used prior to global declaration on line 1 |  |
 | PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
@@ -823,6 +824,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance(..., (...))` |  |
 | PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
+| PLW0602 | GlobalVariableNotAssigned | Using global for `...` but no assignment is done |  |
 
 ### Ruff-specific rules (RUF)
 

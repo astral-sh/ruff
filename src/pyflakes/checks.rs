@@ -8,8 +8,12 @@ use rustpython_parser::ast::{
 };
 
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
+use crate::check_ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::pyflakes::cformat::CFormatSummary;
+use crate::pyflakes::fixes::{
+    remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
+};
 use crate::pyflakes::format::FormatSummary;
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
@@ -70,21 +74,22 @@ pub(crate) fn percent_format_expected_sequence(
 
 /// F504
 pub(crate) fn percent_format_extra_named_arguments(
+    checker: &mut Checker,
     summary: &CFormatSummary,
     right: &Expr,
     location: Range,
-) -> Option<Check> {
+) {
     if summary.num_positional > 0 {
-        return None;
+        return;
     }
     let ExprKind::Dict { keys, values } = &right.node else {
-        return None;
+        return;
     };
     if values.len() > keys.len() {
-        return None; // contains **x splat
+        return; // contains **x splat
     }
 
-    let missing: Vec<&String> = keys
+    let missing: Vec<&str> = keys
         .iter()
         .filter_map(|k| match &k.node {
             // We can only check that string literals exist
@@ -95,7 +100,7 @@ pub(crate) fn percent_format_extra_named_arguments(
                 if summary.keywords.contains(value) {
                     None
                 } else {
-                    Some(value)
+                    Some(value.as_str())
                 }
             }
             _ => None,
@@ -103,13 +108,23 @@ pub(crate) fn percent_format_extra_named_arguments(
         .collect();
 
     if missing.is_empty() {
-        return None;
+        return;
     }
 
-    Some(Check::new(
-        CheckKind::PercentFormatExtraNamedArguments(missing.iter().map(|&s| s.clone()).collect()),
+    let mut check = Check::new(
+        CheckKind::PercentFormatExtraNamedArguments(
+            missing.iter().map(|&s| s.to_string()).collect(),
+        ),
         location,
-    ))
+    );
+    if checker.patch(check.kind.code()) {
+        if let Ok(fix) = remove_unused_format_arguments_from_dict(checker.locator, &missing, right)
+        {
+            check.amend(fix);
+        }
+    }
+
+    checker.add_check(check);
 }
 
 /// F505
@@ -232,12 +247,13 @@ pub(crate) fn percent_format_star_requires_sequence(
 
 /// F522
 pub(crate) fn string_dot_format_extra_named_arguments(
+    checker: &mut Checker,
     summary: &FormatSummary,
     keywords: &[Keyword],
     location: Range,
-) -> Option<Check> {
+) {
     if has_star_star_kwargs(keywords) {
-        return None;
+        return;
     }
 
     let keywords = keywords.iter().filter_map(|k| {
@@ -245,45 +261,67 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         arg.as_ref()
     });
 
-    let missing: Vec<&String> = keywords
-        .filter(|&k| !summary.keywords.contains(k))
+    let missing: Vec<&str> = keywords
+        .filter_map(|k| {
+            if summary.keywords.contains(k) {
+                None
+            } else {
+                Some(k.as_str())
+            }
+        })
         .collect();
 
     if missing.is_empty() {
-        None
-    } else {
-        Some(Check::new(
-            CheckKind::StringDotFormatExtraNamedArguments(
-                missing.iter().map(|&s| s.clone()).collect(),
-            ),
-            location,
-        ))
+        return;
     }
+
+    let mut check = Check::new(
+        CheckKind::StringDotFormatExtraNamedArguments(
+            missing.iter().map(|&s| s.to_string()).collect(),
+        ),
+        location,
+    );
+    if checker.patch(check.kind.code()) {
+        if let Ok(fix) =
+            remove_unused_keyword_arguments_from_format_call(checker.locator, &missing, location)
+        {
+            check.amend(fix);
+        }
+    }
+
+    checker.add_check(check);
 }
 
 /// F523
 pub(crate) fn string_dot_format_extra_positional_arguments(
+    checker: &mut Checker,
     summary: &FormatSummary,
     args: &[Expr],
     location: Range,
-) -> Option<Check> {
+) {
     if has_star_args(args) {
-        return None;
+        return;
     }
 
-    let missing: Vec<String> = (0..args.len())
+    let missing: Vec<usize> = (0..args.len())
         .filter(|i| !(summary.autos.contains(i) || summary.indexes.contains(i)))
-        .map(|i| i.to_string())
         .collect();
 
     if missing.is_empty() {
-        None
-    } else {
-        Some(Check::new(
-            CheckKind::StringDotFormatExtraPositionalArguments(missing),
-            location,
-        ))
+        return;
     }
+
+    let check = Check::new(
+        CheckKind::StringDotFormatExtraPositionalArguments(
+            missing
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect::<Vec<String>>(),
+        ),
+        location,
+    );
+
+    checker.add_check(check);
 }
 
 /// F524
