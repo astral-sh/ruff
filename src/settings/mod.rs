@@ -15,7 +15,7 @@ use rustc_hash::FxHashSet;
 use crate::checks::CheckCode;
 use crate::checks_gen::{CheckCodePrefix, SuffixLength};
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
+use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_import_conventions, flake8_quotes,
     flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
@@ -36,7 +36,6 @@ pub struct Settings {
     pub extend_exclude: GlobSet,
     pub external: FxHashSet<String>,
     pub fixable: FxHashSet<CheckCode>,
-    pub format: SerializationFormat,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>,
@@ -79,7 +78,6 @@ impl Settings {
             extend_exclude: resolve_globset(config.extend_exclude, project_root)?,
             external: FxHashSet::from_iter(config.external),
             fixable: resolve_codes(&config.fixable, &config.unfixable),
-            format: config.format,
             flake8_annotations: config.flake8_annotations,
             flake8_bugbear: config.flake8_bugbear,
             flake8_import_conventions: config.flake8_import_conventions,
@@ -107,7 +105,6 @@ impl Settings {
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
             fixable: FxHashSet::from_iter([check_code]),
-            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
@@ -135,7 +132,6 @@ impl Settings {
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
             fixable: FxHashSet::from_iter(check_codes),
-            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
