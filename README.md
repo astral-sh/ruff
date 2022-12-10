@@ -120,10 +120,16 @@ For **macOS Homebrew** and **Linuxbrew** users, Ruff is also available as [`ruff
 brew install ruff
 ```
 
-For Conda users, Ruff is also available as [`ruff`](https://anaconda.org/conda-forge/ruff) on `conda-forge`:
+For **Conda** users, Ruff is also available as [`ruff`](https://anaconda.org/conda-forge/ruff) on `conda-forge`:
 
 ```shell
 conda install -c conda-forge ruff
+```
+
+For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/community/x86_64/ruff/) on the official repositories:
+
+```shell
+pacman -S ruff
 ```
 
 ### Usage
