@@ -55,10 +55,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_configuration(
-        config: Configuration,
-        project_root: Option<&PathBuf>,
-    ) -> Result<Self> {
+    pub fn from_configuration(config: Configuration, project_root: Option<&Path>) -> Result<Self> {
         Ok(Self {
             allowed_confusables: config.allowed_confusables,
             dummy_variable_rgx: config.dummy_variable_rgx,
@@ -90,7 +87,7 @@ impl Settings {
             pep8_naming: config.pep8_naming,
             pyupgrade: config.pyupgrade,
             per_file_ignores: resolve_per_file_ignores(config.per_file_ignores, project_root)?,
-            src: config.src,
+            src: resolve_src(config.src, project_root),
             target_version: config.target_version,
             show_source: config.show_source,
         })
@@ -192,10 +189,7 @@ impl Hash for Settings {
 }
 
 /// Given a list of patterns, create a `GlobSet`.
-pub fn resolve_globset(
-    patterns: Vec<FilePattern>,
-    project_root: Option<&PathBuf>,
-) -> Result<GlobSet> {
+pub fn resolve_globset(patterns: Vec<FilePattern>, project_root: Option<&Path>) -> Result<GlobSet> {
     let mut builder = globset::GlobSetBuilder::new();
     for pattern in patterns {
         pattern.add_to(&mut builder, project_root)?;
@@ -206,7 +200,7 @@ pub fn resolve_globset(
 /// Given a list of patterns, create a `GlobSet`.
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
-    project_root: Option<&PathBuf>,
+    project_root: Option<&Path>,
 ) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>> {
     per_file_ignores
         .into_iter()
@@ -223,6 +217,15 @@ pub fn resolve_per_file_ignores(
             let basename = Glob::new(&per_file_ignore.pattern)?.compile_matcher();
 
             Ok((absolute, basename, per_file_ignore.codes))
+        })
+        .collect()
+}
+
+pub fn resolve_src(src: Vec<PathBuf>, project_root: Option<&Path>) -> Vec<PathBuf> {
+    src.into_iter()
+        .map(|path| match project_root {
+            Some(project_root) => fs::normalize_path_to(&path, project_root),
+            None => fs::normalize_path(&path),
         })
         .collect()
 }

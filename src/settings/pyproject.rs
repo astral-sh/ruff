@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use common_path::common_path_all;
-use log::debug;
 use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 
@@ -80,18 +79,12 @@ pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
     None
 }
 
-pub fn load_options(pyproject: Option<&PathBuf>) -> Result<Options> {
-    if let Some(pyproject) = pyproject {
-        Ok(parse_pyproject_toml(pyproject)
-            .map_err(|err| anyhow!("Failed to parse `{}`: {}", pyproject.to_string_lossy(), err))?
-            .tool
-            .and_then(|tool| tool.ruff)
-            .unwrap_or_default())
-    } else {
-        debug!("No pyproject.toml found.");
-        debug!("Falling back to default configuration...");
-        Ok(Options::default())
-    }
+pub fn load_options(pyproject: &Path) -> Result<Options> {
+    Ok(parse_pyproject_toml(pyproject)
+        .map_err(|err| anyhow!("Failed to parse `{}`: {}", pyproject.to_string_lossy(), err))?
+        .tool
+        .and_then(|tool| tool.ruff)
+        .unwrap_or_default())
 }
 
 #[cfg(test)]
