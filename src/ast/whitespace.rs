@@ -16,18 +16,16 @@ pub fn indentation<'a, T>(checker: &'a Checker, located: &'a Located<T>) -> Cow<
 }
 
 /// Extract the leading words from a line of text.
-pub fn leading_words(line: &str) -> String {
-    line.trim()
-        .chars()
-        .take_while(|char| char.is_alphanumeric() || char.is_whitespace())
-        .collect()
+pub fn leading_words(line: &str) -> &str {
+    let line = line.trim();
+    line.find(|char: char| !char.is_alphanumeric() && !char.is_whitespace())
+        .map_or(line, |index| &line[..index])
 }
 
 /// Extract the leading whitespace from a line of text.
-pub fn leading_space(line: &str) -> String {
-    line.chars()
-        .take_while(|char| char.is_whitespace())
-        .collect()
+pub fn leading_space(line: &str) -> &str {
+    line.find(|char: char| !char.is_whitespace())
+        .map_or(line, |index| &line[..index])
 }
 
 /// Replace any non-whitespace characters from an indentation string.

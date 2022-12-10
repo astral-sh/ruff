@@ -1148,11 +1148,8 @@ fn common_section(
     style: &SectionStyle,
 ) {
     if checker.settings.enabled.contains(&CheckCode::D405) {
-        if !style
-            .section_names()
-            .contains(&context.section_name.as_str())
-        {
-            let capitalized_section_name = titlecase::titlecase(&context.section_name);
+        if !style.section_names().contains(&context.section_name) {
+            let capitalized_section_name = titlecase::titlecase(context.section_name);
             if style
                 .section_names()
                 .contains(capitalized_section_name.as_str())
@@ -1164,7 +1161,7 @@ fn common_section(
                 if checker.patch(check.kind.code()) {
                     // Replace the section title with the capitalized variant. This requires
                     // locating the start and end of the section name.
-                    if let Some(index) = context.line.find(&context.section_name) {
+                    if let Some(index) = context.line.find(context.section_name) {
                         // Map from bytes to characters.
                         let section_name_start = &context.line[..index].chars().count();
                         let section_name_length = &context.section_name.chars().count();
@@ -1431,7 +1428,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
         let suffix = context
             .line
             .trim()
-            .strip_prefix(&context.section_name)
+            .strip_prefix(context.section_name)
             .unwrap();
         if !suffix.is_empty() {
             let mut check = Check::new(
@@ -1440,7 +1437,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
             );
             if checker.patch(check.kind.code()) {
                 // Delete the suffix. This requires locating the end of the section name.
-                if let Some(index) = context.line.find(&context.section_name) {
+                if let Some(index) = context.line.find(context.section_name) {
                     // Map from bytes to characters.
                     let suffix_start = &context.line[..index + context.section_name.len()]
                         .chars()
@@ -1463,7 +1460,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
     }
 
     if checker.settings.enabled.contains(&CheckCode::D417) {
-        let capitalized_section_name = titlecase::titlecase(&context.section_name);
+        let capitalized_section_name = titlecase::titlecase(context.section_name);
         if capitalized_section_name == "Parameters" {
             parameters_section(checker, docstring, context);
         }
@@ -1477,7 +1474,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
         let suffix = context
             .line
             .trim()
-            .strip_prefix(&context.section_name)
+            .strip_prefix(context.section_name)
             .unwrap();
         if suffix != ":" {
             let mut check = Check::new(
@@ -1486,7 +1483,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
             );
             if checker.patch(check.kind.code()) {
                 // Replace the suffix. This requires locating the end of the section name.
-                if let Some(index) = context.line.find(&context.section_name) {
+                if let Some(index) = context.line.find(context.section_name) {
                     // Map from bytes to characters.
                     let suffix_start = &context.line[..index + context.section_name.len()]
                         .chars()
@@ -1510,7 +1507,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
     }
 
     if checker.settings.enabled.contains(&CheckCode::D417) {
-        let capitalized_section_name = titlecase::titlecase(&context.section_name);
+        let capitalized_section_name = titlecase::titlecase(context.section_name);
         if capitalized_section_name == "Args" || capitalized_section_name == "Arguments" {
             args_section(checker, docstring, context);
         }
