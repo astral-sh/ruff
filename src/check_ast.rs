@@ -305,9 +305,21 @@ where
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
                     // and the current scope.)
                     for name in names {
+                        let mut exists = false;
                         for index in self.scope_stack.iter().skip(1).rev().skip(1) {
                             if let Some(index) = self.scopes[*index].values.get(&name.as_str()) {
+                                exists = true;
                                 self.bindings[*index].used = usage;
+                            }
+                        }
+
+                        // Ensure that every nonlocal has an existing binding from a parent scope.
+                        if !exists {
+                            if self.settings.enabled.contains(&CheckCode::PLE0117) {
+                                self.add_check(Check::new(
+                                    CheckKind::NonlocalWithoutBinding(name.to_string()),
+                                    Range::from_located(stmt),
+                                ));
                             }
                         }
                     }

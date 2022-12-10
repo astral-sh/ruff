@@ -99,6 +99,7 @@ pub enum CheckCode {
     PLC0414,
     PLC2201,
     PLC3002,
+    PLE0117,
     PLE0118,
     PLE1142,
     PLR0206,
@@ -642,6 +643,7 @@ pub enum CheckKind {
     ConsiderUsingFromImport(String, String),
     GlobalVariableNotAssigned(String),
     MisplacedComparisonConstant(String),
+    NonlocalWithoutBinding(String),
     PropertyWithParameters,
     UnnecessaryDirectLambdaCall,
     UseSysExit(String),
@@ -954,6 +956,7 @@ impl CheckCode {
             CheckCode::PLC0414 => CheckKind::UselessImportAlias,
             CheckCode::PLC2201 => CheckKind::MisplacedComparisonConstant("...".to_string()),
             CheckCode::PLC3002 => CheckKind::UnnecessaryDirectLambdaCall,
+            CheckCode::PLE0117 => CheckKind::NonlocalWithoutBinding("...".to_string()),
             CheckCode::PLE0118 => CheckKind::UsedPriorGlobalDeclaration("...".to_string(), 1),
             CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
             CheckCode::PLR0402 => {
@@ -1408,6 +1411,7 @@ impl CheckCode {
             CheckCode::PLC0414 => CheckCategory::Pylint,
             CheckCode::PLC2201 => CheckCategory::Pylint,
             CheckCode::PLC3002 => CheckCategory::Pylint,
+            CheckCode::PLE0117 => CheckCategory::Pylint,
             CheckCode::PLE0118 => CheckCategory::Pylint,
             CheckCode::PLE1142 => CheckCategory::Pylint,
             CheckCode::PLR0206 => CheckCategory::Pylint,
@@ -1546,6 +1550,7 @@ impl CheckKind {
             CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             CheckKind::UseSysExit(_) => &CheckCode::PLR1722,
+            CheckKind::NonlocalWithoutBinding(..) => &CheckCode::PLE0117,
             CheckKind::UsedPriorGlobalDeclaration(..) => &CheckCode::PLE0118,
             CheckKind::UselessElseOnLoop => &CheckCode::PLW0120,
             CheckKind::UselessImportAlias => &CheckCode::PLC0414,
@@ -1956,6 +1961,9 @@ impl CheckKind {
             }
             CheckKind::MisplacedComparisonConstant(comparison) => {
                 format!("Comparison should be {comparison}")
+            }
+            CheckKind::NonlocalWithoutBinding(name) => {
+                format!("Nonlocal name `{name}` found without binding")
             }
             CheckKind::UnnecessaryDirectLambdaCall => "Lambda expression called directly. Execute \
                                                        the expression inline instead."

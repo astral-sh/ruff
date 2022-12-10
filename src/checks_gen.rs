@@ -318,6 +318,7 @@ pub enum CheckCodePrefix {
     PLE0,
     PLE01,
     PLE011,
+    PLE0117,
     PLE0118,
     PLE1,
     PLE11,
@@ -1350,10 +1351,13 @@ impl CheckCodePrefix {
             CheckCodePrefix::PLC30 => vec![CheckCode::PLC3002],
             CheckCodePrefix::PLC300 => vec![CheckCode::PLC3002],
             CheckCodePrefix::PLC3002 => vec![CheckCode::PLC3002],
-            CheckCodePrefix::PLE => vec![CheckCode::PLE0118, CheckCode::PLE1142],
-            CheckCodePrefix::PLE0 => vec![CheckCode::PLE0118],
-            CheckCodePrefix::PLE01 => vec![CheckCode::PLE0118],
-            CheckCodePrefix::PLE011 => vec![CheckCode::PLE0118],
+            CheckCodePrefix::PLE => {
+                vec![CheckCode::PLE0117, CheckCode::PLE0118, CheckCode::PLE1142]
+            }
+            CheckCodePrefix::PLE0 => vec![CheckCode::PLE0117, CheckCode::PLE0118],
+            CheckCodePrefix::PLE01 => vec![CheckCode::PLE0117, CheckCode::PLE0118],
+            CheckCodePrefix::PLE011 => vec![CheckCode::PLE0117, CheckCode::PLE0118],
+            CheckCodePrefix::PLE0117 => vec![CheckCode::PLE0117],
             CheckCodePrefix::PLE0118 => vec![CheckCode::PLE0118],
             CheckCodePrefix::PLE1 => vec![CheckCode::PLE1142],
             CheckCodePrefix::PLE11 => vec![CheckCode::PLE1142],
@@ -2135,6 +2139,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::PLE0 => SuffixLength::One,
             CheckCodePrefix::PLE01 => SuffixLength::Two,
             CheckCodePrefix::PLE011 => SuffixLength::Three,
+            CheckCodePrefix::PLE0117 => SuffixLength::Four,
             CheckCodePrefix::PLE0118 => SuffixLength::Four,
             CheckCodePrefix::PLE1 => SuffixLength::One,
             CheckCodePrefix::PLE11 => SuffixLength::Two,
