@@ -25,7 +25,7 @@ fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
 
 fn has_star_args(args: &[Expr]) -> bool {
     args.iter()
-        .any(|a| matches!(&a.node, ExprKind::Starred { .. }))
+        .any(|arg| matches!(&arg.node, ExprKind::Starred { .. }))
 }
 
 /// F502
@@ -113,7 +113,7 @@ pub(crate) fn percent_format_extra_named_arguments(
 
     let mut check = Check::new(
         CheckKind::PercentFormatExtraNamedArguments(
-            missing.iter().map(|&s| s.to_string()).collect(),
+            missing.iter().map(|&arg| arg.to_string()).collect(),
         ),
         location,
     );
@@ -123,7 +123,6 @@ pub(crate) fn percent_format_extra_named_arguments(
             check.amend(fix);
         }
     }
-
     checker.add_check(check);
 }
 
@@ -262,11 +261,11 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     });
 
     let missing: Vec<&str> = keywords
-        .filter_map(|k| {
-            if summary.keywords.contains(k) {
+        .filter_map(|arg| {
+            if summary.keywords.contains(arg) {
                 None
             } else {
-                Some(k.as_str())
+                Some(arg.as_str())
             }
         })
         .collect();
@@ -277,7 +276,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 
     let mut check = Check::new(
         CheckKind::StringDotFormatExtraNamedArguments(
-            missing.iter().map(|&s| s.to_string()).collect(),
+            missing.iter().map(|&arg| arg.to_string()).collect(),
         ),
         location,
     );
@@ -288,7 +287,6 @@ pub(crate) fn string_dot_format_extra_named_arguments(
             check.amend(fix);
         }
     }
-
     checker.add_check(check);
 }
 
@@ -320,7 +318,6 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         ),
         location,
     );
-
     checker.add_check(check);
 }
 

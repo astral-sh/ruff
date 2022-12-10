@@ -12,7 +12,7 @@ use crate::cst::matchers::{match_expr, match_module};
 use crate::python::string::strip_quotes_and_prefixes;
 use crate::source_code_locator::SourceCodeLocator;
 
-/// Generate a Fix to remove any unused imports from an `import` statement.
+/// Generate a `Fix` to remove any unused imports from an `import` statement.
 pub fn remove_unused_imports(
     locator: &SourceCodeLocator,
     unused_imports: &Vec<(&String, &Range)>,
@@ -78,7 +78,7 @@ pub fn remove_unused_imports(
     }
 }
 
-/// Generate a fix to remove unused keys from format dict
+/// Generate a `Fix` to remove unused keys from format dict.
 pub fn remove_unused_format_arguments_from_dict(
     locator: &SourceCodeLocator,
     unused_arguments: &[&str],
@@ -124,7 +124,7 @@ pub fn remove_unused_format_arguments_from_dict(
     ))
 }
 
-/// Generate a fix to remove unused keyword arguments from format call
+/// Generate a `Fix` to remove unused keyword arguments from format call.
 pub fn remove_unused_keyword_arguments_from_format_call(
     locator: &SourceCodeLocator,
     unused_arguments: &[&str],
