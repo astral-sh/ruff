@@ -411,6 +411,16 @@ mod tests {
         "#,
             &[],
         )?;
+        // TODO(charlie): Extract globals recursively (such that we don't raise F821).
+        flakes(
+            r#"
+        def c(): bar
+        def d():
+            def b():
+                global bar; bar = 1
+        "#,
+            &[CheckCode::F821],
+        )?;
         Ok(())
     }
 
