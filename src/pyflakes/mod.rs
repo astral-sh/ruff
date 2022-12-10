@@ -1482,7 +1482,7 @@ mod tests {
         class bar:
             import fu
         "#,
-            &[CheckCode::F401],
+            &[],
         )?;
 
         flakes(
@@ -1492,7 +1492,7 @@ mod tests {
 
         fu
         "#,
-            &[CheckCode::F401, CheckCode::F821],
+            &[CheckCode::F821],
         )?;
 
         Ok(())
@@ -2097,7 +2097,7 @@ mod tests {
             def fun(self):
                 fu
         "#,
-            &[CheckCode::F401, CheckCode::F821],
+            &[CheckCode::F821],
         )?;
 
         Ok(())
@@ -2343,7 +2343,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[test]
     fn imported_in_class() -> Result<()> {
         // Imports in class scope can be used through self.
@@ -2354,7 +2353,7 @@ mod tests {
             def __init__(self):
                 self.i
         "#,
-            &[CheckCode::F401],
+            &[],
         )?;
 
         Ok(())
