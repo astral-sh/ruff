@@ -309,7 +309,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         return;
     }
 
-    let check = Check::new(
+    checker.add_check(Check::new(
         CheckKind::StringDotFormatExtraPositionalArguments(
             missing
                 .iter()
@@ -317,8 +317,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
                 .collect::<Vec<String>>(),
         ),
         location,
-    );
-    checker.add_check(check);
+    ));
 }
 
 /// F524
