@@ -41,6 +41,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Saleor](https://github.com/saleor/saleor)
 - [Hatch](https://github.com/pypa/hatch)
+- [Jupyter Server](https://github.com/jupyter-server/jupyter_server)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
