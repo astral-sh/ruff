@@ -47,36 +47,36 @@ pub struct Cli {
     pub no_cache: bool,
     /// List of error codes to enable.
     #[arg(long, value_delimiter = ',')]
-    pub select: Vec<CheckCodePrefix>,
+    pub select: Option<Vec<CheckCodePrefix>>,
     /// Like --select, but adds additional error codes on top of the selected
     /// ones.
     #[arg(long, value_delimiter = ',')]
-    pub extend_select: Vec<CheckCodePrefix>,
+    pub extend_select: Option<Vec<CheckCodePrefix>>,
     /// List of error codes to ignore.
     #[arg(long, value_delimiter = ',')]
-    pub ignore: Vec<CheckCodePrefix>,
+    pub ignore: Option<Vec<CheckCodePrefix>>,
     /// Like --ignore, but adds additional error codes on top of the ignored
     /// ones.
     #[arg(long, value_delimiter = ',')]
-    pub extend_ignore: Vec<CheckCodePrefix>,
+    pub extend_ignore: Option<Vec<CheckCodePrefix>>,
     /// List of paths, used to exclude files and/or directories from checks.
     #[arg(long, value_delimiter = ',')]
-    pub exclude: Vec<FilePattern>,
+    pub exclude: Option<Vec<FilePattern>>,
     /// Like --exclude, but adds additional files and directories on top of the
     /// excluded ones.
     #[arg(long, value_delimiter = ',')]
-    pub extend_exclude: Vec<FilePattern>,
+    pub extend_exclude: Option<Vec<FilePattern>>,
     /// List of error codes to treat as eligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
     #[arg(long, value_delimiter = ',')]
-    pub fixable: Vec<CheckCodePrefix>,
+    pub fixable: Option<Vec<CheckCodePrefix>>,
     /// List of error codes to treat as ineligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
     #[arg(long, value_delimiter = ',')]
-    pub unfixable: Vec<CheckCodePrefix>,
+    pub unfixable: Option<Vec<CheckCodePrefix>>,
     /// List of mappings from file pattern to code to exclude
     #[arg(long, value_delimiter = ',')]
-    pub per_file_ignores: Vec<PatternPrefixPair>,
+    pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// Output serialization format for error messages.
     #[arg(long, value_enum)]
     pub format: Option<SerializationFormat>,
@@ -121,9 +121,47 @@ pub struct Cli {
 }
 
 impl Cli {
-    // See: https://github.com/clap-rs/clap/issues/3146
-    pub fn fix(&self) -> Option<bool> {
-        resolve_bool_arg(self.fix, self.no_fix)
+    /// Partition the CLI into command-line arguments and configuration
+    /// overrides.
+    pub fn partition(self) -> (Arguments, Overrides) {
+        (
+            Arguments {
+                add_noqa: self.add_noqa,
+                autoformat: self.autoformat,
+                config: self.config,
+                exit_zero: self.exit_zero,
+                explain: self.explain,
+                files: self.files,
+                generate_shell_completion: self.generate_shell_completion,
+                no_cache: self.no_cache,
+                quiet: self.quiet,
+                show_files: self.show_files,
+                show_settings: self.show_settings,
+                silent: self.silent,
+                stdin_filename: self.stdin_filename,
+                verbose: self.verbose,
+                watch: self.watch,
+            },
+            Overrides {
+                dummy_variable_rgx: self.dummy_variable_rgx,
+                exclude: self.exclude,
+                extend_exclude: self.extend_exclude,
+                extend_ignore: self.extend_ignore,
+                extend_select: self.extend_select,
+                fixable: self.fixable,
+                ignore: self.ignore,
+                line_length: self.line_length,
+                max_complexity: self.max_complexity,
+                per_file_ignores: self.per_file_ignores,
+                select: self.select,
+                show_source: self.show_source,
+                target_version: self.target_version,
+                unfixable: self.unfixable,
+                // TODO(charlie): Included in `pyproject.toml`, but not inherited.
+                fix: resolve_bool_arg(self.fix, self.no_fix),
+                format: self.format,
+            },
+        )
     }
 }
 
@@ -136,8 +174,51 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     }
 }
 
+/// CLI settings that are distinct from configuration (commands, lists of files,
+/// etc.).
+#[allow(clippy::struct_excessive_bools)]
+pub struct Arguments {
+    pub add_noqa: bool,
+    pub autoformat: bool,
+    pub config: Option<PathBuf>,
+    pub exit_zero: bool,
+    pub explain: Option<CheckCode>,
+    pub files: Vec<PathBuf>,
+    pub generate_shell_completion: Option<clap_complete_command::Shell>,
+    pub no_cache: bool,
+    pub quiet: bool,
+    pub show_files: bool,
+    pub show_settings: bool,
+    pub silent: bool,
+    pub stdin_filename: Option<String>,
+    pub verbose: bool,
+    pub watch: bool,
+}
+
+/// CLI settings that function as configuration overrides.
+#[allow(clippy::struct_excessive_bools)]
+pub struct Overrides {
+    pub dummy_variable_rgx: Option<Regex>,
+    pub exclude: Option<Vec<FilePattern>>,
+    pub extend_exclude: Option<Vec<FilePattern>>,
+    pub extend_ignore: Option<Vec<CheckCodePrefix>>,
+    pub extend_select: Option<Vec<CheckCodePrefix>>,
+    pub fixable: Option<Vec<CheckCodePrefix>>,
+    pub ignore: Option<Vec<CheckCodePrefix>>,
+    pub line_length: Option<usize>,
+    pub max_complexity: Option<usize>,
+    pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    pub select: Option<Vec<CheckCodePrefix>>,
+    pub show_source: bool,
+    pub target_version: Option<PythonVersion>,
+    pub unfixable: Option<Vec<CheckCodePrefix>>,
+    // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
+    pub fix: Option<bool>,
+    pub format: Option<SerializationFormat>,
+}
+
 /// Map the CLI settings to a `LogLevel`.
-pub fn extract_log_level(cli: &Cli) -> LogLevel {
+pub fn extract_log_level(cli: &Arguments) -> LogLevel {
     if cli.silent {
         LogLevel::Silent
     } else if cli.quiet {
