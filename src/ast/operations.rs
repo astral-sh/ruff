@@ -79,12 +79,18 @@ struct GlobalVisitor<'a> {
 
 impl<'a> Visitor<'a> for GlobalVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        if let StmtKind::Global { names } = &stmt.node {
-            for name in names {
-                self.globals.insert(name, stmt);
+        match &stmt.node {
+            StmtKind::Global { names } => {
+                for name in names {
+                    self.globals.insert(name, stmt);
+                }
             }
-        } else {
-            visitor::walk_stmt(self, stmt);
+            StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+            | StmtKind::ClassDef { .. } => {
+                // Don't recurse.
+            }
+            _ => visitor::walk_stmt(self, stmt),
         }
     }
 }

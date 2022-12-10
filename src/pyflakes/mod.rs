@@ -404,14 +404,13 @@ mod tests {
         "#,
             &[],
         )?;
-        // Pyflakes allows this, but it causes other issues.
-        // flakes(
-        //     r#"
-        // def c(): bar
-        // def b(): global bar; bar = 1
-        // "#,
-        //     &[],
-        // )?;
+        flakes(
+            r#"
+        def c(): bar
+        def b(): global bar; bar = 1
+        "#,
+            &[],
+        )?;
         Ok(())
     }
 
