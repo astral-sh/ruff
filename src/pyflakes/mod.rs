@@ -1,7 +1,6 @@
 pub mod cformat;
 pub mod checks;
 pub mod fixes;
-mod foo;
 pub mod format;
 pub mod plugins;
 
@@ -2348,7 +2347,7 @@ mod tests {
         // Imports in class scope can be used through self.
         flakes(
             r#"
-        class c:
+        class C:
             import i
             def __init__(self):
                 self.i

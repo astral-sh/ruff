@@ -252,7 +252,7 @@ where
                                 kind: BindingKind::Assignment,
                                 used: None,
                                 range: Range::from_located(stmt),
-                                source: None,
+                                source: Some(RefEquality(stmt)),
                             });
                             self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
                         }
@@ -267,7 +267,7 @@ where
                             kind: BindingKind::Global,
                             used: usage,
                             range: Range::from_located(stmt),
-                            source: None,
+                            source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
                     }
@@ -297,7 +297,7 @@ where
                             kind: BindingKind::Nonlocal,
                             used: usage,
                             range: Range::from_located(stmt),
-                            source: None,
+                            source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
                     }
@@ -589,11 +589,14 @@ where
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
+
+                let globals = operations::extract_globals(body);
                 self.push_scope(Scope::new(ScopeKind::Class(ClassDef {
                     name,
                     bases,
                     keywords,
                     decorator_list,
+                    globals,
                 })));
             }
             StmtKind::Import { names } => {
@@ -1362,6 +1365,10 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PLE0118) {
+                    pylint::plugins::used_prior_global_declaration(self, id, expr);
                 }
             }
             ExprKind::Attribute { attr, .. } => {
@@ -3068,13 +3075,16 @@ impl<'a> Checker<'a> {
                     decorator_list,
                     ..
                 } => {
+                    let globals = operations::extract_globals(body);
                     self.push_scope(Scope::new(ScopeKind::Function(FunctionDef {
                         name,
                         body,
                         args,
                         decorator_list,
                         async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
+                        globals,
                     })));
+
                     self.visit_arguments(args);
                     for stmt in body {
                         self.visit_stmt(stmt);
