@@ -73,7 +73,11 @@ pub struct Scope<'a> {
     pub kind: ScopeKind<'a>,
     pub import_starred: bool,
     pub uses_locals: bool,
+    /// A map from bound name to binding index.
     pub values: FxHashMap<&'a str, usize>,
+    /// A list of (name, index) pairs for bindings that were overridden in the
+    /// scope.
+    pub overridden: Vec<(&'a str, usize)>,
 }
 
 impl<'a> Scope<'a> {
@@ -84,6 +88,7 @@ impl<'a> Scope<'a> {
             import_starred: false,
             uses_locals: false,
             values: FxHashMap::default(),
+            overridden: Vec::new(),
         }
     }
 }
@@ -117,8 +122,6 @@ pub struct Binding<'a> {
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used.
     pub used: Option<(usize, Range)>,
-    /// A list of pointers to `Binding` instances that redefined this binding.
-    pub redefined: Vec<usize>,
 }
 
 // Pyflakes defines the following binding hierarchy (via inheritance):

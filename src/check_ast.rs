@@ -4,6 +4,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::error;
+use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::Location;
 use rustpython_parser::ast::{
@@ -68,6 +69,7 @@ pub struct Checker<'a> {
     pub(crate) depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
     pub(crate) child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
     pub(crate) bindings: Vec<Binding<'a>>,
+    pub(crate) redefinitions: IntMap<usize, Vec<usize>>,
     scopes: Vec<Scope<'a>>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
@@ -114,6 +116,7 @@ impl<'a> Checker<'a> {
             depths: FxHashMap::default(),
             child_to_parent: FxHashMap::default(),
             bindings: vec![],
+            redefinitions: IntMap::default(),
             scopes: vec![],
             scope_stack: vec![],
             dead_scopes: vec![],
@@ -250,7 +253,6 @@ where
                                 used: None,
                                 range: Range::from_located(stmt),
                                 source: None,
-                                redefined: vec![],
                             });
                             self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
                         }
@@ -266,7 +268,6 @@ where
                             used: usage,
                             range: Range::from_located(stmt),
                             source: None,
-                            redefined: vec![],
                         });
                         scope.values.insert(name, index);
                     }
@@ -297,7 +298,6 @@ where
                             used: usage,
                             range: Range::from_located(stmt),
                             source: None,
-                            redefined: vec![],
                         });
                         scope.values.insert(name, index);
                     }
@@ -513,7 +513,6 @@ where
                         used: None,
                         range: Range::from_located(stmt),
                         source: Some(self.current_parent().clone()),
-                        redefined: vec![],
                     },
                 );
             }
@@ -623,7 +622,6 @@ where
                                 used: None,
                                 range: Range::from_located(alias),
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
                     } else {
@@ -664,7 +662,6 @@ where
                                 },
                                 range: Range::from_located(alias),
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
                     }
@@ -809,7 +806,6 @@ where
                                 )),
                                 range: Range::from_located(alias),
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
 
@@ -841,7 +837,6 @@ where
                                 used: None,
                                 range: Range::from_located(stmt),
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
 
@@ -911,7 +906,6 @@ where
                                 },
                                 range,
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
                     }
@@ -1237,7 +1231,6 @@ where
                     used: None,
                     range: Range::from_located(stmt),
                     source: Some(self.current_parent().clone()),
-                    redefined: vec![],
                 },
             );
         };
@@ -2498,7 +2491,6 @@ where
                 used: None,
                 range: Range::from_located(arg),
                 source: Some(self.current_parent().clone()),
-                redefined: vec![],
             },
         );
 
@@ -2564,7 +2556,6 @@ impl<'a> Checker<'a> {
                 range: Range::default(),
                 used: None,
                 source: None,
-                redefined: vec![],
             });
             scope.values.insert(builtin, index);
         }
@@ -2593,8 +2584,9 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let index = self.bindings.len();
+        let binding_index = self.bindings.len();
 
+        let mut overridden = None;
         if let Some((stack_index, scope_index)) = self
             .scope_stack
             .iter()
@@ -2602,8 +2594,8 @@ impl<'a> Checker<'a> {
             .enumerate()
             .find(|(_, scope_index)| self.scopes[**scope_index].values.contains_key(&name))
         {
-            let existing_index = self.scopes[*scope_index].values.get(&name).unwrap();
-            let existing = &self.bindings[*existing_index];
+            let existing_binding_index = self.scopes[*scope_index].values.get(&name).unwrap();
+            let existing = &self.bindings[*existing_binding_index];
             let in_current_scope = stack_index == 0;
             if !matches!(existing.kind, BindingKind::Builtin)
                 && existing.source.as_ref().map_or(true, |left| {
@@ -2626,6 +2618,7 @@ impl<'a> Checker<'a> {
                         | BindingKind::FutureImportation
                 );
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
+                    overridden = Some((*scope_index, *existing_binding_index));
                     if self.settings.enabled.contains(&CheckCode::F402) {
                         self.add_check(Check::new(
                             CheckKind::ImportShadowedByLoopVar(
@@ -2645,6 +2638,7 @@ impl<'a> Checker<'a> {
                                 cast::decorator_list(existing.source.as_ref().unwrap().0),
                             ))
                     {
+                        overridden = Some((*scope_index, *existing_binding_index));
                         if self.settings.enabled.contains(&CheckCode::F811) {
                             self.add_check(Check::new(
                                 CheckKind::RedefinedWhileUnused(
@@ -2656,9 +2650,19 @@ impl<'a> Checker<'a> {
                         }
                     }
                 } else if existing_is_import && binding.redefines(existing) {
-                    self.bindings[*existing_index].redefined.push(index);
+                    self.redefinitions
+                        .entry(*existing_binding_index)
+                        .or_insert_with(Vec::new)
+                        .push(binding_index);
                 }
             }
+        }
+
+        // If we're about to lose the binding, store it as overriden.
+        if let Some((scope_index, binding_index)) = overridden {
+            self.scopes[scope_index]
+                .overridden
+                .push((name, binding_index));
         }
 
         // Assume the rebound name is used as a global or within a loop.
@@ -2675,7 +2679,7 @@ impl<'a> Checker<'a> {
         // in scope.
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
         if !(matches!(binding.kind, BindingKind::Annotation) && scope.values.contains_key(name)) {
-            scope.values.insert(name, index);
+            scope.values.insert(name, binding_index);
         }
 
         self.bindings.push(binding);
@@ -2850,7 +2854,6 @@ impl<'a> Checker<'a> {
                     used: None,
                     range: Range::from_located(expr),
                     source: Some(self.current_parent().clone()),
-                    redefined: vec![],
                 },
             );
             return;
@@ -2868,7 +2871,6 @@ impl<'a> Checker<'a> {
                     used: None,
                     range: Range::from_located(expr),
                     source: Some(self.current_parent().clone()),
-                    redefined: vec![],
                 },
             );
             return;
@@ -2882,7 +2884,6 @@ impl<'a> Checker<'a> {
                     used: None,
                     range: Range::from_located(expr),
                     source: Some(self.current_parent().clone()),
-                    redefined: vec![],
                 },
             );
             return;
@@ -2933,7 +2934,6 @@ impl<'a> Checker<'a> {
                         used: None,
                         range: Range::from_located(expr),
                         source: Some(self.current_parent().clone()),
-                        redefined: vec![],
                     },
                 );
                 return;
@@ -2947,7 +2947,6 @@ impl<'a> Checker<'a> {
                 used: None,
                 range: Range::from_located(expr),
                 source: Some(self.current_parent().clone()),
-                redefined: vec![],
             },
         );
     }
@@ -3225,14 +3224,16 @@ impl<'a> Checker<'a> {
                             continue;
                         }
 
-                        for index in &binding.redefined {
-                            checks.push(Check::new(
-                                CheckKind::RedefinedWhileUnused(
-                                    (*name).to_string(),
-                                    binding.range.location.row(),
-                                ),
-                                self.bindings[*index].range,
-                            ));
+                        if let Some(indices) = self.redefinitions.get(index) {
+                            for index in indices {
+                                checks.push(Check::new(
+                                    CheckKind::RedefinedWhileUnused(
+                                        (*name).to_string(),
+                                        binding.range.location.row(),
+                                    ),
+                                    self.bindings[*index].range,
+                                ));
+                            }
                         }
                     }
                 }
@@ -3279,7 +3280,11 @@ impl<'a> Checker<'a> {
 
                 let mut unused: FxHashMap<BindingContext, Vec<UnusedImport>> = FxHashMap::default();
 
-                for (name, index) in &scope.values {
+                for (name, index) in scope
+                    .values
+                    .iter()
+                    .chain(scope.overridden.iter().map(|(a, b)| (a, b)))
+                {
                     let binding = &self.bindings[*index];
 
                     let (BindingKind::Importation(_, full_name)
