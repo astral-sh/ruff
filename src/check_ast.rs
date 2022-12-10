@@ -1481,21 +1481,16 @@ where
                                     }
                                     Ok(summary) => {
                                         if self.settings.enabled.contains(&CheckCode::F522) {
-                                            if let Some(check) = pyflakes::checks::string_dot_format_extra_named_arguments(
+                                            pyflakes::checks::string_dot_format_extra_named_arguments(self,
                                                 &summary, keywords, location,
-                                            )
-                                            {
-                                                self.add_check(check);
-                                            }
+                                            );
                                         }
 
                                         if self.settings.enabled.contains(&CheckCode::F523) {
-                                            if let Some(check) = pyflakes::checks::string_dot_format_extra_positional_arguments(
+                                            pyflakes::checks::string_dot_format_extra_positional_arguments(
+                                                self,
                                                 &summary, args, location,
-                                            )
-                                            {
-                                                self.add_check(check);
-                                            }
+                                            );
                                         }
 
                                         if self.settings.enabled.contains(&CheckCode::F524) {
@@ -1984,13 +1979,9 @@ where
                                     }
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F504) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_extra_named_arguments(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::checks::percent_format_extra_named_arguments(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F505) {
                                     if let Some(check) =

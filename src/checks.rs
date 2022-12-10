@@ -2675,6 +2675,7 @@ impl CheckKind {
                 | CheckKind::NotIsTest
                 | CheckKind::OneBlankLineAfterClass(..)
                 | CheckKind::OneBlankLineBeforeClass(..)
+                | CheckKind::PercentFormatExtraNamedArguments(..)
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
@@ -2687,6 +2688,7 @@ impl CheckKind {
                 | CheckKind::SectionUnderlineMatchesSectionLength(..)
                 | CheckKind::SectionUnderlineNotOverIndented(..)
                 | CheckKind::SetAttrWithConstant
+                | CheckKind::StringDotFormatExtraNamedArguments(..)
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::TrueFalseComparison(..)
                 | CheckKind::TypeOfPrimitive(..)
