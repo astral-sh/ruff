@@ -90,6 +90,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-print (T20)](#flake8-print-t20)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
+   1. [flake8-simplify (SIM)](#flake8-simplify-sim)
    1. [flake8-tidy-imports (TID)](#flake8-tidy-imports-tid)
    1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
    1. [eradicate (ERA)](#eradicate-era)
@@ -770,6 +771,14 @@ For more, see [flake8-return](https://pypi.org/project/flake8-return/1.2.0/) on 
 | RET506 | SuperfluousElseRaise | Unnecessary `else` after `raise` statement |  |
 | RET507 | SuperfluousElseContinue | Unnecessary `else` after `continue` statement |  |
 | RET508 | SuperfluousElseBreak | Unnecessary `else` after `break` statement |  |
+
+### flake8-simplify (SIM)
+
+For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| SIM118 | KeyInDict | Use 'key in dict' instead of 'key in dict.keys() | 🛠 |
 
 ### flake8-tidy-imports (TID)
 

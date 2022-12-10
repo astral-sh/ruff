@@ -37,7 +37,7 @@ use crate::visibility::{module_visibility, transition_scope, Modifier, Visibilit
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
-    flake8_import_conventions, flake8_print, flake8_return, flake8_tidy_imports,
+    flake8_import_conventions, flake8_print, flake8_return, flake8_simplify, flake8_tidy_imports,
     flake8_unused_arguments, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks,
     pylint, pyupgrade, visibility,
 };
@@ -1059,6 +1059,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::PLW0120) {
                     pylint::plugins::useless_else_on_loop(self, stmt, body, orelse);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM118) {
+                    flake8_simplify::plugins::key_in_dict_for(self, target, iter);
+                }
             }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
@@ -2071,6 +2074,16 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::PLC2201) {
                     pylint::plugins::misplaced_comparison_constant(
+                        self,
+                        expr,
+                        left,
+                        ops,
+                        comparators,
+                    );
+                }
+
+                if self.settings.enabled.contains(&CheckCode::SIM118) {
+                    flake8_simplify::plugins::key_in_dict_compare(
                         self,
                         expr,
                         left,
