@@ -3174,6 +3174,7 @@ impl<'a> Checker<'a> {
             && !self.settings.enabled.contains(&CheckCode::F405)
             && !self.settings.enabled.contains(&CheckCode::F811)
             && !self.settings.enabled.contains(&CheckCode::F822)
+            && !self.settings.enabled.contains(&CheckCode::PLW0602)
         {
             return;
         }
@@ -3185,6 +3186,19 @@ impl<'a> Checker<'a> {
             .rev()
             .map(|index| &self.scopes[*index])
         {
+            // PLW0602
+            if self.settings.enabled.contains(&CheckCode::PLW0602) {
+                for (name, index) in &scope.values {
+                    let binding = &self.bindings[*index];
+                    if matches!(binding.kind, BindingKind::Global) {
+                        checks.push(Check::new(
+                            CheckKind::GlobalVariableNotAssigned((*name).to_string()),
+                            binding.range,
+                        ));
+                    }
+                }
+            }
+
             // Imports in classes are public members.
             if matches!(scope.kind, ScopeKind::Class(..)) {
                 continue;

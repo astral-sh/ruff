@@ -106,6 +106,7 @@ pub enum CheckCode {
     PLR1701,
     PLR1722,
     PLW0120,
+    PLW0602,
     // flake8-builtins
     A001,
     A002,
@@ -639,6 +640,7 @@ pub enum CheckKind {
     AwaitOutsideAsync,
     ConsiderMergingIsinstance(String, Vec<String>),
     ConsiderUsingFromImport(String, String),
+    GlobalVariableNotAssigned(String),
     MisplacedComparisonConstant(String),
     PropertyWithParameters,
     UnnecessaryDirectLambdaCall,
@@ -963,6 +965,7 @@ impl CheckCode {
             }
             CheckCode::PLR1722 => CheckKind::UseSysExit("exit".to_string()),
             CheckCode::PLW0120 => CheckKind::UselessElseOnLoop,
+            CheckCode::PLW0602 => CheckKind::GlobalVariableNotAssigned("...".to_string()),
             // flake8-builtins
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
@@ -1412,6 +1415,7 @@ impl CheckCode {
             CheckCode::PLR1701 => CheckCategory::Pylint,
             CheckCode::PLR1722 => CheckCategory::Pylint,
             CheckCode::PLW0120 => CheckCategory::Pylint,
+            CheckCode::PLW0602 => CheckCategory::Pylint,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
             CheckCode::Q002 => CheckCategory::Flake8Quotes,
@@ -1537,11 +1541,12 @@ impl CheckKind {
             CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
             CheckKind::ConsiderMergingIsinstance(..) => &CheckCode::PLR1701,
             CheckKind::ConsiderUsingFromImport(..) => &CheckCode::PLR0402,
+            CheckKind::GlobalVariableNotAssigned(..) => &CheckCode::PLW0602,
             CheckKind::MisplacedComparisonConstant(..) => &CheckCode::PLC2201,
-            CheckKind::UsedPriorGlobalDeclaration(..) => &CheckCode::PLE0118,
             CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             CheckKind::UseSysExit(_) => &CheckCode::PLR1722,
+            CheckKind::UsedPriorGlobalDeclaration(..) => &CheckCode::PLE0118,
             CheckKind::UselessElseOnLoop => &CheckCode::PLW0120,
             CheckKind::UselessImportAlias => &CheckCode::PLC0414,
             // flake8-builtins
@@ -1963,6 +1968,9 @@ impl CheckKind {
             }
             CheckKind::UsedPriorGlobalDeclaration(name, line) => {
                 format!("Name `{name}` is used prior to global declaration on line {line}")
+            }
+            CheckKind::GlobalVariableNotAssigned(name) => {
+                format!("Using global for `{name}` but no assignment is done")
             }
             CheckKind::AwaitOutsideAsync => {
                 "`await` should be used within an async function".to_string()

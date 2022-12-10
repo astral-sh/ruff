@@ -1,0 +1,23 @@
+---
+source: src/pylint/mod.rs
+expression: checks
+---
+- kind:
+    GlobalVariableNotAssigned: x
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 12
+  fix: ~
+- kind:
+    GlobalVariableNotAssigned: x
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 12
+  fix: ~
+
