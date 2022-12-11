@@ -71,8 +71,8 @@ expression: checks
     row: 89
     column: 4
   end_location:
-    row: 89
-    column: 8
+    row: 90
+    column: 10
   fix: ~
 - kind:
     UndefinedName: PEP593Test123

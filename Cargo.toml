@@ -43,9 +43,9 @@ regex = { version = "1.6.0" }
 ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
 ruff_macros = { version = "0.0.174", path = "ruff_macros" }
 rustc-hash = { version = "1.1.0" }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "28f9f65ccc625f00835d84bbb5fba274dce5aa89" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "28f9f65ccc625f00835d84bbb5fba274dce5aa89" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "28f9f65ccc625f00835d84bbb5fba274dce5aa89" }
+rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "2edd0d264c50c7807bcff03a52a6509e8b7f187f" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "2edd0d264c50c7807bcff03a52a6509e8b7f187f" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "2edd0d264c50c7807bcff03a52a6509e8b7f187f" }
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
