@@ -84,24 +84,22 @@ pub mod updates;
 mod vendored;
 pub mod visibility;
 
-/// Run Ruff over Python source code directly.
-pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
-    // Find the project root and pyproject.toml.
-    let project_root = pyproject::find_project_root(&[path.to_path_buf()]);
-    match &project_root {
-        Some(path) => debug!("Found project root at: {:?}", path),
-        None => debug!("Unable to identify project root; assuming current directory..."),
-    };
-    let pyproject = pyproject::find_pyproject_toml(project_root.as_ref());
-    match &pyproject {
-        Some(path) => debug!("Found pyproject.toml at: {:?}", path),
-        None => debug!("Unable to find pyproject.toml; using default settings..."),
+fn resolve(path: &Path) -> Result<Settings> {
+    // Find the relevant `pyproject.toml`.
+    let Some(pyproject) = pyproject::find_pyproject_toml(path) else {
+        debug!("Unable to find pyproject.toml; using default settings...");
+        return Settings::from_configuration(Configuration::default(), None);
     };
 
-    let settings = Settings::from_configuration(
-        Configuration::from_pyproject(pyproject.as_ref())?,
-        project_root.as_deref(),
-    )?;
+    // Load and parse the `pyproject.toml`.
+    let options = pyproject::load_options(&pyproject)?;
+    let configuration = Configuration::from_options(options)?;
+    Settings::from_configuration(configuration, pyproject.parent())
+}
+
+/// Run Ruff over Python source code directly.
+pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
+    let settings = resolve(path)?;
 
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);

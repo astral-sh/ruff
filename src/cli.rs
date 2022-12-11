@@ -198,6 +198,7 @@ pub struct Arguments {
 }
 
 /// CLI settings that function as configuration overrides.
+#[derive(Clone)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Overrides {
     pub dummy_variable_rgx: Option<Regex>,

@@ -31,12 +31,13 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
-use ::ruff::{cache, commands, fs};
+use ::ruff::{cache, commands};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use log::{debug, error};
 use notify::{recommended_watcher, RecursiveMode, Watcher};
+use path_absolutize::path_dedot;
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use rustpython_ast::Location;
@@ -60,14 +61,14 @@ fn run_once_stdin(
 
 fn run_once(
     files: &[PathBuf],
-    default: &Settings,
+    defaults: &Settings,
     overrides: &Overrides,
     cache: bool,
     autofix: &fixer::Mode,
 ) -> Diagnostics {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, overrides, default);
+    let (paths, resolver) = collect_python_files(files, overrides, defaults);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -77,7 +78,7 @@ fn run_once(
             match entry {
                 Ok(entry) => {
                     let path = entry.path();
-                    let settings = resolver.resolve(path).unwrap_or(default);
+                    let settings = resolver.resolve(path).unwrap_or(defaults);
                     lint_path(path, settings, &cache.into(), autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
@@ -89,7 +90,7 @@ fn run_once(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
-                    let settings = resolver.resolve(path).unwrap_or(default);
+                    let settings = resolver.resolve(path).unwrap_or(defaults);
                     if settings.enabled.contains(&CheckCode::E902) {
                         Diagnostics::new(vec![Message {
                             kind: CheckKind::IOError(message),
@@ -121,10 +122,10 @@ fn run_once(
     diagnostics
 }
 
-fn add_noqa(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> usize {
+fn add_noqa(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) -> usize {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, overrides, default);
+    let (paths, resolver) = collect_python_files(files, overrides, defaults);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -133,7 +134,7 @@ fn add_noqa(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> usi
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path).unwrap_or(default);
+            let settings = resolver.resolve(path).unwrap_or(defaults);
             match add_noqa_to_path(path, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
@@ -150,10 +151,10 @@ fn add_noqa(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> usi
     modifications
 }
 
-fn autoformat(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> usize {
+fn autoformat(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) -> usize {
     // Collect all the files to format.
     let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, overrides, default);
+    let (paths, resolver) = collect_python_files(files, overrides, defaults);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -162,7 +163,7 @@ fn autoformat(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> u
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path).unwrap_or(default);
+            let settings = resolver.resolve(path).unwrap_or(defaults);
             match autoformat_path(path, settings) {
                 Ok(()) => Some(()),
                 Err(e) => {
@@ -185,50 +186,36 @@ fn inner_main() -> Result<ExitCode> {
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
 
+    if cli.show_settings && cli.show_files {
+        anyhow::bail!("specify --show-settings or show-files (not both)")
+    }
     if let Some(shell) = cli.generate_shell_completion {
         shell.generate(&mut Cli::command(), &mut io::stdout());
         return Ok(ExitCode::SUCCESS);
     }
 
-    // Find the project root and pyproject.toml.
-    // TODO(charlie): look in the current directory, but respect `--config`.
-    let project_root = cli.config.as_ref().map_or_else(
-        || pyproject::find_project_root(&cli.files),
-        |config| config.parent().map(fs::normalize_path),
-    );
+    // Find the `pyproject.toml`.
     let pyproject = cli
         .config
-        .or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
-    match &project_root {
-        Some(path) => debug!("Found project root at: {:?}", path),
-        None => debug!("Unable to identify project root; assuming current directory..."),
-    };
-    match &pyproject {
-        Some(path) => debug!("Found pyproject.toml at: {:?}", path),
-        None => debug!("Unable to find pyproject.toml; using default settings..."),
-    };
+        .or_else(|| pyproject::find_pyproject_toml(&path_dedot::CWD));
 
-    // Reconcile configuration from pyproject.toml and command-line arguments.
-    let mut configuration = Configuration::from_pyproject(pyproject.as_ref())?;
-    configuration.merge(&overrides);
-
-    if cli.show_settings && cli.show_files {
-        eprintln!("Error: specify --show-settings or show-files (not both).");
-        return Ok(ExitCode::FAILURE);
-    }
+    // Reconcile configuration from `pyproject.toml` and command-line arguments.
+    let mut configuration = pyproject
+        .as_ref()
+        .map(|path| Configuration::from_pyproject(path))
+        .transpose()?
+        .unwrap_or_default();
+    configuration.merge(overrides.clone());
 
     if cli.show_settings {
         // TODO(charlie): This would be more useful if required a single file, and told
         // you the settings used to lint that file.
-        commands::show_settings(
-            &configuration,
-            project_root.as_deref(),
-            pyproject.as_deref(),
-        );
+        commands::show_settings(&configuration, pyproject.as_deref());
         return Ok(ExitCode::SUCCESS);
     }
 
-    // TODO(charlie): Included in `pyproject.toml`, but not inherited.
+    // Extract options that are included in the `pyproject.toml`, but aren't in
+    // `Settings`.
     let fix = if configuration.fix {
         fixer::Mode::Apply
     } else if matches!(configuration.format, SerializationFormat::Json) {
@@ -238,7 +225,12 @@ fn inner_main() -> Result<ExitCode> {
     };
     let format = configuration.format;
 
-    let settings = Settings::from_configuration(configuration, project_root.as_deref())?;
+    // Construct the "default" settings. These are used when no `pyproject.toml`
+    // files are present, or files are injected from outside of the hierarchy.
+    let defaults = Settings::from_configuration(
+        configuration,
+        pyproject.as_ref().and_then(|path| path.parent()),
+    )?;
 
     if let Some(code) = cli.explain {
         commands::explain(&code, format)?;
@@ -246,7 +238,7 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     if cli.show_files {
-        commands::show_files(&cli.files, &settings, &overrides);
+        commands::show_files(&cli.files, &defaults, &overrides);
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -278,7 +270,7 @@ fn inner_main() -> Result<ExitCode> {
 
         let messages = run_once(
             &cli.files,
-            &settings,
+            &defaults,
             &overrides,
             cache_enabled,
             &fixer::Mode::None,
@@ -294,8 +286,8 @@ fn inner_main() -> Result<ExitCode> {
 
         loop {
             match rx.recv() {
-                Ok(e) => {
-                    let paths = e?.paths;
+                Ok(event) => {
+                    let paths = event?.paths;
                     let py_changed = paths.iter().any(|p| {
                         p.extension()
                             .map(|ext| ext == "py" || ext == "pyi")
@@ -307,7 +299,7 @@ fn inner_main() -> Result<ExitCode> {
 
                         let messages = run_once(
                             &cli.files,
-                            &settings,
+                            &defaults,
                             &overrides,
                             cache_enabled,
                             &fixer::Mode::None,
@@ -315,16 +307,16 @@ fn inner_main() -> Result<ExitCode> {
                         printer.write_continuously(&messages)?;
                     }
                 }
-                Err(e) => return Err(e.into()),
+                Err(err) => return Err(err.into()),
             }
         }
     } else if cli.add_noqa {
-        let modifications = add_noqa(&cli.files, &settings, &overrides);
+        let modifications = add_noqa(&cli.files, &defaults, &overrides);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
     } else if cli.autoformat {
-        let modifications = autoformat(&cli.files, &settings, &overrides);
+        let modifications = autoformat(&cli.files, &defaults, &overrides);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Formatted {modifications} files.");
         }
@@ -335,9 +327,9 @@ fn inner_main() -> Result<ExitCode> {
         let diagnostics = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            run_once_stdin(&settings, path, &fix)?
+            run_once_stdin(&defaults, path, &fix)?
         } else {
-            run_once(&cli.files, &settings, &overrides, cache_enabled, &fix)
+            run_once(&cli.files, &defaults, &overrides, cache_enabled, &fix)
         };
 
         // Always try to print violations (the printer itself may suppress output),
