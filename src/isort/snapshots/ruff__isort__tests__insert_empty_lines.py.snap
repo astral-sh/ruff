@@ -49,32 +49,17 @@ expression: checks
       column: 0
 - kind: UnsortedImports
   location:
-    row: 33
+    row: 52
     column: 0
   end_location:
-    row: 35
+    row: 54
     column: 0
   fix:
-    content: "    import collections\n    import typing\n\n"
+    content: "import os\n\n\n"
     location:
-      row: 33
+      row: 52
       column: 0
     end_location:
-      row: 35
-      column: 0
-- kind: UnsortedImports
-  location:
-    row: 39
-    column: 0
-  end_location:
-    row: 41
-    column: 0
-  fix:
-    content: "    import collections\n    import typing\n\n"
-    location:
-      row: 39
-      column: 0
-    end_location:
-      row: 41
+      row: 54
       column: 0
 

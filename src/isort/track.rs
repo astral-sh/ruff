@@ -11,13 +11,14 @@ use crate::directives::IsortDirectives;
 use crate::isort::helpers;
 use crate::source_code_locator::SourceCodeLocator;
 
+#[derive(Debug)]
 pub enum Trailer {
     Sibling,
     ClassDef,
     FunctionDef,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Block<'a> {
     pub imports: Vec<&'a Stmt>,
     pub trailer: Option<Trailer>,
@@ -54,45 +55,46 @@ impl<'a> ImportTracker<'a> {
     }
 
     fn trailer_for(&self, stmt: &'a Stmt) -> Option<Trailer> {
-        if self.pyi {
+        // No need to compute trailers if we won't be finalizing anything.
+        let index = self.blocks.len() - 1;
+        if self.blocks[index].imports.is_empty() {
+            return None;
+        }
+
+        // Similar to isort, avoid enforcing any newline behaviors in nested blocks.
+        if self.nested {
+            return None;
+        }
+
+        Some(if self.pyi {
             // Black treats interface files differently, limiting to one newline
-            // (`Trailing::Sibling`), and avoiding inserting any newlines in nested function
-            // blocks.
-            if self.nested
-                && matches!(
-                    stmt.node,
-                    StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. }
-                )
-            {
-                None
-            } else {
-                Some(Trailer::Sibling)
-            }
-        } else if self.nested {
-            Some(Trailer::Sibling)
+            // (`Trailing::Sibling`).
+            Trailer::Sibling
         } else {
-            Some(match &stmt.node {
+            // If the import block is followed by a class or function, we want to enforce
+            // two blank lines. The exception: if, between the import and the class or
+            // function, we have at least one commented line, followed by at
+            // least one blank line. In that case, we treat it as a regular
+            // sibling (i.e., as if the comment is the next statement, as
+            // opposed to the class or function).
+            match &stmt.node {
                 StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                    let (num_blanks, num_comments) =
-                        helpers::match_leading_comments(stmt, self.locator);
-                    if num_blanks > 1 && num_comments > 1 {
+                    if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
                         Trailer::FunctionDef
                     }
                 }
                 StmtKind::ClassDef { .. } => {
-                    let (num_blanks, num_comments) =
-                        helpers::match_leading_comments(stmt, self.locator);
-                    if num_blanks > 1 && num_comments > 1 {
+                    if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
                         Trailer::ClassDef
                     }
                 }
                 _ => Trailer::Sibling,
-            })
-        }
+            }
+        })
     }
 
     fn finalize(&mut self, trailer: Option<Trailer>) {
