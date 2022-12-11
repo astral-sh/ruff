@@ -8,6 +8,8 @@ use rustpython_ast::{
 
 use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
+use crate::isort::helpers;
+use crate::source_code_locator::SourceCodeLocator;
 
 pub enum Trailer {
     Sibling,
@@ -22,6 +24,7 @@ pub struct Block<'a> {
 }
 
 pub struct ImportTracker<'a> {
+    locator: &'a SourceCodeLocator<'a>,
     directives: &'a IsortDirectives,
     pyi: bool,
     blocks: Vec<Block<'a>>,
@@ -30,8 +33,13 @@ pub struct ImportTracker<'a> {
 }
 
 impl<'a> ImportTracker<'a> {
-    pub fn new(directives: &'a IsortDirectives, path: &'a Path) -> Self {
+    pub fn new(
+        locator: &'a SourceCodeLocator<'a>,
+        directives: &'a IsortDirectives,
+        path: &'a Path,
+    ) -> Self {
         Self {
+            locator,
             directives,
             pyi: path.extension().map_or(false, |ext| ext == "pyi"),
             blocks: vec![Block::default()],
@@ -65,9 +73,23 @@ impl<'a> ImportTracker<'a> {
         } else {
             Some(match &stmt.node {
                 StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                    Trailer::FunctionDef
+                    let (num_blanks, num_comments) =
+                        helpers::match_leading_comments(stmt, self.locator);
+                    if num_blanks > 1 && num_comments > 1 {
+                        Trailer::Sibling
+                    } else {
+                        Trailer::FunctionDef
+                    }
                 }
-                StmtKind::ClassDef { .. } => Trailer::ClassDef,
+                StmtKind::ClassDef { .. } => {
+                    let (num_blanks, num_comments) =
+                        helpers::match_leading_comments(stmt, self.locator);
+                    if num_blanks > 1 && num_comments > 1 {
+                        Trailer::Sibling
+                    } else {
+                        Trailer::ClassDef
+                    }
+                }
                 _ => Trailer::Sibling,
             })
         }

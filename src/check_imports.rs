@@ -37,7 +37,7 @@ pub fn check_imports(
     autofix: bool,
     path: &Path,
 ) -> Vec<Check> {
-    let mut tracker = ImportTracker::new(directives, path);
+    let mut tracker = ImportTracker::new(locator, directives, path);
     for stmt in python_ast {
         tracker.visit_stmt(stmt);
     }
