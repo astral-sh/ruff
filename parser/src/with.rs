@@ -117,7 +117,7 @@ impl TryFrom<ExprOrWithitems> for Vec<ast::Withitem> {
                     .items
                     .into_iter()
                     .map(|(context_expr, optional_vars)| ast::Withitem {
-                        context_expr: Box::new(context_expr),
+                        context_expr,
                         optional_vars: optional_vars.map(|expr| {
                             Box::new(context::set_context(*expr, ast::ExprContext::Store))
                         }),
@@ -125,7 +125,7 @@ impl TryFrom<ExprOrWithitems> for Vec<ast::Withitem> {
                     .collect())
             }
             _ => Ok(vec![ast::Withitem {
-                context_expr: Box::new(expr_or_withitems.try_into()?),
+                context_expr: expr_or_withitems.try_into()?,
                 optional_vars: None,
             }]),
         }

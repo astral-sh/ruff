@@ -520,12 +520,12 @@ WithItems: Vec<ast::Withitem> = {
     <items:TestAs<ExprOrWithitemsGoal>> =>? items.try_into(),
     <first:TestAs<ExprOrWithitemsGoal>> "as" <vars:Expression> =>? {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
-        let context_expr = Box::new(first.try_into()?);
+        let context_expr = first.try_into()?;
         Ok(vec![ast::Withitem { context_expr, optional_vars }])
     },
     <first:TestAs<ExprOrWithitemsGoal>> <n:("as" Expression)?> "," <mut items:OneOrMore<WithItem>> =>? {
         let optional_vars = n.map(|val| Box::new(set_context(val.1, ast::ExprContext::Store)));
-        let context_expr = Box::new(first.try_into()?);
+        let context_expr = first.try_into()?;
         items.insert(0, ast::Withitem { context_expr, optional_vars });
         Ok(items)
     }
@@ -534,7 +534,6 @@ WithItems: Vec<ast::Withitem> = {
 WithItem: ast::Withitem = {
     <context_expr:Test> <n:("as" Expression)?> => {
         let optional_vars = n.map(|val| Box::new(set_context(val.1, ast::ExprContext::Store)));
-        let context_expr = Box::new(context_expr);
         ast::Withitem { context_expr, optional_vars }
     },
 };
@@ -1280,8 +1279,8 @@ SingleForComprehension: ast::Comprehension = {
     <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:OrTest> <ifs:ComprehensionIf*> <end_location:@R> => {
         let is_async = is_async.is_some();
         ast::Comprehension {
-            target: Box::new(set_context(target, ast::ExprContext::Store)),
-            iter: Box::new(iter),
+            target: set_context(target, ast::ExprContext::Store),
+            iter,
             ifs,
             is_async: if is_async { 1 } else { 0 },
         }

@@ -72,10 +72,7 @@ pub fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, Lexi
                 keywords.push(ast::Keyword::new(
                     start,
                     end,
-                    ast::KeywordData {
-                        arg: name,
-                        value: Box::new(value),
-                    },
+                    ast::KeywordData { arg: name, value },
                 ));
             }
             None => {

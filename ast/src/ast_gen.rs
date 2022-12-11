@@ -337,8 +337,8 @@ pub enum Cmpop {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Comprehension<U = ()> {
-    pub target: Box<Expr<U>>,
-    pub iter: Box<Expr<U>>,
+    pub target: Expr<U>,
+    pub iter: Expr<U>,
     pub ifs: Vec<Expr<U>>,
     pub is_async: usize,
 }
@@ -375,7 +375,7 @@ pub type Arg<U = ()> = Located<ArgData<U>, U>;
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeywordData<U = ()> {
     pub arg: Option<Ident>,
-    pub value: Box<Expr<U>>,
+    pub value: Expr<U>,
 }
 pub type Keyword<U = ()> = Located<KeywordData<U>, U>;
 
@@ -388,13 +388,13 @@ pub type Alias<U = ()> = Located<AliasData, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Withitem<U = ()> {
-    pub context_expr: Box<Expr<U>>,
+    pub context_expr: Expr<U>,
     pub optional_vars: Option<Box<Expr<U>>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MatchCase<U = ()> {
-    pub pattern: Box<Pattern<U>>,
+    pub pattern: Pattern<U>,
     pub guard: Option<Box<Expr<U>>>,
     pub body: Vec<Stmt<U>>,
 }

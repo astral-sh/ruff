@@ -89,6 +89,7 @@ class TypeInfo:
         self.has_userdata = None
         self.children = set()
         self.boxed = False
+        self.product = False
 
     def __repr__(self):
         return f"<TypeInfo: {self.name}>"
@@ -145,6 +146,7 @@ class FindUserdataTypesVisitor(asdl.VisitorBase):
             info.has_userdata = True
         if len(product.fields) > 2:
             info.boxed = True
+        info.product = True
         self.add_children(name, product.fields)
 
     def add_children(self, name, fields):
@@ -236,7 +238,7 @@ class StructVisitor(TypeInfoEmitVisitor):
         if fieldtype and fieldtype.has_userdata:
             typ = f"{typ}<U>"
         # don't box if we're doing Vec<T>, but do box if we're doing Vec<Option<Box<T>>>
-        if fieldtype and fieldtype.boxed and (not field.seq or field.opt):
+        if fieldtype and fieldtype.boxed and (not (parent.product or field.seq) or field.opt):
             typ = f"Box<{typ}>"
         if field.opt:
             typ = f"Option<{typ}>"
