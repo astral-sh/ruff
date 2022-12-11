@@ -1155,7 +1155,13 @@ where
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in operations::extract_globals(body) {
-                    if !self.scopes[GLOBAL_SCOPE_INDEX].values.contains_key(name) {
+                    if self.scopes[GLOBAL_SCOPE_INDEX]
+                        .values
+                        .get(name)
+                        .map_or(true, |index| {
+                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                        })
+                    {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Assignment,
@@ -1207,7 +1213,13 @@ where
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in &globals {
-                    if !self.scopes[GLOBAL_SCOPE_INDEX].values.contains_key(name) {
+                    if self.scopes[GLOBAL_SCOPE_INDEX]
+                        .values
+                        .get(name)
+                        .map_or(true, |index| {
+                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                        })
+                    {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Assignment,
@@ -2717,6 +2729,7 @@ impl<'a> Checker<'a> {
             let mut first_iter = true;
             let mut in_generator = false;
             let mut import_starred = false;
+
             for scope_index in self.scope_stack.iter().rev() {
                 let scope = &self.scopes[*scope_index];
 
