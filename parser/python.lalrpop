@@ -492,9 +492,10 @@ WithItem: ast::Withitem = {
 };
 
 FuncDef: ast::Stmt = {
-    <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <args:Parameters> <r:("->" Test)?> ":" <body:Suite> <end_location:@R>  => {
+    <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <args:Parameters> <r:("->" Test)?> ":" <body:Suite>  => {
         let args = Box::new(args);
         let returns = r.map(|x| Box::new(x.1));
+        let end_location = body.last().unwrap().end_location.unwrap();
         let type_comment = None;
         let node = if is_async.is_some() {
             ast::StmtKind::AsyncFunctionDef { name, args, body, decorator_list, returns, type_comment }
@@ -646,15 +647,16 @@ KwargParameter<ArgType>: Option<Box<ast::Arg>> = {
 };
 
 ClassDef: ast::Stmt = {
-    <decorator_list:Decorator*> <location:@L> "class" <name:Identifier> <a:("(" ArgumentList ")")?> ":" <body:Suite> <end_location:@R> => {
+    <decorator_list:Decorator*> <location:@L> "class" <name:Identifier> <a:("(" ArgumentList ")")?> ":" <body:Suite> => {
         let (bases, keywords) = match a {
             Some((_, arg, _)) => (arg.args, arg.keywords),
             None => (vec![], vec![]),
         };
+        let end_location = body.last().unwrap().end_location;
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::ClassDef {
                 name,
                 bases,
