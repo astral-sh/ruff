@@ -852,6 +852,37 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff).
 
+### Language Server Protocol
+
+Ruff is available as a [Language Server Protocol (LSP)](https://microsoft.github.io/language-server-protocol/)
+server, distributed as the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff) plugin
+for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-server), both of which are
+installable via [PyPI](https://pypi.org/project/python-lsp-ruff/):
+
+```shell
+pip install python-lsp-server python-lsp-ruff
+```
+
+The LSP server can be used with any editor that supports the Language Server Protocol. For example,
+to use it with Neovim, you would add something like the following to your `init.lua`:
+
+```lua
+require'lspconfig'.pylsp.setup {
+  settings = {
+    pylsp = {
+      plugins = {
+        ruff = {
+          enabled = true
+        }
+      }
+    }
+  },
+}
+```
+
+[`ruffd`](https://github.com/Seamooo/ruffd) is another implementation of the Language Server
+Protocol (LSP) for Ruff, written in Rust.
+
 ### PyCharm
 
 Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
@@ -864,10 +895,13 @@ Ruff should then appear as a runnable action:
 
 ![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
 
-### Vim & Neovim (Unofficial)
+### Vim & Neovim
 
-Ruff is available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright) extension
-for coc.nvim.
+Ruff can be integrated into any editor that supports the Language Server Protocol (LSP) (see:
+[Language Server Protocol](#language-server-protocol)).
+
+Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
+extension for `coc.nvim`.
 
 <details>
 <summary>Ruff can also be integrated via <a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm"><code>efm</code></a> in just a <a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">few lines</a>.</summary>
@@ -922,11 +956,6 @@ null_ls.setup({
 ```
 
 </details>
-
-### Language Server Protocol (Unofficial)
-
-[`ruffd`](https://github.com/Seamooo/ruffd) is a Rust-based language server for Ruff that implements
-the Language Server Protocol (LSP).
 
 ### GitHub Actions
 
