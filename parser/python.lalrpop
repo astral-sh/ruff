@@ -689,22 +689,17 @@ YieldExpr: ast::Expr = {
 };
 
 Test: ast::Expr = {
-    <expr:OrTest> <condition: (@L "if" OrTest "else" Test @R)?> => {
-        if let Some(c) = condition {
-            ast::Expr {
-                location: c.0,
-                end_location: Some(c.5),
-                custom: (),
-                node: ast::ExprKind::IfExp {
-                    test: Box::new(c.2),
-                    body: Box::new(expr),
-                    orelse: Box::new(c.4),
-                }
-            }
-        } else {
-            expr
+    <body:OrTest> <location:@L> "if" <test:OrTest> "else" <orelse:Test> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::IfExp {
+            test: Box::new(test),
+            body: Box::new(body),
+            orelse: Box::new(orelse),
         }
     },
+    OrTest,
     LambdaDef,
 };
 
@@ -756,37 +751,31 @@ LambdaDef: ast::Expr = {
 }
 
 OrTest: ast::Expr = {
-    <location:@L> <e1:AndTest> <e2:("or" AndTest)*> <end_location:@R> => {
-        if e2.is_empty() {
-            e1
-        } else {
-            let mut values = vec![e1];
-            values.extend(e2.into_iter().map(|e| e.1));
-            ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::BoolOp { op: ast::Boolop::Or, values }
-            }
+    <location:@L> <e1:AndTest> <e2:("or" AndTest)+> <end_location:@R> => {
+        let mut values = vec![e1];
+        values.extend(e2.into_iter().map(|e| e.1));
+        ast::Expr {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::ExprKind::BoolOp { op: ast::Boolop::Or, values }
         }
     },
+    AndTest,
 };
 
 AndTest: ast::Expr = {
-    <location:@L> <e1:NotTest> <e2:("and" NotTest)*> <end_location:@R> => {
-        if e2.is_empty() {
-            e1
-        } else {
-            let mut values = vec![e1];
-            values.extend(e2.into_iter().map(|e| e.1));
-            ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::BoolOp { op: ast::Boolop::And, values }
-            }
+    <location:@L> <e1:NotTest> <e2:("and" NotTest)+> <end_location:@R> => {
+        let mut values = vec![e1];
+        values.extend(e2.into_iter().map(|e| e.1));
+        ast::Expr {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::ExprKind::BoolOp { op: ast::Boolop::And, values }
         }
     },
+    NotTest,
 };
 
 NotTest: ast::Expr = {
@@ -920,32 +909,23 @@ UnaryOp: ast::Unaryop = {
 };
 
 Power: ast::Expr = {
-    <e:AtomExpr> <e2:(@L "**" Factor @R)?> => {
-        match e2 {
-            None => e,
-            Some((location, _, b, end_location)) => ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::BinOp { left: Box::new(e), op: ast::Operator::Pow, right: Box::new(b) }
-            },
-        }
-    }
+    <e:AtomExpr> <location:@L> "**" <b:Factor> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::BinOp { left: Box::new(e), op: ast::Operator::Pow, right: Box::new(b) }
+    },
+    AtomExpr,
 };
 
 AtomExpr: ast::Expr = {
-    <location:@L> <is_await:"await"?> <atom:AtomExpr2> <end_location:@R> => {
-        if is_await.is_some() {
-            ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::Await { value: Box::new(atom) }
-            }
-        } else {
-            atom
-        }
-    }
+    <location:@L> "await" <atom:AtomExpr2> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::Await { value: Box::new(atom) }
+    },
+    AtomExpr2,
 }
 
 AtomExpr2: ast::Expr = {
@@ -1042,30 +1022,24 @@ Atom: ast::Expr = {
             node: ast::ExprKind::ListComp { elt: Box::new(elt), generators }
         }
     },
-    <location:@L> "(" <elements:TestOrStarNamedExprList?> ")" <end_location:@R> =>? {
-        match elements {
-            Some(elt) => {
-                match elt.node {
-                    ast::ExprKind::Starred { .. } => {
-                        Err(LexicalError{
-                            error : LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
-                            location: location,
-                        }.into())
-                    },
-                    _ => {
-                        Ok(elt)
-                    }
-                }
-            },
-            None => {
-                Ok(ast::Expr::new(
-                     location,
-                     end_location,
-                     ast::ExprKind::Tuple { elts: Vec::new(), ctx: ast::ExprContext::Load }
-                ))
+    "(" <elt:TestOrStarNamedExprList> ")" =>? {
+        match elt.node {
+            ast::ExprKind::Starred { .. } => {
+                Err(LexicalError{
+                    error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
+                    location: elt.location,
+                }.into())
+            }
+            _ => {
+                Ok(elt)
             }
         }
     },
+    <location:@L> "(" ")" <end_location:@R> => ast::Expr::new(
+        location,
+        end_location,
+        ast::ExprKind::Tuple { elts: Vec::new(), ctx: ast::ExprContext::Load }
+    ),
     "(" <e:YieldExpr> ")" => e,
     <location:@L> "(" <elt:NamedExpressionTest> <generators:CompFor> ")" <end_location:@R> => {
         ast::Expr {
