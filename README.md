@@ -1347,7 +1347,7 @@ A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF0
 
 **Default value**: `[]`
 
-**Type**: `Vec<a test>`
+**Type**: `Vec<char>`
 
 **Example usage**:
 
