@@ -81,8 +81,10 @@ pub struct Cli {
     #[arg(long, value_enum)]
     pub format: Option<SerializationFormat>,
     /// Show violations with source code.
-    #[arg(long)]
-    pub show_source: bool,
+    #[arg(long, overrides_with("no_show_source"))]
+    show_source: bool,
+    #[clap(long, overrides_with("show_source"), hide = true)]
+    no_show_source: bool,
     /// See the files Ruff will be run against with the current settings.
     #[arg(long)]
     pub show_files: bool,
@@ -154,7 +156,7 @@ impl Cli {
                 max_complexity: self.max_complexity,
                 per_file_ignores: self.per_file_ignores,
                 select: self.select,
-                show_source: self.show_source,
+                show_source: resolve_bool_arg(self.show_source, self.no_show_source),
                 target_version: self.target_version,
                 unfixable: self.unfixable,
                 // TODO(charlie): Included in `pyproject.toml`, but not inherited.
@@ -209,7 +211,7 @@ pub struct Overrides {
     pub max_complexity: Option<usize>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub select: Option<Vec<CheckCodePrefix>>,
-    pub show_source: bool,
+    pub show_source: Option<bool>,
     pub target_version: Option<PythonVersion>,
     pub unfixable: Option<Vec<CheckCodePrefix>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
