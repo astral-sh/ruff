@@ -975,9 +975,8 @@ Under those conditions, Ruff implements every rule in Flake8.
 Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
 natively, including:
 
-- [`isort`](https://pypi.org/project/isort/)
-- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
-- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
+- [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
+- [`eradicate`](https://pypi.org/project/eradicate/)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
@@ -995,12 +994,13 @@ natively, including:
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
+- [`isort`](https://pypi.org/project/isort/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
-- [`yesqa`](https://github.com/asottile/yesqa)
-- [`eradicate`](https://pypi.org/project/eradicate/)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
+- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
+- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (1/10)
-- [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
+- [`yesqa`](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different error code prefixes than would be found in the
 originating Flake8 plugins. For example, Ruff uses `TID252` to represent the `I252` rule from
@@ -1031,8 +1031,6 @@ Pylint parity is being tracked in [#689](https://github.com/charliermarsh/ruff/i
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
 
-- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
-- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
@@ -1051,6 +1049,8 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)
+- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
+- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/),
 [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
