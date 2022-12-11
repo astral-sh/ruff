@@ -11,6 +11,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::checks_gen::{CheckCodePrefix, CATEGORIES};
+use crate::cli::{collect_per_file_ignores, Overrides};
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
@@ -184,5 +185,56 @@ impl Configuration {
                 .map(pyupgrade::settings::Settings::from_options)
                 .unwrap_or_default(),
         })
+    }
+
+    pub fn merge(&mut self, overrides: Overrides) {
+        if let Some(exclude) = overrides.exclude {
+            self.exclude = exclude;
+        }
+        if let Some(extend_exclude) = overrides.extend_exclude {
+            self.extend_exclude = extend_exclude;
+        }
+        if let Some(per_file_ignores) = overrides.per_file_ignores {
+            self.per_file_ignores = collect_per_file_ignores(per_file_ignores);
+        }
+        if let Some(select) = overrides.select {
+            self.select = select;
+        }
+        if let Some(extend_select) = overrides.extend_select {
+            self.extend_select = extend_select;
+        }
+        if let Some(ignore) = overrides.ignore {
+            self.ignore = ignore;
+        }
+        if let Some(extend_ignore) = overrides.extend_ignore {
+            self.extend_ignore = extend_ignore;
+        }
+        if let Some(fix) = overrides.fix {
+            self.fix = fix;
+        }
+        if let Some(fixable) = overrides.fixable {
+            self.fixable = fixable;
+        }
+        if let Some(format) = overrides.format {
+            self.format = format;
+        }
+        if let Some(unfixable) = overrides.unfixable {
+            self.unfixable = unfixable;
+        }
+        if let Some(line_length) = overrides.line_length {
+            self.line_length = line_length;
+        }
+        if let Some(max_complexity) = overrides.max_complexity {
+            self.mccabe.max_complexity = max_complexity;
+        }
+        if let Some(target_version) = overrides.target_version {
+            self.target_version = target_version;
+        }
+        if let Some(dummy_variable_rgx) = overrides.dummy_variable_rgx {
+            self.dummy_variable_rgx = dummy_variable_rgx;
+        }
+        if overrides.show_source {
+            self.show_source = true;
+        }
     }
 }

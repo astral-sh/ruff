@@ -19,7 +19,7 @@ use std::time::Instant;
 
 use ::ruff::autofix::fixer;
 use ::ruff::checks::{CheckCode, CheckKind};
-use ::ruff::cli::{collect_per_file_ignores, extract_log_level, Cli};
+use ::ruff::cli::{extract_log_level, Cli};
 use ::ruff::fs::iter_python_files;
 use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use ::ruff::logging::{set_up_logging, LogLevel};
@@ -199,8 +199,7 @@ fn autoformat(files: &[PathBuf], settings: &Settings) -> usize {
 
 fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
-    let cli = Cli::parse();
-    let fix = cli.fix();
+    let (cli, overrides) = Cli::parse().partition();
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
 
@@ -220,54 +219,7 @@ fn inner_main() -> Result<ExitCode> {
     // Reconcile configuration from pyproject.toml and command-line arguments.
     let mut configuration =
         Configuration::from_pyproject(pyproject.as_ref(), project_root.as_ref())?;
-    if !cli.exclude.is_empty() {
-        configuration.exclude = cli.exclude;
-    }
-    if !cli.extend_exclude.is_empty() {
-        configuration.extend_exclude = cli.extend_exclude;
-    }
-    if !cli.per_file_ignores.is_empty() {
-        configuration.per_file_ignores = collect_per_file_ignores(cli.per_file_ignores);
-    }
-    if !cli.select.is_empty() {
-        configuration.select = cli.select;
-    }
-    if !cli.extend_select.is_empty() {
-        configuration.extend_select = cli.extend_select;
-    }
-    if !cli.ignore.is_empty() {
-        configuration.ignore = cli.ignore;
-    }
-    if !cli.extend_ignore.is_empty() {
-        configuration.extend_ignore = cli.extend_ignore;
-    }
-    if !cli.fixable.is_empty() {
-        configuration.fixable = cli.fixable;
-    }
-    if !cli.unfixable.is_empty() {
-        configuration.unfixable = cli.unfixable;
-    }
-    if let Some(format) = cli.format {
-        configuration.format = format;
-    }
-    if let Some(line_length) = cli.line_length {
-        configuration.line_length = line_length;
-    }
-    if let Some(max_complexity) = cli.max_complexity {
-        configuration.mccabe.max_complexity = max_complexity;
-    }
-    if let Some(target_version) = cli.target_version {
-        configuration.target_version = target_version;
-    }
-    if let Some(dummy_variable_rgx) = cli.dummy_variable_rgx {
-        configuration.dummy_variable_rgx = dummy_variable_rgx;
-    }
-    if let Some(fix) = fix {
-        configuration.fix = fix;
-    }
-    if cli.show_source {
-        configuration.show_source = true;
-    }
+    configuration.merge(overrides);
 
     if cli.show_settings && cli.show_files {
         eprintln!("Error: specify --show-settings or show-files (not both).");
@@ -278,8 +230,8 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    // Extract settings for internal use.
-    let autofix = if configuration.fix {
+    // TODO(charlie): Included in `pyproject.toml`, but not inherited.
+    let fix = if configuration.fix {
         fixer::Mode::Apply
     } else if matches!(configuration.format, SerializationFormat::Json) {
         fixer::Mode::Generate
@@ -287,6 +239,7 @@ fn inner_main() -> Result<ExitCode> {
         fixer::Mode::None
     };
     let format = configuration.format;
+
     let settings = Settings::from_configuration(configuration, project_root.as_ref())?;
 
     // Now that we've inferred the appropriate log level, add some debug
@@ -319,7 +272,7 @@ fn inner_main() -> Result<ExitCode> {
 
     let printer = Printer::new(&format, &log_level);
     if cli.watch {
-        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+        if matches!(fix, fixer::Mode::Generate | fixer::Mode::Apply) {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
         if cli.add_noqa {
@@ -384,16 +337,16 @@ fn inner_main() -> Result<ExitCode> {
         let diagnostics = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            run_once_stdin(&settings, path, &autofix)?
+            run_once_stdin(&settings, path, &fix)?
         } else {
-            run_once(&cli.files, &settings, cache_enabled, &autofix)
+            run_once(&cli.files, &settings, cache_enabled, &fix)
         };
 
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(autofix, fixer::Mode::Apply)) {
-            printer.write_once(&diagnostics, &autofix)?;
+        if !(is_stdin && matches!(fix, fixer::Mode::Apply)) {
+            printer.write_once(&diagnostics, &fix)?;
         }
 
         // Check for updates if we're in a non-silent log level.
