@@ -11,8 +11,8 @@ itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a8725d161fe8b3ed73a6758b21e177" }
 once_cell = { version = "1.16.0" }
 ruff = { path = ".." }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "28f9f65ccc625f00835d84bbb5fba274dce5aa89" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "28f9f65ccc625f00835d84bbb5fba274dce5aa89" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "28f9f65ccc625f00835d84bbb5fba274dce5aa89" }
+rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "2edd0d264c50c7807bcff03a52a6509e8b7f187f" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "2edd0d264c50c7807bcff03a52a6509e8b7f187f" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "2edd0d264c50c7807bcff03a52a6509e8b7f187f" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
