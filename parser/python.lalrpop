@@ -357,16 +357,24 @@ CompoundStatement: ast::Stmt = {
 };
 
 IfStatement: ast::Stmt = {
-    <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(@L "elif" NamedExpressionTest ":" Suite @R)*> <s3:("else" ":" Suite)?> <end_location:@R> => {
+    <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(@L "elif" NamedExpressionTest ":" Suite)*> <s3:("else" ":" Suite)?> => {
         // Determine last else:
         let mut last = s3.map(|s| s.2).unwrap_or_default();
-
+        let end_location = if let Some(last) = last.last() {
+            last.end_location
+        } else {
+            if let Some(last) = s2.last() {
+                last.4.last().unwrap().end_location
+            } else {
+                body.last().unwrap().end_location
+            }
+        };
         // handle elif:
         for i in s2.into_iter().rev() {
             let x = ast::Stmt {
                 custom: (),
                 location: i.0,
-                end_location: Some(i.5),
+                end_location: i.4.last().unwrap().end_location,
                 node: ast::StmtKind::If { test: Box::new(i.2), body: i.4, orelse: last },
             };
             last = vec![x];
@@ -375,19 +383,24 @@ IfStatement: ast::Stmt = {
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::If { test: Box::new(test), body, orelse: last }
         }
     },
 };
 
 WhileStatement: ast::Stmt = {
-    <location:@L> "while" <test:NamedExpressionTest> ":" <body:Suite> <s2:("else" ":" Suite)?> <end_location:@R> => {
+    <location:@L> "while" <test:NamedExpressionTest> ":" <body:Suite> <s2:("else" ":" Suite)?> => {
+        let end_location = if let Some(ref s) = s2 {
+            s.2.last().unwrap().end_location
+        } else {
+            body.last().unwrap().end_location
+        };
         let orelse = s2.map(|s| s.2).unwrap_or_default();
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::While {
                 test: Box::new(test),
                 body,
@@ -398,7 +411,12 @@ WhileStatement: ast::Stmt = {
 };
 
 ForStatement: ast::Stmt = {
-    <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:TestList> ":" <body:Suite> <s2:("else" ":" Suite)?> <end_location:@R> => {
+    <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:TestList> ":" <body:Suite> <s2:("else" ":" Suite)?> => {
+        let end_location = if let Some(ref s) = s2 {
+            s.2.last().unwrap().end_location.unwrap()
+        } else {
+            body.last().unwrap().end_location.unwrap()
+        };
         let orelse = s2.map(|s| s.2).unwrap_or_default();
         let target = Box::new(set_context(target, ast::ExprContext::Store));
         let iter = Box::new(iter);
@@ -416,10 +434,19 @@ TryStatement: ast::Stmt = {
     <location:@L> "try" ":" <body:Suite> <handlers:ExceptClause+> <else_suite:("else" ":" Suite)?> <finally:("finally" ":" Suite)?> <end_location:@R> => {
         let orelse = else_suite.map(|s| s.2).unwrap_or_default();
         let finalbody = finally.map(|s| s.2).unwrap_or_default();
+        let end_location = if let Some(last) = finalbody.last() {
+            last.end_location
+        } else {
+            if let Some(last) = orelse.last() {
+                last.end_location
+            } else {
+                handlers.last().unwrap().end_location
+            }
+        };
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::Try {
                 body,
                 handlers,
@@ -428,14 +455,15 @@ TryStatement: ast::Stmt = {
             },
         }
     },
-    <location:@L> "try" ":" <body:Suite> <finally:("finally" ":" Suite)> <end_location:@R> => {
+    <location:@L> "try" ":" <body:Suite> <finally:("finally" ":" Suite)> => {
         let handlers = vec![];
         let orelse = vec![];
         let finalbody = finally.2;
+        let end_location = finalbody.last().unwrap().end_location;
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::Try {
                 body,
                 handlers,
@@ -447,7 +475,8 @@ TryStatement: ast::Stmt = {
 };
 
 ExceptClause: ast::Excepthandler = {
-    <location:@L> "except" <typ:Test?> ":" <body:Suite> <end_location:@R> => {
+    <location:@L> "except" <typ:Test?> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end_location.unwrap();
         ast::Excepthandler::new(
             location,
             end_location,
@@ -458,7 +487,8 @@ ExceptClause: ast::Excepthandler = {
             },
         )
     },
-    <location:@L> "except" <x:(Test "as" Identifier)> ":" <body:Suite> <end_location:@R> => {
+    <location:@L> "except" <x:(Test "as" Identifier)> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end_location.unwrap();
         ast::Excepthandler::new(
             location,
             end_location,
@@ -472,7 +502,8 @@ ExceptClause: ast::Excepthandler = {
 };
 
 WithStatement: ast::Stmt = {
-    <location:@L> <is_async:"async"?> "with" <items:OneOrMore<WithItem>> ":" <body:Suite> <end_location:@R> => {
+    <location:@L> <is_async:"async"?> "with" <items:OneOrMore<WithItem>> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end_location.unwrap();
         let type_comment = None;
         let node = if is_async.is_some() {
             ast::StmtKind::AsyncWith { items, body, type_comment }
