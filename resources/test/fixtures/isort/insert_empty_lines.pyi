@@ -39,3 +39,27 @@ if True:
     import collections
     import typing
     def f(): pass
+
+
+import os
+
+# Comment goes here.
+
+def f():
+    pass
+
+
+import os
+
+# Comment goes here.
+def f():
+    pass
+
+
+import os
+
+# Comment goes here.
+
+# And another.
+def f():
+    pass
