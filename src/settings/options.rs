@@ -20,7 +20,7 @@ pub struct Options {
             `RUF002`, and `RUF003`.
         "#,
         default = r#"[]"#,
-        value_type = "Vec<char>",
+        value_type = "Vec<a test>",
         example = r#"
             # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
             # which could be confused for "-", "p", and "*", respectively.
