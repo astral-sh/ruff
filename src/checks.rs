@@ -206,6 +206,8 @@ pub enum CheckCode {
     YTT301,
     YTT302,
     YTT303,
+    // flake8-simplify
+    SIM118,
     // pyupgrade
     UP001,
     UP003,
@@ -337,6 +339,7 @@ pub enum CheckCategory {
     Flake8Print,
     Flake8Quotes,
     Flake8Return,
+    Flake8Simplify,
     Flake8TidyImports,
     Flake8UnusedArguments,
     Eradicate,
@@ -377,6 +380,7 @@ impl CheckCategory {
             CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Flake8Return => "flake8-return",
             CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
+            CheckCategory::Flake8Simplify => "flake8-simplify",
             CheckCategory::Flake8UnusedArguments => "flake8-unused-arguments",
             CheckCategory::Isort => "isort",
             CheckCategory::McCabe => "mccabe",
@@ -406,6 +410,7 @@ impl CheckCategory {
             CheckCategory::Flake8Print => vec![CheckCodePrefix::T20],
             CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
             CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
+            CheckCategory::Flake8Simplify => vec![CheckCodePrefix::SIM],
             CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::TID],
             CheckCategory::Flake8UnusedArguments => vec![CheckCodePrefix::ARG],
             CheckCategory::Isort => vec![CheckCodePrefix::I],
@@ -479,6 +484,10 @@ impl CheckCategory {
             )),
             CheckCategory::Flake8Return => Some((
                 "https://pypi.org/project/flake8-return/1.2.0/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8Simplify => Some((
+                "https://pypi.org/project/flake8-simplify/0.19.3/",
                 &Platform::PyPI,
             )),
             CheckCategory::Flake8TidyImports => Some((
@@ -746,6 +755,8 @@ pub enum CheckKind {
     SysVersion0Referenced,
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
+    // flake8-simplify
+    KeyInDict(String, String),
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UselessMetaclassType,
@@ -1082,6 +1093,8 @@ impl CheckCode {
             CheckCode::YTT303 => CheckKind::SysVersionSlice1Referenced,
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
+            // flake8-simplify
+            CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             // pyupgrade
             CheckCode::UP001 => CheckKind::UselessMetaclassType,
             CheckCode::UP003 => CheckKind::TypeOfPrimitive(Primitive::Str),
@@ -1442,6 +1455,7 @@ impl CheckCode {
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
+            CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::T100 => CheckCategory::Flake8Debugger,
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
@@ -1650,6 +1664,8 @@ impl CheckKind {
             CheckKind::SysVersion0Referenced => &CheckCode::YTT301,
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
+            // flake8-simplify
+            CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             // pyupgrade
             CheckKind::TypeOfPrimitive(_) => &CheckCode::UP003,
             CheckKind::UselessMetaclassType => &CheckCode::UP001,
@@ -2316,6 +2332,10 @@ impl CheckKind {
             CheckKind::SysVersionSlice1Referenced => {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
+            // flake8-simplify
+            CheckKind::KeyInDict(key, dict) => {
+                format!("Use '{key} in {dict}' instead of '{key} in {dict}.keys()")
+            }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
@@ -2660,6 +2680,7 @@ impl CheckKind {
                 | CheckKind::ImplicitReturn
                 | CheckKind::ImplicitReturnValue
                 | CheckKind::IsLiteral
+                | CheckKind::KeyInDict(..)
                 | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
