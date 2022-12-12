@@ -2334,7 +2334,7 @@ impl CheckKind {
             }
             // flake8-simplify
             CheckKind::KeyInDict(key, dict) => {
-                format!("Use '{key} in {dict}' instead of '{key} in {dict}.keys()")
+                format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
