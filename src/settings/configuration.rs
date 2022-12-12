@@ -5,7 +5,6 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use log::debug;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
@@ -81,15 +80,8 @@ static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
     Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
 
 impl Configuration {
-    pub fn from_pyproject(pyproject: Option<&PathBuf>) -> Result<Self> {
-        Self::from_options(pyproject.map_or_else(
-            || {
-                debug!("No pyproject.toml found.");
-                debug!("Falling back to default configuration...");
-                Ok(Options::default())
-            },
-            |path| load_options(path),
-        )?)
+    pub fn from_pyproject(pyproject: &Path) -> Result<Self> {
+        Self::from_options(load_options(pyproject)?)
     }
 
     pub fn from_options(options: Options) -> Result<Self> {
@@ -184,54 +176,90 @@ impl Configuration {
         })
     }
 
-    pub fn merge(&mut self, overrides: &Overrides) {
-        if let Some(dummy_variable_rgx) = &overrides.dummy_variable_rgx {
-            self.dummy_variable_rgx = dummy_variable_rgx.clone();
+    pub fn merge(&mut self, overrides: Overrides) {
+        if let Some(dummy_variable_rgx) = overrides.dummy_variable_rgx {
+            self.dummy_variable_rgx = dummy_variable_rgx;
         }
-        if let Some(exclude) = &overrides.exclude {
-            self.exclude = exclude.clone();
+        if let Some(exclude) = overrides.exclude {
+            self.exclude = exclude;
         }
-        if let Some(extend_exclude) = &overrides.extend_exclude {
-            self.extend_exclude = extend_exclude.clone();
+        if let Some(extend_exclude) = overrides.extend_exclude {
+            self.extend_exclude = extend_exclude;
         }
-        if let Some(extend_ignore) = &overrides.extend_ignore {
-            self.extend_ignore = extend_ignore.clone();
+        if let Some(extend_ignore) = overrides.extend_ignore {
+            self.extend_ignore = extend_ignore;
         }
-        if let Some(extend_select) = &overrides.extend_select {
-            self.extend_select = extend_select.clone();
+        if let Some(extend_select) = overrides.extend_select {
+            self.extend_select = extend_select;
         }
-        if let Some(fix) = &overrides.fix {
-            self.fix = *fix;
+        if let Some(fix) = overrides.fix {
+            self.fix = fix;
         }
-        if let Some(fixable) = &overrides.fixable {
-            self.fixable = fixable.clone();
+        if let Some(fixable) = overrides.fixable {
+            self.fixable = fixable;
         }
-        if let Some(format) = &overrides.format {
-            self.format = *format;
+        if let Some(format) = overrides.format {
+            self.format = format;
         }
-        if let Some(ignore) = &overrides.ignore {
-            self.ignore = ignore.clone();
+        if let Some(ignore) = overrides.ignore {
+            self.ignore = ignore;
         }
-        if let Some(line_length) = &overrides.line_length {
-            self.line_length = *line_length;
+        if let Some(line_length) = overrides.line_length {
+            self.line_length = line_length;
         }
-        if let Some(max_complexity) = &overrides.max_complexity {
-            self.mccabe.max_complexity = *max_complexity;
+        if let Some(max_complexity) = overrides.max_complexity {
+            self.mccabe.max_complexity = max_complexity;
         }
-        if let Some(per_file_ignores) = &overrides.per_file_ignores {
-            self.per_file_ignores = collect_per_file_ignores(per_file_ignores.clone());
+        if let Some(per_file_ignores) = overrides.per_file_ignores {
+            self.per_file_ignores = collect_per_file_ignores(per_file_ignores);
         }
-        if let Some(select) = &overrides.select {
-            self.select = select.clone();
+        if let Some(select) = overrides.select {
+            self.select = select;
         }
-        if let Some(show_source) = &overrides.show_source {
-            self.show_source = *show_source;
+        if let Some(show_source) = overrides.show_source {
+            self.show_source = show_source;
         }
-        if let Some(target_version) = &overrides.target_version {
-            self.target_version = *target_version;
+        if let Some(target_version) = overrides.target_version {
+            self.target_version = target_version;
         }
-        if let Some(unfixable) = &overrides.unfixable {
-            self.unfixable = unfixable.clone();
+        if let Some(unfixable) = overrides.unfixable {
+            self.unfixable = unfixable;
+        }
+    }
+}
+
+impl Default for Configuration {
+    fn default() -> Self {
+        Configuration {
+            allowed_confusables: FxHashSet::default(),
+            dummy_variable_rgx: DEFAULT_DUMMY_VARIABLE_RGX.clone(),
+            src: vec![Path::new(".").to_path_buf()],
+            target_version: PythonVersion::Py310,
+            exclude: DEFAULT_EXCLUDE.clone(),
+            extend_exclude: Vec::default(),
+            extend_ignore: Vec::default(),
+            select: vec![CheckCodePrefix::E, CheckCodePrefix::F],
+            extend_select: Vec::default(),
+            external: Vec::default(),
+            fix: false,
+            fixable: CATEGORIES.to_vec(),
+            unfixable: Vec::default(),
+            format: SerializationFormat::default(),
+            ignore: Vec::default(),
+            ignore_init_module_imports: false,
+            line_length: 88,
+            per_file_ignores: Vec::default(),
+            show_source: false,
+            // Plugins
+            flake8_annotations: flake8_annotations::settings::Settings::default(),
+            flake8_bugbear: flake8_bugbear::settings::Settings::default(),
+            flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
+            flake8_quotes: flake8_quotes::settings::Settings::default(),
+            flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
+            isort: isort::settings::Settings::default(),
+            mccabe: mccabe::settings::Settings::default(),
+            pep8_naming: pep8_naming::settings::Settings::default(),
+            pyupgrade: pyupgrade::settings::Settings::default(),
         }
     }
 }

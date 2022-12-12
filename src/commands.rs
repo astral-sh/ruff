@@ -11,20 +11,15 @@ use crate::settings::types::SerializationFormat;
 use crate::{Configuration, Settings};
 
 /// Print the user-facing configuration settings.
-pub fn show_settings(
-    configuration: &Configuration,
-    project_root: Option<&Path>,
-    pyproject: Option<&Path>,
-) {
+pub fn show_settings(configuration: &Configuration, pyproject: Option<&Path>) {
     println!("Resolved configuration: {configuration:#?}");
-    println!("Found project root at: {project_root:?}");
     println!("Found pyproject.toml at: {pyproject:?}");
 }
 
 /// Show the list of files to be checked based on current settings.
-pub fn show_files(files: &[PathBuf], default: &Settings, overrides: &Overrides) {
+pub fn show_files(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) = collect_python_files(files, overrides, default);
+    let (paths, _resolver) = collect_python_files(files, overrides, defaults);
 
     // Print the list of files.
     for entry in paths

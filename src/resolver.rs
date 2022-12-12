@@ -42,7 +42,7 @@ pub fn settings_for_path(pyproject: &Path, overrides: &Overrides) -> Result<(Pat
         .to_path_buf();
     let options = pyproject::load_options(pyproject)?;
     let mut configuration = Configuration::from_options(options)?;
-    configuration.merge(overrides);
+    configuration.merge(overrides.clone());
     let settings = Settings::from_configuration(configuration, Some(&project_root))?;
     Ok((project_root, settings))
 }
