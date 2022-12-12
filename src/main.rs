@@ -20,6 +20,7 @@ use ::ruff::autofix::fixer;
 use ::ruff::cli::{extract_log_level, Cli};
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::printer::Printer;
+use ::ruff::resolver::Strategy;
 use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
@@ -46,10 +47,44 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    // Find the `pyproject.toml`.
-    let pyproject = cli
-        .config
-        .or_else(|| pyproject::find_pyproject_toml(&path_dedot::CWD));
+    // Find the root `pyproject.toml`.
+    let (strategy, project_root, pyproject) = {
+        if let Some(pyproject) = cli.config {
+            // First priority: the user specified a `pyproject.toml` file. Use that
+            // `pyproject.toml` for all configuration, but resolve paths
+            // relative to the current working directory. (This matches ESLint's
+            // behavior.)
+            (Strategy::Fixed, path_dedot::CWD.clone(), Some(pyproject))
+        } else if let Some(pyproject) = pyproject::find_pyproject_toml(path_dedot::CWD.as_path()) {
+            // Second priority: find a `pyproject.toml` file in the current working path,
+            // and resolve all paths relative to that directory. (With
+            // `Strategy::Hierarchical`, we'll end up finding the "closest"
+            // `pyproject.toml` file for every Python file later on, so
+            // these act as the "default" settings.)
+            (
+                Strategy::Hierarchical,
+                pyproject.parent().unwrap().to_path_buf(),
+                Some(pyproject),
+            )
+        } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
+            // Third priority: find a user-specific `pyproject.toml`, but resolve all paths
+            // relative the current working directory. (With
+            // `Strategy::Hierarchical`, we'll end up the "closest"
+            // `pyproject.toml` file for every Python file later on, so
+            // these act as the "default" settings.)
+            (
+                Strategy::Hierarchical,
+                path_dedot::CWD.clone(),
+                Some(pyproject),
+            )
+        } else {
+            // Fallback: load Ruff's default settings, and resolve all paths relative to the
+            // current working directory. (With `Strategy::Hierarchical`, we'll
+            // end up the "closest" `pyproject.toml` file for every Python file
+            // later on, so these act as the "default" settings.)
+            (Strategy::Hierarchical, path_dedot::CWD.clone(), None)
+        }
+    };
 
     // Reconcile configuration from `pyproject.toml` and command-line arguments.
     let mut configuration = pyproject
@@ -63,6 +98,10 @@ fn inner_main() -> Result<ExitCode> {
         // TODO(charlie): This would be more useful if required a single file, and told
         // you the settings used to lint that file.
         commands::show_settings(&configuration, pyproject.as_deref());
+        return Ok(ExitCode::SUCCESS);
+    }
+    if let Some(code) = cli.explain {
+        commands::explain(&code, &configuration.format)?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -79,18 +118,10 @@ fn inner_main() -> Result<ExitCode> {
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let defaults = Settings::from_configuration(
-        configuration,
-        pyproject.as_ref().and_then(|path| path.parent()),
-    )?;
-
-    if let Some(code) = cli.explain {
-        commands::explain(&code, format)?;
-        return Ok(ExitCode::SUCCESS);
-    }
+    let defaults = Settings::from_configuration(configuration, &project_root)?;
 
     if cli.show_files {
-        commands::show_files(&cli.files, &defaults, &overrides);
+        commands::show_files(&cli.files, &strategy, &defaults, &overrides);
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -122,6 +153,7 @@ fn inner_main() -> Result<ExitCode> {
 
         let messages = commands::run(
             &cli.files,
+            &strategy,
             &defaults,
             &overrides,
             cache_enabled,
@@ -151,6 +183,7 @@ fn inner_main() -> Result<ExitCode> {
 
                         let messages = commands::run(
                             &cli.files,
+                            &strategy,
                             &defaults,
                             &overrides,
                             cache_enabled,
@@ -163,12 +196,12 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else if cli.add_noqa {
-        let modifications = commands::add_noqa(&cli.files, &defaults, &overrides);
+        let modifications = commands::add_noqa(&cli.files, &strategy, &defaults, &overrides);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
     } else if cli.autoformat {
-        let modifications = commands::autoformat(&cli.files, &defaults, &overrides);
+        let modifications = commands::autoformat(&cli.files, &strategy, &defaults, &overrides);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Formatted {modifications} files.");
         }
@@ -181,7 +214,14 @@ fn inner_main() -> Result<ExitCode> {
             let path = Path::new(&filename);
             commands::run_stdin(&defaults, path, &fix)?
         } else {
-            commands::run(&cli.files, &defaults, &overrides, cache_enabled, &fix)
+            commands::run(
+                &cli.files,
+                &strategy,
+                &defaults,
+                &overrides,
+                cache_enabled,
+                &fix,
+            )
         };
 
         // Always try to print violations (the printer itself may suppress output),

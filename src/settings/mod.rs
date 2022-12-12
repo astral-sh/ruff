@@ -55,7 +55,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_configuration(config: Configuration, project_root: Option<&Path>) -> Result<Self> {
+    pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
         Ok(Self {
             allowed_confusables: config.allowed_confusables,
             dummy_variable_rgx: config.dummy_variable_rgx,
@@ -189,7 +189,7 @@ impl Hash for Settings {
 }
 
 /// Given a list of patterns, create a `GlobSet`.
-pub fn resolve_globset(patterns: Vec<FilePattern>, project_root: Option<&Path>) -> Result<GlobSet> {
+pub fn resolve_globset(patterns: Vec<FilePattern>, project_root: &Path) -> Result<GlobSet> {
     let mut builder = globset::GlobSetBuilder::new();
     for pattern in patterns {
         pattern.add_to(&mut builder, project_root)?;
@@ -200,17 +200,14 @@ pub fn resolve_globset(patterns: Vec<FilePattern>, project_root: Option<&Path>) 
 /// Given a list of patterns, create a `GlobSet`.
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
-    project_root: Option<&Path>,
+    project_root: &Path,
 ) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>> {
     per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {
             // Construct absolute path matcher.
             let path = Path::new(&per_file_ignore.pattern);
-            let absolute_path = match project_root {
-                Some(project_root) => fs::normalize_path_to(path, project_root),
-                None => fs::normalize_path(path),
-            };
+            let absolute_path = fs::normalize_path_to(path, project_root);
             let absolute = Glob::new(&absolute_path.to_string_lossy())?.compile_matcher();
 
             // Construct basename matcher.
@@ -221,12 +218,9 @@ pub fn resolve_per_file_ignores(
         .collect()
 }
 
-pub fn resolve_src(src: Vec<PathBuf>, project_root: Option<&Path>) -> Vec<PathBuf> {
+pub fn resolve_src(src: Vec<PathBuf>, project_root: &Path) -> Vec<PathBuf> {
     src.into_iter()
-        .map(|path| match project_root {
-            Some(project_root) => fs::normalize_path_to(&path, project_root),
-            None => fs::normalize_path(&path),
-        })
+        .map(|path| fs::normalize_path_to(&path, project_root))
         .collect()
 }
 

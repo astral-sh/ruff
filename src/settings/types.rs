@@ -53,7 +53,7 @@ pub enum FilePattern {
 }
 
 impl FilePattern {
-    pub fn add_to(self, builder: &mut GlobSetBuilder, project_root: Option<&Path>) -> Result<()> {
+    pub fn add_to(self, builder: &mut GlobSetBuilder, project_root: &Path) -> Result<()> {
         match self {
             FilePattern::Builtin(pattern) => {
                 builder.add(Glob::from_str(pattern)?);
@@ -61,10 +61,7 @@ impl FilePattern {
             FilePattern::User(pattern) => {
                 // Add absolute path.
                 let path = Path::new(&pattern);
-                let absolute_path = match project_root {
-                    Some(project_root) => fs::normalize_path_to(path, project_root),
-                    None => fs::normalize_path(path),
-                };
+                let absolute_path = fs::normalize_path_to(path, project_root);
                 builder.add(Glob::new(&absolute_path.to_string_lossy())?);
 
                 // Add basename path.

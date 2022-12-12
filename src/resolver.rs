@@ -9,6 +9,11 @@ use crate::cli::Overrides;
 use crate::settings::configuration::Configuration;
 use crate::settings::{pyproject, Settings};
 
+pub enum Strategy {
+    Fixed,
+    Hierarchical,
+}
+
 #[derive(Default)]
 pub struct Resolver {
     settings: BTreeMap<PathBuf, Settings>,
@@ -23,14 +28,17 @@ impl Resolver {
         self.settings.insert(path, settings);
     }
 
-    pub fn resolve(&self, path: &Path) -> Option<&Settings> {
-        self.settings.iter().rev().find_map(|(root, settings)| {
-            if path.starts_with(root) {
-                Some(settings)
-            } else {
-                None
-            }
-        })
+    pub fn resolve(&self, path: &Path, strategy: &Strategy) -> Option<&Settings> {
+        match strategy {
+            Strategy::Fixed => None,
+            Strategy::Hierarchical => self.settings.iter().rev().find_map(|(root, settings)| {
+                if path.starts_with(root) {
+                    Some(settings)
+                } else {
+                    None
+                }
+            }),
+        }
     }
 }
 
@@ -43,6 +51,6 @@ pub fn settings_for_path(pyproject: &Path, overrides: &Overrides) -> Result<(Pat
     let options = pyproject::load_options(pyproject)?;
     let mut configuration = Configuration::from_options(options)?;
     configuration.merge(overrides.clone());
-    let settings = Settings::from_configuration(configuration, Some(&project_root))?;
+    let settings = Settings::from_configuration(configuration, &project_root)?;
     Ok((project_root, settings))
 }

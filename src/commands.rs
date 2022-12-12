@@ -17,12 +17,14 @@ use crate::fs::collect_python_files;
 use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use crate::message::Message;
+use crate::resolver::Strategy;
 use crate::settings::types::SerializationFormat;
 use crate::{Configuration, Settings};
 
 /// Run the linter over a collection of files.
 pub fn run(
     files: &[PathBuf],
+    strategy: &Strategy,
     defaults: &Settings,
     overrides: &Overrides,
     cache: bool,
@@ -30,7 +32,7 @@ pub fn run(
 ) -> Diagnostics {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, overrides, defaults);
+    let (paths, resolver) = collect_python_files(files, strategy, overrides, defaults);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -40,7 +42,7 @@ pub fn run(
             match entry {
                 Ok(entry) => {
                     let path = entry.path();
-                    let settings = resolver.resolve(path).unwrap_or(defaults);
+                    let settings = resolver.resolve(path, strategy).unwrap_or(defaults);
                     lint_path(path, settings, &cache.into(), autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
@@ -52,7 +54,7 @@ pub fn run(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
-                    let settings = resolver.resolve(path).unwrap_or(defaults);
+                    let settings = resolver.resolve(path, strategy).unwrap_or(defaults);
                     if settings.enabled.contains(&CheckCode::E902) {
                         Diagnostics::new(vec![Message {
                             kind: CheckKind::IOError(message),
@@ -104,10 +106,15 @@ pub fn run_stdin(
 }
 
 /// Add `noqa` directives to a collection of files.
-pub fn add_noqa(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) -> usize {
+pub fn add_noqa(
+    files: &[PathBuf],
+    strategy: &Strategy,
+    defaults: &Settings,
+    overrides: &Overrides,
+) -> usize {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, overrides, defaults);
+    let (paths, resolver) = collect_python_files(files, strategy, overrides, defaults);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -116,7 +123,7 @@ pub fn add_noqa(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) -
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path).unwrap_or(defaults);
+            let settings = resolver.resolve(path, strategy).unwrap_or(defaults);
             match add_noqa_to_path(path, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
@@ -134,10 +141,15 @@ pub fn add_noqa(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) -
 }
 
 /// Automatically format a collection of files.
-pub fn autoformat(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) -> usize {
+pub fn autoformat(
+    files: &[PathBuf],
+    strategy: &Strategy,
+    defaults: &Settings,
+    overrides: &Overrides,
+) -> usize {
     // Collect all the files to format.
     let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, overrides, defaults);
+    let (paths, resolver) = collect_python_files(files, strategy, overrides, defaults);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -146,7 +158,7 @@ pub fn autoformat(files: &[PathBuf], defaults: &Settings, overrides: &Overrides)
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path).unwrap_or(defaults);
+            let settings = resolver.resolve(path, strategy).unwrap_or(defaults);
             match autoformat_path(path, settings) {
                 Ok(()) => Some(()),
                 Err(e) => {
@@ -170,9 +182,14 @@ pub fn show_settings(configuration: &Configuration, pyproject: Option<&Path>) {
 }
 
 /// Show the list of files to be checked based on current settings.
-pub fn show_files(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) {
+pub fn show_files(
+    files: &[PathBuf],
+    strategy: &Strategy,
+    default: &Settings,
+    overrides: &Overrides,
+) {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) = collect_python_files(files, overrides, defaults);
+    let (paths, _resolver) = collect_python_files(files, strategy, overrides, default);
 
     // Print the list of files.
     for entry in paths
@@ -192,7 +209,7 @@ struct Explanation<'a> {
 }
 
 /// Explain a `CheckCode` to the user.
-pub fn explain(code: &CheckCode, format: SerializationFormat) -> Result<()> {
+pub fn explain(code: &CheckCode, format: &SerializationFormat) -> Result<()> {
     match format {
         SerializationFormat::Text | SerializationFormat::Grouped => {
             println!(

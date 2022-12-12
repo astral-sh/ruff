@@ -30,7 +30,7 @@ impl Pyproject {
 
 fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
-    Ok(toml::from_str(&contents)?)
+    toml::from_str(&contents).map_err(std::convert::Into::into)
 }
 
 /// Find the nearest `pyproject.toml` file.
@@ -41,10 +41,10 @@ pub fn find_pyproject_toml(path: &Path) -> Option<PathBuf> {
             return Some(pyproject);
         }
     }
-    find_user_pyproject_toml()
+    None
 }
 
-fn find_user_pyproject_toml() -> Option<PathBuf> {
+pub fn find_user_pyproject_toml() -> Option<PathBuf> {
     let mut path = dirs::config_dir()?;
     path.push("ruff");
     path.push("pyproject.toml");

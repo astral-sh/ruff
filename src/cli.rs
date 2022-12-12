@@ -16,7 +16,7 @@ use crate::settings::types::{
 #[command(version)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Cli {
-    #[arg(required_unless_present_any = ["explain", "generate_shell_completion"])]
+    #[arg(required_unless_present_any = ["explain", "generate_shell_completion", "show_settings"])]
     pub files: Vec<PathBuf>,
     /// Path to the `pyproject.toml` file to use for configuration.
     #[arg(long)]
@@ -88,7 +88,8 @@ pub struct Cli {
     /// See the files Ruff will be run against with the current settings.
     #[arg(long)]
     pub show_files: bool,
-    /// See Ruff's settings.
+    /// See the settings Ruff will use when run against the current working
+    /// directory.
     #[arg(long)]
     pub show_settings: bool,
     /// Enable automatic additions of noqa directives to failing lines.
