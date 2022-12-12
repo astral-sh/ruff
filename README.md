@@ -331,6 +331,31 @@ Options:
           Print version information
 ```
 
+### `pyproject.toml` discovery
+
+Similar to [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Ruff supports hierarchical configuration, such that the "closest" `pyproject.toml` file in the
+directory hierarchy is used for every individual file, with all paths in the `pyproject.toml` file
+(e.g., `exclude` globs, `src` paths) being resolved relative to the directory containing the
+`pyproject.toml` file.
+
+There are a few exceptions to these rules:
+
+1. If a configuration file is passed directly via `--config`, those settings are used for across
+   files. Any relative paths in that configuration file (like `exclude` globs or `src` paths) are
+   resolved relative to the _current working directory_.
+2. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
+   a default configuration. If a user-specific configuration file exists at `${config_dir}/ruff/pyproject.toml`,
+   that file will be used instead of the default configuration, with `${config_dir}` being determined
+   via the [`dirs](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all relative paths
+   being again resolved relative to the _current working directory_.
+3. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
+   `--select`) will override the settings in _every_ resolved configuration file.
+
+Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Ruff does not merge settings across configuration files; instead, the "closest" configuration file
+is used, and any parent configuration files are ignored.
+
 ### Ignoring errors
 
 To omit a lint check entirely, add it to the "ignore" list via [`ignore`](#ignore) or
