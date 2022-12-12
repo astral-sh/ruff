@@ -33,6 +33,45 @@ use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
 
+/// Discover the relevant strategy, project root, and `pyproject.toml`.
+fn discover(config: Option<PathBuf>) -> (Strategy, PathBuf, Option<PathBuf>) {
+    if let Some(pyproject) = config {
+        // First priority: the user specified a `pyproject.toml` file. Use that
+        // `pyproject.toml` for all configuration, but resolve paths
+        // relative to the current working directory. (This matches ESLint's
+        // behavior.)
+        (Strategy::Fixed, path_dedot::CWD.clone(), Some(pyproject))
+    } else if let Some(pyproject) = pyproject::find_pyproject_toml(path_dedot::CWD.as_path()) {
+        // Second priority: find a `pyproject.toml` file in the current working path,
+        // and resolve all paths relative to that directory. (With
+        // `Strategy::Hierarchical`, we'll end up finding the "closest"
+        // `pyproject.toml` file for every Python file later on, so
+        // these act as the "default" settings.)
+        (
+            Strategy::Hierarchical,
+            pyproject.parent().unwrap().to_path_buf(),
+            Some(pyproject),
+        )
+    } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
+        // Third priority: find a user-specific `pyproject.toml`, but resolve all paths
+        // relative the current working directory. (With
+        // `Strategy::Hierarchical`, we'll end up the "closest"
+        // `pyproject.toml` file for every Python file later on, so
+        // these act as the "default" settings.)
+        (
+            Strategy::Hierarchical,
+            path_dedot::CWD.clone(),
+            Some(pyproject),
+        )
+    } else {
+        // Fallback: load Ruff's default settings, and resolve all paths relative to the
+        // current working directory. (With `Strategy::Hierarchical`, we'll
+        // end up the "closest" `pyproject.toml` file for every Python file
+        // later on, so these act as the "default" settings.)
+        (Strategy::Hierarchical, path_dedot::CWD.clone(), None)
+    }
+}
+
 fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
     let (cli, overrides) = Cli::parse().partition();
@@ -48,43 +87,7 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     // Find the root `pyproject.toml`.
-    let (strategy, project_root, pyproject) = {
-        if let Some(pyproject) = cli.config {
-            // First priority: the user specified a `pyproject.toml` file. Use that
-            // `pyproject.toml` for all configuration, but resolve paths
-            // relative to the current working directory. (This matches ESLint's
-            // behavior.)
-            (Strategy::Fixed, path_dedot::CWD.clone(), Some(pyproject))
-        } else if let Some(pyproject) = pyproject::find_pyproject_toml(path_dedot::CWD.as_path()) {
-            // Second priority: find a `pyproject.toml` file in the current working path,
-            // and resolve all paths relative to that directory. (With
-            // `Strategy::Hierarchical`, we'll end up finding the "closest"
-            // `pyproject.toml` file for every Python file later on, so
-            // these act as the "default" settings.)
-            (
-                Strategy::Hierarchical,
-                pyproject.parent().unwrap().to_path_buf(),
-                Some(pyproject),
-            )
-        } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
-            // Third priority: find a user-specific `pyproject.toml`, but resolve all paths
-            // relative the current working directory. (With
-            // `Strategy::Hierarchical`, we'll end up the "closest"
-            // `pyproject.toml` file for every Python file later on, so
-            // these act as the "default" settings.)
-            (
-                Strategy::Hierarchical,
-                path_dedot::CWD.clone(),
-                Some(pyproject),
-            )
-        } else {
-            // Fallback: load Ruff's default settings, and resolve all paths relative to the
-            // current working directory. (With `Strategy::Hierarchical`, we'll
-            // end up the "closest" `pyproject.toml` file for every Python file
-            // later on, so these act as the "default" settings.)
-            (Strategy::Hierarchical, path_dedot::CWD.clone(), None)
-        }
-    };
+    let (strategy, project_root, pyproject) = discover(cli.config);
 
     // Reconcile configuration from `pyproject.toml` and command-line arguments.
     let mut configuration = pyproject
