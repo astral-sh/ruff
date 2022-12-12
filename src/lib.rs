@@ -15,6 +15,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
+use path_absolutize::path_dedot;
 use rustpython_helpers::tokenize;
 use rustpython_parser::lexer::LexResult;
 use settings::{pyproject, Settings};
@@ -84,21 +85,28 @@ pub mod updates;
 mod vendored;
 pub mod visibility;
 
+/// Load the relevant `Settings` for a given `Path`.
 fn resolve(path: &Path) -> Result<Settings> {
-    // Find the relevant `pyproject.toml`.
-    let Some(pyproject) = pyproject::find_pyproject_toml(path) else {
+    if let Some(pyproject) = pyproject::find_pyproject_toml(path) {
+        // First priority: `pyproject.toml` in the current `Path`.
+        let options = pyproject::load_options(&pyproject)?;
+        let configuration = Configuration::from_options(options)?;
+        Settings::from_configuration(configuration, pyproject.parent().unwrap())
+    } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
+        // Second priority: user-specific `pyproject.toml`.
+        let options = pyproject::load_options(&pyproject)?;
+        let configuration = Configuration::from_options(options)?;
+        Settings::from_configuration(configuration, pyproject.parent().unwrap())
+    } else {
+        // Fallback: default settings.
         debug!("Unable to find pyproject.toml; using default settings...");
-        return Settings::from_configuration(Configuration::default(), None);
-    };
-
-    // Load and parse the `pyproject.toml`.
-    let options = pyproject::load_options(&pyproject)?;
-    let configuration = Configuration::from_options(options)?;
-    Settings::from_configuration(configuration, pyproject.parent())
+        return Settings::from_configuration(Configuration::default(), &path_dedot::CWD);
+    }
 }
 
 /// Run Ruff over Python source code directly.
 pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
+    // Load the relevant `Settings` for the given `Path`.
     let settings = resolve(path)?;
 
     // Tokenize once.

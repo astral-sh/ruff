@@ -13,7 +13,7 @@ use walkdir::{DirEntry, WalkDir};
 use crate::checks::CheckCode;
 use crate::cli::Overrides;
 use crate::resolver;
-use crate::resolver::Resolver;
+use crate::resolver::{Resolver, Strategy};
 use crate::settings::Settings;
 
 /// Extract the absolute path and basename (as strings) from a Path.
@@ -41,13 +41,15 @@ fn is_included(path: &Path) -> bool {
 /// Find all Python (`.py` and `.pyi` files) in a set of `Path`.
 pub fn collect_python_files<'a>(
     paths: &'a [PathBuf],
+    strategy: &Strategy,
     overrides: &'a Overrides,
     default: &'a Settings,
 ) -> (Vec<Result<DirEntry, walkdir::Error>>, Resolver) {
     let mut files = Vec::new();
     let mut resolver = Resolver::default();
     for path in paths {
-        let (files_in_path, file_resolver) = python_files_in_path(path, overrides, default);
+        let (files_in_path, file_resolver) =
+            python_files_in_path(path, strategy, overrides, default);
         files.extend(files_in_path);
         resolver.merge(file_resolver);
     }
@@ -57,6 +59,7 @@ pub fn collect_python_files<'a>(
 /// Find all Python (`.py` and `.pyi` files) in a given `Path`.
 fn python_files_in_path<'a>(
     path: &'a Path,
+    strategy: &Strategy,
     overrides: &'a Overrides,
     default: &'a Settings,
 ) -> (Vec<Result<DirEntry, walkdir::Error>>, Resolver) {
@@ -93,7 +96,7 @@ fn python_files_in_path<'a>(
             }
 
             let path = entry.path();
-            let settings = resolver.resolve(path).unwrap_or(default);
+            let settings = resolver.resolve(path, strategy).unwrap_or(default);
             match extract_path_names(path) {
                 Ok((file_path, file_basename)) => {
                     if !settings.exclude.is_empty()
@@ -203,7 +206,7 @@ mod tests {
         assert!(!is_included(&path));
     }
 
-    fn make_exclusion(file_pattern: FilePattern, project_root: Option<&Path>) -> GlobSet {
+    fn make_exclusion(file_pattern: FilePattern, project_root: &Path) -> GlobSet {
         let mut builder = globset::GlobSetBuilder::new();
         file_pattern.add_to(&mut builder, project_root).unwrap();
         builder.build().unwrap()
@@ -219,7 +222,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(project_root))
+            &make_exclusion(exclude, project_root)
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
@@ -228,7 +231,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(project_root))
+            &make_exclusion(exclude, project_root)
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -239,7 +242,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(project_root))
+            &make_exclusion(exclude, project_root)
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
@@ -248,7 +251,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(project_root))
+            &make_exclusion(exclude, project_root)
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -259,7 +262,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(project_root))
+            &make_exclusion(exclude, project_root)
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -270,7 +273,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(project_root))
+            &make_exclusion(exclude, project_root)
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -281,7 +284,7 @@ mod tests {
         assert!(!is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(project_root))
+            &make_exclusion(exclude, project_root)
         ));
 
         Ok(())
