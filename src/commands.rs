@@ -13,13 +13,12 @@ use serde::Serialize;
 use crate::autofix::fixer;
 use crate::checks::{CheckCode, CheckKind};
 use crate::cli::Overrides;
-use crate::fs::collect_python_files;
 use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use crate::message::Message;
 use crate::resolver::Strategy;
 use crate::settings::types::SerializationFormat;
-use crate::{Configuration, Settings};
+use crate::{resolver, Configuration, Settings};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -32,7 +31,7 @@ pub fn run(
 ) -> Diagnostics {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, strategy, overrides, defaults);
+    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, defaults);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -114,7 +113,7 @@ pub fn add_noqa(
 ) -> usize {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, strategy, overrides, defaults);
+    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, defaults);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -149,7 +148,7 @@ pub fn autoformat(
 ) -> usize {
     // Collect all the files to format.
     let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, strategy, overrides, defaults);
+    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, defaults);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -189,7 +188,7 @@ pub fn show_files(
     overrides: &Overrides,
 ) {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) = collect_python_files(files, strategy, overrides, default);
+    let (paths, _resolver) = resolver::resolve_python_files(files, strategy, overrides, default);
 
     // Print the list of files.
     for entry in paths
