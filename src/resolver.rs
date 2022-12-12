@@ -19,10 +19,10 @@ use crate::settings::{pyproject, Settings};
 pub enum Strategy {
     /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
     /// provided on the command-line).
-    Fixed,
+    Fixed(Settings),
     /// Use the closest `pyproject.toml` file in the filesystem hierarchy, or
     /// the default settings.
-    Hierarchical,
+    Hierarchical(Settings),
 }
 
 /// The strategy for resolving file paths in a `pyproject.toml`.
@@ -60,16 +60,21 @@ impl Resolver {
     }
 
     /// Return the appropriate `Settings` for a given `Path`.
-    pub fn resolve(&self, path: &Path, strategy: &Strategy) -> Option<&Settings> {
+    pub fn resolve<'a>(&'a self, path: &Path, strategy: &'a Strategy) -> &'a Settings {
         match strategy {
-            Strategy::Fixed => None,
-            Strategy::Hierarchical => self.settings.iter().rev().find_map(|(root, settings)| {
-                if path.starts_with(root) {
-                    Some(settings)
-                } else {
-                    None
-                }
-            }),
+            Strategy::Fixed(settings) => settings,
+            Strategy::Hierarchical(default) => self
+                .settings
+                .iter()
+                .rev()
+                .find_map(|(root, settings)| {
+                    if path.starts_with(root) {
+                        Some(settings)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(default),
         }
     }
 }
@@ -156,17 +161,15 @@ fn is_python_file(path: &Path) -> bool {
 }
 
 /// Find all Python (`.py` and `.pyi` files) in a set of `Path`.
-pub fn resolve_python_files<'a>(
-    paths: &'a [PathBuf],
+pub fn resolve_python_files(
+    paths: &[PathBuf],
     strategy: &Strategy,
-    overrides: &'a Overrides,
-    default: &'a Settings,
+    overrides: &Overrides,
 ) -> Result<(Vec<Result<DirEntry, walkdir::Error>>, Resolver)> {
     let mut files = Vec::new();
     let mut resolver = Resolver::default();
     for path in paths {
-        let (files_in_path, file_resolver) =
-            python_files_in_path(path, strategy, overrides, default)?;
+        let (files_in_path, file_resolver) = python_files_in_path(path, strategy, overrides)?;
         files.extend(files_in_path);
         resolver.merge(file_resolver);
     }
@@ -174,11 +177,10 @@ pub fn resolve_python_files<'a>(
 }
 
 /// Find all Python (`.py` and `.pyi` files) in a given `Path`.
-fn python_files_in_path<'a>(
-    path: &'a Path,
+fn python_files_in_path(
+    path: &Path,
     strategy: &Strategy,
-    overrides: &'a Overrides,
-    default: &'a Settings,
+    overrides: &Overrides,
 ) -> Result<(Vec<Result<DirEntry, walkdir::Error>>, Resolver)> {
     let path = fs::normalize_path(path);
 
@@ -213,7 +215,7 @@ fn python_files_in_path<'a>(
             }
 
             let path = entry.path();
-            let settings = resolver.resolve(path, strategy).unwrap_or(default);
+            let settings = resolver.resolve(path, strategy);
             match fs::extract_path_names(path) {
                 Ok((file_path, file_basename)) => {
                     if !settings.exclude.is_empty()

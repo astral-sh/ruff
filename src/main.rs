@@ -37,34 +37,34 @@ use ruff::resolver::{resolve_settings, Relativity};
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
-fn resolve(config: Option<PathBuf>, overrides: &Overrides) -> Result<(Strategy, Settings)> {
+fn resolve(config: Option<PathBuf>, overrides: &Overrides) -> Result<Strategy> {
     if let Some(pyproject) = config {
         // First priority: the user specified a `pyproject.toml` file. Use that
         // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
         // current working directory. (This matches ESLint's behavior.)
         let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
-        Ok((Strategy::Fixed, settings))
+        Ok(Strategy::Fixed(settings))
     } else if let Some(pyproject) = pyproject::find_pyproject_toml(path_dedot::CWD.as_path()) {
         // Second priority: find a `pyproject.toml` file in the current working path,
         // and resolve all paths relative to that directory. (With
         // `Strategy::Hierarchical`, we'll end up finding the "closest" `pyproject.toml`
         // file for every Python file later on, so these act as the "default" settings.)
         let settings = resolve_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
-        Ok((Strategy::Hierarchical, settings))
+        Ok(Strategy::Hierarchical(settings))
     } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
         // Third priority: find a user-specific `pyproject.toml`, but resolve all paths
         // relative the current working directory. (With `Strategy::Hierarchical`, we'll
         // end up the "closest" `pyproject.toml` file for every Python file later on, so
         // these act as the "default" settings.)
         let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
-        Ok((Strategy::Hierarchical, settings))
+        Ok(Strategy::Hierarchical(settings))
     } else {
         // Fallback: load Ruff's default settings, and resolve all paths relative to the
         // current working directory. (With `Strategy::Hierarchical`, we'll end up the
         // "closest" `pyproject.toml` file for every Python file later on, so these act
         // as the "default" settings.)
         let settings = Settings::from_configuration(Configuration::default(), &path_dedot::CWD)?;
-        Ok((Strategy::Hierarchical, settings))
+        Ok(Strategy::Hierarchical(settings))
     }
 }
 
@@ -84,29 +84,32 @@ fn inner_main() -> Result<ExitCode> {
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let (strategy, settings) = resolve(cli.config, &overrides)?;
+    let strategy = resolve(cli.config, &overrides)?;
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
-    let autofix = if settings.fix {
+    let (fix, format) = match &strategy {
+        Strategy::Fixed(settings) => (settings.fix, settings.format),
+        Strategy::Hierarchical(settings) => (settings.fix, settings.format),
+    };
+    let autofix = if fix {
         fixer::Mode::Apply
-    } else if matches!(settings.format, SerializationFormat::Json) {
+    } else if matches!(format, SerializationFormat::Json) {
         fixer::Mode::Generate
     } else {
         fixer::Mode::None
     };
-    let format = settings.format;
 
     if let Some(code) = cli.explain {
         commands::explain(&code, &format)?;
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_settings {
-        commands::show_settings(&cli.files, &strategy, &settings, &overrides)?;
+        commands::show_settings(&cli.files, &strategy, &overrides)?;
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_files {
-        commands::show_files(&cli.files, &strategy, &settings, &overrides)?;
+        commands::show_files(&cli.files, &strategy, &overrides)?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -139,7 +142,6 @@ fn inner_main() -> Result<ExitCode> {
         let messages = commands::run(
             &cli.files,
             &strategy,
-            &settings,
             &overrides,
             cache_enabled,
             &fixer::Mode::None,
@@ -169,7 +171,6 @@ fn inner_main() -> Result<ExitCode> {
                         let messages = commands::run(
                             &cli.files,
                             &strategy,
-                            &settings,
                             &overrides,
                             cache_enabled,
                             &fixer::Mode::None,
@@ -181,12 +182,12 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else if cli.add_noqa {
-        let modifications = commands::add_noqa(&cli.files, &strategy, &settings, &overrides)?;
+        let modifications = commands::add_noqa(&cli.files, &strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
     } else if cli.autoformat {
-        let modifications = commands::autoformat(&cli.files, &strategy, &settings, &overrides)?;
+        let modifications = commands::autoformat(&cli.files, &strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Formatted {modifications} files.");
         }
@@ -197,16 +198,9 @@ fn inner_main() -> Result<ExitCode> {
         let diagnostics = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            commands::run_stdin(&settings, path, &autofix)?
+            commands::run_stdin(&strategy, path, &autofix)?
         } else {
-            commands::run(
-                &cli.files,
-                &strategy,
-                &settings,
-                &overrides,
-                cache_enabled,
-                &autofix,
-            )?
+            commands::run(&cli.files, &strategy, &overrides, cache_enabled, &autofix)?
         };
 
         // Always try to print violations (the printer itself may suppress output),
