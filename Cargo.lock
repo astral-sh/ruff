@@ -1895,6 +1895,7 @@ dependencies = [
  "titlecase",
  "toml",
  "update-informer",
+ "ureq",
  "walkdir",
 ]
 
