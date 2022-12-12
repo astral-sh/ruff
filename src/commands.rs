@@ -1,13 +1,12 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use itertools::Itertools;
 use serde::Serialize;
-use walkdir::DirEntry;
 
 use crate::checks::CheckCode;
 use crate::cli::Overrides;
-use crate::fs::iter_python_files;
-use crate::resolver::{discover_settings, Resolver};
+use crate::fs::collect_python_files;
 use crate::settings::types::SerializationFormat;
 use crate::{Configuration, Settings};
 
@@ -24,23 +23,15 @@ pub fn show_settings(
 
 /// Show the list of files to be checked based on current settings.
 pub fn show_files(files: &[PathBuf], default: &Settings, overrides: &Overrides) {
-    // Discover the settings for the filesystem hierarchy.
-    let settings = discover_settings(files, overrides);
-    let resolver = Resolver {
-        default,
-        settings: &settings,
-    };
-
     // Collect all files in the hierarchy.
-    let mut entries: Vec<DirEntry> = files
-        .iter()
-        .flat_map(|path| iter_python_files(path, &resolver))
-        .flatten()
-        .collect();
-    entries.sort_by(|a, b| a.path().cmp(b.path()));
+    let (paths, _resolver) = collect_python_files(files, overrides, default);
 
     // Print the list of files.
-    for entry in entries {
+    for entry in paths
+        .iter()
+        .flatten()
+        .sorted_by(|a, b| a.path().cmp(b.path()))
+    {
         println!("{}", entry.path().to_string_lossy());
     }
 }

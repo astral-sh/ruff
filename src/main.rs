@@ -20,13 +20,12 @@ use std::time::Instant;
 use ::ruff::autofix::fixer;
 use ::ruff::checks::{CheckCode, CheckKind};
 use ::ruff::cli::{extract_log_level, Cli, Overrides};
-use ::ruff::fs::iter_python_files;
+use ::ruff::fs::collect_python_files;
 use ::ruff::iterators::par_iter;
 use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::message::Message;
 use ::ruff::printer::Printer;
-use ::ruff::resolver::Resolver;
 use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
@@ -40,9 +39,7 @@ use log::{debug, error};
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff::resolver::discover_settings;
 use rustpython_ast::Location;
-use walkdir::DirEntry;
 
 fn read_from_stdin() -> Result<String> {
     let mut buffer = String::new();
@@ -68,19 +65,9 @@ fn run_once(
     cache: bool,
     autofix: &fixer::Mode,
 ) -> Diagnostics {
-    // Discover the settings for the filesystem hierarchy.
-    let settings = discover_settings(files, overrides);
-    let resolver = Resolver {
-        default,
-        settings: &settings,
-    };
-
     // Collect all the files to check.
     let start = Instant::now();
-    let paths: Vec<Result<DirEntry, walkdir::Error>> = files
-        .iter()
-        .flat_map(|path| iter_python_files(path, &resolver))
-        .collect();
+    let (paths, resolver) = collect_python_files(files, overrides, default);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -90,7 +77,7 @@ fn run_once(
             match entry {
                 Ok(entry) => {
                     let path = entry.path();
-                    let settings = resolver.resolve(path);
+                    let settings = resolver.resolve(path).unwrap_or(default);
                     lint_path(path, settings, &cache.into(), autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
@@ -101,8 +88,8 @@ fn run_once(
                 )),
             }
             .unwrap_or_else(|(path, message)| {
-                if let Some(path) = path {
-                    let settings = resolver.resolve(&path);
+                if let Some(path) = &path {
+                    let settings = resolver.resolve(path).unwrap_or(default);
                     if settings.enabled.contains(&CheckCode::E902) {
                         Diagnostics::new(vec![Message {
                             kind: CheckKind::IOError(message),
@@ -135,28 +122,18 @@ fn run_once(
 }
 
 fn add_noqa(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> usize {
-    // Discover the settings for the filesystem hierarchy.
-    let settings = discover_settings(files, overrides);
-    let resolver = Resolver {
-        default,
-        settings: &settings,
-    };
-
     // Collect all the files to check.
     let start = Instant::now();
-    let paths: Vec<DirEntry> = files
-        .iter()
-        .flat_map(|path| iter_python_files(path, &resolver))
-        .flatten()
-        .collect();
+    let (paths, resolver) = collect_python_files(files, overrides, default);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
     let modifications: usize = par_iter(&paths)
+        .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path);
+            let settings = resolver.resolve(path).unwrap_or(default);
             match add_noqa_to_path(path, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
@@ -174,28 +151,19 @@ fn add_noqa(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> usi
 }
 
 fn autoformat(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> usize {
-    // Discover the settings for the filesystem hierarchy.
-    let settings = discover_settings(files, overrides);
-    let resolver = Resolver {
-        default,
-        settings: &settings,
-    };
-
     // Collect all the files to format.
     let start = Instant::now();
-    let paths: Vec<DirEntry> = files
-        .iter()
-        .flat_map(|path| iter_python_files(path, &resolver))
-        .flatten()
-        .collect();
+    let (paths, resolver) = collect_python_files(files, overrides, default);
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
     let start = Instant::now();
     let modifications = par_iter(&paths)
+        .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            match autoformat_path(path) {
+            let settings = resolver.resolve(path).unwrap_or(default);
+            match autoformat_path(path, settings) {
                 Ok(()) => Some(()),
                 Err(e) => {
                     error!("Failed to autoformat {}: {e}", path.to_string_lossy());
