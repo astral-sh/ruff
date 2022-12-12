@@ -4,8 +4,10 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
-use log::{debug, error};
+use anyhow::{bail, Result};
+use log::debug;
+use path_absolutize::path_dedot;
+use rustc_hash::FxHashSet;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::cli::Overrides;
@@ -13,9 +15,32 @@ use crate::fs;
 use crate::settings::configuration::Configuration;
 use crate::settings::{pyproject, Settings};
 
+/// The strategy for discovering a `pyproject.toml` file for each Python file.
 pub enum Strategy {
+    /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
+    /// provided on the command-line).
     Fixed,
+    /// Use the closest `pyproject.toml` file in the filesystem hierarchy, or
+    /// the default settings.
     Hierarchical,
+}
+
+/// The strategy for resolving file paths in a `pyproject.toml`.
+pub enum Relativity {
+    /// Resolve file paths relative to the current working directory.
+    Cwd,
+    /// Resolve file paths relative to the directory containing the
+    /// `pyproject.toml`.
+    Parent,
+}
+
+impl Relativity {
+    pub fn resolve(&self, path: &Path) -> PathBuf {
+        match self {
+            Relativity::Parent => path.parent().unwrap().to_path_buf(),
+            Relativity::Cwd => path_dedot::CWD.clone(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -24,14 +49,17 @@ pub struct Resolver {
 }
 
 impl Resolver {
+    /// Merge a `Resolver` into the current `Resolver`.
     pub fn merge(&mut self, resolver: Resolver) {
         self.settings.extend(resolver.settings);
     }
 
+    /// Add a resolved `Settings` under a given `PathBuf` scope.
     pub fn add(&mut self, path: PathBuf, settings: Settings) {
         self.settings.insert(path, settings);
     }
 
+    /// Return the appropriate `Settings` for a given `Path`.
     pub fn resolve(&self, path: &Path, strategy: &Strategy) -> Option<&Settings> {
         match strategy {
             Strategy::Fixed => None,
@@ -46,17 +74,73 @@ impl Resolver {
     }
 }
 
-/// Extract the `Settings` from a given `pyproject.toml`.
-pub fn settings_for_path(pyproject: &Path, overrides: &Overrides) -> Result<(PathBuf, Settings)> {
-    let project_root = pyproject
-        .parent()
-        .ok_or_else(|| anyhow!("Expected pyproject.toml to be in a directory"))?
-        .to_path_buf();
-    let options = pyproject::load_options(pyproject)?;
-    let mut configuration = Configuration::from_options(options)?;
-    configuration.merge(overrides.clone());
+/// Recursively resolve a `Configuration` from a `pyproject.toml` file at the
+/// specified `Path`.
+pub fn resolve_configuration(
+    pyproject: &Path,
+    relativity: &Relativity,
+    overrides: Option<&Overrides>,
+) -> Result<Configuration> {
+    let mut seen = FxHashSet::default();
+    let mut stack = vec![];
+    let mut next = Some(fs::normalize_path(pyproject));
+    while let Some(path) = next {
+        if seen.contains(&path) {
+            bail!("Circular dependency detected in pyproject.toml");
+        }
+
+        // Resolve the current path.
+        let options = pyproject::load_options(&path)?;
+        let project_root = relativity.resolve(&path);
+        let configuration = Configuration::from_options(options, &project_root)?;
+
+        // If extending, continue to collect.
+        next = configuration
+            .extend
+            .as_ref()
+            .map(|extend| fs::normalize_path_to(extend, &project_root));
+
+        // Keep track of (1) the paths we've already resolved (to avoid cycles), and (2)
+        // the base configuration for every path.
+        seen.insert(path);
+        stack.push(configuration);
+    }
+
+    // Merge the configurations, in order.
+    stack.reverse();
+    let mut configuration = stack
+        .pop()
+        .expect("Expected to have at least one Configuration");
+    while let Some(extend) = stack.pop() {
+        configuration = configuration.combine(extend);
+    }
+    if let Some(overrides) = overrides {
+        configuration.apply(overrides.clone());
+    }
+    Ok(configuration)
+}
+
+/// Extract the project root (scope) and `Settings` from a given
+/// `pyproject.toml`.
+pub fn resolve_scoped_settings(
+    pyproject: &Path,
+    relativity: &Relativity,
+    overrides: Option<&Overrides>,
+) -> Result<(PathBuf, Settings)> {
+    let project_root = relativity.resolve(pyproject);
+    let configuration = resolve_configuration(pyproject, relativity, overrides)?;
     let settings = Settings::from_configuration(configuration, &project_root)?;
     Ok((project_root, settings))
+}
+
+/// Extract the `Settings` from a given `pyproject.toml`.
+pub fn resolve_settings(
+    pyproject: &Path,
+    relativity: &Relativity,
+    overrides: Option<&Overrides>,
+) -> Result<Settings> {
+    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, overrides)?;
+    Ok(settings)
 }
 
 /// Return `true` if the given file should be ignored based on the exclusion
@@ -77,16 +161,16 @@ pub fn resolve_python_files<'a>(
     strategy: &Strategy,
     overrides: &'a Overrides,
     default: &'a Settings,
-) -> (Vec<Result<DirEntry, walkdir::Error>>, Resolver) {
+) -> Result<(Vec<Result<DirEntry, walkdir::Error>>, Resolver)> {
     let mut files = Vec::new();
     let mut resolver = Resolver::default();
     for path in paths {
         let (files_in_path, file_resolver) =
-            python_files_in_path(path, strategy, overrides, default);
+            python_files_in_path(path, strategy, overrides, default)?;
         files.extend(files_in_path);
         resolver.merge(file_resolver);
     }
-    (files, resolver)
+    Ok((files, resolver))
 }
 
 /// Find all Python (`.py` and `.pyi` files) in a given `Path`.
@@ -95,7 +179,7 @@ fn python_files_in_path<'a>(
     strategy: &Strategy,
     overrides: &'a Overrides,
     default: &'a Settings,
-) -> (Vec<Result<DirEntry, walkdir::Error>>, Resolver) {
+) -> Result<(Vec<Result<DirEntry, walkdir::Error>>, Resolver)> {
     let path = fs::normalize_path(path);
 
     // Search for `pyproject.toml` files in all parent directories.
@@ -104,10 +188,9 @@ fn python_files_in_path<'a>(
         if path.is_dir() {
             let pyproject = path.join("pyproject.toml");
             if pyproject.is_file() {
-                match settings_for_path(&pyproject, overrides) {
-                    Ok((root, settings)) => resolver.add(root, settings),
-                    Err(err) => error!("Failed to read settings: {err}"),
-                }
+                let (root, settings) =
+                    resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
+                resolver.add(root, settings);
             }
         }
     }
@@ -121,10 +204,11 @@ fn python_files_in_path<'a>(
             if entry.file_type().is_dir() {
                 let pyproject = entry.path().join("pyproject.toml");
                 if pyproject.is_file() {
-                    match settings_for_path(&pyproject, overrides) {
-                        Ok((root, settings)) => resolver.add(root, settings),
-                        Err(err) => error!("Failed to read settings: {err}"),
-                    }
+                    // TODO(charlie): Return a `Result` here.
+                    let (root, settings) =
+                        resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))
+                            .unwrap();
+                    resolver.add(root, settings);
                 }
             }
 
@@ -161,7 +245,7 @@ fn python_files_in_path<'a>(
         })
         .collect::<Vec<_>>();
 
-    (files, resolver)
+    Ok((files, resolver))
 }
 
 #[cfg(test)]
@@ -191,9 +275,9 @@ mod tests {
         assert!(!is_python_file(&path));
     }
 
-    fn make_exclusion(file_pattern: FilePattern, project_root: &Path) -> GlobSet {
+    fn make_exclusion(file_pattern: FilePattern) -> GlobSet {
         let mut builder = globset::GlobSetBuilder::new();
-        file_pattern.add_to(&mut builder, project_root).unwrap();
+        file_pattern.add_to(&mut builder).unwrap();
         builder.build().unwrap()
     }
 
@@ -202,74 +286,116 @@ mod tests {
         let project_root = Path::new("/tmp/");
 
         let path = Path::new("foo").absolutize_from(project_root).unwrap();
-        let exclude = FilePattern::User("foo".to_string());
+        let exclude = FilePattern::User(
+            "foo".to_string(),
+            Path::new("foo")
+                .absolutize_from(project_root)
+                .unwrap()
+                .to_path_buf(),
+        );
         let (file_path, file_basename) = fs::extract_path_names(&path)?;
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, project_root)
+            &make_exclusion(exclude,)
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
-        let exclude = FilePattern::User("bar".to_string());
+        let exclude = FilePattern::User(
+            "bar".to_string(),
+            Path::new("bar")
+                .absolutize_from(project_root)
+                .unwrap()
+                .to_path_buf(),
+        );
         let (file_path, file_basename) = fs::extract_path_names(&path)?;
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, project_root)
+            &make_exclusion(exclude,)
         ));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = FilePattern::User("baz.py".to_string());
+        let exclude = FilePattern::User(
+            "baz.py".to_string(),
+            Path::new("baz.py")
+                .absolutize_from(project_root)
+                .unwrap()
+                .to_path_buf(),
+        );
         let (file_path, file_basename) = fs::extract_path_names(&path)?;
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, project_root)
+            &make_exclusion(exclude,)
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
-        let exclude = FilePattern::User("foo/bar".to_string());
+        let exclude = FilePattern::User(
+            "foo/bar".to_string(),
+            Path::new("foo/bar")
+                .absolutize_from(project_root)
+                .unwrap()
+                .to_path_buf(),
+        );
         let (file_path, file_basename) = fs::extract_path_names(&path)?;
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, project_root)
+            &make_exclusion(exclude,)
         ));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = FilePattern::User("foo/bar/baz.py".to_string());
+        let exclude = FilePattern::User(
+            "foo/bar/baz.py".to_string(),
+            Path::new("foo/bar/baz.py")
+                .absolutize_from(project_root)
+                .unwrap()
+                .to_path_buf(),
+        );
         let (file_path, file_basename) = fs::extract_path_names(&path)?;
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, project_root)
+            &make_exclusion(exclude,)
         ));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = FilePattern::User("foo/bar/*.py".to_string());
+        let exclude = FilePattern::User(
+            "foo/bar/*.py".to_string(),
+            Path::new("foo/bar/*.py")
+                .absolutize_from(project_root)
+                .unwrap()
+                .to_path_buf(),
+        );
         let (file_path, file_basename) = fs::extract_path_names(&path)?;
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, project_root)
+            &make_exclusion(exclude,)
         ));
 
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = FilePattern::User("baz".to_string());
+        let exclude = FilePattern::User(
+            "baz".to_string(),
+            Path::new("baz")
+                .absolutize_from(project_root)
+                .unwrap()
+                .to_path_buf(),
+        );
         let (file_path, file_basename) = fs::extract_path_names(&path)?;
         assert!(!is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, project_root)
+            &make_exclusion(exclude,)
         ));
 
         Ok(())

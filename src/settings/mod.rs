@@ -8,14 +8,15 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use globset::{Glob, GlobMatcher, GlobSet};
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::checks::CheckCode;
-use crate::checks_gen::{CheckCodePrefix, SuffixLength};
+use crate::checks_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion};
+use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_import_conventions, flake8_quotes,
     flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
@@ -35,7 +36,9 @@ pub struct Settings {
     pub exclude: GlobSet,
     pub extend_exclude: GlobSet,
     pub external: FxHashSet<String>,
+    pub fix: bool,
     pub fixable: FxHashSet<CheckCode>,
+    pub format: SerializationFormat,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>,
@@ -54,42 +57,115 @@ pub struct Settings {
     pub pyupgrade: pyupgrade::settings::Settings,
 }
 
+static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
+    vec![
+        FilePattern::Builtin(".bzr"),
+        FilePattern::Builtin(".direnv"),
+        FilePattern::Builtin(".eggs"),
+        FilePattern::Builtin(".git"),
+        FilePattern::Builtin(".hg"),
+        FilePattern::Builtin(".mypy_cache"),
+        FilePattern::Builtin(".nox"),
+        FilePattern::Builtin(".pants.d"),
+        FilePattern::Builtin(".ruff_cache"),
+        FilePattern::Builtin(".svn"),
+        FilePattern::Builtin(".tox"),
+        FilePattern::Builtin(".venv"),
+        FilePattern::Builtin("__pypackages__"),
+        FilePattern::Builtin("_build"),
+        FilePattern::Builtin("buck-out"),
+        FilePattern::Builtin("build"),
+        FilePattern::Builtin("dist"),
+        FilePattern::Builtin("node_modules"),
+        FilePattern::Builtin("venv"),
+    ]
+});
+
+static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
+    Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
+
 impl Settings {
     pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
         Ok(Self {
-            allowed_confusables: config.allowed_confusables,
-            dummy_variable_rgx: config.dummy_variable_rgx,
+            allowed_confusables: config
+                .allowed_confusables
+                .map(FxHashSet::from_iter)
+                .unwrap_or_default(),
+            dummy_variable_rgx: config
+                .dummy_variable_rgx
+                .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone()),
             enabled: resolve_codes(
                 &config
                     .select
+                    .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F])
                     .into_iter()
-                    .chain(config.extend_select.into_iter())
+                    .chain(config.extend_select.unwrap_or_default().into_iter())
                     .collect::<Vec<_>>(),
                 &config
                     .ignore
+                    .unwrap_or_default()
                     .into_iter()
-                    .chain(config.extend_ignore.into_iter())
+                    .chain(config.extend_ignore.unwrap_or_default().into_iter())
                     .collect::<Vec<_>>(),
             ),
-            exclude: resolve_globset(config.exclude, project_root)?,
-            extend_exclude: resolve_globset(config.extend_exclude, project_root)?,
-            external: FxHashSet::from_iter(config.external),
-            fixable: resolve_codes(&config.fixable, &config.unfixable),
-            flake8_annotations: config.flake8_annotations,
-            flake8_bugbear: config.flake8_bugbear,
-            flake8_import_conventions: config.flake8_import_conventions,
-            flake8_quotes: config.flake8_quotes,
-            flake8_tidy_imports: config.flake8_tidy_imports,
-            ignore_init_module_imports: config.ignore_init_module_imports,
-            isort: config.isort,
-            mccabe: config.mccabe,
-            line_length: config.line_length,
-            pep8_naming: config.pep8_naming,
-            pyupgrade: config.pyupgrade,
-            per_file_ignores: resolve_per_file_ignores(config.per_file_ignores, project_root)?,
-            src: resolve_src(config.src, project_root),
-            target_version: config.target_version,
-            show_source: config.show_source,
+            exclude: resolve_globset(config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()))?,
+            extend_exclude: resolve_globset(config.extend_exclude.unwrap_or_default())?,
+            external: FxHashSet::from_iter(config.external.unwrap_or_default()),
+            fix: config.fix.unwrap_or(false),
+            fixable: resolve_codes(
+                &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
+                &config.unfixable.unwrap_or_default(),
+            ),
+            format: config.format.unwrap_or(SerializationFormat::Text),
+            ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
+            line_length: config.line_length.unwrap_or(88),
+            per_file_ignores: resolve_per_file_ignores(
+                config.per_file_ignores.unwrap_or_default(),
+            )?,
+            src: config
+                .src
+                .unwrap_or_else(|| vec![project_root.to_path_buf()]),
+            target_version: config.target_version.unwrap_or(PythonVersion::Py310),
+            show_source: config.show_source.unwrap_or_default(),
+            // Plugins
+            flake8_annotations: config
+                .flake8_annotations
+                .map(flake8_annotations::settings::Settings::from_options)
+                .unwrap_or_default(),
+            flake8_bugbear: config
+                .flake8_bugbear
+                .map(flake8_bugbear::settings::Settings::from_options)
+                .unwrap_or_default(),
+            flake8_import_conventions: config
+                .flake8_import_conventions
+                .map(flake8_import_conventions::settings::Settings::from_options)
+                .unwrap_or_default(),
+            flake8_quotes: config
+                .flake8_quotes
+                .map(flake8_quotes::settings::Settings::from_options)
+                .unwrap_or_default(),
+            flake8_tidy_imports: config
+                .flake8_tidy_imports
+                .map(flake8_tidy_imports::settings::Settings::from_options)
+                .unwrap_or_default(),
+            isort: config
+                .isort
+                .map(isort::settings::Settings::from_options)
+                .unwrap_or_default(),
+            mccabe: config
+                .mccabe
+                .as_ref()
+                .map(mccabe::settings::Settings::from_options)
+                .unwrap_or_default(),
+            pep8_naming: config
+                .pep8_naming
+                .map(pep8_naming::settings::Settings::from_options)
+                .unwrap_or_default(),
+            pyupgrade: config
+                .pyupgrade
+                .as_ref()
+                .map(pyupgrade::settings::Settings::from_options)
+                .unwrap_or_default(),
         })
     }
 
@@ -101,7 +177,9 @@ impl Settings {
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
+            fix: false,
             fixable: FxHashSet::from_iter([check_code]),
+            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
@@ -128,7 +206,9 @@ impl Settings {
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
+            fix: false,
             fixable: FxHashSet::from_iter(check_codes),
+            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
@@ -189,10 +269,10 @@ impl Hash for Settings {
 }
 
 /// Given a list of patterns, create a `GlobSet`.
-pub fn resolve_globset(patterns: Vec<FilePattern>, project_root: &Path) -> Result<GlobSet> {
+pub fn resolve_globset(patterns: Vec<FilePattern>) -> Result<GlobSet> {
     let mut builder = globset::GlobSetBuilder::new();
     for pattern in patterns {
-        pattern.add_to(&mut builder, project_root)?;
+        pattern.add_to(&mut builder)?;
     }
     builder.build().map_err(std::convert::Into::into)
 }
@@ -200,18 +280,16 @@ pub fn resolve_globset(patterns: Vec<FilePattern>, project_root: &Path) -> Resul
 /// Given a list of patterns, create a `GlobSet`.
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
-    project_root: &Path,
 ) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>> {
     per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {
             // Construct absolute path matcher.
-            let path = Path::new(&per_file_ignore.pattern);
-            let absolute_path = fs::normalize_path_to(path, project_root);
-            let absolute = Glob::new(&absolute_path.to_string_lossy())?.compile_matcher();
+            let absolute =
+                Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
 
             // Construct basename matcher.
-            let basename = Glob::new(&per_file_ignore.pattern)?.compile_matcher();
+            let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
             Ok((absolute, basename, per_file_ignore.codes))
         })

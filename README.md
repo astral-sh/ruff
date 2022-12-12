@@ -1463,6 +1463,30 @@ exclude = [".venv"]
 
 ---
 
+#### [`extend`](#extend)
+
+A path to a local `pyproject.toml` file to merge into this configuration.
+
+To resolve the current `pyproject.toml` file, Ruff will first resolve this base
+configuration file, then merge in any properties defined in the current configuration
+file.
+
+**Default value**: `None`
+
+**Type**: `Path`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Extend the `pyproject.toml` file in the parent directory.
+extend = "../pyproject.toml"
+# But use a different line length.
+line-length = 100
+```
+
+---
+
 #### [`extend-exclude`](#extend-exclude)
 
 A list of file patterns to omit from linting, in addition to those specified by `exclude`.

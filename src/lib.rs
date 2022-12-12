@@ -14,7 +14,6 @@
 use std::path::Path;
 
 use anyhow::Result;
-use log::debug;
 use path_absolutize::path_dedot;
 use rustpython_helpers::tokenize;
 use rustpython_parser::lexer::LexResult;
@@ -22,6 +21,7 @@ use settings::{pyproject, Settings};
 
 use crate::checks::Check;
 use crate::linter::check_path;
+use crate::resolver::Relativity;
 use crate::settings::configuration::Configuration;
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -89,18 +89,13 @@ pub mod visibility;
 fn resolve(path: &Path) -> Result<Settings> {
     if let Some(pyproject) = pyproject::find_pyproject_toml(path) {
         // First priority: `pyproject.toml` in the current `Path`.
-        let options = pyproject::load_options(&pyproject)?;
-        let configuration = Configuration::from_options(options)?;
-        Settings::from_configuration(configuration, pyproject.parent().unwrap())
+        resolver::resolve_settings(&pyproject, &Relativity::Parent, None)
     } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
         // Second priority: user-specific `pyproject.toml`.
-        let options = pyproject::load_options(&pyproject)?;
-        let configuration = Configuration::from_options(options)?;
-        Settings::from_configuration(configuration, pyproject.parent().unwrap())
+        resolver::resolve_settings(&pyproject, &Relativity::Cwd, None)
     } else {
         // Fallback: default settings.
-        debug!("Unable to find pyproject.toml; using default settings...");
-        return Settings::from_configuration(Configuration::default(), &path_dedot::CWD);
+        Settings::from_configuration(Configuration::default(), &path_dedot::CWD)
     }
 }
 

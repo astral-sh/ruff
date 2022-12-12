@@ -32,43 +32,39 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
+use ruff::cli::Overrides;
+use ruff::resolver::{resolve_settings, Relativity};
 
-/// Discover the relevant strategy, project root, and `pyproject.toml`.
-fn discover(config: Option<PathBuf>) -> (Strategy, PathBuf, Option<PathBuf>) {
+/// Resolve the relevant settings strategy and defaults for the current
+/// invocation.
+fn resolve(config: Option<PathBuf>, overrides: &Overrides) -> Result<(Strategy, Settings)> {
     if let Some(pyproject) = config {
         // First priority: the user specified a `pyproject.toml` file. Use that
-        // `pyproject.toml` for all configuration, but resolve paths
-        // relative to the current working directory. (This matches ESLint's
-        // behavior.)
-        (Strategy::Fixed, path_dedot::CWD.clone(), Some(pyproject))
+        // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
+        // current working directory. (This matches ESLint's behavior.)
+        let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
+        Ok((Strategy::Fixed, settings))
     } else if let Some(pyproject) = pyproject::find_pyproject_toml(path_dedot::CWD.as_path()) {
         // Second priority: find a `pyproject.toml` file in the current working path,
         // and resolve all paths relative to that directory. (With
-        // `Strategy::Hierarchical`, we'll end up finding the "closest"
-        // `pyproject.toml` file for every Python file later on, so
-        // these act as the "default" settings.)
-        (
-            Strategy::Hierarchical,
-            pyproject.parent().unwrap().to_path_buf(),
-            Some(pyproject),
-        )
+        // `Strategy::Hierarchical`, we'll end up finding the "closest" `pyproject.toml`
+        // file for every Python file later on, so these act as the "default" settings.)
+        let settings = resolve_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
+        Ok((Strategy::Hierarchical, settings))
     } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
         // Third priority: find a user-specific `pyproject.toml`, but resolve all paths
-        // relative the current working directory. (With
-        // `Strategy::Hierarchical`, we'll end up the "closest"
-        // `pyproject.toml` file for every Python file later on, so
+        // relative the current working directory. (With `Strategy::Hierarchical`, we'll
+        // end up the "closest" `pyproject.toml` file for every Python file later on, so
         // these act as the "default" settings.)
-        (
-            Strategy::Hierarchical,
-            path_dedot::CWD.clone(),
-            Some(pyproject),
-        )
+        let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
+        Ok((Strategy::Hierarchical, settings))
     } else {
         // Fallback: load Ruff's default settings, and resolve all paths relative to the
-        // current working directory. (With `Strategy::Hierarchical`, we'll
-        // end up the "closest" `pyproject.toml` file for every Python file
-        // later on, so these act as the "default" settings.)
-        (Strategy::Hierarchical, path_dedot::CWD.clone(), None)
+        // current working directory. (With `Strategy::Hierarchical`, we'll end up the
+        // "closest" `pyproject.toml` file for every Python file later on, so these act
+        // as the "default" settings.)
+        let settings = Settings::from_configuration(Configuration::default(), &path_dedot::CWD)?;
+        Ok((Strategy::Hierarchical, settings))
     }
 }
 
@@ -86,45 +82,31 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    // Find the root `pyproject.toml`.
-    let (strategy, project_root, pyproject) = discover(cli.config);
+    // Construct the "default" settings. These are used when no `pyproject.toml`
+    // files are present, or files are injected from outside of the hierarchy.
+    let (strategy, settings) = resolve(cli.config, &overrides)?;
 
-    // Reconcile configuration from `pyproject.toml` and command-line arguments.
-    let mut configuration = pyproject
-        .as_ref()
-        .map(|path| Configuration::from_pyproject(path))
-        .transpose()?
-        .unwrap_or_default();
-    configuration.merge(overrides.clone());
-
-    if cli.show_settings {
-        // TODO(charlie): This would be more useful if required a single file, and told
-        // you the settings used to lint that file.
-        commands::show_settings(&configuration, pyproject.as_deref());
-        return Ok(ExitCode::SUCCESS);
-    }
-    if let Some(code) = cli.explain {
-        commands::explain(&code, &configuration.format)?;
-        return Ok(ExitCode::SUCCESS);
-    }
-
-    // Extract options that are included in the `pyproject.toml`, but aren't in
-    // `Settings`.
-    let fix = if configuration.fix {
+    // Extract options that are included in `Settings`, but only apply at the top
+    // level.
+    let autofix = if settings.fix {
         fixer::Mode::Apply
-    } else if matches!(configuration.format, SerializationFormat::Json) {
+    } else if matches!(settings.format, SerializationFormat::Json) {
         fixer::Mode::Generate
     } else {
         fixer::Mode::None
     };
-    let format = configuration.format;
+    let format = settings.format;
 
-    // Construct the "default" settings. These are used when no `pyproject.toml`
-    // files are present, or files are injected from outside of the hierarchy.
-    let defaults = Settings::from_configuration(configuration, &project_root)?;
-
+    if let Some(code) = cli.explain {
+        commands::explain(&code, &format)?;
+        return Ok(ExitCode::SUCCESS);
+    }
+    if cli.show_settings {
+        commands::show_settings(&cli.files, &strategy, &settings, &overrides)?;
+        return Ok(ExitCode::SUCCESS);
+    }
     if cli.show_files {
-        commands::show_files(&cli.files, &strategy, &defaults, &overrides);
+        commands::show_files(&cli.files, &strategy, &settings, &overrides)?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -137,7 +119,7 @@ fn inner_main() -> Result<ExitCode> {
 
     let printer = Printer::new(&format, &log_level);
     if cli.watch {
-        if matches!(fix, fixer::Mode::Generate | fixer::Mode::Apply) {
+        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
         if cli.add_noqa {
@@ -157,11 +139,11 @@ fn inner_main() -> Result<ExitCode> {
         let messages = commands::run(
             &cli.files,
             &strategy,
-            &defaults,
+            &settings,
             &overrides,
             cache_enabled,
             &fixer::Mode::None,
-        );
+        )?;
         printer.write_continuously(&messages)?;
 
         // Configure the file watcher.
@@ -187,11 +169,11 @@ fn inner_main() -> Result<ExitCode> {
                         let messages = commands::run(
                             &cli.files,
                             &strategy,
-                            &defaults,
+                            &settings,
                             &overrides,
                             cache_enabled,
                             &fixer::Mode::None,
-                        );
+                        )?;
                         printer.write_continuously(&messages)?;
                     }
                 }
@@ -199,12 +181,12 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else if cli.add_noqa {
-        let modifications = commands::add_noqa(&cli.files, &strategy, &defaults, &overrides);
+        let modifications = commands::add_noqa(&cli.files, &strategy, &settings, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
     } else if cli.autoformat {
-        let modifications = commands::autoformat(&cli.files, &strategy, &defaults, &overrides);
+        let modifications = commands::autoformat(&cli.files, &strategy, &settings, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Formatted {modifications} files.");
         }
@@ -215,23 +197,23 @@ fn inner_main() -> Result<ExitCode> {
         let diagnostics = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            commands::run_stdin(&defaults, path, &fix)?
+            commands::run_stdin(&settings, path, &autofix)?
         } else {
             commands::run(
                 &cli.files,
                 &strategy,
-                &defaults,
+                &settings,
                 &overrides,
                 cache_enabled,
-                &fix,
-            )
+                &autofix,
+            )?
         };
 
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(fix, fixer::Mode::Apply)) {
-            printer.write_once(&diagnostics, &fix)?;
+        if !(is_stdin && matches!(autofix, fixer::Mode::Apply)) {
+            printer.write_once(&diagnostics, &autofix)?;
         }
 
         // Check for updates if we're in a non-silent log level.

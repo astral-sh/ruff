@@ -18,20 +18,20 @@ use crate::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Di
 use crate::message::Message;
 use crate::resolver::Strategy;
 use crate::settings::types::SerializationFormat;
-use crate::{resolver, Configuration, Settings};
+use crate::{resolver, Settings};
 
 /// Run the linter over a collection of files.
 pub fn run(
     files: &[PathBuf],
     strategy: &Strategy,
-    defaults: &Settings,
+    default: &Settings,
     overrides: &Overrides,
     cache: bool,
     autofix: &fixer::Mode,
-) -> Diagnostics {
+) -> Result<Diagnostics> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, defaults);
+    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, default)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -41,7 +41,7 @@ pub fn run(
             match entry {
                 Ok(entry) => {
                     let path = entry.path();
-                    let settings = resolver.resolve(path, strategy).unwrap_or(defaults);
+                    let settings = resolver.resolve(path, strategy).unwrap_or(default);
                     lint_path(path, settings, &cache.into(), autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
@@ -53,7 +53,7 @@ pub fn run(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
-                    let settings = resolver.resolve(path, strategy).unwrap_or(defaults);
+                    let settings = resolver.resolve(path, strategy).unwrap_or(default);
                     if settings.enabled.contains(&CheckCode::E902) {
                         Diagnostics::new(vec![Message {
                             kind: CheckKind::IOError(message),
@@ -82,7 +82,7 @@ pub fn run(
     let duration = start.elapsed();
     debug!("Checked files in: {:?}", duration);
 
-    diagnostics
+    Ok(diagnostics)
 }
 
 /// Read a `String` from `stdin`.
@@ -108,12 +108,12 @@ pub fn run_stdin(
 pub fn add_noqa(
     files: &[PathBuf],
     strategy: &Strategy,
-    defaults: &Settings,
+    default: &Settings,
     overrides: &Overrides,
-) -> usize {
+) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, defaults);
+    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, default)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -122,7 +122,7 @@ pub fn add_noqa(
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path, strategy).unwrap_or(defaults);
+            let settings = resolver.resolve(path, strategy).unwrap_or(default);
             match add_noqa_to_path(path, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
@@ -136,19 +136,19 @@ pub fn add_noqa(
     let duration = start.elapsed();
     debug!("Added noqa to files in: {:?}", duration);
 
-    modifications
+    Ok(modifications)
 }
 
 /// Automatically format a collection of files.
 pub fn autoformat(
     files: &[PathBuf],
     strategy: &Strategy,
-    defaults: &Settings,
+    default: &Settings,
     overrides: &Overrides,
-) -> usize {
+) -> Result<usize> {
     // Collect all the files to format.
     let start = Instant::now();
-    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, defaults);
+    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, default)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -157,7 +157,7 @@ pub fn autoformat(
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path, strategy).unwrap_or(defaults);
+            let settings = resolver.resolve(path, strategy).unwrap_or(default);
             match autoformat_path(path, settings) {
                 Ok(()) => Some(()),
                 Err(e) => {
@@ -171,13 +171,32 @@ pub fn autoformat(
     let duration = start.elapsed();
     debug!("Auto-formatted files in: {:?}", duration);
 
-    modifications
+    Ok(modifications)
 }
 
 /// Print the user-facing configuration settings.
-pub fn show_settings(configuration: &Configuration, pyproject: Option<&Path>) {
-    println!("Resolved configuration: {configuration:#?}");
-    println!("Found pyproject.toml at: {pyproject:?}");
+pub fn show_settings(
+    files: &[PathBuf],
+    strategy: &Strategy,
+    default: &Settings,
+    overrides: &Overrides,
+) -> Result<()> {
+    // Collect all files in the hierarchy.
+    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides, default)?;
+
+    // Print the list of files.
+    let Some(entry) = paths
+        .iter()
+        .flatten()
+        .sorted_by(|a, b| a.path().cmp(b.path())).next() else {
+        bail!("No files found under the given path");
+    };
+    let path = entry.path();
+    let settings = resolver.resolve(path, strategy).unwrap_or(default);
+    println!("Resolved settings for: {path:?}");
+    println!("{settings:#?}");
+
+    Ok(())
 }
 
 /// Show the list of files to be checked based on current settings.
@@ -186,9 +205,9 @@ pub fn show_files(
     strategy: &Strategy,
     default: &Settings,
     overrides: &Overrides,
-) {
+) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) = resolver::resolve_python_files(files, strategy, overrides, default);
+    let (paths, _resolver) = resolver::resolve_python_files(files, strategy, overrides, default)?;
 
     // Print the list of files.
     for entry in paths
@@ -198,6 +217,8 @@ pub fn show_files(
     {
         println!("{}", entry.path().to_string_lossy());
     }
+
+    Ok(())
 }
 
 #[derive(Serialize)]
