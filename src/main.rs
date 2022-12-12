@@ -175,8 +175,8 @@ fn inner_main() -> Result<ExitCode> {
             match rx.recv() {
                 Ok(event) => {
                     let paths = event?.paths;
-                    let py_changed = paths.iter().any(|p| {
-                        p.extension()
+                    let py_changed = paths.iter().any(|path| {
+                        path.extension()
                             .map(|ext| ext == "py" || ext == "pyi")
                             .unwrap_or_default()
                     });
