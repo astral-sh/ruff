@@ -1447,7 +1447,7 @@ Exclusions are based on globs, and can be either:
   (to exclude any Python files in `directory`). Note that these paths are relative to the
   project root (e.g., the directory containing your `pyproject.toml`).
 
-Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify
+Note that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify
 the excluded paths.
 
 **Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
