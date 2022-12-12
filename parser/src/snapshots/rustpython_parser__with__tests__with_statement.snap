@@ -2091,4 +2091,380 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             type_comment: None,
         },
     },
+    Located {
+        location: Location {
+            row: 23,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 24,
+                column: 0,
+            },
+        ),
+        custom: (),
+        node: With {
+            items: [
+                Withitem {
+                    context_expr: Located {
+                        location: Location {
+                            row: 23,
+                            column: 6,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 23,
+                                column: 7,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                0,
+                            ),
+                            kind: None,
+                        },
+                    },
+                    optional_vars: Some(
+                        Located {
+                            location: Location {
+                                row: 23,
+                                column: 11,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 23,
+                                    column: 12,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "a",
+                                ctx: Store,
+                            },
+                        },
+                    ),
+                },
+            ],
+            body: [
+                Located {
+                    location: Location {
+                        row: 23,
+                        column: 15,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 23,
+                            column: 19,
+                        },
+                    ),
+                    custom: (),
+                    node: Pass,
+                },
+            ],
+            type_comment: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 24,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 25,
+                column: 0,
+            },
+        ),
+        custom: (),
+        node: With {
+            items: [
+                Withitem {
+                    context_expr: Located {
+                        location: Location {
+                            row: 24,
+                            column: 6,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 24,
+                                column: 7,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                0,
+                            ),
+                            kind: None,
+                        },
+                    },
+                    optional_vars: Some(
+                        Located {
+                            location: Location {
+                                row: 24,
+                                column: 11,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 24,
+                                    column: 12,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "a",
+                                ctx: Store,
+                            },
+                        },
+                    ),
+                },
+            ],
+            body: [
+                Located {
+                    location: Location {
+                        row: 24,
+                        column: 16,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 24,
+                            column: 20,
+                        },
+                    ),
+                    custom: (),
+                    node: Pass,
+                },
+            ],
+            type_comment: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 25,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 26,
+                column: 0,
+            },
+        ),
+        custom: (),
+        node: With {
+            items: [
+                Withitem {
+                    context_expr: Located {
+                        location: Location {
+                            row: 25,
+                            column: 6,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 25,
+                                column: 7,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                0,
+                            ),
+                            kind: None,
+                        },
+                    },
+                    optional_vars: Some(
+                        Located {
+                            location: Location {
+                                row: 25,
+                                column: 11,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 25,
+                                    column: 12,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "a",
+                                ctx: Store,
+                            },
+                        },
+                    ),
+                },
+                Withitem {
+                    context_expr: Located {
+                        location: Location {
+                            row: 25,
+                            column: 14,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 25,
+                                column: 15,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
+                        },
+                    },
+                    optional_vars: Some(
+                        Located {
+                            location: Location {
+                                row: 25,
+                                column: 19,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 25,
+                                    column: 20,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "b",
+                                ctx: Store,
+                            },
+                        },
+                    ),
+                },
+            ],
+            body: [
+                Located {
+                    location: Location {
+                        row: 25,
+                        column: 23,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 25,
+                            column: 27,
+                        },
+                    ),
+                    custom: (),
+                    node: Pass,
+                },
+            ],
+            type_comment: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 26,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 27,
+                column: 0,
+            },
+        ),
+        custom: (),
+        node: With {
+            items: [
+                Withitem {
+                    context_expr: Located {
+                        location: Location {
+                            row: 26,
+                            column: 6,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 26,
+                                column: 7,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                0,
+                            ),
+                            kind: None,
+                        },
+                    },
+                    optional_vars: Some(
+                        Located {
+                            location: Location {
+                                row: 26,
+                                column: 11,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 26,
+                                    column: 12,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "a",
+                                ctx: Store,
+                            },
+                        },
+                    ),
+                },
+                Withitem {
+                    context_expr: Located {
+                        location: Location {
+                            row: 26,
+                            column: 14,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 26,
+                                column: 15,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
+                        },
+                    },
+                    optional_vars: Some(
+                        Located {
+                            location: Location {
+                                row: 26,
+                                column: 19,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 26,
+                                    column: 20,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "b",
+                                ctx: Store,
+                            },
+                        },
+                    ),
+                },
+            ],
+            body: [
+                Located {
+                    location: Location {
+                        row: 26,
+                        column: 24,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 26,
+                            column: 28,
+                        },
+                    ),
+                    custom: (),
+                    node: Pass,
+                },
+            ],
+            type_comment: None,
+        },
+    },
 ]

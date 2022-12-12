@@ -15,6 +15,7 @@
 //! intermediate data types.
 
 use crate::ast::{self, Location};
+use crate::context;
 use crate::error::{LexicalError, LexicalErrorType};
 use crate::token::Tok;
 use lalrpop_util::ParseError as LalrpopError;
@@ -117,7 +118,9 @@ impl TryFrom<ExprOrWithitems> for Vec<ast::Withitem> {
                     .into_iter()
                     .map(|(context_expr, optional_vars)| ast::Withitem {
                         context_expr: Box::new(context_expr),
-                        optional_vars,
+                        optional_vars: optional_vars.map(|expr| {
+                            Box::new(context::set_context(*expr, ast::ExprContext::Store))
+                        }),
                     })
                     .collect())
             }
@@ -158,6 +161,10 @@ with (a := 0): pass
 with (a := 0) as x: pass
 with (a := 0, b := 1): pass
 with (a := 0, b := 1) as x: pass
+with (0 as a): pass
+with (0 as a,): pass
+with (0 as a, 1 as b): pass
+with (0 as a, 1 as b,): pass
 ";
         insta::assert_debug_snapshot!(parse_program(source, "<test>").unwrap());
     }
