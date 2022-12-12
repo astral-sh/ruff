@@ -11,20 +11,14 @@
     clippy::too_many_lines
 )]
 
-use std::io::{self, Read};
+use std::io::{self};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
-use std::time::Instant;
 
 use ::ruff::autofix::fixer;
-use ::ruff::checks::{CheckCode, CheckKind};
-use ::ruff::cli::{extract_log_level, Cli, Overrides};
-use ::ruff::fs::collect_python_files;
-use ::ruff::iterators::par_iter;
-use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
+use ::ruff::cli::{extract_log_level, Cli};
 use ::ruff::logging::{set_up_logging, LogLevel};
-use ::ruff::message::Message;
 use ::ruff::printer::Printer;
 use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::SerializationFormat;
@@ -35,150 +29,8 @@ use ::ruff::{cache, commands};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
-use log::{debug, error};
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
-#[cfg(not(target_family = "wasm"))]
-use rayon::prelude::*;
-use rustpython_ast::Location;
-
-fn read_from_stdin() -> Result<String> {
-    let mut buffer = String::new();
-    io::stdin().lock().read_to_string(&mut buffer)?;
-    Ok(buffer)
-}
-
-fn run_once_stdin(
-    settings: &Settings,
-    filename: &Path,
-    autofix: &fixer::Mode,
-) -> Result<Diagnostics> {
-    let stdin = read_from_stdin()?;
-    let mut diagnostics = lint_stdin(filename, &stdin, settings, autofix)?;
-    diagnostics.messages.sort_unstable();
-    Ok(diagnostics)
-}
-
-fn run_once(
-    files: &[PathBuf],
-    defaults: &Settings,
-    overrides: &Overrides,
-    cache: bool,
-    autofix: &fixer::Mode,
-) -> Diagnostics {
-    // Collect all the files to check.
-    let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, overrides, defaults);
-    let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
-
-    let start = Instant::now();
-    let mut diagnostics: Diagnostics = par_iter(&paths)
-        .map(|entry| {
-            match entry {
-                Ok(entry) => {
-                    let path = entry.path();
-                    let settings = resolver.resolve(path).unwrap_or(defaults);
-                    lint_path(path, settings, &cache.into(), autofix)
-                        .map_err(|e| (Some(path.to_owned()), e.to_string()))
-                }
-                Err(e) => Err((
-                    e.path().map(Path::to_owned),
-                    e.io_error()
-                        .map_or_else(|| e.to_string(), io::Error::to_string),
-                )),
-            }
-            .unwrap_or_else(|(path, message)| {
-                if let Some(path) = &path {
-                    let settings = resolver.resolve(path).unwrap_or(defaults);
-                    if settings.enabled.contains(&CheckCode::E902) {
-                        Diagnostics::new(vec![Message {
-                            kind: CheckKind::IOError(message),
-                            location: Location::default(),
-                            end_location: Location::default(),
-                            fix: None,
-                            filename: path.to_string_lossy().to_string(),
-                            source: None,
-                        }])
-                    } else {
-                        error!("Failed to check {}: {message}", path.to_string_lossy());
-                        Diagnostics::default()
-                    }
-                } else {
-                    error!("{message}");
-                    Diagnostics::default()
-                }
-            })
-        })
-        .reduce(Diagnostics::default, |mut acc, item| {
-            acc += item;
-            acc
-        });
-
-    diagnostics.messages.sort_unstable();
-    let duration = start.elapsed();
-    debug!("Checked files in: {:?}", duration);
-
-    diagnostics
-}
-
-fn add_noqa(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) -> usize {
-    // Collect all the files to check.
-    let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, overrides, defaults);
-    let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
-
-    let start = Instant::now();
-    let modifications: usize = par_iter(&paths)
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            let settings = resolver.resolve(path).unwrap_or(defaults);
-            match add_noqa_to_path(path, settings) {
-                Ok(count) => Some(count),
-                Err(e) => {
-                    error!("Failed to add noqa to {}: {e}", path.to_string_lossy());
-                    None
-                }
-            }
-        })
-        .sum();
-
-    let duration = start.elapsed();
-    debug!("Added noqa to files in: {:?}", duration);
-
-    modifications
-}
-
-fn autoformat(files: &[PathBuf], defaults: &Settings, overrides: &Overrides) -> usize {
-    // Collect all the files to format.
-    let start = Instant::now();
-    let (paths, resolver) = collect_python_files(files, overrides, defaults);
-    let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
-
-    let start = Instant::now();
-    let modifications = par_iter(&paths)
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            let settings = resolver.resolve(path).unwrap_or(defaults);
-            match autoformat_path(path, settings) {
-                Ok(()) => Some(()),
-                Err(e) => {
-                    error!("Failed to autoformat {}: {e}", path.to_string_lossy());
-                    None
-                }
-            }
-        })
-        .count();
-
-    let duration = start.elapsed();
-    debug!("Auto-formatted files in: {:?}", duration);
-
-    modifications
-}
 
 fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
@@ -268,7 +120,7 @@ fn inner_main() -> Result<ExitCode> {
         printer.clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = run_once(
+        let messages = commands::run(
             &cli.files,
             &defaults,
             &overrides,
@@ -297,7 +149,7 @@ fn inner_main() -> Result<ExitCode> {
                         printer.clear_screen()?;
                         printer.write_to_user("File change detected...\n");
 
-                        let messages = run_once(
+                        let messages = commands::run(
                             &cli.files,
                             &defaults,
                             &overrides,
@@ -311,12 +163,12 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else if cli.add_noqa {
-        let modifications = add_noqa(&cli.files, &defaults, &overrides);
+        let modifications = commands::add_noqa(&cli.files, &defaults, &overrides);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
     } else if cli.autoformat {
-        let modifications = autoformat(&cli.files, &defaults, &overrides);
+        let modifications = commands::autoformat(&cli.files, &defaults, &overrides);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Formatted {modifications} files.");
         }
@@ -327,9 +179,9 @@ fn inner_main() -> Result<ExitCode> {
         let diagnostics = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            run_once_stdin(&defaults, path, &fix)?
+            commands::run_stdin(&defaults, path, &fix)?
         } else {
-            run_once(&cli.files, &defaults, &overrides, cache_enabled, &fix)
+            commands::run(&cli.files, &defaults, &overrides, cache_enabled, &fix)
         };
 
         // Always try to print violations (the printer itself may suppress output),
