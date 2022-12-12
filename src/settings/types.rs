@@ -1,6 +1,6 @@
 use std::env;
 use std::hash::Hash;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Result};
@@ -53,11 +53,7 @@ pub enum FilePattern {
 }
 
 impl FilePattern {
-    pub fn add_to(
-        self,
-        builder: &mut GlobSetBuilder,
-        project_root: Option<&PathBuf>,
-    ) -> Result<()> {
+    pub fn add_to(self, builder: &mut GlobSetBuilder, project_root: Option<&Path>) -> Result<()> {
         match self {
             FilePattern::Builtin(pattern) => {
                 builder.add(Glob::from_str(pattern)?);

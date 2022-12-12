@@ -58,6 +58,7 @@ pub mod flake8_tidy_imports;
 mod flake8_unused_arguments;
 pub mod fs;
 mod isort;
+pub mod iterators;
 mod lex;
 pub mod linter;
 pub mod logging;
@@ -73,6 +74,7 @@ mod pygrep_hooks;
 mod pylint;
 mod python;
 mod pyupgrade;
+pub mod resolver;
 mod ruff;
 mod rustpython_helpers;
 pub mod settings;
@@ -97,8 +99,8 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     };
 
     let settings = Settings::from_configuration(
-        Configuration::from_pyproject(pyproject.as_ref(), project_root.as_ref())?,
-        project_root.as_ref(),
+        Configuration::from_pyproject(pyproject.as_ref())?,
+        project_root.as_deref(),
     )?;
 
     // Tokenize once.

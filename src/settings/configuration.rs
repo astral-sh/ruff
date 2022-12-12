@@ -5,18 +5,19 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use log::debug;
 use once_cell::sync::Lazy;
-use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::checks_gen::{CheckCodePrefix, CATEGORIES};
 use crate::cli::{collect_per_file_ignores, Overrides};
+use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
+    flake8_tidy_imports, isort, mccabe, pep8_naming, pyupgrade,
 };
 
 #[derive(Debug)]
@@ -80,11 +81,18 @@ static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
     Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
 
 impl Configuration {
-    pub fn from_pyproject(
-        pyproject: Option<&PathBuf>,
-        project_root: Option<&PathBuf>,
-    ) -> Result<Self> {
-        let options = load_options(pyproject)?;
+    pub fn from_pyproject(pyproject: Option<&PathBuf>) -> Result<Self> {
+        Self::from_options(pyproject.map_or_else(
+            || {
+                debug!("No pyproject.toml found.");
+                debug!("Falling back to default configuration...");
+                Ok(Options::default())
+            },
+            |path| load_options(path),
+        )?)
+    }
+
+    pub fn from_options(options: Options) -> Result<Self> {
         Ok(Configuration {
             allowed_confusables: FxHashSet::from_iter(
                 options.allowed_confusables.unwrap_or_default(),
@@ -95,21 +103,10 @@ impl Configuration {
                 None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
             },
             src: options.src.map_or_else(
-                || {
-                    vec![match project_root {
-                        Some(project_root) => project_root.clone(),
-                        None => path_dedot::CWD.clone(),
-                    }]
-                },
+                || vec![Path::new(".").to_path_buf()],
                 |src| {
                     src.iter()
-                        .map(|path| {
-                            let path = Path::new(path);
-                            match project_root {
-                                Some(project_root) => fs::normalize_path_to(path, project_root),
-                                None => fs::normalize_path(path),
-                            }
-                        })
+                        .map(|path| Path::new(path).to_path_buf())
                         .collect()
                 },
             ),
@@ -187,54 +184,54 @@ impl Configuration {
         })
     }
 
-    pub fn merge(&mut self, overrides: Overrides) {
-        if let Some(dummy_variable_rgx) = overrides.dummy_variable_rgx {
-            self.dummy_variable_rgx = dummy_variable_rgx;
+    pub fn merge(&mut self, overrides: &Overrides) {
+        if let Some(dummy_variable_rgx) = &overrides.dummy_variable_rgx {
+            self.dummy_variable_rgx = dummy_variable_rgx.clone();
         }
-        if let Some(exclude) = overrides.exclude {
-            self.exclude = exclude;
+        if let Some(exclude) = &overrides.exclude {
+            self.exclude = exclude.clone();
         }
-        if let Some(extend_exclude) = overrides.extend_exclude {
-            self.extend_exclude = extend_exclude;
+        if let Some(extend_exclude) = &overrides.extend_exclude {
+            self.extend_exclude = extend_exclude.clone();
         }
-        if let Some(extend_ignore) = overrides.extend_ignore {
-            self.extend_ignore = extend_ignore;
+        if let Some(extend_ignore) = &overrides.extend_ignore {
+            self.extend_ignore = extend_ignore.clone();
         }
-        if let Some(extend_select) = overrides.extend_select {
-            self.extend_select = extend_select;
+        if let Some(extend_select) = &overrides.extend_select {
+            self.extend_select = extend_select.clone();
         }
-        if let Some(fix) = overrides.fix {
-            self.fix = fix;
+        if let Some(fix) = &overrides.fix {
+            self.fix = *fix;
         }
-        if let Some(fixable) = overrides.fixable {
-            self.fixable = fixable;
+        if let Some(fixable) = &overrides.fixable {
+            self.fixable = fixable.clone();
         }
-        if let Some(format) = overrides.format {
-            self.format = format;
+        if let Some(format) = &overrides.format {
+            self.format = *format;
         }
-        if let Some(ignore) = overrides.ignore {
-            self.ignore = ignore;
+        if let Some(ignore) = &overrides.ignore {
+            self.ignore = ignore.clone();
         }
-        if let Some(line_length) = overrides.line_length {
-            self.line_length = line_length;
+        if let Some(line_length) = &overrides.line_length {
+            self.line_length = *line_length;
         }
-        if let Some(max_complexity) = overrides.max_complexity {
-            self.mccabe.max_complexity = max_complexity;
+        if let Some(max_complexity) = &overrides.max_complexity {
+            self.mccabe.max_complexity = *max_complexity;
         }
-        if let Some(per_file_ignores) = overrides.per_file_ignores {
-            self.per_file_ignores = collect_per_file_ignores(per_file_ignores);
+        if let Some(per_file_ignores) = &overrides.per_file_ignores {
+            self.per_file_ignores = collect_per_file_ignores(per_file_ignores.clone());
         }
-        if let Some(select) = overrides.select {
-            self.select = select;
+        if let Some(select) = &overrides.select {
+            self.select = select.clone();
         }
-        if let Some(show_source) = overrides.show_source {
-            self.show_source = show_source;
+        if let Some(show_source) = &overrides.show_source {
+            self.show_source = *show_source;
         }
-        if let Some(target_version) = overrides.target_version {
-            self.target_version = target_version;
+        if let Some(target_version) = &overrides.target_version {
+            self.target_version = *target_version;
         }
-        if let Some(unfixable) = overrides.unfixable {
-            self.unfixable = unfixable;
+        if let Some(unfixable) = &overrides.unfixable {
+            self.unfixable = unfixable.clone();
         }
     }
 }

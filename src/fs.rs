@@ -11,6 +11,7 @@ use rustc_hash::FxHashSet;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::checks::CheckCode;
+use crate::resolver::Resolver;
 
 /// Extract the absolute path and basename (as strings) from a Path.
 fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -30,33 +31,62 @@ fn is_excluded(file_path: &str, file_basename: &str, exclude: &globset::GlobSet)
 }
 
 fn is_included(path: &Path) -> bool {
-    let file_name = path.to_string_lossy();
-    file_name.ends_with(".py") || file_name.ends_with(".pyi")
+    path.extension()
+        .map_or(false, |ext| ext == "py" || ext == "pyi")
 }
 
+/// Find all `pyproject.toml` files for a given `Path`. Both parents and
+/// children will be included in the resulting `Vec`.
+pub fn iter_pyproject_files(path: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+
+    // Search for `pyproject.toml` files in all parent directories.
+    let path = normalize_path(path);
+    for path in path.ancestors() {
+        if path.is_dir() {
+            let toml_path = path.join("pyproject.toml");
+            if toml_path.exists() {
+                paths.push(toml_path);
+            }
+        }
+    }
+
+    // Search for `pyproject.toml` files in all child directories.
+    for path in WalkDir::new(path)
+        .into_iter()
+        .filter_entry(|entry| {
+            entry.file_name().to_str().map_or(false, |file_name| {
+                entry.depth() == 0 || !file_name.starts_with('.')
+            })
+        })
+        .filter_map(std::result::Result::ok)
+        .filter(|entry| entry.path().ends_with("pyproject.toml"))
+    {
+        paths.push(path.into_path());
+    }
+
+    paths
+}
+
+/// Find all Python (`.py` and `.pyi` files) in a given `Path`.
 pub fn iter_python_files<'a>(
     path: &'a Path,
-    exclude: &'a globset::GlobSet,
-    extend_exclude: &'a globset::GlobSet,
+    resolver: &'a Resolver<'a>,
 ) -> impl Iterator<Item = Result<DirEntry, walkdir::Error>> + 'a {
-    // Run some checks over the provided patterns, to enable optimizations below.
-    let has_exclude = !exclude.is_empty();
-    let has_extend_exclude = !extend_exclude.is_empty();
-
     WalkDir::new(normalize_path(path))
         .into_iter()
         .filter_entry(move |entry| {
-            if !has_exclude && !has_extend_exclude {
-                return true;
-            }
-
             let path = entry.path();
+            let settings = resolver.resolve(path);
+            let exclude = &settings.exclude;
+            let extend_exclude = &settings.extend_exclude;
+
             match extract_path_names(path) {
                 Ok((file_path, file_basename)) => {
-                    if has_exclude && is_excluded(file_path, file_basename, exclude) {
+                    if !exclude.is_empty() && is_excluded(file_path, file_basename, exclude) {
                         debug!("Ignored path via `exclude`: {:?}", path);
                         false
-                    } else if has_extend_exclude
+                    } else if !extend_exclude.is_empty()
                         && is_excluded(file_path, file_basename, extend_exclude)
                     {
                         debug!("Ignored path via `extend-exclude`: {:?}", path);
@@ -131,7 +161,7 @@ pub(crate) fn read_file(path: &Path) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     use anyhow::Result;
     use globset::GlobSet;
@@ -155,7 +185,7 @@ mod tests {
         assert!(!is_included(&path));
     }
 
-    fn make_exclusion(file_pattern: FilePattern, project_root: Option<&PathBuf>) -> GlobSet {
+    fn make_exclusion(file_pattern: FilePattern, project_root: Option<&Path>) -> GlobSet {
         let mut builder = globset::GlobSetBuilder::new();
         file_pattern.add_to(&mut builder, project_root).unwrap();
         builder.build().unwrap()
@@ -171,7 +201,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+            &make_exclusion(exclude, Some(project_root))
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
@@ -180,7 +210,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+            &make_exclusion(exclude, Some(project_root))
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -191,7 +221,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+            &make_exclusion(exclude, Some(project_root))
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
@@ -200,7 +230,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+            &make_exclusion(exclude, Some(project_root))
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -211,7 +241,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+            &make_exclusion(exclude, Some(project_root))
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -222,7 +252,7 @@ mod tests {
         assert!(is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+            &make_exclusion(exclude, Some(project_root))
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -233,7 +263,7 @@ mod tests {
         assert!(!is_excluded(
             file_path,
             file_basename,
-            &make_exclusion(exclude, Some(&project_root.to_path_buf()))
+            &make_exclusion(exclude, Some(project_root))
         ));
 
         Ok(())

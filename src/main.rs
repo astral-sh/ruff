@@ -19,12 +19,14 @@ use std::time::Instant;
 
 use ::ruff::autofix::fixer;
 use ::ruff::checks::{CheckCode, CheckKind};
-use ::ruff::cli::{extract_log_level, Cli};
+use ::ruff::cli::{extract_log_level, Cli, Overrides};
 use ::ruff::fs::iter_python_files;
+use ::ruff::iterators::par_iter;
 use ::ruff::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::message::Message;
 use ::ruff::printer::Printer;
+use ::ruff::resolver::Resolver;
 use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
@@ -38,22 +40,9 @@ use log::{debug, error};
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff::resolver::discover_settings;
 use rustpython_ast::Location;
 use walkdir::DirEntry;
-
-/// Shim that calls `par_iter` except for wasm because there's no wasm support
-/// in rayon yet (there is a shim to be used for the web, but it requires js
-/// cooperation) Unfortunately, `ParallelIterator` does not implement `Iterator`
-/// so the signatures diverge
-#[cfg(not(target_family = "wasm"))]
-fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl ParallelIterator<Item = &T> {
-    iterable.par_iter()
-}
-
-#[cfg(target_family = "wasm")]
-fn par_iter<T: Sync>(iterable: &Vec<T>) -> impl Iterator<Item = &T> {
-    iterable.iter()
-}
 
 fn read_from_stdin() -> Result<String> {
     let mut buffer = String::new();
@@ -74,15 +63,23 @@ fn run_once_stdin(
 
 fn run_once(
     files: &[PathBuf],
-    settings: &Settings,
+    default: &Settings,
+    overrides: &Overrides,
     cache: bool,
     autofix: &fixer::Mode,
 ) -> Diagnostics {
+    // Discover the settings for the filesystem hierarchy.
+    let settings = discover_settings(files, overrides);
+    let resolver = Resolver {
+        default,
+        settings: &settings,
+    };
+
     // Collect all the files to check.
     let start = Instant::now();
     let paths: Vec<Result<DirEntry, walkdir::Error>> = files
         .iter()
-        .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
+        .flat_map(|path| iter_python_files(path, &resolver))
         .collect();
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
@@ -93,6 +90,7 @@ fn run_once(
             match entry {
                 Ok(entry) => {
                     let path = entry.path();
+                    let settings = resolver.resolve(path);
                     lint_path(path, settings, &cache.into(), autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
@@ -104,6 +102,7 @@ fn run_once(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = path {
+                    let settings = resolver.resolve(&path);
                     if settings.enabled.contains(&CheckCode::E902) {
                         Diagnostics::new(vec![Message {
                             kind: CheckKind::IOError(message),
@@ -135,12 +134,19 @@ fn run_once(
     diagnostics
 }
 
-fn add_noqa(files: &[PathBuf], settings: &Settings) -> usize {
+fn add_noqa(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> usize {
+    // Discover the settings for the filesystem hierarchy.
+    let settings = discover_settings(files, overrides);
+    let resolver = Resolver {
+        default,
+        settings: &settings,
+    };
+
     // Collect all the files to check.
     let start = Instant::now();
     let paths: Vec<DirEntry> = files
         .iter()
-        .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
+        .flat_map(|path| iter_python_files(path, &resolver))
         .flatten()
         .collect();
     let duration = start.elapsed();
@@ -150,6 +156,7 @@ fn add_noqa(files: &[PathBuf], settings: &Settings) -> usize {
     let modifications: usize = par_iter(&paths)
         .filter_map(|entry| {
             let path = entry.path();
+            let settings = resolver.resolve(path);
             match add_noqa_to_path(path, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
@@ -166,12 +173,19 @@ fn add_noqa(files: &[PathBuf], settings: &Settings) -> usize {
     modifications
 }
 
-fn autoformat(files: &[PathBuf], settings: &Settings) -> usize {
+fn autoformat(files: &[PathBuf], default: &Settings, overrides: &Overrides) -> usize {
+    // Discover the settings for the filesystem hierarchy.
+    let settings = discover_settings(files, overrides);
+    let resolver = Resolver {
+        default,
+        settings: &settings,
+    };
+
     // Collect all the files to format.
     let start = Instant::now();
     let paths: Vec<DirEntry> = files
         .iter()
-        .flat_map(|path| iter_python_files(path, &settings.exclude, &settings.extend_exclude))
+        .flat_map(|path| iter_python_files(path, &resolver))
         .flatten()
         .collect();
     let duration = start.elapsed();
@@ -204,29 +218,45 @@ fn inner_main() -> Result<ExitCode> {
     set_up_logging(&log_level)?;
 
     if let Some(shell) = cli.generate_shell_completion {
-        shell.generate(&mut Cli::command(), &mut std::io::stdout());
+        shell.generate(&mut Cli::command(), &mut io::stdout());
         return Ok(ExitCode::SUCCESS);
     }
 
     // Find the project root and pyproject.toml.
-    let config: Option<PathBuf> = cli.config;
-    let project_root = config.as_ref().map_or_else(
+    // TODO(charlie): look in the current directory, but respect `--config`.
+    let project_root = cli.config.as_ref().map_or_else(
         || pyproject::find_project_root(&cli.files),
         |config| config.parent().map(fs::normalize_path),
     );
-    let pyproject = config.or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
+    let pyproject = cli
+        .config
+        .or_else(|| pyproject::find_pyproject_toml(project_root.as_ref()));
+    match &project_root {
+        Some(path) => debug!("Found project root at: {:?}", path),
+        None => debug!("Unable to identify project root; assuming current directory..."),
+    };
+    match &pyproject {
+        Some(path) => debug!("Found pyproject.toml at: {:?}", path),
+        None => debug!("Unable to find pyproject.toml; using default settings..."),
+    };
 
     // Reconcile configuration from pyproject.toml and command-line arguments.
-    let mut configuration =
-        Configuration::from_pyproject(pyproject.as_ref(), project_root.as_ref())?;
-    configuration.merge(overrides);
+    let mut configuration = Configuration::from_pyproject(pyproject.as_ref())?;
+    configuration.merge(&overrides);
 
     if cli.show_settings && cli.show_files {
         eprintln!("Error: specify --show-settings or show-files (not both).");
         return Ok(ExitCode::FAILURE);
     }
+
     if cli.show_settings {
-        commands::show_settings(&configuration, project_root.as_ref(), pyproject.as_ref());
+        // TODO(charlie): This would be more useful if required a single file, and told
+        // you the settings used to lint that file.
+        commands::show_settings(
+            &configuration,
+            project_root.as_deref(),
+            pyproject.as_deref(),
+        );
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -240,18 +270,7 @@ fn inner_main() -> Result<ExitCode> {
     };
     let format = configuration.format;
 
-    let settings = Settings::from_configuration(configuration, project_root.as_ref())?;
-
-    // Now that we've inferred the appropriate log level, add some debug
-    // information.
-    match &project_root {
-        Some(path) => debug!("Found project root at: {:?}", path),
-        None => debug!("Unable to identify project root; assuming current directory..."),
-    };
-    match &pyproject {
-        Some(path) => debug!("Found pyproject.toml at: {:?}", path),
-        None => debug!("Unable to find pyproject.toml; using default settings..."),
-    };
+    let settings = Settings::from_configuration(configuration, project_root.as_deref())?;
 
     if let Some(code) = cli.explain {
         commands::explain(&code, format)?;
@@ -259,7 +278,7 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     if cli.show_files {
-        commands::show_files(&cli.files, &settings);
+        commands::show_files(&cli.files, &settings, &overrides);
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -289,7 +308,13 @@ fn inner_main() -> Result<ExitCode> {
         printer.clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
+        let messages = run_once(
+            &cli.files,
+            &settings,
+            &overrides,
+            cache_enabled,
+            &fixer::Mode::None,
+        );
         printer.write_continuously(&messages)?;
 
         // Configure the file watcher.
@@ -305,15 +330,20 @@ fn inner_main() -> Result<ExitCode> {
                     let paths = e?.paths;
                     let py_changed = paths.iter().any(|p| {
                         p.extension()
-                            .map(|ext| ext.eq_ignore_ascii_case("py"))
+                            .map(|ext| ext == "py" || ext == "pyi")
                             .unwrap_or_default()
                     });
                     if py_changed {
                         printer.clear_screen()?;
                         printer.write_to_user("File change detected...\n");
 
-                        let messages =
-                            run_once(&cli.files, &settings, cache_enabled, &fixer::Mode::None);
+                        let messages = run_once(
+                            &cli.files,
+                            &settings,
+                            &overrides,
+                            cache_enabled,
+                            &fixer::Mode::None,
+                        );
                         printer.write_continuously(&messages)?;
                     }
                 }
@@ -321,12 +351,12 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else if cli.add_noqa {
-        let modifications = add_noqa(&cli.files, &settings);
+        let modifications = add_noqa(&cli.files, &settings, &overrides);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
     } else if cli.autoformat {
-        let modifications = autoformat(&cli.files, &settings);
+        let modifications = autoformat(&cli.files, &settings, &overrides);
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Formatted {modifications} files.");
         }
@@ -339,7 +369,7 @@ fn inner_main() -> Result<ExitCode> {
             let path = Path::new(&filename);
             run_once_stdin(&settings, path, &fix)?
         } else {
-            run_once(&cli.files, &settings, cache_enabled, &fix)
+            run_once(&cli.files, &settings, &overrides, cache_enabled, &fix)
         };
 
         // Always try to print violations (the printer itself may suppress output),
