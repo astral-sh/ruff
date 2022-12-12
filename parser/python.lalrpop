@@ -439,7 +439,8 @@ TryStatement: ast::Stmt = {
             .last()
             .map(|last| last.end_location)
             .or_else(|| orelse.last().map(|last| last.end_location))
-            .unwrap_or_else(|| handlers.last().unwrap().end_location);
+            .or_else(|| handlers.last().map(|last| last.end_location))
+            .unwrap();
         ast::Stmt {
             custom: (),
             location,
