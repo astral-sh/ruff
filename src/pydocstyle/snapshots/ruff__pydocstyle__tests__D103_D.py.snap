@@ -7,7 +7,7 @@ expression: checks
     row: 400
     column: 0
   end_location:
-    row: 401
-    column: 0
+    row: 400
+    column: 27
   fix: ~
 

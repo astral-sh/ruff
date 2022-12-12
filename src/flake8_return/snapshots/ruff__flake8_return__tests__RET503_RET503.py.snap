@@ -7,8 +7,8 @@ expression: checks
     row: 7
     column: 4
   end_location:
-    row: 12
-    column: 0
+    row: 8
+    column: 16
   fix: ~
 - kind: ImplicitReturn
   location:
@@ -45,8 +45,8 @@ expression: checks
     row: 29
     column: 8
   end_location:
-    row: 34
-    column: 0
+    row: 30
+    column: 20
   fix: ~
 - kind: ImplicitReturn
   location:

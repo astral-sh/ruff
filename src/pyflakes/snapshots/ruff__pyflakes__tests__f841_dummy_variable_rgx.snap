@@ -8,8 +8,8 @@ expression: checks
     row: 3
     column: 0
   end_location:
-    row: 7
-    column: 0
+    row: 4
+    column: 8
   fix: ~
 - kind:
     UnusedVariable: foo
@@ -84,12 +84,21 @@ expression: checks
     column: 9
   fix: ~
 - kind:
-    UnusedVariable: f
+    UnusedVariable: my_file
   location:
-    row: 71
+    row: 79
     column: 25
   end_location:
-    row: 71
-    column: 26
+    row: 79
+    column: 32
+  fix: ~
+- kind:
+    UnusedVariable: my_file
+  location:
+    row: 85
+    column: 24
+  end_location:
+    row: 85
+    column: 31
   fix: ~
 

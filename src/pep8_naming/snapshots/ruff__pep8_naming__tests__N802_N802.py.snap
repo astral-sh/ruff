@@ -8,8 +8,8 @@ expression: checks
     row: 4
     column: 0
   end_location:
-    row: 8
-    column: 0
+    row: 5
+    column: 8
   fix: ~
 - kind:
     InvalidFunctionName: _Bad
@@ -17,8 +17,8 @@ expression: checks
     row: 8
     column: 0
   end_location:
-    row: 12
-    column: 0
+    row: 9
+    column: 8
   fix: ~
 - kind:
     InvalidFunctionName: BAD
@@ -26,8 +26,8 @@ expression: checks
     row: 12
     column: 0
   end_location:
-    row: 16
-    column: 0
+    row: 13
+    column: 8
   fix: ~
 - kind:
     InvalidFunctionName: BAD_FUNC
@@ -35,8 +35,8 @@ expression: checks
     row: 16
     column: 0
   end_location:
-    row: 20
-    column: 0
+    row: 17
+    column: 8
   fix: ~
 - kind:
     InvalidFunctionName: testTest
@@ -44,7 +44,7 @@ expression: checks
     row: 40
     column: 4
   end_location:
-    row: 42
-    column: 0
+    row: 41
+    column: 19
   fix: ~
 
