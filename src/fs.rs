@@ -5,13 +5,16 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use globset::GlobMatcher;
-use log::debug;
+use log::{debug, error};
 use path_absolutize::{path_dedot, Absolutize};
 use rustc_hash::FxHashSet;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::checks::CheckCode;
+use crate::cli::Overrides;
+use crate::resolver;
 use crate::resolver::Resolver;
+use crate::settings::Settings;
 
 /// Extract the absolute path and basename (as strings) from a Path.
 fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -35,59 +38,71 @@ fn is_included(path: &Path) -> bool {
         .map_or(false, |ext| ext == "py" || ext == "pyi")
 }
 
-/// Find all `pyproject.toml` files for a given `Path`. Both parents and
-/// children will be included in the resulting `Vec`.
-pub fn iter_pyproject_files(path: &Path) -> Vec<PathBuf> {
-    let mut paths = Vec::new();
+/// Find all Python (`.py` and `.pyi` files) in a set of `Path`.
+pub fn collect_python_files<'a>(
+    paths: &'a [PathBuf],
+    overrides: &'a Overrides,
+    default: &'a Settings,
+) -> (Vec<Result<DirEntry, walkdir::Error>>, Resolver) {
+    let mut files = Vec::new();
+    let mut resolver = Resolver::default();
+    for path in paths {
+        let (files_in_path, file_resolver) = python_files_in_path(path, overrides, default);
+        files.extend(files_in_path);
+        resolver.merge(file_resolver);
+    }
+    (files, resolver)
+}
+
+/// Find all Python (`.py` and `.pyi` files) in a given `Path`.
+fn python_files_in_path<'a>(
+    path: &'a Path,
+    overrides: &'a Overrides,
+    default: &'a Settings,
+) -> (Vec<Result<DirEntry, walkdir::Error>>, Resolver) {
+    let path = normalize_path(path);
 
     // Search for `pyproject.toml` files in all parent directories.
-    let path = normalize_path(path);
+    let mut resolver = Resolver::default();
     for path in path.ancestors() {
         if path.is_dir() {
-            let toml_path = path.join("pyproject.toml");
-            if toml_path.exists() {
-                paths.push(toml_path);
+            let pyproject = path.join("pyproject.toml");
+            if pyproject.is_file() {
+                match resolver::settings_for_path(&pyproject, overrides) {
+                    Ok((root, settings)) => resolver.add(root, settings),
+                    Err(err) => error!("Failed to read settings: {err}"),
+                }
             }
         }
     }
 
-    // Search for `pyproject.toml` files in all child directories.
-    for path in WalkDir::new(path)
+    // Collect all Python files.
+    let files: Vec<Result<DirEntry, walkdir::Error>> = WalkDir::new(path)
         .into_iter()
         .filter_entry(|entry| {
-            entry.file_name().to_str().map_or(false, |file_name| {
-                entry.depth() == 0 || !file_name.starts_with('.')
-            })
-        })
-        .filter_map(std::result::Result::ok)
-        .filter(|entry| entry.path().ends_with("pyproject.toml"))
-    {
-        paths.push(path.into_path());
-    }
+            // Search for the `pyproject.toml` file in this directory, before we visit any
+            // of its contents.
+            if entry.file_type().is_dir() {
+                let pyproject = entry.path().join("pyproject.toml");
+                if pyproject.is_file() {
+                    match resolver::settings_for_path(&pyproject, overrides) {
+                        Ok((root, settings)) => resolver.add(root, settings),
+                        Err(err) => error!("Failed to read settings: {err}"),
+                    }
+                }
+            }
 
-    paths
-}
-
-/// Find all Python (`.py` and `.pyi` files) in a given `Path`.
-pub fn iter_python_files<'a>(
-    path: &'a Path,
-    resolver: &'a Resolver<'a>,
-) -> impl Iterator<Item = Result<DirEntry, walkdir::Error>> + 'a {
-    WalkDir::new(normalize_path(path))
-        .into_iter()
-        .filter_entry(move |entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path);
-            let exclude = &settings.exclude;
-            let extend_exclude = &settings.extend_exclude;
-
+            let settings = resolver.resolve(path).unwrap_or(default);
             match extract_path_names(path) {
                 Ok((file_path, file_basename)) => {
-                    if !exclude.is_empty() && is_excluded(file_path, file_basename, exclude) {
+                    if !settings.exclude.is_empty()
+                        && is_excluded(file_path, file_basename, &settings.exclude)
+                    {
                         debug!("Ignored path via `exclude`: {:?}", path);
                         false
-                    } else if !extend_exclude.is_empty()
-                        && is_excluded(file_path, file_basename, extend_exclude)
+                    } else if !settings.extend_exclude.is_empty()
+                        && is_excluded(file_path, file_basename, &settings.extend_exclude)
                     {
                         debug!("Ignored path via `extend-exclude`: {:?}", path);
                         false
@@ -108,6 +123,9 @@ pub fn iter_python_files<'a>(
                     && !(entry.file_type().is_symlink() && entry.path().is_dir())
             })
         })
+        .collect::<Vec<_>>();
+
+    (files, resolver)
 }
 
 /// Create tree set with codes matching the pattern/code pairs.
