@@ -1,4 +1,0 @@
-[tool.ruff]
-src = ["docs_snippets"]
-extend-ignore = ["F401"]
-extend-exclude = ["./docs_snippets/concepts/ignore.py"]
