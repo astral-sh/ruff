@@ -360,15 +360,11 @@ IfStatement: ast::Stmt = {
     <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(@L "elif" NamedExpressionTest ":" Suite)*> <s3:("else" ":" Suite)?> => {
         // Determine last else:
         let mut last = s3.map(|s| s.2).unwrap_or_default();
-        let end_location = if let Some(last) = last.last() {
-            last.end_location
-        } else {
-            if let Some(last) = s2.last() {
-                last.4.last().unwrap().end_location
-            } else {
-                body.last().unwrap().end_location
-            }
-        };
+        let end_location = last
+            .last()
+            .map(|last| last.end_location)
+            .or_else(|| s2.last().map(|last| last.4.last().unwrap().end_location))
+            .unwrap_or_else(|| body.last().unwrap().end_location);
         // handle elif:
         for i in s2.into_iter().rev() {
             let x = ast::Stmt {
@@ -391,11 +387,10 @@ IfStatement: ast::Stmt = {
 
 WhileStatement: ast::Stmt = {
     <location:@L> "while" <test:NamedExpressionTest> ":" <body:Suite> <s2:("else" ":" Suite)?> => {
-        let end_location = if let Some(ref s) = s2 {
-            s.2.last().unwrap().end_location
-        } else {
-            body.last().unwrap().end_location
-        };
+        let end_location = s2
+            .as_ref()
+            .map(|s| s.2.last().unwrap().end_location)
+            .unwrap_or_else(|| body.last().unwrap().end_location);
         let orelse = s2.map(|s| s.2).unwrap_or_default();
         ast::Stmt {
             custom: (),
@@ -412,11 +407,11 @@ WhileStatement: ast::Stmt = {
 
 ForStatement: ast::Stmt = {
     <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:TestList> ":" <body:Suite> <s2:("else" ":" Suite)?> => {
-        let end_location = if let Some(ref s) = s2 {
-            s.2.last().unwrap().end_location.unwrap()
-        } else {
-            body.last().unwrap().end_location.unwrap()
-        };
+        let end_location = s2
+            .as_ref()
+            .map(|s| s.2.last().unwrap().end_location)
+            .unwrap_or_else(|| body.last().unwrap().end_location)
+            .unwrap();
         let orelse = s2.map(|s| s.2).unwrap_or_default();
         let target = Box::new(set_context(target, ast::ExprContext::Store));
         let iter = Box::new(iter);
@@ -434,15 +429,11 @@ TryStatement: ast::Stmt = {
     <location:@L> "try" ":" <body:Suite> <handlers:ExceptClause+> <else_suite:("else" ":" Suite)?> <finally:("finally" ":" Suite)?> <end_location:@R> => {
         let orelse = else_suite.map(|s| s.2).unwrap_or_default();
         let finalbody = finally.map(|s| s.2).unwrap_or_default();
-        let end_location = if let Some(last) = finalbody.last() {
-            last.end_location
-        } else {
-            if let Some(last) = orelse.last() {
-                last.end_location
-            } else {
-                handlers.last().unwrap().end_location
-            }
-        };
+        let end_location = finalbody
+            .last()
+            .map(|last| last.end_location)
+            .or_else(|| orelse.last().map(|last| last.end_location))
+            .unwrap_or_else(|| handlers.last().unwrap().end_location);
         ast::Stmt {
             custom: (),
             location,
