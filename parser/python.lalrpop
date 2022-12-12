@@ -364,11 +364,11 @@ IfStatement: ast::Stmt = {
         // Determine last else:
         let mut last = s3.map(|s| s.2).unwrap_or_default();
         let end_location = last
-	            .last()
-	            .or_else(|| s2.last().and_then(|last| last.4.last()))
-	            .or_else(|| body.last())
-	            .unwrap()
-	            .end_location;
+            .last()
+            .or_else(|| s2.last().and_then(|last| last.4.last()))
+            .or_else(|| body.last())
+            .unwrap()
+            .end_location;
         // handle elif:
         for i in s2.into_iter().rev() {
             let x = ast::Stmt {
