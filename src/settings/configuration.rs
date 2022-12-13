@@ -126,40 +126,40 @@ impl Configuration {
     #[must_use]
     pub fn combine(self, config: Configuration) -> Self {
         Self {
-            allowed_confusables: config.allowed_confusables.or(self.allowed_confusables),
-            dummy_variable_rgx: config.dummy_variable_rgx.or(self.dummy_variable_rgx),
-            exclude: config.exclude.or(self.exclude),
-            extend: config.extend.or(self.extend),
-            extend_exclude: config.extend_exclude.or(self.extend_exclude),
-            extend_ignore: config.extend_ignore.or(self.extend_ignore),
-            extend_select: config.extend_select.or(self.extend_select),
-            external: config.external.or(self.external),
-            fix: config.fix.or(self.fix),
-            fixable: config.fixable.or(self.fixable),
-            format: config.format.or(self.format),
-            ignore: config.ignore.or(self.ignore),
-            ignore_init_module_imports: config
+            allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
+            dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
+            exclude: self.exclude.or(config.exclude),
+            extend: self.extend.or(config.extend),
+            extend_exclude: self.extend_exclude.or(config.extend_exclude),
+            extend_ignore: self.extend_ignore.or(config.extend_ignore),
+            extend_select: self.extend_select.or(config.extend_select),
+            external: self.external.or(config.external),
+            fix: self.fix.or(config.fix),
+            fixable: self.fixable.or(config.fixable),
+            format: self.format.or(config.format),
+            ignore: self.ignore.or(config.ignore),
+            ignore_init_module_imports: self
                 .ignore_init_module_imports
-                .or(self.ignore_init_module_imports),
-            line_length: config.line_length.or(self.line_length),
-            per_file_ignores: config.per_file_ignores.or(self.per_file_ignores),
-            select: config.select.or(self.select),
-            show_source: config.show_source.or(self.show_source),
-            src: config.src.or(self.src),
-            target_version: config.target_version.or(self.target_version),
-            unfixable: config.unfixable.or(self.unfixable),
+                .or(config.ignore_init_module_imports),
+            line_length: self.line_length.or(config.line_length),
+            per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
+            select: self.select.or(config.select),
+            show_source: self.show_source.or(config.show_source),
+            src: self.src.or(config.src),
+            target_version: self.target_version.or(config.target_version),
+            unfixable: self.unfixable.or(config.unfixable),
             // Plugins
-            flake8_annotations: config.flake8_annotations.or(self.flake8_annotations),
-            flake8_bugbear: config.flake8_bugbear.or(self.flake8_bugbear),
-            flake8_import_conventions: config
+            flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
+            flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
+            flake8_import_conventions: self
                 .flake8_import_conventions
-                .or(self.flake8_import_conventions),
-            flake8_quotes: config.flake8_quotes.or(self.flake8_quotes),
-            flake8_tidy_imports: config.flake8_tidy_imports.or(self.flake8_tidy_imports),
-            isort: config.isort.or(self.isort),
-            mccabe: config.mccabe.or(self.mccabe),
-            pep8_naming: config.pep8_naming.or(self.pep8_naming),
-            pyupgrade: config.pyupgrade.or(self.pyupgrade),
+                .or(config.flake8_import_conventions),
+            flake8_quotes: self.flake8_quotes.or(config.flake8_quotes),
+            flake8_tidy_imports: self.flake8_tidy_imports.or(config.flake8_tidy_imports),
+            isort: self.isort.or(config.isort),
+            mccabe: self.mccabe.or(config.mccabe),
+            pep8_naming: self.pep8_naming.or(config.pep8_naming),
+            pyupgrade: self.pyupgrade.or(config.pyupgrade),
         }
     }
 

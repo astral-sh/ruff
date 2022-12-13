@@ -16,6 +16,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::{pyproject, Settings};
 
 /// The strategy for discovering a `pyproject.toml` file for each Python file.
+#[derive(Debug)]
 pub enum Strategy {
     /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
     /// provided on the command-line).
@@ -37,7 +38,10 @@ pub enum Relativity {
 impl Relativity {
     pub fn resolve(&self, path: &Path) -> PathBuf {
         match self {
-            Relativity::Parent => path.parent().unwrap().to_path_buf(),
+            Relativity::Parent => path
+                .parent()
+                .expect("Expected pyproject.toml file to be in parent directory")
+                .to_path_buf(),
             Relativity::Cwd => path_dedot::CWD.clone(),
         }
     }
@@ -81,6 +85,10 @@ impl Resolver {
 
 /// Recursively resolve a `Configuration` from a `pyproject.toml` file at the
 /// specified `Path`.
+// TODO(charlie): This whole system could do with some caching. Right now, if a
+// configuration file extends another in the same path, we'll re-parse the same
+// file at least twice (possibly more than twice, since we'll also parse it when
+// resolving the "default" configuration).
 pub fn resolve_configuration(
     pyproject: &Path,
     relativity: &Relativity,
@@ -100,10 +108,13 @@ pub fn resolve_configuration(
         let configuration = Configuration::from_options(options, &project_root)?;
 
         // If extending, continue to collect.
-        next = configuration
-            .extend
-            .as_ref()
-            .map(|extend| fs::normalize_path_to(extend, &project_root));
+        next = configuration.extend.as_ref().map(|extend| {
+            fs::normalize_path_to(
+                extend,
+                path.parent()
+                    .expect("Expected pyproject.toml file to be in parent directory"),
+            )
+        });
 
         // Keep track of (1) the paths we've already resolved (to avoid cycles), and (2)
         // the base configuration for every path.
@@ -113,9 +124,7 @@ pub fn resolve_configuration(
 
     // Merge the configurations, in order.
     stack.reverse();
-    let mut configuration = stack
-        .pop()
-        .expect("Expected to have at least one Configuration");
+    let mut configuration = stack.pop().unwrap();
     while let Some(extend) = stack.pop() {
         configuration = configuration.combine(extend);
     }
@@ -160,7 +169,7 @@ fn is_python_file(path: &Path) -> bool {
         .map_or(false, |ext| ext == "py" || ext == "pyi")
 }
 
-/// Find all Python (`.py` and `.pyi` files) in a set of `Path`.
+/// Find all Python (`.py` and `.pyi` files) in a set of `PathBuf`s.
 pub fn resolve_python_files(
     paths: &[PathBuf],
     strategy: &Strategy,
