@@ -19,7 +19,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
+    flake8_tidy_imports, isort, mccabe, pep8_naming, pyupgrade,
 };
 
 pub mod configuration;
@@ -293,12 +293,6 @@ pub fn resolve_per_file_ignores(
 
             Ok((absolute, basename, per_file_ignore.codes))
         })
-        .collect()
-}
-
-pub fn resolve_src(src: Vec<PathBuf>, project_root: &Path) -> Vec<PathBuf> {
-    src.into_iter()
-        .map(|path| fs::normalize_path_to(&path, project_root))
         .collect()
 }
 

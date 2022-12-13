@@ -1,2 +1,3 @@
 [tool.ruff]
-src = ["."]
+src = [".", "python_modules/*"]
+extend-select = ["I001"]
