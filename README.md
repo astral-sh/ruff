@@ -1744,6 +1744,25 @@ show-source = true
 
 The source code paths to consider, e.g., when resolving first- vs. third-party imports.
 
+As an example: given a Python package structure like:
+
+```text
+my_package/
+  pyproject.toml
+  src/
+    my_package/
+      __init__.py
+      foo.py
+      bar.py
+```
+
+The `src` directory should be included in `source` (e.g., `source = ["src"]`), such that
+when resolving imports, `my_package.foo` is considered a first-party import.
+
+This field supports globs. For example, if you have a series of Python packages in
+a `python_modules` directory, `src = ["python_modules/*"]` would expand to incorporate
+all of the packages in that directory.
+
 **Default value**: `["."]`
 
 **Type**: `Vec<PathBuf>`

@@ -5,6 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
 
 use crate::checks_gen::CheckCodePrefix;
@@ -65,11 +66,10 @@ impl Configuration {
                 .map(|pattern| Regex::new(&pattern))
                 .transpose()
                 .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
-            src: options.src.map(|src| {
-                src.iter()
-                    .map(|path| fs::normalize_path_to(Path::new(path), project_root))
-                    .collect()
-            }),
+            src: options
+                .src
+                .map(|src| resolve_src(&src, project_root))
+                .transpose()?,
             target_version: options.target_version,
             exclude: options.exclude.map(|paths| {
                 paths
@@ -215,4 +215,20 @@ impl Configuration {
             self.unfixable = Some(unfixable);
         }
     }
+}
+
+/// Given a list of source paths, which could include glob patterns, resolve the
+/// matching paths.
+pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
+    let globs = src
+        .iter()
+        .map(Path::new)
+        .map(|path| fs::normalize_path_to(path, project_root))
+        .map(|path| glob(&path.to_string_lossy()))
+        .collect::<Result<Vec<Paths>, PatternError>>()?;
+    let paths: Vec<PathBuf> = globs
+        .into_iter()
+        .flatten()
+        .collect::<Result<Vec<PathBuf>, GlobError>>()?;
+    Ok(paths)
 }

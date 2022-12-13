@@ -9,24 +9,26 @@ Running from the repo root should pick up and enforce the appropriate settings f
 
 ```
 ∴ cargo run resources/test/project/
-Found 4 error(s).
+Found 5 error(s).
 resources/test/project/examples/docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 resources/test/project/examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/src/file.py:1:8: F401 `os` imported but unused
 resources/test/project/src/file.py:5:5: F841 Local variable `x` is assigned to but never used
-2 potentially fixable with the --fix option.
+resources/test/project/src/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
+3 potentially fixable with the --fix option.
 ```
 
 Running from the project directory itself should exhibit the same behavior:
 
 ```
 ∴ cd resources/test/project/ && cargo run .
-Found 4 error(s).
+Found 5 error(s).
 examples/docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 src/file.py:1:8: F401 `os` imported but unused
 src/file.py:5:5: F841 Local variable `x` is assigned to but never used
-2 potentially fixable with the --fix option.
+src/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
+3 potentially fixable with the --fix option.
 ```
 
 Running from the sub-package directory should exhibit the same behavior, but omit the top-level
@@ -45,7 +47,7 @@ file paths from the current working directory:
 
 ```
 ∴ cargo run -- --config=resources/test/project/pyproject.toml resources/test/project/
-Found 8 error(s).
+Found 9 error(s).
 resources/test/project/examples/docs/docs/concepts/file.py:1:8: F401 `os` imported but unused
 resources/test/project/examples/docs/docs/concepts/file.py:5:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/examples/docs/docs/file.py:1:8: F401 `os` imported but unused
@@ -54,7 +56,8 @@ resources/test/project/examples/docs/docs/file.py:4:27: F401 `docs.concepts.file
 resources/test/project/examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/src/file.py:1:8: F401 `os` imported but unused
 resources/test/project/src/file.py:5:5: F841 Local variable `x` is assigned to but never used
-5 potentially fixable with the --fix option.
+resources/test/project/src/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
+6 potentially fixable with the --fix option.
 ```
 
 Running from a parent directory should this "ignore" the `exclude` (hence, `concepts/file.py` gets
