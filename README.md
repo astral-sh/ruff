@@ -354,7 +354,16 @@ There are a few exceptions to these rules:
 
 Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
 Ruff does not merge settings across configuration files; instead, the "closest" configuration file
-is used, and any parent configuration files are ignored.
+is used, and any parent configuration files are ignored. In lieu of this implicit cascade, Ruff
+supports an [`extend`](#extend) field, which allows you to inherit the settings from another
+`pyproject.toml` file, like so:
+
+```toml
+# Extend the `pyproject.toml` file in the parent directory.
+extend = "../pyproject.toml"
+# But use a different line length.
+line-length = 100
+```
 
 ### Ignoring errors
 
