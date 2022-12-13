@@ -173,7 +173,8 @@ class Foo(A, B):
  def __init__(self):
   pass
  def method_with_default(self, arg='default'):
-  pass";
+  pass
+";
         insta::assert_debug_snapshot!(parse_program(source, "<test>").unwrap());
     }
 

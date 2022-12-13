@@ -360,16 +360,21 @@ CompoundStatement: ast::Stmt = {
 };
 
 IfStatement: ast::Stmt = {
-    <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(@L "elif" NamedExpressionTest ":" Suite @R)*> <s3:("else" ":" Suite)?> <end_location:@R> => {
+    <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(@L "elif" NamedExpressionTest ":" Suite)*> <s3:("else" ":" Suite)?> => {
         // Determine last else:
         let mut last = s3.map(|s| s.2).unwrap_or_default();
-
+        let end_location = last
+            .last()
+            .or_else(|| s2.last().and_then(|last| last.4.last()))
+            .or_else(|| body.last())
+            .unwrap()
+            .end_location;
         // handle elif:
         for i in s2.into_iter().rev() {
             let x = ast::Stmt {
                 custom: (),
                 location: i.0,
-                end_location: Some(i.5),
+                end_location: i.4.last().unwrap().end_location,
                 node: ast::StmtKind::If { test: Box::new(i.2), body: i.4, orelse: last },
             };
             last = vec![x];
@@ -378,19 +383,24 @@ IfStatement: ast::Stmt = {
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::If { test: Box::new(test), body, orelse: last }
         }
     },
 };
 
 WhileStatement: ast::Stmt = {
-    <location:@L> "while" <test:NamedExpressionTest> ":" <body:Suite> <s2:("else" ":" Suite)?> <end_location:@R> => {
+    <location:@L> "while" <test:NamedExpressionTest> ":" <body:Suite> <s2:("else" ":" Suite)?> => {
         let orelse = s2.map(|s| s.2).unwrap_or_default();
+        let end_location = orelse
+            .last()
+            .or_else(|| body.last())
+            .unwrap()
+            .end_location;
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::While {
                 test: Box::new(test),
                 body,
@@ -401,8 +411,14 @@ WhileStatement: ast::Stmt = {
 };
 
 ForStatement: ast::Stmt = {
-    <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:TestList> ":" <body:Suite> <s2:("else" ":" Suite)?> <end_location:@R> => {
+    <location:@L> <is_async:"async"?> "for" <target:ExpressionList> "in" <iter:TestList> ":" <body:Suite> <s2:("else" ":" Suite)?> => {
         let orelse = s2.map(|s| s.2).unwrap_or_default();
+        let end_location = orelse
+            .last()
+            .or_else(|| body.last())
+            .unwrap()
+            .end_location
+            .unwrap();
         let target = Box::new(set_context(target, ast::ExprContext::Store));
         let iter = Box::new(iter);
         let type_comment = None;
@@ -419,10 +435,16 @@ TryStatement: ast::Stmt = {
     <location:@L> "try" ":" <body:Suite> <handlers:ExceptClause+> <else_suite:("else" ":" Suite)?> <finally:("finally" ":" Suite)?> <end_location:@R> => {
         let orelse = else_suite.map(|s| s.2).unwrap_or_default();
         let finalbody = finally.map(|s| s.2).unwrap_or_default();
+        let end_location = finalbody
+            .last()
+            .map(|last| last.end_location)
+            .or_else(|| orelse.last().map(|last| last.end_location))
+            .or_else(|| handlers.last().map(|last| last.end_location))
+            .unwrap();
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::Try {
                 body,
                 handlers,
@@ -431,14 +453,15 @@ TryStatement: ast::Stmt = {
             },
         }
     },
-    <location:@L> "try" ":" <body:Suite> <finally:("finally" ":" Suite)> <end_location:@R> => {
+    <location:@L> "try" ":" <body:Suite> <finally:("finally" ":" Suite)> => {
         let handlers = vec![];
         let orelse = vec![];
         let finalbody = finally.2;
+        let end_location = finalbody.last().unwrap().end_location;
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::Try {
                 body,
                 handlers,
@@ -450,7 +473,8 @@ TryStatement: ast::Stmt = {
 };
 
 ExceptClause: ast::Excepthandler = {
-    <location:@L> "except" <typ:Test?> ":" <body:Suite> <end_location:@R> => {
+    <location:@L> "except" <typ:Test?> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end_location.unwrap();
         ast::Excepthandler::new(
             location,
             end_location,
@@ -461,7 +485,8 @@ ExceptClause: ast::Excepthandler = {
             },
         )
     },
-    <location:@L> "except" <x:(Test "as" Identifier)> ":" <body:Suite> <end_location:@R> => {
+    <location:@L> "except" <x:(Test "as" Identifier)> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end_location.unwrap();
         ast::Excepthandler::new(
             location,
             end_location,
@@ -475,7 +500,8 @@ ExceptClause: ast::Excepthandler = {
 };
 
 WithStatement: ast::Stmt = {
-    <location:@L> <is_async:"async"?> "with" <items:WithItems> ":" <body:Suite> <end_location:@R> => {
+    <location:@L> <is_async:"async"?> "with" <items:WithItems> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end_location.unwrap();
         let type_comment = None;
         let node = if is_async.is_some() {
             ast::StmtKind::AsyncWith { items, body, type_comment }
@@ -514,9 +540,10 @@ WithItem: ast::Withitem = {
 };
 
 FuncDef: ast::Stmt = {
-    <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <args:Parameters> <r:("->" Test)?> ":" <body:Suite> <end_location:@R>  => {
+    <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <args:Parameters> <r:("->" Test)?> ":" <body:Suite>  => {
         let args = Box::new(args);
         let returns = r.map(|x| Box::new(x.1));
+        let end_location = body.last().unwrap().end_location.unwrap();
         let type_comment = None;
         let node = if is_async.is_some() {
             ast::StmtKind::AsyncFunctionDef { name, args, body, decorator_list, returns, type_comment }
@@ -668,15 +695,16 @@ KwargParameter<ArgType>: Option<Box<ast::Arg>> = {
 };
 
 ClassDef: ast::Stmt = {
-    <decorator_list:Decorator*> <location:@L> "class" <name:Identifier> <a:("(" ArgumentList ")")?> ":" <body:Suite> <end_location:@R> => {
+    <decorator_list:Decorator*> <location:@L> "class" <name:Identifier> <a:("(" ArgumentList ")")?> ":" <body:Suite> => {
         let (bases, keywords) = match a {
             Some((_, arg, _)) => (arg.args, arg.keywords),
             None => (vec![], vec![]),
         };
+        let end_location = body.last().unwrap().end_location;
         ast::Stmt {
             custom: (),
             location,
-            end_location: Some(end_location),
+            end_location,
             node: ast::StmtKind::ClassDef {
                 name,
                 bases,
