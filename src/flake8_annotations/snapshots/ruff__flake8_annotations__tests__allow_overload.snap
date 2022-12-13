@@ -8,7 +8,7 @@ expression: checks
     row: 29
     column: 4
   end_location:
-    row: 35
-    column: 0
+    row: 30
+    column: 16
   fix: ~
 

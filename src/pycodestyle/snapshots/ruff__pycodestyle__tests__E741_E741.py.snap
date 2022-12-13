@@ -215,8 +215,8 @@ expression: checks
     row: 71
     column: 0
   end_location:
-    row: 74
-    column: 0
+    row: 72
+    column: 8
   fix: ~
 - kind:
     AmbiguousVariableName: l

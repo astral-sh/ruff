@@ -8,8 +8,8 @@ expression: checks
     row: 4
     column: 0
   end_location:
-    row: 9
-    column: 0
+    row: 5
+    column: 8
   fix: ~
 - kind:
     MissingTypeFunctionArgument: a
@@ -35,8 +35,8 @@ expression: checks
     row: 9
     column: 0
   end_location:
-    row: 14
-    column: 0
+    row: 10
+    column: 8
   fix: ~
 - kind:
     MissingTypeFunctionArgument: b
@@ -62,8 +62,8 @@ expression: checks
     row: 19
     column: 0
   end_location:
-    row: 24
-    column: 0
+    row: 20
+    column: 8
   fix: ~
 - kind:
     MissingReturnTypePublicFunction: foo
@@ -71,8 +71,8 @@ expression: checks
     row: 24
     column: 0
   end_location:
-    row: 29
-    column: 0
+    row: 25
+    column: 8
   fix: ~
 - kind:
     DynamicallyTypedExpression: a

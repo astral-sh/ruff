@@ -9,8 +9,8 @@ expression: checks
     row: 283
     column: 4
   end_location:
-    row: 296
-    column: 0
+    row: 293
+    column: 16
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -19,8 +19,8 @@ expression: checks
     row: 300
     column: 0
   end_location:
-    row: 309
-    column: 0
+    row: 306
+    column: 7
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -31,8 +31,8 @@ expression: checks
     row: 324
     column: 4
   end_location:
-    row: 332
-    column: 4
+    row: 330
+    column: 11
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -43,8 +43,8 @@ expression: checks
     row: 336
     column: 4
   end_location:
-    row: 345
-    column: 4
+    row: 343
+    column: 11
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -55,8 +55,8 @@ expression: checks
     row: 349
     column: 4
   end_location:
-    row: 357
-    column: 4
+    row: 355
+    column: 11
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -66,8 +66,8 @@ expression: checks
     row: 361
     column: 4
   end_location:
-    row: 369
-    column: 4
+    row: 367
+    column: 11
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -76,8 +76,8 @@ expression: checks
     row: 389
     column: 0
   end_location:
-    row: 401
-    column: 0
+    row: 398
+    column: 7
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -88,8 +88,8 @@ expression: checks
     row: 425
     column: 4
   end_location:
-    row: 436
-    column: 4
+    row: 434
+    column: 11
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -100,8 +100,8 @@ expression: checks
     row: 440
     column: 4
   end_location:
-    row: 455
-    column: 4
+    row: 453
+    column: 11
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -111,8 +111,8 @@ expression: checks
     row: 459
     column: 4
   end_location:
-    row: 471
-    column: 4
+    row: 469
+    column: 11
   fix: ~
 - kind:
     DocumentAllArguments:
@@ -121,7 +121,7 @@ expression: checks
     row: 489
     column: 4
   end_location:
-    row: 498
-    column: 0
+    row: 497
+    column: 11
   fix: ~
 

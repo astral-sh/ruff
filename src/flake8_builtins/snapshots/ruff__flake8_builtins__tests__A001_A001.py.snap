@@ -89,8 +89,8 @@ expression: checks
     row: 10
     column: 0
   end_location:
-    row: 13
-    column: 0
+    row: 11
+    column: 8
   fix: ~
 - kind:
     BuiltinVariableShadowing: slice
@@ -98,8 +98,8 @@ expression: checks
     row: 13
     column: 0
   end_location:
-    row: 16
-    column: 0
+    row: 14
+    column: 8
   fix: ~
 - kind:
     BuiltinVariableShadowing: ValueError
@@ -107,8 +107,8 @@ expression: checks
     row: 18
     column: 0
   end_location:
-    row: 21
-    column: 0
+    row: 19
+    column: 7
   fix: ~
 - kind:
     BuiltinVariableShadowing: memoryview

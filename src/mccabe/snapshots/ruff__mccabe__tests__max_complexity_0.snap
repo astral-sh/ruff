@@ -10,8 +10,8 @@ expression: checks
     row: 2
     column: 0
   end_location:
-    row: 7
-    column: 0
+    row: 3
+    column: 8
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -21,8 +21,8 @@ expression: checks
     row: 7
     column: 0
   end_location:
-    row: 12
-    column: 0
+    row: 8
+    column: 10
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -32,8 +32,8 @@ expression: checks
     row: 12
     column: 0
   end_location:
-    row: 19
-    column: 0
+    row: 15
+    column: 12
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -43,8 +43,8 @@ expression: checks
     row: 19
     column: 0
   end_location:
-    row: 29
-    column: 0
+    row: 25
+    column: 47
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -54,8 +54,8 @@ expression: checks
     row: 29
     column: 0
   end_location:
-    row: 40
-    column: 0
+    row: 36
+    column: 47
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -65,8 +65,8 @@ expression: checks
     row: 40
     column: 0
   end_location:
-    row: 46
-    column: 0
+    row: 42
+    column: 16
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -76,8 +76,8 @@ expression: checks
     row: 46
     column: 0
   end_location:
-    row: 54
-    column: 0
+    row: 50
+    column: 19
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -87,8 +87,8 @@ expression: checks
     row: 54
     column: 0
   end_location:
-    row: 62
-    column: 0
+    row: 58
+    column: 16
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -98,8 +98,8 @@ expression: checks
     row: 62
     column: 0
   end_location:
-    row: 73
-    column: 0
+    row: 69
+    column: 7
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -109,8 +109,8 @@ expression: checks
     row: 63
     column: 4
   end_location:
-    row: 69
-    column: 4
+    row: 67
+    column: 11
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -120,8 +120,8 @@ expression: checks
     row: 64
     column: 8
   end_location:
-    row: 67
-    column: 8
+    row: 65
+    column: 16
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -131,8 +131,8 @@ expression: checks
     row: 73
     column: 0
   end_location:
-    row: 85
-    column: 0
+    row: 81
+    column: 16
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -142,8 +142,8 @@ expression: checks
     row: 85
     column: 0
   end_location:
-    row: 96
-    column: 0
+    row: 92
+    column: 16
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -153,8 +153,8 @@ expression: checks
     row: 96
     column: 0
   end_location:
-    row: 107
-    column: 0
+    row: 103
+    column: 12
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -164,8 +164,8 @@ expression: checks
     row: 107
     column: 0
   end_location:
-    row: 112
-    column: 0
+    row: 108
+    column: 17
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -175,8 +175,8 @@ expression: checks
     row: 113
     column: 4
   end_location:
-    row: 139
-    column: 0
+    row: 138
+    column: 40
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -186,8 +186,8 @@ expression: checks
     row: 118
     column: 12
   end_location:
-    row: 121
-    column: 12
+    row: 119
+    column: 20
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -197,8 +197,8 @@ expression: checks
     row: 121
     column: 12
   end_location:
-    row: 125
-    column: 8
+    row: 123
+    column: 24
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -208,8 +208,8 @@ expression: checks
     row: 126
     column: 12
   end_location:
-    row: 129
-    column: 12
+    row: 127
+    column: 20
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -219,8 +219,8 @@ expression: checks
     row: 129
     column: 12
   end_location:
-    row: 132
-    column: 12
+    row: 130
+    column: 20
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -230,8 +230,8 @@ expression: checks
     row: 132
     column: 12
   end_location:
-    row: 135
-    column: 12
+    row: 133
+    column: 20
   fix: ~
 - kind:
     FunctionIsTooComplex:
@@ -241,7 +241,7 @@ expression: checks
     row: 135
     column: 12
   end_location:
-    row: 138
-    column: 8
+    row: 136
+    column: 20
   fix: ~
 

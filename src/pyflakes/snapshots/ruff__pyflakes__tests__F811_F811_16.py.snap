@@ -10,7 +10,7 @@ expression: checks
     row: 8
     column: 8
   end_location:
-    row: 10
-    column: 0
+    row: 9
+    column: 16
   fix: ~
 

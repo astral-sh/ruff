@@ -8,8 +8,8 @@ expression: checks
     row: 1
     column: 0
   end_location:
-    row: 5
-    column: 0
+    row: 2
+    column: 8
   fix: ~
 - kind:
     InvalidClassName: _bad
@@ -17,8 +17,8 @@ expression: checks
     row: 5
     column: 0
   end_location:
-    row: 9
-    column: 0
+    row: 6
+    column: 8
   fix: ~
 - kind:
     InvalidClassName: bad_class
@@ -26,8 +26,8 @@ expression: checks
     row: 9
     column: 0
   end_location:
-    row: 13
-    column: 0
+    row: 10
+    column: 8
   fix: ~
 - kind:
     InvalidClassName: Bad_Class
@@ -35,8 +35,8 @@ expression: checks
     row: 13
     column: 0
   end_location:
-    row: 17
-    column: 0
+    row: 14
+    column: 8
   fix: ~
 - kind:
     InvalidClassName: BAD_CLASS
@@ -44,7 +44,7 @@ expression: checks
     row: 17
     column: 0
   end_location:
-    row: 21
-    column: 0
+    row: 18
+    column: 8
   fix: ~
 

@@ -1073,8 +1073,7 @@ conflicts with the `isort` rules, like `I001`).
 
 Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
 
-1. Ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
-   pattern matching and parenthesized context managers.
+1. Ruff does not yet support structural pattern matching.
 2. Flake8 has a plugin architecture and supports writing custom lint rules. (Instead, popular Flake8
    plugins are re-implemented in Rust as part of Ruff itself.)
 

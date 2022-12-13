@@ -8,8 +8,8 @@ expression: checks
     row: 1
     column: 0
   end_location:
-    row: 5
-    column: 0
+    row: 2
+    column: 8
   fix: ~
 - kind:
     AmbiguousFunctionName: I
@@ -17,8 +17,8 @@ expression: checks
     row: 5
     column: 0
   end_location:
-    row: 9
-    column: 0
+    row: 6
+    column: 8
   fix: ~
 - kind:
     AmbiguousFunctionName: O
@@ -26,7 +26,7 @@ expression: checks
     row: 10
     column: 4
   end_location:
-    row: 14
-    column: 0
+    row: 11
+    column: 12
   fix: ~
 

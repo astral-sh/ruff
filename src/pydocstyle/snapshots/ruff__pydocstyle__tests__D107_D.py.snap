@@ -7,15 +7,15 @@ expression: checks
     row: 60
     column: 4
   end_location:
-    row: 63
-    column: 4
+    row: 61
+    column: 12
   fix: ~
 - kind: PublicInit
   location:
     row: 534
     column: 4
   end_location:
-    row: 538
-    column: 0
+    row: 535
+    column: 12
   fix: ~
 
