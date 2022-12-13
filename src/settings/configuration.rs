@@ -24,9 +24,9 @@ pub struct Configuration {
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend: Option<PathBuf>,
-    pub extend_exclude: Option<Vec<FilePattern>>,
-    pub extend_ignore: Option<Vec<CheckCodePrefix>>,
-    pub extend_select: Option<Vec<CheckCodePrefix>>,
+    pub extend_exclude: Vec<FilePattern>,
+    pub extend_ignore: Vec<Vec<CheckCodePrefix>>,
+    pub extend_select: Vec<Vec<CheckCodePrefix>>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fixable: Option<Vec<CheckCodePrefix>>,
@@ -60,18 +60,12 @@ impl Configuration {
 
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         Ok(Configuration {
-            extend: options.extend.map(PathBuf::from),
             allowed_confusables: options.allowed_confusables,
             dummy_variable_rgx: options
                 .dummy_variable_rgx
                 .map(|pattern| Regex::new(&pattern))
                 .transpose()
                 .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
-            src: options
-                .src
-                .map(|src| resolve_src(&src, project_root))
-                .transpose()?,
-            target_version: options.target_version,
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
@@ -81,22 +75,24 @@ impl Configuration {
                     })
                     .collect()
             }),
-            extend_exclude: options.extend_exclude.map(|paths| {
-                paths
-                    .into_iter()
-                    .map(|pattern| {
-                        let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
-                        FilePattern::User(pattern, absolute)
-                    })
-                    .collect()
-            }),
-            extend_ignore: options.extend_ignore,
-            select: options.select,
-            extend_select: options.extend_select,
+            extend: options.extend.map(PathBuf::from),
+            extend_exclude: options
+                .extend_exclude
+                .map(|paths| {
+                    paths
+                        .into_iter()
+                        .map(|pattern| {
+                            let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
+                            FilePattern::User(pattern, absolute)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            extend_ignore: vec![options.extend_ignore.unwrap_or_default()],
+            extend_select: vec![options.extend_select.unwrap_or_default()],
             external: options.external,
             fix: options.fix,
             fixable: options.fixable,
-            unfixable: options.unfixable,
             format: options.format,
             ignore: options.ignore,
             ignore_init_module_imports: options.ignore_init_module_imports,
@@ -111,7 +107,14 @@ impl Configuration {
                     .collect()
             }),
             respect_gitignore: options.respect_gitignore,
+            select: options.select,
             show_source: options.show_source,
+            src: options
+                .src
+                .map(|src| resolve_src(&src, project_root))
+                .transpose()?,
+            target_version: options.target_version,
+            unfixable: options.unfixable,
             // Plugins
             flake8_annotations: options.flake8_annotations,
             flake8_bugbear: options.flake8_bugbear,
@@ -133,9 +136,21 @@ impl Configuration {
             exclude: self.exclude.or(config.exclude),
             respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
             extend: self.extend.or(config.extend),
-            extend_exclude: self.extend_exclude.or(config.extend_exclude),
-            extend_ignore: self.extend_ignore.or(config.extend_ignore),
-            extend_select: self.extend_select.or(config.extend_select),
+            extend_exclude: config
+                .extend_exclude
+                .into_iter()
+                .chain(self.extend_exclude.into_iter())
+                .collect(),
+            extend_ignore: config
+                .extend_ignore
+                .into_iter()
+                .chain(self.extend_ignore.into_iter())
+                .collect(),
+            extend_select: config
+                .extend_select
+                .into_iter()
+                .chain(self.extend_select.into_iter())
+                .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),
             fixable: self.fixable.or(config.fixable),
@@ -174,13 +189,7 @@ impl Configuration {
             self.exclude = Some(exclude);
         }
         if let Some(extend_exclude) = overrides.extend_exclude {
-            self.extend_exclude = Some(extend_exclude);
-        }
-        if let Some(extend_ignore) = overrides.extend_ignore {
-            self.extend_ignore = Some(extend_ignore);
-        }
-        if let Some(extend_select) = overrides.extend_select {
-            self.extend_select = Some(extend_select);
+            self.extend_exclude.extend(extend_exclude);
         }
         if let Some(fix) = overrides.fix {
             self.fix = Some(fix);
@@ -219,6 +228,23 @@ impl Configuration {
         }
         if let Some(unfixable) = overrides.unfixable {
             self.unfixable = Some(unfixable);
+        }
+        // Special-case: `extend_ignore` and `extend_select` are parallel arrays, so push an
+        // empty array if only one of the two is provided.
+        match (overrides.extend_ignore, overrides.extend_select) {
+            (Some(extend_ignore), Some(extend_select)) => {
+                self.extend_ignore.push(extend_ignore);
+                self.extend_select.push(extend_select);
+            }
+            (Some(extend_ignore), None) => {
+                self.extend_ignore.push(extend_ignore);
+                self.extend_select.push(Vec::new());
+            }
+            (None, Some(extend_select)) => {
+                self.extend_ignore.push(Vec::new());
+                self.extend_select.push(extend_select);
+            }
+            (None, None) => {}
         }
     }
 }
