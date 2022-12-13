@@ -315,6 +315,18 @@ pub enum CheckCode {
     RUF100,
     // pygrep-hooks
     PGH001,
+    // pandas-vet
+    PDV002,
+    PDV003,
+    PDV004,
+    PDV007,
+    PDV008,
+    PDV009,
+    PDV010,
+    PDV011,
+    PDV012,
+    PDV013,
+    PDV901,
 }
 
 #[derive(EnumIter, Debug, PartialEq, Eq)]
@@ -343,6 +355,7 @@ pub enum CheckCategory {
     Flake8TidyImports,
     Flake8UnusedArguments,
     Eradicate,
+    PandasVet,
     PygrepHooks,
     Pylint,
     Ruff,
@@ -384,6 +397,7 @@ impl CheckCategory {
             CheckCategory::Flake8UnusedArguments => "flake8-unused-arguments",
             CheckCategory::Isort => "isort",
             CheckCategory::McCabe => "mccabe",
+            CheckCategory::PandasVet => "pandas-vet",
             CheckCategory::PEP8Naming => "pep8-naming",
             CheckCategory::Pycodestyle => "pycodestyle",
             CheckCategory::Pydocstyle => "pydocstyle",
@@ -415,6 +429,7 @@ impl CheckCategory {
             CheckCategory::Flake8UnusedArguments => vec![CheckCodePrefix::ARG],
             CheckCategory::Isort => vec![CheckCodePrefix::I],
             CheckCategory::McCabe => vec![CheckCodePrefix::C90],
+            CheckCategory::PandasVet => vec![CheckCodePrefix::PDV],
             CheckCategory::PEP8Naming => vec![CheckCodePrefix::N],
             CheckCategory::Pycodestyle => vec![CheckCodePrefix::E, CheckCodePrefix::W],
             CheckCategory::Pydocstyle => vec![CheckCodePrefix::D],
@@ -504,6 +519,10 @@ impl CheckCategory {
             CheckCategory::McCabe => {
                 Some(("https://pypi.org/project/mccabe/0.7.0/", &Platform::PyPI))
             }
+            CheckCategory::PandasVet => Some((
+                "https://pypi.org/project/pandas-vet/0.2.3/",
+                &Platform::PyPI,
+            )),
             CheckCategory::PEP8Naming => Some((
                 "https://pypi.org/project/pep8-naming/0.13.2/",
                 &Platform::PyPI,
@@ -861,6 +880,18 @@ pub enum CheckKind {
     UnusedLambdaArgument(String),
     // flake8-import-conventions
     ImportAliasIsNotConventional(String, String),
+    // pandas-vet
+    UseOfInplaceArgument,
+    UseOfDotIsNull,
+    UseOfDotNotNull,
+    UseOfDotIx,
+    UseOfDotAt,
+    UseOfDotIat,
+    UseOfDotPivotOrUnstack,
+    UseOfDotValues,
+    UseOfDotReadTable,
+    UseOfDotStack,
+    DfIsABadVariableName,
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -1219,6 +1250,18 @@ impl CheckCode {
             CheckCode::ICN001 => {
                 CheckKind::ImportAliasIsNotConventional("...".to_string(), "...".to_string())
             }
+            // pandas-vet
+            CheckCode::PDV002 => CheckKind::UseOfInplaceArgument,
+            CheckCode::PDV003 => CheckKind::UseOfDotIsNull,
+            CheckCode::PDV004 => CheckKind::UseOfDotNotNull,
+            CheckCode::PDV007 => CheckKind::UseOfDotIx,
+            CheckCode::PDV008 => CheckKind::UseOfDotAt,
+            CheckCode::PDV009 => CheckKind::UseOfDotIat,
+            CheckCode::PDV010 => CheckKind::UseOfDotPivotOrUnstack,
+            CheckCode::PDV011 => CheckKind::UseOfDotValues,
+            CheckCode::PDV012 => CheckKind::UseOfDotReadTable,
+            CheckCode::PDV013 => CheckKind::UseOfDotStack,
+            CheckCode::PDV901 => CheckKind::DfIsABadVariableName,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1420,6 +1463,17 @@ impl CheckCode {
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
+            CheckCode::PDV002 => CheckCategory::PandasVet,
+            CheckCode::PDV003 => CheckCategory::PandasVet,
+            CheckCode::PDV004 => CheckCategory::PandasVet,
+            CheckCode::PDV007 => CheckCategory::PandasVet,
+            CheckCode::PDV008 => CheckCategory::PandasVet,
+            CheckCode::PDV009 => CheckCategory::PandasVet,
+            CheckCode::PDV010 => CheckCategory::PandasVet,
+            CheckCode::PDV011 => CheckCategory::PandasVet,
+            CheckCode::PDV012 => CheckCategory::PandasVet,
+            CheckCode::PDV013 => CheckCategory::PandasVet,
+            CheckCode::PDV901 => CheckCategory::PandasVet,
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
             CheckCode::PLC0414 => CheckCategory::Pylint,
             CheckCode::PLC2201 => CheckCategory::Pylint,
@@ -1770,6 +1824,18 @@ impl CheckKind {
             CheckKind::UnusedLambdaArgument(..) => &CheckCode::ARG005,
             // flake8-import-conventions
             CheckKind::ImportAliasIsNotConventional(..) => &CheckCode::ICN001,
+            // pandas-vet
+            CheckKind::UseOfInplaceArgument => &CheckCode::PDV002,
+            CheckKind::UseOfDotIsNull => &CheckCode::PDV003,
+            CheckKind::UseOfDotNotNull => &CheckCode::PDV004,
+            CheckKind::UseOfDotIx => &CheckCode::PDV007,
+            CheckKind::UseOfDotAt => &CheckCode::PDV008,
+            CheckKind::UseOfDotIat => &CheckCode::PDV009,
+            CheckKind::UseOfDotPivotOrUnstack => &CheckCode::PDV010,
+            CheckKind::UseOfDotValues => &CheckCode::PDV011,
+            CheckKind::UseOfDotReadTable => &CheckCode::PDV012,
+            CheckKind::UseOfDotStack => &CheckCode::PDV013,
+            CheckKind::DfIsABadVariableName => &CheckCode::PDV901,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -2596,6 +2662,40 @@ impl CheckKind {
             // flake8-import-conventions
             CheckKind::ImportAliasIsNotConventional(name, asname) => {
                 format!("`{name}` should be imported as `{asname}`")
+            }
+            // pandas-vet
+            CheckKind::UseOfInplaceArgument => {
+                "`inplace=True` should be avoided; it has inconsistent behavior".to_string()
+            }
+            CheckKind::UseOfDotIsNull => {
+                "`.isna` is preferred to `.isnull`; functionality is equivalent".to_string()
+            }
+            CheckKind::UseOfDotNotNull => {
+                "`.notna` is preferred to `.notnull`; functionality is equivalent".to_string()
+            }
+            CheckKind::UseOfDotIx => {
+                "``ix` i` deprecated; use more explicit `.loc` o` `.iloc`".to_string()
+            }
+            CheckKind::UseOfDotAt => {
+                "Use `.loc` instead of `.at`.  If speed is important, use numpy.".to_string()
+            }
+            CheckKind::UseOfDotIat => {
+                "Use `.iloc` instea` of `.iat`.  If speed is important, use numpy.".to_string()
+            }
+            CheckKind::UseOfDotPivotOrUnstack => "`.pivot_table` is preferred to `.pivot` or \
+                                                  `.unstack`; provides same functionality"
+                .to_string(),
+            CheckKind::UseOfDotValues => "Use `.array` or `.to_array()` instead of `.values`; \
+                                          `values` is ambiguous"
+                .to_string(),
+            CheckKind::UseOfDotReadTable => {
+                "`.read_csv` is preferred to `.read_table`; provides same functionality".to_string()
+            }
+            CheckKind::UseOfDotStack => {
+                "`.melt` is preferred to `.stack`; provides same functionality".to_string()
+            }
+            CheckKind::DfIsABadVariableName => {
+                "`df` is a bad variable name. Be kinder to your future self.".to_string()
             }
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {

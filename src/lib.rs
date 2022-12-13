@@ -66,6 +66,7 @@ pub mod logging;
 pub mod mccabe;
 pub mod message;
 mod noqa;
+mod pandas_vet;
 pub mod pep8_naming;
 pub mod printer;
 mod pycodestyle;

@@ -38,8 +38,8 @@ use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
     flake8_import_conventions, flake8_print, flake8_return, flake8_simplify, flake8_tidy_imports,
-    flake8_unused_arguments, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks,
-    pylint, pyupgrade, visibility,
+    flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
+    pygrep_hooks, pylint, pyupgrade, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -1107,6 +1107,11 @@ where
                         self, stmt, targets, value,
                     );
                 }
+                if self.settings.enabled.contains(&CheckCode::PDV901) {
+                    if let Some(check) = pandas_vet::checks::assignment_to_df(targets) {
+                        self.add_check(check);
+                    }
+                }
             }
             StmtKind::AnnAssign { target, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
@@ -1460,6 +1465,19 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
+                }
+
+                for (code, name) in vec![
+                    (CheckCode::PDV007, "ix"),
+                    (CheckCode::PDV008, "at"),
+                    (CheckCode::PDV009, "iat"),
+                    (CheckCode::PDV011, "values"),
+                ] {
+                    if self.settings.enabled.contains(&code) {
+                        if attr == name {
+                            self.add_check(Check::new(code.kind(), Range::from_located(expr)));
+                        };
+                    }
                 }
             }
             ExprKind::Call {
@@ -1835,6 +1853,42 @@ where
                         &self.import_aliases,
                     ) {
                         self.add_check(check);
+                    }
+                }
+
+                // pandas-vet
+                if self.settings.enabled.contains(&CheckCode::PDV002) {
+                    self.add_checks(pandas_vet::checks::inplace_argument(keywords).into_iter());
+                }
+
+                for (code, name, _) in vec![
+                    (CheckCode::PDV003, "isnull", Some("isna".to_string())),
+                    (CheckCode::PDV004, "notnull", Some("notna".to_string())),
+                    (CheckCode::PDV010, "pivot", None),
+                    (CheckCode::PDV010, "unstack", None),
+                    (CheckCode::PDV012, "read_table", None),
+                    (CheckCode::PDV013, "stack", None),
+                ] {
+                    if self.settings.enabled.contains(&code) {
+                        if let ExprKind::Attribute { attr, .. } = &func.node {
+                            if attr == name {
+                                let check = Check::new(code.kind(), Range::from_located(func));
+
+                                // FIXME: the location of the fix is wrong, e.g. resulting in
+                                // `df.isnull` -> `isna()`
+                                // let mut check = Check::new(code.kind(),
+                                // Range::from_located(func));
+                                // if let Some(fix) = fix {
+                                //     check.fix = Some(Fix::replacement(
+                                //         fix,
+                                //         func.location,
+                                //         func.end_location.unwrap(),
+                                //     ));
+                                // }
+
+                                self.add_check(check);
+                            };
+                        }
                     }
                 }
 
