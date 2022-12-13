@@ -66,6 +66,24 @@ pub struct Options {
     )]
     pub exclude: Option<Vec<String>>,
     #[option(
+        doc = r#"
+            A path to a local `pyproject.toml` file to merge into this configuration.
+
+            To resolve the current `pyproject.toml` file, Ruff will first resolve this base
+            configuration file, then merge in any properties defined in the current configuration
+            file.
+        "#,
+        default = r#"None"#,
+        value_type = "Path",
+        example = r#"
+            # Extend the `pyproject.toml` file in the parent directory.
+            extend = "../pyproject.toml"
+            # But use a different line length.
+            line-length = 100
+        "#
+    )]
+    pub extend: Option<String>,
+    #[option(
         doc = "A list of file patterns to omit from linting, in addition to those specified by \
                `exclude`.",
         default = "[]",

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{command, Parser};
 use regex::Regex;
@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 
 use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
+use crate::fs;
 use crate::logging::LogLevel;
 use crate::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
@@ -16,7 +17,7 @@ use crate::settings::types::{
 #[command(version)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Cli {
-    #[arg(required_unless_present_any = ["explain", "generate_shell_completion", "show_settings"])]
+    #[arg(required_unless_present_any = ["explain", "generate_shell_completion"])]
     pub files: Vec<PathBuf>,
     /// Path to the `pyproject.toml` file to use for configuration.
     #[arg(long)]
@@ -88,8 +89,7 @@ pub struct Cli {
     /// See the files Ruff will be run against with the current settings.
     #[arg(long)]
     pub show_files: bool,
-    /// See the settings Ruff will use when run against the current working
-    /// directory.
+    /// See the settings Ruff used for the first matching file.
     #[arg(long)]
     pub show_settings: bool,
     /// Enable automatic additions of noqa directives to failing lines.
@@ -245,6 +245,9 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     }
     per_file_ignores
         .into_iter()
-        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes))
+        .map(|(pattern, prefixes)| {
+            let absolute = fs::normalize_path(Path::new(&pattern));
+            PerFileIgnore::new(pattern, absolute, &prefixes)
+        })
         .collect()
 }

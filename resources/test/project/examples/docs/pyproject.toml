@@ -1,0 +1,6 @@
+[tool.ruff]
+extend = "../../pyproject.toml"
+src = ["."]
+extend-select = ["I001"]
+extend-ignore = ["F401"]
+extend-exclude = ["./docs/concepts/file.py"]
