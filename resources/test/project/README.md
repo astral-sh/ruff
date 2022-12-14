@@ -78,3 +78,13 @@ docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 1 potentially fixable with the --fix option.
 ```
+
+Passing an excluded directory directly should report errors in the contained files:
+
+```
+∴ cargo run resources/test/project/examples/excluded/
+Found 2 error(s).
+resources/test/project/examples/excluded/script.py:1:8: F401 `os` imported but unused
+resources/test/project/examples/excluded/script.py:5:5: F841 Local variable `x` is assigned to but never used
+1 potentially fixable with the --fix option.
+```
