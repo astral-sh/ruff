@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{bail, Result};
+use ignore::Error;
 use itertools::Itertools;
 use log::{debug, error};
 #[cfg(not(target_family = "wasm"))]
@@ -45,7 +46,11 @@ pub fn run(
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
                 Err(e) => Err((
-                    e.path().map(Path::to_owned),
+                    if let Error::WithPath { path, .. } = e {
+                        Some(path.clone())
+                    } else {
+                        None
+                    },
                     e.io_error()
                         .map_or_else(|| e.to_string(), io::Error::to_string),
                 )),

@@ -5,10 +5,11 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use ignore::{DirEntry, Walk, WalkBuilder, WalkParallel};
+use itertools::Itertools;
 use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::FxHashSet;
-use walkdir::{DirEntry, WalkDir};
 
 use crate::cli::Overrides;
 use crate::fs;
@@ -174,7 +175,7 @@ pub fn resolve_python_files(
     paths: &[PathBuf],
     strategy: &Strategy,
     overrides: &Overrides,
-) -> Result<(Vec<Result<DirEntry, walkdir::Error>>, Resolver)> {
+) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     let mut files = Vec::new();
     let mut resolver = Resolver::default();
     for path in paths {
@@ -190,7 +191,7 @@ fn python_files_in_path(
     path: &Path,
     strategy: &Strategy,
     overrides: &Overrides,
-) -> Result<(Vec<Result<DirEntry, walkdir::Error>>, Resolver)> {
+) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     let path = fs::normalize_path(path);
 
     // Search for `pyproject.toml` files in all parent directories.
@@ -207,12 +208,15 @@ fn python_files_in_path(
     }
 
     // Collect all Python files.
-    let files: Vec<Result<DirEntry, walkdir::Error>> = WalkDir::new(path)
-        .into_iter()
+    // Maybe every time we hit a `pyproject.toml` directory, we stop?
+    let files: Vec<Result<DirEntry, ignore::Error>> = WalkParallel::new(path)
         .filter_entry(|entry| {
             // Search for the `pyproject.toml` file in this directory, before we visit any
             // of its contents.
-            if entry.file_type().is_dir() {
+            if entry
+                .file_type()
+                .map_or(false, |file_type| file_type.is_dir())
+            {
                 let pyproject = entry.path().join("pyproject.toml");
                 if pyproject.is_file() {
                     // TODO(charlie): Return a `Result` here.
@@ -247,13 +251,13 @@ fn python_files_in_path(
                 }
             }
         })
-        .filter(|entry| {
-            entry.as_ref().map_or(true, |entry| {
-                (entry.depth() == 0 || is_python_file(entry.path()))
-                    && !entry.file_type().is_dir()
-                    && !(entry.file_type().is_symlink() && entry.path().is_dir())
-            })
+        .filter_entry(|entry| {
+            (entry.depth() == 0 || is_python_file(entry.path()))
+                && !entry
+                    .file_type()
+                    .map_or(false, |file_type| file_type.is_dir())
         })
+        .build()
         .collect::<Vec<_>>();
 
     Ok((files, resolver))
