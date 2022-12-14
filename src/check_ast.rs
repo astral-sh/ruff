@@ -1557,14 +1557,7 @@ where
                     flake8_bugbear::plugins::getattr_with_constant(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&CheckCode::B010) {
-                    if !self
-                        .scope_stack
-                        .iter()
-                        .rev()
-                        .any(|index| matches!(self.scopes[*index].kind, ScopeKind::Lambda(..)))
-                    {
-                        flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
-                    }
+                    flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&CheckCode::B022) {
                     flake8_bugbear::plugins::useless_contextlib_suppress(self, expr, args);
