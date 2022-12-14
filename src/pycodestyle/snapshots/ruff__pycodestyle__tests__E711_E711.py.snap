@@ -139,13 +139,13 @@ expression: checks
     row: 26
     column: 12
   fix:
-    content: ""
+    content: x is None is not None
     location:
       row: 26
       column: 3
     end_location:
       row: 26
-      column: 3
+      column: 20
 - kind:
     NoneComparison: NotEq
   location:
