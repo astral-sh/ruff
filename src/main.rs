@@ -63,7 +63,10 @@ fn resolve(config: Option<PathBuf>, overrides: &Overrides) -> Result<Strategy> {
         // current working directory. (With `Strategy::Hierarchical`, we'll end up the
         // "closest" `pyproject.toml` file for every Python file later on, so these act
         // as the "default" settings.)
-        let settings = Settings::from_configuration(Configuration::default(), &path_dedot::CWD)?;
+        let mut config = Configuration::default();
+        // Apply command-line options that override defaults
+        config.apply(overrides.clone());
+        let settings = Settings::from_configuration(config, &path_dedot::CWD)?;
         Ok(Strategy::Hierarchical(settings))
     }
 }
