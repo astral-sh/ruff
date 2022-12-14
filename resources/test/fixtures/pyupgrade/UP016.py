@@ -63,6 +63,11 @@ six.byte2int(bs) # bs[0]
 six.indexbytes(bs, i) # bs[i]
 six.int2byte(i) # bytes((i, ))
 
+# Special cases for next calls
+next(six.iteritems(dct)) # next(iter(dct.items()))
+next(six.iterkeys(dct)) # next(iter(dct.keys()))
+next(six.itervalues(dct)) # next(iter(dct.values()))
+
 # TODO: To implement
 
 @six.python_2_unicode_compatible # Remove
@@ -77,6 +82,3 @@ class C(six.with_metaclass(M, B)): pass # class C(B, metaclass=M): pass
 class C(B): pass
 
 
-next(six.iteritems(dct)) # next(iter(dct.items()))
-next(six.iterkeys(dct)) # next(iter(dct.keys()))
-next(six.itervalues(dct)) # next(iter(dct.values()))

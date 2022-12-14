@@ -679,47 +679,92 @@ expression: checks
       column: 15
 - kind: RemoveSixCompat
   location:
-    row: 80
+    row: 67
     column: 5
   end_location:
-    row: 80
+    row: 67
+    column: 23
+  fix:
+    content: iter(dct.items())
+    location:
+      row: 67
+      column: 5
+    end_location:
+      row: 67
+      column: 23
+- kind: RemoveSixCompat
+  location:
+    row: 67
+    column: 5
+  end_location:
+    row: 67
     column: 23
   fix:
     content: dct.items()
     location:
-      row: 80
+      row: 67
       column: 5
     end_location:
-      row: 80
+      row: 67
       column: 23
 - kind: RemoveSixCompat
   location:
-    row: 81
+    row: 68
     column: 5
   end_location:
-    row: 81
+    row: 68
+    column: 22
+  fix:
+    content: iter(dct.keys())
+    location:
+      row: 68
+      column: 5
+    end_location:
+      row: 68
+      column: 22
+- kind: RemoveSixCompat
+  location:
+    row: 68
+    column: 5
+  end_location:
+    row: 68
     column: 22
   fix:
     content: dct.keys()
     location:
-      row: 81
+      row: 68
       column: 5
     end_location:
-      row: 81
+      row: 68
       column: 22
 - kind: RemoveSixCompat
   location:
-    row: 82
+    row: 69
     column: 5
   end_location:
-    row: 82
+    row: 69
+    column: 24
+  fix:
+    content: iter(dct.values())
+    location:
+      row: 69
+      column: 5
+    end_location:
+      row: 69
+      column: 24
+- kind: RemoveSixCompat
+  location:
+    row: 69
+    column: 5
+  end_location:
+    row: 69
     column: 24
   fix:
     content: dct.values()
     location:
-      row: 82
+      row: 69
       column: 5
     end_location:
-      row: 82
+      row: 69
       column: 24
 
