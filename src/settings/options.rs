@@ -207,6 +207,18 @@ pub struct Options {
     pub line_length: Option<usize>,
     #[option(
         doc = r#"
+            Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`,
+            `.git/info/exclude`, and global `gitignore` files. Enabled by default.
+        "#,
+        default = "true",
+        value_type = "bool",
+        example = r#"
+            respect_gitignore = false
+        "#
+    )]
+    pub respect_gitignore: Option<bool>,
+    #[option(
+        doc = r#"
             A list of check code prefixes to enable. Prefixes can specify exact checks (like
             `F841`), entire categories (like `F`), or anything in between.
 

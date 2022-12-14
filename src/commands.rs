@@ -18,20 +18,22 @@ use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use crate::message::Message;
 use crate::resolver;
-use crate::resolver::Strategy;
+use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::types::SerializationFormat;
 
 /// Run the linter over a collection of files.
 pub fn run(
     files: &[PathBuf],
-    strategy: &Strategy,
+    pyproject_strategy: &PyprojectDiscovery,
+    file_strategy: &FileDiscovery,
     overrides: &Overrides,
     cache: bool,
     autofix: &fixer::Mode,
 ) -> Result<Diagnostics> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
+    let (paths, resolver) =
+        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -41,7 +43,7 @@ pub fn run(
             match entry {
                 Ok(entry) => {
                     let path = entry.path();
-                    let settings = resolver.resolve(path, strategy);
+                    let settings = resolver.resolve(path, pyproject_strategy);
                     lint_path(path, settings, &cache.into(), autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
@@ -57,7 +59,7 @@ pub fn run(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
-                    let settings = resolver.resolve(path, strategy);
+                    let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.enabled.contains(&CheckCode::E902) {
                         Diagnostics::new(vec![Message {
                             kind: CheckKind::IOError(message),
@@ -98,14 +100,14 @@ fn read_from_stdin() -> Result<String> {
 
 /// Run the linter over a single file, read from `stdin`.
 pub fn run_stdin(
-    strategy: &Strategy,
+    strategy: &PyprojectDiscovery,
     filename: &Path,
     autofix: &fixer::Mode,
 ) -> Result<Diagnostics> {
     let stdin = read_from_stdin()?;
     let settings = match strategy {
-        Strategy::Fixed(settings) => settings,
-        Strategy::Hierarchical(settings) => settings,
+        PyprojectDiscovery::Fixed(settings) => settings,
+        PyprojectDiscovery::Hierarchical(settings) => settings,
     };
     let mut diagnostics = lint_stdin(filename, &stdin, settings, autofix)?;
     diagnostics.messages.sort_unstable();
@@ -113,10 +115,16 @@ pub fn run_stdin(
 }
 
 /// Add `noqa` directives to a collection of files.
-pub fn add_noqa(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -> Result<usize> {
+pub fn add_noqa(
+    files: &[PathBuf],
+    pyproject_strategy: &PyprojectDiscovery,
+    file_strategy: &FileDiscovery,
+    overrides: &Overrides,
+) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
+    let (paths, resolver) =
+        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -125,7 +133,7 @@ pub fn add_noqa(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path, strategy);
+            let settings = resolver.resolve(path, pyproject_strategy);
             match add_noqa_to_path(path, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
@@ -143,10 +151,16 @@ pub fn add_noqa(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -
 }
 
 /// Automatically format a collection of files.
-pub fn autoformat(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -> Result<usize> {
+pub fn autoformat(
+    files: &[PathBuf],
+    pyproject_strategy: &PyprojectDiscovery,
+    file_strategy: &FileDiscovery,
+    overrides: &Overrides,
+) -> Result<usize> {
     // Collect all the files to format.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
+    let (paths, resolver) =
+        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -155,7 +169,7 @@ pub fn autoformat(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides)
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let settings = resolver.resolve(path, strategy);
+            let settings = resolver.resolve(path, pyproject_strategy);
             match autoformat_path(path, settings) {
                 Ok(()) => Some(()),
                 Err(e) => {
@@ -173,9 +187,15 @@ pub fn autoformat(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides)
 }
 
 /// Print the user-facing configuration settings.
-pub fn show_settings(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -> Result<()> {
+pub fn show_settings(
+    files: &[PathBuf],
+    pyproject_strategy: &PyprojectDiscovery,
+    file_strategy: &FileDiscovery,
+    overrides: &Overrides,
+) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
+    let (paths, resolver) =
+        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
 
     // Print the list of files.
     let Some(entry) = paths
@@ -185,7 +205,7 @@ pub fn show_settings(files: &[PathBuf], strategy: &Strategy, overrides: &Overrid
         bail!("No files found under the given path");
     };
     let path = entry.path();
-    let settings = resolver.resolve(path, strategy);
+    let settings = resolver.resolve(path, pyproject_strategy);
     println!("Resolved settings for: {path:?}");
     println!("{settings:#?}");
 
@@ -193,9 +213,15 @@ pub fn show_settings(files: &[PathBuf], strategy: &Strategy, overrides: &Overrid
 }
 
 /// Show the list of files to be checked based on current settings.
-pub fn show_files(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -> Result<()> {
+pub fn show_files(
+    files: &[PathBuf],
+    pyproject_strategy: &PyprojectDiscovery,
+    file_strategy: &FileDiscovery,
+    overrides: &Overrides,
+) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
+    let (paths, _resolver) =
+        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
 
     // Print the list of files.
     for entry in paths

@@ -29,6 +29,7 @@ pub mod pyproject;
 pub mod types;
 
 #[derive(Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub allowed_confusables: FxHashSet<char>,
     pub dummy_variable_rgx: Regex,
@@ -42,6 +43,7 @@ pub struct Settings {
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>,
+    pub respect_gitignore: bool,
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
@@ -122,6 +124,7 @@ impl Settings {
             per_file_ignores: resolve_per_file_ignores(
                 config.per_file_ignores.unwrap_or_default(),
             )?,
+            respect_gitignore: config.respect_gitignore.unwrap_or(true),
             src: config
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
@@ -183,6 +186,7 @@ impl Settings {
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
+            respect_gitignore: true,
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
@@ -212,6 +216,7 @@ impl Settings {
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
+            respect_gitignore: true,
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
