@@ -258,6 +258,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
@@ -304,6 +305,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
+            respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
@@ -350,6 +352,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
+            respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
@@ -396,6 +399,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
@@ -442,6 +446,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
@@ -496,6 +501,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::D100,
                 CheckCodePrefix::D101,
@@ -578,6 +584,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,

@@ -35,6 +35,7 @@ pub struct Configuration {
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
+    pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<CheckCodePrefix>>,
     pub show_source: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
@@ -109,6 +110,7 @@ impl Configuration {
                     })
                     .collect()
             }),
+            respect_gitignore: options.respect_gitignore,
             show_source: options.show_source,
             // Plugins
             flake8_annotations: options.flake8_annotations,
@@ -129,6 +131,7 @@ impl Configuration {
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
             exclude: self.exclude.or(config.exclude),
+            respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
             extend: self.extend.or(config.extend),
             extend_exclude: self.extend_exclude.or(config.extend_exclude),
             extend_ignore: self.extend_ignore.or(config.extend_ignore),
@@ -201,6 +204,9 @@ impl Configuration {
         }
         if let Some(per_file_ignores) = overrides.per_file_ignores {
             self.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores));
+        }
+        if let Some(respect_gitignore) = overrides.respect_gitignore {
+            self.respect_gitignore = Some(respect_gitignore);
         }
         if let Some(select) = overrides.select {
             self.select = Some(select);

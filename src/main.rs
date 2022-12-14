@@ -20,7 +20,7 @@ use ::ruff::autofix::fixer;
 use ::ruff::cli::{extract_log_level, Cli};
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::printer::Printer;
-use ::ruff::resolver::Strategy;
+use ::ruff::resolver::PyprojectDiscovery;
 use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
@@ -33,31 +33,31 @@ use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
 use ruff::cli::Overrides;
-use ruff::resolver::{resolve_settings, Relativity};
+use ruff::resolver::{resolve_settings, FileDiscovery, Relativity};
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
-fn resolve(config: Option<PathBuf>, overrides: &Overrides) -> Result<Strategy> {
+fn resolve(config: Option<PathBuf>, overrides: &Overrides) -> Result<PyprojectDiscovery> {
     if let Some(pyproject) = config {
         // First priority: the user specified a `pyproject.toml` file. Use that
         // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
         // current working directory. (This matches ESLint's behavior.)
         let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
-        Ok(Strategy::Fixed(settings))
+        Ok(PyprojectDiscovery::Fixed(settings))
     } else if let Some(pyproject) = pyproject::find_pyproject_toml(path_dedot::CWD.as_path()) {
         // Second priority: find a `pyproject.toml` file in the current working path,
         // and resolve all paths relative to that directory. (With
         // `Strategy::Hierarchical`, we'll end up finding the "closest" `pyproject.toml`
         // file for every Python file later on, so these act as the "default" settings.)
         let settings = resolve_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
-        Ok(Strategy::Hierarchical(settings))
+        Ok(PyprojectDiscovery::Hierarchical(settings))
     } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
         // Third priority: find a user-specific `pyproject.toml`, but resolve all paths
         // relative the current working directory. (With `Strategy::Hierarchical`, we'll
         // end up the "closest" `pyproject.toml` file for every Python file later on, so
         // these act as the "default" settings.)
         let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
-        Ok(Strategy::Hierarchical(settings))
+        Ok(PyprojectDiscovery::Hierarchical(settings))
     } else {
         // Fallback: load Ruff's default settings, and resolve all paths relative to the
         // current working directory. (With `Strategy::Hierarchical`, we'll end up the
@@ -67,7 +67,7 @@ fn resolve(config: Option<PathBuf>, overrides: &Overrides) -> Result<Strategy> {
         // Apply command-line options that override defaults.
         config.apply(overrides.clone());
         let settings = Settings::from_configuration(config, &path_dedot::CWD)?;
-        Ok(Strategy::Hierarchical(settings))
+        Ok(PyprojectDiscovery::Hierarchical(settings))
     }
 }
 
@@ -87,13 +87,19 @@ fn inner_main() -> Result<ExitCode> {
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let strategy = resolve(cli.config, &overrides)?;
+    let pyproject_strategy = resolve(cli.config, &overrides)?;
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
-    let (fix, format) = match &strategy {
-        Strategy::Fixed(settings) => (settings.fix, settings.format),
-        Strategy::Hierarchical(settings) => (settings.fix, settings.format),
+    let file_strategy = FileDiscovery {
+        respect_gitignore: match &pyproject_strategy {
+            PyprojectDiscovery::Fixed(settings) => settings.respect_gitignore,
+            PyprojectDiscovery::Hierarchical(settings) => settings.respect_gitignore,
+        },
+    };
+    let (fix, format) = match &pyproject_strategy {
+        PyprojectDiscovery::Fixed(settings) => (settings.fix, settings.format),
+        PyprojectDiscovery::Hierarchical(settings) => (settings.fix, settings.format),
     };
     let autofix = if fix {
         fixer::Mode::Apply
@@ -108,11 +114,11 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_settings {
-        commands::show_settings(&cli.files, &strategy, &overrides)?;
+        commands::show_settings(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_files {
-        commands::show_files(&cli.files, &strategy, &overrides)?;
+        commands::show_files(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -144,7 +150,8 @@ fn inner_main() -> Result<ExitCode> {
 
         let messages = commands::run(
             &cli.files,
-            &strategy,
+            &pyproject_strategy,
+            &file_strategy,
             &overrides,
             cache_enabled,
             &fixer::Mode::None,
@@ -173,7 +180,8 @@ fn inner_main() -> Result<ExitCode> {
 
                         let messages = commands::run(
                             &cli.files,
-                            &strategy,
+                            &pyproject_strategy,
+                            &file_strategy,
                             &overrides,
                             cache_enabled,
                             &fixer::Mode::None,
@@ -185,12 +193,14 @@ fn inner_main() -> Result<ExitCode> {
             }
         }
     } else if cli.add_noqa {
-        let modifications = commands::add_noqa(&cli.files, &strategy, &overrides)?;
+        let modifications =
+            commands::add_noqa(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
     } else if cli.autoformat {
-        let modifications = commands::autoformat(&cli.files, &strategy, &overrides)?;
+        let modifications =
+            commands::autoformat(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Formatted {modifications} files.");
         }
@@ -201,9 +211,16 @@ fn inner_main() -> Result<ExitCode> {
         let diagnostics = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            commands::run_stdin(&strategy, path, &autofix)?
+            commands::run_stdin(&pyproject_strategy, path, &autofix)?
         } else {
-            commands::run(&cli.files, &strategy, &overrides, cache_enabled, &autofix)?
+            commands::run(
+                &cli.files,
+                &pyproject_strategy,
+                &file_strategy,
+                &overrides,
+                cache_enabled,
+                &autofix,
+            )?
         };
 
         // Always try to print violations (the printer itself may suppress output),

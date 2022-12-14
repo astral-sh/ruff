@@ -16,9 +16,16 @@ use crate::fs;
 use crate::settings::configuration::Configuration;
 use crate::settings::{pyproject, Settings};
 
-/// The strategy for discovering a `pyproject.toml` file for each Python file.
+/// The strategy used to discover Python files in the filesystem..
 #[derive(Debug)]
-pub enum Strategy {
+pub struct FileDiscovery {
+    pub respect_gitignore: bool,
+}
+
+/// The strategy used to discover the relevant `pyproject.toml` file for each
+/// Python file.
+#[derive(Debug)]
+pub enum PyprojectDiscovery {
     /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
     /// provided on the command-line).
     Fixed(Settings),
@@ -65,10 +72,10 @@ impl Resolver {
     }
 
     /// Return the appropriate `Settings` for a given `Path`.
-    pub fn resolve<'a>(&'a self, path: &Path, strategy: &'a Strategy) -> &'a Settings {
+    pub fn resolve<'a>(&'a self, path: &Path, strategy: &'a PyprojectDiscovery) -> &'a Settings {
         match strategy {
-            Strategy::Fixed(settings) => settings,
-            Strategy::Hierarchical(default) => self
+            PyprojectDiscovery::Fixed(settings) => settings,
+            PyprojectDiscovery::Hierarchical(default) => self
                 .settings
                 .iter()
                 .rev()
@@ -181,7 +188,8 @@ fn is_python_entry(entry: &DirEntry) -> bool {
 /// Find all Python (`.py` and `.pyi` files) in a set of paths.
 pub fn python_files_in_path(
     paths: &[PathBuf],
-    strategy: &Strategy,
+    pyproject_strategy: &PyprojectDiscovery,
+    file_strategy: &FileDiscovery,
     overrides: &Overrides,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
@@ -209,7 +217,9 @@ pub fn python_files_in_path(
     for path in &paths[1..] {
         builder.add(path);
     }
-    let walker = builder.hidden(false).build_parallel();
+    builder.standard_filters(file_strategy.respect_gitignore);
+    builder.hidden(false);
+    let walker = builder.build_parallel();
 
     // Run the `WalkParallel` to collect all Python files.
     let error: std::sync::Mutex<Result<()>> = std::sync::Mutex::new(Ok(()));
@@ -247,7 +257,7 @@ pub fn python_files_in_path(
                 if entry.depth() > 0 {
                     let path = entry.path();
                     let resolver = resolver.read().unwrap();
-                    let settings = resolver.resolve(path, strategy);
+                    let settings = resolver.resolve(path, pyproject_strategy);
                     match fs::extract_path_names(path) {
                         Ok((file_path, file_basename)) => {
                             if !settings.exclude.is_empty()
