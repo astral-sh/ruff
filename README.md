@@ -343,15 +343,18 @@ directory hierarchy is used for every individual file, with all paths in the `py
 
 There are a few exceptions to these rules:
 
-1. If a configuration file is passed directly via `--config`, those settings are used for across
+1. In locating the "closest" `pyproject.toml` file for a given path, Ruff ignore any
+   `pyproject.toml` files that lack a `[tool.ruff]` section.
+2. If a configuration file is passed directly via `--config`, those settings are used for across
    files. Any relative paths in that configuration file (like `exclude` globs or `src` paths) are
    resolved relative to the _current working directory_.
-2. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
-   a default configuration. If a user-specific configuration file exists at `${config_dir}/ruff/pyproject.toml`,
-   that file will be used instead of the default configuration, with `${config_dir}` being determined
-   via the [`dirs](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all relative paths
-   being again resolved relative to the _current working directory_.
-3. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
+3. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
+   a default configuration. If a user-specific configuration file exists
+   at `${config_dir}/ruff/pyproject.toml`,
+   that file will be used instead of the default configuration, with `${config_dir}` being
+   determined via the [`dirs](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all
+   relative paths being again resolved relative to the _current working directory_.
+4. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
    `--select`) will override the settings in _every_ resolved configuration file.
 
 Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
