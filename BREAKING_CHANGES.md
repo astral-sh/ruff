@@ -1,6 +1,6 @@
 # Breaking Changes
 
-## Upcoming
+## 0.0.181
 
 ### Files excluded by `.gitignore` are now ignored ([#1234](https://github.com/charliermarsh/ruff/pull/1234))
 
