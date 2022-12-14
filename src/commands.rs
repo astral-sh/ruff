@@ -31,7 +31,7 @@ pub fn run(
 ) -> Result<Diagnostics> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -116,7 +116,7 @@ pub fn run_stdin(
 pub fn add_noqa(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -146,7 +146,7 @@ pub fn add_noqa(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -
 pub fn autoformat(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -> Result<usize> {
     // Collect all the files to format.
     let start = Instant::now();
-    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -175,7 +175,7 @@ pub fn autoformat(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides)
 /// Print the user-facing configuration settings.
 pub fn show_settings(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) = resolver::resolve_python_files(files, strategy, overrides)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
 
     // Print the list of files.
     let Some(entry) = paths
@@ -195,7 +195,7 @@ pub fn show_settings(files: &[PathBuf], strategy: &Strategy, overrides: &Overrid
 /// Show the list of files to be checked based on current settings.
 pub fn show_files(files: &[PathBuf], strategy: &Strategy, overrides: &Overrides) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) = resolver::resolve_python_files(files, strategy, overrides)?;
+    let (paths, _resolver) = resolver::python_files_in_path(files, strategy, overrides)?;
 
     // Print the list of files.
     for entry in paths
