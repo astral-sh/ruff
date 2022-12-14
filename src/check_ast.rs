@@ -1892,6 +1892,12 @@ where
                     }
                 }
 
+                if self.settings.enabled.contains(&CheckCode::PDV015) {
+                    if let Some(check) = pandas_vet::checks::use_of_pd_merge(func) {
+                        self.add_check(check);
+                    };
+                }
+
                 // pygrep-hooks
                 if self.settings.enabled.contains(&CheckCode::PGH001) {
                     pygrep_hooks::checks::no_eval(self, func);

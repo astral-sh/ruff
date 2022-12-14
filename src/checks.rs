@@ -326,6 +326,7 @@ pub enum CheckCode {
     PDV011,
     PDV012,
     PDV013,
+    PDV015,
     PDV901,
 }
 
@@ -891,6 +892,7 @@ pub enum CheckKind {
     UseOfDotValues,
     UseOfDotReadTable,
     UseOfDotStack,
+    UseOfPdMerge,
     DfIsABadVariableName,
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
@@ -1261,6 +1263,7 @@ impl CheckCode {
             CheckCode::PDV011 => CheckKind::UseOfDotValues,
             CheckCode::PDV012 => CheckKind::UseOfDotReadTable,
             CheckCode::PDV013 => CheckKind::UseOfDotStack,
+            CheckCode::PDV015 => CheckKind::UseOfPdMerge,
             CheckCode::PDV901 => CheckKind::DfIsABadVariableName,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
@@ -1473,6 +1476,7 @@ impl CheckCode {
             CheckCode::PDV011 => CheckCategory::PandasVet,
             CheckCode::PDV012 => CheckCategory::PandasVet,
             CheckCode::PDV013 => CheckCategory::PandasVet,
+            CheckCode::PDV015 => CheckCategory::PandasVet,
             CheckCode::PDV901 => CheckCategory::PandasVet,
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
             CheckCode::PLC0414 => CheckCategory::Pylint,
@@ -1835,6 +1839,7 @@ impl CheckKind {
             CheckKind::UseOfDotValues => &CheckCode::PDV011,
             CheckKind::UseOfDotReadTable => &CheckCode::PDV012,
             CheckKind::UseOfDotStack => &CheckCode::PDV013,
+            CheckKind::UseOfPdMerge => &CheckCode::PDV015,
             CheckKind::DfIsABadVariableName => &CheckCode::PDV901,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
@@ -2697,6 +2702,9 @@ impl CheckKind {
             CheckKind::DfIsABadVariableName => {
                 "`df` is a bad variable name. Be kinder to your future self.".to_string()
             }
+            CheckKind::UseOfPdMerge => "Use `.merge` method instead of `pd.merge` function. They \
+                                        have equivalent functionality."
+                .to_string(),
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(

@@ -27,6 +27,21 @@ pub fn inplace_argument(keywords: &[Keyword]) -> Option<Check> {
     None
 }
 
+/// PDV015
+pub fn use_of_pd_merge(func: &Expr) -> Option<Check> {
+    if let ExprKind::Attribute { attr, value, .. } = &func.node {
+        if let ExprKind::Name { id, .. } = &value.node {
+            if id == "pd" && attr == "merge" {
+                return Some(Check::new(
+                    CheckKind::UseOfPdMerge,
+                    Range::from_located(func),
+                ));
+            }
+        }
+    }
+    None
+}
+
 /// PDV901
 pub fn assignment_to_df(targets: &[Expr]) -> Option<Check> {
     if targets.len() != 1 {

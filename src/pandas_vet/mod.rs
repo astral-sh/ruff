@@ -90,6 +90,14 @@ mod tests {
         )
     "#, &[]; "PDV013_pass")]
     #[test_case("table = df.stack(level=-1, dropna=True)", &[CheckCode::PDV013]; "PDV013_fail_stack")]
+    #[test_case("df1.merge(df2)", &[]; "PD015_pass_merge_on_dataframe")]
+    #[test_case("df1.merge(df2, 'inner')", &[]; "PD015_pass_merge_on_dataframe_with_multiple_args")]
+    #[test_case("pd.merge(df1, df2)", &[CheckCode::PDV015]; "PD015_fail_merge_on_pandas_object")]
+    #[test_case(
+        "pd.to_datetime(timestamp * 10 ** 9).strftime('%Y-%m-%d %H:%M:%S.%f')",
+        &[];
+        "PD015_pass_other_pd_function"
+    )]
     #[test_case("employees = pd.DataFrame(employee_dict)", &[]; "PDV901_pass_non_df")]
     #[test_case("employees_df = pd.DataFrame(employee_dict)", &[]; "PDV901_pass_part_df")]
     #[test_case("my_function(df=data)", &[]; "PDV901_pass_df_param")]

@@ -859,6 +859,7 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/0.2.3/) on PyPI.
 | PDV011 | UseOfDotValues | Use `.array` or `.to_array()` instead of `.values`; `values` is ambiguous |  |
 | PDV012 | UseOfDotReadTable | `.read_csv` is preferred to `.read_table`; provides same functionality |  |
 | PDV013 | UseOfDotStack | `.melt` is preferred to `.stack`; provides same functionality |  |
+| PDV015 | UseOfPdMerge | Use `.merge` method instead of `pd.merge` function. They have equivalent functionality. |  |
 | PDV901 | DfIsABadVariableName | `df` is a bad variable name. Be kinder to your future self. |  |
 
 ### pygrep-hooks (PGH)
