@@ -5,6 +5,7 @@ pub use property_with_parameters::property_with_parameters;
 pub use unnecessary_direct_lambda_call::unnecessary_direct_lambda_call;
 pub use use_from_import::use_from_import;
 pub use use_sys_exit::use_sys_exit;
+pub use used_prior_global_declaration::used_prior_global_declaration;
 pub use useless_else_on_loop::useless_else_on_loop;
 pub use useless_import_alias::useless_import_alias;
 
@@ -15,5 +16,6 @@ mod property_with_parameters;
 mod unnecessary_direct_lambda_call;
 mod use_from_import;
 mod use_sys_exit;
+mod used_prior_global_declaration;
 mod useless_else_on_loop;
 mod useless_import_alias;

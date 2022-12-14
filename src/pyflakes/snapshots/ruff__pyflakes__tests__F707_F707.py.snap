@@ -7,23 +7,23 @@ expression: checks
     row: 3
     column: 0
   end_location:
-    row: 5
-    column: 0
+    row: 4
+    column: 8
   fix: ~
 - kind: DefaultExceptNotLast
   location:
     row: 10
     column: 0
   end_location:
-    row: 12
-    column: 0
+    row: 11
+    column: 8
   fix: ~
 - kind: DefaultExceptNotLast
   location:
     row: 19
     column: 0
   end_location:
-    row: 21
-    column: 0
+    row: 20
+    column: 8
   fix: ~
 

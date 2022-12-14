@@ -32,23 +32,29 @@ impl Range {
 
 #[derive(Debug)]
 pub struct FunctionDef<'a> {
+    // Properties derived from StmtKind::FunctionDef.
     pub name: &'a str,
     pub args: &'a Arguments,
     pub body: &'a [Stmt],
     pub decorator_list: &'a [Expr],
     // pub returns: Option<&'a Expr>,
     // pub type_comment: Option<&'a str>,
+    // Scope-specific properties.
     // TODO(charlie): Create AsyncFunctionDef to mirror the AST.
     pub async_: bool,
+    pub globals: FxHashMap<&'a str, &'a Stmt>,
 }
 
 #[derive(Debug)]
 pub struct ClassDef<'a> {
+    // Properties derived from StmtKind::ClassDef.
     pub name: &'a str,
     pub bases: &'a [Expr],
     pub keywords: &'a [Keyword],
     // pub body: &'a [Stmt],
     pub decorator_list: &'a [Expr],
+    // Scope-specific properties.
+    pub globals: FxHashMap<&'a str, &'a Stmt>,
 }
 
 #[derive(Debug)]
@@ -73,7 +79,11 @@ pub struct Scope<'a> {
     pub kind: ScopeKind<'a>,
     pub import_starred: bool,
     pub uses_locals: bool,
+    /// A map from bound name to binding index.
     pub values: FxHashMap<&'a str, usize>,
+    /// A list of (name, index) pairs for bindings that were overridden in the
+    /// scope.
+    pub overridden: Vec<(&'a str, usize)>,
 }
 
 impl<'a> Scope<'a> {
@@ -84,6 +94,7 @@ impl<'a> Scope<'a> {
             import_starred: false,
             uses_locals: false,
             values: FxHashMap::default(),
+            overridden: Vec::new(),
         }
     }
 }
@@ -117,8 +128,6 @@ pub struct Binding<'a> {
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used.
     pub used: Option<(usize, Range)>,
-    /// A list of pointers to `Binding` instances that redefined this binding.
-    pub redefined: Vec<usize>,
 }
 
 // Pyflakes defines the following binding hierarchy (via inheritance):

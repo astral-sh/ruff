@@ -7,23 +7,23 @@ expression: checks
     row: 23
     column: 4
   end_location:
-    row: 26
-    column: 4
+    row: 24
+    column: 12
   fix: ~
 - kind: PublicMethod
   location:
     row: 56
     column: 4
   end_location:
-    row: 59
-    column: 4
+    row: 57
+    column: 12
   fix: ~
 - kind: PublicMethod
   location:
     row: 68
     column: 4
   end_location:
-    row: 72
-    column: 0
+    row: 69
+    column: 12
   fix: ~
 

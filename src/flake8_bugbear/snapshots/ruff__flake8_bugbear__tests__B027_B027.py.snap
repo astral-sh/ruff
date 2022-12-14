@@ -8,8 +8,8 @@ expression: checks
     row: 12
     column: 4
   end_location:
-    row: 15
-    column: 4
+    row: 13
+    column: 11
   fix: ~
 - kind:
     EmptyMethodWithoutAbstractDecorator: AbstractClass
@@ -17,8 +17,8 @@ expression: checks
     row: 15
     column: 4
   end_location:
-    row: 18
-    column: 4
+    row: 16
+    column: 12
   fix: ~
 - kind:
     EmptyMethodWithoutAbstractDecorator: AbstractClass
@@ -26,8 +26,8 @@ expression: checks
     row: 18
     column: 4
   end_location:
-    row: 22
-    column: 4
+    row: 20
+    column: 11
   fix: ~
 - kind:
     EmptyMethodWithoutAbstractDecorator: AbstractClass
@@ -35,7 +35,7 @@ expression: checks
     row: 22
     column: 4
   end_location:
-    row: 29
-    column: 4
+    row: 27
+    column: 12
   fix: ~
 

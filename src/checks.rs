@@ -93,17 +93,21 @@ pub enum CheckCode {
     F823,
     F831,
     F841,
+    F842,
     F901,
     // pylint
     PLC0414,
     PLC2201,
     PLC3002,
+    PLE0117,
+    PLE0118,
     PLE1142,
     PLR0206,
     PLR0402,
     PLR1701,
     PLR1722,
     PLW0120,
+    PLW0602,
     // flake8-builtins
     A001,
     A002,
@@ -202,6 +206,8 @@ pub enum CheckCode {
     YTT301,
     YTT302,
     YTT303,
+    // flake8-simplify
+    SIM118,
     // pyupgrade
     UP001,
     UP003,
@@ -244,6 +250,7 @@ pub enum CheckCode {
     D214,
     D215,
     D300,
+    D301,
     D400,
     D402,
     D403,
@@ -333,6 +340,7 @@ pub enum CheckCategory {
     Flake8Print,
     Flake8Quotes,
     Flake8Return,
+    Flake8Simplify,
     Flake8TidyImports,
     Flake8UnusedArguments,
     Eradicate,
@@ -373,6 +381,7 @@ impl CheckCategory {
             CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Flake8Return => "flake8-return",
             CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
+            CheckCategory::Flake8Simplify => "flake8-simplify",
             CheckCategory::Flake8UnusedArguments => "flake8-unused-arguments",
             CheckCategory::Isort => "isort",
             CheckCategory::McCabe => "mccabe",
@@ -402,6 +411,7 @@ impl CheckCategory {
             CheckCategory::Flake8Print => vec![CheckCodePrefix::T20],
             CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
             CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
+            CheckCategory::Flake8Simplify => vec![CheckCodePrefix::SIM],
             CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::TID],
             CheckCategory::Flake8UnusedArguments => vec![CheckCodePrefix::ARG],
             CheckCategory::Isort => vec![CheckCodePrefix::I],
@@ -475,6 +485,10 @@ impl CheckCategory {
             )),
             CheckCategory::Flake8Return => Some((
                 "https://pypi.org/project/flake8-return/1.2.0/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8Simplify => Some((
+                "https://pypi.org/project/flake8-simplify/0.19.3/",
                 &Platform::PyPI,
             )),
             CheckCategory::Flake8TidyImports => Some((
@@ -628,20 +642,24 @@ pub enum CheckKind {
     TwoStarredExpressions,
     UndefinedExport(String),
     UndefinedLocal(String),
+    UnusedAnnotation(String),
     UndefinedName(String),
     UnusedImport(String, bool),
     UnusedVariable(String),
     YieldOutsideFunction(DeferralKeyword),
     // pylint
-    ConsiderMergingIsinstance(String, Vec<String>),
-    UselessImportAlias,
-    MisplacedComparisonConstant(String),
-    UnnecessaryDirectLambdaCall,
-    PropertyWithParameters,
-    ConsiderUsingFromImport(String, String),
     AwaitOutsideAsync,
-    UselessElseOnLoop,
+    ConsiderMergingIsinstance(String, Vec<String>),
+    ConsiderUsingFromImport(String, String),
+    GlobalVariableNotAssigned(String),
+    MisplacedComparisonConstant(String),
+    NonlocalWithoutBinding(String),
+    PropertyWithParameters,
+    UnnecessaryDirectLambdaCall,
     UseSysExit(String),
+    UsedPriorGlobalDeclaration(String, usize),
+    UselessElseOnLoop,
+    UselessImportAlias,
     // flake8-builtins
     BuiltinVariableShadowing(String),
     BuiltinArgumentShadowing(String),
@@ -738,6 +756,8 @@ pub enum CheckKind {
     SysVersion0Referenced,
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
+    // flake8-simplify
+    KeyInDict(String, String),
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UselessMetaclassType,
@@ -798,6 +818,7 @@ pub enum CheckKind {
     SectionUnderlineMatchesSectionLength(String),
     SectionUnderlineNotOverIndented(String),
     SkipDocstring,
+    UsesRPrefixForBackslashedContent,
     UsesTripleQuotes,
     // pep8-naming
     InvalidClassName(String),
@@ -942,11 +963,14 @@ impl CheckCode {
             CheckCode::F823 => CheckKind::UndefinedLocal("...".to_string()),
             CheckCode::F831 => CheckKind::DuplicateArgumentName,
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
+            CheckCode::F842 => CheckKind::UnusedAnnotation("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
             // pylint
             CheckCode::PLC0414 => CheckKind::UselessImportAlias,
             CheckCode::PLC2201 => CheckKind::MisplacedComparisonConstant("...".to_string()),
             CheckCode::PLC3002 => CheckKind::UnnecessaryDirectLambdaCall,
+            CheckCode::PLE0117 => CheckKind::NonlocalWithoutBinding("...".to_string()),
+            CheckCode::PLE0118 => CheckKind::UsedPriorGlobalDeclaration("...".to_string(), 1),
             CheckCode::PLE1142 => CheckKind::AwaitOutsideAsync,
             CheckCode::PLR0402 => {
                 CheckKind::ConsiderUsingFromImport("...".to_string(), "...".to_string())
@@ -957,6 +981,7 @@ impl CheckCode {
             }
             CheckCode::PLR1722 => CheckKind::UseSysExit("exit".to_string()),
             CheckCode::PLW0120 => CheckKind::UselessElseOnLoop,
+            CheckCode::PLW0602 => CheckKind::GlobalVariableNotAssigned("...".to_string()),
             // flake8-builtins
             CheckCode::A001 => CheckKind::BuiltinVariableShadowing("...".to_string()),
             CheckCode::A002 => CheckKind::BuiltinArgumentShadowing("...".to_string()),
@@ -1070,6 +1095,8 @@ impl CheckCode {
             CheckCode::YTT303 => CheckKind::SysVersionSlice1Referenced,
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
+            // flake8-simplify
+            CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             // pyupgrade
             CheckCode::UP001 => CheckKind::UselessMetaclassType,
             CheckCode::UP003 => CheckKind::TypeOfPrimitive(Primitive::Str),
@@ -1115,6 +1142,7 @@ impl CheckCode {
             CheckCode::D214 => CheckKind::SectionNotOverIndented("Returns".to_string()),
             CheckCode::D215 => CheckKind::SectionUnderlineNotOverIndented("Returns".to_string()),
             CheckCode::D300 => CheckKind::UsesTripleQuotes,
+            CheckCode::D301 => CheckKind::UsesRPrefixForBackslashedContent,
             CheckCode::D400 => CheckKind::EndsInPeriod,
             CheckCode::D402 => CheckKind::NoSignature,
             CheckCode::D403 => CheckKind::FirstLineCapitalized,
@@ -1295,6 +1323,7 @@ impl CheckCode {
             CheckCode::D214 => CheckCategory::Pydocstyle,
             CheckCode::D215 => CheckCategory::Pydocstyle,
             CheckCode::D300 => CheckCategory::Pydocstyle,
+            CheckCode::D301 => CheckCategory::Pydocstyle,
             CheckCode::D400 => CheckCategory::Pydocstyle,
             CheckCode::D402 => CheckCategory::Pydocstyle,
             CheckCode::D403 => CheckCategory::Pydocstyle,
@@ -1371,6 +1400,7 @@ impl CheckCode {
             CheckCode::F823 => CheckCategory::Pyflakes,
             CheckCode::F831 => CheckCategory::Pyflakes,
             CheckCode::F841 => CheckCategory::Pyflakes,
+            CheckCode::F842 => CheckCategory::Pyflakes,
             CheckCode::F901 => CheckCategory::Pyflakes,
             CheckCode::FBT001 => CheckCategory::Flake8BooleanTrap,
             CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
@@ -1397,12 +1427,15 @@ impl CheckCode {
             CheckCode::PLC0414 => CheckCategory::Pylint,
             CheckCode::PLC2201 => CheckCategory::Pylint,
             CheckCode::PLC3002 => CheckCategory::Pylint,
+            CheckCode::PLE0117 => CheckCategory::Pylint,
+            CheckCode::PLE0118 => CheckCategory::Pylint,
             CheckCode::PLE1142 => CheckCategory::Pylint,
             CheckCode::PLR0206 => CheckCategory::Pylint,
             CheckCode::PLR0402 => CheckCategory::Pylint,
             CheckCode::PLR1701 => CheckCategory::Pylint,
             CheckCode::PLR1722 => CheckCategory::Pylint,
             CheckCode::PLW0120 => CheckCategory::Pylint,
+            CheckCode::PLW0602 => CheckCategory::Pylint,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
             CheckCode::Q002 => CheckCategory::Flake8Quotes,
@@ -1425,6 +1458,7 @@ impl CheckCode {
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
+            CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::T100 => CheckCategory::Flake8Debugger,
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
@@ -1520,20 +1554,24 @@ impl CheckKind {
             CheckKind::UndefinedName(_) => &CheckCode::F821,
             CheckKind::UnusedImport(..) => &CheckCode::F401,
             CheckKind::UnusedVariable(_) => &CheckCode::F841,
+            CheckKind::UnusedAnnotation(_) => &CheckCode::F842,
             CheckKind::YieldOutsideFunction(_) => &CheckCode::F704,
             // pycodestyle warnings
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(_) => &CheckCode::W605,
             // pylint
-            CheckKind::UselessImportAlias => &CheckCode::PLC0414,
-            CheckKind::MisplacedComparisonConstant(..) => &CheckCode::PLC2201,
-            CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             CheckKind::AwaitOutsideAsync => &CheckCode::PLE1142,
             CheckKind::ConsiderMergingIsinstance(..) => &CheckCode::PLR1701,
-            CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
             CheckKind::ConsiderUsingFromImport(..) => &CheckCode::PLR0402,
+            CheckKind::GlobalVariableNotAssigned(..) => &CheckCode::PLW0602,
+            CheckKind::MisplacedComparisonConstant(..) => &CheckCode::PLC2201,
+            CheckKind::PropertyWithParameters => &CheckCode::PLR0206,
+            CheckKind::UnnecessaryDirectLambdaCall => &CheckCode::PLC3002,
             CheckKind::UseSysExit(_) => &CheckCode::PLR1722,
+            CheckKind::NonlocalWithoutBinding(..) => &CheckCode::PLE0117,
+            CheckKind::UsedPriorGlobalDeclaration(..) => &CheckCode::PLE0118,
             CheckKind::UselessElseOnLoop => &CheckCode::PLW0120,
+            CheckKind::UselessImportAlias => &CheckCode::PLC0414,
             // flake8-builtins
             CheckKind::BuiltinVariableShadowing(_) => &CheckCode::A001,
             CheckKind::BuiltinArgumentShadowing(_) => &CheckCode::A002,
@@ -1630,6 +1668,8 @@ impl CheckKind {
             CheckKind::SysVersion0Referenced => &CheckCode::YTT301,
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
+            // flake8-simplify
+            CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             // pyupgrade
             CheckKind::TypeOfPrimitive(_) => &CheckCode::UP003,
             CheckKind::UselessMetaclassType => &CheckCode::UP001,
@@ -1690,6 +1730,7 @@ impl CheckKind {
             CheckKind::SectionUnderlineMatchesSectionLength(_) => &CheckCode::D409,
             CheckKind::SectionUnderlineNotOverIndented(_) => &CheckCode::D215,
             CheckKind::SkipDocstring => &CheckCode::D418,
+            CheckKind::UsesRPrefixForBackslashedContent => &CheckCode::D301,
             CheckKind::UsesTripleQuotes => &CheckCode::D300,
             // pep8-naming
             CheckKind::InvalidClassName(_) => &CheckCode::N801,
@@ -1907,6 +1948,9 @@ impl CheckKind {
             CheckKind::UndefinedName(name) => {
                 format!("Undefined name `{name}`")
             }
+            CheckKind::UnusedAnnotation(name) => {
+                format!("Local variable `{name}` is annotated but never used")
+            }
             CheckKind::UnusedImport(name, ignore_init) => {
                 if *ignore_init {
                     format!(
@@ -1936,8 +1980,11 @@ impl CheckKind {
                 let types = types.join(", ");
                 format!("Merge these isinstance calls: `isinstance({obj}, ({types}))`")
             }
-            CheckKind::MisplacedComparisonConstant(comprison) => {
-                format!("Comparison should be {comprison}")
+            CheckKind::MisplacedComparisonConstant(comparison) => {
+                format!("Comparison should be {comparison}")
+            }
+            CheckKind::NonlocalWithoutBinding(name) => {
+                format!("Nonlocal name `{name}` found without binding")
             }
             CheckKind::UnnecessaryDirectLambdaCall => "Lambda expression called directly. Execute \
                                                        the expression inline instead."
@@ -1947,6 +1994,12 @@ impl CheckKind {
             }
             CheckKind::ConsiderUsingFromImport(module, name) => {
                 format!("Use `from {module} import {name}` in lieu of alias")
+            }
+            CheckKind::UsedPriorGlobalDeclaration(name, line) => {
+                format!("Name `{name}` is used prior to global declaration on line {line}")
+            }
+            CheckKind::GlobalVariableNotAssigned(name) => {
+                format!("Using global for `{name}` but no assignment is done")
             }
             CheckKind::AwaitOutsideAsync => {
                 "`await` should be used within an async function".to_string()
@@ -2284,6 +2337,10 @@ impl CheckKind {
             CheckKind::SysVersionSlice1Referenced => {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
+            // flake8-simplify
+            CheckKind::KeyInDict(key, dict) => {
+                format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
+            }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
@@ -2345,6 +2402,9 @@ impl CheckKind {
                 .to_string(),
             CheckKind::FirstLineCapitalized => {
                 "First word of the first line should be properly capitalized".to_string()
+            }
+            CheckKind::UsesRPrefixForBackslashedContent => {
+                r#"Use r""" if any backslashes in a docstring"#.to_string()
             }
             CheckKind::UsesTripleQuotes => r#"Use """triple double quotes""""#.to_string(),
             CheckKind::MultiLineSummaryFirstLine => {
@@ -2627,6 +2687,7 @@ impl CheckKind {
                 | CheckKind::ImplicitReturn
                 | CheckKind::ImplicitReturnValue
                 | CheckKind::IsLiteral
+                | CheckKind::KeyInDict(..)
                 | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
@@ -2642,6 +2703,7 @@ impl CheckKind {
                 | CheckKind::NotIsTest
                 | CheckKind::OneBlankLineAfterClass(..)
                 | CheckKind::OneBlankLineBeforeClass(..)
+                | CheckKind::PercentFormatExtraNamedArguments(..)
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
                 | CheckKind::PrintFound
@@ -2654,9 +2716,11 @@ impl CheckKind {
                 | CheckKind::SectionUnderlineMatchesSectionLength(..)
                 | CheckKind::SectionUnderlineNotOverIndented(..)
                 | CheckKind::SetAttrWithConstant
+                | CheckKind::StringDotFormatExtraNamedArguments(..)
                 | CheckKind::SuperCallWithParameters
                 | CheckKind::TrueFalseComparison(..)
                 | CheckKind::TypeOfPrimitive(..)
+                | CheckKind::UnnecessaryCallAroundSorted(..)
                 | CheckKind::UnnecessaryCollectionCall(..)
                 | CheckKind::UnnecessaryComprehension(..)
                 | CheckKind::UnnecessaryEncodeUTF8

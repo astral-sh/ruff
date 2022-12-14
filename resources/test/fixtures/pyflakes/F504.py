@@ -4,3 +4,6 @@ a = "wrong"
 
 hidden = {"a": "!"}
 "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
+
+"%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
+"%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)

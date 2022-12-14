@@ -10,13 +10,13 @@ except ValueError as e:
     print(e)
 
 
-def f1():
+def f():
     x = 1
     y = 2
     z = x + y
 
 
-def f2():
+def f():
     foo = (1, 2)
     (a, b) = (1, 2)
 
@@ -26,12 +26,12 @@ def f2():
     (x, y) = baz = bar
 
 
-def f3():
+def f():
     locals()
     x = 1
 
 
-def f4():
+def f():
     _ = 1
     __ = 1
     _discarded = 1
@@ -40,26 +40,26 @@ def f4():
 a = 1
 
 
-def f5():
+def f():
     global a
 
-    # Used in `f7` via `nonlocal`.
+    # Used in `c` via `nonlocal`.
     b = 1
 
-    def f6():
+    def c():
         # F841
         b = 1
 
-    def f7():
+    def d():
         nonlocal b
 
 
-def f6():
+def f():
     annotations = []
     assert len([annotations for annotations in annotations])
 
 
-def f7():
+def f():
     def connect():
         return None, None
 
@@ -67,6 +67,22 @@ def f7():
         cursor.execute("SELECT * FROM users")
 
 
-def f8():
-    with open("file") as f, open("") as ((a, b)):
+def f():
+    def connect():
+        return None, None
+
+    with (connect() as (connection, cursor)):
+        cursor.execute("SELECT * FROM users")
+
+
+def f():
+    with open("file") as my_file, open("") as ((this, that)):
+        print("hello")
+
+
+def f():
+    with (
+        open("file") as my_file,
+        open("") as ((this, that)),
+    ):
         print("hello")

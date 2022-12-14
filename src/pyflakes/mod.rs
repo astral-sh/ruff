@@ -93,11 +93,13 @@ mod tests {
     #[test_case(CheckCode::F821, Path::new("F821_3.py"); "F821_3")]
     #[test_case(CheckCode::F821, Path::new("F821_4.py"); "F821_4")]
     #[test_case(CheckCode::F821, Path::new("F821_5.py"); "F821_5")]
+    #[test_case(CheckCode::F821, Path::new("F821_6.py"); "F821_6")]
     #[test_case(CheckCode::F822, Path::new("F822.py"); "F822")]
     #[test_case(CheckCode::F823, Path::new("F823.py"); "F823")]
     #[test_case(CheckCode::F831, Path::new("F831.py"); "F831")]
     #[test_case(CheckCode::F841, Path::new("F841_0.py"); "F841_0")]
     #[test_case(CheckCode::F841, Path::new("F841_1.py"); "F841_1")]
+    #[test_case(CheckCode::F842, Path::new("F842.py"); "F842")]
     #[test_case(CheckCode::F901, Path::new("F901.py"); "F901")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
@@ -403,14 +405,23 @@ mod tests {
         "#,
             &[],
         )?;
-        // Pyflakes allows this, but it causes other issues.
-        // flakes(
-        //     r#"
-        // def c(): bar
-        // def b(): global bar; bar = 1
-        // "#,
-        //     &[],
-        // )?;
+        flakes(
+            r#"
+        def c(): bar
+        def b(): global bar; bar = 1
+        "#,
+            &[],
+        )?;
+        // TODO(charlie): Extract globals recursively (such that we don't raise F821).
+        flakes(
+            r#"
+        def c(): bar
+        def d():
+            def b():
+                global bar; bar = 1
+        "#,
+            &[CheckCode::F821],
+        )?;
         Ok(())
     }
 
@@ -1103,11 +1114,11 @@ mod tests {
     fn aliased_import() -> Result<()> {
         flakes(
             "import fu as FU, bar as FU",
-            &[CheckCode::F811, CheckCode::F401],
+            &[CheckCode::F401, CheckCode::F811, CheckCode::F401],
         )?;
         flakes(
             "from moo import fu as FU, bar as FU",
-            &[CheckCode::F811, CheckCode::F401],
+            &[CheckCode::F401, CheckCode::F811, CheckCode::F401],
         )?;
 
         Ok(())
@@ -1144,9 +1155,15 @@ mod tests {
 
     #[test]
     fn redefined_while_unused() -> Result<()> {
-        flakes("import fu; fu = 3", &[CheckCode::F811])?;
-        flakes("import fu; fu, bar = 3", &[CheckCode::F811])?;
-        flakes("import fu; [fu, bar] = 3", &[CheckCode::F811])?;
+        flakes("import fu; fu = 3", &[CheckCode::F401, CheckCode::F811])?;
+        flakes(
+            "import fu; fu, bar = 3",
+            &[CheckCode::F401, CheckCode::F811],
+        )?;
+        flakes(
+            "import fu; [fu, bar] = 3",
+            &[CheckCode::F401, CheckCode::F811],
+        )?;
 
         Ok(())
     }
@@ -1163,7 +1180,7 @@ mod tests {
             import os
         os.path
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1201,7 +1218,7 @@ mod tests {
             pass
         os.path
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1277,7 +1294,7 @@ mod tests {
             from bb import mixer
         mixer(123)
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1349,7 +1366,7 @@ mod tests {
         def fu():
             pass
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1427,7 +1444,7 @@ mod tests {
         class fu:
             pass
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -1474,7 +1491,7 @@ mod tests {
         class bar:
             import fu
         "#,
-            &[CheckCode::F401],
+            &[],
         )?;
 
         flakes(
@@ -1484,7 +1501,7 @@ mod tests {
 
         fu
         "#,
-            &[CheckCode::F401, CheckCode::F821],
+            &[CheckCode::F821],
         )?;
 
         Ok(())
@@ -1691,7 +1708,7 @@ mod tests {
         for fu in range(2):
             pass
         "#,
-            &[CheckCode::F402],
+            &[CheckCode::F401, CheckCode::F402],
         )?;
 
         Ok(())
@@ -1848,7 +1865,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         "#,
-            &[CheckCode::F811, CheckCode::F841],
+            &[CheckCode::F401, CheckCode::F811, CheckCode::F841],
         )?;
 
         Ok(())
@@ -2089,7 +2106,7 @@ mod tests {
             def fun(self):
                 fu
         "#,
-            &[CheckCode::F401, CheckCode::F821],
+            &[CheckCode::F821],
         )?;
 
         Ok(())
@@ -2158,7 +2175,7 @@ mod tests {
         import fu.bar, fu.bar
         fu.bar
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
         flakes(
             r#"
@@ -2166,7 +2183,7 @@ mod tests {
         import fu.bar
         fu.bar
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -2322,7 +2339,7 @@ mod tests {
             fu
         fu
         "#,
-            &[CheckCode::F811],
+            &[CheckCode::F401, CheckCode::F811],
         )?;
 
         Ok(())
@@ -2335,18 +2352,17 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[test]
     fn imported_in_class() -> Result<()> {
         // Imports in class scope can be used through self.
         flakes(
             r#"
-        class c:
+        class C:
             import i
             def __init__(self):
                 self.i
         "#,
-            &[CheckCode::F401],
+            &[],
         )?;
 
         Ok(())
@@ -2765,6 +2781,1085 @@ mod tests {
             &[CheckCode::F821],
         )?;
 
+        Ok(())
+    }
+
+    /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_type_annotations.py>
+    #[test]
+    fn typing_overload() -> Result<()> {
+        // Allow intentional redefinitions via @typing.overload.
+        flakes(
+            r#"
+        import typing
+        from typing import overload
+
+        @overload
+        def f(s: None) -> None:
+            pass
+
+        @overload
+        def f(s: int) -> int:
+            pass
+
+        def f(s):
+            return s
+
+        @typing.overload
+        def g(s: None) -> None:
+            pass
+
+        @typing.overload
+        def g(s: int) -> int:
+            pass
+
+        def g(s):
+            return s
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn typing_extensions_overload() -> Result<()> {
+        // Allow intentional redefinitions via @typing_extensions.overload.
+        flakes(
+            r#"
+        import typing_extensions
+        from typing_extensions import overload
+
+        @overload
+        def f(s: None) -> None:
+            pass
+
+        @overload
+        def f(s: int) -> int:
+            pass
+
+        def f(s):
+            return s
+
+        @typing_extensions.overload
+        def g(s: None) -> None:
+            pass
+
+        @typing_extensions.overload
+        def g(s: int) -> int:
+            pass
+
+        def g(s):
+            return s
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn typing_overload_async() -> Result<()> {
+        // Allow intentional redefinitions via @typing.overload (async).
+        flakes(
+            r#"
+        from typing import overload
+
+        @overload
+        async def f(s: None) -> None:
+            pass
+
+        @overload
+        async def f(s: int) -> int:
+            pass
+
+        async def f(s):
+            return s
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn overload_with_multiple_decorators() -> Result<()> {
+        flakes(
+            r#"
+            from typing import overload
+            dec = lambda f: f
+
+            @dec
+            @overload
+            def f(x: int) -> int:
+                pass
+
+            @dec
+            @overload
+            def f(x: str) -> str:
+                pass
+
+            @dec
+            def f(x): return x
+       "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn overload_in_class() -> Result<()> {
+        flakes(
+            r#"
+        from typing import overload
+
+        class C:
+            @overload
+            def f(self, x: int) -> int:
+                pass
+
+            @overload
+            def f(self, x: str) -> str:
+                pass
+
+            def f(self, x): return x
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn aliased_typing_import() -> Result<()> {
+        // Detect when typing is imported as another name.
+        flakes(
+            r#"
+        import typing as t
+
+        @t.overload
+        def f(s: None) -> None:
+            pass
+
+        @t.overload
+        def f(s: int) -> int:
+            pass
+
+        def f(s):
+            return s
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn not_a_typing_overload() -> Result<()> {
+        // regression test for @typing.overload detection bug in 2.1.0.
+        flakes(
+            r#"
+            def foo(x):
+                return x
+
+            @foo
+            def bar():
+                pass
+
+            def bar():
+                pass
+        "#,
+            &[CheckCode::F811],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn variable_annotations() -> Result<()> {
+        flakes(
+            r#"
+        name: str
+        age: int
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        name: str = 'Bob'
+        age: int = 18
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        class C:
+            name: str
+            age: int
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        class C:
+            name: str = 'Bob'
+            age: int = 18
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        def f():
+            name: str
+            age: int
+        "#,
+            &[CheckCode::F842, CheckCode::F842],
+        )?;
+        flakes(
+            r#"
+        def f():
+            name: str = 'Bob'
+            age: int = 18
+            foo: not_a_real_type = None
+        "#,
+            &[
+                CheckCode::F841,
+                CheckCode::F841,
+                CheckCode::F841,
+                CheckCode::F821,
+            ],
+        )?;
+        flakes(
+            r#"
+        def f():
+            name: str
+            print(name)
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        from typing import Any
+        def f():
+            a: Any
+        "#,
+            &[CheckCode::F842],
+        )?;
+        flakes(
+            r#"
+        foo: not_a_real_type
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        foo: not_a_real_type = None
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        class C:
+            foo: not_a_real_type
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        class C:
+            foo: not_a_real_type = None
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        def f():
+            class C:
+                foo: not_a_real_type
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        def f():
+            class C:
+                foo: not_a_real_type = None
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        from foo import Bar
+        bar: Bar
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from foo import Bar
+        bar: 'Bar'
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        import foo
+        bar: foo.Bar
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        import foo
+        bar: 'foo.Bar'
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from foo import Bar
+        def f(bar: Bar): pass
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from foo import Bar
+        def f(bar: 'Bar'): pass
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from foo import Bar
+        def f(bar) -> Bar: return bar
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from foo import Bar
+        def f(bar) -> 'Bar': return bar
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        bar: 'Bar'
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        bar: 'foo.Bar'
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        from foo import Bar
+        bar: str
+        "#,
+            &[CheckCode::F401],
+        )?;
+        flakes(
+            r#"
+        from foo import Bar
+        def f(bar: str): pass
+        "#,
+            &[CheckCode::F401],
+        )?;
+        flakes(
+            r#"
+        def f(a: A) -> A: pass
+        class A: pass
+        "#,
+            &[CheckCode::F821, CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        def f(a: 'A') -> 'A': return a
+        class A: pass
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        a: A
+        class A: pass
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        a: 'A'
+        class A: pass
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        T: object
+        def f(t: T): pass
+        "#,
+            &[CheckCode::F821],
+        )?;
+        flakes(
+            r#"
+        T: object
+        def g(t: 'T'): pass
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        a: 'A B'
+        "#,
+            &[CheckCode::F722],
+        )?;
+        flakes(
+            r#"
+        a: 'A; B'
+        "#,
+            &[CheckCode::F722],
+        )?;
+        flakes(
+            r#"
+        a: '1 + 2'
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        a: 'a: "A"'
+        "#,
+            &[CheckCode::F722],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn variable_annotation_references_self_name_undefined() -> Result<()> {
+        flakes(
+            r#"
+        x: int = x
+        "#,
+            &[CheckCode::F821],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn type_alias_annotations() -> Result<()> {
+        flakes(
+            r#"
+        from typing_extensions import TypeAlias
+        from foo import Bar
+
+        bar: TypeAlias = Bar
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from typing_extensions import TypeAlias
+        from foo import Bar
+
+        bar: TypeAlias = 'Bar'
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from typing_extensions import TypeAlias
+        from foo import Bar
+
+        class A:
+            bar: TypeAlias = Bar
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from typing_extensions import TypeAlias
+        from foo import Bar
+
+        class A:
+            bar: TypeAlias = 'Bar'
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from typing_extensions import TypeAlias
+
+        bar: TypeAlias
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        from typing_extensions import TypeAlias
+        from foo import Bar
+
+        bar: TypeAlias
+        "#,
+            &[CheckCode::F401],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn annotating_an_import() -> Result<()> {
+        flakes(
+            r#"
+            from a import b, c
+            b: c
+            print(b)
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn unused_annotation() -> Result<()> {
+        // Unused annotations are fine in module and class scope.
+        flakes(
+            r#"
+        x: int
+        class Cls:
+            y: int
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+        def f():
+            x: int
+        "#,
+            &[CheckCode::F842],
+        )?;
+        // This should only print one UnusedVariable message.
+        flakes(
+            r#"
+        def f():
+            x: int
+            x = 3
+        "#,
+            &[CheckCode::F841],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn unassigned_annotation_is_undefined() -> Result<()> {
+        flakes(
+            r#"
+        name: str
+        print(name)
+        "#,
+            &[CheckCode::F821],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn annotated_async_def() -> Result<()> {
+        flakes(
+            r#"
+        class c: pass
+        async def func(c: c) -> None: pass
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn postponed_annotations() -> Result<()> {
+        flakes(
+            r#"
+        from __future__ import annotations
+        def f(a: A) -> A: pass
+        class A:
+            b: B
+        class B: pass
+        "#,
+            &[],
+        )?;
+
+        flakes(
+            r#"
+        from __future__ import annotations
+        def f(a: A) -> A: pass
+        class A:
+            b: Undefined
+        class B: pass
+        "#,
+            &[CheckCode::F821],
+        )?;
+
+        flakes(
+            r#"
+        from __future__ import annotations
+        T: object
+        def f(t: T): pass
+        def g(t: 'T'): pass
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn type_annotation_clobbers_all() -> Result<()> {
+        flakes(
+            r#"
+        from typing import TYPE_CHECKING, List
+
+        from y import z
+
+        if not TYPE_CHECKING:
+            __all__ = ("z",)
+        else:
+            __all__: List[str]
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn return_annotation_is_class_scope_variable() -> Result<()> {
+        flakes(
+            r#"
+        from typing import TypeVar
+        class Test:
+            Y = TypeVar('Y')
+
+            def t(self, x: Y) -> Y:
+                return x
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn return_annotation_is_function_body_variable() -> Result<()> {
+        flakes(
+            r#"
+        class Test:
+            def t(self) -> Y:
+                Y = 2
+                return Y
+        "#,
+            &[CheckCode::F821],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn positional_only_argument_annotations() -> Result<()> {
+        flakes(
+            r#"
+        from x import C
+
+        def f(c: C, /): ...
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn partially_quoted_type_annotation() -> Result<()> {
+        flakes(
+            r#"
+        from queue import Queue
+        from typing import Optional
+
+        def f() -> Optional['Queue[str]']:
+            return None
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn partially_quoted_type_assignment() -> Result<()> {
+        flakes(
+            r#"
+        from queue import Queue
+        from typing import Optional
+
+        MaybeQueue = Optional['Queue[str]']
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn nested_partially_quoted_type_assignment() -> Result<()> {
+        flakes(
+            r#"
+        from queue import Queue
+        from typing import Callable
+
+        Func = Callable[['Queue[str]'], None]
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn quoted_type_cast() -> Result<()> {
+        flakes(
+            r#"
+        from typing import cast, Optional
+
+        maybe_int = cast('Optional[int]', 42)
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn type_cast_literal_str_to_str() -> Result<()> {
+        // Checks that our handling of quoted type annotations in the first
+        // argument to `cast` doesn't cause issues when (only) the _second_
+        // argument is a literal str which looks a bit like a type annotation.
+        flakes(
+            r#"
+        from typing import cast
+
+        a_string = cast(str, 'Optional[int]')
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn quoted_type_cast_renamed_import() -> Result<()> {
+        flakes(
+            r#"
+        from typing import cast as tsac, Optional as Maybe
+
+        maybe_int = tsac('Maybe[int]', 42)
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn quoted_type_var_constraints() -> Result<()> {
+        flakes(
+            r#"
+        from typing import TypeVar, Optional
+
+        T = TypeVar('T', 'str', 'Optional[int]', bytes)
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn quoted_type_var_bound() -> Result<()> {
+        flakes(
+            r#"
+        from typing import TypeVar, Optional, List
+
+        T = TypeVar('T', bound='Optional[int]')
+        S = TypeVar('S', int, bound='List[int]')
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn literal_type_typing() -> Result<()> {
+        flakes(
+            r#"
+        from typing import Literal
+
+        def f(x: Literal['some string']) -> None:
+            return None
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn literal_type_typing_extensions() -> Result<()> {
+        flakes(
+            r#"
+        from typing_extensions import Literal
+
+        def f(x: Literal['some string']) -> None:
+            return None
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn annotated_type_typing_missing_forward_type_multiple_args() -> Result<()> {
+        flakes(
+            r#"
+        from typing import Annotated
+
+        def f(x: Annotated['integer', 1]) -> None:
+            return None
+        "#,
+            &[CheckCode::F821],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn annotated_type_typing_with_string_args() -> Result<()> {
+        flakes(
+            r#"
+        from typing import Annotated
+
+        def f(x: Annotated[int, '> 0']) -> None:
+            return None
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn annotated_type_typing_with_string_args_in_union() -> Result<()> {
+        flakes(
+            r#"
+        from typing import Annotated, Union
+
+        def f(x: Union[Annotated['int', '>0'], 'integer']) -> None:
+            return None
+        "#,
+            &[CheckCode::F821],
+        )?;
+        Ok(())
+    }
+
+    // We err on the side of assuming strings are forward references.
+    #[ignore]
+    #[test]
+    fn literal_type_some_other_module() -> Result<()> {
+        // err on the side of false-negatives for types named Literal.
+        flakes(
+            r#"
+        from my_module import compat
+        from my_module.compat import Literal
+
+        def f(x: compat.Literal['some string']) -> None:
+            return None
+        def g(x: Literal['some string']) -> None:
+            return None
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn literal_union_type_typing() -> Result<()> {
+        flakes(
+            r#"
+        from typing import Literal
+
+        def f(x: Literal['some string', 'foo bar']) -> None:
+            return None
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    // TODO(charlie): Support nested deferred string annotations.
+    #[ignore]
+    #[test]
+    fn deferred_twice_annotation() -> Result<()> {
+        flakes(
+            r#"
+            from queue import Queue
+            from typing import Optional
+
+            def f() -> "Optional['Queue[str]']":
+                return None
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn partial_string_annotations_with_future_annotations() -> Result<()> {
+        flakes(
+            r#"
+            from __future__ import annotations
+
+            from queue import Queue
+            from typing import Optional
+
+            def f() -> Optional['Queue[str]']:
+                return None
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn forward_annotations_for_classes_in_scope() -> Result<()> {
+        flakes(
+            r#"
+        from typing import Optional
+
+        def f():
+            class C:
+                a: "D"
+                b: Optional["D"]
+                c: "Optional[D]"
+
+            class D: pass
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn idiomiatic_typing_guards() -> Result<()> {
+        // typing.TYPE_CHECKING: python3.5.3+.
+        flakes(
+            r#"
+            from typing import TYPE_CHECKING
+
+            if TYPE_CHECKING:
+                from t import T
+
+            def f() -> T:
+                pass
+        "#,
+            &[],
+        )?;
+        // False: the old, more-compatible approach.
+        flakes(
+            r#"
+            if False:
+                from t import T
+
+            def f() -> T:
+                pass
+        "#,
+            &[],
+        )?;
+        // Some choose to assign a constant and do it that way.
+        flakes(
+            r#"
+            MYPY = False
+
+            if MYPY:
+                from t import T
+
+            def f() -> T:
+                pass
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn typing_guard_for_protocol() -> Result<()> {
+        flakes(
+            r#"
+            from typing import TYPE_CHECKING
+
+            if TYPE_CHECKING:
+                from typing import Protocol
+            else:
+                Protocol = object
+
+            class C(Protocol):
+                def f() -> int:
+                    pass
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn typed_names_correct_forward_ref() -> Result<()> {
+        flakes(
+            r#"
+            from typing import TypedDict, List, NamedTuple
+
+            List[TypedDict("x", {})]
+            List[TypedDict("x", x=int)]
+            List[NamedTuple("a", a=int)]
+            List[NamedTuple("a", [("a", int)])]
+        "#,
+            &[],
+        )?;
+        flakes(
+            r#"
+            from typing import TypedDict, List, NamedTuple, TypeVar
+
+            List[TypedDict("x", {"x": "Y"})]
+            List[TypedDict("x", x="Y")]
+            List[NamedTuple("a", [("a", "Y")])]
+            List[NamedTuple("a", a="Y")]
+            List[TypedDict("x", {"x": List["a"]})]
+            List[TypeVar("A", bound="C")]
+            List[TypeVar("A", List["C"])]
+        "#,
+            &[
+                CheckCode::F821,
+                CheckCode::F821,
+                CheckCode::F821,
+                CheckCode::F821,
+                CheckCode::F821,
+                CheckCode::F821,
+                CheckCode::F821,
+            ],
+        )?;
+        flakes(
+            r#"
+            from typing import NamedTuple, TypeVar, cast
+            from t import A, B, C, D, E
+
+            NamedTuple("A", [("a", A["C"])])
+            TypeVar("A", bound=A["B"])
+            TypeVar("A", A["D"])
+            cast(A["E"], [])
+        "#,
+            &[],
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn named_types_classes() -> Result<()> {
+        flakes(
+            r#"
+            from typing import TypedDict, NamedTuple
+            class X(TypedDict):
+                y: TypedDict("z", {"zz":int})
+
+            class Y(NamedTuple):
+                y: NamedTuple("v", [("vv", int)])
+        "#,
+            &[],
+        )?;
         Ok(())
     }
 }

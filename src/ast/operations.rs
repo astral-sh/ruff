@@ -1,9 +1,12 @@
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Cmpop, Located};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::{Binding, BindingKind, Scope};
+use crate::ast::visitor;
+use crate::ast::visitor::Visitor;
 
 /// Extract the names bound to a given __all__ assignment.
 pub fn extract_all_names(stmt: &Stmt, scope: &Scope, bindings: &[Binding]) -> Vec<String> {
@@ -67,6 +70,38 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope, bindings: &[Binding]) -> Ve
     }
 
     names
+}
+
+#[derive(Default)]
+struct GlobalVisitor<'a> {
+    globals: FxHashMap<&'a str, &'a Stmt>,
+}
+
+impl<'a> Visitor<'a> for GlobalVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match &stmt.node {
+            StmtKind::Global { names } => {
+                for name in names {
+                    self.globals.insert(name, stmt);
+                }
+            }
+            StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+            | StmtKind::ClassDef { .. } => {
+                // Don't recurse.
+            }
+            _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+}
+
+/// Extract a map from global name to its last-defining `Stmt`.
+pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, &Stmt> {
+    let mut visitor = GlobalVisitor::default();
+    for stmt in body {
+        visitor.visit_stmt(stmt);
+    }
+    visitor.globals
 }
 
 /// Check if a node is parent of a conditional branch.

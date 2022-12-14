@@ -8,8 +8,8 @@ expression: checks
     row: 6
     column: 8
   end_location:
-    row: 14
-    column: 0
+    row: 11
+    column: 17
   fix: ~
 - kind:
     SuperfluousElseBreak: Elif
@@ -17,8 +17,8 @@ expression: checks
     row: 16
     column: 8
   end_location:
-    row: 26
-    column: 8
+    row: 25
+    column: 17
   fix: ~
 - kind:
     SuperfluousElseBreak: Else
@@ -26,8 +26,8 @@ expression: checks
     row: 31
     column: 8
   end_location:
-    row: 37
-    column: 0
+    row: 34
+    column: 17
   fix: ~
 - kind:
     SuperfluousElseBreak: Else
@@ -35,8 +35,8 @@ expression: checks
     row: 41
     column: 12
   end_location:
-    row: 47
-    column: 8
+    row: 46
+    column: 21
   fix: ~
 - kind:
     SuperfluousElseBreak: Else
@@ -44,8 +44,8 @@ expression: checks
     row: 54
     column: 8
   end_location:
-    row: 62
-    column: 8
+    row: 61
+    column: 17
   fix: ~
 - kind:
     SuperfluousElseBreak: Else
@@ -53,8 +53,8 @@ expression: checks
     row: 68
     column: 12
   end_location:
-    row: 73
-    column: 8
+    row: 72
+    column: 21
   fix: ~
 - kind:
     SuperfluousElseBreak: Else
@@ -62,7 +62,7 @@ expression: checks
     row: 80
     column: 8
   end_location:
-    row: 92
-    column: 0
+    row: 86
+    column: 21
   fix: ~
 

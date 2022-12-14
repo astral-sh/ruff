@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::str::Lines;
 
 use rustpython_ast::{Located, Location};
@@ -5,31 +6,26 @@ use rustpython_ast::{Located, Location};
 use crate::ast::types::Range;
 use crate::check_ast::Checker;
 
+/// Extract the leading indentation from a line.
+pub fn indentation<'a, T>(checker: &'a Checker, located: &'a Located<T>) -> Cow<'a, str> {
+    let range = Range::from_located(located);
+    checker.locator.slice_source_code_range(&Range {
+        location: Location::new(range.location.row(), 0),
+        end_location: Location::new(range.location.row(), range.location.column()),
+    })
+}
+
 /// Extract the leading words from a line of text.
-pub fn leading_words(line: &str) -> String {
-    line.trim()
-        .chars()
-        .take_while(|char| char.is_alphanumeric() || char.is_whitespace())
-        .collect()
+pub fn leading_words(line: &str) -> &str {
+    let line = line.trim();
+    line.find(|char: char| !char.is_alphanumeric() && !char.is_whitespace())
+        .map_or(line, |index| &line[..index])
 }
 
 /// Extract the leading whitespace from a line of text.
-pub fn leading_space(line: &str) -> String {
-    line.chars()
-        .take_while(|char| char.is_whitespace())
-        .collect()
-}
-
-/// Extract the leading indentation from a line.
-pub fn indentation<T>(checker: &Checker, located: &Located<T>) -> String {
-    let range = Range::from_located(located);
-    checker
-        .locator
-        .slice_source_code_range(&Range {
-            location: Location::new(range.location.row(), 0),
-            end_location: Location::new(range.location.row(), range.location.column()),
-        })
-        .to_string()
+pub fn leading_space(line: &str) -> &str {
+    line.find(|char: char| !char.is_whitespace())
+        .map_or(line, |index| &line[..index])
 }
 
 /// Replace any non-whitespace characters from an indentation string.

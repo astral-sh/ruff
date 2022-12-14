@@ -4,7 +4,9 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::error;
+use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_ast::Location;
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -22,7 +24,7 @@ use crate::ast::types::{
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, visitor};
 use crate::checks::{Check, CheckCode, CheckKind, DeferralKeyword};
-use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
+use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
@@ -35,7 +37,7 @@ use crate::visibility::{module_visibility, transition_scope, Modifier, Visibilit
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
-    flake8_import_conventions, flake8_print, flake8_return, flake8_tidy_imports,
+    flake8_import_conventions, flake8_print, flake8_return, flake8_simplify, flake8_tidy_imports,
     flake8_unused_arguments, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks,
     pylint, pyupgrade, visibility,
 };
@@ -67,6 +69,7 @@ pub struct Checker<'a> {
     pub(crate) depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
     pub(crate) child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
     pub(crate) bindings: Vec<Binding<'a>>,
+    pub(crate) redefinitions: IntMap<usize, Vec<usize>>,
     scopes: Vec<Scope<'a>>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
@@ -74,7 +77,7 @@ pub struct Checker<'a> {
     deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext<'a>)>,
     deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, DeferralContext<'a>)>,
-    deferred_assignments: Vec<(usize, DeferralContext<'a>)>,
+    deferred_assignments: Vec<DeferralContext<'a>>,
     // Internal, derivative state.
     visible_scope: VisibleScope,
     in_f_string: Option<Range>,
@@ -113,6 +116,7 @@ impl<'a> Checker<'a> {
             depths: FxHashMap::default(),
             child_to_parent: FxHashMap::default(),
             bindings: vec![],
+            redefinitions: IntMap::default(),
             scopes: vec![],
             scope_stack: vec![],
             dead_scopes: vec![],
@@ -237,24 +241,6 @@ where
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
                 if scope_index != GLOBAL_SCOPE_INDEX {
-                    // If the binding doesn't already exist in the global scope, add it.
-                    for name in names {
-                        if !self.scopes[GLOBAL_SCOPE_INDEX]
-                            .values
-                            .contains_key(&name.as_str())
-                        {
-                            let index = self.bindings.len();
-                            self.bindings.push(Binding {
-                                kind: BindingKind::Assignment,
-                                used: None,
-                                range: Range::from_located(stmt),
-                                source: None,
-                                redefined: vec![],
-                            });
-                            self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
-                        }
-                    }
-
                     // Add the binding to the current scope.
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
@@ -264,8 +250,7 @@ where
                             kind: BindingKind::Global,
                             used: usage,
                             range: Range::from_located(stmt),
-                            source: None,
-                            redefined: vec![],
+                            source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
                     }
@@ -295,8 +280,7 @@ where
                             kind: BindingKind::Nonlocal,
                             used: usage,
                             range: Range::from_located(stmt),
-                            source: None,
-                            redefined: vec![],
+                            source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
                     }
@@ -304,9 +288,21 @@ where
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
                     // and the current scope.)
                     for name in names {
+                        let mut exists = false;
                         for index in self.scope_stack.iter().skip(1).rev().skip(1) {
                             if let Some(index) = self.scopes[*index].values.get(&name.as_str()) {
+                                exists = true;
                                 self.bindings[*index].used = usage;
+                            }
+                        }
+
+                        // Ensure that every nonlocal has an existing binding from a parent scope.
+                        if !exists {
+                            if self.settings.enabled.contains(&CheckCode::PLE0117) {
+                                self.add_check(Check::new(
+                                    CheckKind::NonlocalWithoutBinding(name.to_string()),
+                                    Range::from_located(stmt),
+                                ));
                             }
                         }
                     }
@@ -512,7 +508,6 @@ where
                         used: None,
                         range: Range::from_located(stmt),
                         source: Some(self.current_parent().clone()),
-                        redefined: vec![],
                     },
                 );
             }
@@ -589,12 +584,6 @@ where
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
-                self.push_scope(Scope::new(ScopeKind::Class(ClassDef {
-                    name,
-                    bases,
-                    keywords,
-                    decorator_list,
-                })));
             }
             StmtKind::Import { names } => {
                 if self.settings.enabled.contains(&CheckCode::E402) {
@@ -622,7 +611,6 @@ where
                                 used: None,
                                 range: Range::from_located(alias),
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
                     } else {
@@ -663,7 +651,6 @@ where
                                 },
                                 range: Range::from_located(alias),
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
                     }
@@ -808,7 +795,6 @@ where
                                 )),
                                 range: Range::from_located(alias),
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
 
@@ -840,7 +826,6 @@ where
                                 used: None,
                                 range: Range::from_located(stmt),
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
 
@@ -910,7 +895,6 @@ where
                                 },
                                 range,
                                 source: Some(self.current_parent().clone()),
-                                redefined: vec![],
                             },
                         );
                     }
@@ -1075,6 +1059,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::PLW0120) {
                     pylint::plugins::useless_else_on_loop(self, stmt, body, orelse);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM118) {
+                    flake8_simplify::plugins::key_in_dict_for(self, target, iter);
+                }
             }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
@@ -1140,7 +1127,20 @@ where
         // Recurse.
         let prev_visible_scope = self.visible_scope.clone();
         match &stmt.node {
-            StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
+            StmtKind::FunctionDef {
+                body,
+                name,
+                args,
+                decorator_list,
+                ..
+            }
+            | StmtKind::AsyncFunctionDef {
+                body,
+                name,
+                args,
+                decorator_list,
+                ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::B021) {
                     flake8_bugbear::plugins::f_string_docstring(self, body);
                 }
@@ -1155,13 +1155,50 @@ where
                     .push((definition, scope.visibility.clone()));
                 self.visible_scope = scope;
 
+                // If any global bindings don't already exist in the global scope, add it.
+                let globals = operations::extract_globals(body);
+                for (name, stmt) in operations::extract_globals(body) {
+                    if self.scopes[GLOBAL_SCOPE_INDEX]
+                        .values
+                        .get(name)
+                        .map_or(true, |index| {
+                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                        })
+                    {
+                        let index = self.bindings.len();
+                        self.bindings.push(Binding {
+                            kind: BindingKind::Assignment,
+                            used: None,
+                            range: Range::from_located(stmt),
+                            source: Some(RefEquality(stmt)),
+                        });
+                        self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
+                    }
+                }
+
+                self.push_scope(Scope::new(ScopeKind::Function(FunctionDef {
+                    name,
+                    body,
+                    args,
+                    decorator_list,
+                    async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
+                    globals,
+                })));
+
                 self.deferred_functions.push((
                     stmt,
                     (self.scope_stack.clone(), self.parents.clone()),
                     self.visible_scope.clone(),
                 ));
             }
-            StmtKind::ClassDef { body, .. } => {
+            StmtKind::ClassDef {
+                body,
+                name,
+                bases,
+                keywords,
+                decorator_list,
+                ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::B021) {
                     flake8_bugbear::plugins::f_string_docstring(self, body);
                 }
@@ -1175,6 +1212,35 @@ where
                 self.definitions
                     .push((definition, scope.visibility.clone()));
                 self.visible_scope = scope;
+
+                // If any global bindings don't already exist in the global scope, add it.
+                let globals = operations::extract_globals(body);
+                for (name, stmt) in &globals {
+                    if self.scopes[GLOBAL_SCOPE_INDEX]
+                        .values
+                        .get(name)
+                        .map_or(true, |index| {
+                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                        })
+                    {
+                        let index = self.bindings.len();
+                        self.bindings.push(Binding {
+                            kind: BindingKind::Assignment,
+                            used: None,
+                            range: Range::from_located(stmt),
+                            source: Some(RefEquality(stmt)),
+                        });
+                        self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
+                    }
+                }
+
+                self.push_scope(Scope::new(ScopeKind::Class(ClassDef {
+                    name,
+                    bases,
+                    keywords,
+                    decorator_list,
+                    globals,
+                })));
 
                 for stmt in body {
                     self.visit_stmt(stmt);
@@ -1227,19 +1293,24 @@ where
         self.visible_scope = prev_visible_scope;
 
         // Post-visit.
-        if let StmtKind::ClassDef { name, .. } = &stmt.node {
-            self.pop_scope();
-            self.add_binding(
-                name,
-                Binding {
-                    kind: BindingKind::ClassDefinition,
-                    used: None,
-                    range: Range::from_located(stmt),
-                    source: Some(self.current_parent().clone()),
-                    redefined: vec![],
-                },
-            );
-        };
+        match &stmt.node {
+            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                self.pop_scope();
+            }
+            StmtKind::ClassDef { name, .. } => {
+                self.pop_scope();
+                self.add_binding(
+                    name,
+                    Binding {
+                        kind: BindingKind::ClassDefinition,
+                        used: None,
+                        range: Range::from_located(stmt),
+                        source: Some(self.current_parent().clone()),
+                    },
+                );
+            }
+            _ => {}
+        }
 
         self.pop_parent();
     }
@@ -1369,6 +1440,10 @@ where
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
+
+                if self.settings.enabled.contains(&CheckCode::PLE0118) {
+                    pylint::plugins::used_prior_global_declaration(self, id, expr);
+                }
             }
             ExprKind::Attribute { attr, .. } => {
                 // Ex) typing.List[...]
@@ -1429,41 +1504,28 @@ where
                                     }
                                     Ok(summary) => {
                                         if self.settings.enabled.contains(&CheckCode::F522) {
-                                            if let Some(check) = pyflakes::checks::string_dot_format_extra_named_arguments(
+                                            pyflakes::plugins::string_dot_format_extra_named_arguments(self,
                                                 &summary, keywords, location,
-                                            )
-                                            {
-                                                self.add_check(check);
-                                            }
+                                            );
                                         }
 
                                         if self.settings.enabled.contains(&CheckCode::F523) {
-                                            if let Some(check) = pyflakes::checks::string_dot_format_extra_positional_arguments(
+                                            pyflakes::plugins::string_dot_format_extra_positional_arguments(
+                                                self,
                                                 &summary, args, location,
-                                            )
-                                            {
-                                                self.add_check(check);
-                                            }
+                                            );
                                         }
 
                                         if self.settings.enabled.contains(&CheckCode::F524) {
-                                            if let Some(check) =
-                                                pyflakes::checks::string_dot_format_missing_argument(
-                                                    &summary, args, keywords, location,
-                                                )
-                                            {
-                                                self.add_check(check);
-                                            }
+                                            pyflakes::plugins::string_dot_format_missing_argument(
+                                                self, &summary, args, keywords, location,
+                                            );
                                         }
 
                                         if self.settings.enabled.contains(&CheckCode::F525) {
-                                            if let Some(check) =
-                                                pyflakes::checks::string_dot_format_mixing_automatic(
-                                                    &summary, location,
-                                                )
-                                            {
-                                                self.add_check(check);
-                                            }
+                                            pyflakes::plugins::string_dot_format_mixing_automatic(
+                                                self, &summary, location,
+                                            );
                                         }
                                     }
                                 }
@@ -1914,67 +1976,39 @@ where
                             }
                             Ok(summary) => {
                                 if self.settings.enabled.contains(&CheckCode::F502) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_expected_mapping(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_expected_mapping(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F503) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_expected_sequence(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_expected_sequence(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F504) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_extra_named_arguments(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_extra_named_arguments(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F505) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_missing_arguments(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_missing_arguments(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F506) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_mixed_positional_and_named(
-                                            &summary, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_mixed_positional_and_named(
+                                        self, &summary, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F507) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_positional_count_mismatch(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_positional_count_mismatch(
+                                        self, &summary, right, location,
+                                    );
                                 }
                                 if self.settings.enabled.contains(&CheckCode::F508) {
-                                    if let Some(check) =
-                                        pyflakes::checks::percent_format_star_requires_sequence(
-                                            &summary, right, location,
-                                        )
-                                    {
-                                        self.add_check(check);
-                                    }
+                                    pyflakes::plugins::percent_format_star_requires_sequence(
+                                        self, &summary, right, location,
+                                    );
                                 }
                             }
                         }
@@ -2060,6 +2094,16 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::PLC2201) {
                     pylint::plugins::misplaced_comparison_constant(
+                        self,
+                        expr,
+                        left,
+                        ops,
+                        comparators,
+                    );
+                }
+
+                if self.settings.enabled.contains(&CheckCode::SIM118) {
+                    flake8_simplify::plugins::key_in_dict_compare(
                         self,
                         expr,
                         left,
@@ -2291,7 +2335,6 @@ where
                     self.in_subscript = true;
                     visitor::walk_expr(self, expr);
                 } else {
-                    self.in_subscript = true;
                     match typing::match_annotated_subscript(
                         value,
                         &self.from_imports,
@@ -2311,8 +2354,7 @@ where
                                 // Ex) Annotated[int, "Hello, world!"]
                                 SubscriptKind::PEP593AnnotatedSubscript => {
                                     // First argument is a type (including forward references); the
-                                    // rest are arbitrary Python
-                                    // objects.
+                                    // rest are arbitrary Python objects.
                                     self.visit_expr(value);
                                     if let ExprKind::Tuple { elts, ctx } = &slice.node {
                                         if let Some(expr) = elts.first() {
@@ -2507,7 +2549,6 @@ where
                 used: None,
                 range: Range::from_located(arg),
                 source: Some(self.current_parent().clone()),
-                redefined: vec![],
             },
         );
 
@@ -2573,7 +2614,6 @@ impl<'a> Checker<'a> {
                 range: Range::default(),
                 used: None,
                 source: None,
-                redefined: vec![],
             });
             scope.values.insert(builtin, index);
         }
@@ -2602,8 +2642,9 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let index = self.bindings.len();
+        let binding_index = self.bindings.len();
 
+        let mut overridden = None;
         if let Some((stack_index, scope_index)) = self
             .scope_stack
             .iter()
@@ -2611,8 +2652,8 @@ impl<'a> Checker<'a> {
             .enumerate()
             .find(|(_, scope_index)| self.scopes[**scope_index].values.contains_key(&name))
         {
-            let existing_index = self.scopes[*scope_index].values.get(&name).unwrap();
-            let existing = &self.bindings[*existing_index];
+            let existing_binding_index = self.scopes[*scope_index].values.get(&name).unwrap();
+            let existing = &self.bindings[*existing_binding_index];
             let in_current_scope = stack_index == 0;
             if !matches!(existing.kind, BindingKind::Builtin)
                 && existing.source.as_ref().map_or(true, |left| {
@@ -2635,6 +2676,7 @@ impl<'a> Checker<'a> {
                         | BindingKind::FutureImportation
                 );
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
+                    overridden = Some((*scope_index, *existing_binding_index));
                     if self.settings.enabled.contains(&CheckCode::F402) {
                         self.add_check(Check::new(
                             CheckKind::ImportShadowedByLoopVar(
@@ -2654,6 +2696,7 @@ impl<'a> Checker<'a> {
                                 cast::decorator_list(existing.source.as_ref().unwrap().0),
                             ))
                     {
+                        overridden = Some((*scope_index, *existing_binding_index));
                         if self.settings.enabled.contains(&CheckCode::F811) {
                             self.add_check(Check::new(
                                 CheckKind::RedefinedWhileUnused(
@@ -2665,13 +2708,22 @@ impl<'a> Checker<'a> {
                         }
                     }
                 } else if existing_is_import && binding.redefines(existing) {
-                    self.bindings[*existing_index].redefined.push(index);
+                    self.redefinitions
+                        .entry(*existing_binding_index)
+                        .or_insert_with(Vec::new)
+                        .push(binding_index);
                 }
             }
         }
 
-        // TODO(charlie): Don't treat annotations as assignments if there is an existing
-        // value.
+        // If we're about to lose the binding, store it as overriden.
+        if let Some((scope_index, binding_index)) = overridden {
+            self.scopes[scope_index]
+                .overridden
+                .push((name, binding_index));
+        }
+
+        // Assume the rebound name is used as a global or within a loop.
         let scope = self.current_scope();
         let binding = match scope.values.get(&name) {
             None => binding,
@@ -2681,10 +2733,14 @@ impl<'a> Checker<'a> {
             },
         };
 
-        self.bindings.push(binding);
-
+        // Don't treat annotations as assignments if there is an existing value
+        // in scope.
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-        scope.values.insert(name, index);
+        if !(matches!(binding.kind, BindingKind::Annotation) && scope.values.contains_key(name)) {
+            scope.values.insert(name, binding_index);
+        }
+
+        self.bindings.push(binding);
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
@@ -2694,6 +2750,7 @@ impl<'a> Checker<'a> {
             let mut first_iter = true;
             let mut in_generator = false;
             let mut import_starred = false;
+
             for scope_index in self.scope_stack.iter().rev() {
                 let scope = &self.scopes[*scope_index];
 
@@ -2708,6 +2765,13 @@ impl<'a> Checker<'a> {
                 if let Some(index) = scope.values.get(&id.as_str()) {
                     // Mark the binding as used.
                     self.bindings[*index].used = Some((scope_id, Range::from_located(expr)));
+
+                    if matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                        && !self.in_deferred_string_type_definition
+                        && !self.in_deferred_type_definition
+                    {
+                        continue;
+                    }
 
                     // If the name of the sub-importation is the same as an alias of another
                     // importation and the alias is used, that sub-importation should be
@@ -2849,7 +2913,6 @@ impl<'a> Checker<'a> {
                     used: None,
                     range: Range::from_located(expr),
                     source: Some(self.current_parent().clone()),
-                    redefined: vec![],
                 },
             );
             return;
@@ -2867,7 +2930,6 @@ impl<'a> Checker<'a> {
                     used: None,
                     range: Range::from_located(expr),
                     source: Some(self.current_parent().clone()),
-                    redefined: vec![],
                 },
             );
             return;
@@ -2881,7 +2943,6 @@ impl<'a> Checker<'a> {
                     used: None,
                     range: Range::from_located(expr),
                     source: Some(self.current_parent().clone()),
-                    redefined: vec![],
                 },
             );
             return;
@@ -2932,7 +2993,6 @@ impl<'a> Checker<'a> {
                         used: None,
                         range: Range::from_located(expr),
                         source: Some(self.current_parent().clone()),
-                        redefined: vec![],
                     },
                 );
                 return;
@@ -2946,7 +3006,6 @@ impl<'a> Checker<'a> {
                 used: None,
                 range: Range::from_located(expr),
                 source: Some(self.current_parent().clone()),
-                redefined: vec![],
             },
         );
     }
@@ -3054,27 +3113,8 @@ impl<'a> Checker<'a> {
             self.visible_scope = visibility;
 
             match &stmt.node {
-                StmtKind::FunctionDef {
-                    name,
-                    body,
-                    args,
-                    decorator_list,
-                    ..
-                }
-                | StmtKind::AsyncFunctionDef {
-                    name,
-                    body,
-                    args,
-                    decorator_list,
-                    ..
-                } => {
-                    self.push_scope(Scope::new(ScopeKind::Function(FunctionDef {
-                        name,
-                        body,
-                        args,
-                        decorator_list,
-                        async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
-                    })));
+                StmtKind::FunctionDef { body, args, .. }
+                | StmtKind::AsyncFunctionDef { body, args, .. } => {
                     self.visit_arguments(args);
                     for stmt in body {
                         self.visit_stmt(stmt);
@@ -3083,12 +3123,7 @@ impl<'a> Checker<'a> {
                 _ => unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef"),
             }
 
-            self.deferred_assignments.push((
-                *self.scope_stack.last().expect("No current scope found"),
-                (scopes, parents),
-            ));
-
-            self.pop_scope();
+            self.deferred_assignments.push((scopes, parents));
         }
     }
 
@@ -3099,29 +3134,35 @@ impl<'a> Checker<'a> {
             self.parents = parents.clone();
 
             if let ExprKind::Lambda { args, body } = &expr.node {
-                self.push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
                 self.visit_arguments(args);
                 self.visit_expr(body);
             } else {
                 unreachable!("Expected ExprKind::Lambda");
             }
 
-            self.deferred_assignments.push((
-                *self.scope_stack.last().expect("No current scope found"),
-                (scopes, parents),
-            ));
-
-            self.pop_scope();
+            self.deferred_assignments.push((scopes, parents));
         }
     }
 
     fn check_deferred_assignments(&mut self) {
         self.deferred_assignments.reverse();
-        while let Some((index, (scopes, _parents))) = self.deferred_assignments.pop() {
+        while let Some((scopes, _parents)) = self.deferred_assignments.pop() {
+            let scope_index = scopes[scopes.len() - 1];
+            let parent_scope_index = scopes[scopes.len() - 2];
             if self.settings.enabled.contains(&CheckCode::F841) {
                 self.add_checks(
-                    pyflakes::checks::unused_variables(
-                        &self.scopes[index],
+                    pyflakes::checks::unused_variable(
+                        &self.scopes[scope_index],
+                        &self.bindings,
+                        &self.settings.dummy_variable_rgx,
+                    )
+                    .into_iter(),
+                );
+            }
+            if self.settings.enabled.contains(&CheckCode::F842) {
+                self.add_checks(
+                    pyflakes::checks::unused_annotation(
+                        &self.scopes[scope_index],
                         &self.bindings,
                         &self.settings.dummy_variable_rgx,
                     )
@@ -3137,10 +3178,8 @@ impl<'a> Checker<'a> {
                 self.add_checks(
                     flake8_unused_arguments::plugins::unused_arguments(
                         self,
-                        &self.scopes[*scopes
-                            .last()
-                            .expect("Expected parent scope above function scope")],
-                        &self.scopes[index],
+                        &self.scopes[parent_scope_index],
+                        &self.scopes[scope_index],
                         &self.bindings,
                     )
                     .into_iter(),
@@ -3154,6 +3193,7 @@ impl<'a> Checker<'a> {
             && !self.settings.enabled.contains(&CheckCode::F405)
             && !self.settings.enabled.contains(&CheckCode::F811)
             && !self.settings.enabled.contains(&CheckCode::F822)
+            && !self.settings.enabled.contains(&CheckCode::PLW0602)
         {
             return;
         }
@@ -3165,6 +3205,24 @@ impl<'a> Checker<'a> {
             .rev()
             .map(|index| &self.scopes[*index])
         {
+            // PLW0602
+            if self.settings.enabled.contains(&CheckCode::PLW0602) {
+                for (name, index) in &scope.values {
+                    let binding = &self.bindings[*index];
+                    if matches!(binding.kind, BindingKind::Global) {
+                        checks.push(Check::new(
+                            CheckKind::GlobalVariableNotAssigned((*name).to_string()),
+                            binding.range,
+                        ));
+                    }
+                }
+            }
+
+            // Imports in classes are public members.
+            if matches!(scope.kind, ScopeKind::Class(..)) {
+                continue;
+            }
+
             let all_binding: Option<&Binding> = scope
                 .values
                 .get("__all__")
@@ -3192,6 +3250,9 @@ impl<'a> Checker<'a> {
                 }
             }
 
+            // Look for any bindings that were redefined in another scope, and remain
+            // unused. Note that we only store references in `redefinitions` if
+            // the bindings are in different scopes.
             if self.settings.enabled.contains(&CheckCode::F811) {
                 for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
@@ -3214,14 +3275,16 @@ impl<'a> Checker<'a> {
                             continue;
                         }
 
-                        for index in &binding.redefined {
-                            checks.push(Check::new(
-                                CheckKind::RedefinedWhileUnused(
-                                    (*name).to_string(),
-                                    binding.range.location.row(),
-                                ),
-                                self.bindings[*index].range,
-                            ));
+                        if let Some(indices) = self.redefinitions.get(index) {
+                            for index in indices {
+                                checks.push(Check::new(
+                                    CheckKind::RedefinedWhileUnused(
+                                        (*name).to_string(),
+                                        binding.range.location.row(),
+                                    ),
+                                    self.bindings[*index].range,
+                                ));
+                            }
                         }
                     }
                 }
@@ -3268,7 +3331,11 @@ impl<'a> Checker<'a> {
 
                 let mut unused: FxHashMap<BindingContext, Vec<UnusedImport>> = FxHashMap::default();
 
-                for (name, index) in &scope.values {
+                for (name, index) in scope
+                    .values
+                    .iter()
+                    .chain(scope.overridden.iter().map(|(a, b)| (a, b)))
+                {
                     let binding = &self.bindings[*index];
 
                     let (BindingKind::Importation(_, full_name)
@@ -3344,22 +3411,68 @@ impl<'a> Checker<'a> {
     }
 
     fn check_definitions(&mut self) {
+        let enforce_annotations = self.settings.enabled.contains(&CheckCode::ANN001)
+            || self.settings.enabled.contains(&CheckCode::ANN002)
+            || self.settings.enabled.contains(&CheckCode::ANN003)
+            || self.settings.enabled.contains(&CheckCode::ANN101)
+            || self.settings.enabled.contains(&CheckCode::ANN102)
+            || self.settings.enabled.contains(&CheckCode::ANN201)
+            || self.settings.enabled.contains(&CheckCode::ANN202)
+            || self.settings.enabled.contains(&CheckCode::ANN204)
+            || self.settings.enabled.contains(&CheckCode::ANN205)
+            || self.settings.enabled.contains(&CheckCode::ANN206)
+            || self.settings.enabled.contains(&CheckCode::ANN401);
+        let enforce_docstrings = self.settings.enabled.contains(&CheckCode::D100)
+            || self.settings.enabled.contains(&CheckCode::D101)
+            || self.settings.enabled.contains(&CheckCode::D102)
+            || self.settings.enabled.contains(&CheckCode::D103)
+            || self.settings.enabled.contains(&CheckCode::D104)
+            || self.settings.enabled.contains(&CheckCode::D105)
+            || self.settings.enabled.contains(&CheckCode::D106)
+            || self.settings.enabled.contains(&CheckCode::D107)
+            || self.settings.enabled.contains(&CheckCode::D200)
+            || self.settings.enabled.contains(&CheckCode::D201)
+            || self.settings.enabled.contains(&CheckCode::D202)
+            || self.settings.enabled.contains(&CheckCode::D203)
+            || self.settings.enabled.contains(&CheckCode::D204)
+            || self.settings.enabled.contains(&CheckCode::D205)
+            || self.settings.enabled.contains(&CheckCode::D206)
+            || self.settings.enabled.contains(&CheckCode::D207)
+            || self.settings.enabled.contains(&CheckCode::D208)
+            || self.settings.enabled.contains(&CheckCode::D209)
+            || self.settings.enabled.contains(&CheckCode::D210)
+            || self.settings.enabled.contains(&CheckCode::D211)
+            || self.settings.enabled.contains(&CheckCode::D212)
+            || self.settings.enabled.contains(&CheckCode::D213)
+            || self.settings.enabled.contains(&CheckCode::D214)
+            || self.settings.enabled.contains(&CheckCode::D215)
+            || self.settings.enabled.contains(&CheckCode::D300)
+            || self.settings.enabled.contains(&CheckCode::D301)
+            || self.settings.enabled.contains(&CheckCode::D400)
+            || self.settings.enabled.contains(&CheckCode::D402)
+            || self.settings.enabled.contains(&CheckCode::D403)
+            || self.settings.enabled.contains(&CheckCode::D404)
+            || self.settings.enabled.contains(&CheckCode::D405)
+            || self.settings.enabled.contains(&CheckCode::D406)
+            || self.settings.enabled.contains(&CheckCode::D407)
+            || self.settings.enabled.contains(&CheckCode::D408)
+            || self.settings.enabled.contains(&CheckCode::D409)
+            || self.settings.enabled.contains(&CheckCode::D410)
+            || self.settings.enabled.contains(&CheckCode::D411)
+            || self.settings.enabled.contains(&CheckCode::D412)
+            || self.settings.enabled.contains(&CheckCode::D413)
+            || self.settings.enabled.contains(&CheckCode::D414)
+            || self.settings.enabled.contains(&CheckCode::D415)
+            || self.settings.enabled.contains(&CheckCode::D416)
+            || self.settings.enabled.contains(&CheckCode::D417)
+            || self.settings.enabled.contains(&CheckCode::D418)
+            || self.settings.enabled.contains(&CheckCode::D419);
+
         let mut overloaded_name: Option<String> = None;
         self.definitions.reverse();
         while let Some((definition, visibility)) = self.definitions.pop() {
             // flake8-annotations
-            if self.settings.enabled.contains(&CheckCode::ANN001)
-                || self.settings.enabled.contains(&CheckCode::ANN002)
-                || self.settings.enabled.contains(&CheckCode::ANN003)
-                || self.settings.enabled.contains(&CheckCode::ANN101)
-                || self.settings.enabled.contains(&CheckCode::ANN102)
-                || self.settings.enabled.contains(&CheckCode::ANN201)
-                || self.settings.enabled.contains(&CheckCode::ANN202)
-                || self.settings.enabled.contains(&CheckCode::ANN204)
-                || self.settings.enabled.contains(&CheckCode::ANN205)
-                || self.settings.enabled.contains(&CheckCode::ANN206)
-                || self.settings.enabled.contains(&CheckCode::ANN401)
-            {
+            if enforce_annotations {
                 // TODO(charlie): This should be even stricter, in that an overload
                 // implementation should come immediately after the overloaded
                 // interfaces, without any AST nodes in between. Right now, we
@@ -3378,84 +3491,110 @@ impl<'a> Checker<'a> {
             }
 
             // pydocstyle
-            if !pydocstyle::plugins::not_empty(self, &definition) {
-                continue;
-            }
-            if !pydocstyle::plugins::not_missing(self, &definition, &visibility) {
-                continue;
-            }
-            if self.settings.enabled.contains(&CheckCode::D200) {
-                pydocstyle::plugins::one_liner(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D201)
-                || self.settings.enabled.contains(&CheckCode::D202)
-            {
-                pydocstyle::plugins::blank_before_after_function(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D203)
-                || self.settings.enabled.contains(&CheckCode::D204)
-                || self.settings.enabled.contains(&CheckCode::D211)
-            {
-                pydocstyle::plugins::blank_before_after_class(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D205) {
-                pydocstyle::plugins::blank_after_summary(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D206)
-                || self.settings.enabled.contains(&CheckCode::D207)
-                || self.settings.enabled.contains(&CheckCode::D208)
-            {
-                pydocstyle::plugins::indent(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D209) {
-                pydocstyle::plugins::newline_after_last_paragraph(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D210) {
-                pydocstyle::plugins::no_surrounding_whitespace(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D212)
-                || self.settings.enabled.contains(&CheckCode::D213)
-            {
-                pydocstyle::plugins::multi_line_summary_start(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D300) {
-                pydocstyle::plugins::triple_quotes(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D400) {
-                pydocstyle::plugins::ends_with_period(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D402) {
-                pydocstyle::plugins::no_signature(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D403) {
-                pydocstyle::plugins::capitalized(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D404) {
-                pydocstyle::plugins::starts_with_this(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D415) {
-                pydocstyle::plugins::ends_with_punctuation(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D418) {
-                pydocstyle::plugins::if_needed(self, &definition);
-            }
-            if self.settings.enabled.contains(&CheckCode::D212)
-                || self.settings.enabled.contains(&CheckCode::D214)
-                || self.settings.enabled.contains(&CheckCode::D215)
-                || self.settings.enabled.contains(&CheckCode::D405)
-                || self.settings.enabled.contains(&CheckCode::D406)
-                || self.settings.enabled.contains(&CheckCode::D407)
-                || self.settings.enabled.contains(&CheckCode::D408)
-                || self.settings.enabled.contains(&CheckCode::D409)
-                || self.settings.enabled.contains(&CheckCode::D410)
-                || self.settings.enabled.contains(&CheckCode::D411)
-                || self.settings.enabled.contains(&CheckCode::D412)
-                || self.settings.enabled.contains(&CheckCode::D413)
-                || self.settings.enabled.contains(&CheckCode::D414)
-                || self.settings.enabled.contains(&CheckCode::D416)
-                || self.settings.enabled.contains(&CheckCode::D417)
-            {
-                pydocstyle::plugins::sections(self, &definition);
+            if enforce_docstrings {
+                if definition.docstring.is_none() {
+                    pydocstyle::plugins::not_missing(self, &definition, &visibility);
+                    continue;
+                }
+
+                // Extract a `Docstring` from a `Definition`.
+                let expr = definition.docstring.unwrap();
+                let content = self
+                    .locator
+                    .slice_source_code_range(&Range::from_located(expr));
+                let indentation = self.locator.slice_source_code_range(&Range {
+                    location: Location::new(expr.location.row(), 0),
+                    end_location: Location::new(expr.location.row(), expr.location.column()),
+                });
+                let body = pydocstyle::helpers::raw_contents(&content);
+                let docstring = Docstring {
+                    kind: definition.kind,
+                    expr,
+                    contents: &content,
+                    indentation: &indentation,
+                    body,
+                };
+
+                if !pydocstyle::plugins::not_empty(self, &docstring) {
+                    continue;
+                }
+
+                if self.settings.enabled.contains(&CheckCode::D200) {
+                    pydocstyle::plugins::one_liner(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D201)
+                    || self.settings.enabled.contains(&CheckCode::D202)
+                {
+                    pydocstyle::plugins::blank_before_after_function(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D203)
+                    || self.settings.enabled.contains(&CheckCode::D204)
+                    || self.settings.enabled.contains(&CheckCode::D211)
+                {
+                    pydocstyle::plugins::blank_before_after_class(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D205) {
+                    pydocstyle::plugins::blank_after_summary(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D206)
+                    || self.settings.enabled.contains(&CheckCode::D207)
+                    || self.settings.enabled.contains(&CheckCode::D208)
+                {
+                    pydocstyle::plugins::indent(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D209) {
+                    pydocstyle::plugins::newline_after_last_paragraph(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D210) {
+                    pydocstyle::plugins::no_surrounding_whitespace(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D212)
+                    || self.settings.enabled.contains(&CheckCode::D213)
+                {
+                    pydocstyle::plugins::multi_line_summary_start(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D300) {
+                    pydocstyle::plugins::triple_quotes(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D301) {
+                    pydocstyle::plugins::backslashes(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D400) {
+                    pydocstyle::plugins::ends_with_period(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D402) {
+                    pydocstyle::plugins::no_signature(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D403) {
+                    pydocstyle::plugins::capitalized(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D404) {
+                    pydocstyle::plugins::starts_with_this(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D415) {
+                    pydocstyle::plugins::ends_with_punctuation(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D418) {
+                    pydocstyle::plugins::if_needed(self, &docstring);
+                }
+                if self.settings.enabled.contains(&CheckCode::D212)
+                    || self.settings.enabled.contains(&CheckCode::D214)
+                    || self.settings.enabled.contains(&CheckCode::D215)
+                    || self.settings.enabled.contains(&CheckCode::D405)
+                    || self.settings.enabled.contains(&CheckCode::D406)
+                    || self.settings.enabled.contains(&CheckCode::D407)
+                    || self.settings.enabled.contains(&CheckCode::D408)
+                    || self.settings.enabled.contains(&CheckCode::D409)
+                    || self.settings.enabled.contains(&CheckCode::D410)
+                    || self.settings.enabled.contains(&CheckCode::D411)
+                    || self.settings.enabled.contains(&CheckCode::D412)
+                    || self.settings.enabled.contains(&CheckCode::D413)
+                    || self.settings.enabled.contains(&CheckCode::D414)
+                    || self.settings.enabled.contains(&CheckCode::D416)
+                    || self.settings.enabled.contains(&CheckCode::D417)
+                {
+                    pydocstyle::plugins::sections(self, &docstring);
+                }
             }
         }
     }

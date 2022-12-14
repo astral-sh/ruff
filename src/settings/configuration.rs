@@ -5,12 +5,12 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use once_cell::sync::Lazy;
-use path_absolutize::path_dedot;
+use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
-use rustc_hash::FxHashSet;
 
-use crate::checks_gen::{CheckCodePrefix, CATEGORIES};
+use crate::checks_gen::CheckCodePrefix;
+use crate::cli::{collect_per_file_ignores, Overrides};
+use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
@@ -18,171 +18,217 @@ use crate::{
     flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Configuration {
-    pub allowed_confusables: FxHashSet<char>,
-    pub dummy_variable_rgx: Regex,
-    pub exclude: Vec<FilePattern>,
-    pub extend_exclude: Vec<FilePattern>,
-    pub extend_ignore: Vec<CheckCodePrefix>,
-    pub extend_select: Vec<CheckCodePrefix>,
-    pub external: Vec<String>,
-    pub fix: bool,
-    pub fixable: Vec<CheckCodePrefix>,
-    pub format: SerializationFormat,
-    pub ignore: Vec<CheckCodePrefix>,
-    pub ignore_init_module_imports: bool,
-    pub line_length: usize,
-    pub per_file_ignores: Vec<PerFileIgnore>,
-    pub select: Vec<CheckCodePrefix>,
-    pub show_source: bool,
-    pub src: Vec<PathBuf>,
-    pub target_version: PythonVersion,
-    pub unfixable: Vec<CheckCodePrefix>,
+    pub allowed_confusables: Option<Vec<char>>,
+    pub dummy_variable_rgx: Option<Regex>,
+    pub exclude: Option<Vec<FilePattern>>,
+    pub extend: Option<PathBuf>,
+    pub extend_exclude: Option<Vec<FilePattern>>,
+    pub extend_ignore: Option<Vec<CheckCodePrefix>>,
+    pub extend_select: Option<Vec<CheckCodePrefix>>,
+    pub external: Option<Vec<String>>,
+    pub fix: Option<bool>,
+    pub fixable: Option<Vec<CheckCodePrefix>>,
+    pub format: Option<SerializationFormat>,
+    pub ignore: Option<Vec<CheckCodePrefix>>,
+    pub ignore_init_module_imports: Option<bool>,
+    pub line_length: Option<usize>,
+    pub per_file_ignores: Option<Vec<PerFileIgnore>>,
+    pub select: Option<Vec<CheckCodePrefix>>,
+    pub show_source: Option<bool>,
+    pub src: Option<Vec<PathBuf>>,
+    pub target_version: Option<PythonVersion>,
+    pub unfixable: Option<Vec<CheckCodePrefix>>,
     // Plugins
-    pub flake8_annotations: flake8_annotations::settings::Settings,
-    pub flake8_bugbear: flake8_bugbear::settings::Settings,
-    pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
-    pub flake8_quotes: flake8_quotes::settings::Settings,
-    pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
-    pub isort: isort::settings::Settings,
-    pub mccabe: mccabe::settings::Settings,
-    pub pep8_naming: pep8_naming::settings::Settings,
-    pub pyupgrade: pyupgrade::settings::Settings,
+    pub flake8_annotations: Option<flake8_annotations::settings::Options>,
+    pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
+    pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
+    pub flake8_quotes: Option<flake8_quotes::settings::Options>,
+    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
+    pub isort: Option<isort::settings::Options>,
+    pub mccabe: Option<mccabe::settings::Options>,
+    pub pep8_naming: Option<pep8_naming::settings::Options>,
+    pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
 
-static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
-    vec![
-        FilePattern::Builtin(".bzr"),
-        FilePattern::Builtin(".direnv"),
-        FilePattern::Builtin(".eggs"),
-        FilePattern::Builtin(".git"),
-        FilePattern::Builtin(".hg"),
-        FilePattern::Builtin(".mypy_cache"),
-        FilePattern::Builtin(".nox"),
-        FilePattern::Builtin(".pants.d"),
-        FilePattern::Builtin(".ruff_cache"),
-        FilePattern::Builtin(".svn"),
-        FilePattern::Builtin(".tox"),
-        FilePattern::Builtin(".venv"),
-        FilePattern::Builtin("__pypackages__"),
-        FilePattern::Builtin("_build"),
-        FilePattern::Builtin("buck-out"),
-        FilePattern::Builtin("build"),
-        FilePattern::Builtin("dist"),
-        FilePattern::Builtin("node_modules"),
-        FilePattern::Builtin("venv"),
-    ]
-});
-
-static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
-    Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
-
 impl Configuration {
-    pub fn from_pyproject(
-        pyproject: Option<&PathBuf>,
-        project_root: Option<&PathBuf>,
-    ) -> Result<Self> {
-        let options = load_options(pyproject)?;
+    pub fn from_pyproject(pyproject: &Path, project_root: &Path) -> Result<Self> {
+        Self::from_options(load_options(pyproject)?, project_root)
+    }
+
+    pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         Ok(Configuration {
-            allowed_confusables: FxHashSet::from_iter(
-                options.allowed_confusables.unwrap_or_default(),
-            ),
-            dummy_variable_rgx: match options.dummy_variable_rgx {
-                Some(pattern) => Regex::new(&pattern)
-                    .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
-                None => DEFAULT_DUMMY_VARIABLE_RGX.clone(),
-            },
-            src: options.src.map_or_else(
-                || {
-                    vec![match project_root {
-                        Some(project_root) => project_root.clone(),
-                        None => path_dedot::CWD.clone(),
-                    }]
-                },
-                |src| {
-                    src.iter()
-                        .map(|path| {
-                            let path = Path::new(path);
-                            match project_root {
-                                Some(project_root) => fs::normalize_path_to(path, project_root),
-                                None => fs::normalize_path(path),
-                            }
-                        })
-                        .collect()
-                },
-            ),
-            target_version: options.target_version.unwrap_or(PythonVersion::Py310),
-            exclude: options.exclude.map_or_else(
-                || DEFAULT_EXCLUDE.clone(),
-                |paths| paths.into_iter().map(FilePattern::User).collect(),
-            ),
-            extend_exclude: options
-                .extend_exclude
-                .map(|paths| paths.into_iter().map(FilePattern::User).collect())
-                .unwrap_or_default(),
-            extend_ignore: options.extend_ignore.unwrap_or_default(),
-            select: options
-                .select
-                .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F]),
-            extend_select: options.extend_select.unwrap_or_default(),
-            external: options.external.unwrap_or_default(),
-            fix: options.fix.unwrap_or_default(),
-            fixable: options.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
-            unfixable: options.unfixable.unwrap_or_default(),
-            format: options.format.unwrap_or_default(),
-            ignore: options.ignore.unwrap_or_default(),
-            ignore_init_module_imports: options.ignore_init_module_imports.unwrap_or_default(),
-            line_length: options.line_length.unwrap_or(88),
-            per_file_ignores: options
-                .per_file_ignores
-                .map(|per_file_ignores| {
-                    per_file_ignores
-                        .into_iter()
-                        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes))
-                        .collect()
-                })
-                .unwrap_or_default(),
-            show_source: options.show_source.unwrap_or_default(),
+            extend: options.extend.map(PathBuf::from),
+            allowed_confusables: options.allowed_confusables,
+            dummy_variable_rgx: options
+                .dummy_variable_rgx
+                .map(|pattern| Regex::new(&pattern))
+                .transpose()
+                .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
+            src: options
+                .src
+                .map(|src| resolve_src(&src, project_root))
+                .transpose()?,
+            target_version: options.target_version,
+            exclude: options.exclude.map(|paths| {
+                paths
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
+            extend_exclude: options.extend_exclude.map(|paths| {
+                paths
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
+            extend_ignore: options.extend_ignore,
+            select: options.select,
+            extend_select: options.extend_select,
+            external: options.external,
+            fix: options.fix,
+            fixable: options.fixable,
+            unfixable: options.unfixable,
+            format: options.format,
+            ignore: options.ignore,
+            ignore_init_module_imports: options.ignore_init_module_imports,
+            line_length: options.line_length,
+            per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
+                per_file_ignores
+                    .into_iter()
+                    .map(|(pattern, prefixes)| {
+                        let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
+                        PerFileIgnore::new(pattern, absolute, &prefixes)
+                    })
+                    .collect()
+            }),
+            show_source: options.show_source,
             // Plugins
-            flake8_annotations: options
-                .flake8_annotations
-                .map(flake8_annotations::settings::Settings::from_options)
-                .unwrap_or_default(),
-            flake8_bugbear: options
-                .flake8_bugbear
-                .map(flake8_bugbear::settings::Settings::from_options)
-                .unwrap_or_default(),
-            flake8_import_conventions: options
-                .flake8_import_conventions
-                .map(flake8_import_conventions::settings::Settings::from_options)
-                .unwrap_or_default(),
-            flake8_quotes: options
-                .flake8_quotes
-                .map(flake8_quotes::settings::Settings::from_options)
-                .unwrap_or_default(),
-            flake8_tidy_imports: options
-                .flake8_tidy_imports
-                .map(flake8_tidy_imports::settings::Settings::from_options)
-                .unwrap_or_default(),
-            isort: options
-                .isort
-                .map(isort::settings::Settings::from_options)
-                .unwrap_or_default(),
-            mccabe: options
-                .mccabe
-                .as_ref()
-                .map(mccabe::settings::Settings::from_options)
-                .unwrap_or_default(),
-            pep8_naming: options
-                .pep8_naming
-                .map(pep8_naming::settings::Settings::from_options)
-                .unwrap_or_default(),
-            pyupgrade: options
-                .pyupgrade
-                .as_ref()
-                .map(pyupgrade::settings::Settings::from_options)
-                .unwrap_or_default(),
+            flake8_annotations: options.flake8_annotations,
+            flake8_bugbear: options.flake8_bugbear,
+            flake8_import_conventions: options.flake8_import_conventions,
+            flake8_quotes: options.flake8_quotes,
+            flake8_tidy_imports: options.flake8_tidy_imports,
+            isort: options.isort,
+            mccabe: options.mccabe,
+            pep8_naming: options.pep8_naming,
+            pyupgrade: options.pyupgrade,
         })
     }
+
+    #[must_use]
+    pub fn combine(self, config: Configuration) -> Self {
+        Self {
+            allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
+            dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
+            exclude: self.exclude.or(config.exclude),
+            extend: self.extend.or(config.extend),
+            extend_exclude: self.extend_exclude.or(config.extend_exclude),
+            extend_ignore: self.extend_ignore.or(config.extend_ignore),
+            extend_select: self.extend_select.or(config.extend_select),
+            external: self.external.or(config.external),
+            fix: self.fix.or(config.fix),
+            fixable: self.fixable.or(config.fixable),
+            format: self.format.or(config.format),
+            ignore: self.ignore.or(config.ignore),
+            ignore_init_module_imports: self
+                .ignore_init_module_imports
+                .or(config.ignore_init_module_imports),
+            line_length: self.line_length.or(config.line_length),
+            per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
+            select: self.select.or(config.select),
+            show_source: self.show_source.or(config.show_source),
+            src: self.src.or(config.src),
+            target_version: self.target_version.or(config.target_version),
+            unfixable: self.unfixable.or(config.unfixable),
+            // Plugins
+            flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
+            flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
+            flake8_import_conventions: self
+                .flake8_import_conventions
+                .or(config.flake8_import_conventions),
+            flake8_quotes: self.flake8_quotes.or(config.flake8_quotes),
+            flake8_tidy_imports: self.flake8_tidy_imports.or(config.flake8_tidy_imports),
+            isort: self.isort.or(config.isort),
+            mccabe: self.mccabe.or(config.mccabe),
+            pep8_naming: self.pep8_naming.or(config.pep8_naming),
+            pyupgrade: self.pyupgrade.or(config.pyupgrade),
+        }
+    }
+
+    pub fn apply(&mut self, overrides: Overrides) {
+        if let Some(dummy_variable_rgx) = overrides.dummy_variable_rgx {
+            self.dummy_variable_rgx = Some(dummy_variable_rgx);
+        }
+        if let Some(exclude) = overrides.exclude {
+            self.exclude = Some(exclude);
+        }
+        if let Some(extend_exclude) = overrides.extend_exclude {
+            self.extend_exclude = Some(extend_exclude);
+        }
+        if let Some(extend_ignore) = overrides.extend_ignore {
+            self.extend_ignore = Some(extend_ignore);
+        }
+        if let Some(extend_select) = overrides.extend_select {
+            self.extend_select = Some(extend_select);
+        }
+        if let Some(fix) = overrides.fix {
+            self.fix = Some(fix);
+        }
+        if let Some(fixable) = overrides.fixable {
+            self.fixable = Some(fixable);
+        }
+        if let Some(format) = overrides.format {
+            self.format = Some(format);
+        }
+        if let Some(ignore) = overrides.ignore {
+            self.ignore = Some(ignore);
+        }
+        if let Some(line_length) = overrides.line_length {
+            self.line_length = Some(line_length);
+        }
+        if let Some(max_complexity) = overrides.max_complexity {
+            self.mccabe = Some(mccabe::settings::Options {
+                max_complexity: Some(max_complexity),
+            });
+        }
+        if let Some(per_file_ignores) = overrides.per_file_ignores {
+            self.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores));
+        }
+        if let Some(select) = overrides.select {
+            self.select = Some(select);
+        }
+        if let Some(show_source) = overrides.show_source {
+            self.show_source = Some(show_source);
+        }
+        if let Some(target_version) = overrides.target_version {
+            self.target_version = Some(target_version);
+        }
+        if let Some(unfixable) = overrides.unfixable {
+            self.unfixable = Some(unfixable);
+        }
+    }
+}
+
+/// Given a list of source paths, which could include glob patterns, resolve the
+/// matching paths.
+pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
+    let globs = src
+        .iter()
+        .map(Path::new)
+        .map(|path| fs::normalize_path_to(path, project_root))
+        .map(|path| glob(&path.to_string_lossy()))
+        .collect::<Result<Vec<Paths>, PatternError>>()?;
+    let paths: Vec<PathBuf> = globs
+        .into_iter()
+        .flatten()
+        .collect::<Result<Vec<PathBuf>, GlobError>>()?;
+    Ok(paths)
 }

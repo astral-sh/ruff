@@ -2,348 +2,12 @@ use std::string::ToString;
 
 use regex::Regex;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Keyword, KeywordData};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
-use crate::pyflakes::cformat::CFormatSummary;
-use crate::pyflakes::format::FormatSummary;
-
-fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
-    keywords.iter().any(|k| {
-        let KeywordData { arg, .. } = &k.node;
-        arg.is_none()
-    })
-}
-
-fn has_star_args(args: &[Expr]) -> bool {
-    args.iter()
-        .any(|a| matches!(&a.node, ExprKind::Starred { .. }))
-}
-
-/// F502
-pub(crate) fn percent_format_expected_mapping(
-    summary: &CFormatSummary,
-    right: &Expr,
-    location: Range,
-) -> Option<Check> {
-    if summary.keywords.is_empty() {
-        None
-    } else {
-        // Tuple, List, Set (+comprehensions)
-        match right.node {
-            ExprKind::List { .. }
-            | ExprKind::Tuple { .. }
-            | ExprKind::Set { .. }
-            | ExprKind::ListComp { .. }
-            | ExprKind::SetComp { .. }
-            | ExprKind::GeneratorExp { .. } => Some(Check::new(
-                CheckKind::PercentFormatExpectedMapping,
-                location,
-            )),
-            _ => None,
-        }
-    }
-}
-
-/// F503
-pub(crate) fn percent_format_expected_sequence(
-    summary: &CFormatSummary,
-    right: &Expr,
-    location: Range,
-) -> Option<Check> {
-    if summary.num_positional <= 1 {
-        None
-    } else {
-        match right.node {
-            ExprKind::Dict { .. } | ExprKind::DictComp { .. } => Some(Check::new(
-                CheckKind::PercentFormatExpectedSequence,
-                location,
-            )),
-            _ => None,
-        }
-    }
-}
-
-/// F504
-pub(crate) fn percent_format_extra_named_arguments(
-    summary: &CFormatSummary,
-    right: &Expr,
-    location: Range,
-) -> Option<Check> {
-    if summary.num_positional > 0 {
-        return None;
-    }
-    let ExprKind::Dict { keys, values } = &right.node else {
-        return None;
-    };
-    if values.len() > keys.len() {
-        return None; // contains **x splat
-    }
-
-    let missing: Vec<&String> = keys
-        .iter()
-        .filter_map(|k| match &k.node {
-            // We can only check that string literals exist
-            ExprKind::Constant {
-                value: Constant::Str(value),
-                ..
-            } => {
-                if summary.keywords.contains(value) {
-                    None
-                } else {
-                    Some(value)
-                }
-            }
-            _ => None,
-        })
-        .collect();
-
-    if missing.is_empty() {
-        return None;
-    }
-
-    Some(Check::new(
-        CheckKind::PercentFormatExtraNamedArguments(missing.iter().map(|&s| s.clone()).collect()),
-        location,
-    ))
-}
-
-/// F505
-pub(crate) fn percent_format_missing_arguments(
-    summary: &CFormatSummary,
-    right: &Expr,
-    location: Range,
-) -> Option<Check> {
-    if summary.num_positional > 0 {
-        return None;
-    }
-
-    if let ExprKind::Dict { keys, values } = &right.node {
-        if values.len() > keys.len() {
-            return None; // contains **x splat
-        }
-
-        let mut keywords = FxHashSet::default();
-        for key in keys {
-            match &key.node {
-                ExprKind::Constant {
-                    value: Constant::Str(value),
-                    ..
-                } => {
-                    keywords.insert(value);
-                }
-                _ => {
-                    return None; // Dynamic keys present
-                }
-            }
-        }
-
-        let missing: Vec<&String> = summary
-            .keywords
-            .iter()
-            .filter(|k| !keywords.contains(k))
-            .collect();
-
-        if missing.is_empty() {
-            None
-        } else {
-            Some(Check::new(
-                CheckKind::PercentFormatMissingArgument(
-                    missing.iter().map(|&s| s.clone()).collect(),
-                ),
-                location,
-            ))
-        }
-    } else {
-        None
-    }
-}
-
-/// F506
-pub(crate) fn percent_format_mixed_positional_and_named(
-    summary: &CFormatSummary,
-    location: Range,
-) -> Option<Check> {
-    if summary.num_positional == 0 || summary.keywords.is_empty() {
-        None
-    } else {
-        Some(Check::new(
-            CheckKind::PercentFormatMixedPositionalAndNamed,
-            location,
-        ))
-    }
-}
-
-/// F507
-pub(crate) fn percent_format_positional_count_mismatch(
-    summary: &CFormatSummary,
-    right: &Expr,
-    location: Range,
-) -> Option<Check> {
-    if !summary.keywords.is_empty() {
-        return None;
-    }
-
-    match &right.node {
-        ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } | ExprKind::Set { elts, .. } => {
-            let mut found = 0;
-            for elt in elts {
-                if let ExprKind::Starred { .. } = &elt.node {
-                    return None;
-                }
-                found += 1;
-            }
-
-            if found == summary.num_positional {
-                None
-            } else {
-                Some(Check::new(
-                    CheckKind::PercentFormatPositionalCountMismatch(summary.num_positional, found),
-                    location,
-                ))
-            }
-        }
-        _ => None,
-    }
-}
-
-/// F508
-pub(crate) fn percent_format_star_requires_sequence(
-    summary: &CFormatSummary,
-    right: &Expr,
-    location: Range,
-) -> Option<Check> {
-    if summary.starred {
-        match &right.node {
-            ExprKind::Dict { .. } | ExprKind::DictComp { .. } => Some(Check::new(
-                CheckKind::PercentFormatStarRequiresSequence,
-                location,
-            )),
-            _ => None,
-        }
-    } else {
-        None
-    }
-}
-
-/// F522
-pub(crate) fn string_dot_format_extra_named_arguments(
-    summary: &FormatSummary,
-    keywords: &[Keyword],
-    location: Range,
-) -> Option<Check> {
-    if has_star_star_kwargs(keywords) {
-        return None;
-    }
-
-    let keywords = keywords.iter().filter_map(|k| {
-        let KeywordData { arg, .. } = &k.node;
-        arg.as_ref()
-    });
-
-    let missing: Vec<&String> = keywords
-        .filter(|&k| !summary.keywords.contains(k))
-        .collect();
-
-    if missing.is_empty() {
-        None
-    } else {
-        Some(Check::new(
-            CheckKind::StringDotFormatExtraNamedArguments(
-                missing.iter().map(|&s| s.clone()).collect(),
-            ),
-            location,
-        ))
-    }
-}
-
-/// F523
-pub(crate) fn string_dot_format_extra_positional_arguments(
-    summary: &FormatSummary,
-    args: &[Expr],
-    location: Range,
-) -> Option<Check> {
-    if has_star_args(args) {
-        return None;
-    }
-
-    let missing: Vec<String> = (0..args.len())
-        .filter(|i| !(summary.autos.contains(i) || summary.indexes.contains(i)))
-        .map(|i| i.to_string())
-        .collect();
-
-    if missing.is_empty() {
-        None
-    } else {
-        Some(Check::new(
-            CheckKind::StringDotFormatExtraPositionalArguments(missing),
-            location,
-        ))
-    }
-}
-
-/// F524
-pub(crate) fn string_dot_format_missing_argument(
-    summary: &FormatSummary,
-    args: &[Expr],
-    keywords: &[Keyword],
-    location: Range,
-) -> Option<Check> {
-    if has_star_args(args) || has_star_star_kwargs(keywords) {
-        return None;
-    }
-
-    let keywords: FxHashSet<_> = keywords
-        .iter()
-        .filter_map(|k| {
-            let KeywordData { arg, .. } = &k.node;
-            arg.as_ref()
-        })
-        .collect();
-
-    let missing: Vec<String> = summary
-        .autos
-        .iter()
-        .chain(summary.indexes.iter())
-        .filter(|&&i| i >= args.len())
-        .map(ToString::to_string)
-        .chain(
-            summary
-                .keywords
-                .iter()
-                .filter(|k| !keywords.contains(k))
-                .cloned(),
-        )
-        .collect();
-
-    if missing.is_empty() {
-        None
-    } else {
-        Some(Check::new(
-            CheckKind::StringDotFormatMissingArguments(missing),
-            location,
-        ))
-    }
-}
-
-/// F525
-pub(crate) fn string_dot_format_mixing_automatic(
-    summary: &FormatSummary,
-    location: Range,
-) -> Option<Check> {
-    if summary.autos.is_empty() || summary.indexes.is_empty() {
-        None
-    } else {
-        Some(Check::new(
-            CheckKind::StringDotFormatMixingAutomatic,
-            location,
-        ))
-    }
-}
 
 /// F631
 pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
@@ -388,7 +52,7 @@ pub fn undefined_local(name: &str, scopes: &[&Scope], bindings: &[Binding]) -> O
 }
 
 /// F841
-pub fn unused_variables(
+pub fn unused_variable(
     scope: &Scope,
     bindings: &[Binding],
     dummy_variable_rgx: &Regex,
@@ -418,6 +82,31 @@ pub fn unused_variables(
         }
     }
 
+    checks
+}
+
+/// F842
+pub fn unused_annotation(
+    scope: &Scope,
+    bindings: &[Binding],
+    dummy_variable_rgx: &Regex,
+) -> Vec<Check> {
+    let mut checks: Vec<Check> = vec![];
+    for (name, binding) in scope
+        .values
+        .iter()
+        .map(|(name, index)| (name, &bindings[*index]))
+    {
+        if binding.used.is_none()
+            && matches!(binding.kind, BindingKind::Annotation)
+            && !dummy_variable_rgx.is_match(name)
+        {
+            checks.push(Check::new(
+                CheckKind::UnusedAnnotation((*name).to_string()),
+                binding.range,
+            ));
+        }
+    }
     checks
 }
 

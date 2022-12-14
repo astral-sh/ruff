@@ -3,9 +3,6 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use common_path::common_path_all;
-use log::debug;
-use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 
 use crate::fs;
@@ -33,21 +30,21 @@ impl Pyproject {
 
 fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
-    Ok(toml::from_str(&contents)?)
+    toml::from_str(&contents).map_err(std::convert::Into::into)
 }
 
-pub fn find_pyproject_toml(path: Option<&PathBuf>) -> Option<PathBuf> {
-    if let Some(path) = path {
-        let path_pyproject_toml = path.join("pyproject.toml");
-        if path_pyproject_toml.is_file() {
-            return Some(path_pyproject_toml);
+/// Find the nearest `pyproject.toml` file.
+pub fn find_pyproject_toml(path: &Path) -> Option<PathBuf> {
+    for directory in path.ancestors() {
+        let pyproject = directory.join("pyproject.toml");
+        if pyproject.is_file() {
+            return Some(pyproject);
         }
     }
-
-    find_user_pyproject_toml()
+    None
 }
 
-fn find_user_pyproject_toml() -> Option<PathBuf> {
+pub fn find_user_pyproject_toml() -> Option<PathBuf> {
     let mut path = dirs::config_dir()?;
     path.push("ruff");
     path.push("pyproject.toml");
@@ -58,46 +55,17 @@ fn find_user_pyproject_toml() -> Option<PathBuf> {
     }
 }
 
-pub fn find_project_root(sources: &[PathBuf]) -> Option<PathBuf> {
-    let absolute_sources: Vec<PathBuf> = sources
-        .iter()
-        .flat_map(|source| source.absolutize().map(|path| path.to_path_buf()))
-        .collect();
-    if let Some(prefix) = common_path_all(absolute_sources.iter().map(PathBuf::as_path)) {
-        for directory in prefix.ancestors() {
-            if directory.join(".git").is_dir() {
-                return Some(directory.to_path_buf());
-            }
-            if directory.join(".hg").is_dir() {
-                return Some(directory.to_path_buf());
-            }
-            if directory.join("pyproject.toml").is_file() {
-                return Some(directory.to_path_buf());
-            }
-        }
-    }
-
-    None
-}
-
-pub fn load_options(pyproject: Option<&PathBuf>) -> Result<Options> {
-    if let Some(pyproject) = pyproject {
-        Ok(parse_pyproject_toml(pyproject)
-            .map_err(|err| anyhow!("Failed to parse `{}`: {}", pyproject.to_string_lossy(), err))?
-            .tool
-            .and_then(|tool| tool.ruff)
-            .unwrap_or_default())
-    } else {
-        debug!("No pyproject.toml found.");
-        debug!("Falling back to default configuration...");
-        Ok(Options::default())
-    }
+pub fn load_options(pyproject: &Path) -> Result<Options> {
+    Ok(parse_pyproject_toml(pyproject)
+        .map_err(|err| anyhow!("Failed to parse `{}`: {}", pyproject.to_string_lossy(), err))?
+        .tool
+        .and_then(|tool| tool.ruff)
+        .unwrap_or_default())
 }
 
 #[cfg(test)]
 mod tests {
     use std::env::current_dir;
-    use std::path::PathBuf;
     use std::str::FromStr;
 
     use anyhow::Result;
@@ -107,7 +75,7 @@ mod tests {
     use crate::flake8_quotes::settings::Quote;
     use crate::flake8_tidy_imports::settings::Strictness;
     use crate::settings::pyproject::{
-        find_project_root, find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
+        find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
     use crate::{
@@ -140,6 +108,7 @@ mod tests {
                     allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
+                    extend: None,
                     extend_exclude: None,
                     extend_ignore: None,
                     extend_select: None,
@@ -183,6 +152,7 @@ line-length = 79
                     allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
+                    extend: None,
                     extend_exclude: None,
                     extend_ignore: None,
                     extend_select: None,
@@ -226,6 +196,7 @@ exclude = ["foo.py"]
                     allowed_confusables: None,
                     line_length: None,
                     fix: None,
+                    extend: None,
                     exclude: Some(vec!["foo.py".to_string()]),
                     extend_exclude: None,
                     select: None,
@@ -269,6 +240,7 @@ select = ["E501"]
                     allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
+                    extend: None,
                     extend_exclude: None,
                     extend_ignore: None,
                     extend_select: None,
@@ -313,6 +285,7 @@ ignore = ["E501"]
                     allowed_confusables: None,
                     dummy_variable_rgx: None,
                     exclude: None,
+                    extend: None,
                     extend_exclude: None,
                     extend_ignore: None,
                     extend_select: Some(vec![CheckCodePrefix::RUF100]),
@@ -376,14 +349,14 @@ other-attribute = 1
     #[test]
     fn find_and_parse_pyproject_toml() -> Result<()> {
         let cwd = current_dir()?;
-        let project_root =
-            find_project_root(&[PathBuf::from("resources/test/fixtures/__init__.py")]).unwrap();
-        assert_eq!(project_root, cwd.join("resources/test/fixtures"));
+        let pyproject =
+            find_pyproject_toml(&cwd.join("resources/test/fixtures/__init__.py")).unwrap();
+        assert_eq!(
+            pyproject,
+            cwd.join("resources/test/fixtures/pyproject.toml")
+        );
 
-        let path = find_pyproject_toml(Some(&project_root)).unwrap();
-        assert_eq!(path, cwd.join("resources/test/fixtures/pyproject.toml"));
-
-        let pyproject = parse_pyproject_toml(&path)?;
+        let pyproject = parse_pyproject_toml(&pyproject)?;
         let config = pyproject.tool.and_then(|tool| tool.ruff).unwrap();
         assert_eq!(
             config,
@@ -392,6 +365,7 @@ other-attribute = 1
                 line_length: Some(88),
                 fix: None,
                 exclude: None,
+                extend: None,
                 extend_exclude: Some(vec![
                     "excluded_file.py".to_string(),
                     "migrations".to_string(),

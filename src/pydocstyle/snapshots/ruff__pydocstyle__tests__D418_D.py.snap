@@ -7,23 +7,23 @@ expression: checks
     row: 34
     column: 4
   end_location:
-    row: 38
-    column: 4
+    row: 36
+    column: 11
   fix: ~
 - kind: SkipDocstring
   location:
     row: 90
     column: 4
   end_location:
-    row: 94
-    column: 4
+    row: 92
+    column: 11
   fix: ~
 - kind: SkipDocstring
   location:
     row: 110
     column: 0
   end_location:
-    row: 115
-    column: 0
+    row: 112
+    column: 7
   fix: ~
 

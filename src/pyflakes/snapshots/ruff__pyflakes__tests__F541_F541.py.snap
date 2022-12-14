@@ -26,4 +26,12 @@ expression: checks
     row: 7
     column: 10
   fix: ~
+- kind: FStringMissingPlaceholders
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 16
+  fix: ~
 

@@ -49,27 +49,18 @@ impl FromStr for PythonVersion {
 #[derive(Debug, Clone)]
 pub enum FilePattern {
     Builtin(&'static str),
-    User(String),
+    User(String, PathBuf),
 }
 
 impl FilePattern {
-    pub fn add_to(
-        self,
-        builder: &mut GlobSetBuilder,
-        project_root: Option<&PathBuf>,
-    ) -> Result<()> {
+    pub fn add_to(self, builder: &mut GlobSetBuilder) -> Result<()> {
         match self {
             FilePattern::Builtin(pattern) => {
                 builder.add(Glob::from_str(pattern)?);
             }
-            FilePattern::User(pattern) => {
-                // Add absolute path.
-                let path = Path::new(&pattern);
-                let absolute_path = match project_root {
-                    Some(project_root) => fs::normalize_path_to(path, project_root),
-                    None => fs::normalize_path(path),
-                };
-                builder.add(Glob::new(&absolute_path.to_string_lossy())?);
+            FilePattern::User(pattern, absolute) => {
+                // Add the absolute path.
+                builder.add(Glob::new(&absolute.to_string_lossy())?);
 
                 // Add basename path.
                 if !pattern.contains(std::path::MAIN_SEPARATOR) {
@@ -85,20 +76,27 @@ impl FromStr for FilePattern {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::User(s.into()))
+        let pattern = s.to_string();
+        let absolute = fs::normalize_path(Path::new(&pattern));
+        Ok(Self::User(pattern, absolute))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct PerFileIgnore {
-    pub pattern: String,
+    pub basename: String,
+    pub absolute: PathBuf,
     pub codes: FxHashSet<CheckCode>,
 }
 
 impl PerFileIgnore {
-    pub fn new(pattern: String, prefixes: &[CheckCodePrefix]) -> Self {
+    pub fn new(basename: String, absolute: PathBuf, prefixes: &[CheckCodePrefix]) -> Self {
         let codes = prefixes.iter().flat_map(CheckCodePrefix::codes).collect();
-        Self { pattern, codes }
+        Self {
+            basename,
+            absolute,
+            codes,
+        }
     }
 }
 

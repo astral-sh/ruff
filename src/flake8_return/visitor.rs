@@ -18,6 +18,8 @@ pub struct Stack<'a> {
 #[derive(Default)]
 pub struct ReturnVisitor<'a> {
     pub stack: Stack<'a>,
+    // If we're in an f-string, the location of the defining expression.
+    in_f_string: Option<Location>,
 }
 
 impl<'a> ReturnVisitor<'a> {
@@ -34,7 +36,7 @@ impl<'a> ReturnVisitor<'a> {
                     .assigns
                     .entry(id)
                     .or_insert_with(Vec::new)
-                    .push(expr.location);
+                    .push(self.in_f_string.unwrap_or(expr.location));
                 return;
             }
             _ => {}
@@ -70,7 +72,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                         .refs
                         .entry(id)
                         .or_insert_with(Vec::new)
-                        .push(value.location);
+                        .push(self.in_f_string.unwrap_or(value.location));
                 }
 
                 visitor::walk_expr(self, value);
@@ -111,7 +113,13 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     .refs
                     .entry(id)
                     .or_insert_with(Vec::new)
-                    .push(expr.location);
+                    .push(self.in_f_string.unwrap_or(expr.location));
+            }
+            ExprKind::JoinedStr { .. } => {
+                let prev_in_f_string = self.in_f_string;
+                self.in_f_string = Some(expr.location);
+                visitor::walk_expr(self, expr);
+                self.in_f_string = prev_in_f_string;
             }
             _ => visitor::walk_expr(self, expr),
         }

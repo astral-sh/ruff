@@ -55,7 +55,7 @@ pub struct Options {
               (to exclude any Python files in `directory`). Note that these paths are relative to the
               project root (e.g., the directory containing your `pyproject.toml`).
 
-            Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify
+            Note that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify
             the excluded paths.
         "#,
         default = r#"[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
@@ -65,6 +65,24 @@ pub struct Options {
         "#
     )]
     pub exclude: Option<Vec<String>>,
+    #[option(
+        doc = r#"
+            A path to a local `pyproject.toml` file to merge into this configuration.
+
+            To resolve the current `pyproject.toml` file, Ruff will first resolve this base
+            configuration file, then merge in any properties defined in the current configuration
+            file.
+        "#,
+        default = r#"None"#,
+        value_type = "Path",
+        example = r#"
+            # Extend the `pyproject.toml` file in the parent directory.
+            extend = "../pyproject.toml"
+            # But use a different line length.
+            line-length = 100
+        "#
+    )]
+    pub extend: Option<String>,
     #[option(
         doc = "A list of file patterns to omit from linting, in addition to those specified by \
                `exclude`.",
@@ -217,8 +235,28 @@ pub struct Options {
     )]
     pub show_source: Option<bool>,
     #[option(
-        doc = "The source code paths to consider, e.g., when resolving first- vs. third-party \
-               imports.",
+        doc = r#"
+            The source code paths to consider, e.g., when resolving first- vs. third-party imports.
+
+            As an example: given a Python package structure like:
+
+            ```text
+            my_package/
+              pyproject.toml
+              src/
+                my_package/
+                  __init__.py
+                  foo.py
+                  bar.py
+            ```
+
+            The `src` directory should be included in `source` (e.g., `source = ["src"]`), such that
+            when resolving imports, `my_package.foo` is considered a first-party import.
+
+            This field supports globs. For example, if you have a series of Python packages in
+            a `python_modules` directory, `src = ["python_modules/*"]` would expand to incorporate
+            all of the packages in that directory.
+            "#,
         default = r#"["."]"#,
         value_type = "Vec<PathBuf>",
         example = r#"

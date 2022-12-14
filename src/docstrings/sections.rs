@@ -3,7 +3,7 @@ use crate::docstrings::styles::SectionStyle;
 
 #[derive(Debug)]
 pub(crate) struct SectionContext<'a> {
-    pub(crate) section_name: String,
+    pub(crate) section_name: &'a str,
     pub(crate) previous_line: &'a str,
     pub(crate) line: &'a str,
     pub(crate) following_lines: &'a [&'a str],
@@ -22,7 +22,7 @@ fn is_docstring_section(context: &SectionContext) -> bool {
     let section_name_suffix = context
         .line
         .trim()
-        .strip_prefix(&context.section_name)
+        .strip_prefix(context.section_name)
         .unwrap()
         .trim();
     let this_looks_like_a_section_name =

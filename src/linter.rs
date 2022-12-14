@@ -211,7 +211,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
 }
 
 /// Apply autoformatting to the source code at the given `Path`.
-pub fn autoformat_path(path: &Path) -> Result<()> {
+pub fn autoformat_path(path: &Path, _settings: &Settings) -> Result<()> {
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 

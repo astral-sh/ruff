@@ -41,6 +41,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Saleor](https://github.com/saleor/saleor)
 - [Hatch](https://github.com/pypa/hatch)
+- [Jupyter Server](https://github.com/jupyter-server/jupyter_server)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -89,6 +90,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-print (T20)](#flake8-print-t20)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
+   1. [flake8-simplify (SIM)](#flake8-simplify-sim)
    1. [flake8-tidy-imports (TID)](#flake8-tidy-imports-tid)
    1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
    1. [eradicate (ERA)](#eradicate-era)
@@ -120,10 +122,16 @@ For **macOS Homebrew** and **Linuxbrew** users, Ruff is also available as [`ruff
 brew install ruff
 ```
 
-For Conda users, Ruff is also available as [`ruff`](https://anaconda.org/conda-forge/ruff) on `conda-forge`:
+For **Conda** users, Ruff is also available as [`ruff`](https://anaconda.org/conda-forge/ruff) on `conda-forge`:
 
 ```shell
 conda install -c conda-forge ruff
+```
+
+For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/community/x86_64/ruff/) on the official repositories:
+
+```shell
+pacman -S ruff
 ```
 
 ### Usage
@@ -147,7 +155,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.171
+    rev: v0.0.179
     hooks:
       - id: ruff
 ```
@@ -323,6 +331,40 @@ Options:
           Print version information
 ```
 
+### `pyproject.toml` discovery
+
+Similar to [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Ruff supports hierarchical configuration, such that the "closest" `pyproject.toml` file in the
+directory hierarchy is used for every individual file, with all paths in the `pyproject.toml` file
+(e.g., `exclude` globs, `src` paths) being resolved relative to the directory containing the
+`pyproject.toml` file.
+
+There are a few exceptions to these rules:
+
+1. If a configuration file is passed directly via `--config`, those settings are used for across
+   files. Any relative paths in that configuration file (like `exclude` globs or `src` paths) are
+   resolved relative to the _current working directory_.
+2. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
+   a default configuration. If a user-specific configuration file exists at `${config_dir}/ruff/pyproject.toml`,
+   that file will be used instead of the default configuration, with `${config_dir}` being determined
+   via the [`dirs](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all relative paths
+   being again resolved relative to the _current working directory_.
+3. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
+   `--select`) will override the settings in _every_ resolved configuration file.
+
+Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Ruff does not merge settings across configuration files; instead, the "closest" configuration file
+is used, and any parent configuration files are ignored. In lieu of this implicit cascade, Ruff
+supports an [`extend`](#extend) field, which allows you to inherit the settings from another
+`pyproject.toml` file, like so:
+
+```toml
+# Extend the `pyproject.toml` file in the parent directory.
+extend = "../pyproject.toml"
+# But use a different line length.
+line-length = 100
+```
+
 ### Ignoring errors
 
 To omit a lint check entirely, add it to the "ignore" list via [`ignore`](#ignore) or
@@ -362,7 +404,7 @@ For targeted exclusions across entire files (e.g., "Ignore all F841 violations i
 ### "Action Comments"
 
 Ruff respects `isort`'s ["Action Comments"](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
-(`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `isort: split`), which
+(`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which
 enable selectively enabling and disabling import sorting for blocks of code and other inline
 configuration.
 
@@ -412,14 +454,14 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F501 | PercentFormatInvalidFormat | '...' % ... has invalid format string: ... |  |
 | F502 | PercentFormatExpectedMapping | '...' % ... expected mapping but got sequence |  |
 | F503 | PercentFormatExpectedSequence | '...' % ... expected sequence but got mapping |  |
-| F504 | PercentFormatExtraNamedArguments | '...' % ... has unused named argument(s): ... |  |
+| F504 | PercentFormatExtraNamedArguments | '...' % ... has unused named argument(s): ... | 🛠 |
 | F505 | PercentFormatMissingArgument | '...' % ... is missing argument(s) for placeholder(s): ... |  |
 | F506 | PercentFormatMixedPositionalAndNamed | '...' % ... has mixed positional and named placeholders |  |
 | F507 | PercentFormatPositionalCountMismatch | '...' % ... has 4 placeholder(s) but 2 substitution(s) |  |
 | F508 | PercentFormatStarRequiresSequence | '...' % ... `*` specifier requires sequence |  |
 | F509 | PercentFormatUnsupportedFormatCharacter | '...' % ... has unsupported format character 'c' |  |
 | F521 | StringDotFormatInvalidFormat | '...'.format(...) has invalid format string: ... |  |
-| F522 | StringDotFormatExtraNamedArguments | '...'.format(...) has unused named argument(s): ... |  |
+| F522 | StringDotFormatExtraNamedArguments | '...'.format(...) has unused named argument(s): ... | 🛠 |
 | F523 | StringDotFormatExtraPositionalArguments | '...'.format(...) has unused arguments at position(s): ... |  |
 | F524 | StringDotFormatMissingArguments | '...'.format(...) is missing argument(s) for placeholder(s): ... |  |
 | F525 | StringDotFormatMixingAutomatic | '...'.format(...) mixes automatic and manual numbering |  |
@@ -444,6 +486,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |  |
 | F831 | DuplicateArgumentName | Duplicate argument name in function definition |  |
 | F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
+| F842 | UnusedAnnotation | Local variable `...` is annotated but never used |  |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
 ### pycodestyle (E, W)
@@ -516,6 +559,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D214 | SectionNotOverIndented | Section is over-indented ("Returns") | 🛠 |
 | D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("Returns") | 🛠 |
 | D300 | UsesTripleQuotes | Use """triple double quotes""" |  |
+| D301 | UsesRPrefixForBackslashedContent | Use r""" if any backslashes in a docstring |  |
 | D400 | EndsInPeriod | First line should end with a period | 🛠 |
 | D402 | NoSignature | First line should not be the function's signature |  |
 | D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |
@@ -708,7 +752,7 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary `(list\|tuple)` literal passed to `tuple()` (remove the outer call to `tuple()`) | 🛠 |
 | C410 | UnnecessaryLiteralWithinListCall | Unnecessary `(list\|tuple)` literal passed to `list()` (rewrite as a `list` literal) | 🛠 |
 | C411 | UnnecessaryListCall | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
-| C413 | UnnecessaryCallAroundSorted | Unnecessary `(list\|reversed)` call around `sorted()` |  |
+| C413 | UnnecessaryCallAroundSorted | Unnecessary `(list\|reversed)` call around `sorted()` | 🛠 |
 | C414 | UnnecessaryDoubleCastOrProcess | Unnecessary `(list\|reversed\|set\|sorted\|tuple)` call within `(list\|set\|sorted\|tuple)()` |  |
 | C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within `(reversed\|set\|sorted)()` |  |
 | C416 | UnnecessaryComprehension | Unnecessary `(list\|set)` comprehension (rewrite using `(list\|set)()`) | 🛠 |
@@ -763,6 +807,14 @@ For more, see [flake8-return](https://pypi.org/project/flake8-return/1.2.0/) on 
 | RET507 | SuperfluousElseContinue | Unnecessary `else` after `continue` statement |  |
 | RET508 | SuperfluousElseBreak | Unnecessary `else` after `break` statement |  |
 
+### flake8-simplify (SIM)
+
+For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
+
 ### flake8-tidy-imports (TID)
 
 For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
@@ -808,12 +860,15 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLC0414 | UselessImportAlias | Import alias does not rename original package | 🛠 |
 | PLC2201 | MisplacedComparisonConstant | Comparison should be ... | 🛠 |
 | PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
+| PLE0117 | NonlocalWithoutBinding | Nonlocal name `...` found without binding |  |
+| PLE0118 | UsedPriorGlobalDeclaration | Name `...` is used prior to global declaration on line 1 |  |
 | PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
 | PLR0402 | ConsiderUsingFromImport | Use `from ... import ...` in lieu of alias |  |
 | PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance(..., (...))` |  |
 | PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
+| PLW0602 | GlobalVariableNotAssigned | Using global for `...` but no assignment is done |  |
 
 ### Ruff-specific rules (RUF)
 
@@ -832,6 +887,37 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff).
 
+### Language Server Protocol
+
+Ruff is available as a [Language Server Protocol (LSP)](https://microsoft.github.io/language-server-protocol/)
+server, distributed as the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff) plugin
+for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-server), both of which are
+installable via [PyPI](https://pypi.org/project/python-lsp-ruff/):
+
+```shell
+pip install python-lsp-server python-lsp-ruff
+```
+
+The LSP server can be used with any editor that supports the Language Server Protocol. For example,
+to use it with Neovim, you would add something like the following to your `init.lua`:
+
+```lua
+require'lspconfig'.pylsp.setup {
+  settings = {
+    pylsp = {
+      plugins = {
+        ruff = {
+          enabled = true
+        }
+      }
+    }
+  },
+}
+```
+
+[`ruffd`](https://github.com/Seamooo/ruffd) is another implementation of the Language Server
+Protocol (LSP) for Ruff, written in Rust.
+
 ### PyCharm
 
 Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
@@ -844,10 +930,13 @@ Ruff should then appear as a runnable action:
 
 ![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
 
-### Vim & Neovim (Unofficial)
+### Vim & Neovim
 
-Ruff is available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright) extension
-for coc.nvim.
+Ruff can be integrated into any editor that supports the Language Server Protocol (LSP) (see:
+[Language Server Protocol](#language-server-protocol)).
+
+Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
+extension for `coc.nvim`.
 
 <details>
 <summary>Ruff can also be integrated via <a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm"><code>efm</code></a> in just a <a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">few lines</a>.</summary>
@@ -903,11 +992,6 @@ null_ls.setup({
 
 </details>
 
-### Language Server Protocol (Unofficial)
-
-[`ruffd`](https://github.com/Seamooo/ruffd) is a Rust-based language server for Ruff that implements
-the Language Server Protocol (LSP).
-
 ### GitHub Actions
 
 GitHub Actions has everything you need to run Ruff out-of-the-box:
@@ -955,9 +1039,8 @@ Under those conditions, Ruff implements every rule in Flake8.
 Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
 natively, including:
 
-- [`isort`](https://pypi.org/project/isort/)
-- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
-- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
+- [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
+- [`eradicate`](https://pypi.org/project/eradicate/)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
@@ -975,12 +1058,13 @@ natively, including:
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
+- [`isort`](https://pypi.org/project/isort/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
-- [`yesqa`](https://github.com/asottile/yesqa)
-- [`eradicate`](https://pypi.org/project/eradicate/)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
+- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
+- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (1/10)
-- [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
+- [`yesqa`](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different error code prefixes than would be found in the
 originating Flake8 plugins. For example, Ruff uses `TID252` to represent the `I252` rule from
@@ -990,8 +1074,7 @@ conflicts with the `isort` rules, like `I001`).
 
 Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
 
-1. Ruff does not yet support a few Python 3.9 and 3.10 language features, including structural
-   pattern matching and parenthesized context managers.
+1. Ruff does not yet support structural pattern matching.
 2. Flake8 has a plugin architecture and supports writing custom lint rules. (Instead, popular Flake8
    plugins are re-implemented in Rust as part of Ruff itself.)
 
@@ -1011,8 +1094,6 @@ Pylint parity is being tracked in [#689](https://github.com/charliermarsh/ruff/i
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
 
-- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
-- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
 - [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
@@ -1031,6 +1112,8 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)
+- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
+- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/),
 [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
@@ -1373,7 +1456,7 @@ Exclusions are based on globs, and can be either:
   (to exclude any Python files in `directory`). Note that these paths are relative to the
   project root (e.g., the directory containing your `pyproject.toml`).
 
-Note that you'll typically want to use [`extend_exclude`](#extend_exclude) to modify
+Note that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify
 the excluded paths.
 
 **Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
@@ -1385,6 +1468,30 @@ the excluded paths.
 ```toml
 [tool.ruff]
 exclude = [".venv"]
+```
+
+---
+
+#### [`extend`](#extend)
+
+A path to a local `pyproject.toml` file to merge into this configuration.
+
+To resolve the current `pyproject.toml` file, Ruff will first resolve this base
+configuration file, then merge in any properties defined in the current configuration
+file.
+
+**Default value**: `None`
+
+**Type**: `Path`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# Extend the `pyproject.toml` file in the parent directory.
+extend = "../pyproject.toml"
+# But use a different line length.
+line-length = 100
 ```
 
 ---
@@ -1645,6 +1752,25 @@ show-source = true
 #### [`src`](#src)
 
 The source code paths to consider, e.g., when resolving first- vs. third-party imports.
+
+As an example: given a Python package structure like:
+
+```text
+my_package/
+  pyproject.toml
+  src/
+    my_package/
+      __init__.py
+      foo.py
+      bar.py
+```
+
+The `src` directory should be included in `source` (e.g., `source = ["src"]`), such that
+when resolving imports, `my_package.foo` is considered a first-party import.
+
+This field supports globs. For example, if you have a series of Python packages in
+a `python_modules` directory, `src = ["python_modules/*"]` would expand to incorporate
+all of the packages in that directory.
 
 **Default value**: `["."]`
 
@@ -1982,6 +2108,10 @@ from .utils import (
 )
 ```
 
+Note that this setting is only effective when combined with `combine-as-imports = true`.
+When `combine-as-imports` isn't enabled, every aliased `import from` will be given its
+own line, in which case, wrapping is not necessary.
+
 **Default value**: `false`
 
 **Type**: `bool`
@@ -1991,6 +2121,7 @@ from .utils import (
 ```toml
 [tool.ruff.isort]
 force-wrap-aliases = true
+combine-as-imports = true
 ```
 
 ---

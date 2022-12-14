@@ -8,8 +8,8 @@ expression: checks
     row: 17
     column: 0
   end_location:
-    row: 22
-    column: 0
+    row: 19
+    column: 13
   fix: ~
 - kind:
     AbstractBaseClassWithoutAbstractMethod: MetaBase_1
@@ -17,8 +17,8 @@ expression: checks
     row: 58
     column: 0
   end_location:
-    row: 63
-    column: 0
+    row: 60
+    column: 13
   fix: ~
 - kind:
     AbstractBaseClassWithoutAbstractMethod: abc_Base_1
@@ -26,8 +26,8 @@ expression: checks
     row: 69
     column: 0
   end_location:
-    row: 74
-    column: 0
+    row: 71
+    column: 13
   fix: ~
 - kind:
     AbstractBaseClassWithoutAbstractMethod: abc_Base_2
@@ -35,8 +35,8 @@ expression: checks
     row: 74
     column: 0
   end_location:
-    row: 79
-    column: 0
+    row: 76
+    column: 13
   fix: ~
 - kind:
     AbstractBaseClassWithoutAbstractMethod: notabc_Base_1
@@ -44,8 +44,8 @@ expression: checks
     row: 79
     column: 0
   end_location:
-    row: 84
-    column: 0
+    row: 81
+    column: 13
   fix: ~
 - kind:
     AbstractBaseClassWithoutAbstractMethod: abc_set_class_variable_4
@@ -53,7 +53,7 @@ expression: checks
     row: 128
     column: 0
   end_location:
-    row: 130
-    column: 0
+    row: 129
+    column: 7
   fix: ~
 
