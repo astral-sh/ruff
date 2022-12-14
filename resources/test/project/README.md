@@ -9,33 +9,37 @@ Running from the repo root should pick up and enforce the appropriate settings f
 
 ```
 ∴ cargo run resources/test/project/
-Found 5 error(s).
+Found 7 error(s).
+resources/test/project/examples/.dotfiles/script.py:1:8: F401 `os` imported but unused
+resources/test/project/examples/.dotfiles/script.py:5:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/examples/docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 resources/test/project/examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/src/file.py:1:8: F401 `os` imported but unused
 resources/test/project/src/file.py:5:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/src/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
-3 potentially fixable with the --fix option.
+4 potentially fixable with the --fix option.
 ```
 
 Running from the project directory itself should exhibit the same behavior:
 
 ```
-∴ cd resources/test/project/ && cargo run .
-Found 5 error(s).
+∴ (cd resources/test/project/ && cargo run .)
+Found 7 error(s).
+examples/.dotfiles/script.py:1:8: F401 `os` imported but unused
+examples/.dotfiles/script.py:5:5: F841 Local variable `x` is assigned to but never used
 examples/docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 src/file.py:1:8: F401 `os` imported but unused
 src/file.py:5:5: F841 Local variable `x` is assigned to but never used
 src/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
-3 potentially fixable with the --fix option.
+4 potentially fixable with the --fix option.
 ```
 
 Running from the sub-package directory should exhibit the same behavior, but omit the top-level
 files:
 
 ```
-∴ cd resources/test/project/examples/docs && cargo run .
+∴ (cd resources/test/project/examples/docs && cargo run .)
 Found 2 error(s).
 docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
@@ -46,8 +50,10 @@ docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 file paths from the current working directory:
 
 ```
-∴ cargo run -- --config=resources/test/project/pyproject.toml resources/test/project/
-Found 9 error(s).
+∴ (cargo run -- --config=resources/test/project/pyproject.toml resources/test/project/)
+Found 11 error(s).
+resources/test/project/examples/.dotfiles/script.py:1:8: F401 `os` imported but unused
+resources/test/project/examples/.dotfiles/script.py:5:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/examples/docs/docs/concepts/file.py:1:8: F401 `os` imported but unused
 resources/test/project/examples/docs/docs/concepts/file.py:5:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/examples/docs/docs/file.py:1:8: F401 `os` imported but unused
@@ -57,15 +63,16 @@ resources/test/project/examples/docs/docs/file.py:8:5: F841 Local variable `x` i
 resources/test/project/src/file.py:1:8: F401 `os` imported but unused
 resources/test/project/src/file.py:5:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/src/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
-6 potentially fixable with the --fix option.
+7 potentially fixable with the --fix option.
 ```
 
 Running from a parent directory should this "ignore" the `exclude` (hence, `concepts/file.py` gets
 included in the output):
 
 ```
-∴ cd resources/test/project/examples && cargo run -- --config=docs/pyproject.toml .
-Found 3 error(s).
+∴ (cd resources/test/project/examples && cargo run -- --config=docs/pyproject.toml .)
+Found 4 error(s).
+.dotfiles/script.py:5:5: F841 Local variable `x` is assigned to but never used
 docs/docs/concepts/file.py:5:5: F841 Local variable `x` is assigned to but never used
 docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
