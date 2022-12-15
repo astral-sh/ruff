@@ -856,7 +856,7 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/0.2.3/) on PyPI.
 | PDV008 | UseOfDotAt | Use `.loc` instead of `.at`.  If speed is important, use numpy. |  |
 | PDV009 | UseOfDotIat | Use `.iloc` instea` of `.iat`.  If speed is important, use numpy. |  |
 | PDV010 | UseOfDotPivotOrUnstack | `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality |  |
-| PDV011 | UseOfDotValues | Use `.array` or `.to_array()` instead of `.values`; `values` is ambiguous |  |
+| PDV011 | UseOfDotValues | Use `.to_numpy()` instead of `.values` |  |
 | PDV012 | UseOfDotReadTable | `.read_csv` is preferred to `.read_table`; provides same functionality |  |
 | PDV013 | UseOfDotStack | `.melt` is preferred to `.stack`; provides same functionality |  |
 | PDV015 | UseOfPdMerge | Use `.merge` method instead of `pd.merge` function. They have equivalent functionality. |  |

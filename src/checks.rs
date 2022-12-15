@@ -2690,9 +2690,7 @@ impl CheckKind {
             CheckKind::UseOfDotPivotOrUnstack => "`.pivot_table` is preferred to `.pivot` or \
                                                   `.unstack`; provides same functionality"
                 .to_string(),
-            CheckKind::UseOfDotValues => "Use `.array` or `.to_array()` instead of `.values`; \
-                                          `values` is ambiguous"
-                .to_string(),
+            CheckKind::UseOfDotValues => "Use `.to_numpy()` instead of `.values`".to_string(),
             CheckKind::UseOfDotReadTable => {
                 "`.read_csv` is preferred to `.read_table`; provides same functionality".to_string()
             }
