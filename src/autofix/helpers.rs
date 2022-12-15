@@ -1,3 +1,4 @@
+use crate::ast::helpers;
 use crate::ast::helpers::to_absolute;
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
@@ -72,49 +73,72 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
     }
 }
 
-fn trailing_semicolon(locator: &SourceCodeLocator, stmt: &Stmt) -> Option<Range> {
+/// Return the location of a trailing semicolon following a `Stmt`, if it's part of a multi-statement line.
+fn trailing_semicolon(locator: &SourceCodeLocator, stmt: &Stmt) -> Option<Location> {
     let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
+    for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
+        let trimmed = line.trim();
+        if trimmed.starts_with(';') {
+            let column = line
+                .char_indices()
+                .find_map(|(column, char)| if char == ';' { Some(column) } else { None })
+                .unwrap();
+            return Some(to_absolute(
+                Location::new(row, column),
+                stmt.end_location.unwrap(),
+            ));
+        }
+        if !trimmed.starts_with('\\') {
+            break;
+        }
+    }
+    None
+}
+
+fn next_valid_character(locator: &SourceCodeLocator, semicolon: Location) -> Location {
+    let contents =
+        locator.slice_source_code_at(&Location::new(semicolon.row(), semicolon.column() + 1));
+    for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('\\') {
+            continue;
+        }
+        return if trimmed.is_empty() {
+            to_absolute(Location::new(row + 1, 0), semicolon)
+        } else {
+            let column = line
+                .char_indices()
+                .find_map(|(column, char)| {
+                    if !char.is_whitespace() {
+                        Some(column)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap();
+            to_absolute(Location::new(row, column), semicolon)
+        };
+    }
+    Location::new(semicolon.row() + 1, 0)
 }
 
 // The algorithm should be: keep skipping lines that "start" with whitespace or a backslash or a hash.
 // Keep going until we find the first character after a semi.
 fn removal_range(locator: &SourceCodeLocator, stmt: &Stmt) -> Range {
-    // Step 1: find trailing semi.
-
-    // Step 2: find next valid character (end-of-line is fine, otherwise anything that isn't a continuation character or whitespace).
-
-    // Keep going until we see something that isn't a newline, or a semicolon.
-    let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
-    for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
-        // Ignore continuations and comment lines.
-        let trimmed = line.trim();
-        if trimmed.starts_with('\\') || trimmed.starts_with('#') {
-            continue;
+    if let Some(semicolon) = trailing_semicolon(locator, stmt) {
+        let next = next_valid_character(locator, semicolon);
+        Range {
+            location: stmt.location,
+            end_location: next,
         }
-        // Look for a semicolon; trim until the next valid character.
-        if trimmed.starts_with(';') {
-            let column = line
-                .char_indices()
-                .find_map(|(column, char)| if char == ';' { Some(column) } else { None })
-                .unwrap()
-                + 1;
-            let column = column
-                + line
-                    .chars()
-                    .skip(column)
-                    .take_while(|c| c.is_whitespace())
-                    .count();
-            return Range {
-                location: stmt.location,
-                end_location: to_absolute(
-                    Location::new(row + 1, column),
-                    stmt.end_location.unwrap(),
-                ),
-            };
+    } else if helpers::match_leading_content(stmt, locator) {
+        Range::from_located(stmt)
+    } else {
+        Range {
+            location: Location::new(stmt.location.row(), 0),
+            end_location: Location::new(stmt.end_location.unwrap().row() + 1, 0),
         }
     }
-
-    Range::from_located(stmt)
 }
 
 pub fn remove_stmt(
