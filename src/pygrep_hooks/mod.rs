@@ -1,4 +1,5 @@
 pub mod checks;
+pub mod plugins;
 
 #[cfg(test)]
 mod tests {
@@ -14,6 +15,8 @@ mod tests {
 
     #[test_case(CheckCode::PGH001, Path::new("PGH001_0.py"); "PGH001_0")]
     #[test_case(CheckCode::PGH001, Path::new("PGH001_1.py"); "PGH001_1")]
+    #[test_case(CheckCode::PGH002, Path::new("PGH002_0.py"); "PGH002_0")]
+    #[test_case(CheckCode::PGH002, Path::new("PGH002_1.py"); "PGH002_1")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let mut checks = test_path(
