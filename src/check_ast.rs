@@ -1861,32 +1861,18 @@ where
                     self.add_checks(pandas_vet::checks::inplace_argument(keywords).into_iter());
                 }
 
-                for (code, name, _) in vec![
-                    (CheckCode::PDV003, "isnull", Some("isna".to_string())),
-                    (CheckCode::PDV004, "notnull", Some("notna".to_string())),
-                    (CheckCode::PDV010, "pivot", None),
-                    (CheckCode::PDV010, "unstack", None),
-                    (CheckCode::PDV012, "read_table", None),
-                    (CheckCode::PDV013, "stack", None),
+                for (code, name) in vec![
+                    (CheckCode::PDV003, "isnull"),
+                    (CheckCode::PDV004, "notnull"),
+                    (CheckCode::PDV010, "pivot"),
+                    (CheckCode::PDV010, "unstack"),
+                    (CheckCode::PDV012, "read_table"),
+                    (CheckCode::PDV013, "stack"),
                 ] {
                     if self.settings.enabled.contains(&code) {
                         if let ExprKind::Attribute { attr, .. } = &func.node {
                             if attr == name {
-                                let check = Check::new(code.kind(), Range::from_located(func));
-
-                                // FIXME: the location of the fix is wrong, e.g. resulting in
-                                // `df.isnull` -> `isna()`
-                                // let mut check = Check::new(code.kind(),
-                                // Range::from_located(func));
-                                // if let Some(fix) = fix {
-                                //     check.fix = Some(Fix::replacement(
-                                //         fix,
-                                //         func.location,
-                                //         func.end_location.unwrap(),
-                                //     ));
-                                // }
-
-                                self.add_check(check);
+                                self.add_check(Check::new(code.kind(), Range::from_located(func)));
                             };
                         }
                     }
