@@ -1,5 +1,6 @@
 use crate::ast::helpers::to_absolute;
 use crate::ast::types::Range;
+use crate::ast::whitespace::LinesWithTrailingNewline;
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use rustpython_parser::ast::{ExcepthandlerKind, Location, Stmt, StmtKind};
@@ -71,33 +72,49 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
     }
 }
 
+fn trailing_semicolon(locator: &SourceCodeLocator, stmt: &Stmt) -> Option<Range> {
+    let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
+}
+
 // The algorithm should be: keep skipping lines that "start" with whitespace or a backslash or a hash.
 // Keep going until we find the first character after a semi.
 fn removal_range(locator: &SourceCodeLocator, stmt: &Stmt) -> Range {
+    // Step 1: find trailing semi.
+
+    // Step 2: find next valid character (end-of-line is fine, otherwise anything that isn't a continuation character or whitespace).
+
     // Keep going until we see something that isn't a newline, or a semicolon.
     let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
-    let mut last = None;
-    for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
-        last = Some(end);
-        if matches!(tok, Tok::Newline | Tok::Semi) {
+    for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
+        // Ignore continuations and comment lines.
+        let trimmed = line.trim();
+        if trimmed.starts_with('\\') || trimmed.starts_with('#') {
             continue;
         }
-        return Range {
-            location: stmt.location,
-            end_location: to_absolute(start, stmt.end_location.unwrap()),
-        };
-    }
-    if let Some(last) = last {
-        Range {
-            location: stmt.location,
-            end_location: to_absolute(last, stmt.end_location.unwrap()),
+        // Look for a semicolon; trim until the next valid character.
+        if trimmed.starts_with(';') {
+            let column = line
+                .char_indices()
+                .find_map(|(column, char)| if char == ';' { Some(column) } else { None })
+                .unwrap()
+                + 1;
+            let column = column
+                + line
+                    .chars()
+                    .skip(column)
+                    .take_while(|c| c.is_whitespace())
+                    .count();
+            return Range {
+                location: stmt.location,
+                end_location: to_absolute(
+                    Location::new(row + 1, column),
+                    stmt.end_location.unwrap(),
+                ),
+            };
         }
-    } else {
-        Range {
-            location: stmt.location,
-            end_location: stmt.end_location.unwrap(),
-        }
     }
+
+    Range::from_located(stmt)
 }
 
 pub fn remove_stmt(
