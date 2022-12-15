@@ -77,4 +77,19 @@ expression: checks
     end_location:
       row: 22
       column: 31
+- kind: GetAttrWithConstant
+  location:
+    row: 23
+    column: 3
+  end_location:
+    row: 23
+    column: 20
+  fix:
+    content: x.bar
+    location:
+      row: 23
+      column: 3
+    end_location:
+      row: 23
+      column: 20
 

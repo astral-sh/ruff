@@ -86,10 +86,16 @@ pub struct Cli {
     show_source: bool,
     #[clap(long, overrides_with("show_source"), hide = true)]
     no_show_source: bool,
+    /// Respect file exclusions via `.gitignore` and other standard ignore
+    /// files.
+    #[arg(long, overrides_with("no_respect_gitignore"))]
+    respect_gitignore: bool,
+    #[clap(long, overrides_with("respect_gitignore"), hide = true)]
+    no_respect_gitignore: bool,
     /// See the files Ruff will be run against with the current settings.
     #[arg(long)]
     pub show_files: bool,
-    /// See the settings Ruff used for the first matching file.
+    /// See the settings Ruff will use to check a given Python file.
     #[arg(long)]
     pub show_settings: bool,
     /// Enable automatic additions of noqa directives to failing lines.
@@ -156,6 +162,10 @@ impl Cli {
                 line_length: self.line_length,
                 max_complexity: self.max_complexity,
                 per_file_ignores: self.per_file_ignores,
+                respect_gitignore: resolve_bool_arg(
+                    self.respect_gitignore,
+                    self.no_respect_gitignore,
+                ),
                 select: self.select,
                 show_source: resolve_bool_arg(self.show_source, self.no_show_source),
                 target_version: self.target_version,
@@ -212,6 +222,7 @@ pub struct Overrides {
     pub line_length: Option<usize>,
     pub max_complexity: Option<usize>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<CheckCodePrefix>>,
     pub show_source: Option<bool>,
     pub target_version: Option<PythonVersion>,

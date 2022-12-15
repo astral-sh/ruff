@@ -156,7 +156,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.179
+    rev: v0.0.182
     hooks:
       - id: ruff
 ```
@@ -305,13 +305,15 @@ Options:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for error messages [default: text] [possible values: text, json, junit, grouped]
+          Output serialization format for error messages [possible values: text, json, junit, grouped, github]
       --show-source
           Show violations with source code
+      --respect-gitignore
+          Respect file exclusions via `.gitignore` and other standard ignore files
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
-          See Ruff's settings
+          See the settings Ruff will use to check a given Python file
       --add-noqa
           Enable automatic additions of noqa directives to failing lines
       --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
@@ -342,15 +344,18 @@ directory hierarchy is used for every individual file, with all paths in the `py
 
 There are a few exceptions to these rules:
 
-1. If a configuration file is passed directly via `--config`, those settings are used for across
+1. In locating the "closest" `pyproject.toml` file for a given path, Ruff ignore any
+   `pyproject.toml` files that lack a `[tool.ruff]` section.
+2. If a configuration file is passed directly via `--config`, those settings are used for across
    files. Any relative paths in that configuration file (like `exclude` globs or `src` paths) are
    resolved relative to the _current working directory_.
-2. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
-   a default configuration. If a user-specific configuration file exists at `${config_dir}/ruff/pyproject.toml`,
-   that file will be used instead of the default configuration, with `${config_dir}` being determined
-   via the [`dirs](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all relative paths
-   being again resolved relative to the _current working directory_.
-3. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
+3. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
+   a default configuration. If a user-specific configuration file exists
+   at `${config_dir}/ruff/pyproject.toml`,
+   that file will be used instead of the default configuration, with `${config_dir}` being
+   determined via the [`dirs](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all
+   relative paths being again resolved relative to the _current working directory_.
+4. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
    `--select`) will override the settings in _every_ resolved configuration file.
 
 Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
@@ -365,6 +370,18 @@ extend = "../pyproject.toml"
 # But use a different line length.
 line-length = 100
 ```
+
+### Python file discovery
+
+When passed a path on the command-line, Ruff will automatically discover all Python files in that
+path, taking into account the [`exclude`](#exclude) and [`extend-exclude`](#extend-exclude) settings
+in each directory's `pyproject.toml` file.
+
+By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
+`.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](#respect-gitignore)).
+
+Files that are passed to `ruff` directly are always checked, regardless of the above criteria.
+For example, `ruff /path/to/excluded/file.py` will always check `file.py`.
 
 ### Ignoring errors
 
@@ -1723,6 +1740,24 @@ any matching files.
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["E402"]
 "path/to/file.py" = ["E402"]
+```
+
+---
+
+#### [`respect-gitignore`](#respect-gitignore)
+
+Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`,
+`.git/info/exclude`, and global `gitignore` files. Enabled by default.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+respect_gitignore = false
 ```
 
 ---
