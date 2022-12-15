@@ -9,7 +9,9 @@ use std::{fs, process, str};
 use anyhow::{anyhow, Context, Result};
 use assert_cmd::{crate_name, Command};
 use itertools::Itertools;
+use log::info;
 use ruff::checks::CheckCategory;
+use ruff::logging::{set_up_logging, LogLevel};
 use strum::IntoEnumIterator;
 use walkdir::WalkDir;
 
@@ -37,14 +39,18 @@ impl Blackd {
             .spawn()
             .context("Starting blackd")?;
 
-        // Wait for blackd to be ready
-        for _ in 0..20 {
+        // Wait for `blackd` to be ready.
+        for _ in 0..10 {
             match TcpStream::connect(address) {
                 Err(e) if e.kind() == ErrorKind::ConnectionRefused => {
-                    sleep(Duration::from_millis(50));
+                    info!("`blackd` not ready yet; retrying...");
+                    sleep(Duration::from_millis(100));
                 }
                 Err(e) => return Err(e.into()),
-                Ok(_) => break,
+                Ok(_) => {
+                    info!("`blackd` ready");
+                    break;
+                }
             }
         }
 
@@ -78,7 +84,7 @@ impl Blackd {
                 }
             }
             Err(ureq::Error::Status(_, response)) => Err(anyhow::anyhow!(
-                "Formatting with black failed: {}",
+                "Formatting with `black` failed: {}",
                 response.into_string()?
             )),
             Err(e) => Err(e.into()),
@@ -88,13 +94,14 @@ impl Blackd {
 
 impl Drop for Blackd {
     fn drop(&mut self) {
-        self.server.kill().expect("Couldn't end blackd process");
+        self.server.kill().expect("Couldn't end `blackd` process");
     }
 }
 
 fn run_test(path: &Path, blackd: &Blackd, ruff_args: &[&str]) -> Result<()> {
     let input = fs::read(path)?;
 
+    // Step 1: Run `ruff` on the input.
     let step_1 = &Command::cargo_bin(crate_name!())?
         .args(ruff_args)
         .write_stdin(input)
@@ -108,8 +115,10 @@ fn run_test(path: &Path, blackd: &Blackd, ruff_args: &[&str]) -> Result<()> {
     }
     let step_1_output = step_1.get_output().stdout.clone();
 
+    // Step 2: Run `blackd` on the input.
     let step_2_output = blackd.check(&step_1_output)?;
 
+    // Step 3: Re-run `ruff` on the input.
     let step_3 = &Command::cargo_bin(crate_name!())?
         .args(ruff_args)
         .write_stdin(step_2_output.clone())
@@ -135,6 +144,8 @@ fn run_test(path: &Path, blackd: &Blackd, ruff_args: &[&str]) -> Result<()> {
 #[test]
 #[ignore]
 fn test_ruff_black_compatibility() -> Result<()> {
+    set_up_logging(&LogLevel::Default)?;
+
     let blackd = Blackd::new()?;
 
     let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
