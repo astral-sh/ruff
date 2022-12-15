@@ -3,21 +3,48 @@ source: src/pep8_naming/mod.rs
 expression: checks
 ---
 - kind:
-    InvalidFunctionName: tearDownModule
+    InvalidFunctionName: Bad
   location:
-    row: 32
+    row: 4
     column: 4
   end_location:
-    row: 32
-    column: 18
+    row: 4
+    column: 7
   fix: ~
 - kind:
-    InvalidFunctionName: tearDown
+    InvalidFunctionName: _Bad
   location:
-    row: 37
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 8
+  fix: ~
+- kind:
+    InvalidFunctionName: BAD
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 7
+  fix: ~
+- kind:
+    InvalidFunctionName: BAD_FUNC
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 12
+  fix: ~
+- kind:
+    InvalidFunctionName: testTest
+  location:
+    row: 40
     column: 8
   end_location:
-    row: 37
+    row: 40
     column: 16
   fix: ~
 

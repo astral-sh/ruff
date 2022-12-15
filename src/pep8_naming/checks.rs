@@ -33,7 +33,7 @@ pub fn invalid_function_name(
     ignore_names: &[String],
     locator: &SourceCodeLocator,
 ) -> Option<Check> {
-    if name.to_lowercase() != name && ignore_names.iter().any(|ignore_name| ignore_name == name) {
+    if name.to_lowercase() != name && !ignore_names.iter().any(|ignore_name| ignore_name == name) {
         return Some(Check::new(
             CheckKind::InvalidFunctionName(name.to_string()),
             identifier_range(func_def, locator),

@@ -1,4 +1,4 @@
-use rustpython_ast::{Located};
+use rustpython_ast::Located;
 
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
