@@ -71,6 +71,7 @@ assert_cmd = { version = "2.0.4" }
 criterion = { version = "0.4.0" }
 insta = { version = "1.19.1", features = ["yaml"] }
 test-case = { version = "2.2.2" }
+ureq = { version = "2.5.0", features = [] }
 
 [features]
 default = ["update-informer"]
