@@ -56,7 +56,6 @@ textwrap = { version = "0.16.0" }
 titlecase = { version = "2.2.1" }
 toml = { version = "0.5.9" }
 update-informer = { version = "0.5.0", default-features = false, features = ["pypi"], optional = true }
-ureq = { version = "2.5.0", features = [] }
 walkdir = { version = "2.3.2" }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
@@ -72,6 +71,7 @@ assert_cmd = { version = "2.0.4" }
 criterion = { version = "0.4.0" }
 insta = { version = "1.19.1", features = ["yaml"] }
 test-case = { version = "2.2.2" }
+ureq = { version = "2.5.0", features = [] }
 
 [features]
 default = ["update-informer"]
