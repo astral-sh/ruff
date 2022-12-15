@@ -1,0 +1,6 @@
+---
+source: src/pygrep_hooks/mod.rs
+expression: checks
+---
+[]
+

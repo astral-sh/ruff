@@ -316,6 +316,7 @@ pub enum CheckCode {
     RUF100,
     // pygrep-hooks
     PGH001,
+    PGH002,
     // pandas-vet
     PDV002,
     PDV003,
@@ -887,6 +888,7 @@ pub enum CheckKind {
     BooleanPositionalValueInFunctionCall,
     // pygrep-hooks
     NoEval,
+    DeprecatedLogWarn,
     // flake8-unused-arguments
     UnusedFunctionArgument(String),
     UnusedMethodArgument(String),
@@ -1260,6 +1262,7 @@ impl CheckCode {
             CheckCode::FBT003 => CheckKind::BooleanPositionalValueInFunctionCall,
             // pygrep-hooks
             CheckCode::PGH001 => CheckKind::NoEval,
+            CheckCode::PGH002 => CheckKind::DeprecatedLogWarn,
             // flake8-unused-arguments
             CheckCode::ARG001 => CheckKind::UnusedFunctionArgument("...".to_string()),
             CheckCode::ARG002 => CheckKind::UnusedMethodArgument("...".to_string()),
@@ -1504,6 +1507,7 @@ impl CheckCode {
             CheckCode::PDV015 => CheckCategory::PandasVet,
             CheckCode::PDV901 => CheckCategory::PandasVet,
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
+            CheckCode::PGH002 => CheckCategory::PygrepHooks,
             CheckCode::PLC0414 => CheckCategory::Pylint,
             CheckCode::PLC2201 => CheckCategory::Pylint,
             CheckCode::PLC3002 => CheckCategory::Pylint,
@@ -1847,6 +1851,7 @@ impl CheckKind {
             CheckKind::BooleanPositionalValueInFunctionCall => &CheckCode::FBT003,
             // pygrep-hooks
             CheckKind::NoEval => &CheckCode::PGH001,
+            CheckKind::DeprecatedLogWarn => &CheckCode::PGH002,
             // flake8-unused-arguments
             CheckKind::UnusedFunctionArgument(..) => &CheckCode::ARG001,
             CheckKind::UnusedMethodArgument(..) => &CheckCode::ARG002,
@@ -2684,6 +2689,9 @@ impl CheckKind {
             }
             // pygrep-hooks
             CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
+            CheckKind::DeprecatedLogWarn => {
+                "`warn` is deprecated in favor of `warning`".to_string()
+            }
             // flake8-unused-arguments
             CheckKind::UnusedFunctionArgument(name) => {
                 format!("Unused function argument: `{name}`")
