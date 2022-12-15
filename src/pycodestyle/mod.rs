@@ -44,4 +44,16 @@ mod tests {
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
+
+    #[test]
+    fn constant_literals() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/pycodestyle/constant_literals.py"),
+            &settings::Settings::for_rules(vec![CheckCode::E711, CheckCode::E712, CheckCode::F632]),
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
 }
