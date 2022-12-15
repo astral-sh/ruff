@@ -11,6 +11,16 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::SourceCodeLocator;
 
+/// Create an `Expr` with default location from an `ExprKind`.
+pub fn create_expr(node: ExprKind) -> Expr {
+    Expr::new(Location::default(), Location::default(), node)
+}
+
+/// Create a `Stmt` with a default location from a `StmtKind`.
+pub fn create_stmt(node: StmtKind) -> Stmt {
+    Stmt::new(Location::default(), Location::default(), node)
+}
+
 fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
     match &expr.node {
         ExprKind::Call { func, .. } => {

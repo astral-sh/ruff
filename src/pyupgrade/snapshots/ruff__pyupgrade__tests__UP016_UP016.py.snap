@@ -1,0 +1,770 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind: RemoveSixCompat
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 13
+  fix:
+    content: str
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 13
+- kind: RemoveSixCompat
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 15
+  fix:
+    content: bytes
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 15
+- kind: RemoveSixCompat
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 15
+  fix:
+    content: "(type,)"
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 15
+- kind: RemoveSixCompat
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 16
+  fix:
+    content: "(str,)"
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 16
+- kind: RemoveSixCompat
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 17
+  fix:
+    content: "(int,)"
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 17
+- kind: RemoveSixCompat
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 10
+  fix:
+    content: chr
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 12
+      column: 10
+- kind: RemoveSixCompat
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 13
+  fix:
+    content: iter
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 13
+- kind: RemoveSixCompat
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 10
+  fix:
+    content: print
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 14
+      column: 10
+- kind: RemoveSixCompat
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 9
+  fix:
+    content: exec
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 9
+- kind: RemoveSixCompat
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 20
+  fix:
+    content: next
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 16
+      column: 20
+- kind: RemoveSixCompat
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 8
+  fix:
+    content: next
+    location:
+      row: 17
+      column: 0
+    end_location:
+      row: 17
+      column: 8
+- kind: RemoveSixCompat
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 12
+  fix:
+    content: callable
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 18
+      column: 12
+- kind: RemoveSixCompat
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 15
+  fix:
+    content: range
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 15
+- kind: RemoveSixCompat
+  location:
+    row: 20
+    column: 0
+  end_location:
+    row: 20
+    column: 16
+  fix:
+    content: range
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 20
+      column: 16
+- kind: RemoveSixCompat
+  location:
+    row: 21
+    column: 16
+  end_location:
+    row: 21
+    column: 31
+  fix:
+    content: "(type,)"
+    location:
+      row: 21
+      column: 16
+    end_location:
+      row: 21
+      column: 31
+- kind: RemoveSixCompat
+  location:
+    row: 22
+    column: 16
+  end_location:
+    row: 22
+    column: 33
+  fix:
+    content: "(int,)"
+    location:
+      row: 22
+      column: 16
+    end_location:
+      row: 22
+      column: 33
+- kind: RemoveSixCompat
+  location:
+    row: 23
+    column: 16
+  end_location:
+    row: 23
+    column: 32
+  fix:
+    content: "(str,)"
+    location:
+      row: 23
+      column: 16
+    end_location:
+      row: 23
+      column: 32
+- kind: RemoveSixCompat
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 26
+    column: 18
+  fix:
+    content: dct.items()
+    location:
+      row: 26
+      column: 0
+    end_location:
+      row: 26
+      column: 18
+- kind: RemoveSixCompat
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 27
+    column: 17
+  fix:
+    content: dct.keys()
+    location:
+      row: 27
+      column: 0
+    end_location:
+      row: 27
+      column: 17
+- kind: RemoveSixCompat
+  location:
+    row: 28
+    column: 0
+  end_location:
+    row: 28
+    column: 19
+  fix:
+    content: dct.values()
+    location:
+      row: 28
+      column: 0
+    end_location:
+      row: 28
+      column: 19
+- kind: RemoveSixCompat
+  location:
+    row: 29
+    column: 0
+  end_location:
+    row: 29
+    column: 18
+  fix:
+    content: dct.items()
+    location:
+      row: 29
+      column: 0
+    end_location:
+      row: 29
+      column: 18
+- kind: RemoveSixCompat
+  location:
+    row: 30
+    column: 0
+  end_location:
+    row: 30
+    column: 17
+  fix:
+    content: dct.keys()
+    location:
+      row: 30
+      column: 0
+    end_location:
+      row: 30
+      column: 17
+- kind: RemoveSixCompat
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 31
+    column: 19
+  fix:
+    content: dct.values()
+    location:
+      row: 31
+      column: 0
+    end_location:
+      row: 31
+      column: 19
+- kind: RemoveSixCompat
+  location:
+    row: 32
+    column: 0
+  end_location:
+    row: 32
+    column: 34
+  fix:
+    content: "self.assertCountEqual(a1, a2)"
+    location:
+      row: 32
+      column: 0
+    end_location:
+      row: 32
+      column: 34
+- kind: RemoveSixCompat
+  location:
+    row: 33
+    column: 0
+  end_location:
+    row: 33
+    column: 37
+  fix:
+    content: "self.assertRaisesRegex(e, r, fn)"
+    location:
+      row: 33
+      column: 0
+    end_location:
+      row: 33
+      column: 37
+- kind: RemoveSixCompat
+  location:
+    row: 34
+    column: 0
+  end_location:
+    row: 34
+    column: 27
+  fix:
+    content: "self.assertRegex(s, r)"
+    location:
+      row: 34
+      column: 0
+    end_location:
+      row: 34
+      column: 27
+- kind: RemoveSixCompat
+  location:
+    row: 37
+    column: 0
+  end_location:
+    row: 37
+    column: 29
+  fix:
+    content: meth.__func__
+    location:
+      row: 37
+      column: 0
+    end_location:
+      row: 37
+      column: 29
+- kind: RemoveSixCompat
+  location:
+    row: 38
+    column: 0
+  end_location:
+    row: 38
+    column: 25
+  fix:
+    content: meth.__self__
+    location:
+      row: 38
+      column: 0
+    end_location:
+      row: 38
+      column: 25
+- kind: RemoveSixCompat
+  location:
+    row: 39
+    column: 0
+  end_location:
+    row: 39
+    column: 28
+  fix:
+    content: fn.__closure__
+    location:
+      row: 39
+      column: 0
+    end_location:
+      row: 39
+      column: 28
+- kind: RemoveSixCompat
+  location:
+    row: 40
+    column: 0
+  end_location:
+    row: 40
+    column: 25
+  fix:
+    content: fn.__code__
+    location:
+      row: 40
+      column: 0
+    end_location:
+      row: 40
+      column: 25
+- kind: RemoveSixCompat
+  location:
+    row: 41
+    column: 0
+  end_location:
+    row: 41
+    column: 29
+  fix:
+    content: fn.__defaults__
+    location:
+      row: 41
+      column: 0
+    end_location:
+      row: 41
+      column: 29
+- kind: RemoveSixCompat
+  location:
+    row: 42
+    column: 0
+  end_location:
+    row: 42
+    column: 28
+  fix:
+    content: fn.__globals__
+    location:
+      row: 42
+      column: 0
+    end_location:
+      row: 42
+      column: 28
+- kind: RemoveSixCompat
+  location:
+    row: 45
+    column: 0
+  end_location:
+    row: 45
+    column: 12
+  fix:
+    content: "b\"...\""
+    location:
+      row: 45
+      column: 0
+    end_location:
+      row: 45
+      column: 12
+- kind: RemoveSixCompat
+  location:
+    row: 46
+    column: 0
+  end_location:
+    row: 46
+    column: 12
+  fix:
+    content: "\"...\""
+    location:
+      row: 46
+      column: 0
+    end_location:
+      row: 46
+      column: 12
+- kind: RemoveSixCompat
+  location:
+    row: 47
+    column: 0
+  end_location:
+    row: 47
+    column: 24
+  fix:
+    content: "b\"...\""
+    location:
+      row: 47
+      column: 0
+    end_location:
+      row: 47
+      column: 24
+- kind: RemoveSixCompat
+  location:
+    row: 48
+    column: 0
+  end_location:
+    row: 48
+    column: 21
+  fix:
+    content: "\"...\""
+    location:
+      row: 48
+      column: 0
+    end_location:
+      row: 48
+      column: 21
+- kind: RemoveSixCompat
+  location:
+    row: 49
+    column: 0
+  end_location:
+    row: 49
+    column: 22
+  fix:
+    content: "\"...\""
+    location:
+      row: 49
+      column: 0
+    end_location:
+      row: 49
+      column: 22
+- kind: RemoveSixCompat
+  location:
+    row: 53
+    column: 0
+  end_location:
+    row: 53
+    column: 30
+  fix:
+    content: meth
+    location:
+      row: 53
+      column: 0
+    end_location:
+      row: 53
+      column: 30
+- kind: RemoveSixCompat
+  location:
+    row: 54
+    column: 0
+  end_location:
+    row: 54
+    column: 34
+  fix:
+    content: fn
+    location:
+      row: 54
+      column: 0
+    end_location:
+      row: 54
+      column: 34
+- kind: RemoveSixCompat
+  location:
+    row: 57
+    column: 0
+  end_location:
+    row: 57
+    column: 29
+  fix:
+    content: raise exc from exc_from
+    location:
+      row: 57
+      column: 0
+    end_location:
+      row: 57
+      column: 29
+- kind: RemoveSixCompat
+  location:
+    row: 58
+    column: 0
+  end_location:
+    row: 58
+    column: 24
+  fix:
+    content: raise exc.with_traceback(tb)
+    location:
+      row: 58
+      column: 0
+    end_location:
+      row: 58
+      column: 24
+- kind: RemoveSixCompat
+  location:
+    row: 59
+    column: 0
+  end_location:
+    row: 59
+    column: 28
+  fix:
+    content: raise
+    location:
+      row: 59
+      column: 0
+    end_location:
+      row: 59
+      column: 28
+- kind: RemoveSixCompat
+  location:
+    row: 62
+    column: 0
+  end_location:
+    row: 62
+    column: 16
+  fix:
+    content: "bs[0]"
+    location:
+      row: 62
+      column: 0
+    end_location:
+      row: 62
+      column: 16
+- kind: RemoveSixCompat
+  location:
+    row: 63
+    column: 0
+  end_location:
+    row: 63
+    column: 21
+  fix:
+    content: "bs[i]"
+    location:
+      row: 63
+      column: 0
+    end_location:
+      row: 63
+      column: 21
+- kind: RemoveSixCompat
+  location:
+    row: 64
+    column: 0
+  end_location:
+    row: 64
+    column: 15
+  fix:
+    content: "bytes((i,))"
+    location:
+      row: 64
+      column: 0
+    end_location:
+      row: 64
+      column: 15
+- kind: RemoveSixCompat
+  location:
+    row: 67
+    column: 5
+  end_location:
+    row: 67
+    column: 23
+  fix:
+    content: iter(dct.items())
+    location:
+      row: 67
+      column: 5
+    end_location:
+      row: 67
+      column: 23
+- kind: RemoveSixCompat
+  location:
+    row: 67
+    column: 5
+  end_location:
+    row: 67
+    column: 23
+  fix:
+    content: dct.items()
+    location:
+      row: 67
+      column: 5
+    end_location:
+      row: 67
+      column: 23
+- kind: RemoveSixCompat
+  location:
+    row: 68
+    column: 5
+  end_location:
+    row: 68
+    column: 22
+  fix:
+    content: iter(dct.keys())
+    location:
+      row: 68
+      column: 5
+    end_location:
+      row: 68
+      column: 22
+- kind: RemoveSixCompat
+  location:
+    row: 68
+    column: 5
+  end_location:
+    row: 68
+    column: 22
+  fix:
+    content: dct.keys()
+    location:
+      row: 68
+      column: 5
+    end_location:
+      row: 68
+      column: 22
+- kind: RemoveSixCompat
+  location:
+    row: 69
+    column: 5
+  end_location:
+    row: 69
+    column: 24
+  fix:
+    content: iter(dct.values())
+    location:
+      row: 69
+      column: 5
+    end_location:
+      row: 69
+      column: 24
+- kind: RemoveSixCompat
+  location:
+    row: 69
+    column: 5
+  end_location:
+    row: 69
+    column: 24
+  fix:
+    content: dct.values()
+    location:
+      row: 69
+      column: 5
+    end_location:
+      row: 69
+      column: 24
+

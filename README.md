@@ -618,6 +618,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP013 | ConvertTypedDictFunctionalToClass | Convert `...` from `TypedDict` functional to class syntax | 🛠 |
 | UP014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
 | UP015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
+| UP016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
 
 ### pep8-naming (N)
 
