@@ -1,13 +1,11 @@
+use anyhow::{bail, Result};
+use itertools::Itertools;
+use rustpython_parser::ast::{ExcepthandlerKind, Location, Stmt, StmtKind};
+
 use crate::ast::helpers;
 use crate::ast::helpers::to_absolute;
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
-use anyhow::{bail, Result};
-use itertools::Itertools;
-use rustpython_parser::ast::{ExcepthandlerKind, Location, Stmt, StmtKind};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-
 use crate::autofix::Fix;
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -73,7 +71,8 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
     }
 }
 
-/// Return the location of a trailing semicolon following a `Stmt`, if it's part of a multi-statement line.
+/// Return the location of a trailing semicolon following a `Stmt`, if it's part
+/// of a multi-statement line.
 fn trailing_semicolon(locator: &SourceCodeLocator, stmt: &Stmt) -> Option<Location> {
     let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
     for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
@@ -84,7 +83,7 @@ fn trailing_semicolon(locator: &SourceCodeLocator, stmt: &Stmt) -> Option<Locati
                 .find_map(|(column, char)| if char == ';' { Some(column) } else { None })
                 .unwrap();
             return Some(to_absolute(
-                Location::new(row, column),
+                Location::new(row + 1, column),
                 stmt.end_location.unwrap(),
             ));
         }
@@ -95,36 +94,51 @@ fn trailing_semicolon(locator: &SourceCodeLocator, stmt: &Stmt) -> Option<Locati
     None
 }
 
+/// Find the start of the next `Stmt` after a semicolon.
 fn next_valid_character(locator: &SourceCodeLocator, semicolon: Location) -> Location {
-    let contents =
-        locator.slice_source_code_at(&Location::new(semicolon.row(), semicolon.column() + 1));
+    let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
+    let contents = locator.slice_source_code_at(&start_location);
     for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
         let trimmed = line.trim();
+        // Skip past any continuations.
         if trimmed.starts_with('\\') {
             continue;
         }
         return if trimmed.is_empty() {
-            to_absolute(Location::new(row + 1, 0), semicolon)
+            // If the line is empty, then despite the previous statement ending in a
+            // semicolon, we know that it's not a multi-statement line.
+            to_absolute(Location::new(row + 1, 0), start_location)
         } else {
+            // Otherwise, find the start of the next statement. (Or, anything that isn't
+            // whitespace.)
             let column = line
                 .char_indices()
                 .find_map(|(column, char)| {
-                    if !char.is_whitespace() {
-                        Some(column)
-                    } else {
+                    if char.is_whitespace() {
                         None
+                    } else {
+                        Some(column)
                     }
                 })
                 .unwrap();
-            to_absolute(Location::new(row, column), semicolon)
+            to_absolute(Location::new(row + 1, column), start_location)
         };
     }
-    Location::new(semicolon.row() + 1, 0)
+    Location::new(start_location.row() + 1, 0)
 }
 
-// The algorithm should be: keep skipping lines that "start" with whitespace or a backslash or a hash.
-// Keep going until we find the first character after a semi.
-fn removal_range(locator: &SourceCodeLocator, stmt: &Stmt) -> Range {
+/// Return the `Range` to use when deleting a `Stmt`.
+///
+/// In some cases, this is as simple as the `Range` of the `Stmt` itself.
+/// However, there are a few exceptions:
+/// - If the `Stmt` has no trailing and leading content, then it's convenient to
+///   remove the entire start and end lines.
+/// - If the `Stmt` is _not_ the terminal statement in a multi-statement line,
+///   we need to delete up to the start of the next statement (and avoid
+///   deleting any content that precedes the statement).
+/// - If the `Stmt` is the terminal statement in a multi-statement line, we need
+///   to avoid deleting any content that precedes the statement.
+fn deletion_range(locator: &SourceCodeLocator, stmt: &Stmt) -> Range {
     if let Some(semicolon) = trailing_semicolon(locator, stmt) {
         let next = next_valid_character(locator, semicolon);
         Range {
@@ -141,13 +155,12 @@ fn removal_range(locator: &SourceCodeLocator, stmt: &Stmt) -> Range {
     }
 }
 
-pub fn remove_stmt(
+pub fn delete_stmt(
     locator: &SourceCodeLocator,
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
 ) -> Result<Fix> {
-    let range = removal_range(locator, stmt);
     if parent
         .map(|parent| is_lone_child(stmt, parent, deleted))
         .map_or(Ok(None), |v| v.map(Some))?
@@ -155,14 +168,13 @@ pub fn remove_stmt(
     {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
-        println!("Replacing with pass: {:?}", range);
         Ok(Fix::replacement(
             "pass".to_string(),
-            range.location,
-            range.end_location,
+            stmt.location,
+            stmt.end_location.unwrap(),
         ))
     } else {
-        println!("Deleting: {:?}", range);
+        let range = deletion_range(locator, stmt);
         Ok(Fix::deletion(range.location, range.end_location))
     }
 }

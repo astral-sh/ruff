@@ -16,7 +16,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
         let defined_by = checker.current_parent();
         let defined_in = checker.current_grandparent();
-        match helpers::remove_stmt(
+        match helpers::delete_stmt(
             checker.locator,
             defined_by.0,
             defined_in.map(|node| node.0),

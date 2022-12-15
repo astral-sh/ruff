@@ -65,7 +65,7 @@ pub fn remove_unused_imports(
     }
 
     if aliases.is_empty() {
-        helpers::remove_stmt(locator, stmt, parent, deleted)
+        helpers::delete_stmt(locator, stmt, parent, deleted)
     } else {
         let mut state = CodegenState::default();
         tree.codegen(&mut state);

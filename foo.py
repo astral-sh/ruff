@@ -29,3 +29,21 @@ if True:
 if True:
     x = 1 \
         ; import foo
+
+
+# Extra content on both sides.
+if True:
+    x = 1; import foo; x = 1
+    x = 1;     import foo;     x = 1
+
+# Extra content following on the next line.
+if True:
+    x = 1; \
+        import foo; \
+    x = 1
+
+# Extra content (including the semicolon) following on the next line.
+if True:
+    x = 1 \
+        ;import foo \
+        ;x = 1
