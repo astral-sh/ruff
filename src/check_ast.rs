@@ -6,7 +6,7 @@ use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::Location;
+use rustpython_ast::{Located, Location};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -257,12 +257,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    let location = Range::from_located(stmt);
                     self.add_checks(
                         names
                             .iter()
                             .filter_map(|name| {
-                                pycodestyle::checks::ambiguous_variable_name(name, location)
+                                pycodestyle::checks::ambiguous_variable_name(name, stmt)
                             })
                             .into_iter(),
                     );
@@ -309,12 +308,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    let location = Range::from_located(stmt);
                     self.add_checks(
                         names
                             .iter()
                             .filter_map(|name| {
-                                pycodestyle::checks::ambiguous_variable_name(name, location)
+                                pycodestyle::checks::ambiguous_variable_name(name, stmt)
                             })
                             .into_iter(),
                     );
@@ -369,7 +367,8 @@ where
                     if let Some(check) = pep8_naming::checks::invalid_function_name(
                         stmt,
                         name,
-                        &self.settings.pep8_naming,
+                        &self.settings.pep8_naming.ignore_names,
+                        self.locator,
                     ) {
                         self.add_check(check);
                     }
@@ -406,9 +405,12 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N807) {
-                    if let Some(check) =
-                        pep8_naming::checks::dunder_function_name(self.current_scope(), stmt, name)
-                    {
+                    if let Some(check) = pep8_naming::checks::dunder_function_name(
+                        self.current_scope(),
+                        stmt,
+                        name,
+                        self.locator,
+                    ) {
                         self.add_check(check);
                     }
                 }
@@ -445,6 +447,7 @@ where
                         name,
                         body,
                         self.settings.mccabe.max_complexity,
+                        self.locator,
                     ) {
                         self.add_check(check);
                     }
@@ -460,7 +463,7 @@ where
                     pylint::plugins::property_with_parameters(self, stmt, decorator_list, args);
                 }
 
-                self.check_builtin_shadowing(name, Range::from_located(stmt), true);
+                self.check_builtin_shadowing(name, stmt, true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
@@ -548,7 +551,9 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N801) {
-                    if let Some(check) = pep8_naming::checks::invalid_class_name(stmt, name) {
+                    if let Some(check) =
+                        pep8_naming::checks::invalid_class_name(stmt, name, self.locator)
+                    {
                         self.add_check(check);
                     }
                 }
@@ -573,7 +578,7 @@ where
                     );
                 }
 
-                self.check_builtin_shadowing(name, Range::from_located(stmt), false);
+                self.check_builtin_shadowing(name, stmt, false);
 
                 for expr in bases {
                     self.visit_expr(expr);
@@ -615,7 +620,7 @@ where
                         );
                     } else {
                         if let Some(asname) = &alias.node.asname {
-                            self.check_builtin_shadowing(asname, Range::from_located(stmt), false);
+                            self.check_builtin_shadowing(asname, stmt, false);
                         }
 
                         // Given `import foo`, `name` and `full_name` would both be `foo`.
@@ -683,7 +688,10 @@ where
                         if self.settings.enabled.contains(&CheckCode::N811) {
                             if let Some(check) =
                                 pep8_naming::checks::constant_imported_as_non_constant(
-                                    stmt, name, asname,
+                                    stmt,
+                                    name,
+                                    asname,
+                                    self.locator,
                                 )
                             {
                                 self.add_check(check);
@@ -693,7 +701,10 @@ where
                         if self.settings.enabled.contains(&CheckCode::N812) {
                             if let Some(check) =
                                 pep8_naming::checks::lowercase_imported_as_non_lowercase(
-                                    stmt, name, asname,
+                                    stmt,
+                                    name,
+                                    asname,
+                                    self.locator,
                                 )
                             {
                                 self.add_check(check);
@@ -703,7 +714,10 @@ where
                         if self.settings.enabled.contains(&CheckCode::N813) {
                             if let Some(check) =
                                 pep8_naming::checks::camelcase_imported_as_lowercase(
-                                    stmt, name, asname,
+                                    stmt,
+                                    name,
+                                    asname,
+                                    self.locator,
                                 )
                             {
                                 self.add_check(check);
@@ -712,7 +726,10 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::N814) {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
-                                stmt, name, asname,
+                                stmt,
+                                name,
+                                asname,
+                                self.locator,
                             ) {
                                 self.add_check(check);
                             }
@@ -720,7 +737,10 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::N817) {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
-                                stmt, name, asname,
+                                stmt,
+                                name,
+                                asname,
+                                self.locator,
                             ) {
                                 self.add_check(check);
                             }
@@ -858,7 +878,7 @@ where
                         scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
-                            self.check_builtin_shadowing(asname, Range::from_located(stmt), false);
+                            self.check_builtin_shadowing(asname, stmt, false);
                         }
 
                         // Given `from foo import bar`, `name` would be "bar" and `full_name` would
@@ -927,6 +947,7 @@ where
                                     stmt,
                                     &alias.node.name,
                                     asname,
+                                    self.locator,
                                 )
                             {
                                 self.add_check(check);
@@ -939,6 +960,7 @@ where
                                     stmt,
                                     &alias.node.name,
                                     asname,
+                                    self.locator,
                                 )
                             {
                                 self.add_check(check);
@@ -951,6 +973,7 @@ where
                                     stmt,
                                     &alias.node.name,
                                     asname,
+                                    self.locator,
                                 )
                             {
                                 self.add_check(check);
@@ -962,6 +985,7 @@ where
                                 stmt,
                                 &alias.node.name,
                                 asname,
+                                self.locator,
                             ) {
                                 self.add_check(check);
                             }
@@ -972,6 +996,7 @@ where
                                 stmt,
                                 &alias.node.name,
                                 asname,
+                                self.locator,
                             ) {
                                 self.add_check(check);
                             }
@@ -1422,15 +1447,14 @@ where
                     }
                     ExprContext::Store => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
-                                id,
-                                Range::from_located(expr),
-                            ) {
+                            if let Some(check) =
+                                pycodestyle::checks::ambiguous_variable_name(id, expr)
+                            {
                                 self.add_check(check);
                             }
                         }
 
-                        self.check_builtin_shadowing(id, Range::from_located(expr), true);
+                        self.check_builtin_shadowing(id, expr, true);
 
                         self.handle_node_store(id, expr);
                     }
@@ -2413,19 +2437,14 @@ where
                 match name {
                     Some(name) => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
-                                name,
-                                Range::from_located(excepthandler),
-                            ) {
+                            if let Some(check) =
+                                pycodestyle::checks::ambiguous_variable_name(name, excepthandler)
+                            {
                                 self.add_check(check);
                             }
                         }
 
-                        self.check_builtin_shadowing(
-                            name,
-                            Range::from_located(excepthandler),
-                            false,
-                        );
+                        self.check_builtin_shadowing(name, excepthandler, false);
 
                         if self.current_scope().values.contains_key(&name.as_str()) {
                             self.handle_node_store(
@@ -2538,23 +2557,18 @@ where
         );
 
         if self.settings.enabled.contains(&CheckCode::E741) {
-            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
-                &arg.node.arg,
-                Range::from_located(arg),
-            ) {
+            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(&arg.node.arg, arg) {
                 self.add_check(check);
             }
         }
 
         if self.settings.enabled.contains(&CheckCode::N803) {
-            if let Some(check) =
-                pep8_naming::checks::invalid_argument_name(&arg.node.arg, Range::from_located(arg))
-            {
+            if let Some(check) = pep8_naming::checks::invalid_argument_name(&arg.node.arg, arg) {
                 self.add_check(check);
             }
         }
 
-        self.check_builtin_arg_shadowing(&arg.node.arg, Range::from_located(arg));
+        self.check_builtin_arg_shadowing(&arg.node.arg, arg);
     }
 }
 
@@ -3584,12 +3598,12 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_builtin_shadowing(&mut self, name: &str, location: Range, is_attribute: bool) {
+    fn check_builtin_shadowing<T>(&mut self, name: &str, located: &Located<T>, is_attribute: bool) {
         if is_attribute && matches!(self.current_scope().kind, ScopeKind::Class(_)) {
             if self.settings.enabled.contains(&CheckCode::A003) {
                 if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
-                    location,
+                    located,
                     flake8_builtins::types::ShadowingType::Attribute,
                 ) {
                     self.add_check(check);
@@ -3599,7 +3613,7 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::A001) {
                 if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
-                    location,
+                    located,
                     flake8_builtins::types::ShadowingType::Variable,
                 ) {
                     self.add_check(check);
@@ -3608,11 +3622,11 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_builtin_arg_shadowing(&mut self, name: &str, location: Range) {
+    fn check_builtin_arg_shadowing(&mut self, name: &str, arg: &Arg) {
         if self.settings.enabled.contains(&CheckCode::A002) {
             if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                 name,
-                location,
+                arg,
                 flake8_builtins::types::ShadowingType::Argument,
             ) {
                 self.add_check(check);

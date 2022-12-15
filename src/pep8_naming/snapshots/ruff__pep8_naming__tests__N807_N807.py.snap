@@ -5,17 +5,17 @@ expression: checks
 - kind: DunderFunctionName
   location:
     row: 1
-    column: 0
+    column: 4
   end_location:
-    row: 2
-    column: 8
+    row: 1
+    column: 11
   fix: ~
 - kind: DunderFunctionName
   location:
     row: 14
-    column: 4
+    column: 8
   end_location:
-    row: 15
-    column: 12
+    row: 14
+    column: 15
   fix: ~
 

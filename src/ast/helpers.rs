@@ -1,9 +1,12 @@
+use log::error;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{
     Arguments, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, Stmt, StmtKind,
 };
+use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
 use crate::SourceCodeLocator;
@@ -311,13 +314,42 @@ pub fn count_trailing_lines(stmt: &Stmt, locator: &SourceCodeLocator) -> usize {
         .count()
 }
 
+/// Return the appropriate visual `Range` for any message that spans a `Stmt`.
+/// Specifically, this method returns the range of a function or class name,
+/// rather than that of the entire function or class body.
+pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
+    if matches!(
+        stmt.node,
+        StmtKind::ClassDef { .. }
+            | StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+    ) {
+        let contents = locator.slice_source_code_range(&Range::from_located(stmt));
+        for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
+            if matches!(tok, Tok::Name { .. }) {
+                let start = to_absolute(start, stmt.location);
+                let end = to_absolute(end, stmt.location);
+                return Range {
+                    location: start,
+                    end_location: end,
+                };
+            }
+        }
+        error!("Failed to find identifier for {:?}", stmt);
+    }
+    Range::from_located(stmt)
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
     use rustc_hash::{FxHashMap, FxHashSet};
+    use rustpython_ast::Location;
     use rustpython_parser::parser;
 
-    use crate::ast::helpers::match_module_member;
+    use crate::ast::helpers::{identifier_range, match_module_member};
+    use crate::ast::types::Range;
+    use crate::source_code_locator::SourceCodeLocator;
 
     #[test]
     fn builtin() -> Result<()> {
@@ -459,6 +491,93 @@ mod tests {
             &FxHashMap::default(),
             &FxHashMap::from_iter([("t", "typing")]),
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn extract_identifier_range() -> Result<()> {
+        let contents = "def f(): pass".trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            identifier_range(stmt, &locator),
+            Range {
+                location: Location::new(1, 4),
+                end_location: Location::new(1, 5),
+            }
+        );
+
+        let contents = r#"
+def \
+  f():
+  pass
+"#
+        .trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            identifier_range(stmt, &locator),
+            Range {
+                location: Location::new(2, 2),
+                end_location: Location::new(2, 3),
+            }
+        );
+
+        let contents = "class Class(): pass".trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            identifier_range(stmt, &locator),
+            Range {
+                location: Location::new(1, 6),
+                end_location: Location::new(1, 11),
+            }
+        );
+
+        let contents = "class Class: pass".trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            identifier_range(stmt, &locator),
+            Range {
+                location: Location::new(1, 6),
+                end_location: Location::new(1, 11),
+            }
+        );
+
+        let contents = r#"
+@decorator()
+class Class():
+  pass
+"#
+        .trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            identifier_range(stmt, &locator),
+            Range {
+                location: Location::new(2, 6),
+                end_location: Location::new(2, 11),
+            }
+        );
+
+        let contents = r#"x = y + 1"#.trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            identifier_range(stmt, &locator),
+            Range {
+                location: Location::new(1, 0),
+                end_location: Location::new(1, 9),
+            }
+        );
+
         Ok(())
     }
 }
