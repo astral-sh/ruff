@@ -23,7 +23,12 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
         let defined_in = checker.current_grandparent();
         if matches!(defined_by.0.node, StmtKind::Expr { .. }) {
             let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
-            match helpers::remove_stmt(defined_by.0, defined_in.map(|node| node.0), &deleted) {
+            match helpers::remove_stmt(
+                checker.locator,
+                defined_by.0,
+                defined_in.map(|node| node.0),
+                &deleted,
+            ) {
                 Ok(fix) => {
                     if fix.content.is_empty() || fix.content == "pass" {
                         checker.deletions.insert(defined_by.clone());

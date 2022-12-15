@@ -1,8 +1,13 @@
+use crate::ast::helpers::to_absolute;
+use crate::ast::types::Range;
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use rustpython_parser::ast::{ExcepthandlerKind, Location, Stmt, StmtKind};
+use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
 use crate::autofix::Fix;
+use crate::source_code_locator::SourceCodeLocator;
 
 /// Determine if a body contains only a single statement, taking into account
 /// deleted.
@@ -66,7 +71,42 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
     }
 }
 
-pub fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Result<Fix> {
+// The algorithm should be: keep skipping lines that "start" with whitespace or a backslash or a hash.
+// Keep going until we find the first character after a semi.
+fn removal_range(locator: &SourceCodeLocator, stmt: &Stmt) -> Range {
+    // Keep going until we see something that isn't a newline, or a semicolon.
+    let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
+    let mut last = None;
+    for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
+        last = Some(end);
+        if matches!(tok, Tok::Newline | Tok::Semi) {
+            continue;
+        }
+        return Range {
+            location: stmt.location,
+            end_location: to_absolute(start, stmt.end_location.unwrap()),
+        };
+    }
+    if let Some(last) = last {
+        Range {
+            location: stmt.location,
+            end_location: to_absolute(last, stmt.end_location.unwrap()),
+        }
+    } else {
+        Range {
+            location: stmt.location,
+            end_location: stmt.end_location.unwrap(),
+        }
+    }
+}
+
+pub fn remove_stmt(
+    locator: &SourceCodeLocator,
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
+    deleted: &[&Stmt],
+) -> Result<Fix> {
+    let range = removal_range(locator, stmt);
     if parent
         .map(|parent| is_lone_child(stmt, parent, deleted))
         .map_or(Ok(None), |v| v.map(Some))?
@@ -74,18 +114,14 @@ pub fn remove_stmt(stmt: &Stmt, parent: Option<&Stmt>, deleted: &[&Stmt]) -> Res
     {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
+        println!("Replacing with pass: {:?}", range);
         Ok(Fix::replacement(
             "pass".to_string(),
-            stmt.location,
-            stmt.end_location.unwrap(),
+            range.location,
+            range.end_location,
         ))
     } else {
-        // Otherwise, nuke the entire line.
-        // TODO(charlie): This logic assumes that there are no multi-statement physical
-        // lines.
-        Ok(Fix::deletion(
-            Location::new(stmt.location.row(), 0),
-            Location::new(stmt.end_location.unwrap().row() + 1, 0),
-        ))
+        println!("Deleting: {:?}", range);
+        Ok(Fix::deletion(range.location, range.end_location))
     }
 }

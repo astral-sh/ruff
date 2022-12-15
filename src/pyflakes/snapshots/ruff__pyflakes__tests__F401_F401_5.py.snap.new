@@ -1,0 +1,78 @@
+---
+source: src/pyflakes/mod.rs
+assertion_line: 114
+expression: checks
+---
+- kind:
+    UnusedImport:
+      - a.b.c
+      - false
+  location:
+    row: 2
+    column: 16
+  end_location:
+    row: 2
+    column: 17
+  fix:
+    content: ""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 3
+      column: 0
+- kind:
+    UnusedImport:
+      - d.e.f
+      - false
+  location:
+    row: 3
+    column: 16
+  end_location:
+    row: 3
+    column: 22
+  fix:
+    content: ""
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 4
+      column: 0
+- kind:
+    UnusedImport:
+      - h.i
+      - false
+  location:
+    row: 4
+    column: 7
+  end_location:
+    row: 4
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 5
+      column: 0
+- kind:
+    UnusedImport:
+      - j.k
+      - false
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 15
+  fix:
+    content: ""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 15
+
