@@ -154,6 +154,18 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn multi_statement_lines() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/pyflakes/multi_statement_lines.py"),
+            &settings::Settings::for_rule(CheckCode::F401),
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
     /// A re-implementation of the Pyflakes test runner.
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[CheckCode]) -> Result<()> {
