@@ -394,6 +394,7 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Resul
     Ok(None)
 }
 
+/// UP016
 pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
     match handle_next_on_six_dict(expr, checker.patch(&CheckCode::UP016), checker) {
         Ok(Some(check)) => {
