@@ -1,4 +1,5 @@
 use crate::Location;
+use std::error::Error as StdError;
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -16,7 +17,14 @@ impl<T> std::ops::Deref for BaseError<T> {
     }
 }
 
-impl<T> std::error::Error for BaseError<T> where T: std::fmt::Display + std::fmt::Debug {}
+impl<T> StdError for BaseError<T>
+where
+    T: StdError + 'static,
+{
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        Some(&self.error)
+    }
+}
 
 impl<T> Display for BaseError<T>
 where
@@ -51,10 +59,16 @@ impl<T> BaseError<T> {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub struct CompileError<T> {
     pub body: BaseError<T>,
     pub statement: Option<String>,
+}
+
+impl<T: StdError + 'static> StdError for CompileError<T> {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.body.source()
+    }
 }
 
 impl<T> std::ops::Deref for CompileError<T> {

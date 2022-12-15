@@ -1,14 +1,12 @@
 //! Implement python as a virtual machine with bytecodes. This module
 //! implements bytecode structure.
 
-use crate::Location;
+use crate::marshal::MarshalError;
+use crate::{marshal, Location};
 use bitflags::bitflags;
-use bstr::ByteSlice;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_complex::Complex64;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::{collections::BTreeSet, fmt, hash, mem};
 
@@ -31,9 +29,7 @@ impl Constant for ConstantData {
             ConstantData::Str { value } => Str { value },
             ConstantData::Bytes { value } => Bytes { value },
             ConstantData::Code { code } => Code { code },
-            ConstantData::Tuple { elements } => Tuple {
-                elements: Box::new(elements.iter().map(|e| e.borrow_constant())),
-            },
+            ConstantData::Tuple { elements } => Tuple { elements },
             ConstantData::None => None,
             ConstantData::Ellipsis => Ellipsis,
         }
@@ -44,6 +40,9 @@ impl Constant for ConstantData {
 pub trait ConstantBag: Sized + Copy {
     type Constant: Constant;
     fn make_constant<C: Constant>(&self, constant: BorrowedConstant<C>) -> Self::Constant;
+    fn make_int(&self, value: BigInt) -> Self::Constant;
+    fn make_tuple(&self, elements: impl Iterator<Item = Self::Constant>) -> Self::Constant;
+    fn make_code(&self, code: CodeObject<Self::Constant>) -> Self::Constant;
     fn make_name(&self, name: &str) -> <Self::Constant as Constant>::Name;
 }
 
@@ -55,6 +54,19 @@ impl ConstantBag for BasicBag {
     fn make_constant<C: Constant>(&self, constant: BorrowedConstant<C>) -> Self::Constant {
         constant.to_owned()
     }
+    fn make_int(&self, value: BigInt) -> Self::Constant {
+        ConstantData::Integer { value }
+    }
+    fn make_tuple(&self, elements: impl Iterator<Item = Self::Constant>) -> Self::Constant {
+        ConstantData::Tuple {
+            elements: elements.collect(),
+        }
+    }
+    fn make_code(&self, code: CodeObject<Self::Constant>) -> Self::Constant {
+        ConstantData::Code {
+            code: Box::new(code),
+        }
+    }
     fn make_name(&self, name: &str) -> <Self::Constant as Constant>::Name {
         name.to_owned()
     }
@@ -62,26 +74,22 @@ impl ConstantBag for BasicBag {
 
 /// Primary container of a single code object. Each python function has
 /// a codeobject. Also a module has a codeobject.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct CodeObject<C: Constant = ConstantData> {
     pub instructions: Box<[CodeUnit]>,
     pub locations: Box<[Location]>,
     pub flags: CodeFlags,
-    pub posonlyarg_count: usize,
+    pub posonlyarg_count: u32,
     // Number of positional-only arguments
-    pub arg_count: usize,
-    pub kwonlyarg_count: usize,
+    pub arg_count: u32,
+    pub kwonlyarg_count: u32,
     pub source_path: C::Name,
-    pub first_line_number: usize,
+    pub first_line_number: u32,
     pub max_stackdepth: u32,
     pub obj_name: C::Name,
     // Name of the object that created this code object
-    pub cell2arg: Option<Box<[isize]>>,
+    pub cell2arg: Option<Box<[i32]>>,
     pub constants: Box<[C]>,
-    #[serde(bound(
-        deserialize = "C::Name: serde::Deserialize<'de>",
-        serialize = "C::Name: serde::Serialize"
-    ))]
     pub names: Box<[C::Name]>,
     pub varnames: Box<[C::Name]>,
     pub cellvars: Box<[C::Name]>,
@@ -89,7 +97,6 @@ pub struct CodeObject<C: Constant = ConstantData> {
 }
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
     pub struct CodeFlags: u16 {
         const NEW_LOCALS = 0x01;
         const IS_GENERATOR = 0x02;
@@ -114,7 +121,7 @@ impl CodeFlags {
 }
 
 /// an opcode argument that may be extended by a prior ExtendedArg
-#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct OpArgByte(pub u8);
 impl OpArgByte {
@@ -211,23 +218,7 @@ impl OpArgType for bool {
     }
 }
 
-macro_rules! enum_oparg {
-    ($t:ident) => {
-        impl OpArgType for $t {
-            #[inline(always)]
-            fn from_oparg(x: u32) -> Option<Self> {
-                $t::try_from_primitive(x as _).ok()
-            }
-            #[inline(always)]
-            fn to_oparg(self) -> u32 {
-                u8::from(self).into()
-            }
-        }
-    };
-}
-
-#[derive(Copy, Clone, Serialize, Deserialize)]
-#[serde(bound = "")]
+#[derive(Copy, Clone)]
 pub struct Arg<T: OpArgType>(PhantomData<T>);
 
 impl<T: OpArgType> Arg<T> {
@@ -302,7 +293,7 @@ impl fmt::Display for Label {
 }
 
 /// Transforms a value prior to formatting it.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, TryFromPrimitive, IntoPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ConversionFlag {
     /// No conversion
@@ -314,32 +305,57 @@ pub enum ConversionFlag {
     /// Converts by calling `repr(<value>)`.
     Repr = b'r',
 }
-enum_oparg!(ConversionFlag);
+
+impl OpArgType for ConversionFlag {
+    fn to_oparg(self) -> u32 {
+        self as u32
+    }
+    fn from_oparg(x: u32) -> Option<Self> {
+        Some(match u8::try_from(x).ok()? {
+            0 => Self::None,
+            b's' => Self::Str,
+            b'a' => Self::Ascii,
+            b'r' => Self::Repr,
+            _ => return None,
+        })
+    }
+}
 
 impl TryFrom<usize> for ConversionFlag {
     type Error = usize;
     fn try_from(b: usize) -> Result<Self, Self::Error> {
-        u8::try_from(b)
-            .ok()
-            .and_then(|b| Self::try_from(b).ok())
-            .ok_or(b)
+        u32::try_from(b).ok().and_then(Self::from_oparg).ok_or(b)
     }
 }
 
 /// The kind of Raise that occurred.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, TryFromPrimitive, IntoPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum RaiseKind {
     Reraise,
     Raise,
     RaiseCause,
 }
-enum_oparg!(RaiseKind);
+
+impl OpArgType for RaiseKind {
+    fn to_oparg(self) -> u32 {
+        self as u32
+    }
+    fn from_oparg(x: u32) -> Option<Self> {
+        Some(match x {
+            0 => Self::Reraise,
+            1 => Self::Raise,
+            2 => Self::RaiseCause,
+            _ => return None,
+        })
+    }
+}
 
 pub type NameIdx = u32;
 
 /// A Single bytecode instruction.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u8)]
 pub enum Instruction {
     /// Importing by name
     ImportName {
@@ -562,7 +578,29 @@ pub enum Instruction {
 }
 const _: () = assert!(mem::size_of::<Instruction>() == 1);
 
-#[derive(Copy, Clone, Serialize, Deserialize)]
+impl From<Instruction> for u8 {
+    #[inline]
+    fn from(ins: Instruction) -> u8 {
+        // SAFETY: there's no padding bits
+        unsafe { std::mem::transmute::<Instruction, u8>(ins) }
+    }
+}
+
+impl TryFrom<u8> for Instruction {
+    type Error = crate::marshal::MarshalError;
+
+    #[inline]
+    fn try_from(value: u8) -> Result<Self, crate::marshal::MarshalError> {
+        if value <= u8::from(Instruction::ExtendedArg) {
+            Ok(unsafe { std::mem::transmute::<u8, Instruction>(value) })
+        } else {
+            Err(crate::marshal::MarshalError::InvalidBytecode)
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
 pub struct CodeUnit {
     pub op: Instruction,
     pub arg: OpArgByte,
@@ -579,7 +617,6 @@ impl CodeUnit {
 use self::Instruction::*;
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
     pub struct MakeFunctionFlags: u8 {
         const CLOSURE = 0x01;
         const ANNOTATIONS = 0x02;
@@ -607,7 +644,7 @@ impl OpArgType for MakeFunctionFlags {
 /// let b = ConstantData::Boolean {value: false};
 /// assert_ne!(a, b);
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ConstantData {
     Tuple { elements: Vec<ConstantData> },
     Integer { value: BigInt },
@@ -677,36 +714,40 @@ pub enum BorrowedConstant<'a, C: Constant> {
     Str { value: &'a str },
     Bytes { value: &'a [u8] },
     Code { code: &'a CodeObject<C> },
-    Tuple { elements: BorrowedTupleIter<'a, C> },
+    Tuple { elements: &'a [C] },
     None,
     Ellipsis,
 }
 
-type BorrowedTupleIter<'a, C> = Box<dyn Iterator<Item = BorrowedConstant<'a, C>> + 'a>;
+impl<C: Constant> Copy for BorrowedConstant<'_, C> {}
+impl<C: Constant> Clone for BorrowedConstant<'_, C> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
 
 impl<C: Constant> BorrowedConstant<'_, C> {
-    // takes `self` because we need to consume the iterator
-    pub fn fmt_display(self, f: &mut fmt::Formatter) -> fmt::Result {
+    pub fn fmt_display(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             BorrowedConstant::Integer { value } => write!(f, "{value}"),
             BorrowedConstant::Float { value } => write!(f, "{value}"),
             BorrowedConstant::Complex { value } => write!(f, "{value}"),
             BorrowedConstant::Boolean { value } => {
-                write!(f, "{}", if value { "True" } else { "False" })
+                write!(f, "{}", if *value { "True" } else { "False" })
             }
             BorrowedConstant::Str { value } => write!(f, "{value:?}"),
-            BorrowedConstant::Bytes { value } => write!(f, "b{:?}", value.as_bstr()),
+            BorrowedConstant::Bytes { value } => write!(f, "b\"{}\"", value.escape_ascii()),
             BorrowedConstant::Code { code } => write!(f, "{code:?}"),
             BorrowedConstant::Tuple { elements } => {
                 write!(f, "(")?;
                 let mut first = true;
-                for c in elements {
+                for c in *elements {
                     if first {
                         first = false
                     } else {
                         write!(f, ", ")?;
                     }
-                    c.fmt_display(f)?;
+                    c.borrow_constant().fmt_display(f)?;
                 }
                 write!(f, ")")
             }
@@ -733,7 +774,10 @@ impl<C: Constant> BorrowedConstant<'_, C> {
                 code: Box::new(code.map_clone_bag(&BasicBag)),
             },
             BorrowedConstant::Tuple { elements } => Tuple {
-                elements: elements.map(BorrowedConstant::to_owned).collect(),
+                elements: elements
+                    .iter()
+                    .map(|c| c.borrow_constant().to_owned())
+                    .collect(),
             },
             BorrowedConstant::None => None,
             BorrowedConstant::Ellipsis => Ellipsis,
@@ -742,7 +786,7 @@ impl<C: Constant> BorrowedConstant<'_, C> {
 }
 
 /// The possible comparison operators
-#[derive(Debug, Copy, Clone, PartialEq, Eq, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ComparisonOperator {
     // be intentional with bits so that we can do eval_ord with just a bitwise and
@@ -754,9 +798,25 @@ pub enum ComparisonOperator {
     LessOrEqual = 0b101,
     GreaterOrEqual = 0b110,
 }
-enum_oparg!(ComparisonOperator);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, TryFromPrimitive, IntoPrimitive)]
+impl OpArgType for ComparisonOperator {
+    fn to_oparg(self) -> u32 {
+        self as u32
+    }
+    fn from_oparg(x: u32) -> Option<Self> {
+        Some(match x {
+            0b001 => Self::Less,
+            0b010 => Self::Greater,
+            0b011 => Self::NotEqual,
+            0b100 => Self::Equal,
+            0b101 => Self::LessOrEqual,
+            0b110 => Self::GreaterOrEqual,
+            _ => return None,
+        })
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TestOperator {
     In,
@@ -766,7 +826,22 @@ pub enum TestOperator {
     /// two exceptions that match?
     ExceptionMatch,
 }
-enum_oparg!(TestOperator);
+
+impl OpArgType for TestOperator {
+    fn to_oparg(self) -> u32 {
+        self as u32
+    }
+    fn from_oparg(x: u32) -> Option<Self> {
+        Some(match x {
+            0 => Self::In,
+            1 => Self::NotIn,
+            2 => Self::Is,
+            3 => Self::IsNot,
+            4 => Self::ExceptionMatch,
+            _ => return None,
+        })
+    }
+}
 
 /// The possible Binary operators
 /// # Examples
@@ -776,7 +851,7 @@ enum_oparg!(TestOperator);
 /// use rustpython_compiler_core::BinaryOperator::Add;
 /// let op = BinaryOperation {op: Add};
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum BinaryOperator {
     Power,
@@ -793,10 +868,33 @@ pub enum BinaryOperator {
     Xor,
     Or,
 }
-enum_oparg!(BinaryOperator);
+
+impl OpArgType for BinaryOperator {
+    fn to_oparg(self) -> u32 {
+        self as u32
+    }
+    fn from_oparg(x: u32) -> Option<Self> {
+        Some(match x {
+            0 => Self::Power,
+            1 => Self::Multiply,
+            2 => Self::MatrixMultiply,
+            3 => Self::Divide,
+            4 => Self::FloorDivide,
+            5 => Self::Modulo,
+            6 => Self::Add,
+            7 => Self::Subtract,
+            8 => Self::Lshift,
+            9 => Self::Rshift,
+            10 => Self::And,
+            11 => Self::Xor,
+            12 => Self::Or,
+            _ => return None,
+        })
+    }
+}
 
 /// The possible unary operators
-#[derive(Debug, Copy, Clone, PartialEq, Eq, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum UnaryOperator {
     Not,
@@ -804,7 +902,21 @@ pub enum UnaryOperator {
     Minus,
     Plus,
 }
-enum_oparg!(UnaryOperator);
+
+impl OpArgType for UnaryOperator {
+    fn to_oparg(self) -> u32 {
+        self as u32
+    }
+    fn from_oparg(x: u32) -> Option<Self> {
+        Some(match x {
+            0 => Self::Not,
+            1 => Self::Invert,
+            2 => Self::Minus,
+            3 => Self::Plus,
+            _ => return None,
+        })
+    }
+}
 
 #[derive(Copy, Clone)]
 pub struct UnpackExArgs {
@@ -867,10 +979,10 @@ impl<C: Constant> CodeObject<C> {
     /// Get all arguments of the code object
     /// like inspect.getargs
     pub fn arg_names(&self) -> Arguments<C::Name> {
-        let nargs = self.arg_count;
-        let nkwargs = self.kwonlyarg_count;
+        let nargs = self.arg_count as usize;
+        let nkwargs = self.kwonlyarg_count as usize;
         let mut varargspos = nargs + nkwargs;
-        let posonlyargs = &self.varnames[..self.posonlyarg_count];
+        let posonlyargs = &self.varnames[..self.posonlyarg_count as usize];
         let args = &self.varnames[..nargs];
         let kwonlyargs = &self.varnames[nargs..varargspos];
 
@@ -1033,49 +1145,23 @@ impl<C: Constant> CodeObject<C> {
     }
 }
 
-/// Error that occurs during code deserialization
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum CodeDeserializeError {
-    /// Unexpected End Of File
-    Eof,
-    /// Invalid Bytecode
-    Other,
-}
-
-impl fmt::Display for CodeDeserializeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Eof => f.write_str("unexpected end of data"),
-            Self::Other => f.write_str("invalid bytecode"),
-        }
-    }
-}
-
-impl std::error::Error for CodeDeserializeError {}
-
 impl CodeObject<ConstantData> {
     /// Load a code object from bytes
-    pub fn from_bytes(data: &[u8]) -> Result<Self, CodeDeserializeError> {
+    pub fn from_bytes(data: &[u8]) -> Result<Self, MarshalError> {
         use lz4_flex::block::DecompressError;
         let raw_bincode = lz4_flex::decompress_size_prepended(data).map_err(|e| match e {
             DecompressError::OutputTooSmall { .. } | DecompressError::ExpectedAnotherByte => {
-                CodeDeserializeError::Eof
+                MarshalError::Eof
             }
-            _ => CodeDeserializeError::Other,
+            _ => MarshalError::InvalidBytecode,
         })?;
-        let data = bincode::deserialize(&raw_bincode).map_err(|e| match *e {
-            bincode::ErrorKind::Io(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                CodeDeserializeError::Eof
-            }
-            _ => CodeDeserializeError::Other,
-        })?;
-        Ok(data)
+        marshal::deserialize_code(&mut &raw_bincode[..], BasicBag)
     }
 
     /// Serialize this bytecode to bytes.
     pub fn to_bytes(&self) -> Vec<u8> {
-        let data = bincode::serialize(&self).expect("CodeObject is not serializable");
+        let mut data = Vec::new();
+        marshal::serialize_code(&mut data, self);
         lz4_flex::compress_prepend_size(&data)
     }
 }
@@ -1466,7 +1552,7 @@ impl<C: Constant> fmt::Debug for CodeObject<C> {
 }
 
 /// A frozen module. Holds a code object and whether it is part of a package
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 pub struct FrozenModule {
     pub code: CodeObject<ConstantData>,
     pub package: bool,
@@ -1474,34 +1560,28 @@ pub struct FrozenModule {
 
 pub mod frozen_lib {
     use super::*;
-    use bincode::{options, Options};
-    use std::io;
+    use marshal::{Read, Write};
 
     /// Decode a library to a iterable of frozen modules
     pub fn decode_lib(bytes: &[u8]) -> FrozenModulesIter {
         let data = lz4_flex::decompress_size_prepended(bytes).unwrap();
-        let r = VecReader { data, pos: 0 };
-        let mut de = bincode::Deserializer::with_bincode_read(r, options());
-        let len = u64::deserialize(&mut de).unwrap().try_into().unwrap();
-        FrozenModulesIter { len, de }
+        let mut data = marshal::Cursor { data, position: 0 };
+        let remaining = data.read_u32().unwrap();
+        FrozenModulesIter { remaining, data }
     }
 
     pub struct FrozenModulesIter {
-        len: usize,
-        // ideally this could be a SeqAccess, but I think that would require existential types
-        de: bincode::Deserializer<VecReader, bincode::DefaultOptions>,
+        remaining: u32,
+        data: marshal::Cursor<Vec<u8>>,
     }
 
     impl Iterator for FrozenModulesIter {
         type Item = (String, FrozenModule);
 
         fn next(&mut self) -> Option<Self::Item> {
-            // manually mimic bincode's seq encoding, which is <len:u64> <element*len>
-            // This probably won't change (bincode doesn't require padding or anything), but
-            // it's not guaranteed by semver as far as I can tell
-            if self.len > 0 {
-                let entry = Deserialize::deserialize(&mut self.de).unwrap();
-                self.len -= 1;
+            if self.remaining > 0 {
+                let entry = read_entry(&mut self.data).unwrap();
+                self.remaining -= 1;
                 Some(entry)
             } else {
                 None
@@ -1509,11 +1589,18 @@ pub mod frozen_lib {
         }
 
         fn size_hint(&self) -> (usize, Option<usize>) {
-            (self.len, Some(self.len))
+            (self.remaining as usize, Some(self.remaining as usize))
         }
     }
-
     impl ExactSizeIterator for FrozenModulesIter {}
+
+    fn read_entry(rdr: &mut impl Read) -> Result<(String, FrozenModule), marshal::MarshalError> {
+        let len = rdr.read_u32()?;
+        let name = rdr.read_str(len)?.to_owned();
+        let code = marshal::deserialize_code(rdr, BasicBag)?;
+        let package = rdr.read_u8()? != 0;
+        Ok((name, FrozenModule { code, package }))
+    }
 
     /// Encode the given iterator of frozen modules into a compressed vector of bytes
     pub fn encode_lib<'a, I>(lib: I) -> Vec<u8>
@@ -1522,82 +1609,25 @@ pub mod frozen_lib {
         I::IntoIter: ExactSizeIterator + Clone,
     {
         let iter = lib.into_iter();
-        let data = options().serialize(&SerializeLib { iter }).unwrap();
+        let mut data = Vec::new();
+        write_lib(&mut data, iter);
         lz4_flex::compress_prepend_size(&data)
     }
 
-    struct SerializeLib<I> {
-        iter: I,
-    }
-
-    impl<'a, I> Serialize for SerializeLib<I>
-    where
-        I: ExactSizeIterator<Item = (&'a str, &'a FrozenModule)> + Clone,
-    {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            serializer.collect_seq(self.iter.clone())
+    fn write_lib<'a>(
+        buf: &mut impl Write,
+        lib: impl ExactSizeIterator<Item = (&'a str, &'a FrozenModule)>,
+    ) {
+        marshal::write_len(buf, lib.len());
+        for (name, module) in lib {
+            write_entry(buf, name, module);
         }
     }
 
-    /// Owned version of bincode::de::read::SliceReader<'a>
-    struct VecReader {
-        data: Vec<u8>,
-        pos: usize,
-    }
-
-    impl io::Read for VecReader {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-            let mut subslice = &self.data[self.pos..];
-            let n = io::Read::read(&mut subslice, buf)?;
-            self.pos += n;
-            Ok(n)
-        }
-        fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
-            self.get_byte_slice(buf.len())
-                .map(|data| buf.copy_from_slice(data))
-        }
-    }
-
-    impl VecReader {
-        #[inline(always)]
-        fn get_byte_slice(&mut self, length: usize) -> io::Result<&[u8]> {
-            let subslice = &self.data[self.pos..];
-            match subslice.get(..length) {
-                Some(ret) => {
-                    self.pos += length;
-                    Ok(ret)
-                }
-                None => Err(io::ErrorKind::UnexpectedEof.into()),
-            }
-        }
-    }
-
-    impl<'storage> bincode::BincodeRead<'storage> for VecReader {
-        fn forward_read_str<V>(&mut self, length: usize, visitor: V) -> bincode::Result<V::Value>
-        where
-            V: serde::de::Visitor<'storage>,
-        {
-            let bytes = self.get_byte_slice(length)?;
-            match ::std::str::from_utf8(bytes) {
-                Ok(s) => visitor.visit_str(s),
-                Err(e) => Err(bincode::ErrorKind::InvalidUtf8Encoding(e).into()),
-            }
-        }
-
-        fn get_byte_buffer(&mut self, length: usize) -> bincode::Result<Vec<u8>> {
-            self.get_byte_slice(length)
-                .map(|x| x.to_vec())
-                .map_err(Into::into)
-        }
-
-        fn forward_read_bytes<V>(&mut self, length: usize, visitor: V) -> bincode::Result<V::Value>
-        where
-            V: serde::de::Visitor<'storage>,
-        {
-            visitor.visit_bytes(self.get_byte_slice(length)?)
-        }
+    fn write_entry(buf: &mut impl Write, name: &str, module: &FrozenModule) {
+        marshal::write_len(buf, name.len());
+        buf.write_slice(name.as_bytes());
+        marshal::serialize_code(buf, &module.code);
+        buf.write_u8(module.package as u8);
     }
 }

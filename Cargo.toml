@@ -9,5 +9,3 @@ edition = "2021"
 rustpython-compiler-core = { path = "core" }
 rustpython-codegen = { path = "codegen" }
 rustpython-parser = { path = "parser" }
-
-thiserror = { workspace = true }

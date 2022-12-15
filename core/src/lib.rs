@@ -4,6 +4,7 @@
 mod bytecode;
 mod error;
 mod location;
+pub mod marshal;
 mod mode;
 
 pub use bytecode::*;

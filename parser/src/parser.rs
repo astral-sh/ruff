@@ -200,7 +200,7 @@ pub fn parse_tokens(
 pub type ParseError = rustpython_compiler_core::BaseError<ParseErrorType>;
 
 /// Represents the different types of errors that can occur during parsing.
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, PartialEq)]
 pub enum ParseErrorType {
     /// Parser encountered an unexpected end of input
     Eof,
@@ -214,6 +214,8 @@ pub enum ParseErrorType {
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
 }
+
+impl std::error::Error for ParseErrorType {}
 
 // Convert `lalrpop_util::ParseError` to our internal type
 fn parse_error_from_lalrpop(
