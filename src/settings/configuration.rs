@@ -229,8 +229,8 @@ impl Configuration {
         if let Some(unfixable) = overrides.unfixable {
             self.unfixable = Some(unfixable);
         }
-        // Special-case: `extend_ignore` and `extend_select` are parallel arrays, so push an
-        // empty array if only one of the two is provided.
+        // Special-case: `extend_ignore` and `extend_select` are parallel arrays, so
+        // push an empty array if only one of the two is provided.
         match (overrides.extend_ignore, overrides.extend_select) {
             (Some(extend_ignore), Some(extend_select)) => {
                 self.extend_ignore.push(extend_ignore);
