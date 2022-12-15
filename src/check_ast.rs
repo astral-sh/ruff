@@ -223,10 +223,10 @@ where
             StmtKind::Import { .. } => {
                 self.futures_allowed = false;
             }
-            node => {
+            _ => {
                 self.futures_allowed = false;
                 if !self.seen_import_boundary
-                    && !helpers::is_assignment_to_a_dunder(node)
+                    && !helpers::is_assignment_to_a_dunder(stmt)
                     && !operations::in_nested_block(
                         &mut self.parents.iter().rev().map(|node| node.0),
                     )

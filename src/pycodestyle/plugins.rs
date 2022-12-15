@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 use rustpython_ast::{Arguments, Location, StmtKind};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Stmt, Unaryop};
 
+use crate::ast::helpers;
 use crate::ast::helpers::{match_leading_content, match_trailing_content};
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
@@ -46,9 +47,10 @@ pub fn literal_comparisons(
     let mut checks: Vec<Check> = vec![];
 
     let op = ops.first().unwrap();
-    let comparator = left;
 
     // Check `left`.
+    let mut comparator = left;
+    let next = &comparators[0];
     if check_none_comparisons
         && matches!(
             comparator.node,
@@ -63,7 +65,7 @@ pub fn literal_comparisons(
                 CheckKind::NoneComparison(RejectedCmpop::Eq),
                 Range::from_located(comparator),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::Is);
             }
             checks.push(check);
@@ -73,7 +75,7 @@ pub fn literal_comparisons(
                 CheckKind::NoneComparison(RejectedCmpop::NotEq),
                 Range::from_located(comparator),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::IsNot);
             }
             checks.push(check);
@@ -91,7 +93,7 @@ pub fn literal_comparisons(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
                     Range::from_located(comparator),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
                     bad_ops.insert(0, Cmpop::Is);
                 }
                 checks.push(check);
@@ -101,7 +103,7 @@ pub fn literal_comparisons(
                     CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
                     Range::from_located(comparator),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
                     bad_ops.insert(0, Cmpop::IsNot);
                 }
                 checks.push(check);
@@ -110,10 +112,10 @@ pub fn literal_comparisons(
     }
 
     // Check each comparator in order.
-    for (idx, (op, comparator)) in izip!(ops, comparators).enumerate() {
+    for (idx, (op, next)) in izip!(ops, comparators).enumerate() {
         if check_none_comparisons
             && matches!(
-                comparator.node,
+                next.node,
                 ExprKind::Constant {
                     value: Constant::None,
                     kind: None
@@ -123,9 +125,11 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 let check = Check::new(
                     CheckKind::NoneComparison(RejectedCmpop::Eq),
-                    Range::from_located(comparator),
+                    Range::from_located(next),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(check.kind.code())
+                    && !helpers::is_constant_non_singleton(comparator)
+                {
                     bad_ops.insert(idx, Cmpop::Is);
                 }
                 checks.push(check);
@@ -133,9 +137,11 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::NotEq) {
                 let check = Check::new(
                     CheckKind::NoneComparison(RejectedCmpop::NotEq),
-                    Range::from_located(comparator),
+                    Range::from_located(next),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(check.kind.code())
+                    && !helpers::is_constant_non_singleton(comparator)
+                {
                     bad_ops.insert(idx, Cmpop::IsNot);
                 }
                 checks.push(check);
@@ -146,14 +152,16 @@ pub fn literal_comparisons(
             if let ExprKind::Constant {
                 value: Constant::Bool(value),
                 kind: None,
-            } = comparator.node
+            } = next.node
             {
                 if matches!(op, Cmpop::Eq) {
                     let check = Check::new(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
-                        Range::from_located(comparator),
+                        Range::from_located(next),
                     );
-                    if checker.patch(check.kind.code()) {
+                    if checker.patch(check.kind.code())
+                        && !helpers::is_constant_non_singleton(comparator)
+                    {
                         bad_ops.insert(idx, Cmpop::Is);
                     }
                     checks.push(check);
@@ -161,15 +169,19 @@ pub fn literal_comparisons(
                 if matches!(op, Cmpop::NotEq) {
                     let check = Check::new(
                         CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
-                        Range::from_located(comparator),
+                        Range::from_located(next),
                     );
-                    if checker.patch(check.kind.code()) {
+                    if checker.patch(check.kind.code())
+                        && !helpers::is_constant_non_singleton(comparator)
+                    {
                         bad_ops.insert(idx, Cmpop::IsNot);
                     }
                     checks.push(check);
                 }
             }
         }
+
+        comparator = next;
     }
 
     if !bad_ops.is_empty() {

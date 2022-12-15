@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{
-    Arguments, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, Stmt, StmtKind,
+    Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, Stmt, StmtKind,
 };
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -152,15 +152,12 @@ pub fn match_call_path(
 
 static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
-pub fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
+/// Return `true` if the `Stmt` is an assignment to a dunder (like `__all__`).
+pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     // Check whether it's an assignment to a dunder, with or without a type
     // annotation. This is what pycodestyle (as of 2.9.1) does.
-    match node {
-        StmtKind::Assign {
-            targets,
-            value: _,
-            type_comment: _,
-        } => {
+    match &stmt.node {
+        StmtKind::Assign { targets, .. } => {
             if targets.len() != 1 {
                 return false;
             }
@@ -169,17 +166,38 @@ pub fn is_assignment_to_a_dunder(node: &StmtKind) -> bool {
                 _ => false,
             }
         }
-        StmtKind::AnnAssign {
-            target,
-            annotation: _,
-            value: _,
-            simple: _,
-        } => match &target.node {
+        StmtKind::AnnAssign { target, .. } => match &target.node {
             ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
             _ => false,
         },
         _ => false,
     }
+}
+
+/// Return `true` if the `Expr` is a singleton (`None`, `True`, `False`, or
+/// `...`).
+pub fn is_singleton(expr: &Expr) -> bool {
+    matches!(
+        expr.node,
+        ExprKind::Constant {
+            value: Constant::None | Constant::Bool(_) | Constant::Ellipsis,
+            ..
+        }
+    )
+}
+
+/// Return `true` if the `Expr` is a constant or tuple of constants.
+pub fn is_constant(expr: &Expr) -> bool {
+    match &expr.node {
+        ExprKind::Constant { .. } => true,
+        ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant),
+        _ => false,
+    }
+}
+
+/// Return `true` if the `Expr` is a non-singleton constant.
+pub fn is_constant_non_singleton(expr: &Expr) -> bool {
+    is_constant(expr) && !is_singleton(expr)
 }
 
 /// Extract the names of all handled exceptions.
@@ -232,7 +250,6 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 
 /// Returns `true` if a call is an argumented `super` invocation.
 pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
-    // Check: is this a `super` call?
     if let ExprKind::Name { id, .. } = &func.node {
         id == "super" && !args.is_empty()
     } else {
