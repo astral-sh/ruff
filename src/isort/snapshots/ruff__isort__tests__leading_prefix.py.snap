@@ -9,14 +9,7 @@ expression: checks
   end_location:
     row: 2
     column: 9
-  fix:
-    content: "\nimport os\nimport sys\n\n"
-    location:
-      row: 1
-      column: 7
-    end_location:
-      row: 4
-      column: 0
+  fix: ~
 - kind: UnsortedImports
   location:
     row: 5
@@ -24,12 +17,21 @@ expression: checks
   end_location:
     row: 6
     column: 13
-  fix:
-    content: "\n    import os\n    import sys\n"
-    location:
-      row: 5
-      column: 11
-    end_location:
-      row: 7
-      column: 0
+  fix: ~
+- kind: UnsortedImports
+  location:
+    row: 10
+    column: 8
+  end_location:
+    row: 10
+    column: 17
+  fix: ~
+- kind: UnsortedImports
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 9
+  fix: ~
 

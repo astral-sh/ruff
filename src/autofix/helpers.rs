@@ -73,7 +73,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
 
 /// Return the location of a trailing semicolon following a `Stmt`, if it's part
 /// of a multi-statement line.
-fn trailing_semicolon(locator: &SourceCodeLocator, stmt: &Stmt) -> Option<Location> {
+fn trailing_semicolon(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Location> {
     let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
     for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
         let trimmed = line.trim();
@@ -94,8 +94,8 @@ fn trailing_semicolon(locator: &SourceCodeLocator, stmt: &Stmt) -> Option<Locati
     None
 }
 
-/// Find the start of the next `Stmt` after a semicolon.
-fn next_valid_character(semicolon: Location, locator: &SourceCodeLocator) -> Location {
+/// Find the next valid break for a `Stmt` after a semicolon.
+fn next_stmt_break(semicolon: Location, locator: &SourceCodeLocator) -> Location {
     let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
     let contents = locator.slice_source_code_at(&start_location);
     for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
@@ -127,31 +127,43 @@ fn next_valid_character(semicolon: Location, locator: &SourceCodeLocator) -> Loc
     Location::new(start_location.row() + 1, 0)
 }
 
+/// Return `true` if a `Stmt` occurs at the end of a file.
+fn is_end_of_file(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+    let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
+    contents.is_empty()
+}
+
 /// Return the `Range` to use when deleting a `Stmt`.
 ///
 /// In some cases, this is as simple as the `Range` of the `Stmt` itself.
 /// However, there are a few exceptions:
-/// - If the `Stmt` has no trailing and leading content, then it's convenient to
-///   remove the entire start and end lines.
 /// - If the `Stmt` is _not_ the terminal statement in a multi-statement line,
 ///   we need to delete up to the start of the next statement (and avoid
 ///   deleting any content that precedes the statement).
 /// - If the `Stmt` is the terminal statement in a multi-statement line, we need
 ///   to avoid deleting any content that precedes the statement.
-fn deletion_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
-    if let Some(semicolon) = trailing_semicolon(locator, stmt) {
-        let next = next_valid_character(semicolon, locator);
-        Range {
+/// - If the `Stmt` has no trailing and leading content, then it's convenient to
+///   remove the entire start and end lines.
+fn deletion_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Result<Range> {
+    if let Some(semicolon) = trailing_semicolon(stmt, locator) {
+        let next = next_stmt_break(semicolon, locator);
+        Ok(Range {
             location: stmt.location,
             end_location: next,
-        }
+        })
     } else if helpers::match_leading_content(stmt, locator) {
-        Range::from_located(stmt)
+        Ok(Range::from_located(stmt))
+    } else if helpers::preceded_by_continuation(stmt, locator) {
+        if is_end_of_file(stmt, locator) {
+            bail!("Unable to delete suspected continuation line at end-of-file")
+        } else {
+            Ok(Range::from_located(stmt))
+        }
     } else {
-        Range {
+        Ok(Range {
             location: Location::new(stmt.location.row(), 0),
             end_location: Location::new(stmt.end_location.unwrap().row() + 1, 0),
-        }
+        })
     }
 }
 
@@ -174,7 +186,87 @@ pub fn delete_stmt(
             stmt.end_location.unwrap(),
         ))
     } else {
-        let range = deletion_range(stmt, locator);
+        let range = deletion_range(stmt, locator)?;
         Ok(Fix::deletion(range.location, range.end_location))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use rustpython_ast::Location;
+    use rustpython_parser::parser;
+
+    use crate::autofix::helpers::{next_stmt_break, trailing_semicolon};
+    use crate::source_code_locator::SourceCodeLocator;
+
+    #[test]
+    fn find_semicolon() -> Result<()> {
+        let contents = "x = 1";
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(trailing_semicolon(stmt, &locator), None);
+
+        let contents = "x = 1; y = 1";
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            trailing_semicolon(stmt, &locator),
+            Some(Location::new(1, 5))
+        );
+
+        let contents = "x = 1 ; y = 1";
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            trailing_semicolon(stmt, &locator),
+            Some(Location::new(1, 6))
+        );
+
+        let contents = r#"
+x = 1 \
+  ; y = 1
+"#
+        .trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            trailing_semicolon(stmt, &locator),
+            Some(Location::new(2, 2))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_next_stmt_break() {
+        let contents = "x = 1; y = 1";
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            next_stmt_break(Location::new(1, 4), &locator),
+            Location::new(1, 5)
+        );
+
+        let contents = "x = 1 ; y = 1";
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            next_stmt_break(Location::new(1, 5), &locator),
+            Location::new(1, 6)
+        );
+
+        let contents = r#"
+x = 1 \
+  ; y = 1
+"#
+        .trim();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(
+            next_stmt_break(Location::new(2, 2), &locator),
+            Location::new(2, 4)
+        );
     }
 }

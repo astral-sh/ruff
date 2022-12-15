@@ -367,6 +367,39 @@ pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
     Range::from_located(stmt)
 }
 
+/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
+/// other statements preceding it.
+pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+    // Does the previous line end in a continuation? This will have a specific
+    // false-positive, which is that if the previous line ends in a comment, it
+    // will be treated as a continuation. So we should only use this information to make
+    // conservative choices.
+    // TODO(charlie): Come up with a more robust strategy.
+    if stmt.location.row() > 1 {
+        let range = Range {
+            location: Location::new(stmt.location.row() - 1, 0),
+            end_location: Location::new(stmt.location.row(), 0),
+        };
+        let line = locator.slice_source_code_range(&range);
+        if line.trim().ends_with('\\') {
+            return true;
+        }
+    }
+    false
+}
+
+/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
+/// other statements preceding it.
+pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+    match_leading_content(stmt, locator) || preceded_by_continuation(stmt, locator)
+}
+
+/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
+/// other statements following it.
+pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+    match_trailing_content(stmt, locator)
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
@@ -374,7 +407,9 @@ mod tests {
     use rustpython_ast::Location;
     use rustpython_parser::parser;
 
-    use crate::ast::helpers::{identifier_range, match_module_member};
+    use crate::ast::helpers::{
+        identifier_range, match_leading_content, match_module_member, match_trailing_content,
+    };
     use crate::ast::types::Range;
     use crate::source_code_locator::SourceCodeLocator;
 
@@ -518,6 +553,45 @@ mod tests {
             &FxHashMap::default(),
             &FxHashMap::from_iter([("t", "typing")]),
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn trailing_content() -> Result<()> {
+        let contents = "x = 1";
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(match_trailing_content(stmt, &locator), false);
+
+        let contents = "x = 1; y = 2";
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(match_trailing_content(stmt, &locator), true);
+
+        let contents = "x = 1  ";
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(match_trailing_content(stmt, &locator), false);
+
+        let contents = "x = 1  # Comment";
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(match_trailing_content(stmt, &locator), false);
+
+        let contents = r#"
+x = 1
+y = 2
+"#
+        .trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        assert_eq!(match_trailing_content(stmt, &locator), false);
+
         Ok(())
     }
 

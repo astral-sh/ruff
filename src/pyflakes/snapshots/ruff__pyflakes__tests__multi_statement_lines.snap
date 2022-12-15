@@ -106,10 +106,10 @@ expression: checks
     content: ""
     location:
       row: 21
-      column: 0
+      column: 9
     end_location:
-      row: 22
-      column: 0
+      row: 21
+      column: 19
 - kind:
     UnusedImport:
       - foo

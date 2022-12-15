@@ -7,7 +7,6 @@ import fu
 
 
 class bar:
-    # STOPSHIP: This errors.
     fu = 1
 
 
