@@ -1,5 +1,5 @@
 use itertools::izip;
-use rustpython_ast::{Location, Stmt, StmtKind};
+use rustpython_ast::{Located, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -65,11 +65,11 @@ fn is_ambiguous_name(name: &str) -> bool {
 }
 
 /// E741
-pub fn ambiguous_variable_name(name: &str, location: Range) -> Option<Check> {
+pub fn ambiguous_variable_name<T>(name: &str, located: &Located<T>) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousVariableName(name.to_string()),
-            location,
+            Range::from_located(located),
         ))
     } else {
         None
