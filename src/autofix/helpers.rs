@@ -95,7 +95,7 @@ fn trailing_semicolon(locator: &SourceCodeLocator, stmt: &Stmt) -> Option<Locati
 }
 
 /// Find the start of the next `Stmt` after a semicolon.
-fn next_valid_character(locator: &SourceCodeLocator, semicolon: Location) -> Location {
+fn next_valid_character(semicolon: Location, locator: &SourceCodeLocator) -> Location {
     let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
     let contents = locator.slice_source_code_at(&start_location);
     for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
@@ -138,9 +138,9 @@ fn next_valid_character(locator: &SourceCodeLocator, semicolon: Location) -> Loc
 ///   deleting any content that precedes the statement).
 /// - If the `Stmt` is the terminal statement in a multi-statement line, we need
 ///   to avoid deleting any content that precedes the statement.
-fn deletion_range(locator: &SourceCodeLocator, stmt: &Stmt) -> Range {
+fn deletion_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
     if let Some(semicolon) = trailing_semicolon(locator, stmt) {
-        let next = next_valid_character(locator, semicolon);
+        let next = next_valid_character(semicolon, locator);
         Range {
             location: stmt.location,
             end_location: next,
@@ -156,10 +156,10 @@ fn deletion_range(locator: &SourceCodeLocator, stmt: &Stmt) -> Range {
 }
 
 pub fn delete_stmt(
-    locator: &SourceCodeLocator,
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
+    locator: &SourceCodeLocator,
 ) -> Result<Fix> {
     if parent
         .map(|parent| is_lone_child(stmt, parent, deleted))
@@ -174,7 +174,7 @@ pub fn delete_stmt(
             stmt.end_location.unwrap(),
         ))
     } else {
-        let range = deletion_range(locator, stmt);
+        let range = deletion_range(stmt, locator);
         Ok(Fix::deletion(range.location, range.end_location))
     }
 }

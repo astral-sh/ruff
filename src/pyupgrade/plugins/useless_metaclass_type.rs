@@ -17,10 +17,10 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         let defined_by = checker.current_parent();
         let defined_in = checker.current_grandparent();
         match helpers::delete_stmt(
-            checker.locator,
             defined_by.0,
             defined_in.map(|node| node.0),
             &deleted,
+            checker.locator,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {

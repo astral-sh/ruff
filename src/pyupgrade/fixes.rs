@@ -175,7 +175,7 @@ pub fn remove_unnecessary_future_import(
     }
 
     if aliases.is_empty() {
-        autofix::helpers::delete_stmt(locator, stmt, parent, deleted)
+        autofix::helpers::delete_stmt(stmt, parent, deleted, locator)
     } else {
         let mut state = CodegenState::default();
         tree.codegen(&mut state);

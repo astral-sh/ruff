@@ -24,10 +24,10 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
         if matches!(defined_by.0.node, StmtKind::Expr { .. }) {
             let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
             match helpers::delete_stmt(
-                checker.locator,
                 defined_by.0,
                 defined_in.map(|node| node.0),
                 &deleted,
+                checker.locator,
             ) {
                 Ok(fix) => {
                     if fix.content.is_empty() || fix.content == "pass" {

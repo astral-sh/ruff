@@ -14,11 +14,11 @@ use crate::source_code_locator::SourceCodeLocator;
 
 /// Generate a `Fix` to remove any unused imports from an `import` statement.
 pub fn remove_unused_imports(
-    locator: &SourceCodeLocator,
     unused_imports: &Vec<(&String, &Range)>,
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
+    locator: &SourceCodeLocator,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text)?;
@@ -65,7 +65,7 @@ pub fn remove_unused_imports(
     }
 
     if aliases.is_empty() {
-        helpers::delete_stmt(locator, stmt, parent, deleted)
+        helpers::delete_stmt(stmt, parent, deleted, locator)
     } else {
         let mut state = CodegenState::default();
         tree.codegen(&mut state);
@@ -80,9 +80,9 @@ pub fn remove_unused_imports(
 
 /// Generate a `Fix` to remove unused keys from format dict.
 pub fn remove_unused_format_arguments_from_dict(
-    locator: &SourceCodeLocator,
     unused_arguments: &[&str],
     stmt: &Expr,
+    locator: &SourceCodeLocator,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text)?;
@@ -126,9 +126,9 @@ pub fn remove_unused_format_arguments_from_dict(
 
 /// Generate a `Fix` to remove unused keyword arguments from format call.
 pub fn remove_unused_keyword_arguments_from_format_call(
-    locator: &SourceCodeLocator,
     unused_arguments: &[&str],
     location: Range,
+    locator: &SourceCodeLocator,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&location);
     let mut tree = match_module(&module_text)?;
