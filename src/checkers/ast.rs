@@ -37,10 +37,10 @@ use crate::vendored::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
-    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
-    flake8_errmsg, flake8_import_conventions, flake8_print, flake8_return, flake8_simplify,
-    flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, visibility,
+    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
+    flake8_debugger, flake8_errmsg, flake8_import_conventions, flake8_print, flake8_return,
+    flake8_simplify, flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet,
+    pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -1953,6 +1953,18 @@ where
                     if let Some(check) = pandas_vet::checks::use_of_pd_merge(func) {
                         self.add_check(check);
                     };
+                }
+
+                // flake8-datetimez
+                if self.settings.enabled.contains(&CheckCode::DTZ001) {
+                    if let Some(check) = flake8_datetimez::checks::call_datetime_without_tzinfo(
+                        func,
+                        args,
+                        keywords,
+                        Range::from_located(expr),
+                    ) {
+                        self.add_check(check);
+                    }
                 }
 
                 // pygrep-hooks
