@@ -1513,10 +1513,6 @@ where
                 args,
                 keywords,
             } => {
-                if self.settings.enabled.contains(&CheckCode::UP016) {
-                    pyupgrade::plugins::remove_six_compat(self, expr);
-                }
-
                 // pyflakes
                 if self.settings.enabled.contains(&CheckCode::F521)
                     || self.settings.enabled.contains(&CheckCode::F522)
@@ -1582,6 +1578,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP012) {
                     pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP016) {
+                    pyupgrade::plugins::remove_six_compat(self, expr);
                 }
 
                 // flake8-super
