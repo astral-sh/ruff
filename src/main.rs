@@ -44,7 +44,7 @@ fn resolve(config: Option<PathBuf>, overrides: &Overrides) -> Result<PyprojectDi
         // current working directory. (This matches ESLint's behavior.)
         let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
         Ok(PyprojectDiscovery::Fixed(settings))
-    } else if let Some(pyproject) = pyproject::find_pyproject_toml(path_dedot::CWD.as_path()) {
+    } else if let Some(pyproject) = pyproject::find_pyproject_toml(path_dedot::CWD.as_path())? {
         // Second priority: find a `pyproject.toml` file in the current working path,
         // and resolve all paths relative to that directory. (With
         // `Strategy::Hierarchical`, we'll end up finding the "closest" `pyproject.toml`

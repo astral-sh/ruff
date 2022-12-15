@@ -14,6 +14,7 @@ use rustc_hash::FxHashSet;
 use crate::cli::Overrides;
 use crate::fs;
 use crate::settings::configuration::Configuration;
+use crate::settings::pyproject::has_ruff_section;
 use crate::settings::{pyproject, Settings};
 
 /// The strategy used to discover Python files in the filesystem..
@@ -201,9 +202,11 @@ pub fn python_files_in_path(
         for ancestor in path.ancestors() {
             let pyproject = ancestor.join("pyproject.toml");
             if pyproject.is_file() {
-                let (root, settings) =
-                    resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
-                resolver.add(root, settings);
+                if has_ruff_section(&pyproject)? {
+                    let (root, settings) =
+                        resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
+                    resolver.add(root, settings);
+                }
             }
         }
     }
@@ -237,12 +240,23 @@ pub fn python_files_in_path(
                 {
                     let pyproject = entry.path().join("pyproject.toml");
                     if pyproject.is_file() {
-                        match resolve_scoped_settings(
-                            &pyproject,
-                            &Relativity::Parent,
-                            Some(overrides),
-                        ) {
-                            Ok((root, settings)) => resolver.write().unwrap().add(root, settings),
+                        match has_ruff_section(&pyproject) {
+                            Ok(false) => {}
+                            Ok(true) => {
+                                match resolve_scoped_settings(
+                                    &pyproject,
+                                    &Relativity::Parent,
+                                    Some(overrides),
+                                ) {
+                                    Ok((root, settings)) => {
+                                        resolver.write().unwrap().add(root, settings);
+                                    }
+                                    Err(err) => {
+                                        *error.lock().unwrap() = Err(err);
+                                        return WalkState::Quit;
+                                    }
+                                }
+                            }
                             Err(err) => {
                                 *error.lock().unwrap() = Err(err);
                                 return WalkState::Quit;
@@ -272,8 +286,8 @@ pub fn python_files_in_path(
                                 return WalkState::Skip;
                             }
                         }
-                        Err(e) => {
-                            debug!("Ignored path due to error in parsing: {:?}: {}", path, e);
+                        Err(err) => {
+                            debug!("Ignored path due to error in parsing: {:?}: {}", path, err);
                             return WalkState::Skip;
                         }
                     }
