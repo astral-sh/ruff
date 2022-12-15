@@ -66,6 +66,7 @@ pub mod logging;
 pub mod mccabe;
 pub mod message;
 mod noqa;
+mod pandas_vet;
 pub mod pep8_naming;
 pub mod printer;
 mod pycodestyle;
@@ -87,7 +88,7 @@ pub mod visibility;
 
 /// Load the relevant `Settings` for a given `Path`.
 fn resolve(path: &Path) -> Result<Settings> {
-    if let Some(pyproject) = pyproject::find_pyproject_toml(path) {
+    if let Some(pyproject) = pyproject::find_pyproject_toml(path)? {
         // First priority: `pyproject.toml` in the current `Path`.
         resolver::resolve_settings(&pyproject, &Relativity::Parent, None)
     } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {

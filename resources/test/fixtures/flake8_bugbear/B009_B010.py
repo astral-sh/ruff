@@ -20,6 +20,8 @@ getattr(foo, "_123abc")
 getattr(foo, "abc123")
 getattr(foo, r"abc123")
 _ = lambda x: getattr(x, "bar")
+if getattr(x, "bar"):
+    pass
 
 # Valid setattr usage
 setattr(foo, bar, None)
@@ -28,6 +30,8 @@ setattr(foo, "123abc", None)
 setattr(foo, r"123\abc", None)
 setattr(foo, "except", None)
 _ = lambda x: setattr(x, "bar", 1)
+if setattr(x, "bar", 1):
+    pass
 
 # Invalid usage
 setattr(foo, "bar", None)

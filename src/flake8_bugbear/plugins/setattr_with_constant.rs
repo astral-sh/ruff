@@ -56,16 +56,23 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     if KWLIST.contains(&name.as_str()) {
         return;
     }
-    let mut check = Check::new(CheckKind::SetAttrWithConstant, Range::from_located(expr));
-    if checker.patch(check.kind.code()) {
-        match assignment(obj, name, value) {
-            Ok(content) => check.amend(Fix::replacement(
-                content,
-                expr.location,
-                expr.end_location.unwrap(),
-            )),
-            Err(e) => error!("Failed to fix invalid comparison: {e}"),
-        };
+    // We can only replace a `setattr` call (which is an `Expr`) with an assignment
+    // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
+    // (i.e., it's directly within an `StmtKind::Expr`).
+    if let StmtKind::Expr { value: child } = &checker.current_parent().0.node {
+        if expr == child.as_ref() {
+            let mut check = Check::new(CheckKind::SetAttrWithConstant, Range::from_located(expr));
+            if checker.patch(check.kind.code()) {
+                match assignment(obj, name, value) {
+                    Ok(content) => check.amend(Fix::replacement(
+                        content,
+                        expr.location,
+                        expr.end_location.unwrap(),
+                    )),
+                    Err(e) => error!("Failed to fix invalid comparison: {e}"),
+                };
+            }
+            checker.add_check(check);
+        }
     }
-    checker.add_check(check);
 }

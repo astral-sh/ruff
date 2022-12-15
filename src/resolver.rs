@@ -3,21 +3,30 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
+use ignore::{DirEntry, WalkBuilder, WalkState};
 use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::FxHashSet;
-use walkdir::{DirEntry, WalkDir};
 
 use crate::cli::Overrides;
 use crate::fs;
 use crate::settings::configuration::Configuration;
+use crate::settings::pyproject::has_ruff_section;
 use crate::settings::{pyproject, Settings};
 
-/// The strategy for discovering a `pyproject.toml` file for each Python file.
+/// The strategy used to discover Python files in the filesystem..
 #[derive(Debug)]
-pub enum Strategy {
+pub struct FileDiscovery {
+    pub respect_gitignore: bool,
+}
+
+/// The strategy used to discover the relevant `pyproject.toml` file for each
+/// Python file.
+#[derive(Debug)]
+pub enum PyprojectDiscovery {
     /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
     /// provided on the command-line).
     Fixed(Settings),
@@ -64,10 +73,10 @@ impl Resolver {
     }
 
     /// Return the appropriate `Settings` for a given `Path`.
-    pub fn resolve<'a>(&'a self, path: &Path, strategy: &'a Strategy) -> &'a Settings {
+    pub fn resolve<'a>(&'a self, path: &Path, strategy: &'a PyprojectDiscovery) -> &'a Settings {
         match strategy {
-            Strategy::Fixed(settings) => settings,
-            Strategy::Hierarchical(default) => self
+            PyprojectDiscovery::Fixed(settings) => settings,
+            PyprojectDiscovery::Hierarchical(default) => self
                 .settings
                 .iter()
                 .rev()
@@ -164,99 +173,138 @@ fn is_excluded(file_path: &str, file_basename: &str, exclude: &globset::GlobSet)
 }
 
 /// Return `true` if the `Path` appears to be that of a Python file.
-fn is_python_file(path: &Path) -> bool {
+fn is_python_path(path: &Path) -> bool {
     path.extension()
         .map_or(false, |ext| ext == "py" || ext == "pyi")
 }
 
-/// Find all Python (`.py` and `.pyi` files) in a set of `PathBuf`s.
-pub fn resolve_python_files(
-    paths: &[PathBuf],
-    strategy: &Strategy,
-    overrides: &Overrides,
-) -> Result<(Vec<Result<DirEntry, walkdir::Error>>, Resolver)> {
-    let mut files = Vec::new();
-    let mut resolver = Resolver::default();
-    for path in paths {
-        let (files_in_path, file_resolver) = python_files_in_path(path, strategy, overrides)?;
-        files.extend(files_in_path);
-        resolver.merge(file_resolver);
-    }
-    Ok((files, resolver))
+/// Return `true` if the `Entry` appears to be that of a Python file.
+fn is_python_entry(entry: &DirEntry) -> bool {
+    is_python_path(entry.path())
+        && !entry
+            .file_type()
+            .map_or(false, |file_type| file_type.is_dir())
 }
 
-/// Find all Python (`.py` and `.pyi` files) in a given `Path`.
-fn python_files_in_path(
-    path: &Path,
-    strategy: &Strategy,
+/// Find all Python (`.py` and `.pyi` files) in a set of paths.
+pub fn python_files_in_path(
+    paths: &[PathBuf],
+    pyproject_strategy: &PyprojectDiscovery,
+    file_strategy: &FileDiscovery,
     overrides: &Overrides,
-) -> Result<(Vec<Result<DirEntry, walkdir::Error>>, Resolver)> {
-    let path = fs::normalize_path(path);
+) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
+    // Normalize every path (e.g., convert from relative to absolute).
+    let paths: Vec<PathBuf> = paths.iter().map(|path| fs::normalize_path(path)).collect();
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
-    for path in path.ancestors() {
-        if path.is_dir() {
-            let pyproject = path.join("pyproject.toml");
+    for path in &paths {
+        for ancestor in path.ancestors() {
+            let pyproject = ancestor.join("pyproject.toml");
             if pyproject.is_file() {
-                let (root, settings) =
-                    resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
-                resolver.add(root, settings);
+                if has_ruff_section(&pyproject)? {
+                    let (root, settings) =
+                        resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
+                    resolver.add(root, settings);
+                }
             }
         }
     }
 
-    // Collect all Python files.
-    let files: Vec<Result<DirEntry, walkdir::Error>> = WalkDir::new(path)
-        .into_iter()
-        .filter_entry(|entry| {
+    // Create the `WalkBuilder`.
+    let mut builder = WalkBuilder::new(
+        paths
+            .get(0)
+            .ok_or_else(|| anyhow!("Expected at least one path to search for Python files"))?,
+    );
+    for path in &paths[1..] {
+        builder.add(path);
+    }
+    builder.standard_filters(file_strategy.respect_gitignore);
+    builder.hidden(false);
+    let walker = builder.build_parallel();
+
+    // Run the `WalkParallel` to collect all Python files.
+    let error: std::sync::Mutex<Result<()>> = std::sync::Mutex::new(Ok(()));
+    let resolver: RwLock<Resolver> = RwLock::new(resolver);
+    let files: std::sync::Mutex<Vec<Result<DirEntry, ignore::Error>>> =
+        std::sync::Mutex::new(vec![]);
+    walker.run(|| {
+        Box::new(|result| {
             // Search for the `pyproject.toml` file in this directory, before we visit any
             // of its contents.
-            if entry.file_type().is_dir() {
-                let pyproject = entry.path().join("pyproject.toml");
-                if pyproject.is_file() {
-                    // TODO(charlie): Return a `Result` here.
-                    let (root, settings) =
-                        resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))
-                            .unwrap();
-                    resolver.add(root, settings);
-                }
-            }
-
-            let path = entry.path();
-            let settings = resolver.resolve(path, strategy);
-            match fs::extract_path_names(path) {
-                Ok((file_path, file_basename)) => {
-                    if !settings.exclude.is_empty()
-                        && is_excluded(file_path, file_basename, &settings.exclude)
-                    {
-                        debug!("Ignored path via `exclude`: {:?}", path);
-                        false
-                    } else if !settings.extend_exclude.is_empty()
-                        && is_excluded(file_path, file_basename, &settings.extend_exclude)
-                    {
-                        debug!("Ignored path via `extend-exclude`: {:?}", path);
-                        false
-                    } else {
-                        true
+            if let Ok(entry) = &result {
+                if entry
+                    .file_type()
+                    .map_or(false, |file_type| file_type.is_dir())
+                {
+                    let pyproject = entry.path().join("pyproject.toml");
+                    if pyproject.is_file() {
+                        match has_ruff_section(&pyproject) {
+                            Ok(false) => {}
+                            Ok(true) => {
+                                match resolve_scoped_settings(
+                                    &pyproject,
+                                    &Relativity::Parent,
+                                    Some(overrides),
+                                ) {
+                                    Ok((root, settings)) => {
+                                        resolver.write().unwrap().add(root, settings);
+                                    }
+                                    Err(err) => {
+                                        *error.lock().unwrap() = Err(err);
+                                        return WalkState::Quit;
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                *error.lock().unwrap() = Err(err);
+                                return WalkState::Quit;
+                            }
+                        }
                     }
                 }
-                Err(e) => {
-                    debug!("Ignored path due to error in parsing: {:?}: {}", path, e);
-                    true
+            }
+
+            // Respect our own exclusion behavior.
+            if let Ok(entry) = &result {
+                if entry.depth() > 0 {
+                    let path = entry.path();
+                    let resolver = resolver.read().unwrap();
+                    let settings = resolver.resolve(path, pyproject_strategy);
+                    match fs::extract_path_names(path) {
+                        Ok((file_path, file_basename)) => {
+                            if !settings.exclude.is_empty()
+                                && is_excluded(file_path, file_basename, &settings.exclude)
+                            {
+                                debug!("Ignored path via `exclude`: {:?}", path);
+                                return WalkState::Skip;
+                            } else if !settings.extend_exclude.is_empty()
+                                && is_excluded(file_path, file_basename, &settings.extend_exclude)
+                            {
+                                debug!("Ignored path via `extend-exclude`: {:?}", path);
+                                return WalkState::Skip;
+                            }
+                        }
+                        Err(err) => {
+                            debug!("Ignored path due to error in parsing: {:?}: {}", path, err);
+                            return WalkState::Skip;
+                        }
+                    }
                 }
             }
-        })
-        .filter(|entry| {
-            entry.as_ref().map_or(true, |entry| {
-                (entry.depth() == 0 || is_python_file(entry.path()))
-                    && !entry.file_type().is_dir()
-                    && !(entry.file_type().is_symlink() && entry.path().is_dir())
-            })
-        })
-        .collect::<Vec<_>>();
 
-    Ok((files, resolver))
+            if result.as_ref().map_or(true, is_python_entry) {
+                files.lock().unwrap().push(result);
+            }
+
+            WalkState::Continue
+        })
+    });
+
+    error.into_inner().unwrap()?;
+
+    Ok((files.into_inner().unwrap(), resolver.into_inner().unwrap()))
 }
 
 #[cfg(test)]
@@ -268,22 +316,22 @@ mod tests {
     use path_absolutize::Absolutize;
 
     use crate::fs;
-    use crate::resolver::{is_excluded, is_python_file};
+    use crate::resolver::{is_excluded, is_python_path};
     use crate::settings::types::FilePattern;
 
     #[test]
     fn inclusions() {
         let path = Path::new("foo/bar/baz.py").absolutize().unwrap();
-        assert!(is_python_file(&path));
+        assert!(is_python_path(&path));
 
         let path = Path::new("foo/bar/baz.pyi").absolutize().unwrap();
-        assert!(is_python_file(&path));
+        assert!(is_python_path(&path));
 
         let path = Path::new("foo/bar/baz.js").absolutize().unwrap();
-        assert!(!is_python_file(&path));
+        assert!(!is_python_path(&path));
 
         let path = Path::new("foo/bar/baz").absolutize().unwrap();
-        assert!(!is_python_file(&path));
+        assert!(!is_python_path(&path));
     }
 
     fn make_exclusion(file_pattern: FilePattern) -> GlobSet {

@@ -33,17 +33,24 @@ fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
     toml::from_str(&contents).map_err(std::convert::Into::into)
 }
 
-/// Find the nearest `pyproject.toml` file.
-pub fn find_pyproject_toml(path: &Path) -> Option<PathBuf> {
-    for directory in path.ancestors() {
-        let pyproject = directory.join("pyproject.toml");
-        if pyproject.is_file() {
-            return Some(pyproject);
-        }
-    }
-    None
+/// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
+pub fn has_ruff_section(path: &Path) -> Result<bool> {
+    let pyproject = parse_pyproject_toml(path)?;
+    Ok(pyproject.tool.and_then(|tool| tool.ruff).is_some())
 }
 
+/// Find the path to the `pyproject.toml` file, if such a file exists.
+pub fn find_pyproject_toml(path: &Path) -> Result<Option<PathBuf>> {
+    for directory in path.ancestors() {
+        let pyproject = directory.join("pyproject.toml");
+        if pyproject.is_file() && has_ruff_section(&pyproject)? {
+            return Ok(Some(pyproject));
+        }
+    }
+    Ok(None)
+}
+
+/// Find the path to the user-specific `pyproject.toml`, if it exists.
 pub fn find_user_pyproject_toml() -> Option<PathBuf> {
     let mut path = dirs::config_dir()?;
     path.push("ruff");
@@ -55,6 +62,7 @@ pub fn find_user_pyproject_toml() -> Option<PathBuf> {
     }
 }
 
+/// Load `Options` from a `pyproject.toml`.
 pub fn load_options(pyproject: &Path) -> Result<Options> {
     Ok(parse_pyproject_toml(pyproject)
         .map_err(|err| anyhow!("Failed to parse `{}`: {}", pyproject.to_string_lossy(), err))?
@@ -119,6 +127,7 @@ mod tests {
                     ignore_init_module_imports: None,
                     line_length: None,
                     per_file_ignores: None,
+                    respect_gitignore: None,
                     select: None,
                     show_source: None,
                     src: None,
@@ -163,6 +172,7 @@ line-length = 79
                     ignore_init_module_imports: None,
                     line_length: Some(79),
                     per_file_ignores: None,
+                    respect_gitignore: None,
                     select: None,
                     show_source: None,
                     src: None,
@@ -209,6 +219,7 @@ exclude = ["foo.py"]
                     format: None,
                     unfixable: None,
                     per_file_ignores: None,
+                    respect_gitignore: None,
                     dummy_variable_rgx: None,
                     src: None,
                     target_version: None,
@@ -251,6 +262,7 @@ select = ["E501"]
                     ignore_init_module_imports: None,
                     line_length: None,
                     per_file_ignores: None,
+                    respect_gitignore: None,
                     select: Some(vec![CheckCodePrefix::E501]),
                     show_source: None,
                     src: None,
@@ -296,6 +308,7 @@ ignore = ["E501"]
                     ignore_init_module_imports: None,
                     line_length: None,
                     per_file_ignores: None,
+                    respect_gitignore: None,
                     select: None,
                     show_source: None,
                     src: None,
@@ -350,7 +363,7 @@ other-attribute = 1
     fn find_and_parse_pyproject_toml() -> Result<()> {
         let cwd = current_dir()?;
         let pyproject =
-            find_pyproject_toml(&cwd.join("resources/test/fixtures/__init__.py")).unwrap();
+            find_pyproject_toml(&cwd.join("resources/test/fixtures/__init__.py"))?.unwrap();
         assert_eq!(
             pyproject,
             cwd.join("resources/test/fixtures/pyproject.toml")
@@ -383,8 +396,9 @@ other-attribute = 1
                 per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
                     vec![CheckCodePrefix::F401]
-                ),])),
+                )])),
                 dummy_variable_rgx: None,
+                respect_gitignore: None,
                 src: None,
                 target_version: None,
                 show_source: None,

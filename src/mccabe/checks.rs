@@ -1,7 +1,8 @@
 use rustpython_ast::{ExcepthandlerKind, ExprKind, Stmt, StmtKind};
 
-use crate::ast::types::Range;
+use crate::ast::helpers::identifier_range;
 use crate::checks::{Check, CheckKind};
+use crate::source_code_locator::SourceCodeLocator;
 
 fn get_complexity_number(stmts: &[Stmt]) -> usize {
     let mut complexity = 0;
@@ -59,12 +60,13 @@ pub fn function_is_too_complex(
     name: &str,
     body: &[Stmt],
     max_complexity: usize,
+    locator: &SourceCodeLocator,
 ) -> Option<Check> {
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
         Some(Check::new(
             CheckKind::FunctionIsTooComplex(name.to_string(), complexity),
-            Range::from_located(stmt),
+            identifier_range(stmt, locator),
         ))
     } else {
         None

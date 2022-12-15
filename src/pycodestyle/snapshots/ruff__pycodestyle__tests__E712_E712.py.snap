@@ -175,13 +175,13 @@ expression: checks
     row: 25
     column: 14
   fix:
-    content: ""
+    content: res is True is not False
     location:
       row: 25
       column: 3
     end_location:
       row: 25
-      column: 3
+      column: 23
 - kind:
     TrueFalseComparison:
       - false

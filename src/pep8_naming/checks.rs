@@ -1,47 +1,53 @@
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
+use rustpython_ast::{Arg, Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::function_type;
+use crate::ast::helpers::identifier_range;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
 use crate::pep8_naming::helpers;
 use crate::pep8_naming::settings::Settings;
 use crate::python::string::{self};
+use crate::source_code_locator::SourceCodeLocator;
 
 /// N801
-pub fn invalid_class_name(class_def: &Stmt, name: &str) -> Option<Check> {
+pub fn invalid_class_name(
+    class_def: &Stmt,
+    name: &str,
+    locator: &SourceCodeLocator,
+) -> Option<Check> {
     let stripped = name.strip_prefix('_').unwrap_or(name);
     if !stripped.chars().next().map_or(false, char::is_uppercase) || stripped.contains('_') {
         return Some(Check::new(
             CheckKind::InvalidClassName(name.to_string()),
-            Range::from_located(class_def),
+            identifier_range(class_def, locator),
         ));
     }
     None
 }
 
 /// N802
-pub fn invalid_function_name(func_def: &Stmt, name: &str, settings: &Settings) -> Option<Check> {
-    if name.to_lowercase() != name
-        && !settings
-            .ignore_names
-            .iter()
-            .any(|ignore_name| ignore_name == name)
-    {
+pub fn invalid_function_name(
+    func_def: &Stmt,
+    name: &str,
+    ignore_names: &[String],
+    locator: &SourceCodeLocator,
+) -> Option<Check> {
+    if name.to_lowercase() != name && !ignore_names.iter().any(|ignore_name| ignore_name == name) {
         return Some(Check::new(
             CheckKind::InvalidFunctionName(name.to_string()),
-            Range::from_located(func_def),
+            identifier_range(func_def, locator),
         ));
     }
     None
 }
 
 /// N803
-pub fn invalid_argument_name(name: &str, location: Range) -> Option<Check> {
+pub fn invalid_argument_name(name: &str, arg: &Arg) -> Option<Check> {
     if name.to_lowercase() != name {
         return Some(Check::new(
             CheckKind::InvalidArgumentName(name.to_string()),
-            location,
+            Range::from_located(arg),
         ));
     }
     None
@@ -124,7 +130,12 @@ pub fn invalid_first_argument_name_for_method(
 }
 
 /// N807
-pub fn dunder_function_name(scope: &Scope, stmt: &Stmt, name: &str) -> Option<Check> {
+pub fn dunder_function_name(
+    scope: &Scope,
+    stmt: &Stmt,
+    name: &str,
+    locator: &SourceCodeLocator,
+) -> Option<Check> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
     }
@@ -138,7 +149,7 @@ pub fn dunder_function_name(scope: &Scope, stmt: &Stmt, name: &str) -> Option<Ch
 
     Some(Check::new(
         CheckKind::DunderFunctionName,
-        Range::from_located(stmt),
+        identifier_range(stmt, locator),
     ))
 }
 
@@ -147,11 +158,12 @@ pub fn constant_imported_as_non_constant(
     import_from: &Stmt,
     name: &str,
     asname: &str,
+    locator: &SourceCodeLocator,
 ) -> Option<Check> {
     if string::is_upper(name) && !string::is_upper(asname) {
         return Some(Check::new(
             CheckKind::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
+            identifier_range(import_from, locator),
         ));
     }
     None
@@ -162,11 +174,12 @@ pub fn lowercase_imported_as_non_lowercase(
     import_from: &Stmt,
     name: &str,
     asname: &str,
+    locator: &SourceCodeLocator,
 ) -> Option<Check> {
     if !string::is_upper(name) && string::is_lower(name) && asname.to_lowercase() != asname {
         return Some(Check::new(
             CheckKind::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
+            identifier_range(import_from, locator),
         ));
     }
     None
@@ -177,11 +190,12 @@ pub fn camelcase_imported_as_lowercase(
     import_from: &Stmt,
     name: &str,
     asname: &str,
+    locator: &SourceCodeLocator,
 ) -> Option<Check> {
     if helpers::is_camelcase(name) && string::is_lower(asname) {
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
+            identifier_range(import_from, locator),
         ));
     }
     None
@@ -192,6 +206,7 @@ pub fn camelcase_imported_as_constant(
     import_from: &Stmt,
     name: &str,
     asname: &str,
+    locator: &SourceCodeLocator,
 ) -> Option<Check> {
     if helpers::is_camelcase(name)
         && !string::is_lower(asname)
@@ -200,7 +215,7 @@ pub fn camelcase_imported_as_constant(
     {
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
+            identifier_range(import_from, locator),
         ));
     }
     None
@@ -211,6 +226,7 @@ pub fn camelcase_imported_as_acronym(
     import_from: &Stmt,
     name: &str,
     asname: &str,
+    locator: &SourceCodeLocator,
 ) -> Option<Check> {
     if helpers::is_camelcase(name)
         && !string::is_lower(asname)
@@ -219,7 +235,7 @@ pub fn camelcase_imported_as_acronym(
     {
         return Some(Check::new(
             CheckKind::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
-            Range::from_located(import_from),
+            identifier_range(import_from, locator),
         ));
     }
     None

@@ -35,12 +35,4 @@ impl Fix {
             end_location: at,
         }
     }
-
-    pub fn dummy(location: Location) -> Self {
-        Self {
-            content: String::new(),
-            location,
-            end_location: location,
-        }
-    }
 }
