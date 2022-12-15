@@ -340,58 +340,52 @@ fn handle_func(
 }
 
 fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Result<Option<Check>> {
-    if let ExprKind::Call { func, args, .. } = &expr.node {
-        if let ExprKind::Name { id, .. } = &func.node {
-            if id == "next" {
-                if let [arg] = &args[..] {
-                    let call_path =
-                        dealias_call_path(collect_call_paths(arg), &checker.import_aliases);
-                    if is_module_member(&call_path, "six") {
-                        if let ExprKind::Call { func, args, .. } = &arg.node {
-                            if let ExprKind::Attribute { attr, .. } = &func.node {
-                                if let [dict_arg] = &args[..] {
-                                    let method_name = match attr.as_str() {
-                                        "iteritems" => Some("items"),
-                                        "iterkeys" => Some("keys"),
-                                        "itervalues" => Some("values"),
-                                        _ => return Ok(None),
-                                    };
-                                    if let Some(method_name) = method_name {
-                                        match replace_by_expr_kind(
-                                            ExprKind::Call {
-                                                func: Box::new(create_expr(ExprKind::Name {
-                                                    id: "iter".to_string(),
-                                                    ctx: ExprContext::Load,
-                                                })),
-                                                args: vec![create_expr(ExprKind::Call {
-                                                    func: Box::new(create_expr(
-                                                        ExprKind::Attribute {
-                                                            value: Box::new(dict_arg.clone()),
-                                                            attr: method_name.to_string(),
-                                                            ctx: ExprContext::Load,
-                                                        },
-                                                    )),
-                                                    args: vec![],
-                                                    keywords: vec![],
-                                                })],
-                                                keywords: vec![],
-                                            },
-                                            arg,
-                                            patch,
-                                        ) {
-                                            Ok(check) => return Ok(Some(check)),
-                                            Err(err) => return Err(err),
-                                        };
-                                    };
-                                };
-                            };
-                        };
-                    };
-                };
-            };
-        };
+    let ExprKind::Call { func, args, .. } = &expr.node else {
+        return Ok(None);
     };
-    Ok(None)
+    let ExprKind::Name { id, .. } = &func.node else {
+        return Ok(None);
+    };
+    if id != "next" {
+        return Ok(None);
+    }
+    let [arg] = &args[..] else { return Ok(None); };
+    let call_path = dealias_call_path(collect_call_paths(arg), &checker.import_aliases);
+    if !is_module_member(&call_path, "six") {
+        return Ok(None);
+    }
+    let ExprKind::Call { func, args, .. } = &arg.node else {return Ok(None);};
+    let ExprKind::Attribute { attr, .. } = &func.node else {return Ok(None);};
+    let [dict_arg] = &args[..] else {return Ok(None);};
+    let method_name = match attr.as_str() {
+        "iteritems" => "items",
+        "iterkeys" => "keys",
+        "itervalues" => "values",
+        _ => return Ok(None),
+    };
+    match replace_by_expr_kind(
+        ExprKind::Call {
+            func: Box::new(create_expr(ExprKind::Name {
+                id: "iter".to_string(),
+                ctx: ExprContext::Load,
+            })),
+            args: vec![create_expr(ExprKind::Call {
+                func: Box::new(create_expr(ExprKind::Attribute {
+                    value: Box::new(dict_arg.clone()),
+                    attr: method_name.to_string(),
+                    ctx: ExprContext::Load,
+                })),
+                args: vec![],
+                keywords: vec![],
+            })],
+            keywords: vec![],
+        },
+        arg,
+        patch,
+    ) {
+        Ok(check) => Ok(Some(check)),
+        Err(err) => Err(err),
+    }
 }
 
 /// UP016
@@ -403,7 +397,7 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
         }
         Ok(None) => (),
         Err(err) => {
-            error!("Error while removing six compat: {}", err);
+            error!("Error while removing `six` reference: {}", err);
             return;
         }
     };
@@ -418,7 +412,7 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
             } => match handle_func(func, args, keywords, expr, patch, checker.locator) {
                 Ok(check) => check,
                 Err(err) => {
-                    error!("Failed to remove six compat: {err}");
+                    error!("Failed to remove `six` reference: {err}");
                     return;
                 }
             },

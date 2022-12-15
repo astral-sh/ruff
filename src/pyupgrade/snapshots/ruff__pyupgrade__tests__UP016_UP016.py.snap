@@ -490,7 +490,7 @@ expression: checks
     row: 45
     column: 12
   fix:
-    content: "b'...'"
+    content: "b\"...\""
     location:
       row: 45
       column: 0
@@ -505,7 +505,7 @@ expression: checks
     row: 46
     column: 12
   fix:
-    content: "'...'"
+    content: "\"...\""
     location:
       row: 46
       column: 0
@@ -520,7 +520,7 @@ expression: checks
     row: 47
     column: 24
   fix:
-    content: "b'...'"
+    content: "b\"...\""
     location:
       row: 47
       column: 0
@@ -535,7 +535,7 @@ expression: checks
     row: 48
     column: 21
   fix:
-    content: "'...'"
+    content: "\"...\""
     location:
       row: 48
       column: 0
@@ -550,7 +550,7 @@ expression: checks
     row: 49
     column: 22
   fix:
-    content: "'...'"
+    content: "\"...\""
     location:
       row: 49
       column: 0
