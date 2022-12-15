@@ -21,6 +21,7 @@ pub enum Plugin {
     Flake8Simplify,
     Flake8TidyImports,
     McCabe,
+    PandasVet,
     PEP8Naming,
     Pyupgrade,
 }
@@ -45,6 +46,7 @@ impl FromStr for Plugin {
             "flake8-simplify" => Ok(Plugin::Flake8Simplify),
             "flake8-tidy-imports" => Ok(Plugin::Flake8TidyImports),
             "mccabe" => Ok(Plugin::McCabe),
+            "pandas-vet" => Ok(Plugin::PandasVet),
             "pep8-naming" => Ok(Plugin::PEP8Naming),
             "pyupgrade" => Ok(Plugin::Pyupgrade),
             _ => Err(anyhow!("Unknown plugin: {string}")),
@@ -57,12 +59,14 @@ impl Plugin {
         match self {
             Plugin::Flake8Annotations => CheckCodePrefix::ANN,
             Plugin::Flake8Bandit => CheckCodePrefix::S,
+            // TODO(charlie): Handle rename of `B` to `BLE`.
             Plugin::Flake8BlindExcept => CheckCodePrefix::BLE,
             Plugin::Flake8Bugbear => CheckCodePrefix::B,
             Plugin::Flake8Builtins => CheckCodePrefix::A,
             Plugin::Flake8Comprehensions => CheckCodePrefix::C4,
             Plugin::Flake8Debugger => CheckCodePrefix::T1,
             Plugin::Flake8Docstrings => CheckCodePrefix::D,
+            // TODO(charlie): Handle rename of `E` to `ERA`.
             Plugin::Flake8Eradicate => CheckCodePrefix::ERA,
             Plugin::Flake8Print => CheckCodePrefix::T2,
             Plugin::Flake8Quotes => CheckCodePrefix::Q,
@@ -70,6 +74,8 @@ impl Plugin {
             Plugin::Flake8Simplify => CheckCodePrefix::SIM,
             Plugin::Flake8TidyImports => CheckCodePrefix::I25,
             Plugin::McCabe => CheckCodePrefix::C9,
+            // TODO(charlie): Handle rename of `PD` to `PDV`.
+            Plugin::PandasVet => CheckCodePrefix::PDV,
             Plugin::PEP8Naming => CheckCodePrefix::N,
             Plugin::Pyupgrade => CheckCodePrefix::U,
         }
@@ -105,10 +111,11 @@ impl Plugin {
             Plugin::Flake8Quotes => vec![CheckCodePrefix::Q],
             Plugin::Flake8Return => vec![CheckCodePrefix::RET],
             Plugin::Flake8Simplify => vec![CheckCodePrefix::SIM],
-            Plugin::Flake8TidyImports => vec![CheckCodePrefix::I25],
+            Plugin::Flake8TidyImports => vec![CheckCodePrefix::TID],
             Plugin::McCabe => vec![CheckCodePrefix::C9],
+            Plugin::PandasVet => vec![CheckCodePrefix::PDV],
             Plugin::PEP8Naming => vec![CheckCodePrefix::N],
-            Plugin::Pyupgrade => vec![CheckCodePrefix::U],
+            Plugin::Pyupgrade => vec![CheckCodePrefix::UP],
         }
     }
 }
@@ -403,6 +410,7 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin
         Plugin::Flake8Return,
         Plugin::Flake8Simplify,
         Plugin::Flake8TidyImports,
+        Plugin::PandasVet,
         Plugin::PEP8Naming,
         Plugin::Pyupgrade,
     ]
