@@ -97,26 +97,31 @@ impl Settings {
                 .dummy_variable_rgx
                 .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone()),
             enabled: resolve_codes(
-                &config
-                    .select
-                    .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F])
-                    .into_iter()
-                    .chain(config.extend_select.unwrap_or_default().into_iter())
-                    .collect::<Vec<_>>(),
-                &config
-                    .ignore
-                    .unwrap_or_default()
-                    .into_iter()
-                    .chain(config.extend_ignore.unwrap_or_default().into_iter())
-                    .collect::<Vec<_>>(),
+                [CheckCodeSpec {
+                    select: &config
+                        .select
+                        .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F]),
+                    ignore: &config.ignore.unwrap_or_default(),
+                }]
+                .into_iter()
+                .chain(
+                    config
+                        .extend_select
+                        .iter()
+                        .zip(config.extend_ignore.iter())
+                        .map(|(select, ignore)| CheckCodeSpec { select, ignore }),
+                ),
             ),
             exclude: resolve_globset(config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()))?,
-            extend_exclude: resolve_globset(config.extend_exclude.unwrap_or_default())?,
+            extend_exclude: resolve_globset(config.extend_exclude)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()),
             fix: config.fix.unwrap_or(false),
             fixable: resolve_codes(
-                &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
-                &config.unfixable.unwrap_or_default(),
+                [CheckCodeSpec {
+                    select: &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
+                    ignore: &config.unfixable.unwrap_or_default(),
+                }]
+                .into_iter(),
             ),
             format: config.format.unwrap_or(SerializationFormat::Text),
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
@@ -301,26 +306,34 @@ pub fn resolve_per_file_ignores(
         .collect()
 }
 
+#[derive(Debug)]
+struct CheckCodeSpec<'a> {
+    select: &'a [CheckCodePrefix],
+    ignore: &'a [CheckCodePrefix],
+}
+
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// error codes.
-fn resolve_codes(select: &[CheckCodePrefix], ignore: &[CheckCodePrefix]) -> FxHashSet<CheckCode> {
+fn resolve_codes<'a>(specs: impl Iterator<Item = CheckCodeSpec<'a>>) -> FxHashSet<CheckCode> {
     let mut codes: FxHashSet<CheckCode> = FxHashSet::default();
-    for specificity in [
-        SuffixLength::Zero,
-        SuffixLength::One,
-        SuffixLength::Two,
-        SuffixLength::Three,
-        SuffixLength::Four,
-    ] {
-        for prefix in select {
-            if prefix.specificity() == specificity {
-                codes.extend(prefix.codes());
+    for spec in specs {
+        for specificity in [
+            SuffixLength::Zero,
+            SuffixLength::One,
+            SuffixLength::Two,
+            SuffixLength::Three,
+            SuffixLength::Four,
+        ] {
+            for prefix in spec.select {
+                if prefix.specificity() == specificity {
+                    codes.extend(prefix.codes());
+                }
             }
-        }
-        for prefix in ignore {
-            if prefix.specificity() == specificity {
-                for code in prefix.codes() {
-                    codes.remove(&code);
+            for prefix in spec.ignore {
+                if prefix.specificity() == specificity {
+                    for code in prefix.codes() {
+                        codes.remove(&code);
+                    }
                 }
             }
         }
@@ -334,24 +347,80 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::checks_gen::CheckCodePrefix;
-    use crate::settings::resolve_codes;
+    use crate::settings::{resolve_codes, CheckCodeSpec};
 
     #[test]
-    fn resolver() {
-        let actual = resolve_codes(&[CheckCodePrefix::W], &[]);
+    fn check_codes() {
+        let actual = resolve_codes(
+            [CheckCodeSpec {
+                select: &[CheckCodePrefix::W],
+                ignore: &[],
+            }]
+            .into_iter(),
+        );
         let expected = FxHashSet::from_iter([CheckCode::W292, CheckCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(&[CheckCodePrefix::W6], &[]);
+        let actual = resolve_codes(
+            [CheckCodeSpec {
+                select: &[CheckCodePrefix::W6],
+                ignore: &[],
+            }]
+            .into_iter(),
+        );
         let expected = FxHashSet::from_iter([CheckCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(&[CheckCodePrefix::W], &[CheckCodePrefix::W292]);
+        let actual = resolve_codes(
+            [CheckCodeSpec {
+                select: &[CheckCodePrefix::W],
+                ignore: &[CheckCodePrefix::W292],
+            }]
+            .into_iter(),
+        );
         let expected = FxHashSet::from_iter([CheckCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(&[CheckCodePrefix::W605], &[CheckCodePrefix::W605]);
+        let actual = resolve_codes(
+            [CheckCodeSpec {
+                select: &[CheckCodePrefix::W605],
+                ignore: &[CheckCodePrefix::W605],
+            }]
+            .into_iter(),
+        );
         let expected = FxHashSet::from_iter([]);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_codes(
+            [
+                CheckCodeSpec {
+                    select: &[CheckCodePrefix::W],
+                    ignore: &[CheckCodePrefix::W292],
+                },
+                CheckCodeSpec {
+                    select: &[CheckCodePrefix::W292],
+                    ignore: &[],
+                },
+            ]
+            .into_iter(),
+        );
+        let expected = FxHashSet::from_iter([CheckCode::W292, CheckCode::W605]);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_codes(
+            [
+                CheckCodeSpec {
+                    select: &[CheckCodePrefix::W],
+                    ignore: &[CheckCodePrefix::W292],
+                },
+                CheckCodeSpec {
+                    select: &[CheckCodePrefix::W292],
+                    ignore: &[CheckCodePrefix::W],
+                },
+            ]
+            .into_iter(),
+        );
+        let expected = FxHashSet::from_iter([CheckCode::W292]);
         assert_eq!(actual, expected);
     }
 }
