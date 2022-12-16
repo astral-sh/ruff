@@ -15,7 +15,7 @@ use ruff::logging::{set_up_logging, LogLevel};
 use strum::IntoEnumIterator;
 use walkdir::WalkDir;
 
-/// Handles blackd process and allows submitting code to it for formatting.
+/// Handles `blackd` process and allows submitting code to it for formatting.
 struct Blackd {
     address: SocketAddr,
     server: process::Child,
@@ -155,19 +155,20 @@ fn test_ruff_black_compatibility() -> Result<()> {
 
     // Ignore some fixtures that currently trigger errors. `E999.py` especially, as
     // that is triggering a syntax error on purpose.
-    let excludes = ["E999.py", "B009_B010.py", "W605_1.py", "leading_prefix.py"];
+    let excludes = ["E999.py"];
 
     let paths: Vec<walkdir::DirEntry> = WalkDir::new(fixtures_dir)
         .into_iter()
         .filter(|entry| {
             entry.as_ref().map_or(true, |entry| {
-                let file_name = entry.path().file_name().unwrap().to_string_lossy();
-
-                (file_name.ends_with(".py") || file_name.ends_with(".pyi"))
-                    && !excludes.contains(&file_name.to_string().as_str())
+                entry
+                    .path()
+                    .extension()
+                    .map_or(false, |ext| ext == "py" || ext == "pyi")
+                    && !excludes.contains(&entry.path().file_name().unwrap().to_str().unwrap())
             })
         })
-        .filter_map(std::result::Result::ok)
+        .filter_map(Result::ok)
         .collect();
 
     let codes = CheckCategory::iter()

@@ -1,0 +1,239 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 3
+    column: 11
+  end_location:
+    row: 3
+    column: 14
+  fix:
+    content: ""
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 16
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 4
+    column: 11
+  end_location:
+    row: 4
+    column: 14
+  fix:
+    content: ""
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 20
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 7
+    column: 11
+  end_location:
+    row: 7
+    column: 14
+  fix:
+    content: ""
+    location:
+      row: 7
+      column: 4
+    end_location:
+      row: 8
+      column: 0
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 11
+    column: 11
+  end_location:
+    row: 11
+    column: 14
+  fix:
+    content: ""
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 12
+      column: 10
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 16
+    column: 18
+  end_location:
+    row: 16
+    column: 21
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 11
+    end_location:
+      row: 16
+      column: 21
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 21
+    column: 16
+  end_location:
+    row: 21
+    column: 19
+  fix:
+    content: ""
+    location:
+      row: 21
+      column: 9
+    end_location:
+      row: 21
+      column: 19
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 26
+    column: 17
+  end_location:
+    row: 26
+    column: 20
+  fix:
+    content: ""
+    location:
+      row: 26
+      column: 10
+    end_location:
+      row: 26
+      column: 20
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 30
+    column: 18
+  end_location:
+    row: 30
+    column: 21
+  fix:
+    content: ""
+    location:
+      row: 30
+      column: 11
+    end_location:
+      row: 30
+      column: 23
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 31
+    column: 22
+  end_location:
+    row: 31
+    column: 25
+  fix:
+    content: ""
+    location:
+      row: 31
+      column: 15
+    end_location:
+      row: 31
+      column: 31
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 35
+    column: 15
+  end_location:
+    row: 35
+    column: 18
+  fix:
+    content: ""
+    location:
+      row: 35
+      column: 8
+    end_location:
+      row: 36
+      column: 4
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 40
+    column: 16
+  end_location:
+    row: 40
+    column: 19
+  fix:
+    content: ""
+    location:
+      row: 40
+      column: 9
+    end_location:
+      row: 41
+      column: 9
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 46
+    column: 7
+  end_location:
+    row: 46
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 46
+      column: 0
+    end_location:
+      row: 46
+      column: 10
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 51
+    column: 7
+  end_location:
+    row: 51
+    column: 10
+  fix:
+    content: "\n"
+    location:
+      row: 51
+      column: 0
+    end_location:
+      row: 51
+      column: 10
+

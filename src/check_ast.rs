@@ -3425,11 +3425,11 @@ impl<'a> Checker<'a> {
                         let deleted: Vec<&Stmt> =
                             self.deletions.iter().map(|node| node.0).collect();
                         match pyflakes::fixes::remove_unused_imports(
-                            self.locator,
                             &unused_imports,
                             child,
                             parent,
                             &deleted,
+                            self.locator,
                         ) {
                             Ok(fix) => {
                                 if fix.content.is_empty() || fix.content == "pass" {
