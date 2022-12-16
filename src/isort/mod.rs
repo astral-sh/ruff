@@ -548,7 +548,6 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
-    use crate::settings::flags;
     use crate::{isort, Settings};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
@@ -591,7 +590,6 @@ mod tests {
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
                 ..Settings::for_rule(CheckCode::I001)
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -613,7 +611,6 @@ mod tests {
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
                 ..Settings::for_rule(CheckCode::I001)
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -636,7 +633,6 @@ mod tests {
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
                 ..Settings::for_rule(CheckCode::I001)
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

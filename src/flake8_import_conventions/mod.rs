@@ -11,7 +11,6 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
-    use crate::settings::flags;
     use crate::{flake8_import_conventions, Settings};
 
     #[test]
@@ -19,7 +18,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/defaults.py"),
             &Settings::for_rule(CheckCode::ICN001),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("defaults", checks);
@@ -43,7 +41,6 @@ mod tests {
                     ),
                 ..Settings::for_rule(CheckCode::ICN001)
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("custom", checks);
@@ -69,7 +66,6 @@ mod tests {
                     ),
                 ..Settings::for_rule(CheckCode::ICN001)
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("remove_default", checks);
@@ -93,7 +89,6 @@ mod tests {
                     ),
                 ..Settings::for_rule(CheckCode::ICN001)
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("override_default", checks);

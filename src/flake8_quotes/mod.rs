@@ -11,7 +11,6 @@ mod tests {
     use crate::checks::CheckCode;
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::test_path;
-    use crate::settings::flags;
     use crate::{flake8_quotes, Settings};
 
     #[test_case(Path::new("doubles.py"))]
@@ -39,7 +38,6 @@ mod tests {
                     CheckCode::Q003,
                 ])
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -71,7 +69,6 @@ mod tests {
                     CheckCode::Q003,
                 ])
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -108,7 +105,6 @@ mod tests {
                     CheckCode::Q003,
                 ])
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -145,7 +141,6 @@ mod tests {
                     CheckCode::Q003,
                 ])
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

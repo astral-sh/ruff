@@ -10,7 +10,6 @@ mod tests {
     use crate::checks::CheckCode;
     use crate::flake8_tidy_imports::settings::Strictness;
     use crate::linter::test_path;
-    use crate::settings::flags;
     use crate::{flake8_tidy_imports, Settings};
 
     #[test]
@@ -23,7 +22,6 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![CheckCode::TID252])
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -40,7 +38,6 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![CheckCode::TID252])
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);

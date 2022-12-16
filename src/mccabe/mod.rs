@@ -10,7 +10,6 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
-    use crate::settings::flags;
     use crate::{mccabe, Settings};
 
     #[test_case(0)]
@@ -24,7 +23,6 @@ mod tests {
                 mccabe: mccabe::settings::Settings { max_complexity },
                 ..Settings::for_rules(vec![CheckCode::C901])
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

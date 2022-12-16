@@ -12,7 +12,6 @@ mod tests {
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::settings;
-    use crate::settings::flags;
 
     #[test_case(CheckCode::E402, Path::new("E402.py"); "E402")]
     #[test_case(CheckCode::E501, Path::new("E501.py"); "E501")]
@@ -39,7 +38,6 @@ mod tests {
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -51,7 +49,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/pycodestyle/constant_literals.py"),
             &settings::Settings::for_rules(vec![CheckCode::E711, CheckCode::E712, CheckCode::F632]),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);

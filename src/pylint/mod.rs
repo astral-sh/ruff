@@ -9,7 +9,6 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
-    use crate::settings::flags;
     use crate::Settings;
 
     #[test_case(CheckCode::PLC0414, Path::new("import_aliasing.py"); "PLC0414")]
@@ -37,7 +36,6 @@ mod tests {
                 .join(path)
                 .as_path(),
             &Settings::for_rules(vec![check_code]),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

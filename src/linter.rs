@@ -332,7 +332,7 @@ fn lint(
 }
 
 #[cfg(test)]
-pub fn test_path(path: &Path, settings: &Settings, autofix: flags::Autofix) -> Result<Vec<Check>> {
+pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
@@ -348,7 +348,7 @@ pub fn test_path(path: &Path, settings: &Settings, autofix: flags::Autofix) -> R
         &locator,
         &directives,
         settings,
-        autofix,
+        flags::Autofix::Enabled,
         flags::Noqa::Enabled,
     )
 }

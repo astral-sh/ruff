@@ -110,7 +110,6 @@ mod tests {
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -125,7 +124,6 @@ mod tests {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
                 ..settings::Settings::for_rule(CheckCode::F841)
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -137,7 +135,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/pyflakes/__init__.py"),
             &settings::Settings::for_rules(vec![CheckCode::F821, CheckCode::F822]),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -149,7 +146,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/pyflakes/future_annotations.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -161,7 +157,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/pyflakes/multi_statement_lines.py"),
             &settings::Settings::for_rule(CheckCode::F401),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);

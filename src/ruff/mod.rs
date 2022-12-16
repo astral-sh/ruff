@@ -12,7 +12,6 @@ mod tests {
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::settings;
-    use crate::settings::flags;
 
     #[test]
     fn confusables() -> Result<()> {
@@ -26,7 +25,6 @@ mod tests {
                     CheckCode::RUF003,
                 ])
             },
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -42,7 +40,6 @@ mod tests {
                 CheckCode::E501,
                 CheckCode::F841,
             ]),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -54,7 +51,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/ruff/flake8_noqa.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F841]),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -66,7 +62,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/ruff/ruff_noqa.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F841]),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -78,7 +73,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/ruff/redirects.py"),
             &settings::Settings::for_rules(vec![CheckCode::UP007]),
-            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
