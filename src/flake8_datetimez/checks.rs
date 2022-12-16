@@ -114,3 +114,13 @@ pub fn call_datetime_today(func: &Expr, location: Range) -> Option<Check> {
     }
     None
 }
+
+pub fn call_datetime_utcnow(func: &Expr, location: Range) -> Option<Check> {
+    let is_datetime_utcnow_func = is_expected_func_call(func, &["datetime", "utcnow"]);
+    let is_datetime_datetime_utcnow_func =
+        is_expected_func_call(func, &["datetime", "datetime", "utcnow"]);
+    if is_datetime_utcnow_func || is_datetime_datetime_utcnow_func {
+        return Some(Check::new(CheckKind::CallDatetimeUtcnow, location));
+    }
+    None
+}
