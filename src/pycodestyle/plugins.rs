@@ -184,6 +184,8 @@ pub fn literal_comparisons(
         comparator = next;
     }
 
+    // TODO(charlie): Respect `noqa` directives. If one of the operators has a
+    // `noqa`, but another doesn't, both will be removed here.
     if !bad_ops.is_empty() {
         // Replace the entire comparison expression.
         let ops = ops

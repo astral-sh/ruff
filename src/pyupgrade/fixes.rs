@@ -170,8 +170,21 @@ pub fn remove_unnecessary_future_import(
         aliases.remove(*index);
     }
 
+    // But avoid destroying any trailing comments.
     if let Some(alias) = aliases.last_mut() {
-        alias.comma = trailing_comma;
+        let has_comment = if let Some(comma) = &alias.comma {
+            match &comma.whitespace_after {
+                ParenthesizableWhitespace::SimpleWhitespace(_) => false,
+                ParenthesizableWhitespace::ParenthesizedWhitespace(whitespace) => {
+                    whitespace.first_line.comment.is_some()
+                }
+            }
+        } else {
+            false
+        };
+        if !has_comment {
+            alias.comma = trailing_comma;
+        }
     }
 
     if aliases.is_empty() {
