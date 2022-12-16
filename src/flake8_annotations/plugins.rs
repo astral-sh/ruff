@@ -1,3 +1,4 @@
+use log::error;
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
@@ -6,6 +7,7 @@ use crate::ast::{cast, visitor};
 use crate::check_ast::Checker;
 use crate::checks::{CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind};
+use crate::flake8_annotations::fixes;
 use crate::flake8_annotations::helpers::match_function_def;
 use crate::visibility::Visibility;
 use crate::{visibility, Check};
@@ -295,8 +297,8 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     check_dynamically_typed(checker, expr, || name.to_string());
                 }
             } else {
-                // Allow omission of return annotation in `__init__` functions, if the function
-                // only returns `None` (explicitly or implicitly).
+                // Allow omission of return annotation if the function only returns `None`
+                // (explicitly or implicitly).
                 if checker.settings.flake8_annotations.suppress_none_returning
                     && is_none_returning(body)
                 {
@@ -317,13 +319,6 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             Range::from_located(stmt),
                         ));
                     }
-                } else if visibility::is_magic(stmt) {
-                    if checker.settings.enabled.contains(&CheckCode::ANN204) {
-                        checker.add_check(Check::new(
-                            CheckKind::MissingReturnTypeMagicMethod(name.to_string()),
-                            Range::from_located(stmt),
-                        ));
-                    }
                 } else if visibility::is_init(stmt) {
                     // Allow omission of return annotation in `__init__` functions, as long as at
                     // least one argument is typed.
@@ -331,11 +326,25 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         if !(checker.settings.flake8_annotations.mypy_init_return
                             && has_any_typed_arg)
                         {
-                            checker.add_check(Check::new(
-                                CheckKind::MissingReturnTypeMagicMethod(name.to_string()),
+                            let mut check = Check::new(
+                                CheckKind::MissingReturnTypeSpecialMethod(name.to_string()),
                                 Range::from_located(stmt),
-                            ));
+                            );
+                            if checker.patch(check.kind.code()) {
+                                match fixes::add_return_none_annotation(checker.locator, stmt) {
+                                    Ok(fix) => check.amend(fix),
+                                    Err(e) => error!("Failed to generate fix: {e}"),
+                                }
+                            }
+                            checker.add_check(check);
                         }
+                    }
+                } else if visibility::is_magic(stmt) {
+                    if checker.settings.enabled.contains(&CheckCode::ANN204) {
+                        checker.add_check(Check::new(
+                            CheckKind::MissingReturnTypeSpecialMethod(name.to_string()),
+                            Range::from_located(stmt),
+                        ));
                     }
                 } else {
                     match visibility {

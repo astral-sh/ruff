@@ -772,7 +772,7 @@ pub enum CheckKind {
     MissingTypeCls(String),
     MissingReturnTypePublicFunction(String),
     MissingReturnTypePrivateFunction(String),
-    MissingReturnTypeMagicMethod(String),
+    MissingReturnTypeSpecialMethod(String),
     MissingReturnTypeStaticMethod(String),
     MissingReturnTypeClassMethod(String),
     DynamicallyTypedExpression(String),
@@ -1126,7 +1126,7 @@ impl CheckCode {
             CheckCode::ANN102 => CheckKind::MissingTypeCls("...".to_string()),
             CheckCode::ANN201 => CheckKind::MissingReturnTypePublicFunction("...".to_string()),
             CheckCode::ANN202 => CheckKind::MissingReturnTypePrivateFunction("...".to_string()),
-            CheckCode::ANN204 => CheckKind::MissingReturnTypeMagicMethod("...".to_string()),
+            CheckCode::ANN204 => CheckKind::MissingReturnTypeSpecialMethod("...".to_string()),
             CheckCode::ANN205 => CheckKind::MissingReturnTypeStaticMethod("...".to_string()),
             CheckCode::ANN206 => CheckKind::MissingReturnTypeClassMethod("...".to_string()),
             CheckCode::ANN401 => CheckKind::DynamicallyTypedExpression("...".to_string()),
@@ -1733,7 +1733,7 @@ impl CheckKind {
             CheckKind::MissingTypeCls(_) => &CheckCode::ANN102,
             CheckKind::MissingReturnTypePublicFunction(_) => &CheckCode::ANN201,
             CheckKind::MissingReturnTypePrivateFunction(_) => &CheckCode::ANN202,
-            CheckKind::MissingReturnTypeMagicMethod(_) => &CheckCode::ANN204,
+            CheckKind::MissingReturnTypeSpecialMethod(_) => &CheckCode::ANN204,
             CheckKind::MissingReturnTypeStaticMethod(_) => &CheckCode::ANN205,
             CheckKind::MissingReturnTypeClassMethod(_) => &CheckCode::ANN206,
             CheckKind::DynamicallyTypedExpression(_) => &CheckCode::ANN401,
@@ -2390,8 +2390,8 @@ impl CheckKind {
             CheckKind::MissingReturnTypePrivateFunction(name) => {
                 format!("Missing return type annotation for private function `{name}`")
             }
-            CheckKind::MissingReturnTypeMagicMethod(name) => {
-                format!("Missing return type annotation for magic method `{name}`")
+            CheckKind::MissingReturnTypeSpecialMethod(name) => {
+                format!("Missing return type annotation for special method `{name}`")
             }
             CheckKind::MissingReturnTypeStaticMethod(name) => {
                 format!("Missing return type annotation for staticmethod `{name}`")
@@ -2817,7 +2817,6 @@ impl CheckKind {
                 | CheckKind::CommentedOutCode
                 | CheckKind::ConvertNamedTupleFunctionalToClass(..)
                 | CheckKind::ConvertTypedDictFunctionalToClass(..)
-                | CheckKind::RemoveSixCompat
                 | CheckKind::DashedUnderlineAfterSection(..)
                 | CheckKind::DeprecatedUnittestAlias(..)
                 | CheckKind::DoNotAssertFalse
@@ -2831,6 +2830,7 @@ impl CheckKind {
                 | CheckKind::IsLiteral
                 | CheckKind::KeyInDict(..)
                 | CheckKind::MisplacedComparisonConstant(..)
+                | CheckKind::MissingReturnTypeSpecialMethod(..)
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
@@ -2845,13 +2845,14 @@ impl CheckKind {
                 | CheckKind::NotIsTest
                 | CheckKind::OneBlankLineAfterClass(..)
                 | CheckKind::OneBlankLineBeforeClass(..)
-                | CheckKind::PercentFormatExtraNamedArguments(..)
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
+                | CheckKind::PercentFormatExtraNamedArguments(..)
                 | CheckKind::PrintFound
                 | CheckKind::RaiseNotImplemented
                 | CheckKind::RedundantOpenModes
                 | CheckKind::RedundantTupleInExceptionHandler(..)
+                | CheckKind::RemoveSixCompat
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
                 | CheckKind::SectionUnderlineAfterName(..)

@@ -1,3 +1,4 @@
+mod fixes;
 pub mod helpers;
 pub mod plugins;
 pub mod settings;
