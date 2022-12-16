@@ -62,11 +62,6 @@ pub struct Resolver {
 }
 
 impl Resolver {
-    /// Merge a `Resolver` into the current `Resolver`.
-    pub fn merge(&mut self, resolver: Resolver) {
-        self.settings.extend(resolver.settings);
-    }
-
     /// Add a resolved `Settings` under a given `PathBuf` scope.
     pub fn add(&mut self, path: PathBuf, settings: Settings) {
         self.settings.insert(path, settings);

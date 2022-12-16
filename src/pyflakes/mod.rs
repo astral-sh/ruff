@@ -177,6 +177,7 @@ mod tests {
         );
         let mut checks = check_path(
             Path::new("<filename>"),
+            None,
             &contents,
             tokens,
             &locator,

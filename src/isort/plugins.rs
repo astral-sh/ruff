@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use rustpython_ast::{Location, Stmt};
 use textwrap::{dedent, indent};
 
@@ -36,6 +38,7 @@ pub fn check_imports(
     locator: &SourceCodeLocator,
     settings: &Settings,
     autofix: flags::Autofix,
+    package: Option<&Path>,
 ) -> Option<Check> {
     let indentation = locator.slice_source_code_range(&extract_indentation_range(&block.imports));
     let indentation = leading_space(&indentation);
@@ -71,6 +74,7 @@ pub fn check_imports(
         comments,
         settings.line_length - indentation.len(),
         &settings.src,
+        package,
         &settings.isort.known_first_party,
         &settings.isort.known_third_party,
         &settings.isort.extra_standard_library,

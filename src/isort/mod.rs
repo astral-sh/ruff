@@ -1,6 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
 use ropey::RopeBuilder;
@@ -294,6 +294,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
 fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
+    package: Option<&Path>,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
@@ -305,6 +306,7 @@ fn categorize_imports<'a>(
             &alias.module_base(),
             None,
             src,
+            package,
             known_first_party,
             known_third_party,
             extra_standard_library,
@@ -321,6 +323,7 @@ fn categorize_imports<'a>(
             &import_from.module_base(),
             import_from.level,
             src,
+            package,
             known_first_party,
             known_third_party,
             extra_standard_library,
@@ -337,6 +340,7 @@ fn categorize_imports<'a>(
             &import_from.module_base(),
             import_from.level,
             src,
+            package,
             known_first_party,
             known_third_party,
             extra_standard_library,
@@ -353,6 +357,7 @@ fn categorize_imports<'a>(
             &import_from.module_base(),
             import_from.level,
             src,
+            package,
             known_first_party,
             known_third_party,
             extra_standard_library,
@@ -470,6 +475,7 @@ pub fn format_imports(
     comments: Vec<Comment>,
     line_length: usize,
     src: &[PathBuf],
+    package: Option<&Path>,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
@@ -486,6 +492,7 @@ pub fn format_imports(
     let block_by_type = categorize_imports(
         block,
         src,
+        package,
         known_first_party,
         known_third_party,
         extra_standard_library,
