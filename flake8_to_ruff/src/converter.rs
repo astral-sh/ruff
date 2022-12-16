@@ -7,7 +7,8 @@ use ruff::flake8_tidy_imports::settings::Strictness;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
 use ruff::{
-    flake8_annotations, flake8_bugbear, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_quotes, flake8_tidy_imports, mccabe,
+    pep8_naming,
 };
 
 use crate::plugin::Plugin;
@@ -73,6 +74,7 @@ pub fn convert(
     let mut options = Options::default();
     let mut flake8_annotations = flake8_annotations::settings::Options::default();
     let mut flake8_bugbear = flake8_bugbear::settings::Options::default();
+    let mut flake8_errmsg = flake8_errmsg::settings::Options::default();
     let mut flake8_quotes = flake8_quotes::settings::Options::default();
     let mut flake8_tidy_imports = flake8_tidy_imports::settings::Options::default();
     let mut mccabe = mccabe::settings::Options::default();
@@ -194,6 +196,15 @@ pub fn convert(
                     Ok(max_complexity) => mccabe.max_complexity = Some(max_complexity),
                     Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                 },
+                // flake8-errmsg
+                "errmsg-max-string-length" | "errmsg_max_string_length" => {
+                    match value.clone().parse::<usize>() {
+                        Ok(max_string_length) => {
+                            flake8_errmsg.max_string_length = Some(max_string_length);
+                        }
+                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    }
+                }
                 // Unknown
                 _ => eprintln!("Skipping unsupported property: {key}"),
             }
@@ -208,6 +219,9 @@ pub fn convert(
     }
     if flake8_bugbear != flake8_bugbear::settings::Options::default() {
         options.flake8_bugbear = Some(flake8_bugbear);
+    }
+    if flake8_errmsg != flake8_errmsg::settings::Options::default() {
+        options.flake8_errmsg = Some(flake8_errmsg);
     }
     if flake8_quotes != flake8_quotes::settings::Options::default() {
         options.flake8_quotes = Some(flake8_quotes);
@@ -270,6 +284,7 @@ mod tests {
             unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
+            flake8_errmsg: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -317,6 +332,7 @@ mod tests {
             unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
+            flake8_errmsg: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -364,6 +380,7 @@ mod tests {
             unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
+            flake8_errmsg: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -411,6 +428,7 @@ mod tests {
             unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
+            flake8_errmsg: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -458,6 +476,7 @@ mod tests {
             unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
+            flake8_errmsg: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
@@ -549,6 +568,7 @@ mod tests {
             unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
+            flake8_errmsg: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -597,6 +617,7 @@ mod tests {
             unfixable: None,
             flake8_annotations: None,
             flake8_bugbear: None,
+            flake8_errmsg: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,

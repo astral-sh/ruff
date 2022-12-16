@@ -86,6 +86,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-builtins (A)](#flake8-builtins-a)
    1. [flake8-comprehensions (C4)](#flake8-comprehensions-c4)
    1. [flake8-debugger (T10)](#flake8-debugger-t10)
+   1. [flake8-errmsg (EM)](#flake8-errmsg-em)
    1. [flake8-import-conventions (ICN)](#flake8-import-conventions-icn)
    1. [flake8-print (T20)](#flake8-print-t20)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
@@ -783,6 +784,16 @@ For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | T100 | Debugger | Import for `...` found |  |
+
+### flake8-errmsg (EM)
+
+For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/0.4.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| EM101 | RawStringInException | Exception must not use a string literal, assign to variable first |  |
+| EM102 | FStringInException | Exception must not use an f-string literal, assign to variable first |  |
+| EM103 | DotFormatInException | Exception must not use a `.format()` string directly, assign to variable first |  |
 
 ### flake8-import-conventions (ICN)
 
@@ -1972,6 +1983,25 @@ Additional callable functions to consider "immutable" when evaluating, e.g.,
 [tool.ruff.flake8-bugbear]
 # Allow default arguments like, e.g., `data: List[str] = fastapi.Query(None)`.
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+```
+
+---
+
+### `flake8-errmsg`
+
+#### [`max-string-length`](#max-string-length)
+
+Maximum string length for string literals in exception messages.
+
+**Default value**: `0`
+
+**Type**: `usize`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-errmsg]
+max-string-length = 20
 ```
 
 ---

@@ -14,7 +14,7 @@ use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_import_conventions, flake8_quotes,
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
     flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
 };
 
@@ -44,6 +44,7 @@ pub struct Configuration {
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
+    pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
@@ -118,6 +119,7 @@ impl Configuration {
             // Plugins
             flake8_annotations: options.flake8_annotations,
             flake8_bugbear: options.flake8_bugbear,
+            flake8_errmsg: options.flake8_errmsg,
             flake8_import_conventions: options.flake8_import_conventions,
             flake8_quotes: options.flake8_quotes,
             flake8_tidy_imports: options.flake8_tidy_imports,
@@ -169,6 +171,7 @@ impl Configuration {
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
             flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
+            flake8_errmsg: self.flake8_errmsg.or(config.flake8_errmsg),
             flake8_import_conventions: self
                 .flake8_import_conventions
                 .or(config.flake8_import_conventions),

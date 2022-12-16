@@ -50,6 +50,7 @@ pub mod flake8_bugbear;
 mod flake8_builtins;
 mod flake8_comprehensions;
 mod flake8_debugger;
+pub mod flake8_errmsg;
 mod flake8_import_conventions;
 mod flake8_print;
 pub mod flake8_quotes;

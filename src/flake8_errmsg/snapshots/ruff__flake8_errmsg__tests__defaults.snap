@@ -1,0 +1,29 @@
+---
+source: src/flake8_errmsg/mod.rs
+expression: checks
+---
+- kind: RawStringInException
+  location:
+    row: 5
+    column: 23
+  end_location:
+    row: 5
+    column: 53
+  fix: ~
+- kind: FStringInException
+  location:
+    row: 10
+    column: 23
+  end_location:
+    row: 10
+    column: 56
+  fix: ~
+- kind: DotFormatInException
+  location:
+    row: 14
+    column: 23
+  end_location:
+    row: 14
+    column: 81
+  fix: ~
+
