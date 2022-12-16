@@ -12,6 +12,7 @@ mod tests {
     use crate::checks::CheckCode;
     use crate::checks_gen::CheckCodePrefix;
     use crate::linter::check_path;
+    use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
     use crate::{directives, rustpython_helpers, settings};
 
@@ -32,8 +33,8 @@ mod tests {
             &locator,
             &directives,
             &settings,
-            true,
-            false,
+            flags::Autofix::Enabled,
+            flags::Noqa::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         let actual = checks

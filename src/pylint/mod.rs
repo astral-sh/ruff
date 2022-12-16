@@ -36,7 +36,6 @@ mod tests {
                 .join(path)
                 .as_path(),
             &Settings::for_rules(vec![check_code]),
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

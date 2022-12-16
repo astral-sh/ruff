@@ -38,7 +38,6 @@ mod tests {
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -50,7 +49,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/pycodestyle/constant_literals.py"),
             &settings::Settings::for_rules(vec![CheckCode::E711, CheckCode::E712, CheckCode::F632]),
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);

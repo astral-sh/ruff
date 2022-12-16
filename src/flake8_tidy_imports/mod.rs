@@ -22,7 +22,6 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![CheckCode::TID252])
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -39,7 +38,6 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![CheckCode::TID252])
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);

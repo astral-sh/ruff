@@ -4,6 +4,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checks::{CheckCode, CheckKind};
 use crate::eradicate::detection::comment_contains_code;
+use crate::settings::flags;
 use crate::{Check, Settings, SourceCodeLocator};
 
 fn is_standalone_comment(line: &str) -> bool {
@@ -23,7 +24,7 @@ pub fn commented_out_code(
     start: Location,
     end: Location,
     settings: &Settings,
-    autofix: bool,
+    autofix: flags::Autofix,
 ) -> Option<Check> {
     let location = Location::new(start.row(), 0);
     let end_location = Location::new(end.row() + 1, 0);
@@ -41,7 +42,9 @@ pub fn commented_out_code(
                 end_location: end,
             },
         );
-        if autofix && settings.fixable.contains(&CheckCode::ERA001) {
+        if matches!(autofix, flags::Autofix::Enabled)
+            && settings.fixable.contains(&CheckCode::ERA001)
+        {
             check.amend(Fix::deletion(location, end_location));
         }
         Some(check)

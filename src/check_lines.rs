@@ -10,7 +10,7 @@ use crate::autofix::Fix;
 use crate::checks::{Check, CheckCode, CheckKind, CODE_REDIRECTS};
 use crate::noqa;
 use crate::noqa::{is_file_exempt, Directive};
-use crate::settings::Settings;
+use crate::settings::{flags, Settings};
 
 // Regex from PEP263.
 static CODING_COMMENT_REGEX: Lazy<Regex> =
@@ -39,8 +39,8 @@ pub fn check_lines(
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
-    autofix: bool,
-    ignore_noqa: bool,
+    autofix: flags::Autofix,
+    noqa: flags::Noqa,
 ) {
     let enforce_unnecessary_coding_comment = settings.enabled.contains(&CheckCode::UP009);
     let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
@@ -64,14 +64,14 @@ pub fn check_lines(
             {
                 (Directive::All(..), matches) => {
                     matches.push($check.kind.code().as_ref());
-                    if ignore_noqa {
+                    if matches!(noqa, flags::Noqa::Disabled) {
                         line_checks.push($check);
                     }
                 }
                 (Directive::Codes(.., codes), matches) => {
                     if noqa::includes($check.kind.code(), codes) {
                         matches.push($check.kind.code().as_ref());
-                        if ignore_noqa {
+                        if matches!(noqa, flags::Noqa::Disabled) {
                             line_checks.push($check);
                         }
                     } else {
@@ -108,7 +108,9 @@ pub fn check_lines(
                             end_location: Location::new(lineno + 2, 0),
                         },
                     );
-                    if autofix && settings.fixable.contains(check.kind.code()) {
+                    if matches!(autofix, flags::Autofix::Enabled)
+                        && settings.fixable.contains(check.kind.code())
+                    {
                         check.amend(Fix::deletion(
                             Location::new(lineno + 1, 0),
                             Location::new(lineno + 2, 0),
@@ -196,7 +198,9 @@ pub fn check_lines(
                                 end_location: Location::new(row + 1, end),
                             },
                         );
-                        if autofix && settings.fixable.contains(check.kind.code()) {
+                        if matches!(autofix, flags::Autofix::Enabled)
+                            && settings.fixable.contains(check.kind.code())
+                        {
                             check.amend(Fix::deletion(
                                 Location::new(row + 1, start - spaces),
                                 Location::new(row + 1, lines[row].chars().count()),
@@ -225,7 +229,9 @@ pub fn check_lines(
                                 end_location: Location::new(row + 1, end),
                             },
                         );
-                        if autofix && settings.fixable.contains(check.kind.code()) {
+                        if matches!(autofix, flags::Autofix::Enabled)
+                            && settings.fixable.contains(check.kind.code())
+                        {
                             if valid_codes.is_empty() {
                                 check.amend(Fix::deletion(
                                     Location::new(row + 1, start - spaces),
@@ -247,7 +253,7 @@ pub fn check_lines(
         }
     }
 
-    if !ignore_noqa {
+    if matches!(noqa, flags::Noqa::Enabled) {
         ignored.sort_unstable();
         for index in ignored.iter().rev() {
             checks.swap_remove(*index);
@@ -262,7 +268,7 @@ mod tests {
 
     use super::check_lines;
     use crate::checks::{Check, CheckCode};
-    use crate::settings::Settings;
+    use crate::settings::{flags, Settings};
 
     #[test]
     fn e501_non_ascii_char() {
@@ -277,8 +283,8 @@ mod tests {
                     line_length,
                     ..Settings::for_rule(CheckCode::E501)
                 },
-                true,
-                false,
+                flags::Autofix::Enabled,
+                flags::Noqa::Enabled,
             );
             checks
         };

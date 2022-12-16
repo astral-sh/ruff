@@ -31,7 +31,6 @@ mod tests {
                     CheckCode::ANN401,
                 ])
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -57,7 +56,6 @@ mod tests {
                     CheckCode::ANN102,
                 ])
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -83,7 +81,6 @@ mod tests {
                     CheckCode::ANN206,
                 ])
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -109,7 +106,6 @@ mod tests {
                     CheckCode::ANN206,
                 ])
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -129,7 +125,6 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![CheckCode::ANN401])
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -149,7 +144,6 @@ mod tests {
                     CheckCode::ANN206,
                 ])
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);

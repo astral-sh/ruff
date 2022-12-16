@@ -18,6 +18,7 @@ mod tests {
     use crate::checks::CheckCode;
     use crate::checks_gen::CheckCodePrefix;
     use crate::linter::{check_path, test_path};
+    use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
     use crate::{directives, rustpython_helpers, settings};
 
@@ -109,7 +110,6 @@ mod tests {
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -124,7 +124,6 @@ mod tests {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
                 ..settings::Settings::for_rule(CheckCode::F841)
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -136,7 +135,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/pyflakes/__init__.py"),
             &settings::Settings::for_rules(vec![CheckCode::F821, CheckCode::F822]),
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -148,7 +146,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/pyflakes/future_annotations.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F821]),
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -160,7 +157,6 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/pyflakes/multi_statement_lines.py"),
             &settings::Settings::for_rule(CheckCode::F401),
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -186,8 +182,8 @@ mod tests {
             &locator,
             &directives,
             &settings,
-            true,
-            false,
+            flags::Autofix::Enabled,
+            flags::Noqa::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         let actual = checks

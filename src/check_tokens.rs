@@ -5,6 +5,7 @@ use rustpython_parser::lexer::{LexResult, Tok};
 use crate::checks::{Check, CheckCode};
 use crate::lex::docstring_detection::StateMachine;
 use crate::ruff::checks::Context;
+use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::{eradicate, flake8_quotes, pycodestyle, ruff, Settings};
 
@@ -12,7 +13,7 @@ pub fn check_tokens(
     locator: &SourceCodeLocator,
     tokens: &[LexResult],
     settings: &Settings,
-    autofix: bool,
+    autofix: flags::Autofix,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
 

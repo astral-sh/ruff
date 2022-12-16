@@ -23,6 +23,7 @@ use crate::checks::Check;
 use crate::linter::check_path;
 use crate::resolver::Relativity;
 use crate::settings::configuration::Configuration;
+use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
 
 mod ast;
@@ -127,8 +128,8 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         &locator,
         &directives,
         &settings,
-        autofix,
-        false,
+        autofix.into(),
+        flags::Noqa::Enabled,
     )?;
 
     Ok(checks)

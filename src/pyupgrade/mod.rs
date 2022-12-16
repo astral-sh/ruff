@@ -44,7 +44,6 @@ mod tests {
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -59,7 +58,6 @@ mod tests {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(CheckCode::UP006)
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -74,7 +72,6 @@ mod tests {
                 target_version: PythonVersion::Py310,
                 ..settings::Settings::for_rule(CheckCode::UP006)
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -89,7 +86,6 @@ mod tests {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(CheckCode::UP007)
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
@@ -104,7 +100,6 @@ mod tests {
                 target_version: PythonVersion::Py310,
                 ..settings::Settings::for_rule(CheckCode::UP007)
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);

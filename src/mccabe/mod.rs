@@ -23,7 +23,6 @@ mod tests {
                 mccabe: mccabe::settings::Settings { max_complexity },
                 ..Settings::for_rules(vec![CheckCode::C901])
             },
-            true,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
