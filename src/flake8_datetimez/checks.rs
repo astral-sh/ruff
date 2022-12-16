@@ -215,3 +215,13 @@ pub fn call_date_today(func: &Expr, location: Range) -> Option<Check> {
     }
     None
 }
+
+pub fn call_date_fromtimestamp(func: &Expr, location: Range) -> Option<Check> {
+    let is_date_fromtimestamp_func = is_expected_func_call(func, &["date", "fromtimestamp"]);
+    let is_datetime_date_fromtimestamp_func =
+        is_expected_func_call(func, &["datetime", "date", "fromtimestamp"]);
+    if is_date_fromtimestamp_func || !is_datetime_date_fromtimestamp_func {
+        return Some(Check::new(CheckKind::CallDateFromtimestamp, location));
+    }
+    None
+}

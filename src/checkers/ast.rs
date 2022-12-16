@@ -2017,6 +2017,14 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::DTZ012) {
+                    if let Some(check) = flake8_datetimez::checks::call_date_fromtimestamp(
+                        func,
+                        Range::from_located(expr),
+                    ) {
+                        self.add_check(check);
+                    }
+                }
 
                 // pygrep-hooks
                 if self.settings.enabled.contains(&CheckCode::PGH001) {
