@@ -8,7 +8,7 @@ expression: checks
       - 88
   location:
     row: 5
-    column: 0
+    column: 88
   end_location:
     row: 5
     column: 123
@@ -19,7 +19,7 @@ expression: checks
       - 88
   location:
     row: 25
-    column: 0
+    column: 88
   end_location:
     row: 25
     column: 127
@@ -30,7 +30,7 @@ expression: checks
       - 88
   location:
     row: 40
-    column: 0
+    column: 88
   end_location:
     row: 40
     column: 132
@@ -41,7 +41,7 @@ expression: checks
       - 88
   location:
     row: 43
-    column: 0
+    column: 88
   end_location:
     row: 43
     column: 105
