@@ -10,7 +10,7 @@ fn get_tzinfo_in_keywords(keywords: &[Keyword]) -> Option<&Keyword> {
     })
 }
 
-fn is_none(value: &Located<ExprKind>) -> bool {
+fn is_const_none(value: &Located<ExprKind>) -> bool {
     matches!(
         &value.node,
         ExprKind::Constant {
@@ -20,35 +20,38 @@ fn is_none(value: &Located<ExprKind>) -> bool {
     )
 }
 
-fn is_datetime_func(func: &Expr) -> bool {
-    match &func.node {
-        ExprKind::Name {
-            id,
-            ctx: ExprContext::Load,
-        } => id == "datetime",
-        _ => false,
-    }
-}
-
-fn is_datetime_datetime_func(func: &Expr) -> bool {
+// a.b.c(..) -> ['a', 'b', 'c']
+fn get_call_parts(func: &Expr) -> Vec<&String> {
     match &func.node {
         ExprKind::Attribute {
             value,
             attr,
             ctx: ExprContext::Load,
-        } => match &**value {
-            Located {
-                node:
-                    ExprKind::Name {
-                        id,
-                        ctx: ExprContext::Load,
-                    },
-                ..
-            } => id == "datetime" && attr == "datetime",
-            _ => false,
-        },
-        _ => false,
+        } => {
+            let mut parts = get_call_parts(value);
+            parts.push(attr);
+            parts
+        }
+        ExprKind::Name {
+            id,
+            ctx: ExprContext::Load,
+        } => {
+            vec![id]
+        }
+        _ => Vec::new(),
     }
+}
+
+fn is_expected_func_call(func: &Expr, func_call_parts: &[&str]) -> bool {
+    if func_call_parts.is_empty() {
+        return false;
+    }
+    let got_call_parts = get_call_parts(func);
+    got_call_parts.len() == func_call_parts.len()
+        && func_call_parts
+            .iter()
+            .zip(got_call_parts)
+            .all(|(got, expected)| got == expected)
 }
 
 pub fn call_datetime_without_tzinfo(
@@ -57,8 +60,12 @@ pub fn call_datetime_without_tzinfo(
     keywords: &[Keyword],
     location: Range,
 ) -> Option<Check> {
-    let is_datetime_datetime_func = is_datetime_datetime_func(func);
-    let is_datetime_func = is_datetime_func(func);
+    let is_datetime_datetime_func = is_expected_func_call(func, &["datetime", "datetime"]);
+    let is_datetime_func = is_expected_func_call(func, &["datetime"]);
+
+    if !is_datetime_datetime_func && !is_datetime_func {
+        return None;
+    }
 
     // no args
     if is_datetime_datetime_func && args.len() < 8 && keywords.is_empty() {
@@ -71,7 +78,7 @@ pub fn call_datetime_without_tzinfo(
     }
 
     // none args
-    if is_datetime_datetime_func && args.len() == 8 && is_none(&args[7]) {
+    if is_datetime_datetime_func && args.len() == 8 && is_const_none(&args[7]) {
         return Some(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
     }
 
@@ -89,7 +96,7 @@ pub fn call_datetime_without_tzinfo(
             ..
         }) = tzinfo
         {
-            if is_none(value) {
+            if is_const_none(value) {
                 return Some(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
             }
         }
