@@ -57,7 +57,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    fn post_text(&self, num_fixable: usize, autofix: &fixer::Mode) {
+    fn post_text(&self, num_fixable: usize, autofix: fixer::Mode) {
         if self.log_level >= &LogLevel::Default {
             if num_fixable > 0 && !matches!(autofix, fixer::Mode::Apply) {
                 println!("{num_fixable} potentially fixable with the --fix option.");
@@ -65,7 +65,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    pub fn write_once(&self, diagnostics: &Diagnostics, autofix: &fixer::Mode) -> Result<()> {
+    pub fn write_once(&self, diagnostics: &Diagnostics, autofix: fixer::Mode) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }

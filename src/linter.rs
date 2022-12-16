@@ -148,13 +148,13 @@ const MAX_ITERATIONS: usize = 100;
 pub fn lint_path(
     path: &Path,
     settings: &Settings,
-    mode: &cache::Mode,
-    autofix: &fixer::Mode,
+    cache: flags::Cache,
+    autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
     let metadata = path.metadata()?;
 
     // Check the cache.
-    if let Some(messages) = cache::get(path, &metadata, settings, autofix, mode) {
+    if let Some(messages) = cache::get(path, &metadata, settings, autofix, cache) {
         debug!("Cache hit for: {}", path.to_string_lossy());
         return Ok(Diagnostics::new(messages));
     }
@@ -166,7 +166,7 @@ pub fn lint_path(
     let (contents, fixed, messages) = lint(contents, path, settings, autofix)?;
 
     // Re-populate the cache.
-    cache::set(path, &metadata, settings, autofix, &messages, mode);
+    cache::set(path, &metadata, settings, autofix, &messages, cache);
 
     // If we applied any fixes, write the contents back to disk.
     if fixed > 0 {
@@ -241,7 +241,7 @@ pub fn lint_stdin(
     path: &Path,
     stdin: &str,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
     // Read the file from disk.
     let contents = stdin.to_string();
@@ -261,7 +261,7 @@ fn lint(
     mut contents: String,
     path: &Path,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: fixer::Mode,
 ) -> Result<(String, usize, Vec<Message>)> {
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;

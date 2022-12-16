@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::autofix::fixer;
 use crate::message::Message;
-use crate::settings::Settings;
+use crate::settings::{flags, Settings};
 
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -34,43 +34,6 @@ struct CheckResult {
     messages: Vec<Message>,
 }
 
-pub enum Mode {
-    ReadWrite,
-    ReadOnly,
-    WriteOnly,
-    None,
-}
-
-impl Mode {
-    fn allow_read(&self) -> bool {
-        match self {
-            Mode::ReadWrite => true,
-            Mode::ReadOnly => true,
-            Mode::WriteOnly => false,
-            Mode::None => false,
-        }
-    }
-
-    fn allow_write(&self) -> bool {
-        match self {
-            Mode::ReadWrite => true,
-            Mode::ReadOnly => false,
-            Mode::WriteOnly => true,
-            Mode::None => false,
-        }
-    }
-}
-
-impl From<bool> for Mode {
-    fn from(value: bool) -> Self {
-        if value {
-            Mode::ReadWrite
-        } else {
-            Mode::None
-        }
-    }
-}
-
 fn cache_dir() -> &'static str {
     "./.ruff_cache"
 }
@@ -79,7 +42,7 @@ fn content_dir() -> &'static str {
     "content"
 }
 
-fn cache_key(path: &Path, settings: &Settings, autofix: &fixer::Mode) -> u64 {
+fn cache_key(path: &Path, settings: &Settings, autofix: fixer::Mode) -> u64 {
     let mut hasher = DefaultHasher::new();
     CARGO_PKG_VERSION.hash(&mut hasher);
     path.absolutize().unwrap().hash(&mut hasher);
@@ -132,10 +95,10 @@ pub fn get(
     path: &Path,
     metadata: &Metadata,
     settings: &Settings,
-    autofix: &fixer::Mode,
-    mode: &Mode,
+    autofix: fixer::Mode,
+    cache: flags::Cache,
 ) -> Option<Vec<Message>> {
-    if !mode.allow_read() {
+    if matches!(cache, flags::Cache::Disabled) {
         return None;
     };
 
@@ -161,11 +124,11 @@ pub fn set(
     path: &Path,
     metadata: &Metadata,
     settings: &Settings,
-    autofix: &fixer::Mode,
+    autofix: fixer::Mode,
     messages: &[Message],
-    mode: &Mode,
+    cache: flags::Cache,
 ) {
-    if !mode.allow_write() {
+    if matches!(cache, flags::Cache::Disabled) {
         return;
     };
 

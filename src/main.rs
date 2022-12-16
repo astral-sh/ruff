@@ -17,10 +17,10 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use ::ruff::autofix::fixer;
-use ::ruff::cli::{extract_log_level, Cli};
+use ::ruff::cli::{extract_log_level, Cli, Overrides};
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::printer::Printer;
-use ::ruff::resolver::PyprojectDiscovery;
+use ::ruff::resolver::{resolve_settings, FileDiscovery, PyprojectDiscovery, Relativity};
 use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
@@ -32,8 +32,6 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
-use ruff::cli::Overrides;
-use ruff::resolver::{resolve_settings, FileDiscovery, Relativity};
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
@@ -153,8 +151,8 @@ fn inner_main() -> Result<ExitCode> {
             &pyproject_strategy,
             &file_strategy,
             &overrides,
-            cache_enabled,
-            &fixer::Mode::None,
+            cache_enabled.into(),
+            fixer::Mode::None,
         )?;
         printer.write_continuously(&messages)?;
 
@@ -183,8 +181,8 @@ fn inner_main() -> Result<ExitCode> {
                             &pyproject_strategy,
                             &file_strategy,
                             &overrides,
-                            cache_enabled,
-                            &fixer::Mode::None,
+                            cache_enabled.into(),
+                            fixer::Mode::None,
                         )?;
                         printer.write_continuously(&messages)?;
                     }
@@ -211,15 +209,15 @@ fn inner_main() -> Result<ExitCode> {
         let diagnostics = if is_stdin {
             let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
             let path = Path::new(&filename);
-            commands::run_stdin(&pyproject_strategy, path, &autofix)?
+            commands::run_stdin(&pyproject_strategy, path, autofix)?
         } else {
             commands::run(
                 &cli.files,
                 &pyproject_strategy,
                 &file_strategy,
                 &overrides,
-                cache_enabled,
-                &autofix,
+                cache_enabled.into(),
+                autofix,
             )?
         };
 
@@ -227,7 +225,7 @@ fn inner_main() -> Result<ExitCode> {
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, fixer::Mode::Apply)) {
-            printer.write_once(&diagnostics, &autofix)?;
+            printer.write_once(&diagnostics, autofix)?;
         }
 
         // Check for updates if we're in a non-silent log level.

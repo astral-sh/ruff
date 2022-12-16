@@ -19,6 +19,7 @@ use crate::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Di
 use crate::message::Message;
 use crate::resolver;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
+use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
 
 /// Run the linter over a collection of files.
@@ -27,8 +28,8 @@ pub fn run(
     pyproject_strategy: &PyprojectDiscovery,
     file_strategy: &FileDiscovery,
     overrides: &Overrides,
-    cache: bool,
-    autofix: &fixer::Mode,
+    cache: flags::Cache,
+    autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
     // Collect all the files to check.
     let start = Instant::now();
@@ -44,7 +45,7 @@ pub fn run(
                 Ok(entry) => {
                     let path = entry.path();
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    lint_path(path, settings, &cache.into(), autofix)
+                    lint_path(path, settings, cache, autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
                 Err(e) => Err((
@@ -102,7 +103,7 @@ fn read_from_stdin() -> Result<String> {
 pub fn run_stdin(
     strategy: &PyprojectDiscovery,
     filename: &Path,
-    autofix: &fixer::Mode,
+    autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
     let stdin = read_from_stdin()?;
     let settings = match strategy {

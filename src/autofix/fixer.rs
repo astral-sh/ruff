@@ -10,7 +10,7 @@ use crate::autofix::Fix;
 use crate::checks::Check;
 use crate::source_code_locator::SourceCodeLocator;
 
-#[derive(Debug, Hash)]
+#[derive(Debug, Copy, Clone, Hash)]
 pub enum Mode {
     Generate,
     Apply,
