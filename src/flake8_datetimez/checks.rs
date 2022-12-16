@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, KeywordData
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
 
-fn get_keyword_in_keywords<'a>(keywords: &'a[Keyword], keyword_name: &str) -> Option<&'a Keyword> {
+fn get_keyword_in_keywords<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
     keywords.iter().find(|keyword| {
         let KeywordData { arg, .. } = &keyword.node;
         arg.as_ref().map_or(false, |_arg| _arg == keyword_name)
@@ -132,10 +132,10 @@ pub fn call_datetime_utcfromtimestamp(func: &Expr, location: Range) -> Option<Ch
 }
 
 pub fn call_datetime_now_without_tzinfo(
-    func: &Expr, 
+    func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-    location: Range
+    location: Range,
 ) -> Option<Check> {
     let check = Some(Check::new(
         CheckKind::CallDatetimeNowWithoutTzinfo,
@@ -155,12 +155,12 @@ pub fn call_datetime_now_without_tzinfo(
     }
 
     // none args
-    if args.len() > 0 && is_const_none(&args[0]) {
+    if !args.is_empty() && is_const_none(&args[0]) {
         return check;
     }
 
     // wrong keywords / none keyword
-    if keywords.len() > 0 {
+    if !keywords.is_empty() {
         if has_not_none_keyword_in_keywords(keywords, "tz") {
             return None;
         }
@@ -171,17 +171,15 @@ pub fn call_datetime_now_without_tzinfo(
 }
 
 pub fn call_datetime_fromtimestamp(
-    func: &Expr, 
+    func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-    location: Range
+    location: Range,
 ) -> Option<Check> {
-    let check = Some(Check::new(
-        CheckKind::CallDatetimeFromtimestamp,
-        location,
-    ));
+    let check = Some(Check::new(CheckKind::CallDatetimeFromtimestamp, location));
 
-    let is_datetime_fromtimestamp_func = is_expected_func_call(func, &["datetime", "fromtimestamp"]);
+    let is_datetime_fromtimestamp_func =
+        is_expected_func_call(func, &["datetime", "fromtimestamp"]);
     let is_datetime_datetime_fromtimestamp_func =
         is_expected_func_call(func, &["datetime", "datetime", "fromtimestamp"]);
     if !is_datetime_fromtimestamp_func && !is_datetime_datetime_fromtimestamp_func {
@@ -199,7 +197,7 @@ pub fn call_datetime_fromtimestamp(
     }
 
     // wrong keywords / none keyword
-    if keywords.len() > 0 {
+    if !keywords.is_empty() {
         if has_not_none_keyword_in_keywords(keywords, "tz") {
             return None;
         }
