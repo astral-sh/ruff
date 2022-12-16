@@ -79,23 +79,18 @@ pub fn call_datetime_without_tzinfo(
         return None;
     }
 
-    // no args
-    if is_datetime_datetime_func && args.len() < 8 && keywords.is_empty() {
-        return check;
-    }
-
-    // no args unqualified
-    if is_datetime_func && args.len() < 8 && keywords.is_empty() {
+    // no args / no args unqualified
+    if args.len() < 8 && keywords.is_empty() {
         return check;
     }
 
     // none args
-    if is_datetime_datetime_func && args.len() == 8 && is_const_none(&args[7]) {
+    if args.len() == 8 && is_const_none(&args[7]) {
         return check;
     }
 
     // no kwargs / none kwargs
-    if is_datetime_datetime_func && !has_not_none_keyword_in_keywords(keywords, "tzinfo") {
+    if !has_not_none_keyword_in_keywords(keywords, "tzinfo") {
         return check;
     }
 
