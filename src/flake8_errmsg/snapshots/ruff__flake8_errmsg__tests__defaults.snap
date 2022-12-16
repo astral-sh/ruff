@@ -10,20 +10,28 @@ expression: checks
     row: 5
     column: 53
   fix: ~
-- kind: FStringInException
+- kind: RawStringInException
   location:
-    row: 10
+    row: 9
     column: 23
   end_location:
-    row: 10
+    row: 9
+    column: 30
+  fix: ~
+- kind: FStringInException
+  location:
+    row: 14
+    column: 23
+  end_location:
+    row: 14
     column: 56
   fix: ~
 - kind: DotFormatInException
   location:
-    row: 14
+    row: 18
     column: 23
   end_location:
-    row: 14
+    row: 18
     column: 81
   fix: ~
 

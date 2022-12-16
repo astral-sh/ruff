@@ -12,18 +12,18 @@ expression: checks
   fix: ~
 - kind: FStringInException
   location:
-    row: 10
+    row: 14
     column: 23
   end_location:
-    row: 10
+    row: 14
     column: 56
   fix: ~
 - kind: DotFormatInException
   location:
-    row: 14
+    row: 18
     column: 23
   end_location:
-    row: 14
+    row: 18
     column: 81
   fix: ~
 
