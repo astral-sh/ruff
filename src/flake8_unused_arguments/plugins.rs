@@ -6,7 +6,6 @@ use rustpython_ast::{Arg, Arguments};
 
 use crate::ast::function_type;
 use crate::ast::function_type::FunctionType;
-use crate::ast::helpers::collect_arg_names;
 use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeKind};
 use crate::check_ast::Checker;
 use crate::flake8_unused_arguments::helpers;
@@ -20,16 +19,35 @@ fn function(
     values: &FxHashMap<&str, usize>,
     bindings: &[Binding],
     dummy_variable_rgx: &Regex,
+    ignore_variadic_names: bool,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
-    for arg_name in collect_arg_names(args) {
-        if let Some(binding) = values.get(arg_name).map(|index| &bindings[*index]) {
+    for arg in args
+        .posonlyargs
+        .iter()
+        .chain(args.args.iter())
+        .chain(args.kwonlyargs.iter())
+        .chain(
+            iter::once::<Option<&Arg>>(args.vararg.as_deref())
+                .flatten()
+                .skip(usize::from(ignore_variadic_names)),
+        )
+        .chain(
+            iter::once::<Option<&Arg>>(args.kwarg.as_deref())
+                .flatten()
+                .skip(usize::from(ignore_variadic_names)),
+        )
+    {
+        if let Some(binding) = values
+            .get(&arg.node.arg.as_str())
+            .map(|index| &bindings[*index])
+        {
             if binding.used.is_none()
                 && matches!(binding.kind, BindingKind::Argument)
-                && !dummy_variable_rgx.is_match(arg_name)
+                && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
                 checks.push(Check::new(
-                    argumentable.check_for(arg_name.to_string()),
+                    argumentable.check_for(arg.node.arg.to_string()),
                     binding.range,
                 ));
             }
@@ -45,6 +63,7 @@ fn method(
     values: &FxHashMap<&str, usize>,
     bindings: &[Binding],
     dummy_variable_rgx: &Regex,
+    ignore_variadic_names: bool,
 ) -> Vec<Check> {
     let mut checks: Vec<Check> = vec![];
     for arg in args
@@ -53,8 +72,16 @@ fn method(
         .chain(args.args.iter())
         .skip(1)
         .chain(args.kwonlyargs.iter())
-        .chain(iter::once::<Option<&Arg>>(args.vararg.as_deref()).flatten())
-        .chain(iter::once::<Option<&Arg>>(args.kwarg.as_deref()).flatten())
+        .chain(
+            iter::once::<Option<&Arg>>(args.vararg.as_deref())
+                .flatten()
+                .skip(usize::from(ignore_variadic_names)),
+        )
+        .chain(
+            iter::once::<Option<&Arg>>(args.kwarg.as_deref())
+                .flatten()
+                .skip(usize::from(ignore_variadic_names)),
+        )
     {
         if let Some(binding) = values
             .get(&arg.node.arg.as_str())
@@ -110,6 +137,10 @@ pub fn unused_arguments(
                             &scope.values,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
+                            checker
+                                .settings
+                                .flake8_unused_arguments
+                                .ignore_variadic_names,
                         )
                     } else {
                         vec![]
@@ -130,6 +161,10 @@ pub fn unused_arguments(
                             &scope.values,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
+                            checker
+                                .settings
+                                .flake8_unused_arguments
+                                .ignore_variadic_names,
                         )
                     } else {
                         vec![]
@@ -150,6 +185,10 @@ pub fn unused_arguments(
                             &scope.values,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
+                            checker
+                                .settings
+                                .flake8_unused_arguments
+                                .ignore_variadic_names,
                         )
                     } else {
                         vec![]
@@ -170,6 +209,10 @@ pub fn unused_arguments(
                             &scope.values,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
+                            checker
+                                .settings
+                                .flake8_unused_arguments
+                                .ignore_variadic_names,
                         )
                     } else {
                         vec![]
@@ -189,6 +232,10 @@ pub fn unused_arguments(
                     &scope.values,
                     bindings,
                     &checker.settings.dummy_variable_rgx,
+                    checker
+                        .settings
+                        .flake8_unused_arguments
+                        .ignore_variadic_names,
                 )
             } else {
                 vec![]

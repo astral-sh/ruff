@@ -19,7 +19,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, isort, mccabe, pep8_naming, pyupgrade,
+    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pyupgrade,
 };
 
 pub mod configuration;
@@ -54,6 +54,7 @@ pub struct Settings {
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
+    pub flake8_unused_arguments: flake8_unused_arguments::settings::Settings,
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
@@ -161,6 +162,10 @@ impl Settings {
                 .flake8_tidy_imports
                 .map(flake8_tidy_imports::settings::Settings::from_options)
                 .unwrap_or_default(),
+            flake8_unused_arguments: config
+                .flake8_unused_arguments
+                .map(flake8_unused_arguments::settings::Settings::from_options)
+                .unwrap_or_default(),
             isort: config
                 .isort
                 .map(isort::settings::Settings::from_options)
@@ -206,6 +211,7 @@ impl Settings {
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
+            flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
@@ -237,6 +243,7 @@ impl Settings {
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
+            flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
@@ -275,9 +282,11 @@ impl Hash for Settings {
         // Add plugin properties in alphabetical order.
         self.flake8_annotations.hash(state);
         self.flake8_bugbear.hash(state);
+        self.flake8_errmsg.hash(state);
         self.flake8_import_conventions.hash(state);
         self.flake8_quotes.hash(state);
         self.flake8_tidy_imports.hash(state);
+        self.flake8_unused_arguments.hash(state);
         self.isort.hash(state);
         self.mccabe.hash(state);
         self.pep8_naming.hash(state);

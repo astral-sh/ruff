@@ -15,7 +15,7 @@ use crate::settings::pyproject::load_options;
 use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, fs, isort, mccabe, pep8_naming, pyupgrade,
+    flake8_tidy_imports, flake8_unused_arguments, fs, isort, mccabe, pep8_naming, pyupgrade,
 };
 
 #[derive(Debug, Default)]
@@ -48,6 +48,7 @@ pub struct Configuration {
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
+    pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
     pub isort: Option<isort::settings::Options>,
     pub mccabe: Option<mccabe::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
@@ -123,6 +124,7 @@ impl Configuration {
             flake8_import_conventions: options.flake8_import_conventions,
             flake8_quotes: options.flake8_quotes,
             flake8_tidy_imports: options.flake8_tidy_imports,
+            flake8_unused_arguments: options.flake8_unused_arguments,
             isort: options.isort,
             mccabe: options.mccabe,
             pep8_naming: options.pep8_naming,
@@ -177,6 +179,9 @@ impl Configuration {
                 .or(config.flake8_import_conventions),
             flake8_quotes: self.flake8_quotes.or(config.flake8_quotes),
             flake8_tidy_imports: self.flake8_tidy_imports.or(config.flake8_tidy_imports),
+            flake8_unused_arguments: self
+                .flake8_unused_arguments
+                .or(config.flake8_unused_arguments),
             isort: self.isort.or(config.isort),
             mccabe: self.mccabe.or(config.mccabe),
             pep8_naming: self.pep8_naming.or(config.pep8_naming),
