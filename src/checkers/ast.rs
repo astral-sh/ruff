@@ -2000,6 +2000,16 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::DTZ006) {
+                    if let Some(check) = flake8_datetimez::checks::call_datetime_fromtimestamp(
+                        func,
+                        args,
+                        keywords,
+                        Range::from_located(expr),
+                    ) {
+                        self.add_check(check);
+                    }
+                }
 
                 // pygrep-hooks
                 if self.settings.enabled.contains(&CheckCode::PGH001) {

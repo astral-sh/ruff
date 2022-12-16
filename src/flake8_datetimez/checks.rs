@@ -169,3 +169,42 @@ pub fn call_datetime_now_without_tzinfo(
 
     None
 }
+
+pub fn call_datetime_fromtimestamp(
+    func: &Expr, 
+    args: &[Expr],
+    keywords: &[Keyword],
+    location: Range
+) -> Option<Check> {
+    let check = Some(Check::new(
+        CheckKind::CallDatetimeFromtimestamp,
+        location,
+    ));
+
+    let is_datetime_fromtimestamp_func = is_expected_func_call(func, &["datetime", "fromtimestamp"]);
+    let is_datetime_datetime_fromtimestamp_func =
+        is_expected_func_call(func, &["datetime", "datetime", "fromtimestamp"]);
+    if !is_datetime_fromtimestamp_func && !is_datetime_datetime_fromtimestamp_func {
+        return None;
+    }
+
+    // no args / no args unqualified
+    if args.len() < 2 && keywords.is_empty() {
+        return check;
+    }
+
+    // none args
+    if args.len() > 1 && is_const_none(&args[1]) {
+        return check;
+    }
+
+    // wrong keywords / none keyword
+    if keywords.len() > 0 {
+        if has_not_none_keyword_in_keywords(keywords, "tz") {
+            return None;
+        }
+        return check;
+    }
+
+    None
+}
