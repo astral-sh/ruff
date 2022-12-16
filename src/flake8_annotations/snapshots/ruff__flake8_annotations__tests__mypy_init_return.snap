@@ -3,23 +3,37 @@ source: src/flake8_annotations/mod.rs
 expression: checks
 ---
 - kind:
-    MissingReturnTypeMagicMethod: __init__
+    MissingReturnTypeSpecialMethod: __init__
   location:
     row: 5
     column: 4
   end_location:
     row: 6
     column: 11
-  fix: ~
+  fix:
+    content: " -> None"
+    location:
+      row: 5
+      column: 22
+    end_location:
+      row: 5
+      column: 22
 - kind:
-    MissingReturnTypeMagicMethod: __init__
+    MissingReturnTypeSpecialMethod: __init__
   location:
     row: 11
     column: 4
   end_location:
     row: 12
     column: 11
-  fix: ~
+  fix:
+    content: " -> None"
+    location:
+      row: 11
+      column: 27
+    end_location:
+      row: 11
+      column: 27
 - kind:
     MissingReturnTypePrivateFunction: __init__
   location:
