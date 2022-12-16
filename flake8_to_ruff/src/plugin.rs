@@ -14,6 +14,7 @@ pub enum Plugin {
     Flake8Comprehensions,
     Flake8Debugger,
     Flake8Docstrings,
+    Flake8ErrMsg,
     Flake8Eradicate,
     Flake8Print,
     Flake8Quotes,
@@ -40,6 +41,7 @@ impl FromStr for Plugin {
             "flake8-debugger" => Ok(Plugin::Flake8Debugger),
             "flake8-docstrings" => Ok(Plugin::Flake8Docstrings),
             "flake8-eradicate" => Ok(Plugin::Flake8BlindExcept),
+            "flake8-errmsg" => Ok(Plugin::Flake8ErrMsg),
             "flake8-print" => Ok(Plugin::Flake8Print),
             "flake8-quotes" => Ok(Plugin::Flake8Quotes),
             "flake8-return" => Ok(Plugin::Flake8Return),
@@ -68,6 +70,7 @@ impl Plugin {
             Plugin::Flake8Docstrings => CheckCodePrefix::D,
             // TODO(charlie): Handle rename of `E` to `ERA`.
             Plugin::Flake8Eradicate => CheckCodePrefix::ERA,
+            Plugin::Flake8ErrMsg => CheckCodePrefix::EM,
             Plugin::Flake8Print => CheckCodePrefix::T2,
             Plugin::Flake8Quotes => CheckCodePrefix::Q,
             Plugin::Flake8Return => CheckCodePrefix::RET,
@@ -107,6 +110,7 @@ impl Plugin {
                 DocstringConvention::PEP8.select()
             }
             Plugin::Flake8Eradicate => vec![CheckCodePrefix::ERA],
+            Plugin::Flake8ErrMsg => vec![CheckCodePrefix::EM],
             Plugin::Flake8Print => vec![CheckCodePrefix::T2],
             Plugin::Flake8Quotes => vec![CheckCodePrefix::Q],
             Plugin::Flake8Return => vec![CheckCodePrefix::RET],
@@ -384,6 +388,9 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
             "staticmethod-decorators" | "staticmethod_decorators" => {
                 plugins.insert(Plugin::PEP8Naming);
             }
+            "max-string-length" | "max_string_length" => {
+                plugins.insert(Plugin::Flake8ErrMsg);
+            }
             _ => {}
         }
     }
@@ -405,6 +412,7 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin
         Plugin::Flake8Debugger,
         Plugin::Flake8Docstrings,
         Plugin::Flake8Eradicate,
+        Plugin::Flake8ErrMsg,
         Plugin::Flake8Print,
         Plugin::Flake8Quotes,
         Plugin::Flake8Return,

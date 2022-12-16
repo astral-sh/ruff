@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::checks_gen::CheckCodePrefix;
 use crate::settings::types::{PythonVersion, SerializationFormat};
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_import_conventions, flake8_quotes,
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
     flake8_tidy_imports, isort, mccabe, pep8_naming, pyupgrade,
 };
 
@@ -306,6 +306,8 @@ pub struct Options {
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     #[option_group]
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
+    #[option_group]
+    pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     #[option_group]
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     #[option_group]

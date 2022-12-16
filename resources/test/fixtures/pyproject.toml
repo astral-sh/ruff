@@ -42,6 +42,9 @@ staticmethod-decorators = ["staticmethod"]
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "parents"
 
+[tool.ruff.flake8-errmsg]
+max-string-length = 20
+
 [tool.ruff.flake8-import-conventions.aliases]
 pandas = "pd"
 

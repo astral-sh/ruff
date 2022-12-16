@@ -329,6 +329,10 @@ pub enum CheckCode {
     PDV013,
     PDV015,
     PDV901,
+    // flake8-errmsg
+    EM101,
+    EM102,
+    EM103,
 }
 
 #[derive(EnumIter, Debug, PartialEq, Eq)]
@@ -349,6 +353,7 @@ pub enum CheckCategory {
     Flake8Builtins,
     Flake8Comprehensions,
     Flake8Debugger,
+    Flake8ErrMsg,
     Flake8ImportConventions,
     Flake8Print,
     Flake8Quotes,
@@ -390,6 +395,7 @@ impl CheckCategory {
             CheckCategory::Flake8Builtins => "flake8-builtins",
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
             CheckCategory::Flake8Debugger => "flake8-debugger",
+            CheckCategory::Flake8ErrMsg => "flake8-errmsg",
             CheckCategory::Flake8ImportConventions => "flake8-import-conventions",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
@@ -423,6 +429,7 @@ impl CheckCategory {
             CheckCategory::Flake8Builtins => vec![CheckCodePrefix::A],
             CheckCategory::Flake8Comprehensions => vec![CheckCodePrefix::C4],
             CheckCategory::Flake8Debugger => vec![CheckCodePrefix::T10],
+            CheckCategory::Flake8ErrMsg => vec![CheckCodePrefix::EM],
             CheckCategory::Flake8Print => vec![CheckCodePrefix::T20],
             CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
             CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
@@ -488,6 +495,10 @@ impl CheckCategory {
             )),
             CheckCategory::Flake8Debugger => Some((
                 "https://pypi.org/project/flake8-debugger/4.1.2/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8ErrMsg => Some((
+                "https://pypi.org/project/flake8-errmsg/0.4.0/",
                 &Platform::PyPI,
             )),
             CheckCategory::Flake8ImportConventions => None,
@@ -896,6 +907,10 @@ pub enum CheckKind {
     UseOfDotStack,
     UseOfPdMerge,
     DfIsABadVariableName,
+    // flake8-errmsg
+    RawStringInException,
+    FStringInException,
+    DotFormatInException,
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -1268,6 +1283,10 @@ impl CheckCode {
             CheckCode::PDV013 => CheckKind::UseOfDotStack,
             CheckCode::PDV015 => CheckKind::UseOfPdMerge,
             CheckCode::PDV901 => CheckKind::DfIsABadVariableName,
+            // flake8-errmsg
+            CheckCode::EM101 => CheckKind::RawStringInException,
+            CheckCode::EM102 => CheckKind::FStringInException,
+            CheckCode::EM103 => CheckKind::DotFormatInException,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1403,6 +1422,9 @@ impl CheckCode {
             CheckCode::E743 => CheckCategory::Pycodestyle,
             CheckCode::E902 => CheckCategory::Pycodestyle,
             CheckCode::E999 => CheckCategory::Pycodestyle,
+            CheckCode::EM101 => CheckCategory::Flake8ErrMsg,
+            CheckCode::EM102 => CheckCategory::Flake8ErrMsg,
+            CheckCode::EM103 => CheckCategory::Flake8ErrMsg,
             CheckCode::ERA001 => CheckCategory::Eradicate,
             CheckCode::F401 => CheckCategory::Pyflakes,
             CheckCode::F402 => CheckCategory::Pyflakes,
@@ -1846,6 +1868,10 @@ impl CheckKind {
             CheckKind::UseOfDotStack => &CheckCode::PDV013,
             CheckKind::UseOfPdMerge => &CheckCode::PDV015,
             CheckKind::DfIsABadVariableName => &CheckCode::PDV901,
+            // flake8-errmsg
+            CheckKind::RawStringInException => &CheckCode::EM101,
+            CheckKind::FStringInException => &CheckCode::EM102,
+            CheckKind::DotFormatInException => &CheckCode::EM103,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -2708,6 +2734,16 @@ impl CheckKind {
             }
             CheckKind::UseOfPdMerge => "Use `.merge` method instead of `pd.merge` function. They \
                                         have equivalent functionality."
+                .to_string(),
+            // flake8-errmsg
+            CheckKind::RawStringInException => {
+                "Exception must not use a string literal, assign to variable first".to_string()
+            }
+            CheckKind::FStringInException => {
+                "Exception must not use an f-string literal, assign to variable first".to_string()
+            }
+            CheckKind::DotFormatInException => "Exception must not use a `.format()` string \
+                                                directly, assign to variable first"
                 .to_string(),
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {

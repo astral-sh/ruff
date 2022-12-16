@@ -87,8 +87,8 @@ mod tests {
     };
     use crate::settings::types::PatternPrefixPair;
     use crate::{
-        flake8_bugbear, flake8_import_conventions, flake8_quotes, flake8_tidy_imports, mccabe,
-        pep8_naming,
+        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
+        flake8_tidy_imports, mccabe, pep8_naming,
     };
 
     #[test]
@@ -136,6 +136,7 @@ mod tests {
                     unfixable: None,
                     flake8_annotations: None,
                     flake8_bugbear: None,
+                    flake8_errmsg: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -181,6 +182,7 @@ line-length = 79
                     unfixable: None,
                     flake8_annotations: None,
                     flake8_bugbear: None,
+                    flake8_errmsg: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -225,6 +227,7 @@ exclude = ["foo.py"]
                     target_version: None,
                     show_source: None,
                     flake8_annotations: None,
+                    flake8_errmsg: None,
                     flake8_bugbear: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
@@ -271,6 +274,7 @@ select = ["E501"]
                     unfixable: None,
                     flake8_annotations: None,
                     flake8_bugbear: None,
+                    flake8_errmsg: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -317,6 +321,7 @@ ignore = ["E501"]
                     unfixable: None,
                     flake8_annotations: None,
                     flake8_bugbear: None,
+                    flake8_errmsg: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -408,6 +413,9 @@ other-attribute = 1
                         "fastapi.Depends".to_string(),
                         "fastapi.Query".to_string(),
                     ]),
+                }),
+                flake8_errmsg: Some(flake8_errmsg::settings::Options {
+                    max_string_length: Some(20),
                 }),
                 flake8_quotes: Some(flake8_quotes::settings::Options {
                     inline_quotes: Some(Quote::Single),

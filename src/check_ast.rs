@@ -37,9 +37,9 @@ use crate::visibility::{module_visibility, transition_scope, Modifier, Visibilit
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
-    flake8_import_conventions, flake8_print, flake8_return, flake8_simplify, flake8_tidy_imports,
-    flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pygrep_hooks, pylint, pyupgrade, visibility,
+    flake8_errmsg, flake8_import_conventions, flake8_print, flake8_return, flake8_simplify,
+    flake8_tidy_imports, flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle,
+    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -1018,6 +1018,20 @@ where
                 if self.settings.enabled.contains(&CheckCode::B016) {
                     if let Some(exc) = exc {
                         flake8_bugbear::plugins::cannot_raise_literal(self, exc);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::EM101)
+                    | self.settings.enabled.contains(&CheckCode::EM102)
+                    | self.settings.enabled.contains(&CheckCode::EM103)
+                {
+                    if let Some(exc) = exc {
+                        self.add_checks(
+                            flake8_errmsg::checks::check_string_in_exception(
+                                exc,
+                                self.settings.flake8_errmsg.max_string_length,
+                            )
+                            .into_iter(),
+                        );
                     }
                 }
             }
