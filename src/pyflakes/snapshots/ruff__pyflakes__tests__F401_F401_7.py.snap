@@ -1,0 +1,59 @@
+---
+source: src/pyflakes/mod.rs
+expression: checks
+---
+- kind:
+    UnusedImport:
+      - module.B
+      - false
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 5
+  fix:
+    content: "from module import (\n    A,  # noqa: F401\n    )"
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 6
+      column: 1
+- kind:
+    UnusedImport:
+      - module.A
+      - false
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 5
+  fix:
+    content: ""
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 17
+      column: 0
+- kind:
+    UnusedImport:
+      - module.B
+      - false
+  location:
+    row: 15
+    column: 4
+  end_location:
+    row: 15
+    column: 5
+  fix:
+    content: ""
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 17
+      column: 0
+

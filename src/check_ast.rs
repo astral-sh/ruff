@@ -25,6 +25,7 @@ use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, visitor};
 use crate::checks::{Check, CheckCode, CheckKind, DeferralKeyword};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
+use crate::noqa::Directive;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
@@ -38,8 +39,8 @@ use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_debugger,
     flake8_errmsg, flake8_import_conventions, flake8_print, flake8_return, flake8_simplify,
-    flake8_tidy_imports, flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle,
-    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, visibility,
+    flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -51,7 +52,9 @@ pub struct Checker<'a> {
     // Input data.
     path: &'a Path,
     autofix: bool,
+    ignore_noqa: bool,
     pub(crate) settings: &'a Settings,
+    pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
     pub(crate) locator: &'a SourceCodeLocator<'a>,
     // Computed checks.
     checks: Vec<Check>,
@@ -98,13 +101,17 @@ pub struct Checker<'a> {
 impl<'a> Checker<'a> {
     pub fn new(
         settings: &'a Settings,
+        noqa_line_for: &'a IntMap<usize, usize>,
         autofix: bool,
+        ignore_noqa: bool,
         path: &'a Path,
         locator: &'a SourceCodeLocator,
     ) -> Checker<'a> {
         Checker {
             settings,
+            noqa_line_for,
             autofix,
+            ignore_noqa,
             path,
             locator,
             checks: vec![],
@@ -198,6 +205,30 @@ impl<'a> Checker<'a> {
             .map_or(false, |index| {
                 matches!(self.bindings[*index].kind, BindingKind::Builtin)
             })
+    }
+
+    /// Return `true` if a `CheckCode` is disabled by a `noqa` directive.
+    pub fn is_ignored(&self, code: &CheckCode, lineno: usize) -> bool {
+        // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
+        // However, in rare cases, we need to check them here. For example, when
+        // removing unused imports, we create a single fix that's applied to all
+        // unused members on a single import. We need to pre-emptively omit any
+        // members from the fix that will eventually be excluded by a `noqa`.
+        // Unfortunately, we _do_ want to register a `Check` for each eventually-ignored
+        // import, so that our `noqa` counts are accurate.
+        if self.ignore_noqa {
+            return false;
+        }
+        let noqa_lineno = self.noqa_line_for.get(&lineno).unwrap_or(&lineno);
+        let line = self.locator.slice_source_code_range(&Range {
+            location: Location::new(*noqa_lineno, 0),
+            end_location: Location::new(noqa_lineno + 1, 0),
+        });
+        match noqa::extract_noqa_directive(&line) {
+            Directive::None => false,
+            Directive::All(..) => true,
+            Directive::Codes(.., codes) => noqa::includes(code, &codes),
+        }
     }
 }
 
@@ -3396,6 +3427,8 @@ impl<'a> Checker<'a> {
                     (&'a RefEquality<'b, Stmt>, Option<&'a RefEquality<'b, Stmt>>);
 
                 let mut unused: FxHashMap<BindingContext, Vec<UnusedImport>> = FxHashMap::default();
+                let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
+                    FxHashMap::default();
 
                 for (name, index) in scope
                     .values
@@ -3420,12 +3453,21 @@ impl<'a> Checker<'a> {
 
                     let defined_by = binding.source.as_ref().unwrap();
                     let defined_in = self.child_to_parent.get(defined_by);
-                    unused
-                        .entry((defined_by, defined_in))
-                        .or_default()
-                        .push((full_name, &binding.range));
+                    if self.is_ignored(&CheckCode::F401, binding.range.location.row()) {
+                        ignored
+                            .entry((defined_by, defined_in))
+                            .or_default()
+                            .push((full_name, &binding.range));
+                    } else {
+                        unused
+                            .entry((defined_by, defined_in))
+                            .or_default()
+                            .push((full_name, &binding.range));
+                    }
                 }
 
+                let ignore_init =
+                    self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
                 for ((defined_by, defined_in), unused_imports) in unused
                     .into_iter()
                     .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
@@ -3433,8 +3475,6 @@ impl<'a> Checker<'a> {
                     let child = defined_by.0;
                     let parent = defined_in.map(|defined_in| defined_in.0);
 
-                    let ignore_init = self.settings.ignore_init_module_imports
-                        && self.path.ends_with("__init__.py");
                     let fix = if !ignore_init && self.patch(&CheckCode::F401) {
                         let deleted: Vec<&Stmt> =
                             self.deletions.iter().map(|node| node.0).collect();
@@ -3469,6 +3509,17 @@ impl<'a> Checker<'a> {
                             check.amend(fix.clone());
                         }
                         checks.push(check);
+                    }
+                }
+                for (_, unused_imports) in ignored
+                    .into_iter()
+                    .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
+                {
+                    for (full_name, range) in unused_imports {
+                        checks.push(Check::new(
+                            CheckKind::UnusedImport(full_name.clone(), ignore_init),
+                            *range,
+                        ));
                     }
                 }
             }
@@ -3705,11 +3756,13 @@ impl<'a> Checker<'a> {
 pub fn check_ast(
     python_ast: &Suite,
     locator: &SourceCodeLocator,
+    noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: bool,
+    ignore_noqa: bool,
     path: &Path,
 ) -> Vec<Check> {
-    let mut checker = Checker::new(settings, autofix, path, locator);
+    let mut checker = Checker::new(settings, noqa_line_for, autofix, ignore_noqa, path, locator);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 

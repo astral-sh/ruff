@@ -83,7 +83,15 @@ pub(crate) fn check_path(
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
                 if use_ast {
-                    checks.extend(check_ast(&python_ast, locator, settings, autofix, path));
+                    checks.extend(check_ast(
+                        &python_ast,
+                        locator,
+                        &directives.noqa_line_for,
+                        settings,
+                        autofix,
+                        ignore_noqa,
+                        path,
+                    ));
                 }
                 if use_imports {
                     checks.extend(check_imports(
