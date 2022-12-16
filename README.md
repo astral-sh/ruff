@@ -673,7 +673,7 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 | ANN102 | MissingTypeCls | Missing type annotation for `...` in classmethod |  |
 | ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function `...` |  |
 | ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function `...` |  |
-| ANN204 | MissingReturnTypeMagicMethod | Missing return type annotation for magic method `...` |  |
+| ANN204 | MissingReturnTypeSpecialMethod | Missing return type annotation for special method `...` | 🛠 |
 | ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `...` |  |
 | ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `...` |  |
 | ANN401 | DynamicallyTypedExpression | Dynamically typed expressions (typing.Any) are disallowed in `...` |  |
