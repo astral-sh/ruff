@@ -155,7 +155,7 @@ pub fn check_lines(
                 let check = Check::new(
                     CheckKind::LineTooLong(line_length, settings.line_length),
                     Range {
-                        location: Location::new(lineno + 1, 0),
+                        location: Location::new(lineno + 1, settings.line_length),
                         end_location: Location::new(lineno + 1, line_length),
                     },
                 );
