@@ -179,7 +179,7 @@ fn is_python_path(path: &Path) -> bool {
 }
 
 /// Return `true` if the `Entry` appears to be that of a Python file.
-fn is_python_entry(entry: &DirEntry) -> bool {
+pub fn is_python_entry(entry: &DirEntry) -> bool {
     is_python_path(entry.path())
         && !entry
             .file_type()

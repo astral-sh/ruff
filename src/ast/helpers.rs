@@ -372,8 +372,8 @@ pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
 pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
     // Does the previous line end in a continuation? This will have a specific
     // false-positive, which is that if the previous line ends in a comment, it
-    // will be treated as a continuation. So we should only use this information to make
-    // conservative choices.
+    // will be treated as a continuation. So we should only use this information to
+    // make conservative choices.
     // TODO(charlie): Come up with a more robust strategy.
     if stmt.location.row() > 1 {
         let range = Range {
@@ -407,9 +407,7 @@ mod tests {
     use rustpython_ast::Location;
     use rustpython_parser::parser;
 
-    use crate::ast::helpers::{
-        identifier_range, match_leading_content, match_module_member, match_trailing_content,
-    };
+    use crate::ast::helpers::{identifier_range, match_module_member, match_trailing_content};
     use crate::ast::types::Range;
     use crate::source_code_locator::SourceCodeLocator;
 
@@ -562,25 +560,25 @@ mod tests {
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = SourceCodeLocator::new(contents);
-        assert_eq!(match_trailing_content(stmt, &locator), false);
+        assert!(!match_trailing_content(stmt, &locator));
 
         let contents = "x = 1; y = 2";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = SourceCodeLocator::new(contents);
-        assert_eq!(match_trailing_content(stmt, &locator), true);
+        assert!(match_trailing_content(stmt, &locator));
 
         let contents = "x = 1  ";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = SourceCodeLocator::new(contents);
-        assert_eq!(match_trailing_content(stmt, &locator), false);
+        assert!(!match_trailing_content(stmt, &locator));
 
         let contents = "x = 1  # Comment";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = SourceCodeLocator::new(contents);
-        assert_eq!(match_trailing_content(stmt, &locator), false);
+        assert!(!match_trailing_content(stmt, &locator));
 
         let contents = r#"
 x = 1
@@ -590,7 +588,7 @@ y = 2
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = SourceCodeLocator::new(contents);
-        assert_eq!(match_trailing_content(stmt, &locator), false);
+        assert!(!match_trailing_content(stmt, &locator));
 
         Ok(())
     }

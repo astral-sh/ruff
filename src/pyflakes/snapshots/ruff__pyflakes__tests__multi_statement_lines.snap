@@ -200,4 +200,40 @@ expression: checks
     end_location:
       row: 41
       column: 9
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 46
+    column: 7
+  end_location:
+    row: 46
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 46
+      column: 0
+    end_location:
+      row: 46
+      column: 10
+- kind:
+    UnusedImport:
+      - foo
+      - false
+  location:
+    row: 51
+    column: 7
+  end_location:
+    row: 51
+    column: 10
+  fix:
+    content: "\n"
+    location:
+      row: 51
+      column: 0
+    end_location:
+      row: 51
+      column: 10
 

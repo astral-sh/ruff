@@ -4,7 +4,6 @@ use rustpython_parser::ast::{ExcepthandlerKind, Location, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::ast::helpers::to_absolute;
-use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::autofix::Fix;
 use crate::source_code_locator::SourceCodeLocator;
@@ -133,10 +132,10 @@ fn is_end_of_file(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
     contents.is_empty()
 }
 
-/// Return the `Range` to use when deleting a `Stmt`.
+/// Return the `Fix` to use when deleting a `Stmt`.
 ///
-/// In some cases, this is as simple as the `Range` of the `Stmt` itself.
-/// However, there are a few exceptions:
+/// In some cases, this is as simple as deleting the `Range` of the `Stmt`
+/// itself. However, there are a few exceptions:
 /// - If the `Stmt` is _not_ the terminal statement in a multi-statement line,
 ///   we need to delete up to the start of the next statement (and avoid
 ///   deleting any content that precedes the statement).
@@ -144,29 +143,8 @@ fn is_end_of_file(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
 ///   to avoid deleting any content that precedes the statement.
 /// - If the `Stmt` has no trailing and leading content, then it's convenient to
 ///   remove the entire start and end lines.
-fn deletion_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Result<Range> {
-    if let Some(semicolon) = trailing_semicolon(stmt, locator) {
-        let next = next_stmt_break(semicolon, locator);
-        Ok(Range {
-            location: stmt.location,
-            end_location: next,
-        })
-    } else if helpers::match_leading_content(stmt, locator) {
-        Ok(Range::from_located(stmt))
-    } else if helpers::preceded_by_continuation(stmt, locator) {
-        if is_end_of_file(stmt, locator) {
-            bail!("Unable to delete suspected continuation line at end-of-file")
-        } else {
-            Ok(Range::from_located(stmt))
-        }
-    } else {
-        Ok(Range {
-            location: Location::new(stmt.location.row(), 0),
-            end_location: Location::new(stmt.end_location.unwrap().row() + 1, 0),
-        })
-    }
-}
-
+/// - If the `Stmt` is the last statement in its parent body, replace it with a
+///   `pass` instead.
 pub fn delete_stmt(
     stmt: &Stmt,
     parent: Option<&Stmt>,
@@ -186,8 +164,24 @@ pub fn delete_stmt(
             stmt.end_location.unwrap(),
         ))
     } else {
-        let range = deletion_range(stmt, locator)?;
-        Ok(Fix::deletion(range.location, range.end_location))
+        Ok(if let Some(semicolon) = trailing_semicolon(stmt, locator) {
+            let next = next_stmt_break(semicolon, locator);
+            Fix::deletion(stmt.location, next)
+        } else if helpers::match_leading_content(stmt, locator) {
+            Fix::deletion(stmt.location, stmt.end_location.unwrap())
+        } else if helpers::preceded_by_continuation(stmt, locator) {
+            if is_end_of_file(stmt, locator) && stmt.location.column() == 0 {
+                // Special-case: a file can't end in a continuation.
+                Fix::replacement("\n".to_string(), stmt.location, stmt.end_location.unwrap())
+            } else {
+                Fix::deletion(stmt.location, stmt.end_location.unwrap())
+            }
+        } else {
+            Fix::deletion(
+                Location::new(stmt.location.row(), 0),
+                Location::new(stmt.end_location.unwrap().row() + 1, 0),
+            )
+        })
     }
 }
 
