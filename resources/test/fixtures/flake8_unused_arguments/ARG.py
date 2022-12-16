@@ -27,7 +27,7 @@ def f(cls, x):
 lambda x: print("Hello, world!")
 
 
-class X:
+class C:
     ###
     # Unused arguments.
     ###

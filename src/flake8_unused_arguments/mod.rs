@@ -1,5 +1,6 @@
 mod helpers;
 pub mod plugins;
+pub mod settings;
 mod types;
 
 #[cfg(test)]
@@ -12,7 +13,7 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
-    use crate::settings;
+    use crate::{flake8_unused_arguments, settings};
 
     #[test_case(CheckCode::ARG001, Path::new("ARG.py"); "ARG001")]
     #[test_case(CheckCode::ARG002, Path::new("ARG.py"); "ARG002")]
@@ -30,6 +31,52 @@ mod tests {
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test]
+    fn ignore_variadic_names() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py"),
+            &settings::Settings {
+                flake8_unused_arguments: flake8_unused_arguments::settings::Settings {
+                    ignore_variadic_names: true,
+                },
+                ..settings::Settings::for_rules(vec![
+                    CheckCode::ARG001,
+                    CheckCode::ARG002,
+                    CheckCode::ARG003,
+                    CheckCode::ARG004,
+                    CheckCode::ARG005,
+                ])
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn enforce_variadic_names() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py"),
+            &settings::Settings {
+                flake8_unused_arguments: flake8_unused_arguments::settings::Settings {
+                    ignore_variadic_names: false,
+                },
+                ..settings::Settings::for_rules(vec![
+                    CheckCode::ARG001,
+                    CheckCode::ARG002,
+                    CheckCode::ARG003,
+                    CheckCode::ARG004,
+                    CheckCode::ARG005,
+                ])
+            },
+            true,
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 }

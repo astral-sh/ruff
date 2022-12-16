@@ -2144,6 +2144,25 @@ ban-relative-imports = "all"
 
 ---
 
+### `flake8-unused-arguments`
+
+#### [`ignore-variadic-names`](#ignore-variadic-names)
+
+Whether to allow unused variadic arguments, like `*args` and `**kwargs`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-unused-arguments]
+ignore-variadic-names = true
+```
+
+---
+
 ### `isort`
 
 #### [`combine-as-imports`](#combine-as-imports)
