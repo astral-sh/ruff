@@ -12,6 +12,7 @@ mod tests {
     use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::settings;
+    use crate::settings::flags;
 
     #[test_case(CheckCode::C400, Path::new("C400.py"); "C400")]
     #[test_case(CheckCode::C401, Path::new("C401.py"); "C401")]
@@ -37,7 +38,7 @@ mod tests {
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
-            true,
+            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);

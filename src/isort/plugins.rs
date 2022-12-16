@@ -10,6 +10,7 @@ use crate::autofix::Fix;
 use crate::checks::CheckKind;
 use crate::isort::track::Block;
 use crate::isort::{comments, format_imports};
+use crate::settings::flags;
 use crate::{Check, Settings, SourceCodeLocator};
 
 fn extract_range(body: &[&Stmt]) -> Range {
@@ -34,7 +35,7 @@ pub fn check_imports(
     block: &Block,
     locator: &SourceCodeLocator,
     settings: &Settings,
-    autofix: bool,
+    autofix: flags::Autofix,
 ) -> Option<Check> {
     let indentation = locator.slice_source_code_range(&extract_indentation_range(&block.imports));
     let indentation = leading_space(&indentation);
@@ -87,7 +88,9 @@ pub fn check_imports(
         None
     } else {
         let mut check = Check::new(CheckKind::UnsortedImports, range);
-        if autofix && settings.fixable.contains(check.kind.code()) {
+        if matches!(autofix, flags::Autofix::Enabled)
+            && settings.fixable.contains(check.kind.code())
+        {
             check.amend(Fix::replacement(
                 indent(&expected, indentation),
                 range.location,

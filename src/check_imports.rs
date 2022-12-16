@@ -9,14 +9,14 @@ use crate::checks::Check;
 use crate::directives::IsortDirectives;
 use crate::isort;
 use crate::isort::track::ImportTracker;
-use crate::settings::Settings;
+use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 
 fn check_import_blocks(
     tracker: ImportTracker,
     locator: &SourceCodeLocator,
     settings: &Settings,
-    autofix: bool,
+    autofix: flags::Autofix,
 ) -> Vec<Check> {
     let mut checks = vec![];
     for block in tracker.into_iter() {
@@ -34,7 +34,7 @@ pub fn check_imports(
     locator: &SourceCodeLocator,
     directives: &IsortDirectives,
     settings: &Settings,
-    autofix: bool,
+    autofix: flags::Autofix,
     path: &Path,
 ) -> Vec<Check> {
     let mut tracker = ImportTracker::new(locator, directives, path);

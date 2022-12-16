@@ -9,6 +9,7 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::settings::flags;
     use crate::{flake8_errmsg, settings};
 
     #[test]
@@ -20,7 +21,7 @@ mod tests {
                 CheckCode::EM102,
                 CheckCode::EM103,
             ]),
-            false,
+            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("defaults", checks);
@@ -41,7 +42,7 @@ mod tests {
                     CheckCode::EM103,
                 ])
             },
-            false,
+            flags::Autofix::Enabled,
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("custom", checks);

@@ -27,15 +27,6 @@ impl From<bool> for Mode {
     }
 }
 
-impl From<&Mode> for bool {
-    fn from(value: &Mode) -> Self {
-        match value {
-            Mode::Generate | Mode::Apply => true,
-            Mode::None => false,
-        }
-    }
-}
-
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub fn fix_file<'a>(
     checks: &'a [Check],

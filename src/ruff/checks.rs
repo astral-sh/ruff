@@ -5,6 +5,7 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checks::CheckKind;
+use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::{Check, Settings};
 
@@ -1609,7 +1610,7 @@ pub fn ambiguous_unicode_character(
     end: Location,
     context: Context,
     settings: &Settings,
-    autofix: bool,
+    autofix: flags::Autofix,
 ) -> Vec<Check> {
     let mut checks = vec![];
 
@@ -1653,7 +1654,9 @@ pub fn ambiguous_unicode_character(
                         },
                     );
                     if settings.enabled.contains(check.kind.code()) {
-                        if autofix && settings.fixable.contains(check.kind.code()) {
+                        if matches!(autofix, flags::Autofix::Enabled)
+                            && settings.fixable.contains(check.kind.code())
+                        {
                             check.amend(Fix::replacement(
                                 representant.to_string(),
                                 location,

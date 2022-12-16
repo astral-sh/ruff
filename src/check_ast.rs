@@ -31,7 +31,7 @@ use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
 use crate::python::typing::SubscriptKind;
 use crate::settings::types::PythonVersion;
-use crate::settings::Settings;
+use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::vendored::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
@@ -51,8 +51,8 @@ type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 pub struct Checker<'a> {
     // Input data.
     path: &'a Path,
-    autofix: bool,
-    ignore_noqa: bool,
+    autofix: flags::Autofix,
+    noqa: flags::Noqa,
     pub(crate) settings: &'a Settings,
     pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
     pub(crate) locator: &'a SourceCodeLocator<'a>,
@@ -102,8 +102,8 @@ impl<'a> Checker<'a> {
     pub fn new(
         settings: &'a Settings,
         noqa_line_for: &'a IntMap<usize, usize>,
-        autofix: bool,
-        ignore_noqa: bool,
+        autofix: flags::Autofix,
+        noqa: flags::Noqa,
         path: &'a Path,
         locator: &'a SourceCodeLocator,
     ) -> Checker<'a> {
@@ -111,7 +111,7 @@ impl<'a> Checker<'a> {
             settings,
             noqa_line_for,
             autofix,
-            ignore_noqa,
+            noqa,
             path,
             locator,
             checks: vec![],
@@ -182,7 +182,9 @@ impl<'a> Checker<'a> {
     pub fn patch(&self, code: &CheckCode) -> bool {
         // TODO(charlie): We can't fix errors in f-strings until RustPython adds
         // location data.
-        self.autofix && self.in_f_string.is_none() && self.settings.fixable.contains(code)
+        matches!(self.autofix, flags::Autofix::Enabled)
+            && self.in_f_string.is_none()
+            && self.settings.fixable.contains(code)
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -216,7 +218,7 @@ impl<'a> Checker<'a> {
         // members from the fix that will eventually be excluded by a `noqa`.
         // Unfortunately, we _do_ want to register a `Check` for each eventually-ignored
         // import, so that our `noqa` counts are accurate.
-        if self.ignore_noqa {
+        if matches!(self.noqa, flags::Noqa::Disabled) {
             return false;
         }
         let noqa_lineno = self.noqa_line_for.get(&lineno).unwrap_or(&lineno);
@@ -3758,11 +3760,11 @@ pub fn check_ast(
     locator: &SourceCodeLocator,
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
-    autofix: bool,
-    ignore_noqa: bool,
+    autofix: flags::Autofix,
+    noqa: flags::Noqa,
     path: &Path,
 ) -> Vec<Check> {
-    let mut checker = Checker::new(settings, noqa_line_for, autofix, ignore_noqa, path, locator);
+    let mut checker = Checker::new(settings, noqa_line_for, autofix, noqa, path, locator);
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 

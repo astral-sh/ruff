@@ -22,7 +22,7 @@ use crate::code_gen::SourceGenerator;
 use crate::directives::Directives;
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
-use crate::settings::Settings;
+use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::{cache, directives, fs, rustpython_helpers};
 
@@ -55,8 +55,8 @@ pub(crate) fn check_path(
     locator: &SourceCodeLocator,
     directives: &Directives,
     settings: &Settings,
-    autofix: bool,
-    ignore_noqa: bool,
+    autofix: flags::Autofix,
+    noqa: flags::Noqa,
 ) -> Result<Vec<Check>> {
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
@@ -89,7 +89,7 @@ pub(crate) fn check_path(
                         &directives.noqa_line_for,
                         settings,
                         autofix,
-                        ignore_noqa,
+                        noqa,
                         path,
                     ));
                 }
@@ -125,7 +125,7 @@ pub(crate) fn check_path(
         &directives.noqa_line_for,
         settings,
         autofix,
-        ignore_noqa,
+        noqa,
     );
 
     // Create path ignores.
@@ -205,8 +205,8 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
             isort: directives.isort,
         },
         settings,
-        false,
-        true,
+        flags::Autofix::Disabled,
+        flags::Noqa::Disabled,
     )?;
 
     add_noqa(
@@ -293,7 +293,7 @@ fn lint(
             &directives,
             settings,
             autofix.into(),
-            false,
+            flags::Noqa::Enabled,
         )?;
 
         // Apply autofix.
@@ -332,7 +332,7 @@ fn lint(
 }
 
 #[cfg(test)]
-pub fn test_path(path: &Path, settings: &Settings, autofix: bool) -> Result<Vec<Check>> {
+pub fn test_path(path: &Path, settings: &Settings, autofix: flags::Autofix) -> Result<Vec<Check>> {
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
@@ -349,6 +349,6 @@ pub fn test_path(path: &Path, settings: &Settings, autofix: bool) -> Result<Vec<
         &directives,
         settings,
         autofix,
-        false,
+        flags::Noqa::Enabled,
     )
 }
