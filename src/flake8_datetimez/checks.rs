@@ -3,11 +3,21 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, KeywordData
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
 
-fn get_tzinfo_in_keywords(keywords: &[Keyword]) -> Option<&Keyword> {
+fn get_keyword_in_keywords<'a>(keywords: &'a[Keyword], keyword_name: &str) -> Option<&'a Keyword> {
     keywords.iter().find(|keyword| {
         let KeywordData { arg, .. } = &keyword.node;
-        arg.as_ref().map_or(false, |_arg| _arg == "tzinfo")
+        arg.as_ref().map_or(false, |_arg| _arg == keyword_name)
     })
+}
+
+// aaa(<keyword>=<not_none>)
+fn has_not_none_keyword_in_keywords(keywords: &[Keyword], keyword: &str) -> bool {
+    if let Some(keyword_data) = get_keyword_in_keywords(keywords, keyword) {
+        if !is_const_none(&keyword_data.node.value) {
+            return true;
+        }
+    }
+    false
 }
 
 fn is_const_none(value: &Located<ExprKind>) -> bool {
@@ -20,7 +30,7 @@ fn is_const_none(value: &Located<ExprKind>) -> bool {
     )
 }
 
-// a.b.c(..) -> ['a', 'b', 'c']
+// aaa.bbb.ccc(..) -> ['aaa', 'bbb', 'ccc']
 fn get_call_parts(func: &Expr) -> Vec<&String> {
     match &func.node {
         ExprKind::Attribute {
@@ -60,6 +70,8 @@ pub fn call_datetime_without_tzinfo(
     keywords: &[Keyword],
     location: Range,
 ) -> Option<Check> {
+    let check = Some(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
+
     let is_datetime_datetime_func = is_expected_func_call(func, &["datetime", "datetime"]);
     let is_datetime_func = is_expected_func_call(func, &["datetime"]);
 
@@ -69,37 +81,22 @@ pub fn call_datetime_without_tzinfo(
 
     // no args
     if is_datetime_datetime_func && args.len() < 8 && keywords.is_empty() {
-        return Some(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
+        return check;
     }
 
     // no args unqualified
     if is_datetime_func && args.len() < 8 && keywords.is_empty() {
-        return Some(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
+        return check;
     }
 
     // none args
     if is_datetime_datetime_func && args.len() == 8 && is_const_none(&args[7]) {
-        return Some(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
+        return check;
     }
 
-    let tzinfo = get_tzinfo_in_keywords(keywords);
-
-    // no kwargs
-    if is_datetime_datetime_func && tzinfo.is_none() {
-        return Some(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
-    }
-
-    // none kwargs
-    if is_datetime_datetime_func {
-        if let Some(Located {
-            node: KeywordData { value, .. },
-            ..
-        }) = tzinfo
-        {
-            if is_const_none(value) {
-                return Some(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
-            }
-        }
+    // no kwargs / none kwargs
+    if is_datetime_datetime_func && !has_not_none_keyword_in_keywords(keywords, "tzinfo") {
+        return check;
     }
 
     None
@@ -121,6 +118,20 @@ pub fn call_datetime_utcnow(func: &Expr, location: Range) -> Option<Check> {
         is_expected_func_call(func, &["datetime", "datetime", "utcnow"]);
     if is_datetime_utcnow_func || is_datetime_datetime_utcnow_func {
         return Some(Check::new(CheckKind::CallDatetimeUtcnow, location));
+    }
+    None
+}
+
+pub fn call_datetime_utcfromtimestamp(func: &Expr, location: Range) -> Option<Check> {
+    let is_datetime_utcfromtimestamp_func =
+        is_expected_func_call(func, &["datetime", "utcfromtimestamp"]);
+    let is_datetime_datetime_utcfromtimestamp_func =
+        is_expected_func_call(func, &["datetime", "datetime", "utcfromtimestamp"]);
+    if is_datetime_utcfromtimestamp_func || is_datetime_datetime_utcfromtimestamp_func {
+        return Some(Check::new(
+            CheckKind::CallDatetimeUtcfromtimestamp,
+            location,
+        ));
     }
     None
 }
