@@ -135,3 +135,42 @@ pub fn call_datetime_utcfromtimestamp(func: &Expr, location: Range) -> Option<Ch
     }
     None
 }
+
+pub fn call_datetime_now_without_tzinfo(
+    func: &Expr, 
+    args: &[Expr],
+    keywords: &[Keyword],
+    location: Range
+) -> Option<Check> {
+    let check = Some(Check::new(
+        CheckKind::CallDatetimeNowWithoutTzinfo,
+        location,
+    ));
+
+    let is_datetime_now_func = is_expected_func_call(func, &["datetime", "now"]);
+    let is_datetime_datetime_now_func =
+        is_expected_func_call(func, &["datetime", "datetime", "now"]);
+    if !is_datetime_now_func && !is_datetime_datetime_now_func {
+        return None;
+    }
+
+    // no args / no args unqualified
+    if args.is_empty() && keywords.is_empty() {
+        return check;
+    }
+
+    // none args
+    if args.len() > 0 && is_const_none(&args[0]) {
+        return check;
+    }
+
+    // wrong keywords / none keyword
+    if keywords.len() > 0 {
+        if has_not_none_keyword_in_keywords(keywords, "tz") {
+            return None;
+        }
+        return check;
+    }
+
+    None
+}
