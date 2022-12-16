@@ -104,3 +104,13 @@ pub fn call_datetime_without_tzinfo(
 
     None
 }
+
+pub fn call_datetime_today(func: &Expr, location: Range) -> Option<Check> {
+    let is_datetime_today_func = is_expected_func_call(func, &["datetime", "today"]);
+    let is_datetime_datetime_today_func =
+        is_expected_func_call(func, &["datetime", "datetime", "today"]);
+    if is_datetime_today_func || is_datetime_datetime_today_func {
+        return Some(Check::new(CheckKind::CallDatetimeToday, location));
+    }
+    None
+}

@@ -1966,6 +1966,14 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::DTZ002) {
+                    if let Some(check) = flake8_datetimez::checks::call_datetime_today(
+                        func,
+                        Range::from_located(expr),
+                    ) {
+                        self.add_check(check);
+                    }
+                }
 
                 // pygrep-hooks
                 if self.settings.enabled.contains(&CheckCode::PGH001) {
