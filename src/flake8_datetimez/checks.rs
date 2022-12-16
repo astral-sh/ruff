@@ -206,3 +206,12 @@ pub fn call_datetime_fromtimestamp(
 
     None
 }
+
+pub fn call_date_today(func: &Expr, location: Range) -> Option<Check> {
+    let is_date_today_func = is_expected_func_call(func, &["date", "today"]);
+    let is_datetime_date_today_func = is_expected_func_call(func, &["datetime", "date", "today"]);
+    if is_date_today_func || is_datetime_date_today_func {
+        return Some(Check::new(CheckKind::CallDateToday, location));
+    }
+    None
+}
