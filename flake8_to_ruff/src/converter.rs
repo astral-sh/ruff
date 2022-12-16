@@ -200,7 +200,7 @@ pub fn convert(
                 "errmsg-max-string-length" | "errmsg_max_string_length" => {
                     match value.clone().parse::<usize>() {
                         Ok(max_string_length) => {
-                            flake8_errmsg.max_string_length = Some(max_string_length)
+                            flake8_errmsg.max_string_length = Some(max_string_length);
                         }
                         Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                     }

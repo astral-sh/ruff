@@ -23,9 +23,10 @@ pub struct Settings {
 }
 
 impl Settings {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: Options) -> Self {
         Self {
-            max_string_length: options.max_string_length.unwrap_or(0),
+            max_string_length: options.max_string_length.unwrap_or_default(),
         }
     }
 }

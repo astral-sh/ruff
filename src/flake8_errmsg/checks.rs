@@ -17,14 +17,14 @@ pub fn check_string_in_exception(exc: &Expr, max_string_length: usize) -> Vec<Ch
                 if string.len() > max_string_length {
                     checks.push(Check::new(
                         CheckKind::RawStringInException,
-                        Range::from_located(&first),
-                    ))
+                        Range::from_located(first),
+                    ));
                 }
             }
             // Check for f-strings
             ExprKind::JoinedStr { .. } => checks.push(Check::new(
                 CheckKind::FStringInException,
-                Range::from_located(&first),
+                Range::from_located(first),
             )),
             // Check for .format() calls
             ExprKind::Call { func, .. } => {
@@ -32,8 +32,8 @@ pub fn check_string_in_exception(exc: &Expr, max_string_length: usize) -> Vec<Ch
                     if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
                         checks.push(Check::new(
                             CheckKind::DotFormatInException,
-                            Range::from_located(&first),
-                        ))
+                            Range::from_located(first),
+                        ));
                     }
                 }
             }
