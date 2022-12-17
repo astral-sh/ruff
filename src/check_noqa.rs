@@ -1,3 +1,5 @@
+//! `NoQA` enforcement and validation.
+
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
@@ -11,14 +13,15 @@ use crate::settings::{flags, Settings};
 pub fn check_noqa(
     checks: &mut Vec<Check>,
     contents: &str,
+    commented_lines: &[usize],
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: flags::Autofix,
 ) {
-    let enforce_noqa = settings.enabled.contains(&CheckCode::RUF100);
-
     let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut ignored = vec![];
+
+    let enforce_noqa = settings.enabled.contains(&CheckCode::RUF100);
 
     checks.sort_by_key(|check| check.location);
     let mut checks_iter = checks.iter().enumerate().peekable();
@@ -27,44 +30,45 @@ pub fn check_noqa(
     }
 
     let lines: Vec<&str> = contents.lines().collect();
-    for (lineno, line) in lines.iter().enumerate() {
+    for lineno in commented_lines {
         // If we hit an exemption for the entire file, bail.
-        if is_file_exempt(line) {
+        if is_file_exempt(lines[lineno - 1]) {
             checks.drain(..);
             return;
         }
 
-        // Grab the noqa (logical) line number for the current (physical) line.
-        // If there are newlines at the end of the file, they won't be represented in
-        // `noqa_line_for`, so fallback to the current line.
-        let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
-
         if enforce_noqa {
             noqa_directives
-                .entry(noqa_lineno)
-                .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
+                .entry(lineno - 1)
+                .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno - 1]), vec![]));
         }
 
         // Remove any ignored checks.
         while let Some((index, check)) =
-            checks_iter.next_if(|(_index, check)| check.location.row() == lineno + 1)
+            checks_iter.next_if(|(_index, check)| check.location.row() <= *lineno)
         {
-            let noqa = noqa_directives
-                .entry(noqa_lineno)
-                .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno]), vec![]));
-
-            match noqa {
-                (Directive::All(..), matches) => {
-                    matches.push(check.kind.code().as_ref());
-                    ignored.push(index);
-                }
-                (Directive::Codes(.., codes), matches) => {
-                    if noqa::includes(check.kind.code(), codes) {
+            // Grab the noqa (logical) line number for the current (physical) line.
+            // If there are newlines at the end of the file, they won't be represented in
+            // `noqa_line_for`, so fallback to the current line.
+            let check_lineno = check.location.row();
+            let noqa_lineno = noqa_line_for.get(&check_lineno).unwrap_or(&check_lineno);
+            if noqa_lineno == lineno {
+                let noqa = noqa_directives.entry(noqa_lineno - 1).or_insert_with(|| {
+                    (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![])
+                });
+                match noqa {
+                    (Directive::All(..), matches) => {
                         matches.push(check.kind.code().as_ref());
                         ignored.push(index);
                     }
+                    (Directive::Codes(.., codes), matches) => {
+                        if noqa::includes(check.kind.code(), codes) {
+                            matches.push(check.kind.code().as_ref());
+                            ignored.push(index);
+                        }
+                    }
+                    (Directive::None, ..) => {}
                 }
-                (Directive::None, ..) => {}
             }
         }
     }
