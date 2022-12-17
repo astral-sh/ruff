@@ -573,6 +573,7 @@ pub enum LintSource {
     Lines,
     Tokens,
     Imports,
+    NoQA,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -923,9 +924,8 @@ impl CheckCode {
     /// physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            CheckCode::E501 | CheckCode::W292 | CheckCode::RUF100 | CheckCode::UP009 => {
-                &LintSource::Lines
-            }
+            CheckCode::RUF100 => &LintSource::NoQA,
+            CheckCode::E501 | CheckCode::W292 | CheckCode::UP009 => &LintSource::Lines,
             CheckCode::ERA001
             | CheckCode::Q000
             | CheckCode::Q001

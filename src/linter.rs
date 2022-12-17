@@ -7,7 +7,7 @@ use std::path::Path;
 use anyhow::Result;
 #[cfg(not(target_family = "wasm"))]
 use log::debug;
-use nohash_hasher::IntMap;
+
 use rustpython_parser::lexer::LexResult;
 
 use crate::ast::types::Range;
@@ -16,6 +16,7 @@ use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
 use crate::check_imports::check_imports;
 use crate::check_lines::check_lines;
+use crate::check_noqa::check_noqa;
 use crate::check_tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::code_gen::SourceGenerator;
@@ -63,11 +64,11 @@ pub(crate) fn check_path(
     let mut checks: Vec<Check> = vec![];
 
     // Run the token-based checks.
-    let use_tokens = settings
+    if settings
         .enabled
         .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens));
-    if use_tokens {
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens))
+    {
         checks.extend(check_tokens(locator, &tokens, settings, autofix));
     }
 
@@ -121,14 +122,30 @@ pub(crate) fn check_path(
     }
 
     // Run the lines-based checks.
-    check_lines(
-        &mut checks,
-        contents,
-        &directives.noqa_line_for,
-        settings,
-        autofix,
-        noqa,
-    );
+    if settings
+        .enabled
+        .iter()
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::Lines))
+    {
+        checks.extend(check_lines(contents, settings, autofix));
+    }
+
+    // Enforce `noqa` directives.
+    if matches!(noqa, flags::Noqa::Enabled)
+        || settings
+            .enabled
+            .iter()
+            .any(|check_code| matches!(check_code.lint_source(), LintSource::NoQA))
+    {
+        check_noqa(
+            &mut checks,
+            contents,
+            &directives.commented_lines,
+            &directives.noqa_line_for,
+            settings,
+            autofix,
+        );
+    }
 
     // Create path ignores.
     if !checks.is_empty() && !settings.per_file_ignores.is_empty() {
@@ -204,10 +221,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &contents,
         tokens,
         &locator,
-        &Directives {
-            noqa_line_for: IntMap::default(),
-            isort: directives.isort,
-        },
+        &directives,
         settings,
         flags::Autofix::Disabled,
         flags::Noqa::Disabled,
