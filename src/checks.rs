@@ -317,6 +317,7 @@ pub enum CheckCode {
     // pygrep-hooks
     PGH001,
     PGH002,
+    PGH003,
     // pandas-vet
     PDV002,
     PDV003,
@@ -889,6 +890,7 @@ pub enum CheckKind {
     // pygrep-hooks
     NoEval,
     DeprecatedLogWarn,
+    BlanketTypeIgnore,
     // flake8-unused-arguments
     UnusedFunctionArgument(String),
     UnusedMethodArgument(String),
@@ -927,7 +929,9 @@ impl CheckCode {
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             CheckCode::RUF100 => &LintSource::NoQA,
-            CheckCode::E501 | CheckCode::W292 | CheckCode::UP009 => &LintSource::Lines,
+            CheckCode::E501 | CheckCode::W292 | CheckCode::UP009 | CheckCode::PGH003 => {
+                &LintSource::Lines
+            }
             CheckCode::ERA001
             | CheckCode::Q000
             | CheckCode::Q001
@@ -1263,6 +1267,7 @@ impl CheckCode {
             // pygrep-hooks
             CheckCode::PGH001 => CheckKind::NoEval,
             CheckCode::PGH002 => CheckKind::DeprecatedLogWarn,
+            CheckCode::PGH003 => CheckKind::BlanketTypeIgnore,
             // flake8-unused-arguments
             CheckCode::ARG001 => CheckKind::UnusedFunctionArgument("...".to_string()),
             CheckCode::ARG002 => CheckKind::UnusedMethodArgument("...".to_string()),
@@ -1508,6 +1513,7 @@ impl CheckCode {
             CheckCode::PDV901 => CheckCategory::PandasVet,
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
             CheckCode::PGH002 => CheckCategory::PygrepHooks,
+            CheckCode::PGH003 => CheckCategory::PygrepHooks,
             CheckCode::PLC0414 => CheckCategory::Pylint,
             CheckCode::PLC2201 => CheckCategory::Pylint,
             CheckCode::PLC3002 => CheckCategory::Pylint,
@@ -1852,6 +1858,7 @@ impl CheckKind {
             // pygrep-hooks
             CheckKind::NoEval => &CheckCode::PGH001,
             CheckKind::DeprecatedLogWarn => &CheckCode::PGH002,
+            CheckKind::BlanketTypeIgnore => &CheckCode::PGH003,
             // flake8-unused-arguments
             CheckKind::UnusedFunctionArgument(..) => &CheckCode::ARG001,
             CheckKind::UnusedMethodArgument(..) => &CheckCode::ARG002,
@@ -2691,6 +2698,9 @@ impl CheckKind {
             CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
             CheckKind::DeprecatedLogWarn => {
                 "`warn` is deprecated in favor of `warning`".to_string()
+            }
+            CheckKind::BlanketTypeIgnore => {
+                "Use specific error codes when ignoring type issues".to_string()
             }
             // flake8-unused-arguments
             CheckKind::UnusedFunctionArgument(name) => {
