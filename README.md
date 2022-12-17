@@ -946,8 +946,11 @@ installable via [PyPI](https://pypi.org/project/python-lsp-ruff/):
 pip install python-lsp-server python-lsp-ruff
 ```
 
-The LSP server can be used with any editor that supports the Language Server Protocol. For example,
-to use it with Neovim, you would add something like the following to your `init.lua`:
+The LSP server can be used with any editor that supports the Language Server Protocol, including
+Neovim, Emacs, Sublime Text, etc.
+
+For example, to use `python-lsp-ruff` with Neovim, add something like the following to your
+`init.lua`:
 
 ```lua
 require'lspconfig'.pylsp.setup {
@@ -956,12 +959,58 @@ require'lspconfig'.pylsp.setup {
       plugins = {
         ruff = {
           enabled = true
+        },
+        pycodestyle = {
+          enabled = false
+        },
+        pyflakes = {
+          enabled = false
+        },
+        mccabe = {
+          enabled = false
         }
       }
     }
   },
 }
 ```
+
+To use `python-lsp-ruff` with Sublime Text, install Sublime Text's [LSP](https://github.com/sublimelsp/LSP)
+package, then add something like the following to `LSP.sublime-settings`:
+
+```json
+{
+  "clients": {
+    "python-lsp-server": {
+      "command": ["pylsp"],
+      "enabled": true,
+      "selector": "source.python",
+      "settings": {
+        "pylsp": {
+          "plugins": {
+            "pycodestyle": {
+              "enabled": false
+            },
+            "pyflakes": {
+              "enabled": false
+            },
+            "mccabe": {
+              "enabled": false
+            },
+            "ruff": {
+              "enabled": true
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Upon successful installation, you should see errors surfaced directly in your editor:
+
+![](https://user-images.githubusercontent.com/1309177/208266375-331ad8e5-8ac1-4735-bca8-07734eb38536.png)
 
 [`ruffd`](https://github.com/Seamooo/ruffd) is another implementation of the Language Server
 Protocol (LSP) for Ruff, written in Rust.
