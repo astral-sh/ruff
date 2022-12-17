@@ -17,10 +17,10 @@ use crate::cli::Overrides;
 use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
 use crate::message::Message;
-use crate::resolver;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
+use crate::{packages, resolver};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -31,12 +31,21 @@ pub fn run(
     cache: flags::Cache,
     autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
-    // Collect all the files to check.
+    // Collect all the Python files to check.
     let start = Instant::now();
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
+
+    // Discover the package root for each Python file.
+    let package_roots = packages::detect_package_roots(
+        &paths
+            .iter()
+            .flatten()
+            .map(ignore::DirEntry::path)
+            .collect::<Vec<_>>(),
+    );
 
     let start = Instant::now();
     let mut diagnostics: Diagnostics = par_iter(&paths)
@@ -44,8 +53,12 @@ pub fn run(
             match entry {
                 Ok(entry) => {
                     let path = entry.path();
+                    let package = path
+                        .parent()
+                        .and_then(|parent| package_roots.get(parent))
+                        .and_then(|package| *package);
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    lint_path(path, settings, cache, autofix)
+                    lint_path(path, package, settings, cache, autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
                 Err(e) => Err((

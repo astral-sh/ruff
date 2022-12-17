@@ -68,6 +68,7 @@ pub mod logging;
 pub mod mccabe;
 pub mod message;
 mod noqa;
+mod packages;
 mod pandas_vet;
 pub mod pep8_naming;
 pub mod printer;
@@ -123,6 +124,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     // Generate checks.
     let checks = check_path(
         path,
+        packages::detect_package_root(path),
         contents,
         tokens,
         &locator,

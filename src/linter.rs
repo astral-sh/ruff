@@ -50,6 +50,7 @@ impl AddAssign for Diagnostics {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_path(
     path: &Path,
+    package: Option<&Path>,
     contents: &str,
     tokens: Vec<LexResult>,
     locator: &SourceCodeLocator,
@@ -101,6 +102,7 @@ pub(crate) fn check_path(
                         settings,
                         autofix,
                         path,
+                        package,
                     ));
                 }
             }
@@ -147,6 +149,7 @@ const MAX_ITERATIONS: usize = 100;
 /// Lint the source code at the given `Path`.
 pub fn lint_path(
     path: &Path,
+    package: Option<&Path>,
     settings: &Settings,
     cache: flags::Cache,
     autofix: fixer::Mode,
@@ -163,7 +166,7 @@ pub fn lint_path(
     let contents = fs::read_file(path)?;
 
     // Lint the file.
-    let (contents, fixed, messages) = lint(contents, path, settings, autofix)?;
+    let (contents, fixed, messages) = lint(contents, path, package, settings, autofix)?;
 
     // Re-populate the cache.
     cache::set(path, &metadata, settings, autofix, &messages, cache);
@@ -197,6 +200,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     // Generate checks, ignoring any existing `noqa` directives.
     let checks = check_path(
         path,
+        None,
         &contents,
         tokens,
         &locator,
@@ -247,7 +251,7 @@ pub fn lint_stdin(
     let contents = stdin.to_string();
 
     // Lint the file.
-    let (contents, fixed, messages) = lint(contents, path, settings, autofix)?;
+    let (contents, fixed, messages) = lint(contents, path, None, settings, autofix)?;
 
     // Write the fixed contents to stdout.
     if matches!(autofix, fixer::Mode::Apply) {
@@ -260,6 +264,7 @@ pub fn lint_stdin(
 fn lint(
     mut contents: String,
     path: &Path,
+    package: Option<&Path>,
     settings: &Settings,
     autofix: fixer::Mode,
 ) -> Result<(String, usize, Vec<Message>)> {
@@ -287,6 +292,7 @@ fn lint(
         // Generate checks.
         let checks = check_path(
             path,
+            package,
             &contents,
             tokens,
             &locator,
@@ -343,6 +349,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
     );
     check_path(
         path,
+        None,
         &contents,
         tokens,
         &locator,
