@@ -16,6 +16,7 @@ use crate::autofix::fixer::fix_file;
 use crate::check_ast::check_ast;
 use crate::check_imports::check_imports;
 use crate::check_lines::check_lines;
+use crate::check_noqa::check_noqa;
 use crate::check_tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::code_gen::SourceGenerator;
@@ -121,14 +122,24 @@ pub(crate) fn check_path(
     }
 
     // Run the lines-based checks.
-    check_lines(
-        &mut checks,
-        contents,
-        &directives.noqa_line_for,
-        settings,
-        autofix,
-        noqa,
-    );
+    let use_lines = settings
+        .enabled
+        .iter()
+        .any(|check_code| matches!(check_code.lint_source(), LintSource::Lines));
+    if use_lines {
+        checks.extend(check_lines(contents, settings, autofix));
+    }
+
+    // Enforce `noqa` directives.
+    if matches!(noqa, flags::Noqa::Enabled) {
+        check_noqa(
+            &mut checks,
+            contents,
+            &directives.noqa_line_for,
+            settings,
+            autofix,
+        );
+    }
 
     // Create path ignores.
     if !checks.is_empty() && !settings.per_file_ignores.is_empty() {

@@ -1,12 +1,92 @@
+use once_cell::sync::Lazy;
+use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Constant, KeywordData};
+use rustpython_ast::{Constant, KeywordData, Location};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
+use crate::autofix::Fix;
 use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::types::Primitive;
 use crate::settings::types::PythonVersion;
+
+/// UP001
+pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -> Option<Check> {
+    if targets.len() != 1 {
+        return None;
+    }
+    let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() else {
+        return None;
+    };
+    if id != "__metaclass__" {
+        return None;
+    }
+    let ExprKind::Name { id, .. } = &value.node else {
+        return None;
+    };
+    if id != "type" {
+        return None;
+    }
+    Some(Check::new(CheckKind::UselessMetaclassType, location))
+}
+
+/// UP003
+pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
+    // Validate the arguments.
+    if args.len() != 1 {
+        return None;
+    }
+
+    let (ExprKind::Attribute { attr: id, .. } | ExprKind::Name { id, .. }) = &func.node else {
+        return None;
+    };
+    if id != "type" {
+        return None;
+    }
+
+    let ExprKind::Constant { value, .. } = &args[0].node else {
+        return None;
+    };
+
+    let primitive = Primitive::from_constant(value)?;
+    Some(Check::new(CheckKind::TypeOfPrimitive(primitive), location))
+}
+
+/// UP004
+pub fn useless_object_inheritance(
+    name: &str,
+    bases: &[Expr],
+    scope: &Scope,
+    bindings: &[Binding],
+) -> Option<Check> {
+    for expr in bases {
+        let ExprKind::Name { id, .. } = &expr.node else {
+            continue;
+        };
+        if id != "object" {
+            continue;
+        }
+        if !matches!(
+            scope
+                .values
+                .get(&id.as_str())
+                .map(|index| &bindings[*index]),
+            None | Some(Binding {
+                kind: BindingKind::Builtin,
+                ..
+            })
+        ) {
+            continue;
+        }
+        return Some(Check::new(
+            CheckKind::UselessObjectInheritance(name.to_string()),
+            Range::from_located(expr),
+        ));
+    }
+
+    None
+}
 
 /// UP008
 pub fn super_args(
@@ -80,81 +160,31 @@ pub fn super_args(
     None
 }
 
-/// UP001
-pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -> Option<Check> {
-    if targets.len() != 1 {
-        return None;
-    }
-    let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() else {
-        return None;
-    };
-    if id != "__metaclass__" {
-        return None;
-    }
-    let ExprKind::Name { id, .. } = &value.node else {
-        return None;
-    };
-    if id != "type" {
-        return None;
-    }
-    Some(Check::new(CheckKind::UselessMetaclassType, location))
-}
+// Regex from PEP263.
+static CODING_COMMENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").unwrap());
 
-/// UP004
-pub fn useless_object_inheritance(
-    name: &str,
-    bases: &[Expr],
-    scope: &Scope,
-    bindings: &[Binding],
-) -> Option<Check> {
-    for expr in bases {
-        let ExprKind::Name { id, .. } = &expr.node else {
-            continue;
-        };
-        if id != "object" {
-            continue;
+/// UP009
+pub fn unnecessary_coding_comment(lineno: usize, line: &str, autofix: bool) -> Option<Check> {
+    // PEP3120 makes utf-8 the default encoding.
+    if CODING_COMMENT_REGEX.is_match(line) {
+        let mut check = Check::new(
+            CheckKind::PEP3120UnnecessaryCodingComment,
+            Range {
+                location: Location::new(lineno + 1, 0),
+                end_location: Location::new(lineno + 2, 0),
+            },
+        );
+        if autofix {
+            check.amend(Fix::deletion(
+                Location::new(lineno + 1, 0),
+                Location::new(lineno + 2, 0),
+            ));
         }
-        if !matches!(
-            scope
-                .values
-                .get(&id.as_str())
-                .map(|index| &bindings[*index]),
-            None | Some(Binding {
-                kind: BindingKind::Builtin,
-                ..
-            })
-        ) {
-            continue;
-        }
-        return Some(Check::new(
-            CheckKind::UselessObjectInheritance(name.to_string()),
-            Range::from_located(expr),
-        ));
+        Some(check)
+    } else {
+        None
     }
-
-    None
-}
-
-/// UP003
-pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
-    // Validate the arguments.
-    if args.len() != 1 {
-        return None;
-    }
-
-    let (ExprKind::Attribute { attr: id, .. } | ExprKind::Name { id, .. }) = &func.node else {
-        return None;
-    };
-    if id != "type" {
-        return None;
-    }
-
-    let ExprKind::Constant { value, .. } = &args[0].node else {
-        return None;
-    };
-
-    let primitive = Primitive::from_constant(value)?;
-    Some(Check::new(CheckKind::TypeOfPrimitive(primitive), location))
 }
 
 /// UP011

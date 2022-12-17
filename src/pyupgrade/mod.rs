@@ -1,4 +1,4 @@
-mod checks;
+pub mod checks;
 pub mod fixes;
 pub mod plugins;
 pub mod settings;

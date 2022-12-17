@@ -1,10 +1,43 @@
 use itertools::izip;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use rustpython_ast::{Located, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
+
+static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
+
+/// E501
+pub fn line_too_long(lineno: usize, line: &str, max_line_length: usize) -> Option<Check> {
+    let line_length = line.chars().count();
+
+    if line_length <= max_line_length {
+        return None;
+    }
+
+    let mut chunks = line.split_whitespace();
+    let (Some(first), Some(_)) = (chunks.next(), chunks.next()) else {
+        // Single word / no printable chars - no way to make the line shorter
+        return None;
+    };
+
+    // Do not enforce the line length for commented lines that end with a URL
+    // or contain only a single word.
+    if first == "#" || chunks.last().map_or(true, |c| URL_REGEX.is_match(c)) {
+        return None;
+    }
+
+    Some(Check::new(
+        CheckKind::LineTooLong(line_length, max_line_length),
+        Range {
+            location: Location::new(lineno + 1, max_line_length),
+            end_location: Location::new(lineno + 1, line_length),
+        },
+    ))
+}
 
 /// E721
 pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Check> {
@@ -98,6 +131,24 @@ pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
     } else {
         None
     }
+}
+
+/// W292
+pub fn no_newline_at_end_of_file(contents: &str) -> Option<Check> {
+    if !contents.ends_with('\n') {
+        // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
+        // want to raise W292 anyway).
+        if let Some(line) = contents.lines().last() {
+            return Some(Check::new(
+                CheckKind::NoNewLineAtEndOfFile,
+                Range {
+                    location: Location::new(contents.lines().count(), line.len() + 1),
+                    end_location: Location::new(contents.lines().count(), line.len() + 1),
+                },
+            ));
+        }
+    }
+    None
 }
 
 // See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
