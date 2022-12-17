@@ -155,7 +155,7 @@ fn test_ruff_black_compatibility() -> Result<()> {
 
     // Ignore some fixtures that currently trigger errors. `E999.py` especially, as
     // that is triggering a syntax error on purpose.
-    let excludes = ["E999.py"];
+    let excludes = ["E999.py", "W605_1.py"];
 
     let paths: Vec<walkdir::DirEntry> = WalkDir::new(fixtures_dir)
         .into_iter()
