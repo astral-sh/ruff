@@ -1,7 +1,7 @@
 use rustpython_parser::ast::Expr;
 
 use crate::autofix::Fix;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::pyupgrade::checks;
 
 /// UP011

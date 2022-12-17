@@ -1,7 +1,7 @@
 use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::CheckKind;
 use crate::Check;
 

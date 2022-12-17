@@ -6,7 +6,7 @@ use std::path::Path;
 use rustpython_ast::{Expr, Stmt, StmtKind};
 
 use crate::ast::helpers::match_module_member;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Documentable;
 
 #[derive(Debug, Clone)]

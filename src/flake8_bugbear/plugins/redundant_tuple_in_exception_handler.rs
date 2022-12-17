@@ -7,7 +7,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::code_gen::SourceGenerator;
 use crate::SourceCodeLocator;

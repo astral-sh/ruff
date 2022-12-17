@@ -4,7 +4,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::{cast, visitor};
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::flake8_annotations::fixes;

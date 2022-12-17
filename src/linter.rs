@@ -7,17 +7,16 @@ use std::path::Path;
 use anyhow::Result;
 #[cfg(not(target_family = "wasm"))]
 use log::debug;
-
 use rustpython_parser::lexer::LexResult;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
 use crate::autofix::fixer::fix_file;
-use crate::check_ast::check_ast;
-use crate::check_imports::check_imports;
-use crate::check_lines::check_lines;
-use crate::check_noqa::check_noqa;
-use crate::check_tokens::check_tokens;
+use crate::checkers::ast::check_ast;
+use crate::checkers::imports::check_imports;
+use crate::checkers::lines::check_lines;
+use crate::checkers::noqa::check_noqa;
+use crate::checkers::tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
 use crate::code_gen::SourceGenerator;
 use crate::directives::Directives;

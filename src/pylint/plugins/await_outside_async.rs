@@ -1,7 +1,7 @@
 use rustpython_ast::Expr;
 
 use crate::ast::types::{FunctionDef, Range, ScopeKind};
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::CheckKind;
 use crate::Check;
 

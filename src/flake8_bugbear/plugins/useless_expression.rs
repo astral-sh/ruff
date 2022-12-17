@@ -1,7 +1,7 @@
 use rustpython_ast::{Constant, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 // B018

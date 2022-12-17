@@ -2,7 +2,7 @@ use rustpython_ast::{Arguments, ExprKind};
 use rustpython_parser::ast::{Constant, Expr};
 
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 const FUNC_NAME_ALLOWLIST: &[&str] = &["get", "setdefault", "pop", "fromkeys"];

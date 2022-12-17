@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::autofix::helpers;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::CheckCode;
 use crate::flake8_print::checks;
 

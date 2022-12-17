@@ -6,7 +6,7 @@ use crate::ast::helpers;
 use crate::ast::operations::locate_cmpops;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 /// F632

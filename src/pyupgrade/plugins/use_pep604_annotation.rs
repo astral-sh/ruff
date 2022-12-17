@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
 use crate::ast::helpers::{collect_call_paths, dealias_call_path};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::code_gen::SourceGenerator;
 

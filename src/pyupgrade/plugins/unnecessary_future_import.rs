@@ -5,7 +5,7 @@ use rustpython_ast::{AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;

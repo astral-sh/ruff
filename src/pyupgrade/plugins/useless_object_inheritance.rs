@@ -1,6 +1,6 @@
 use rustpython_ast::{Expr, Keyword, Stmt};
 
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::pyupgrade;
 use crate::pyupgrade::checks;
 
