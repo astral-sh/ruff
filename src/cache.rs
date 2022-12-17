@@ -42,10 +42,10 @@ fn content_dir() -> &'static str {
     "content"
 }
 
-fn cache_key(path: &Path, settings: &Settings, autofix: fixer::Mode) -> u64 {
+fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: fixer::Mode) -> u64 {
     let mut hasher = DefaultHasher::new();
     CARGO_PKG_VERSION.hash(&mut hasher);
-    path.absolutize().unwrap().hash(&mut hasher);
+    path.as_ref().absolutize().unwrap().hash(&mut hasher);
     settings.hash(&mut hasher);
     autofix.hash(&mut hasher);
     hasher.finish()
@@ -91,8 +91,8 @@ fn read_sync(key: u64) -> Result<Vec<u8>, std::io::Error> {
 }
 
 /// Get a value from the cache.
-pub fn get(
-    path: &Path,
+pub fn get<P: AsRef<Path>>(
+    path: P,
     metadata: &Metadata,
     settings: &Settings,
     autofix: fixer::Mode,
@@ -120,8 +120,8 @@ pub fn get(
 }
 
 /// Set a value in the cache.
-pub fn set(
-    path: &Path,
+pub fn set<P: AsRef<Path>>(
+    path: P,
     metadata: &Metadata,
     settings: &Settings,
     autofix: fixer::Mode,

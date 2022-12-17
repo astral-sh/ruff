@@ -40,7 +40,8 @@ pub(crate) fn ignores_from_path<'a>(
 
 /// Convert any path to an absolute path (based on the current working
 /// directory).
-pub fn normalize_path(path: &Path) -> PathBuf {
+pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    let path = path.as_ref();
     if let Ok(path) = path.absolutize() {
         return path.to_path_buf();
     }
@@ -48,8 +49,9 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 }
 
 /// Convert any path to an absolute path (based on the specified project root).
-pub fn normalize_path_to(path: &Path, project_root: &Path) -> PathBuf {
-    if let Ok(path) = path.absolutize_from(project_root) {
+pub fn normalize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: R) -> PathBuf {
+    let path = path.as_ref();
+    if let Ok(path) = path.absolutize_from(project_root.as_ref()) {
         return path.to_path_buf();
     }
     path.to_path_buf()

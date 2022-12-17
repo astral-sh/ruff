@@ -40,8 +40,8 @@ pub fn has_ruff_section<P: AsRef<Path>>(path: P) -> Result<bool> {
 }
 
 /// Find the path to the `pyproject.toml` file, if such a file exists.
-pub fn find_pyproject_toml(path: &Path) -> Result<Option<PathBuf>> {
-    for directory in path.ancestors() {
+pub fn find_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
+    for directory in path.as_ref().ancestors() {
         let pyproject = directory.join("pyproject.toml");
         if pyproject.is_file() && has_ruff_section(&pyproject)? {
             return Ok(Some(pyproject));
@@ -63,9 +63,15 @@ pub fn find_user_pyproject_toml() -> Option<PathBuf> {
 }
 
 /// Load `Options` from a `pyproject.toml`.
-pub fn load_options(pyproject: &Path) -> Result<Options> {
-    Ok(parse_pyproject_toml(pyproject)
-        .map_err(|err| anyhow!("Failed to parse `{}`: {}", pyproject.to_string_lossy(), err))?
+pub fn load_options<P: AsRef<Path>>(pyproject: P) -> Result<Options> {
+    Ok(parse_pyproject_toml(&pyproject)
+        .map_err(|err| {
+            anyhow!(
+                "Failed to parse `{}`: {}",
+                pyproject.as_ref().to_string_lossy(),
+                err
+            )
+        })?
         .tool
         .and_then(|tool| tool.ruff)
         .unwrap_or_default())
@@ -373,7 +379,7 @@ other-attribute = 1
     fn find_and_parse_pyproject_toml() -> Result<()> {
         let cwd = current_dir()?;
         let pyproject =
-            find_pyproject_toml(&cwd.join("resources/test/fixtures/__init__.py"))?.unwrap();
+            find_pyproject_toml(cwd.join("resources/test/fixtures/__init__.py"))?.unwrap();
         assert_eq!(
             pyproject,
             cwd.join("resources/test/fixtures/pyproject.toml")

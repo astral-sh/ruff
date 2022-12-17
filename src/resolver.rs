@@ -189,7 +189,7 @@ pub fn python_files_in_path(
     overrides: &Overrides,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
-    let paths: Vec<PathBuf> = paths.iter().map(|path| fs::normalize_path(path)).collect();
+    let paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).collect();
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
