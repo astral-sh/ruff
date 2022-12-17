@@ -1,0 +1,45 @@
+---
+source: src/flake8_datetimez/mod.rs
+expression: checks
+---
+- kind: CallDatetimeFromtimestamp
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 37
+  fix: ~
+- kind: CallDatetimeFromtimestamp
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 28
+  fix: ~
+- kind: CallDatetimeFromtimestamp
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 64
+  fix: ~
+- kind: CallDatetimeFromtimestamp
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 43
+  fix: ~
+- kind: CallDatetimeFromtimestamp
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 46
+  fix: ~
+

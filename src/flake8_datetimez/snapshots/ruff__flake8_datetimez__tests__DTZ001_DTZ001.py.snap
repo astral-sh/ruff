@@ -1,0 +1,45 @@
+---
+source: src/flake8_datetimez/mod.rs
+expression: checks
+---
+- kind: CallDatetimeWithoutTzinfo
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 38
+  fix: ~
+- kind: CallDatetimeWithoutTzinfo
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 29
+  fix: ~
+- kind: CallDatetimeWithoutTzinfo
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 47
+  fix: ~
+- kind: CallDatetimeWithoutTzinfo
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 37
+  fix: ~
+- kind: CallDatetimeWithoutTzinfo
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 42
+  fix: ~
+
