@@ -5,7 +5,7 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, StmtKind};
 use crate::ast::helpers::{collect_call_paths, create_expr, create_stmt, dealias_call_path};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::code_gen::SourceGenerator;
 use crate::SourceCodeLocator;

@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, Stmt};
 
 use crate::ast::types::Range;
 use crate::autofix::helpers;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::pyupgrade::checks;
 
 /// UP001

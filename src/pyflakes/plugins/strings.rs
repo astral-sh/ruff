@@ -5,7 +5,7 @@ use rustpython_ast::{Keyword, KeywordData};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::pyflakes::cformat::CFormatSummary;
 use crate::pyflakes::fixes::{

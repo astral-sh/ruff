@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::{Range, ScopeKind};
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {

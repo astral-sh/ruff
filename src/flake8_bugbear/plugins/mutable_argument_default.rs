@@ -3,7 +3,7 @@ use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Operator};
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 const MUTABLE_FUNCS: &[(&str, &str)] = &[

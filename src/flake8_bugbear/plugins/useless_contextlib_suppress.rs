@@ -2,7 +2,7 @@ use rustpython_ast::Expr;
 
 use crate::ast::helpers::{collect_call_paths, match_call_path};
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 /// B005

@@ -3,7 +3,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Boolop, Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::CheckKind;
 use crate::Check;
 

@@ -4,7 +4,7 @@ use std::str::Lines;
 use rustpython_ast::{Located, Location};
 
 use crate::ast::types::Range;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 
 /// Extract the leading indentation from a line.
 pub fn indentation<'a, T>(checker: &'a Checker, located: &'a Located<T>) -> Cow<'a, str> {

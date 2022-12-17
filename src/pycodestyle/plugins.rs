@@ -10,7 +10,7 @@ use crate::ast::helpers::{match_leading_content, match_trailing_content};
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind, RejectedCmpop};
 use crate::code_gen::SourceGenerator;
 

@@ -5,7 +5,7 @@ use crate::ast::helpers::collect_arg_names;
 use crate::ast::types::{Node, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 #[derive(Default)]

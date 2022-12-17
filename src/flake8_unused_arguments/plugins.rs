@@ -7,7 +7,7 @@ use rustpython_ast::{Arg, Arguments};
 use crate::ast::function_type;
 use crate::ast::function_type::FunctionType;
 use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeKind};
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::flake8_unused_arguments::helpers;
 use crate::flake8_unused_arguments::types::Argumentable;
 use crate::{visibility, Check};

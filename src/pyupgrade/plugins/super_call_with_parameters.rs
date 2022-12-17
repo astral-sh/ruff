@@ -1,7 +1,7 @@
 use rustpython_ast::{Expr, Stmt};
 
 use crate::ast::helpers;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::pyupgrade;
 use crate::pyupgrade::checks;
 

@@ -8,7 +8,7 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::ast::{cast, whitespace};
 use crate::autofix::Fix;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring};

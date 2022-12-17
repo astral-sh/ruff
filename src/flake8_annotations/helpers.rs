@@ -1,7 +1,7 @@
 use rustpython_ast::{Arguments, Expr, Stmt, StmtKind};
 
 use crate::ast::cast;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::visibility;
 

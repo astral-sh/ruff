@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::autofix::Fix;
-use crate::check_ast::Checker;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 /// Return `true` if the `module` was imported using a star import (e.g., `from
