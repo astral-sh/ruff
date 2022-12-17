@@ -28,13 +28,13 @@ impl Pyproject {
     }
 }
 
-fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
+fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
     toml::from_str(&contents).map_err(std::convert::Into::into)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
-pub fn has_ruff_section(path: &Path) -> Result<bool> {
+pub fn has_ruff_section<P: AsRef<Path>>(path: P) -> Result<bool> {
     let pyproject = parse_pyproject_toml(path)?;
     Ok(pyproject.tool.and_then(|tool| tool.ruff).is_some())
 }

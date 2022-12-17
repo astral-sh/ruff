@@ -64,7 +64,7 @@ pub fn relativize_path(path: &Path) -> Cow<str> {
 }
 
 /// Read a file's contents from disk.
-pub(crate) fn read_file(path: &Path) -> Result<String> {
+pub(crate) fn read_file<P: AsRef<Path>>(path: P) -> Result<String> {
     let file = File::open(path)?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = String::new();
