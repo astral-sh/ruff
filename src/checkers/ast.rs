@@ -2010,6 +2010,18 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::DTZ007) {
+                    if let Some(check) =
+                        flake8_datetimez::checks::call_datetime_strptime_without_zone(
+                            func,
+                            args,
+                            keywords,
+                            Range::from_located(expr),
+                        )
+                    {
+                        self.add_check(check);
+                    }
+                }
                 if self.settings.enabled.contains(&CheckCode::DTZ011) {
                     if let Some(check) =
                         flake8_datetimez::checks::call_date_today(func, Range::from_located(expr))

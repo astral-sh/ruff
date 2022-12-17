@@ -207,6 +207,64 @@ pub fn call_datetime_fromtimestamp(
     None
 }
 
+fn call_datetime_strptime_without_zone_and_replace(func: &Expr, args: &[Expr]) -> bool {
+    let is_datetime_dateitme_strptime_func =
+        is_expected_func_call(func, &["datetime", "datetime", "strptime"]);
+    let is_dateitme_strptime_func = is_expected_func_call(func, &["datetime", "strptime"]);
+    if is_datetime_dateitme_strptime_func || is_dateitme_strptime_func {
+        // few args
+        if args.len() < 2 {
+            return false;
+        }
+        if let ExprKind::Constant {
+            value: Constant::Str(format),
+            kind: None,
+        } = &args[1].node
+        {
+            if !format.contains("%z") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+pub fn call_datetime_strptime_without_zone(
+    func: &Expr,
+    args: &[Expr],
+    _keywords: &[Keyword],
+    location: Range,
+) -> Option<Check> {
+    let check = Some(Check::new(
+        CheckKind::CallDatetimeStrptimeWithoutZone,
+        location,
+    ));
+
+    // bad format / no replace or astimezone / no replace or astimezone unqualified
+    if call_datetime_strptime_without_zone_and_replace(func, args) {
+        return check;
+    }
+
+    // FIXME: wrong replace / none replace check
+    // let has_not_none_tzinfo = has_not_none_keyword_in_keywords(keywords, "tzinfo");
+    // let is_replace_func = is_expected_func_call(func, &["replace"]);
+    // if is_replace_func {
+    //     if let ExprKind::Attribute { value, .. } = &func.node {
+    //         if let Located {
+    //             node: ExprKind::Call { func, args, .. },
+    //             ..
+    //         } = &**value
+    //         {
+    //             if !has_not_none_tzinfo
+    //                 && call_datetime_strptime_without_zone_and_replace(func, args) {
+    //                 return check;
+    //             }
+    //         }
+    //     }
+    // }
+    None
+}
+
 pub fn call_date_today(func: &Expr, location: Range) -> Option<Check> {
     let is_date_today_func = is_expected_func_call(func, &["date", "today"]);
     let is_datetime_date_today_func = is_expected_func_call(func, &["datetime", "date", "today"]);
