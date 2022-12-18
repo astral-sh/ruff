@@ -246,9 +246,9 @@ pub fn call_datetime_strptime_without_zone(
     }
 
     // FIXME: wrong replace / none replace check
-    // let has_not_none_tzinfo = has_not_none_keyword_in_keywords(keywords, "tzinfo");
-    // let is_replace_func = is_expected_func_call(func, &["replace"]);
-    // if is_replace_func {
+    // let has_not_none_tzinfo = has_not_none_keyword_in_keywords(keywords,
+    // "tzinfo"); let is_replace_func = is_expected_func_call(func,
+    // &["replace"]); if is_replace_func {
     //     if let ExprKind::Attribute { value, .. } = &func.node {
     //         if let Located {
     //             node: ExprKind::Call { func, args, .. },
@@ -256,8 +256,8 @@ pub fn call_datetime_strptime_without_zone(
     //         } = &**value
     //         {
     //             if !has_not_none_tzinfo
-    //                 && call_datetime_strptime_without_zone_and_replace(func, args) {
-    //                 return check;
+    //                 && call_datetime_strptime_without_zone_and_replace(func,
+    // args) {                 return check;
     //             }
     //         }
     //     }

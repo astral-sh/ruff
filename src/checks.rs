@@ -1918,11 +1918,6 @@ impl CheckKind {
             CheckKind::RawStringInException => &CheckCode::EM101,
             CheckKind::FStringInException => &CheckCode::EM102,
             CheckKind::DotFormatInException => &CheckCode::EM103,
-            // Ruff
-            CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
-            CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
-            CheckKind::AmbiguousUnicodeCharacterComment(..) => &CheckCode::RUF003,
-            CheckKind::UnusedNOQA(_) => &CheckCode::RUF100,
             // flake8-datetimez
             CheckKind::CallDatetimeWithoutTzinfo => &CheckCode::DTZ001,
             CheckKind::CallDatetimeToday => &CheckCode::DTZ002,
@@ -1933,6 +1928,11 @@ impl CheckKind {
             CheckKind::CallDatetimeStrptimeWithoutZone => &CheckCode::DTZ007,
             CheckKind::CallDateToday => &CheckCode::DTZ011,
             CheckKind::CallDateFromtimestamp => &CheckCode::DTZ012,
+            // Ruff
+            CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
+            CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
+            CheckKind::AmbiguousUnicodeCharacterComment(..) => &CheckCode::RUF003,
+            CheckKind::UnusedNOQA(_) => &CheckCode::RUF100,
         }
     }
 
@@ -2841,35 +2841,36 @@ impl CheckKind {
                                                      `tzinfo` argument is not allowed."
                 .to_string(),
             CheckKind::CallDatetimeToday => "The use of `datetime.datetime.today()` is not \
-                                             allowed.Use `datetime.datetime.now(tz=)` instead."
+                                             allowed. Use `datetime.datetime.now(tz=)` instead."
                 .to_string(),
             CheckKind::CallDatetimeUtcnow => "The use of `datetime.datetime.utcnow()` is not \
-                                              allowed.Use `datetime.datetime.now(tz=)` instead."
+                                              allowed. Use `datetime.datetime.now(tz=)` instead."
                 .to_string(),
             CheckKind::CallDatetimeUtcfromtimestamp => {
-                "The use of `datetime.datetime.utcfromtimestamp()` is not allowed.
-                Use `datetime.datetime.fromtimestamp(, tz=)` instead."
+                "The use of `datetime.datetime.utcfromtimestamp()` is not allowed. Use \
+                 `datetime.datetime.fromtimestamp(, tz=)` instead."
                     .to_string()
             }
             CheckKind::CallDatetimeNowWithoutTzinfo => "The use of `datetime.datetime.now()` \
-                                                        without `tz` argument is not allowed."
+                                                        without `tz` argument is not allowed"
                 .to_string(),
             CheckKind::CallDatetimeFromtimestamp => "The use of \
                                                      `datetime.datetime.fromtimestamp()` without \
-                                                     `tz` argument is not allowed."
+                                                     `tz` argument is not allowed"
                 .to_string(),
             CheckKind::CallDatetimeStrptimeWithoutZone => {
                 "The use of `datetime.datetime.strptime()` without %z must be followed by \
-                 `.replace(tzinfo=)`."
+                 `.replace(tzinfo=)`"
                     .to_string()
             }
-            CheckKind::CallDateToday => "The use of `datetime.date.today()` is not allowed.
-                Use `datetime.datetime.now(tz=).date()` instead."
+            CheckKind::CallDateToday => "The use of `datetime.date.today()` is not allowed. Use \
+                                         `datetime.datetime.now(tz=).date()` instead."
                 .to_string(),
-            CheckKind::CallDateFromtimestamp => "The use of `datetime.date.fromtimestamp()` is \
-                                                 not allowed.
-                Use `datetime.datetime.fromtimestamp(, tz=).date()` instead."
-                .to_string(),
+            CheckKind::CallDateFromtimestamp => {
+                "The use of `datetime.date.fromtimestamp()` is not allowed. Use \
+                 `datetime.datetime.fromtimestamp(, tz=).date()` instead."
+                    .to_string()
+            }
         }
     }
 
