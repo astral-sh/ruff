@@ -6,7 +6,7 @@ use crate::checks::{Check, CheckKind};
 fn get_keyword_in_keywords<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
     keywords.iter().find(|keyword| {
         let KeywordData { arg, .. } = &keyword.node;
-        arg.as_ref().map_or(false, |_arg| _arg == keyword_name)
+        arg.as_ref().map_or(false, |arg| arg == keyword_name)
     })
 }
 
