@@ -1,17 +1,17 @@
 //! Generate the `CheckCodePrefix` enum.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::OpenOptions;
+use std::fs;
 use std::io::Write;
+use std::path::PathBuf;
+use std::process::{Command, Output, Stdio};
 
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use clap::Parser;
 use codegen::{Scope, Type, Variant};
 use itertools::Itertools;
 use ruff::checks::{CheckCode, CODE_REDIRECTS, PREFIX_REDIRECTS};
 use strum::IntoEnumIterator;
-
-const FILE: &str = "src/checks_gen.rs";
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -204,12 +204,25 @@ pub fn main(cli: &Cli) -> Result<()> {
     output.push('\n');
     output.push('\n');
 
+    let rustfmt = Command::new("rustfmt")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+    write!(rustfmt.stdin.as_ref().unwrap(), "{output}")?;
+    let Output { status, stdout, .. } = rustfmt.wait_with_output()?;
+    ensure!(status.success(), "rustfmt failed with {status}");
+
     // Write the output to `src/checks_gen.rs` (or stdout).
     if cli.dry_run {
-        println!("{output}");
+        println!("{}", String::from_utf8(stdout)?);
     } else {
-        let mut f = OpenOptions::new().write(true).truncate(true).open(FILE)?;
-        write!(f, "{output}")?;
+        let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("Failed to find root directory")
+            .join("src/checks_gen.rs");
+        if fs::read(&file).map_or(true, |old| old != stdout) {
+            fs::write(&file, stdout)?;
+        }
     }
 
     Ok(())

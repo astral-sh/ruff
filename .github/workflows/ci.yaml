@@ -39,7 +39,7 @@ jobs:
       - run: ./target/release/ruff_dev generate-rules-table
       - run: ./target/release/ruff_dev generate-options
       - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. You may have to rerun 'cargo dev generate-options' and/or 'cargo dev generate-rules-table'."
-      - run: ./target/release/ruff_dev generate-check-code-prefix && cargo fmt -- src/checks_gen.rs
+      - run: ./target/release/ruff_dev generate-check-code-prefix
       - run: git diff --quiet src/checks_gen.rs || echo "::error file=src/checks_gen.rs::This file is outdated. You may have to rerun 'cargo dev generate-check-code-prefix'."
       - run: git diff --exit-code -- README.md src/checks_gen.rs
 
