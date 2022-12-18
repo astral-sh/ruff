@@ -56,7 +56,6 @@ fn duplicate_handler_exceptions<'a>(
                 Range::from_located(expr),
             );
             if checker.patch(check.kind.code()) {
-                // TODO(charlie): If we have a single element, remove the tuple.
                 let mut generator = SourceGenerator::new();
                 if unique_elts.len() == 1 {
                     generator.unparse_expr(unique_elts[0], 0);
