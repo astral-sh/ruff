@@ -62,7 +62,6 @@ pub fn call_datetime_without_tzinfo(
     // no kwargs / none kwargs
     if !has_not_none_keyword_in_keywords(keywords, "tzinfo") {
         checker.add_check(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
-        
     }
 }
 
@@ -206,18 +205,24 @@ pub fn call_datetime_strptime_without_zone(
         return;
     }
 
-    if let Some(ExprKind::Constant {
+    // Does the `strptime` call contain a format string with a timezone specifier?
+    let Some(ExprKind::Constant {
         value: Constant::Str(format),
         kind: None,
-    }) = args.get(1).as_ref().map(|arg| &arg.node)
-    {
-        if !format.contains("%z") {
-            checker.add_check(Check::new(
-                CheckKind::CallDatetimeStrptimeWithoutZone,
-                location,
-            ));
-        }
+    }) = args.get(1).as_ref().map(|arg| &arg.node) else {
+        return;
+    };
+
+    if format.contains("%z") {
+        return;
     }
+
+    // Do we have a valid call to `.replace`?
+
+    checker.add_check(Check::new(
+        CheckKind::CallDatetimeStrptimeWithoutZone,
+        location,
+    ));
 }
 
 /// DTZ011
