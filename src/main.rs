@@ -12,7 +12,7 @@
 )]
 
 use std::io::{self};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
@@ -36,19 +36,21 @@ use path_absolutize::path_dedot;
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
 fn resolve(
-    config: Option<PathBuf>,
+    config: Option<&Path>,
     overrides: &Overrides,
-    stdin_filename: &Option<PathBuf>,
+    stdin_filename: Option<&Path>,
 ) -> Result<PyprojectDiscovery> {
     if let Some(pyproject) = config {
         // First priority: the user specified a `pyproject.toml` file. Use that
         // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
         // current working directory. (This matches ESLint's behavior.)
-        let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
+        let settings = resolve_settings(pyproject, &Relativity::Cwd, Some(overrides))?;
         Ok(PyprojectDiscovery::Fixed(settings))
-    } else if let Some(pyproject) =
-        pyproject::find_pyproject_toml(stdin_filename.as_ref().unwrap_or(&path_dedot::CWD))?
-    {
+    } else if let Some(pyproject) = pyproject::find_pyproject_toml(
+        stdin_filename
+            .as_ref()
+            .unwrap_or(&path_dedot::CWD.as_path()),
+    )? {
         // Second priority: find a `pyproject.toml` file in either an ancestor of
         // `stdin_filename` (if set) or the current working path all paths relative to
         // that directory. (With `Strategy::Hierarchical`, we'll end up finding
@@ -92,7 +94,11 @@ fn inner_main() -> Result<ExitCode> {
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_strategy = resolve(cli.config, &overrides, &cli.stdin_filename)?;
+    let pyproject_strategy = resolve(
+        cli.config.as_deref(),
+        &overrides,
+        cli.stdin_filename.as_deref(),
+    )?;
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
