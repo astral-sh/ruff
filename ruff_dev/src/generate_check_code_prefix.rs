@@ -107,7 +107,7 @@ pub fn main(cli: &Cli) -> Result<()> {
     for (prefix, codes) in &prefix_to_codes {
         if let Some(target) = CODE_REDIRECTS.get(&prefix.as_str()) {
             gen = gen.line(format!(
-                "CheckCodePrefix::{prefix} => {{ eprintln!(\"{{}}{{}} {{}}\", \
+                "CheckCodePrefix::{prefix} => {{ one_time_warning!(\"{{}}{{}} {{}}\", \
                  \"warning\".yellow().bold(), \":\".bold(), \"`{}` has been remapped to \
                  `{}`\".bold()); \n vec![{}] }}",
                 prefix,
@@ -119,7 +119,7 @@ pub fn main(cli: &Cli) -> Result<()> {
             ));
         } else if let Some(target) = PREFIX_REDIRECTS.get(&prefix.as_str()) {
             gen = gen.line(format!(
-                "CheckCodePrefix::{prefix} => {{ eprintln!(\"{{}}{{}} {{}}\", \
+                "CheckCodePrefix::{prefix} => {{ one_time_warning!(\"{{}}{{}} {{}}\", \
                  \"warning\".yellow().bold(), \":\".bold(), \"`{}` has been remapped to \
                  `{}`\".bold()); \n vec![{}] }}",
                 prefix,
@@ -181,6 +181,8 @@ pub fn main(cli: &Cli) -> Result<()> {
     output.push('\n');
     output.push('\n');
     output.push_str("use crate::checks::CheckCode;");
+    output.push('\n');
+    output.push_str("use crate::one_time_warning;");
     output.push('\n');
     output.push('\n');
     output.push_str(&scope.to_string());
