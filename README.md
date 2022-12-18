@@ -354,7 +354,7 @@ There are a few exceptions to these rules:
    a default configuration. If a user-specific configuration file exists
    at `${config_dir}/ruff/pyproject.toml`,
    that file will be used instead of the default configuration, with `${config_dir}` being
-   determined via the [`dirs](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all
+   determined via the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all
    relative paths being again resolved relative to the _current working directory_.
 4. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
    `--select`) will override the settings in _every_ resolved configuration file.
