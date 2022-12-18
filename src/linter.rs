@@ -126,7 +126,12 @@ pub(crate) fn check_path(
         .iter()
         .any(|check_code| matches!(check_code.lint_source(), LintSource::Lines))
     {
-        checks.extend(check_lines(contents, settings, autofix));
+        checks.extend(check_lines(
+            contents,
+            &directives.commented_lines,
+            settings,
+            autofix,
+        ));
     }
 
     // Enforce `noqa` directives.

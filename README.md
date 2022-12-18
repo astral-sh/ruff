@@ -900,6 +900,8 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PGH001 | NoEval | No builtin `eval()` allowed |  |
+| PGH002 | DeprecatedLogWarn | `warn` is deprecated in favor of `warning` |  |
+| PGH003 | BlanketTypeIgnore | Use specific error codes when ignoring type issues |  |
 
 ### Pylint (PLC, PLE, PLR, PLW)
 
