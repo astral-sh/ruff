@@ -1957,7 +1957,7 @@ where
 
                 // pygrep-hooks
                 if self.settings.enabled.contains(&CheckCode::PGH001) {
-                    pygrep_hooks::checks::no_eval(self, func);
+                    pygrep_hooks::plugins::no_eval(self, func);
                 }
                 if self.settings.enabled.contains(&CheckCode::PGH002) {
                     pygrep_hooks::plugins::deprecated_log_warn(self, func);

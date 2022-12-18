@@ -4,6 +4,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+/// PGH001 - no eval
 pub fn no_eval(checker: &mut Checker, func: &Expr) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
