@@ -1,8 +1,7 @@
 //! Generate the `CheckCodePrefix` enum.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::OpenOptions;
-use std::io::Write;
+use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -211,8 +210,9 @@ pub fn main(cli: &Cli) -> Result<()> {
             .parent()
             .expect("Failed to find root directory")
             .join("src/checks_gen.rs");
-        let mut f = OpenOptions::new().write(true).truncate(true).open(file)?;
-        write!(f, "{output}")?;
+        if fs::read(&file).map_or(true, |old| old != output.as_bytes()) {
+            fs::write(&file, output.as_bytes())?;
+        }
     }
 
     Ok(())
