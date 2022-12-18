@@ -891,12 +891,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     context_expr: Located {
                         location: Location {
                             row: 12,
-                            column: 6,
+                            column: 5,
                         },
                         end_location: Some(
                             Location {
                                 row: 12,
-                                column: 8,
+                                column: 9,
                             },
                         ),
                         custom: (),
@@ -1061,12 +1061,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     context_expr: Located {
                         location: Location {
                             row: 14,
-                            column: 6,
+                            column: 5,
                         },
                         end_location: Some(
                             Location {
                                 row: 14,
-                                column: 10,
+                                column: 11,
                             },
                         ),
                         custom: (),
@@ -1172,12 +1172,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     context_expr: Located {
                         location: Location {
                             row: 15,
-                            column: 6,
+                            column: 5,
                         },
                         end_location: Some(
                             Location {
                                 row: 15,
-                                column: 9,
+                                column: 10,
                             },
                         ),
                         custom: (),
@@ -1260,12 +1260,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     context_expr: Located {
                         location: Location {
                             row: 16,
-                            column: 6,
+                            column: 5,
                         },
                         end_location: Some(
                             Location {
                                 row: 16,
-                                column: 9,
+                                column: 10,
                             },
                         ),
                         custom: (),
@@ -1366,12 +1366,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     context_expr: Located {
                         location: Location {
                             row: 17,
-                            column: 6,
+                            column: 5,
                         },
                         end_location: Some(
                             Location {
                                 row: 17,
-                                column: 11,
+                                column: 12,
                             },
                         ),
                         custom: (),
@@ -1473,12 +1473,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     context_expr: Located {
                         location: Location {
                             row: 18,
-                            column: 6,
+                            column: 5,
                         },
                         end_location: Some(
                             Location {
                                 row: 18,
-                                column: 11,
+                                column: 12,
                             },
                         ),
                         custom: (),
@@ -1934,12 +1934,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     context_expr: Located {
                         location: Location {
                             row: 22,
-                            column: 6,
+                            column: 5,
                         },
                         end_location: Some(
                             Location {
                                 row: 22,
-                                column: 20,
+                                column: 21,
                             },
                         ),
                         custom: (),
