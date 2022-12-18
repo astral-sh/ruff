@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 
 use crate::checks::CheckCode;
+use crate::one_time_warning;
 
 #[derive(
     EnumString, AsRefStr, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize,
@@ -1243,7 +1244,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::I00 => vec![CheckCode::I001],
             CheckCodePrefix::I001 => vec![CheckCode::I001],
             CheckCodePrefix::I2 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1252,7 +1253,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::TID252]
             }
             CheckCodePrefix::I25 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1261,7 +1262,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::TID252]
             }
             CheckCodePrefix::I252 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1274,7 +1275,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::ICN00 => vec![CheckCode::ICN001],
             CheckCodePrefix::ICN001 => vec![CheckCode::ICN001],
             CheckCodePrefix::M => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1283,7 +1284,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::RUF100]
             }
             CheckCodePrefix::M0 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1292,7 +1293,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::RUF100]
             }
             CheckCodePrefix::M001 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1603,7 +1604,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::TID25 => vec![CheckCode::TID252],
             CheckCodePrefix::TID252 => vec![CheckCode::TID252],
             CheckCodePrefix::U => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1628,7 +1629,7 @@ impl CheckCodePrefix {
                 ]
             }
             CheckCodePrefix::U0 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1653,7 +1654,7 @@ impl CheckCodePrefix {
                 ]
             }
             CheckCodePrefix::U00 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1671,7 +1672,7 @@ impl CheckCodePrefix {
                 ]
             }
             CheckCodePrefix::U001 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1680,7 +1681,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP001]
             }
             CheckCodePrefix::U003 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1689,7 +1690,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP003]
             }
             CheckCodePrefix::U004 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1698,7 +1699,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP004]
             }
             CheckCodePrefix::U005 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1707,7 +1708,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP005]
             }
             CheckCodePrefix::U006 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1716,7 +1717,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP006]
             }
             CheckCodePrefix::U007 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1725,7 +1726,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP007]
             }
             CheckCodePrefix::U008 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1734,7 +1735,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP008]
             }
             CheckCodePrefix::U009 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1743,7 +1744,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP009]
             }
             CheckCodePrefix::U01 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1760,7 +1761,7 @@ impl CheckCodePrefix {
                 ]
             }
             CheckCodePrefix::U010 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1769,7 +1770,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP010]
             }
             CheckCodePrefix::U011 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1778,7 +1779,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP011]
             }
             CheckCodePrefix::U012 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1787,7 +1788,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP012]
             }
             CheckCodePrefix::U013 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1796,7 +1797,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP013]
             }
             CheckCodePrefix::U014 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1805,7 +1806,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP014]
             }
             CheckCodePrefix::U015 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),
@@ -1814,7 +1815,7 @@ impl CheckCodePrefix {
                 vec![CheckCode::UP015]
             }
             CheckCodePrefix::U016 => {
-                eprintln!(
+                one_time_warning!(
                     "{}{} {}",
                     "warning".yellow().bold(),
                     ":".bold(),

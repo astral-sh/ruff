@@ -2,6 +2,16 @@ use anyhow::Result;
 use fern;
 
 #[macro_export]
+macro_rules! one_time_warning {
+    ($($arg:tt)*) => {
+        static WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if !WARNED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! tell_user {
     ($($arg:tt)*) => {
         println!(
