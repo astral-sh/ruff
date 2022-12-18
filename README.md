@@ -881,9 +881,9 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/0.2.3/) on PyPI.
 | PDV002 | UseOfInplaceArgument | `inplace=True` should be avoided; it has inconsistent behavior |  |
 | PDV003 | UseOfDotIsNull | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
 | PDV004 | UseOfDotNotNull | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
-| PDV007 | UseOfDotIx | ``ix` i` deprecated; use more explicit `.loc` o` `.iloc` |  |
+| PDV007 | UseOfDotIx | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
 | PDV008 | UseOfDotAt | Use `.loc` instead of `.at`.  If speed is important, use numpy. |  |
-| PDV009 | UseOfDotIat | Use `.iloc` instea` of `.iat`.  If speed is important, use numpy. |  |
+| PDV009 | UseOfDotIat | Use `.iloc` instead of `.iat`.  If speed is important, use numpy. |  |
 | PDV010 | UseOfDotPivotOrUnstack | `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality |  |
 | PDV011 | UseOfDotValues | Use `.to_numpy()` instead of `.values` |  |
 | PDV012 | UseOfDotReadTable | `.read_csv` is preferred to `.read_table`; provides same functionality |  |
