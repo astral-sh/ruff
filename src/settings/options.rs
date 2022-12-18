@@ -38,7 +38,7 @@ pub struct Options {
         value_type = "Regex",
         example = r#"
             # Only ignore variables named "_".
-            dummy_variable_rgx = "^_$"
+            dummy-variable-rgx = "^_$"
         "#
     )]
     pub dummy_variable_rgx: Option<String>,

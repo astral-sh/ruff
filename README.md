@@ -1573,7 +1573,7 @@ ignored when evaluating (e.g.) unused-variable checks. The default expression ma
 ```toml
 [tool.ruff]
 # Only ignore variables named "_".
-dummy_variable_rgx = "^_$"
+dummy-variable-rgx = "^_$"
 ```
 
 ---
