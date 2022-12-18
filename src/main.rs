@@ -35,18 +35,27 @@ use path_absolutize::path_dedot;
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
-fn resolve(config: Option<PathBuf>, overrides: &Overrides) -> Result<PyprojectDiscovery> {
+fn resolve(
+    config: Option<&Path>,
+    overrides: &Overrides,
+    stdin_filename: Option<&Path>,
+) -> Result<PyprojectDiscovery> {
     if let Some(pyproject) = config {
         // First priority: the user specified a `pyproject.toml` file. Use that
         // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
         // current working directory. (This matches ESLint's behavior.)
-        let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
+        let settings = resolve_settings(pyproject, &Relativity::Cwd, Some(overrides))?;
         Ok(PyprojectDiscovery::Fixed(settings))
-    } else if let Some(pyproject) = pyproject::find_pyproject_toml(path_dedot::CWD.as_path())? {
-        // Second priority: find a `pyproject.toml` file in the current working path,
-        // and resolve all paths relative to that directory. (With
-        // `Strategy::Hierarchical`, we'll end up finding the "closest" `pyproject.toml`
-        // file for every Python file later on, so these act as the "default" settings.)
+    } else if let Some(pyproject) = pyproject::find_pyproject_toml(
+        stdin_filename
+            .as_ref()
+            .unwrap_or(&path_dedot::CWD.as_path()),
+    )? {
+        // Second priority: find a `pyproject.toml` file in either an ancestor of
+        // `stdin_filename` (if set) or the current working path all paths relative to
+        // that directory. (With `Strategy::Hierarchical`, we'll end up finding
+        // the "closest" `pyproject.toml` file for every Python file later on,
+        // so these act as the "default" settings.)
         let settings = resolve_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
         Ok(PyprojectDiscovery::Hierarchical(settings))
     } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
@@ -85,7 +94,11 @@ fn inner_main() -> Result<ExitCode> {
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_strategy = resolve(cli.config, &overrides)?;
+    let pyproject_strategy = resolve(
+        cli.config.as_deref(),
+        &overrides,
+        cli.stdin_filename.as_deref(),
+    )?;
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
@@ -207,9 +220,8 @@ fn inner_main() -> Result<ExitCode> {
 
         // Generate lint violations.
         let diagnostics = if is_stdin {
-            let filename = cli.stdin_filename.unwrap_or_else(|| "-".to_string());
-            let path = Path::new(&filename);
-            commands::run_stdin(&pyproject_strategy, path, autofix)?
+            let path = cli.stdin_filename.unwrap_or_else(|| PathBuf::from("-"));
+            commands::run_stdin(&pyproject_strategy, &path, autofix)?
         } else {
             commands::run(
                 &cli.files,

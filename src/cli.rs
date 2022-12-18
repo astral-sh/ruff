@@ -120,7 +120,7 @@ pub struct Cli {
     pub autoformat: bool,
     /// The name of the file when passing it through stdin.
     #[arg(long)]
-    pub stdin_filename: Option<String>,
+    pub stdin_filename: Option<PathBuf>,
     /// Explain a rule.
     #[arg(long)]
     pub explain: Option<CheckCode>,
@@ -203,7 +203,7 @@ pub struct Arguments {
     pub show_files: bool,
     pub show_settings: bool,
     pub silent: bool,
-    pub stdin_filename: Option<String>,
+    pub stdin_filename: Option<PathBuf>,
     pub verbose: bool,
     pub watch: bool,
 }
