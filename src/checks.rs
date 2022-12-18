@@ -2711,13 +2711,13 @@ impl CheckKind {
                 "`.notna` is preferred to `.notnull`; functionality is equivalent".to_string()
             }
             CheckKind::UseOfDotIx => {
-                "``ix` i` deprecated; use more explicit `.loc` o` `.iloc`".to_string()
+                "`.ix` is deprecated; use more explicit `.loc` or `.iloc`".to_string()
             }
             CheckKind::UseOfDotAt => {
                 "Use `.loc` instead of `.at`.  If speed is important, use numpy.".to_string()
             }
             CheckKind::UseOfDotIat => {
-                "Use `.iloc` instea` of `.iat`.  If speed is important, use numpy.".to_string()
+                "Use `.iloc` instead of `.iat`.  If speed is important, use numpy.".to_string()
             }
             CheckKind::UseOfDotPivotOrUnstack => "`.pivot_table` is preferred to `.pivot` or \
                                                   `.unstack`; provides same functionality"
