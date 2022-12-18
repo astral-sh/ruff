@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
@@ -10,8 +11,6 @@ use codegen::{Scope, Type, Variant};
 use itertools::Itertools;
 use ruff::checks::{CheckCode, CODE_REDIRECTS, PREFIX_REDIRECTS};
 use strum::IntoEnumIterator;
-
-const FILE: &str = "src/checks_gen.rs";
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -208,7 +207,11 @@ pub fn main(cli: &Cli) -> Result<()> {
     if cli.dry_run {
         println!("{output}");
     } else {
-        let mut f = OpenOptions::new().write(true).truncate(true).open(FILE)?;
+        let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("Failed to find root directory")
+            .join("src/checks_gen.rs");
+        let mut f = OpenOptions::new().write(true).truncate(true).open(file)?;
         write!(f, "{output}")?;
     }
 
