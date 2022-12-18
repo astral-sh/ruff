@@ -7,50 +7,50 @@ expression: checks
       - OSError
   location:
     row: 17
-    column: 8
+    column: 7
   end_location:
     row: 17
-    column: 24
+    column: 25
   fix:
-    content: "OSError,"
+    content: OSError
     location:
       row: 17
-      column: 8
+      column: 7
     end_location:
       row: 17
-      column: 24
+      column: 25
 - kind:
     DuplicateHandlerException:
       - MyError
   location:
     row: 28
-    column: 8
+    column: 7
   end_location:
     row: 28
-    column: 24
+    column: 25
   fix:
-    content: "MyError,"
+    content: MyError
     location:
       row: 28
-      column: 8
+      column: 7
     end_location:
       row: 28
-      column: 24
+      column: 25
 - kind:
     DuplicateHandlerException:
       - re.error
   location:
     row: 49
-    column: 8
+    column: 7
   end_location:
     row: 49
-    column: 26
+    column: 27
   fix:
-    content: "re.error,"
+    content: re.error
     location:
       row: 49
-      column: 8
+      column: 7
     end_location:
       row: 49
-      column: 26
+      column: 27
 
