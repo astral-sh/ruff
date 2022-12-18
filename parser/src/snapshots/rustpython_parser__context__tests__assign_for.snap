@@ -36,12 +36,12 @@ expression: parse_ast
             iter: Located {
                 location: Location {
                     row: 1,
-                    column: 10,
+                    column: 9,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 17,
+                        column: 18,
                     },
                 ),
                 custom: (),

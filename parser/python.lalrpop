@@ -1089,7 +1089,7 @@ AtomAs<Goal>: Goal = {
             node: ast::ExprKind::ListComp { elt: Box::new(elt), generators }
         }.into()
     },
-    "(" <location:@L> <items:OneOrMore<TestOrStarNamedExprOrWithitem>> <trailing_comma:","?> <end_location:@R> ")" =>? {
+    <location:@L> "(" <items:OneOrMore<TestOrStarNamedExprOrWithitem>> <trailing_comma:","?> ")" <end_location:@R> =>? {
         if items.len() == 1 && items[0].1.is_none() && trailing_comma.is_none() {
             match items[0].0.node {
                 ast::ExprKind::Starred { .. } => {
