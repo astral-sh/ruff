@@ -933,21 +933,93 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
 ### VS Code (Official)
 
-Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff).
+Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff),
+which supports autofix actions, import sorting, and more.
 
-### Language Server Protocol
+![](https://user-images.githubusercontent.com/1309177/205175763-cf34871d-5c05-4abf-9916-440afc82dbf8.gif)
 
-Ruff is available as a [Language Server Protocol (LSP)](https://microsoft.github.io/language-server-protocol/)
-server, distributed as the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff) plugin
-for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-server), both of which are
-installable via [PyPI](https://pypi.org/project/python-lsp-ruff/):
+### Language Server Protocol (Official)
+
+Ruff supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
+via the [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp) Python package, available on
+[PyPI](https://pypi.org/project/ruff-lsp/).
+
+[`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp) enables Ruff to be used with any editor that
+supports the Language Server Protocol, including [Neovim](https://github.com/charliermarsh/ruff-lsp#example-neovim),
+[Sublime Text](https://github.com/charliermarsh/ruff-lsp#example-sublime-text), Emacs, and more.
+
+For example, to use `ruff-lsp` with Neovim, install `ruff-lsp` from PyPI along with
+[`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig). Then, add something like the following
+to your `init.lua`:
+
+```lua
+-- See: https://github.com/neovim/nvim-lspconfig/tree/54eb2a070a4f389b1be0f98070f81d23e2b1a715#suggested-configuration
+local opts = { noremap=true, silent=true }
+vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, opts)
+vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, opts)
+vim.keymap.set('n', ']d', vim.diagnostic.goto_next, opts)
+vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
+
+-- Use an on_attach function to only map the following keys
+-- after the language server attaches to the current buffer
+local on_attach = function(client, bufnr)
+  -- Enable completion triggered by <c-x><c-o>
+  vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
+
+  -- Mappings.
+  -- See `:help vim.lsp.*` for documentation on any of the below functions
+  local bufopts = { noremap=true, silent=true, buffer=bufnr }
+  vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
+  vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
+  vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
+  vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
+  vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, bufopts)
+  vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder, bufopts)
+  vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder, bufopts)
+  vim.keymap.set('n', '<space>wl', function()
+    print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+  end, bufopts)
+  vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts)
+  vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
+  vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
+  vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
+  vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end, bufopts)
+end
+
+-- Configure `ruff-lsp`.
+local configs = require 'lspconfig.configs'
+if not configs.ruff_lsp then
+  configs.ruff_lsp = {
+    default_config = {
+    cmd = { "ruff-lsp" },
+    filetypes = {'python'},
+    root_dir = require('lspconfig').util.find_git_ancestor,
+    settings = {
+      ruff_lsp = {
+        -- Any extra CLI arguments for `ruff` go here.
+        args = {}
+      }
+    }
+  }
+}
+end
+
+require('lspconfig').ruff_lsp.setup {
+  on_attach = on_attach,
+}
+```
+
+### Language Server Protocol (Unofficial)
+
+Ruff is also available as the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff)
+plugin for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-ruff), both of which are
+installable from PyPI:
 
 ```shell
 pip install python-lsp-server python-lsp-ruff
 ```
 
-The LSP server can be used with any editor that supports the Language Server Protocol, including
-Neovim, Emacs, Sublime Text, etc.
+The LSP server can then be used with any editor that supports the Language Server Protocol.
 
 For example, to use `python-lsp-ruff` with Neovim, add something like the following to your
 `init.lua`:
@@ -975,46 +1047,6 @@ require'lspconfig'.pylsp.setup {
 }
 ```
 
-To use `python-lsp-ruff` with Sublime Text, install Sublime Text's [LSP](https://github.com/sublimelsp/LSP)
-package, then add something like the following to `LSP.sublime-settings`:
-
-```json
-{
-  "clients": {
-    "python-lsp-server": {
-      "command": ["pylsp"],
-      "enabled": true,
-      "selector": "source.python",
-      "settings": {
-        "pylsp": {
-          "plugins": {
-            "pycodestyle": {
-              "enabled": false
-            },
-            "pyflakes": {
-              "enabled": false
-            },
-            "mccabe": {
-              "enabled": false
-            },
-            "ruff": {
-              "enabled": true
-            }
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-Upon successful installation, you should see errors surfaced directly in your editor:
-
-![](https://user-images.githubusercontent.com/1309177/208266375-331ad8e5-8ac1-4735-bca8-07734eb38536.png)
-
-[`ruffd`](https://github.com/Seamooo/ruffd) is another implementation of the Language Server
-Protocol (LSP) for Ruff, written in Rust.
-
 ### PyCharm
 
 Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
@@ -1029,8 +1061,8 @@ Ruff should then appear as a runnable action:
 
 ### Vim & Neovim
 
-Ruff can be integrated into any editor that supports the Language Server Protocol (LSP) (see:
-[Language Server Protocol](#language-server-protocol)).
+Ruff can be integrated into any editor that supports the Language Server Protocol via [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp)
+(see: [Language Server Protocol](#language-server-protocol-official)).
 
 Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
 extension for `coc.nvim`.
