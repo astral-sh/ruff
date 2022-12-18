@@ -2838,7 +2838,7 @@ impl CheckKind {
             },
             // flake8-datetimez
             CheckKind::CallDatetimeWithoutTzinfo => "The use of `datetime.datetime()` without \
-                                                     `tzinfo` argument is not allowed."
+                                                     `tzinfo` argument is not allowed"
                 .to_string(),
             CheckKind::CallDatetimeToday => "The use of `datetime.datetime.today()` is not \
                                              allowed. Use `datetime.datetime.now(tz=)` instead."
@@ -2889,6 +2889,23 @@ impl CheckKind {
             }
             CheckKind::StarArgUnpackingAfterKeywordArg => {
                 "Star-arg unpacking after a keyword argument is strongly discouraged".to_string()
+            }
+
+            // flake8-datetimez
+            CheckKind::CallDatetimeToday => {
+                "The use of `datetime.datetime.today()` is not allowed".to_string()
+            }
+            CheckKind::CallDatetimeUtcnow => {
+                "The use of `datetime.datetime.utcnow()` is not allowed".to_string()
+            }
+            CheckKind::CallDatetimeUtcfromtimestamp => {
+                "The use of `datetime.datetime.utcfromtimestamp()` is not allowed".to_string()
+            }
+            CheckKind::CallDateToday => {
+                "The use of `datetime.date.today()` is not allowed.".to_string()
+            }
+            CheckKind::CallDateFromtimestamp => {
+                "The use of `datetime.date.fromtimestamp()` is not allowed".to_string()
             }
             _ => self.body(),
         }

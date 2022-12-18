@@ -871,15 +871,15 @@ For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/20.10
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| DTZ001 | CallDatetimeWithoutTzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed. |  |
-| DTZ002 | CallDatetimeToday | The use of `datetime.datetime.today()` is not allowed. Use `datetime.datetime.now(tz=)` instead. |  |
-| DTZ003 | CallDatetimeUtcnow | The use of `datetime.datetime.utcnow()` is not allowed. Use `datetime.datetime.now(tz=)` instead. |  |
-| DTZ004 | CallDatetimeUtcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed. Use `datetime.datetime.fromtimestamp(, tz=)` instead. |  |
+| DTZ001 | CallDatetimeWithoutTzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
+| DTZ002 | CallDatetimeToday | The use of `datetime.datetime.today()` is not allowed |  |
+| DTZ003 | CallDatetimeUtcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
+| DTZ004 | CallDatetimeUtcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
 | DTZ005 | CallDatetimeNowWithoutTzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
 | DTZ006 | CallDatetimeFromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
 | DTZ007 | CallDatetimeStrptimeWithoutZone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` |  |
-| DTZ011 | CallDateToday | The use of `datetime.date.today()` is not allowed. Use `datetime.datetime.now(tz=).date()` instead. |  |
-| DTZ012 | CallDateFromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed. Use `datetime.datetime.fromtimestamp(, tz=).date()` instead. |  |
+| DTZ011 | CallDateToday | The use of `datetime.date.today()` is not allowed. |  |
+| DTZ012 | CallDateFromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
 
 ### eradicate (ERA)
 
