@@ -4,10 +4,18 @@ expression: checks
 ---
 - kind: CallDateFromtimestamp
   location:
-    row: 8
+    row: 4
     column: 0
   end_location:
-    row: 8
+    row: 4
+    column: 33
+  fix: ~
+- kind: CallDateFromtimestamp
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
     column: 24
   fix: ~
 

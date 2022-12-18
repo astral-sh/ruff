@@ -1,8 +1,9 @@
 import datetime
-from datetime import date
 
-
+# qualified
 datetime.date.today()
+
+from datetime import date
 
 # unqualified
 date.today()

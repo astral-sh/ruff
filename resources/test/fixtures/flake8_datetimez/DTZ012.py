@@ -1,8 +1,9 @@
 import datetime
-from datetime import date
 
-
+# qualified
 datetime.date.fromtimestamp(1234)
+
+from datetime import date
 
 # unqualified
 date.fromtimestamp(1234)

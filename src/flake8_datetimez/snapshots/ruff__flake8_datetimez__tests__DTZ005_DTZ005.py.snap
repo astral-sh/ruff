@@ -4,42 +4,42 @@ expression: checks
 ---
 - kind: CallDatetimeNowWithoutTzinfo
   location:
-    row: 5
+    row: 4
     column: 0
   end_location:
-    row: 5
+    row: 4
     column: 23
   fix: ~
 - kind: CallDatetimeNowWithoutTzinfo
   location:
-    row: 8
+    row: 7
     column: 0
   end_location:
-    row: 8
-    column: 14
-  fix: ~
-- kind: CallDatetimeNowWithoutTzinfo
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
+    row: 7
     column: 48
   fix: ~
 - kind: CallDatetimeNowWithoutTzinfo
   location:
-    row: 14
+    row: 10
     column: 0
   end_location:
-    row: 14
+    row: 10
     column: 27
   fix: ~
 - kind: CallDatetimeNowWithoutTzinfo
   location:
-    row: 17
+    row: 13
     column: 0
   end_location:
-    row: 17
+    row: 13
     column: 30
+  fix: ~
+- kind: CallDatetimeNowWithoutTzinfo
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 14
   fix: ~
 

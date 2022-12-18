@@ -4,42 +4,42 @@ expression: checks
 ---
 - kind: CallDatetimeStrptimeWithoutZone
   location:
-    row: 5
+    row: 4
     column: 0
   end_location:
-    row: 5
+    row: 4
     column: 53
   fix: ~
 - kind: CallDatetimeStrptimeWithoutZone
   location:
-    row: 8
+    row: 7
     column: 0
   end_location:
-    row: 8
+    row: 7
     column: 52
   fix: ~
 - kind: CallDatetimeStrptimeWithoutZone
   location:
-    row: 11
+    row: 10
     column: 0
   end_location:
-    row: 11
+    row: 10
+    column: 52
+  fix: ~
+- kind: CallDatetimeStrptimeWithoutZone
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 52
+  fix: ~
+- kind: CallDatetimeStrptimeWithoutZone
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
     column: 43
-  fix: ~
-- kind: CallDatetimeStrptimeWithoutZone
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 52
-  fix: ~
-- kind: CallDatetimeStrptimeWithoutZone
-  location:
-    row: 17
-    column: 0
-  end_location:
-    row: 17
-    column: 52
   fix: ~
 

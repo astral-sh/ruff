@@ -1957,85 +1957,74 @@ where
 
                 // flake8-datetimez
                 if self.settings.enabled.contains(&CheckCode::DTZ001) {
-                    if let Some(check) = flake8_datetimez::checks::call_datetime_without_tzinfo(
+                    flake8_datetimez::plugins::call_datetime_without_tzinfo(
+                        self,
                         func,
                         args,
                         keywords,
                         Range::from_located(expr),
-                    ) {
-                        self.add_check(check);
-                    }
+                    );
                 }
                 if self.settings.enabled.contains(&CheckCode::DTZ002) {
-                    if let Some(check) = flake8_datetimez::checks::call_datetime_today(
+                    flake8_datetimez::plugins::call_datetime_today(
+                        self,
                         func,
                         Range::from_located(expr),
-                    ) {
-                        self.add_check(check);
-                    }
+                    );
                 }
                 if self.settings.enabled.contains(&CheckCode::DTZ003) {
-                    if let Some(check) = flake8_datetimez::checks::call_datetime_utcnow(
+                    flake8_datetimez::plugins::call_datetime_utcnow(
+                        self,
                         func,
                         Range::from_located(expr),
-                    ) {
-                        self.add_check(check);
-                    }
+                    );
                 }
                 if self.settings.enabled.contains(&CheckCode::DTZ004) {
-                    if let Some(check) = flake8_datetimez::checks::call_datetime_utcfromtimestamp(
+                    flake8_datetimez::plugins::call_datetime_utcfromtimestamp(
+                        self,
                         func,
                         Range::from_located(expr),
-                    ) {
-                        self.add_check(check);
-                    }
+                    );
                 }
                 if self.settings.enabled.contains(&CheckCode::DTZ005) {
-                    if let Some(check) = flake8_datetimez::checks::call_datetime_now_without_tzinfo(
+                    flake8_datetimez::plugins::call_datetime_now_without_tzinfo(
+                        self,
                         func,
                         args,
                         keywords,
                         Range::from_located(expr),
-                    ) {
-                        self.add_check(check);
-                    }
+                    );
                 }
                 if self.settings.enabled.contains(&CheckCode::DTZ006) {
-                    if let Some(check) = flake8_datetimez::checks::call_datetime_fromtimestamp(
+                    flake8_datetimez::plugins::call_datetime_fromtimestamp(
+                        self,
                         func,
                         args,
                         keywords,
                         Range::from_located(expr),
-                    ) {
-                        self.add_check(check);
-                    }
+                    );
                 }
                 if self.settings.enabled.contains(&CheckCode::DTZ007) {
-                    if let Some(check) =
-                        flake8_datetimez::checks::call_datetime_strptime_without_zone(
-                            func,
-                            args,
-                            keywords,
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.add_check(check);
-                    }
+                    flake8_datetimez::plugins::call_datetime_strptime_without_zone(
+                        self,
+                        func,
+                        args,
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&CheckCode::DTZ011) {
-                    if let Some(check) =
-                        flake8_datetimez::checks::call_date_today(func, Range::from_located(expr))
-                    {
-                        self.add_check(check);
-                    }
-                }
-                if self.settings.enabled.contains(&CheckCode::DTZ012) {
-                    if let Some(check) = flake8_datetimez::checks::call_date_fromtimestamp(
+                    flake8_datetimez::plugins::call_date_today(
+                        self,
                         func,
                         Range::from_located(expr),
-                    ) {
-                        self.add_check(check);
-                    }
+                    );
+                }
+                if self.settings.enabled.contains(&CheckCode::DTZ012) {
+                    flake8_datetimez::plugins::call_date_fromtimestamp(
+                        self,
+                        func,
+                        Range::from_located(expr),
+                    );
                 }
 
                 // pygrep-hooks
