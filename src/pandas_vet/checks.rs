@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 use crate::ast::types::Range;
 use crate::checks::{Check, CheckKind};
 
-/// PDV002
+/// PD002
 pub fn inplace_argument(keywords: &[Keyword]) -> Option<Check> {
     for keyword in keywords {
         let arg = keyword.node.arg.as_ref()?;
@@ -27,7 +27,7 @@ pub fn inplace_argument(keywords: &[Keyword]) -> Option<Check> {
     None
 }
 
-/// PDV015
+/// PD015
 pub fn use_of_pd_merge(func: &Expr) -> Option<Check> {
     if let ExprKind::Attribute { attr, value, .. } = &func.node {
         if let ExprKind::Name { id, .. } = &value.node {
@@ -42,7 +42,7 @@ pub fn use_of_pd_merge(func: &Expr) -> Option<Check> {
     None
 }
 
-/// PDV901
+/// PD901
 pub fn assignment_to_df(targets: &[Expr]) -> Option<Check> {
     if targets.len() != 1 {
         return None;

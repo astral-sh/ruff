@@ -1181,7 +1181,7 @@ where
                         self, stmt, targets, value,
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::PDV901) {
+                if self.settings.enabled.contains(&CheckCode::PD901) {
                     if let Some(check) = pandas_vet::checks::assignment_to_df(targets) {
                         self.add_check(check);
                     }
@@ -1547,10 +1547,10 @@ where
                 }
 
                 for (code, name) in vec![
-                    (CheckCode::PDV007, "ix"),
-                    (CheckCode::PDV008, "at"),
-                    (CheckCode::PDV009, "iat"),
-                    (CheckCode::PDV011, "values"),
+                    (CheckCode::PD007, "ix"),
+                    (CheckCode::PD008, "at"),
+                    (CheckCode::PD009, "iat"),
+                    (CheckCode::PD011, "values"),
                 ] {
                     if self.settings.enabled.contains(&code) {
                         if attr == name {
@@ -1932,17 +1932,17 @@ where
                 }
 
                 // pandas-vet
-                if self.settings.enabled.contains(&CheckCode::PDV002) {
+                if self.settings.enabled.contains(&CheckCode::PD002) {
                     self.add_checks(pandas_vet::checks::inplace_argument(keywords).into_iter());
                 }
 
                 for (code, name) in vec![
-                    (CheckCode::PDV003, "isnull"),
-                    (CheckCode::PDV004, "notnull"),
-                    (CheckCode::PDV010, "pivot"),
-                    (CheckCode::PDV010, "unstack"),
-                    (CheckCode::PDV012, "read_table"),
-                    (CheckCode::PDV013, "stack"),
+                    (CheckCode::PD003, "isnull"),
+                    (CheckCode::PD004, "notnull"),
+                    (CheckCode::PD010, "pivot"),
+                    (CheckCode::PD010, "unstack"),
+                    (CheckCode::PD012, "read_table"),
+                    (CheckCode::PD013, "stack"),
                 ] {
                     if self.settings.enabled.contains(&code) {
                         if let ExprKind::Attribute { attr, .. } = &func.node {
@@ -1953,7 +1953,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PDV015) {
+                if self.settings.enabled.contains(&CheckCode::PD015) {
                     if let Some(check) = pandas_vet::checks::use_of_pd_merge(func) {
                         self.add_check(check);
                     };

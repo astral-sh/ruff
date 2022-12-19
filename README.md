@@ -96,7 +96,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
    1. [flake8-datetimez (DTZ)](#flake8-datetimez-dtz)
    1. [eradicate (ERA)](#eradicate-era)
-   1. [pandas-vet (PDV)](#pandas-vet-pdv)
+   1. [pandas-vet (PD)](#pandas-vet-pd)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
@@ -891,24 +891,24 @@ For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
 | ---- | ---- | ------- | --- |
 | ERA001 | CommentedOutCode | Found commented-out code | 🛠 |
 
-### pandas-vet (PDV)
+### pandas-vet (PD)
 
 For more, see [pandas-vet](https://pypi.org/project/pandas-vet/0.2.3/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PDV002 | UseOfInplaceArgument | `inplace=True` should be avoided; it has inconsistent behavior |  |
-| PDV003 | UseOfDotIsNull | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
-| PDV004 | UseOfDotNotNull | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
-| PDV007 | UseOfDotIx | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
-| PDV008 | UseOfDotAt | Use `.loc` instead of `.at`.  If speed is important, use numpy. |  |
-| PDV009 | UseOfDotIat | Use `.iloc` instead of `.iat`.  If speed is important, use numpy. |  |
-| PDV010 | UseOfDotPivotOrUnstack | `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality |  |
-| PDV011 | UseOfDotValues | Use `.to_numpy()` instead of `.values` |  |
-| PDV012 | UseOfDotReadTable | `.read_csv` is preferred to `.read_table`; provides same functionality |  |
-| PDV013 | UseOfDotStack | `.melt` is preferred to `.stack`; provides same functionality |  |
-| PDV015 | UseOfPdMerge | Use `.merge` method instead of `pd.merge` function. They have equivalent functionality. |  |
-| PDV901 | DfIsABadVariableName | `df` is a bad variable name. Be kinder to your future self. |  |
+| PD002 | UseOfInplaceArgument | `inplace=True` should be avoided; it has inconsistent behavior |  |
+| PD003 | UseOfDotIsNull | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
+| PD004 | UseOfDotNotNull | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
+| PD007 | UseOfDotIx | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
+| PD008 | UseOfDotAt | Use `.loc` instead of `.at`.  If speed is important, use numpy. |  |
+| PD009 | UseOfDotIat | Use `.iloc` instead of `.iat`.  If speed is important, use numpy. |  |
+| PD010 | UseOfDotPivotOrUnstack | `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality |  |
+| PD011 | UseOfDotValues | Use `.to_numpy()` instead of `.values` |  |
+| PD012 | UseOfDotReadTable | `.read_csv` is preferred to `.read_table`; provides same functionality |  |
+| PD013 | UseOfDotStack | `.melt` is preferred to `.stack`; provides same functionality |  |
+| PD015 | UseOfPdMerge | Use `.merge` method instead of `pd.merge` function. They have equivalent functionality. |  |
+| PD901 | DfIsABadVariableName | `df` is a bad variable name. Be kinder to your future self. |  |
 
 ### pygrep-hooks (PGH)
 
