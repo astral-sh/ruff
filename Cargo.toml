@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "ruff"
-version = "0.0.186"
+version = "0.0.187"
 edition = "2021"
 rust-version = "1.65.0"
 
@@ -43,7 +43,7 @@ quick-junit = { version = "0.3.2" }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
-ruff_macros = { version = "0.0.186", path = "ruff_macros" }
+ruff_macros = { version = "0.0.187", path = "ruff_macros" }
 rustc-hash = { version = "1.1.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "c01f014b1269eedcf4bdb45d5fbc62ae2beecf31" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "c01f014b1269eedcf4bdb45d5fbc62ae2beecf31" }
