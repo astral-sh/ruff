@@ -13,7 +13,6 @@ mod tests {
     use crate::linter::test_path;
     use crate::settings;
 
-    #[test_case(CheckCode::T100, Path::new("T100.py"); "T100")]
     #[test_case(CheckCode::T201, Path::new("T201.py"); "T201")]
     #[test_case(CheckCode::T203, Path::new("T203.py"); "T203")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
