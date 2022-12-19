@@ -94,6 +94,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-simplify (SIM)](#flake8-simplify-sim)
    1. [flake8-tidy-imports (TID)](#flake8-tidy-imports-tid)
    1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
+   1. [flake8-datetimez (DTZ)](#flake8-datetimez-dtz)
    1. [eradicate (ERA)](#eradicate-era)
    1. [pandas-vet (PDV)](#pandas-vet-pdv)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
@@ -866,6 +867,22 @@ For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-a
 | ARG004 | UnusedStaticMethodArgument | Unused static method argument: `...` |  |
 | ARG005 | UnusedLambdaArgument | Unused lambda argument: `...` |  |
 
+### flake8-datetimez (DTZ)
+
+For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/20.10.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| DTZ001 | CallDatetimeWithoutTzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
+| DTZ002 | CallDatetimeToday | The use of `datetime.datetime.today()` is not allowed |  |
+| DTZ003 | CallDatetimeUtcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
+| DTZ004 | CallDatetimeUtcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
+| DTZ005 | CallDatetimeNowWithoutTzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
+| DTZ006 | CallDatetimeFromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
+| DTZ007 | CallDatetimeStrptimeWithoutZone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` |  |
+| DTZ011 | CallDateToday | The use of `datetime.date.today()` is not allowed. |  |
+| DTZ012 | CallDateFromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
+
 ### eradicate (ERA)
 
 For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
@@ -1186,6 +1203,7 @@ natively, including:
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
+- [`flake8-datetimez`](https://pypi.org/project/flake8-datetimez/)
 - [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
@@ -1240,6 +1258,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
+- [`flake8-datetimez`](https://pypi.org/project/flake8-datetimez/)
 - [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)

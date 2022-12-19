@@ -47,6 +47,7 @@ pub mod flake8_boolean_trap;
 pub mod flake8_bugbear;
 mod flake8_builtins;
 mod flake8_comprehensions;
+mod flake8_datetimez;
 mod flake8_debugger;
 pub mod flake8_errmsg;
 mod flake8_import_conventions;

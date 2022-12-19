@@ -14,8 +14,8 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         };
     if checker.patch(check.kind.code()) {
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
-        let defined_by = checker.current_parent();
-        let defined_in = checker.current_grandparent();
+        let defined_by = checker.current_stmt();
+        let defined_in = checker.current_stmt_parent();
         match helpers::delete_stmt(
             defined_by.0,
             defined_in.map(|node| node.0),

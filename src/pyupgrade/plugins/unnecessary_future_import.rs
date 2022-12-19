@@ -65,8 +65,8 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
 
     if checker.patch(check.kind.code()) {
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
-        let defined_by = checker.current_parent();
-        let defined_in = checker.current_grandparent();
+        let defined_by = checker.current_stmt();
+        let defined_in = checker.current_stmt_parent();
         match fixes::remove_unnecessary_future_import(
             checker.locator,
             &removable_index,

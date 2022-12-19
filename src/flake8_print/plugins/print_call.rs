@@ -19,8 +19,8 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
     };
 
     if checker.patch(check.kind.code()) {
-        let defined_by = checker.current_parent();
-        let defined_in = checker.current_grandparent();
+        let defined_by = checker.current_stmt();
+        let defined_in = checker.current_stmt_parent();
         if matches!(defined_by.0.node, StmtKind::Expr { .. }) {
             let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
             match helpers::delete_stmt(

@@ -309,6 +309,16 @@ pub enum CheckCode {
     ARG005,
     // flake8-import-conventions
     ICN001,
+    // flake8-datetimez
+    DTZ001,
+    DTZ002,
+    DTZ003,
+    DTZ004,
+    DTZ005,
+    DTZ006,
+    DTZ007,
+    DTZ011,
+    DTZ012,
     // Ruff
     RUF001,
     RUF002,
@@ -363,6 +373,7 @@ pub enum CheckCategory {
     Flake8Simplify,
     Flake8TidyImports,
     Flake8UnusedArguments,
+    Flake8Datetimez,
     Eradicate,
     PandasVet,
     PygrepHooks,
@@ -405,6 +416,7 @@ impl CheckCategory {
             CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
             CheckCategory::Flake8Simplify => "flake8-simplify",
             CheckCategory::Flake8UnusedArguments => "flake8-unused-arguments",
+            CheckCategory::Flake8Datetimez => "flake8-datetimez",
             CheckCategory::Isort => "isort",
             CheckCategory::McCabe => "mccabe",
             CheckCategory::PandasVet => "pandas-vet",
@@ -438,6 +450,7 @@ impl CheckCategory {
             CheckCategory::Flake8Simplify => vec![CheckCodePrefix::SIM],
             CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::TID],
             CheckCategory::Flake8UnusedArguments => vec![CheckCodePrefix::ARG],
+            CheckCategory::Flake8Datetimez => vec![CheckCodePrefix::DTZ],
             CheckCategory::Isort => vec![CheckCodePrefix::I],
             CheckCategory::McCabe => vec![CheckCodePrefix::C90],
             CheckCategory::PandasVet => vec![CheckCodePrefix::PDV],
@@ -526,6 +539,10 @@ impl CheckCategory {
             )),
             CheckCategory::Flake8UnusedArguments => Some((
                 "https://pypi.org/project/flake8-unused-arguments/0.0.12/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8Datetimez => Some((
+                "https://pypi.org/project/flake8-datetimez/20.10.0/",
                 &Platform::PyPI,
             )),
             CheckCategory::Isort => {
@@ -921,6 +938,16 @@ pub enum CheckKind {
     AmbiguousUnicodeCharacterDocstring(char, char),
     AmbiguousUnicodeCharacterComment(char, char),
     UnusedNOQA(Option<Vec<String>>),
+    // flake8-datetimez
+    CallDatetimeWithoutTzinfo,
+    CallDatetimeToday,
+    CallDatetimeUtcnow,
+    CallDatetimeUtcfromtimestamp,
+    CallDatetimeNowWithoutTzinfo,
+    CallDatetimeFromtimestamp,
+    CallDatetimeStrptimeWithoutZone,
+    CallDateToday,
+    CallDateFromtimestamp,
 }
 
 impl CheckCode {
@@ -1295,6 +1322,16 @@ impl CheckCode {
             CheckCode::EM101 => CheckKind::RawStringInException,
             CheckCode::EM102 => CheckKind::FStringInException,
             CheckCode::EM103 => CheckKind::DotFormatInException,
+            // flake8-datetimez
+            CheckCode::DTZ001 => CheckKind::CallDatetimeWithoutTzinfo,
+            CheckCode::DTZ002 => CheckKind::CallDatetimeToday,
+            CheckCode::DTZ003 => CheckKind::CallDatetimeUtcnow,
+            CheckCode::DTZ004 => CheckKind::CallDatetimeUtcfromtimestamp,
+            CheckCode::DTZ005 => CheckKind::CallDatetimeNowWithoutTzinfo,
+            CheckCode::DTZ006 => CheckKind::CallDatetimeFromtimestamp,
+            CheckCode::DTZ007 => CheckKind::CallDatetimeStrptimeWithoutZone,
+            CheckCode::DTZ011 => CheckKind::CallDateToday,
+            CheckCode::DTZ012 => CheckKind::CallDateFromtimestamp,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1416,6 +1453,15 @@ impl CheckCode {
             CheckCode::D417 => CheckCategory::Pydocstyle,
             CheckCode::D418 => CheckCategory::Pydocstyle,
             CheckCode::D419 => CheckCategory::Pydocstyle,
+            CheckCode::DTZ001 => CheckCategory::Flake8Datetimez,
+            CheckCode::DTZ002 => CheckCategory::Flake8Datetimez,
+            CheckCode::DTZ003 => CheckCategory::Flake8Datetimez,
+            CheckCode::DTZ004 => CheckCategory::Flake8Datetimez,
+            CheckCode::DTZ005 => CheckCategory::Flake8Datetimez,
+            CheckCode::DTZ006 => CheckCategory::Flake8Datetimez,
+            CheckCode::DTZ007 => CheckCategory::Flake8Datetimez,
+            CheckCode::DTZ011 => CheckCategory::Flake8Datetimez,
+            CheckCode::DTZ012 => CheckCategory::Flake8Datetimez,
             CheckCode::E402 => CheckCategory::Pycodestyle,
             CheckCode::E501 => CheckCategory::Pycodestyle,
             CheckCode::E711 => CheckCategory::Pycodestyle,
@@ -1884,6 +1930,16 @@ impl CheckKind {
             CheckKind::RawStringInException => &CheckCode::EM101,
             CheckKind::FStringInException => &CheckCode::EM102,
             CheckKind::DotFormatInException => &CheckCode::EM103,
+            // flake8-datetimez
+            CheckKind::CallDatetimeWithoutTzinfo => &CheckCode::DTZ001,
+            CheckKind::CallDatetimeToday => &CheckCode::DTZ002,
+            CheckKind::CallDatetimeUtcnow => &CheckCode::DTZ003,
+            CheckKind::CallDatetimeUtcfromtimestamp => &CheckCode::DTZ004,
+            CheckKind::CallDatetimeNowWithoutTzinfo => &CheckCode::DTZ005,
+            CheckKind::CallDatetimeFromtimestamp => &CheckCode::DTZ006,
+            CheckKind::CallDatetimeStrptimeWithoutZone => &CheckCode::DTZ007,
+            CheckKind::CallDateToday => &CheckCode::DTZ011,
+            CheckKind::CallDateFromtimestamp => &CheckCode::DTZ012,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -2798,6 +2854,41 @@ impl CheckKind {
                     format!("Unused `noqa` directive for: {codes}")
                 }
             },
+            // flake8-datetimez
+            CheckKind::CallDatetimeWithoutTzinfo => "The use of `datetime.datetime()` without \
+                                                     `tzinfo` argument is not allowed"
+                .to_string(),
+            CheckKind::CallDatetimeToday => "The use of `datetime.datetime.today()` is not \
+                                             allowed. Use `datetime.datetime.now(tz=)` instead."
+                .to_string(),
+            CheckKind::CallDatetimeUtcnow => "The use of `datetime.datetime.utcnow()` is not \
+                                              allowed. Use `datetime.datetime.now(tz=)` instead."
+                .to_string(),
+            CheckKind::CallDatetimeUtcfromtimestamp => {
+                "The use of `datetime.datetime.utcfromtimestamp()` is not allowed. Use \
+                 `datetime.datetime.fromtimestamp(, tz=)` instead."
+                    .to_string()
+            }
+            CheckKind::CallDatetimeNowWithoutTzinfo => "The use of `datetime.datetime.now()` \
+                                                        without `tz` argument is not allowed"
+                .to_string(),
+            CheckKind::CallDatetimeFromtimestamp => "The use of \
+                                                     `datetime.datetime.fromtimestamp()` without \
+                                                     `tz` argument is not allowed"
+                .to_string(),
+            CheckKind::CallDatetimeStrptimeWithoutZone => {
+                "The use of `datetime.datetime.strptime()` without %z must be followed by \
+                 `.replace(tzinfo=)`"
+                    .to_string()
+            }
+            CheckKind::CallDateToday => "The use of `datetime.date.today()` is not allowed. Use \
+                                         `datetime.datetime.now(tz=).date()` instead."
+                .to_string(),
+            CheckKind::CallDateFromtimestamp => {
+                "The use of `datetime.date.fromtimestamp()` is not allowed. Use \
+                 `datetime.datetime.fromtimestamp(, tz=).date()` instead."
+                    .to_string()
+            }
         }
     }
 
@@ -2816,6 +2907,23 @@ impl CheckKind {
             }
             CheckKind::StarArgUnpackingAfterKeywordArg => {
                 "Star-arg unpacking after a keyword argument is strongly discouraged".to_string()
+            }
+
+            // flake8-datetimez
+            CheckKind::CallDatetimeToday => {
+                "The use of `datetime.datetime.today()` is not allowed".to_string()
+            }
+            CheckKind::CallDatetimeUtcnow => {
+                "The use of `datetime.datetime.utcnow()` is not allowed".to_string()
+            }
+            CheckKind::CallDatetimeUtcfromtimestamp => {
+                "The use of `datetime.datetime.utcfromtimestamp()` is not allowed".to_string()
+            }
+            CheckKind::CallDateToday => {
+                "The use of `datetime.date.today()` is not allowed.".to_string()
+            }
+            CheckKind::CallDateFromtimestamp => {
+                "The use of `datetime.date.fromtimestamp()` is not allowed".to_string()
             }
             _ => self.body(),
         }

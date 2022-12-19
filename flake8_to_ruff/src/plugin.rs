@@ -12,6 +12,7 @@ pub enum Plugin {
     Flake8Bugbear,
     Flake8Builtins,
     Flake8Comprehensions,
+    Flake8Datetimez,
     Flake8Debugger,
     Flake8Docstrings,
     Flake8ErrMsg,
@@ -38,6 +39,7 @@ impl FromStr for Plugin {
             "flake8-bugbear" => Ok(Plugin::Flake8Bugbear),
             "flake8-builtins" => Ok(Plugin::Flake8Builtins),
             "flake8-comprehensions" => Ok(Plugin::Flake8Comprehensions),
+            "flake8-datetimez" => Ok(Plugin::Flake8Datetimez),
             "flake8-debugger" => Ok(Plugin::Flake8Debugger),
             "flake8-docstrings" => Ok(Plugin::Flake8Docstrings),
             "flake8-eradicate" => Ok(Plugin::Flake8BlindExcept),
@@ -66,6 +68,7 @@ impl Plugin {
             Plugin::Flake8Bugbear => CheckCodePrefix::B,
             Plugin::Flake8Builtins => CheckCodePrefix::A,
             Plugin::Flake8Comprehensions => CheckCodePrefix::C4,
+            Plugin::Flake8Datetimez => CheckCodePrefix::DTZ,
             Plugin::Flake8Debugger => CheckCodePrefix::T1,
             Plugin::Flake8Docstrings => CheckCodePrefix::D,
             // TODO(charlie): Handle rename of `E` to `ERA`.
@@ -92,6 +95,7 @@ impl Plugin {
             Plugin::Flake8Bugbear => vec![CheckCodePrefix::B],
             Plugin::Flake8Builtins => vec![CheckCodePrefix::A],
             Plugin::Flake8Comprehensions => vec![CheckCodePrefix::C4],
+            Plugin::Flake8Datetimez => vec![CheckCodePrefix::DTZ],
             Plugin::Flake8Debugger => vec![CheckCodePrefix::T1],
             Plugin::Flake8Docstrings => {
                 // Use the user-provided docstring.
@@ -409,6 +413,7 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin
         Plugin::Flake8Bugbear,
         Plugin::Flake8Builtins,
         Plugin::Flake8Comprehensions,
+        Plugin::Flake8Datetimez,
         Plugin::Flake8Debugger,
         Plugin::Flake8Docstrings,
         Plugin::Flake8Eradicate,

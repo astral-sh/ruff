@@ -1,0 +1,21 @@
+---
+source: src/flake8_datetimez/mod.rs
+expression: checks
+---
+- kind: CallDatetimeToday
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 25
+  fix: ~
+- kind: CallDatetimeToday
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 16
+  fix: ~
+
