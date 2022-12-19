@@ -205,19 +205,45 @@ pub fn call_datetime_strptime_without_zone(
         return;
     }
 
-    // Does the `strptime` call contain a format string with a timezone specifier?
     let Some(ExprKind::Constant {
         value: Constant::Str(format),
         kind: None,
     }) = args.get(1).as_ref().map(|arg| &arg.node) else {
+                checker.add_check(Check::new(
+            CheckKind::CallDatetimeStrptimeWithoutZone,
+            location,
+        ));
         return;
     };
 
+    // Does the `strptime` call contain a format string with a timezone specifier?
     if format.contains("%z") {
         return;
     }
 
-    // Do we have a valid call to `.replace`?
+    let (Some(grandparent), Some(parent)) = (checker.current_expr_grandparent(), checker.current_expr_parent()) else {
+        checker.add_check(Check::new(
+            CheckKind::CallDatetimeStrptimeWithoutZone,
+            location,
+        ));
+        return;
+    };
+
+    if let ExprKind::Call { keywords, .. } = &grandparent.0.node {
+        if let ExprKind::Attribute { attr, .. } = &parent.0.node {
+            // Ex) `datetime.strptime(...).astimezone()`
+            if attr == "astimezone" {
+                return;
+            }
+
+            // Ex) `datetime.strptime(...).replace(tzinfo=UTC)`
+            if attr == "replace" {
+                if has_not_none_keyword_in_keywords(keywords, "tzinfo") {
+                    return;
+                }
+            }
+        }
+    }
 
     checker.add_check(Check::new(
         CheckKind::CallDatetimeStrptimeWithoutZone,

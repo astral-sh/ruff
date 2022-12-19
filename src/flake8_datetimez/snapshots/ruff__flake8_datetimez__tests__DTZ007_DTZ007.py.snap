@@ -36,10 +36,10 @@ expression: checks
   fix: ~
 - kind: CallDatetimeStrptimeWithoutZone
   location:
-    row: 18
+    row: 29
     column: 0
   end_location:
-    row: 18
+    row: 29
     column: 43
   fix: ~
 

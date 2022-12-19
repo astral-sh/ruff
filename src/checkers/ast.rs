@@ -73,6 +73,7 @@ pub struct Checker<'a> {
     pub(crate) child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
     pub(crate) bindings: Vec<Binding<'a>>,
     pub(crate) redefinitions: IntMap<usize, Vec<usize>>,
+    exprs: Vec<RefEquality<'a, Expr>>,
     scopes: Vec<Scope<'a>>,
     scope_stack: Vec<usize>,
     dead_scopes: Vec<usize>,
@@ -95,7 +96,7 @@ pub struct Checker<'a> {
     annotations_future_enabled: bool,
     except_handlers: Vec<Vec<Vec<&'a str>>>,
     // Check-specific state.
-    pub(crate) seen_b023: Vec<&'a Expr>,
+    pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
 }
 
 impl<'a> Checker<'a> {
@@ -124,6 +125,7 @@ impl<'a> Checker<'a> {
             child_to_parent: FxHashMap::default(),
             bindings: vec![],
             redefinitions: IntMap::default(),
+            exprs: vec![],
             scopes: vec![],
             scope_stack: vec![],
             dead_scopes: vec![],
@@ -149,7 +151,7 @@ impl<'a> Checker<'a> {
             annotations_future_enabled: false,
             except_handlers: vec![],
             // Check-specific state.
-            seen_b023: vec![],
+            flake8_bugbear_seen: vec![],
         }
     }
 
@@ -543,7 +545,7 @@ where
                         kind: BindingKind::FunctionDefinition,
                         used: None,
                         range: Range::from_located(stmt),
-                        source: Some(self.current_parent().clone()),
+                        source: Some(self.current_stmt().clone()),
                     },
                 );
             }
@@ -648,7 +650,7 @@ where
                                 ),
                                 used: None,
                                 range: Range::from_located(alias),
-                                source: Some(self.current_parent().clone()),
+                                source: Some(self.current_stmt().clone()),
                             },
                         );
                     } else {
@@ -688,7 +690,7 @@ where
                                     None
                                 },
                                 range: Range::from_located(alias),
-                                source: Some(self.current_parent().clone()),
+                                source: Some(self.current_stmt().clone()),
                             },
                         );
                     }
@@ -847,7 +849,7 @@ where
                                     Range::from_located(alias),
                                 )),
                                 range: Range::from_located(alias),
-                                source: Some(self.current_parent().clone()),
+                                source: Some(self.current_stmt().clone()),
                             },
                         );
 
@@ -878,7 +880,7 @@ where
                                 kind: BindingKind::StarImportation(*level, module.clone()),
                                 used: None,
                                 range: Range::from_located(stmt),
-                                source: Some(self.current_parent().clone()),
+                                source: Some(self.current_stmt().clone()),
                             },
                         );
 
@@ -947,7 +949,7 @@ where
                                     None
                                 },
                                 range,
-                                source: Some(self.current_parent().clone()),
+                                source: Some(self.current_stmt().clone()),
                             },
                         );
                     }
@@ -1382,7 +1384,7 @@ where
                         kind: BindingKind::ClassDefinition,
                         used: None,
                         range: Range::from_located(stmt),
-                        source: Some(self.current_parent().clone()),
+                        source: Some(self.current_stmt().clone()),
                     },
                 );
             }
@@ -1403,10 +1405,6 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        let prev_in_f_string = self.in_f_string;
-        let prev_in_literal = self.in_literal;
-        let prev_in_type_definition = self.in_type_definition;
-
         if !(self.in_deferred_type_definition || self.in_deferred_string_type_definition)
             && self.in_type_definition
             && self.annotations_future_enabled
@@ -1431,6 +1429,12 @@ where
             }
             return;
         }
+
+        self.push_expr(expr);
+
+        let prev_in_f_string = self.in_f_string;
+        let prev_in_literal = self.in_literal;
+        let prev_in_type_definition = self.in_type_definition;
 
         // Pre-visit.
         match &expr.node {
@@ -2579,6 +2583,8 @@ where
         self.in_type_definition = prev_in_type_definition;
         self.in_literal = prev_in_literal;
         self.in_f_string = prev_in_f_string;
+
+        self.pop_expr();
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
@@ -2724,7 +2730,7 @@ where
                 kind: BindingKind::Argument,
                 used: None,
                 range: Range::from_located(arg),
-                source: Some(self.current_parent().clone()),
+                source: Some(self.current_stmt().clone()),
             },
         );
 
@@ -2759,7 +2765,17 @@ impl<'a> Checker<'a> {
     }
 
     fn pop_parent(&mut self) {
-        self.parents.pop().expect("Attempted to pop without scope");
+        self.parents.pop().expect("Attempted to pop without parent");
+    }
+
+    fn push_expr(&mut self, expr: &'a Expr) {
+        self.exprs.push(RefEquality(expr));
+    }
+
+    fn pop_expr(&mut self) {
+        self.exprs
+            .pop()
+            .expect("Attempted to pop without expression");
     }
 
     fn push_scope(&mut self, scope: Scope<'a>) {
@@ -2790,6 +2806,36 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Return the current `Stmt`.
+    pub fn current_stmt(&self) -> &RefEquality<'a, Stmt> {
+        self.parents.iter().rev().next().expect("No parent found")
+    }
+
+    /// Return the parent `Stmt` of the current `Stmt`, if any.
+    pub fn current_stmt_parent(&self) -> Option<&RefEquality<'a, Stmt>> {
+        self.parents.iter().rev().nth(1)
+    }
+
+    /// Return the grandparent `Stmt` of the current `Stmt`, if any.
+    pub fn current_stmt_grandparent(&self) -> Option<&RefEquality<'a, Stmt>> {
+        self.parents.iter().rev().nth(2)
+    }
+
+    /// Return the current `Expr`.
+    pub fn current_expr(&self) -> Option<&RefEquality<'a, Expr>> {
+        self.exprs.iter().rev().next()
+    }
+
+    /// Return the parent `Expr` of the current `Expr`.
+    pub fn current_expr_parent(&self) -> Option<&RefEquality<'a, Expr>> {
+        self.exprs.iter().rev().nth(1)
+    }
+
+    /// Return the grandparent `Expr` of the current `Expr`.
+    pub fn current_expr_grandparent(&self) -> Option<&RefEquality<'a, Expr>> {
+        self.exprs.iter().rev().nth(2)
+    }
+
     pub fn current_scope(&self) -> &Scope {
         &self.scopes[*(self.scope_stack.last().expect("No current scope found"))]
     }
@@ -2799,14 +2845,6 @@ impl<'a> Checker<'a> {
             .iter()
             .rev()
             .map(|index| &self.scopes[*index])
-    }
-
-    pub fn current_parent(&self) -> &RefEquality<'a, Stmt> {
-        self.parents.iter().rev().next().expect("No parent found")
-    }
-
-    pub fn current_grandparent(&self) -> Option<&RefEquality<'a, Stmt>> {
-        self.parents.iter().rev().nth(1)
     }
 
     fn add_binding<'b>(&mut self, name: &'b str, binding: Binding<'a>)
@@ -3038,7 +3076,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let parent = self.current_parent().0;
+        let parent = self.current_stmt().0;
 
         if self.settings.enabled.contains(&CheckCode::F823) {
             let scopes: Vec<&Scope> = self
@@ -3083,7 +3121,7 @@ impl<'a> Checker<'a> {
                     kind: BindingKind::Annotation,
                     used: None,
                     range: Range::from_located(expr),
-                    source: Some(self.current_parent().clone()),
+                    source: Some(self.current_stmt().clone()),
                 },
             );
             return;
@@ -3100,7 +3138,7 @@ impl<'a> Checker<'a> {
                     kind: BindingKind::LoopVar,
                     used: None,
                     range: Range::from_located(expr),
-                    source: Some(self.current_parent().clone()),
+                    source: Some(self.current_stmt().clone()),
                 },
             );
             return;
@@ -3113,7 +3151,7 @@ impl<'a> Checker<'a> {
                     kind: BindingKind::Binding,
                     used: None,
                     range: Range::from_located(expr),
-                    source: Some(self.current_parent().clone()),
+                    source: Some(self.current_stmt().clone()),
                 },
             );
             return;
@@ -3163,7 +3201,7 @@ impl<'a> Checker<'a> {
                         )),
                         used: None,
                         range: Range::from_located(expr),
-                        source: Some(self.current_parent().clone()),
+                        source: Some(self.current_stmt().clone()),
                     },
                 );
                 return;
@@ -3176,7 +3214,7 @@ impl<'a> Checker<'a> {
                 kind: BindingKind::Assignment,
                 used: None,
                 range: Range::from_located(expr),
-                source: Some(self.current_parent().clone()),
+                source: Some(self.current_stmt().clone()),
             },
         );
     }
