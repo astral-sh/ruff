@@ -1643,7 +1643,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::T201)
                     || self.settings.enabled.contains(&CheckCode::T203)
                 {
-                    flake8_print::plugins::print_call(self, expr, func);
+                    flake8_print::plugins::print_call(self, expr, func, keywords);
                 }
 
                 // flake8-bugbear

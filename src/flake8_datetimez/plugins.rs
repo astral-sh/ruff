@@ -1,39 +1,11 @@
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword, KeywordData};
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
+use crate::ast::helpers::{
+    collect_call_paths, dealias_call_path, has_non_none_keyword, is_const_none, match_call_path,
+};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
-
-/// Return the `Keyword` with the given name, if it's present in the list of
-/// `Keyword` arguments.
-fn get_keyword_in_keywords<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
-    keywords.iter().find(|keyword| {
-        let KeywordData { arg, .. } = &keyword.node;
-        arg.as_ref().map_or(false, |arg| arg == keyword_name)
-    })
-}
-
-/// Return `true` if an `Expr` is `None`.
-fn is_const_none(expr: &Expr) -> bool {
-    matches!(
-        &expr.node,
-        ExprKind::Constant {
-            value: Constant::None,
-            kind: None
-        },
-    )
-}
-
-/// Return `true` if a keyword argument is present with a non-`None` value.
-fn has_not_none_keyword_in_keywords(keywords: &[Keyword], keyword: &str) -> bool {
-    if let Some(keyword_data) = get_keyword_in_keywords(keywords, keyword) {
-        if !is_const_none(&keyword_data.node.value) {
-            return true;
-        }
-    }
-    false
-}
 
 pub fn call_datetime_without_tzinfo(
     checker: &mut Checker,
@@ -60,7 +32,7 @@ pub fn call_datetime_without_tzinfo(
     }
 
     // no kwargs / none kwargs
-    if !has_not_none_keyword_in_keywords(keywords, "tzinfo") {
+    if !has_non_none_keyword(keywords, "tzinfo") {
         checker.add_check(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
     }
 }
@@ -144,7 +116,7 @@ pub fn call_datetime_now_without_tzinfo(
     }
 
     // wrong keywords / none keyword
-    if !keywords.is_empty() && !has_not_none_keyword_in_keywords(keywords, "tz") {
+    if !keywords.is_empty() && !has_non_none_keyword(keywords, "tz") {
         checker.add_check(Check::new(
             CheckKind::CallDatetimeNowWithoutTzinfo,
             location,
@@ -183,7 +155,7 @@ pub fn call_datetime_fromtimestamp(
     }
 
     // wrong keywords / none keyword
-    if !keywords.is_empty() && !has_not_none_keyword_in_keywords(keywords, "tz") {
+    if !keywords.is_empty() && !has_non_none_keyword(keywords, "tz") {
         checker.add_check(Check::new(CheckKind::CallDatetimeFromtimestamp, location));
     }
 }
@@ -238,7 +210,7 @@ pub fn call_datetime_strptime_without_zone(
 
             // Ex) `datetime.strptime(...).replace(tzinfo=UTC)`
             if attr == "replace" {
-                if has_not_none_keyword_in_keywords(keywords, "tzinfo") {
+                if has_non_none_keyword(keywords, "tzinfo") {
                     return;
                 }
             }

@@ -3,7 +3,8 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{
-    Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Location, Stmt, StmtKind,
+    Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
+    Location, Stmt, StmtKind,
 };
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -208,6 +209,34 @@ pub fn is_constant(expr: &Expr) -> bool {
 /// Return `true` if the `Expr` is a non-singleton constant.
 pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
+}
+
+/// Return the `Keyword` with the given name, if it's present in the list of
+/// `Keyword` arguments.
+pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
+    keywords.iter().find(|keyword| {
+        let KeywordData { arg, .. } = &keyword.node;
+        arg.as_ref().map_or(false, |arg| arg == keyword_name)
+    })
+}
+
+/// Return `true` if an `Expr` is `None`.
+pub fn is_const_none(expr: &Expr) -> bool {
+    matches!(
+        &expr.node,
+        ExprKind::Constant {
+            value: Constant::None,
+            kind: None
+        },
+    )
+}
+
+/// Return `true` if a keyword argument is present with a non-`None` value.
+pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
+    find_keyword(keywords, keyword).map_or(false, |keyword| {
+        let KeywordData { value, .. } = &keyword.node;
+        !is_const_none(value)
+    })
 }
 
 /// Extract the names of all handled exceptions.
