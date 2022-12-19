@@ -26,7 +26,7 @@ pub fn line_too_long(lineno: usize, line: &str, max_line_length: usize) -> Optio
 
     // Do not enforce the line length for commented lines that end with a URL
     // or contain only a single word.
-    if first == "#" || chunks.last().map_or(true, |c| URL_REGEX.is_match(c)) {
+    if first == "#" && chunks.last().map_or(true, |c| URL_REGEX.is_match(c)) {
         return None;
     }
 

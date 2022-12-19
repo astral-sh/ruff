@@ -69,3 +69,13 @@ _ = """Lorem ipsum dolor sit amet.
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 """  # noqa
+
+# Valid
+# this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy long comment  # noqa: E501
+
+# Valid
+_ = """Here's a source: https://github.com/ethereum/web3.py/blob/ffe59daf10edc19ee5f05227b25bac8d090e8aa4/web3/_utils/events.py#L201
+
+May raise:
+- DeserializationError if the abi string is invalid or abi or log topics/data do not match
+"""  # noqa: E501

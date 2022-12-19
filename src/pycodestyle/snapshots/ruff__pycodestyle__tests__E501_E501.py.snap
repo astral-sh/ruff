@@ -46,4 +46,15 @@ expression: checks
     row: 43
     column: 105
   fix: ~
+- kind:
+    LineTooLong:
+      - 129
+      - 88
+  location:
+    row: 61
+    column: 88
+  end_location:
+    row: 61
+    column: 129
+  fix: ~
 
