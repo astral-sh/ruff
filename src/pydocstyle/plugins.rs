@@ -1349,39 +1349,22 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
 static GOOGLE_ARGS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*(\w+)\s*(\(.*?\))?\s*:\n?\s*.+").unwrap());
+    Lazy::new(|| Regex::new(r"^\s*(\w+)\s*(\(.*?\))?\s*:.+").unwrap());
 
 fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
-    let mut args_sections: Vec<String> = vec![];
-    for line in textwrap::dedent(&context.following_lines.join("\n"))
-        .trim()
-        .lines()
-    {
-        if line.chars().next().map_or(true, char::is_whitespace) {
-            // This is a continuation of documentation for the last
-            // parameter because it does start with whitespace.
-            if let Some(current) = args_sections.last_mut() {
-                current.push_str(line);
-            }
-        } else {
-            // This line is the start of documentation for the next
-            // parameter because it doesn't start with any whitespace.
-            args_sections.push(line.to_string());
+    let mut matches = Vec::new();
+    for line in context.following_lines {
+        if let Some(captures) = GOOGLE_ARGS_REGEX.captures(line) {
+            matches.push(captures);
         }
     }
 
     missing_args(
         checker,
         docstring,
-        // Collect the list of arguments documented in the docstring.
-        &args_sections
+        &matches
             .iter()
-            .filter_map(
-                |section| match GOOGLE_ARGS_REGEX.captures(section.as_str()) {
-                    Some(caps) => caps.get(1).map(|arg_name| arg_name.as_str()),
-                    None => None,
-                },
-            )
+            .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str()))
             .collect(),
     );
 }
