@@ -4,17 +4,62 @@ expression: checks
 ---
 - kind: PrintFound
   location:
-    row: 1
+    row: 4
     column: 0
   end_location:
-    row: 1
+    row: 4
     column: 22
   fix:
     content: ""
     location:
-      row: 1
+      row: 4
       column: 0
     end_location:
-      row: 2
+      row: 5
+      column: 0
+- kind: PrintFound
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 33
+  fix:
+    content: ""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 6
+      column: 0
+- kind: PrintFound
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 39
+  fix:
+    content: ""
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 7
+      column: 0
+- kind: PrintFound
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 39
+  fix:
+    content: ""
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 8
       column: 0
 
