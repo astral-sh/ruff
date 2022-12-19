@@ -80,8 +80,7 @@ impl Plugin {
             Plugin::Flake8Simplify => CheckCodePrefix::SIM,
             Plugin::Flake8TidyImports => CheckCodePrefix::I25,
             Plugin::McCabe => CheckCodePrefix::C9,
-            // TODO(charlie): Handle rename of `PD` to `PDV`.
-            Plugin::PandasVet => CheckCodePrefix::PDV,
+            Plugin::PandasVet => CheckCodePrefix::PD,
             Plugin::PEP8Naming => CheckCodePrefix::N,
             Plugin::Pyupgrade => CheckCodePrefix::U,
         }
@@ -121,7 +120,7 @@ impl Plugin {
             Plugin::Flake8Simplify => vec![CheckCodePrefix::SIM],
             Plugin::Flake8TidyImports => vec![CheckCodePrefix::TID],
             Plugin::McCabe => vec![CheckCodePrefix::C9],
-            Plugin::PandasVet => vec![CheckCodePrefix::PDV],
+            Plugin::PandasVet => vec![CheckCodePrefix::PD],
             Plugin::PEP8Naming => vec![CheckCodePrefix::N],
             Plugin::Pyupgrade => vec![CheckCodePrefix::UP],
         }

@@ -317,9 +317,26 @@ pub enum CheckCodePrefix {
     N816,
     N817,
     N818,
+    PD,
+    PD0,
+    PD00,
+    PD002,
+    PD003,
+    PD004,
+    PD007,
+    PD008,
+    PD009,
+    PD01,
+    PD010,
+    PD011,
+    PD012,
+    PD013,
+    PD015,
+    PD9,
+    PD90,
+    PD901,
     PDV,
     PDV0,
-    PDV00,
     PDV002,
     PDV003,
     PDV004,
@@ -1425,62 +1442,246 @@ impl CheckCodePrefix {
             CheckCodePrefix::N816 => vec![CheckCode::N816],
             CheckCodePrefix::N817 => vec![CheckCode::N817],
             CheckCodePrefix::N818 => vec![CheckCode::N818],
-            CheckCodePrefix::PDV => vec![
-                CheckCode::PDV002,
-                CheckCode::PDV003,
-                CheckCode::PDV004,
-                CheckCode::PDV007,
-                CheckCode::PDV008,
-                CheckCode::PDV009,
-                CheckCode::PDV010,
-                CheckCode::PDV011,
-                CheckCode::PDV012,
-                CheckCode::PDV013,
-                CheckCode::PDV015,
-                CheckCode::PDV901,
+            CheckCodePrefix::PD => vec![
+                CheckCode::PD002,
+                CheckCode::PD003,
+                CheckCode::PD004,
+                CheckCode::PD007,
+                CheckCode::PD008,
+                CheckCode::PD009,
+                CheckCode::PD010,
+                CheckCode::PD011,
+                CheckCode::PD012,
+                CheckCode::PD013,
+                CheckCode::PD015,
+                CheckCode::PD901,
             ],
-            CheckCodePrefix::PDV0 => vec![
-                CheckCode::PDV002,
-                CheckCode::PDV003,
-                CheckCode::PDV004,
-                CheckCode::PDV007,
-                CheckCode::PDV008,
-                CheckCode::PDV009,
-                CheckCode::PDV010,
-                CheckCode::PDV011,
-                CheckCode::PDV012,
-                CheckCode::PDV013,
-                CheckCode::PDV015,
+            CheckCodePrefix::PD0 => vec![
+                CheckCode::PD002,
+                CheckCode::PD003,
+                CheckCode::PD004,
+                CheckCode::PD007,
+                CheckCode::PD008,
+                CheckCode::PD009,
+                CheckCode::PD010,
+                CheckCode::PD011,
+                CheckCode::PD012,
+                CheckCode::PD013,
+                CheckCode::PD015,
             ],
-            CheckCodePrefix::PDV00 => vec![
-                CheckCode::PDV002,
-                CheckCode::PDV003,
-                CheckCode::PDV004,
-                CheckCode::PDV007,
-                CheckCode::PDV008,
-                CheckCode::PDV009,
+            CheckCodePrefix::PD00 => vec![
+                CheckCode::PD002,
+                CheckCode::PD003,
+                CheckCode::PD004,
+                CheckCode::PD007,
+                CheckCode::PD008,
+                CheckCode::PD009,
             ],
-            CheckCodePrefix::PDV002 => vec![CheckCode::PDV002],
-            CheckCodePrefix::PDV003 => vec![CheckCode::PDV003],
-            CheckCodePrefix::PDV004 => vec![CheckCode::PDV004],
-            CheckCodePrefix::PDV007 => vec![CheckCode::PDV007],
-            CheckCodePrefix::PDV008 => vec![CheckCode::PDV008],
-            CheckCodePrefix::PDV009 => vec![CheckCode::PDV009],
-            CheckCodePrefix::PDV01 => vec![
-                CheckCode::PDV010,
-                CheckCode::PDV011,
-                CheckCode::PDV012,
-                CheckCode::PDV013,
-                CheckCode::PDV015,
+            CheckCodePrefix::PD002 => vec![CheckCode::PD002],
+            CheckCodePrefix::PD003 => vec![CheckCode::PD003],
+            CheckCodePrefix::PD004 => vec![CheckCode::PD004],
+            CheckCodePrefix::PD007 => vec![CheckCode::PD007],
+            CheckCodePrefix::PD008 => vec![CheckCode::PD008],
+            CheckCodePrefix::PD009 => vec![CheckCode::PD009],
+            CheckCodePrefix::PD01 => vec![
+                CheckCode::PD010,
+                CheckCode::PD011,
+                CheckCode::PD012,
+                CheckCode::PD013,
+                CheckCode::PD015,
             ],
-            CheckCodePrefix::PDV010 => vec![CheckCode::PDV010],
-            CheckCodePrefix::PDV011 => vec![CheckCode::PDV011],
-            CheckCodePrefix::PDV012 => vec![CheckCode::PDV012],
-            CheckCodePrefix::PDV013 => vec![CheckCode::PDV013],
-            CheckCodePrefix::PDV015 => vec![CheckCode::PDV015],
-            CheckCodePrefix::PDV9 => vec![CheckCode::PDV901],
-            CheckCodePrefix::PDV90 => vec![CheckCode::PDV901],
-            CheckCodePrefix::PDV901 => vec![CheckCode::PDV901],
+            CheckCodePrefix::PD010 => vec![CheckCode::PD010],
+            CheckCodePrefix::PD011 => vec![CheckCode::PD011],
+            CheckCodePrefix::PD012 => vec![CheckCode::PD012],
+            CheckCodePrefix::PD013 => vec![CheckCode::PD013],
+            CheckCodePrefix::PD015 => vec![CheckCode::PD015],
+            CheckCodePrefix::PD9 => vec![CheckCode::PD901],
+            CheckCodePrefix::PD90 => vec![CheckCode::PD901],
+            CheckCodePrefix::PD901 => vec![CheckCode::PD901],
+            CheckCodePrefix::PDV => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV` has been remapped to `PD`".bold()
+                );
+                vec![
+                    CheckCode::PD002,
+                    CheckCode::PD003,
+                    CheckCode::PD004,
+                    CheckCode::PD007,
+                    CheckCode::PD008,
+                    CheckCode::PD009,
+                    CheckCode::PD010,
+                    CheckCode::PD011,
+                    CheckCode::PD012,
+                    CheckCode::PD013,
+                    CheckCode::PD015,
+                    CheckCode::PD901,
+                ]
+            }
+            CheckCodePrefix::PDV0 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV0` has been remapped to `PD0`".bold()
+                );
+                vec![
+                    CheckCode::PD002,
+                    CheckCode::PD003,
+                    CheckCode::PD004,
+                    CheckCode::PD007,
+                    CheckCode::PD008,
+                    CheckCode::PD009,
+                    CheckCode::PD010,
+                    CheckCode::PD011,
+                    CheckCode::PD012,
+                    CheckCode::PD013,
+                    CheckCode::PD015,
+                ]
+            }
+            CheckCodePrefix::PDV002 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV002` has been remapped to `PD002`".bold()
+                );
+                vec![CheckCode::PD002]
+            }
+            CheckCodePrefix::PDV003 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV003` has been remapped to `PD003`".bold()
+                );
+                vec![CheckCode::PD003]
+            }
+            CheckCodePrefix::PDV004 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV004` has been remapped to `PD004`".bold()
+                );
+                vec![CheckCode::PD004]
+            }
+            CheckCodePrefix::PDV007 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV007` has been remapped to `PD007`".bold()
+                );
+                vec![CheckCode::PD007]
+            }
+            CheckCodePrefix::PDV008 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV008` has been remapped to `PD008`".bold()
+                );
+                vec![CheckCode::PD008]
+            }
+            CheckCodePrefix::PDV009 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV009` has been remapped to `PD009`".bold()
+                );
+                vec![CheckCode::PD009]
+            }
+            CheckCodePrefix::PDV01 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV01` has been remapped to `PD01`".bold()
+                );
+                vec![
+                    CheckCode::PD010,
+                    CheckCode::PD011,
+                    CheckCode::PD012,
+                    CheckCode::PD013,
+                    CheckCode::PD015,
+                ]
+            }
+            CheckCodePrefix::PDV010 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV010` has been remapped to `PD010`".bold()
+                );
+                vec![CheckCode::PD010]
+            }
+            CheckCodePrefix::PDV011 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV011` has been remapped to `PD011`".bold()
+                );
+                vec![CheckCode::PD011]
+            }
+            CheckCodePrefix::PDV012 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV012` has been remapped to `PD012`".bold()
+                );
+                vec![CheckCode::PD012]
+            }
+            CheckCodePrefix::PDV013 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV013` has been remapped to `PD013`".bold()
+                );
+                vec![CheckCode::PD013]
+            }
+            CheckCodePrefix::PDV015 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV015` has been remapped to `PD015`".bold()
+                );
+                vec![CheckCode::PD015]
+            }
+            CheckCodePrefix::PDV9 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV9` has been remapped to `PD9`".bold()
+                );
+                vec![CheckCode::PD901]
+            }
+            CheckCodePrefix::PDV90 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV90` has been remapped to `PD90`".bold()
+                );
+                vec![CheckCode::PD901]
+            }
+            CheckCodePrefix::PDV901 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`PDV901` has been remapped to `PD901`".bold()
+                );
+                vec![CheckCode::PD901]
+            }
             CheckCodePrefix::PGH => vec![CheckCode::PGH001, CheckCode::PGH002, CheckCode::PGH003],
             CheckCodePrefix::PGH0 => vec![CheckCode::PGH001, CheckCode::PGH002, CheckCode::PGH003],
             CheckCodePrefix::PGH00 => vec![CheckCode::PGH001, CheckCode::PGH002, CheckCode::PGH003],
@@ -2308,9 +2509,26 @@ impl CheckCodePrefix {
             CheckCodePrefix::N816 => SuffixLength::Three,
             CheckCodePrefix::N817 => SuffixLength::Three,
             CheckCodePrefix::N818 => SuffixLength::Three,
+            CheckCodePrefix::PD => SuffixLength::Zero,
+            CheckCodePrefix::PD0 => SuffixLength::One,
+            CheckCodePrefix::PD00 => SuffixLength::Two,
+            CheckCodePrefix::PD002 => SuffixLength::Three,
+            CheckCodePrefix::PD003 => SuffixLength::Three,
+            CheckCodePrefix::PD004 => SuffixLength::Three,
+            CheckCodePrefix::PD007 => SuffixLength::Three,
+            CheckCodePrefix::PD008 => SuffixLength::Three,
+            CheckCodePrefix::PD009 => SuffixLength::Three,
+            CheckCodePrefix::PD01 => SuffixLength::Two,
+            CheckCodePrefix::PD010 => SuffixLength::Three,
+            CheckCodePrefix::PD011 => SuffixLength::Three,
+            CheckCodePrefix::PD012 => SuffixLength::Three,
+            CheckCodePrefix::PD013 => SuffixLength::Three,
+            CheckCodePrefix::PD015 => SuffixLength::Three,
+            CheckCodePrefix::PD9 => SuffixLength::One,
+            CheckCodePrefix::PD90 => SuffixLength::Two,
+            CheckCodePrefix::PD901 => SuffixLength::Three,
             CheckCodePrefix::PDV => SuffixLength::Zero,
             CheckCodePrefix::PDV0 => SuffixLength::One,
-            CheckCodePrefix::PDV00 => SuffixLength::Two,
             CheckCodePrefix::PDV002 => SuffixLength::Three,
             CheckCodePrefix::PDV003 => SuffixLength::Three,
             CheckCodePrefix::PDV004 => SuffixLength::Three,
@@ -2512,7 +2730,7 @@ pub const CATEGORIES: &[CheckCodePrefix] = &[
     CheckCodePrefix::I,
     CheckCodePrefix::ICN,
     CheckCodePrefix::N,
-    CheckCodePrefix::PDV,
+    CheckCodePrefix::PD,
     CheckCodePrefix::PGH,
     CheckCodePrefix::PLC,
     CheckCodePrefix::PLE,
