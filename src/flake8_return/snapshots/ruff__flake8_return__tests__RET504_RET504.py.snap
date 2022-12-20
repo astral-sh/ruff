@@ -12,50 +12,34 @@ expression: checks
   fix: ~
 - kind: UnnecessaryAssign
   location:
-    row: 12
+    row: 13
     column: 11
   end_location:
-    row: 12
+    row: 13
     column: 12
   fix: ~
 - kind: UnnecessaryAssign
   location:
-    row: 18
-    column: 11
-  end_location:
-    row: 18
-    column: 12
-  fix: ~
-- kind: UnnecessaryAssign
-  location:
-    row: 25
-    column: 11
-  end_location:
-    row: 25
-    column: 12
-  fix: ~
-- kind: UnnecessaryAssign
-  location:
-    row: 31
+    row: 19
     column: 15
   end_location:
-    row: 31
+    row: 19
     column: 16
   fix: ~
 - kind: UnnecessaryAssign
   location:
-    row: 43
+    row: 31
     column: 11
   end_location:
-    row: 43
+    row: 31
     column: 17
   fix: ~
 - kind: UnnecessaryAssign
   location:
-    row: 51
+    row: 39
     column: 11
   end_location:
-    row: 51
+    row: 39
     column: 20
   fix: ~
 

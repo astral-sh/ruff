@@ -7,18 +7,6 @@ def x():
 
 
 def x():
-    b, a = 1, 2
-    print(b)
-    return a  # error
-
-
-def x():
-    a = 1
-    print()
-    return a  # error
-
-
-def x():
     a = 1
     print(a)
     a = 2
@@ -53,7 +41,6 @@ def x():
 
 # https://github.com/afonasev/flake8-return/issues/47#issue-641117366
 def user_agent_username(username=None):
-
     if not username:
         return ""
 
@@ -133,6 +120,20 @@ def x():
 def x():
     a = 1
     print(f"a={a}")
+    return a
+
+
+# Considered OK, since functions can have side effects.
+def x():
+    b, a = 1, 2
+    print(b)
+    return a
+
+
+# Considered OK, since functions can have side effects.
+def x():
+    a = 1
+    print()
     return a
 
 
