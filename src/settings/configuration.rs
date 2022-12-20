@@ -31,6 +31,7 @@ pub struct Configuration {
     pub fix: Option<bool>,
     pub fixable: Option<Vec<CheckCodePrefix>>,
     pub format: Option<SerializationFormat>,
+    pub force_exclude: Option<bool>,
     pub ignore: Option<Vec<CheckCodePrefix>>,
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
@@ -96,6 +97,7 @@ impl Configuration {
             fix: options.fix,
             fixable: options.fixable,
             format: options.format,
+            force_exclude: options.force_exclude,
             ignore: options.ignore,
             ignore_init_module_imports: options.ignore_init_module_imports,
             line_length: options.line_length,
@@ -159,6 +161,7 @@ impl Configuration {
             fix: self.fix.or(config.fix),
             fixable: self.fixable.or(config.fixable),
             format: self.format.or(config.format),
+            force_exclude: self.force_exclude.or(config.force_exclude),
             ignore: self.ignore.or(config.ignore),
             ignore_init_module_imports: self
                 .ignore_init_module_imports
@@ -207,6 +210,9 @@ impl Configuration {
         }
         if let Some(format) = overrides.format {
             self.format = Some(format);
+        }
+        if let Some(force_exclude) = overrides.force_exclude {
+            self.force_exclude = Some(force_exclude);
         }
         if let Some(ignore) = overrides.ignore {
             self.ignore = Some(ignore);
