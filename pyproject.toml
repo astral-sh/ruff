@@ -32,6 +32,10 @@ build-backend = "maturin"
 bindings = "bin"
 strip = true
 
+[tool.ruff]
+force-exclude = true
+exclude = ["setup.py"]
+
 [tool.ruff.isort]
 force-wrap-aliases = true
 combine-as-imports = true

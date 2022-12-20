@@ -92,6 +92,12 @@ pub struct Cli {
     respect_gitignore: bool,
     #[clap(long, overrides_with("respect_gitignore"), hide = true)]
     no_respect_gitignore: bool,
+    /// Enforce exclusions, even for paths passed to Ruff directly on the
+    /// command-line.
+    #[arg(long, overrides_with("no_show_source"))]
+    force_exclude: bool,
+    #[clap(long, overrides_with("force_exclude"), hide = true)]
+    no_force_exclude: bool,
     /// See the files Ruff will be run against with the current settings.
     #[arg(long)]
     pub show_files: bool,
@@ -173,6 +179,7 @@ impl Cli {
                 // TODO(charlie): Included in `pyproject.toml`, but not inherited.
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 format: self.format,
+                force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
             },
         )
     }
@@ -230,6 +237,7 @@ pub struct Overrides {
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     pub fix: Option<bool>,
     pub format: Option<SerializationFormat>,
+    pub force_exclude: Option<bool>,
 }
 
 /// Map the CLI settings to a `LogLevel`.

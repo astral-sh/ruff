@@ -103,6 +103,10 @@ fn inner_main() -> Result<ExitCode> {
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
     let file_strategy = FileDiscovery {
+        force_exclude: match &pyproject_strategy {
+            PyprojectDiscovery::Fixed(settings) => settings.force_exclude,
+            PyprojectDiscovery::Hierarchical(settings) => settings.force_exclude,
+        },
         respect_gitignore: match &pyproject_strategy {
             PyprojectDiscovery::Fixed(settings) => settings.respect_gitignore,
             PyprojectDiscovery::Hierarchical(settings) => settings.respect_gitignore,

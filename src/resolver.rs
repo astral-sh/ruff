@@ -20,6 +20,7 @@ use crate::settings::{pyproject, Settings};
 /// The strategy used to discover Python files in the filesystem..
 #[derive(Debug)]
 pub struct FileDiscovery {
+    pub force_exclude: bool,
     pub respect_gitignore: bool,
 }
 
@@ -263,7 +264,7 @@ pub fn python_files_in_path(
 
             // Respect our own exclusion behavior.
             if let Ok(entry) = &result {
-                if entry.depth() > 0 {
+                if file_strategy.force_exclude || entry.depth() > 0 {
                     let path = entry.path();
                     let resolver = resolver.read().unwrap();
                     let settings = resolver.resolve(path, pyproject_strategy);
