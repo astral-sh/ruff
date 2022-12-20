@@ -100,6 +100,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     .push((stmt.location, stmt.end_location.unwrap()));
                 visitor::walk_stmt(self, stmt);
             }
+
             _ => {
                 visitor::walk_stmt(self, stmt);
             }
@@ -108,6 +109,17 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match &expr.node {
+            ExprKind::Call { .. } => {
+                // Arbitrary function calls can have side effects, so we conservatively treat
+                // every function call as a reference to every known variable.
+                for name in self.stack.assigns.keys() {
+                    self.stack
+                        .refs
+                        .entry(name)
+                        .or_insert_with(Vec::new)
+                        .push(self.in_f_string.unwrap_or(expr.location));
+                }
+            }
             ExprKind::Name { id, .. } => {
                 self.stack
                     .refs
