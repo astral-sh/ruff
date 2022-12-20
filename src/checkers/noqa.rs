@@ -100,18 +100,32 @@ pub fn check_noqa(
                 Directive::Codes(spaces, start, end, codes) => {
                     let mut invalid_codes = vec![];
                     let mut valid_codes = vec![];
+                    let mut self_ignore = false;
                     for code in codes {
                         let code = CODE_REDIRECTS.get(code).map_or(code, AsRef::as_ref);
-                        if matches.contains(&code) || settings.external.contains(code) {
-                            valid_codes.push(code.to_string());
+                        if code == CheckCode::RUF100.as_ref() {
+                            self_ignore = true;
                         } else {
-                            invalid_codes.push(code.to_string());
+                            if matches.contains(&code) || settings.external.contains(code) {
+                                valid_codes.push(code);
+                            } else {
+                                invalid_codes.push(code);
+                            }
                         }
+                    }
+
+                    if self_ignore {
+                        continue;
                     }
 
                     if !invalid_codes.is_empty() {
                         let mut check = Check::new(
-                            CheckKind::UnusedNOQA(Some(invalid_codes)),
+                            CheckKind::UnusedNOQA(Some(
+                                invalid_codes
+                                    .iter()
+                                    .map(|code| (*code).to_string())
+                                    .collect(),
+                            )),
                             Range {
                                 location: Location::new(row + 1, start),
                                 end_location: Location::new(row + 1, end),

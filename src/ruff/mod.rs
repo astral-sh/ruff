@@ -38,6 +38,7 @@ mod tests {
             &settings::Settings::for_rules(vec![
                 CheckCode::RUF100,
                 CheckCode::E501,
+                CheckCode::F401,
                 CheckCode::F841,
             ]),
         )?;
