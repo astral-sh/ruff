@@ -2507,6 +2507,29 @@ where
                         self.visit_expr(value);
                         self.in_type_definition = prev_in_type_definition;
                     }
+                } else if ["Arg", "DefaultArg", "NamedArg", "DefaultNamedArg"]
+                    .iter()
+                    .any(|target| {
+                        match_call_path(&call_path, "mypy_extensions", target, &self.from_imports)
+                    })
+                {
+                    self.visit_expr(func);
+
+                    // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
+                    let mut arguments = args.iter().chain(keywords.iter().map(|keyword| {
+                        let KeywordData { value, .. } = &keyword.node;
+                        value
+                    }));
+                    if let Some(expr) = arguments.next() {
+                        self.in_type_definition = true;
+                        self.visit_expr(expr);
+                        self.in_type_definition = prev_in_type_definition;
+                    }
+                    for expr in arguments {
+                        self.in_type_definition = false;
+                        self.visit_expr(expr);
+                        self.in_type_definition = prev_in_type_definition;
+                    }
                 } else {
                     visitor::walk_expr(self, expr);
                 }
