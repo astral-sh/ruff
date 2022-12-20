@@ -23,6 +23,12 @@ datetime.datetime.strptime("something", "something").astimezone()
 # OK
 datetime.datetime.strptime("something", "%H:%M:%S%z")
 
+# OK
+datetime.datetime.strptime("something", something).astimezone()
+
+# OK
+datetime.datetime.strptime("something", something).replace(tzinfo=datetime.timezone.utc)
+
 from datetime import datetime
 
 # no replace orastimezone unqualified

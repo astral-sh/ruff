@@ -177,21 +177,16 @@ pub fn call_datetime_strptime_without_zone(
         return;
     }
 
-    let Some(ExprKind::Constant {
+    // Does the `strptime` call contain a format string with a timezone specifier?
+    if let Some(ExprKind::Constant {
         value: Constant::Str(format),
         kind: None,
-    }) = args.get(1).as_ref().map(|arg| &arg.node) else {
-                checker.add_check(Check::new(
-            CheckKind::CallDatetimeStrptimeWithoutZone,
-            location,
-        ));
-        return;
+    }) = args.get(1).as_ref().map(|arg| &arg.node)
+    {
+        if format.contains("%z") {
+            return;
+        }
     };
-
-    // Does the `strptime` call contain a format string with a timezone specifier?
-    if format.contains("%z") {
-        return;
-    }
 
     let (Some(grandparent), Some(parent)) = (checker.current_expr_grandparent(), checker.current_expr_parent()) else {
         checker.add_check(Check::new(
