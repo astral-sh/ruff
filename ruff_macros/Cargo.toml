@@ -1,6 +1,6 @@
 [package]
 name = "ruff_macros"
-version = "0.0.188"
+version = "0.0.189"
 edition = "2021"
 
 [lib]
