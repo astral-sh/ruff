@@ -79,3 +79,10 @@ _ = """Here's a source: https://github.com/ethereum/web3.py/blob/ffe59daf10edc19
 May raise:
 - DeserializationError if the abi string is invalid or abi or log topics/data do not match
 """  # noqa: E501
+
+import collections  # noqa
+import os  # noqa: F401, RUF100
+import shelve  # noqa: RUF100
+import sys  # noqa: F401, RUF100
+
+print(sys.path)

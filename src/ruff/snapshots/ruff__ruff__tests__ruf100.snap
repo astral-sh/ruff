@@ -182,4 +182,22 @@ expression: checks
     end_location:
       row: 71
       column: 11
+- kind:
+    UnusedImport:
+      - shelve
+      - false
+  location:
+    row: 85
+    column: 7
+  end_location:
+    row: 85
+    column: 13
+  fix:
+    content: ""
+    location:
+      row: 85
+      column: 0
+    end_location:
+      row: 86
+      column: 0
 
