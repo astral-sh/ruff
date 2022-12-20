@@ -1765,6 +1765,30 @@ fixable = ["E", "F"]
 
 ---
 
+#### [`force-exclude`](#force-exclude)
+
+Whether to enforce `exclude` and `extend-exclude` patterns, even for paths that are
+passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even
+if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to
+respect these exclusions unequivocally.
+
+This is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all
+changed files to the [`ruff-pre-commit`](https://github.com/charliermarsh/ruff-pre-commit)
+plugin, regardless of whether they're marked as excluded by Ruff's own settings.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+force-exclude = true
+```
+
+---
+
 #### [`format`](#format)
 
 The style in which violation messages should be formatted: `"text"` (default),
