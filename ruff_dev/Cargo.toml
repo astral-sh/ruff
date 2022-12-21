@@ -16,3 +16,4 @@ rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev 
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "1b6cb170e925a43d605b3fed9f6b878e63e47744" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
+textwrap = { version = "0.16.0" }
