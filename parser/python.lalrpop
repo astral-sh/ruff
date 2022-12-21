@@ -870,7 +870,7 @@ CompOp: ast::Cmpop = {
 
 Expression = ExpressionAs<ExprGoal>;
 ExpressionAs<Goal>: Goal = {
-    <e1:Expression> <location:@L> "|" <e2:XorExpression> <end_location:@R> => ast::Expr {
+    <location:@L> <e1:Expression> "|" <e2:XorExpression> <end_location:@R> => ast::Expr {
         location,
         end_location: Some(end_location),
         custom: (),
@@ -881,7 +881,7 @@ ExpressionAs<Goal>: Goal = {
 
 XorExpression = XorExpressionAs<ExprGoal>;
 XorExpressionAs<Goal>: Goal = {
-    <e1:XorExpression> <location:@L> "^" <e2:AndExpression> <end_location:@R> => ast::Expr {
+     <location:@L> <e1:XorExpression> "^" <e2:AndExpression> <end_location:@R> => ast::Expr {
         location,
         end_location: Some(end_location),
         custom: (),
@@ -892,7 +892,7 @@ XorExpressionAs<Goal>: Goal = {
 
 AndExpression = AndExpressionAs<ExprGoal>;
 AndExpressionAs<Goal>: Goal = {
-    <e1:AndExpression> <location:@L> "&" <e2:ShiftExpression> <end_location:@R> => ast::Expr {
+    <location:@L> <e1:AndExpression> "&" <e2:ShiftExpression> <end_location:@R> => ast::Expr {
         location,
         end_location: Some(end_location),
         custom: (),
@@ -903,7 +903,7 @@ AndExpressionAs<Goal>: Goal = {
 
 ShiftExpression = ShiftExpressionAs<ExprGoal>;
 ShiftExpressionAs<Goal>: Goal = {
-    <e1:ShiftExpression> <location:@L> <op:ShiftOp> <e2:ArithmeticExpression> <end_location:@R> => ast::Expr {
+    <location:@L> <e1:ShiftExpression> <op:ShiftOp> <e2:ArithmeticExpression> <end_location:@R> => ast::Expr {
         location,
         end_location: Some(end_location),
         custom: (),
@@ -935,7 +935,7 @@ AddOp: ast::Operator = {
 
 Term = TermAs<ExprGoal>;
 TermAs<Goal>: Goal = {
-    <a:Term> <location:@L> <op:MulOp> <b:Factor> <end_location:@R> => ast::Expr {
+    <location:@L> <a:Term> <op:MulOp> <b:Factor> <end_location:@R> => ast::Expr {
         location,
         end_location: Some(end_location),
         custom: (),
@@ -971,7 +971,7 @@ UnaryOp: ast::Unaryop = {
 
 Power = PowerAs<ExprGoal>;
 PowerAs<Goal>: Goal = {
-    <e:AtomExpr> <location:@L> "**" <b:Factor> <end_location:@R> => ast::Expr {
+    <location:@L> <e:AtomExpr> "**" <b:Factor> <end_location:@R> => ast::Expr {
         location,
         end_location: Some(end_location),
         custom: (),

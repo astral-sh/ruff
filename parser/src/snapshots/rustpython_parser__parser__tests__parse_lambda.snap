@@ -78,7 +78,7 @@ expression: parse_ast
                     body: Located {
                         location: Location {
                             row: 1,
-                            column: 15,
+                            column: 13,
                         },
                         end_location: Some(
                             Location {
