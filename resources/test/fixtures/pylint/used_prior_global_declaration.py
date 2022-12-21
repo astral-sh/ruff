@@ -109,6 +109,11 @@ def f():
     del x
 
 
+def f():
+    print(f"{x=}")
+    global x
+
+
 ###
 # Non-errors.
 ###
@@ -146,3 +151,8 @@ def f():
     global x, y
 
     del x
+
+
+def f():
+    global x
+    print(f"{x=}")

@@ -134,4 +134,15 @@ expression: checks
     row: 105
     column: 9
   fix: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      - x
+      - 114
+  location:
+    row: 113
+    column: 10
+  end_location:
+    row: 113
+    column: 17
+  fix: ~
 
