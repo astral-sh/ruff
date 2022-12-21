@@ -8,6 +8,7 @@ use std::path::Path;
 use anyhow::Result;
 use filetime::FileTime;
 use log::error;
+use once_cell::sync::Lazy;
 use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +16,7 @@ use crate::autofix::fixer;
 use crate::message::Message;
 use crate::settings::{flags, Settings};
 
+static CACHE_DIR: Lazy<Option<String>> = Lazy::new(|| std::env::var("RUFF_CACHE_DIR").ok());
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize, Deserialize)]
@@ -34,12 +36,12 @@ struct CheckResult {
     messages: Vec<Message>,
 }
 
-fn cache_dir() -> &'static str {
-    "./.ruff_cache"
+fn cache_dir() -> &'static Path {
+    Path::new(CACHE_DIR.as_ref().map_or(".ruff_cache", String::as_str))
 }
 
-fn content_dir() -> &'static str {
-    "content"
+fn content_dir() -> &'static Path {
+    Path::new("content")
 }
 
 fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: fixer::Mode) -> u64 {
@@ -53,7 +55,7 @@ fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: fixer::Mode)
 
 /// Initialize the cache directory.
 pub fn init() -> Result<()> {
-    let path = Path::new(cache_dir());
+    let path = cache_dir();
 
     // Create the cache directories.
     create_dir_all(path.join(content_dir()))?;
@@ -75,19 +77,13 @@ pub fn init() -> Result<()> {
 
 fn write_sync(key: u64, value: &[u8]) -> Result<(), std::io::Error> {
     fs::write(
-        Path::new(cache_dir())
-            .join(content_dir())
-            .join(format!("{key:x}")),
+        cache_dir().join(content_dir()).join(format!("{key:x}")),
         value,
     )
 }
 
 fn read_sync(key: u64) -> Result<Vec<u8>, std::io::Error> {
-    fs::read(
-        Path::new(cache_dir())
-            .join(content_dir())
-            .join(format!("{key:x}")),
-    )
+    fs::read(cache_dir().join(content_dir()).join(format!("{key:x}")))
 }
 
 /// Get a value from the cache.
