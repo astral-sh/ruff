@@ -13,7 +13,7 @@ pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &E
         _ => return,
     };
     if let Some(stmt) = globals.get(name) {
-        if expr.location < stmt.location {
+        if checker.range_for(expr).location < stmt.location {
             checker.add_check(Check::new(
                 CheckKind::UsedPriorGlobalDeclaration(name.to_string(), stmt.location.row()),
                 Range::from_located(expr),

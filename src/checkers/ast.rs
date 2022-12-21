@@ -156,19 +156,14 @@ impl<'a> Checker<'a> {
     }
 
     /// Add a `Check` to the `Checker`.
-    pub(crate) fn add_check(&mut self, check: Check) {
+    pub(crate) fn add_check(&mut self, mut check: Check) {
         // If we're in an f-string, override the location. RustPython doesn't produce
         // reliable locations for expressions within f-strings, so we use the
         // span of the f-string itself as a best-effort default.
-        let check = if let Some(range) = self.in_f_string {
-            Check {
-                location: range.location,
-                end_location: range.end_location,
-                ..check
-            }
-        } else {
-            check
-        };
+        if let Some(range) = self.in_f_string {
+            check.location = range.location;
+            check.end_location = range.end_location;
+        }
         self.checks.push(check);
     }
 
@@ -187,6 +182,13 @@ impl<'a> Checker<'a> {
         matches!(self.autofix, flags::Autofix::Enabled)
             && self.in_f_string.is_none()
             && self.settings.fixable.contains(code)
+    }
+
+    /// Return the amended `Range` from a `Located`.
+    pub fn range_for<T>(&self, located: &Located<T>) -> Range {
+        // If we're in an f-string, override the location.
+        self.in_f_string
+            .unwrap_or_else(|| Range::from_located(located))
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
