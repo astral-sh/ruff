@@ -11,13 +11,20 @@ use ruff::{
     pep8_naming,
 };
 
+use crate::black::Black;
 use crate::plugin::Plugin;
 use crate::{parser, plugin};
 
 pub fn convert(
-    flake8: &HashMap<String, Option<String>>,
+    config: &HashMap<String, HashMap<String, Option<String>>>,
+    black: Option<&Black>,
     plugins: Option<Vec<Plugin>>,
 ) -> Result<Pyproject> {
+    // Extract the Flake8 section.
+    let flake8 = config
+        .get("flake8")
+        .expect("Unable to find flake8 section in INI file");
+
     // Extract all referenced check code prefixes, to power plugin inference.
     let mut referenced_codes: BTreeSet<CheckCodePrefix> = BTreeSet::default();
     for (key, value) in flake8 {
@@ -236,6 +243,19 @@ pub fn convert(
         options.pep8_naming = Some(pep8_naming);
     }
 
+    // Extract any settings from the existing `pyproject.toml`.
+    if let Some(black) = black {
+        if let Some(line_length) = &black.line_length {
+            options.line_length = Some(*line_length);
+        }
+
+        if let Some(target_version) = &black.target_version {
+            if let Some(target_version) = target_version.iter().min() {
+                options.target_version = Some(*target_version);
+            }
+        }
+    }
+
     // Create the pyproject.toml.
     Ok(Pyproject::new(options))
 }
@@ -255,7 +275,7 @@ mod tests {
 
     #[test]
     fn it_converts_empty() -> Result<()> {
-        let actual = convert(&HashMap::from([]), None)?;
+        let actual = convert(&HashMap::from([]), None, None)?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
             dummy_variable_rgx: None,
@@ -303,7 +323,11 @@ mod tests {
     #[test]
     fn it_converts_dashes() -> Result<()> {
         let actual = convert(
-            &HashMap::from([("max-line-length".to_string(), Some("100".to_string()))]),
+            &HashMap::from([(
+                "flake8".to_string(),
+                HashMap::from([("max-line-length".to_string(), Some("100".to_string()))]),
+            )]),
+            None,
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -353,7 +377,11 @@ mod tests {
     #[test]
     fn it_converts_underscores() -> Result<()> {
         let actual = convert(
-            &HashMap::from([("max_line_length".to_string(), Some("100".to_string()))]),
+            &HashMap::from([(
+                "flake8".to_string(),
+                HashMap::from([("max_line_length".to_string(), Some("100".to_string()))]),
+            )]),
+            None,
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -403,7 +431,11 @@ mod tests {
     #[test]
     fn it_ignores_parse_errors() -> Result<()> {
         let actual = convert(
-            &HashMap::from([("max_line_length".to_string(), Some("abc".to_string()))]),
+            &HashMap::from([(
+                "flake8".to_string(),
+                HashMap::from([("max_line_length".to_string(), Some("abc".to_string()))]),
+            )]),
+            None,
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -453,7 +485,11 @@ mod tests {
     #[test]
     fn it_converts_plugin_options() -> Result<()> {
         let actual = convert(
-            &HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
+            &HashMap::from([(
+                "flake8".to_string(),
+                HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
+            )]),
+            None,
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -509,9 +545,13 @@ mod tests {
     fn it_converts_docstring_conventions() -> Result<()> {
         let actual = convert(
             &HashMap::from([(
-                "docstring-convention".to_string(),
-                Some("numpy".to_string()),
+                "flake8".to_string(),
+                HashMap::from([(
+                    "docstring-convention".to_string(),
+                    Some("numpy".to_string()),
+                )]),
             )]),
+            None,
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
@@ -597,7 +637,11 @@ mod tests {
     #[test]
     fn it_infers_plugins_if_omitted() -> Result<()> {
         let actual = convert(
-            &HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
+            &HashMap::from([(
+                "flake8".to_string(),
+                HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
+            )]),
+            None,
             None,
         )?;
         let expected = Pyproject::new(Options {

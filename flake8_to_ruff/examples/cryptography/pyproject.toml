@@ -1,0 +1,65 @@
+[build-system]
+requires = [
+    # The minimum setuptools version is specific to the PEP 517 backend,
+    # and may be stricter than the version required in `setup.cfg`
+    "setuptools>=40.6.0,!=60.9.0",
+    "wheel",
+    # Must be kept in sync with the `install_requirements` in `setup.cfg`
+    "cffi>=1.12; platform_python_implementation != 'PyPy'",
+    "setuptools-rust>=0.11.4",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 79
+target-version = ["py36"]
+
+[tool.pytest.ini_options]
+addopts = "-r s --capture=no --strict-markers --benchmark-disable"
+markers = [
+    "skip_fips: this test is not executed in FIPS mode",
+    "supported: parametrized test requiring only_if and skip_message",
+]
+
+[tool.mypy]
+show_error_codes = true
+check_untyped_defs = true
+no_implicit_reexport = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pretend"
+]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = [
+    "cryptography",
+    "tests/",
+]
+
+[tool.coverage.paths]
+source = [
+   "src/cryptography",
+   "*.tox/*/lib*/python*/site-packages/cryptography",
+   "*.tox\\*\\Lib\\site-packages\\cryptography",
+   "*.tox/pypy/site-packages/cryptography",
+]
+tests =[
+   "tests/",
+   "*tests\\",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "@abc.abstractmethod",
+    "@abc.abstractproperty",
+    "@typing.overload",
+    "if typing.TYPE_CHECKING",
+]

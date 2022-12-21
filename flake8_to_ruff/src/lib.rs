@@ -11,6 +11,7 @@
     clippy::too_many_lines
 )]
 
+pub mod black;
 pub mod converter;
 mod parser;
 pub mod plugin;
