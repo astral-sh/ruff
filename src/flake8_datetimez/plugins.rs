@@ -19,20 +19,14 @@ pub fn call_datetime_without_tzinfo(
         return;
     }
 
-    // no args / no args unqualified
-    if args.len() < 8 && keywords.is_empty() {
+    // No positional arg: keyword is missing or constant None.
+    if args.len() < 8 && !has_non_none_keyword(keywords, "tzinfo") {
         checker.add_check(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
         return;
     }
 
-    // none args
-    if args.len() == 8 && is_const_none(&args[7]) {
-        checker.add_check(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
-        return;
-    }
-
-    // no kwargs / none kwargs
-    if !has_non_none_keyword(keywords, "tzinfo") {
+    // Positional arg: is constant None.
+    if args.len() >= 8 && is_const_none(&args[7]) {
         checker.add_check(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
     }
 }
