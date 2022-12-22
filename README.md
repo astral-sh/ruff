@@ -628,6 +628,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
 | UP015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
 | UP016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
+| UP017 | DatetimeTimezoneUTC | Use `datetime.UTC` alias | 🛠 |
 
 ### pep8-naming (N)
 
@@ -1224,7 +1225,7 @@ natively, including:
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (17/33)
 - [`yesqa`](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different error code prefixes than would be found in the
@@ -1281,7 +1282,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 Ruff can also replace [`isort`](https://pypi.org/project/isort/),
 [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
 [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10), and a subset of the rules
-implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33).
+implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (17/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 
