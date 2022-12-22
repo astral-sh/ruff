@@ -130,7 +130,7 @@ pub fn run_stdin(
         PyprojectDiscovery::Hierarchical(settings) => settings,
     };
     let package_root = filename
-        .and_then(std::path::Path::parent)
+        .and_then(Path::parent)
         .and_then(packages::detect_package_root);
     let stdin = read_from_stdin()?;
     let mut diagnostics = lint_stdin(filename, package_root, &stdin, settings, autofix)?;

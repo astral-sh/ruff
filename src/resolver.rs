@@ -209,7 +209,7 @@ pub fn python_files_in_path(
 
     // Check if the paths themselves are excluded.
     if file_strategy.force_exclude {
-        paths.retain(|path| !is_file_excluded(path, &resolver, pyproject_strategy, file_strategy));
+        paths.retain(|path| !is_file_excluded(path, &resolver, pyproject_strategy));
         if paths.is_empty() {
             return Ok((vec![], resolver));
         }
@@ -315,7 +315,7 @@ pub fn python_files_in_path(
     Ok((files.into_inner().unwrap(), resolver.into_inner().unwrap()))
 }
 
-/// Return `true` if the Python file at `Path` _not_ excluded.
+/// Return `true` if the Python file at `Path` is _not_ excluded.
 pub fn python_file_at_path(
     path: &Path,
     pyproject_strategy: &PyprojectDiscovery,
@@ -323,7 +323,7 @@ pub fn python_file_at_path(
     overrides: &Overrides,
 ) -> Result<bool> {
     if !file_strategy.force_exclude {
-        return Ok(false);
+        return Ok(true);
     }
 
     // Normalize the path (e.g., convert from relative to absolute).
@@ -343,12 +343,7 @@ pub fn python_file_at_path(
     }
 
     // Check exclusions.
-    Ok(!is_file_excluded(
-        &path,
-        &resolver,
-        pyproject_strategy,
-        file_strategy,
-    ))
+    Ok(!is_file_excluded(&path, &resolver, pyproject_strategy))
 }
 
 /// Return `true` if the given top-level `Path` should be excluded.
@@ -356,10 +351,8 @@ fn is_file_excluded(
     path: &Path,
     resolver: &Resolver,
     pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
 ) -> bool {
-    // Step 1: Is the file itself, or any of its ancestors, excluded via `exclude` or
-    // `extend_exclude`?
+    // TODO(charlie): Respect gitignore.
     for path in path.ancestors() {
         if path.file_name().is_none() {
             break;
@@ -385,35 +378,6 @@ fn is_file_excluded(
             }
         }
     }
-
-    // Step 2: Is the file ignored via a gitignore?
-    // Note that we can't enforce this behavior for non-existent files, which _could_ come up when
-    // you pass a file via `--stdin-filename`, and _could_ be considered incorrect. For example,
-    // if `subdir` is listed in the `gitignore`, and you pass `subdir/non_existent_file.py`, then
-    // right now, we _wouldn't_ mark that theoretical file as ignored. If the `ignore` crate had
-    // a public matcher API, we could support that, but right now, we _have_ to look at the
-    // filesystem to reverse-engineer the gitignore match.
-    if file_strategy.respect_gitignore && path.exists() {
-        // TODO(charlie): This isn't right either, because the _parent_ could be the thing that's
-        // ignored via the `.gitignore`.
-        if let Some(parent) = path.parent() {
-            for entry in WalkBuilder::new(parent)
-                .standard_filters(true)
-                .hidden(false)
-                .max_depth(Some(1))
-                .build()
-                .flatten()
-            {
-                println!("{:?}", entry);
-                if entry.path() == path {
-                    return false;
-                }
-            }
-            debug!("Ignored path due to gitignore match: {:?}", path);
-            return true;
-        }
-    }
-
     false
 }
 
