@@ -50,6 +50,7 @@ rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev 
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "c01f014b1269eedcf4bdb45d5fbc62ae2beecf31" }
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }
+shellexpand = { version = "3.0.0" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }

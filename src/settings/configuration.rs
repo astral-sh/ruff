@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
+use shellexpand;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::cli::{collect_per_file_ignores, Overrides};
@@ -78,7 +79,14 @@ impl Configuration {
                     })
                     .collect()
             }),
-            extend: options.extend.map(PathBuf::from),
+            extend: options
+                .extend
+                .map(|extend| {
+                    let extend = shellexpand::full(&extend);
+                    extend.map(|extend| PathBuf::from(extend.as_ref()))
+                })
+                .transpose()
+                .map_err(|e| anyhow!("Invalid `extend` value: {e}"))?,
             extend_exclude: options
                 .extend_exclude
                 .map(|paths| {
