@@ -1,10 +1,11 @@
 use std::collections::{BTreeSet, HashMap};
+use std::fmt;
 use std::str::FromStr;
 
 use anyhow::anyhow;
 use ruff::checks_gen::CheckCodePrefix;
 
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {
     Flake8Annotations,
     Flake8Bandit,
@@ -42,7 +43,7 @@ impl FromStr for Plugin {
             "flake8-datetimez" => Ok(Plugin::Flake8Datetimez),
             "flake8-debugger" => Ok(Plugin::Flake8Debugger),
             "flake8-docstrings" => Ok(Plugin::Flake8Docstrings),
-            "flake8-eradicate" => Ok(Plugin::Flake8BlindExcept),
+            "flake8-eradicate" => Ok(Plugin::Flake8Eradicate),
             "flake8-errmsg" => Ok(Plugin::Flake8ErrMsg),
             "flake8-print" => Ok(Plugin::Flake8Print),
             "flake8-quotes" => Ok(Plugin::Flake8Quotes),
@@ -55,6 +56,37 @@ impl FromStr for Plugin {
             "pyupgrade" => Ok(Plugin::Pyupgrade),
             _ => Err(anyhow!("Unknown plugin: {string}")),
         }
+    }
+}
+
+impl fmt::Debug for Plugin {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Plugin::Flake8Annotations => "flake8-annotations",
+                Plugin::Flake8Bandit => "flake8-bandit",
+                Plugin::Flake8BlindExcept => "flake8-blind-except",
+                Plugin::Flake8Bugbear => "flake8-bugbear",
+                Plugin::Flake8Builtins => "flake8-builtins",
+                Plugin::Flake8Comprehensions => "flake8-comprehensions",
+                Plugin::Flake8Datetimez => "flake8-datetimez",
+                Plugin::Flake8Debugger => "flake8-debugger",
+                Plugin::Flake8Docstrings => "flake8-docstrings",
+                Plugin::Flake8Eradicate => "flake8-eradicate",
+                Plugin::Flake8ErrMsg => "flake8-errmsg",
+                Plugin::Flake8Print => "flake8-print",
+                Plugin::Flake8Quotes => "flake8-quotes",
+                Plugin::Flake8Return => "flake8-return",
+                Plugin::Flake8Simplify => "flake8-simplify",
+                Plugin::Flake8TidyImports => "flake8-tidy-imports",
+                Plugin::McCabe => "mccabe",
+                Plugin::PandasVet => "pandas-vet",
+                Plugin::PEP8Naming => "pep8-naming",
+                Plugin::Pyupgrade => "pyupgrade",
+            }
+        )
     }
 }
 

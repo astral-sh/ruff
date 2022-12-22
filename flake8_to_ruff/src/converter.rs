@@ -61,10 +61,18 @@ pub fn convert(
             plugin::resolve_select(
                 flake8,
                 &plugins.unwrap_or_else(|| {
-                    plugin::infer_plugins_from_options(flake8)
-                        .into_iter()
-                        .chain(plugin::infer_plugins_from_codes(&referenced_codes))
-                        .collect()
+                    let from_options = plugin::infer_plugins_from_options(flake8);
+                    if !from_options.is_empty() {
+                        eprintln!("Inferred plugins from settings: {from_options:#?}");
+                    }
+                    let from_codes = plugin::infer_plugins_from_codes(&referenced_codes);
+                    if !from_codes.is_empty() {
+                        eprintln!(
+                            "Inferred plugins from referenced check codes: {:#?}",
+                            from_codes
+                        );
+                    }
+                    from_options.into_iter().chain(from_codes).collect()
                 }),
             )
         });
