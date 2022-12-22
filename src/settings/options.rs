@@ -67,7 +67,8 @@ pub struct Options {
     pub exclude: Option<Vec<String>>,
     #[option(
         doc = r#"
-            A path to a local `pyproject.toml` file to merge into this configuration.
+            A path to a local `pyproject.toml` file to merge into this configuration. User home
+            directory and environment variables will be expanded.
 
             To resolve the current `pyproject.toml` file, Ruff will first resolve this base
             configuration file, then merge in any properties defined in the current configuration
