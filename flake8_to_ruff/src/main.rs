@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Parser;
 use configparser::ini::Ini;
+use flake8_to_ruff::black::parse_black_options;
 use flake8_to_ruff::converter;
 use flake8_to_ruff::plugin::Plugin;
 
@@ -26,10 +27,14 @@ use flake8_to_ruff::plugin::Plugin;
     long_about = None
 )]
 struct Cli {
-    /// Path to the Flake8 configuration file (e.g., 'setup.cfg', 'tox.ini', or
-    /// '.flake8').
+    /// Path to the Flake8 configuration file (e.g., `setup.cfg`, `tox.ini`, or
+    /// `.flake8`).
     #[arg(required = true)]
     file: PathBuf,
+    /// Optional path to a `pyproject.toml` file, used to ensure compatibility
+    /// with Black.
+    #[arg(long)]
+    pyproject: Option<PathBuf>,
     /// List of plugins to enable.
     #[arg(long, value_delimiter = ',')]
     plugin: Option<Vec<Plugin>>,
@@ -43,13 +48,15 @@ fn main() -> Result<()> {
     ini.set_multiline(true);
     let config = ini.load(cli.file).map_err(|msg| anyhow::anyhow!(msg))?;
 
-    // Extract the Flake8 section.
-    let flake8 = config
-        .get("flake8")
-        .expect("Unable to find flake8 section in INI file");
+    // Read the pyproject.toml file.
+    let black = cli
+        .pyproject
+        .map(parse_black_options)
+        .transpose()?
+        .flatten();
 
-    // Create the pyproject.toml.
-    let pyproject = converter::convert(flake8, cli.plugin)?;
+    // Create Ruff's pyproject.toml section.
+    let pyproject = converter::convert(&config, black.as_ref(), cli.plugin)?;
     println!("{}", toml::to_string_pretty(&pyproject)?);
 
     Ok(())
