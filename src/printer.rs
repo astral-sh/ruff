@@ -44,7 +44,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    fn pre_text(&self, diagnostics: &Diagnostics) {
+    fn post_text(&self, diagnostics: &Diagnostics, autofix: fixer::Mode) {
         if self.log_level >= &LogLevel::Default {
             let fixed = diagnostics.fixed;
             let remaining = diagnostics.messages.len();
@@ -54,13 +54,16 @@ impl<'a> Printer<'a> {
             } else if remaining > 0 {
                 println!("Found {remaining} error(s).");
             }
-        }
-    }
 
-    fn post_text(&self, num_fixable: usize, autofix: fixer::Mode) {
-        if self.log_level >= &LogLevel::Default {
-            if num_fixable > 0 && !matches!(autofix, fixer::Mode::Apply) {
-                println!("{num_fixable} potentially fixable with the --fix option.");
+            if !matches!(autofix, fixer::Mode::Apply) {
+                let num_fixable = diagnostics
+                    .messages
+                    .iter()
+                    .filter(|message| message.kind.fixable())
+                    .count();
+                if num_fixable > 0 {
+                    println!("{num_fixable} potentially fixable with the --fix option.");
+                }
             }
         }
     }
@@ -69,12 +72,6 @@ impl<'a> Printer<'a> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
-
-        let num_fixable = diagnostics
-            .messages
-            .iter()
-            .filter(|message| message.kind.fixable())
-            .count();
 
         match self.format {
             SerializationFormat::Json => {
@@ -141,18 +138,13 @@ impl<'a> Printer<'a> {
                 println!("{}", report.to_string().unwrap());
             }
             SerializationFormat::Text => {
-                self.pre_text(diagnostics);
-
                 for message in &diagnostics.messages {
                     print_message(message);
                 }
 
-                self.post_text(num_fixable, autofix);
+                self.post_text(diagnostics, autofix);
             }
             SerializationFormat::Grouped => {
-                self.pre_text(diagnostics);
-                println!();
-
                 // Group by filename.
                 let mut grouped_messages = BTreeMap::default();
                 for message in &diagnostics.messages {
@@ -190,11 +182,9 @@ impl<'a> Printer<'a> {
                     println!();
                 }
 
-                self.post_text(num_fixable, autofix);
+                self.post_text(diagnostics, autofix);
             }
             SerializationFormat::Github => {
-                self.pre_text(diagnostics);
-
                 // Generate error workflow command in GitHub Actions format
                 // https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
                 diagnostics.messages.iter().for_each(|message| {
