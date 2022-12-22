@@ -260,7 +260,8 @@ pub fn autoformat_path(path: &Path, _settings: &Settings) -> Result<()> {
 /// Generate a list of `Check` violations from source code content derived from
 /// stdin.
 pub fn lint_stdin(
-    path: &Path,
+    path: Option<&Path>,
+    package: Option<&Path>,
     stdin: &str,
     settings: &Settings,
     autofix: fixer::Mode,
@@ -269,7 +270,13 @@ pub fn lint_stdin(
     let contents = stdin.to_string();
 
     // Lint the file.
-    let (contents, fixed, messages) = lint(contents, path, None, settings, autofix)?;
+    let (contents, fixed, messages) = lint(
+        contents,
+        path.unwrap_or_else(|| Path::new("-")),
+        package,
+        settings,
+        autofix,
+    )?;
 
     // Write the fixed contents to stdout.
     if matches!(autofix, fixer::Mode::Apply) {

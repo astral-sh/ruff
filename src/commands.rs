@@ -114,16 +114,19 @@ fn read_from_stdin() -> Result<String> {
 
 /// Run the linter over a single file, read from `stdin`.
 pub fn run_stdin(
+    filename: Option<&Path>,
     strategy: &PyprojectDiscovery,
-    filename: &Path,
     autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
+    let package_root = filename
+        .and_then(std::path::Path::parent)
+        .and_then(packages::detect_package_root);
     let stdin = read_from_stdin()?;
     let settings = match strategy {
         PyprojectDiscovery::Fixed(settings) => settings,
         PyprojectDiscovery::Hierarchical(settings) => settings,
     };
-    let mut diagnostics = lint_stdin(filename, &stdin, settings, autofix)?;
+    let mut diagnostics = lint_stdin(filename, package_root, &stdin, settings, autofix)?;
     diagnostics.messages.sort_unstable();
     Ok(diagnostics)
 }
