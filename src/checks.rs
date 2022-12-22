@@ -3043,6 +3043,80 @@ impl Check {
     }
 }
 
+/// A hash map from deprecated `CheckCodePrefix` to latest `CheckCodePrefix`.
+pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCodePrefix>> = Lazy::new(|| {
+    FxHashMap::from_iter([
+        // TODO(charlie): Remove by 2023-01-01.
+        ("U001", CheckCodePrefix::UP001),
+        ("U003", CheckCodePrefix::UP003),
+        ("U004", CheckCodePrefix::UP004),
+        ("U005", CheckCodePrefix::UP005),
+        ("U006", CheckCodePrefix::UP006),
+        ("U007", CheckCodePrefix::UP007),
+        ("U008", CheckCodePrefix::UP008),
+        ("U009", CheckCodePrefix::UP009),
+        ("U010", CheckCodePrefix::UP010),
+        ("U011", CheckCodePrefix::UP011),
+        ("U012", CheckCodePrefix::UP012),
+        ("U013", CheckCodePrefix::UP013),
+        ("U014", CheckCodePrefix::UP014),
+        ("U015", CheckCodePrefix::UP015),
+        ("U016", CheckCodePrefix::UP016),
+        // TODO(charlie): Remove by 2023-02-01.
+        ("I252", CheckCodePrefix::TID252),
+        ("M001", CheckCodePrefix::RUF100),
+        // TODO(charlie): Remove by 2023-02-01.
+        ("PDV002", CheckCodePrefix::PD002),
+        ("PDV003", CheckCodePrefix::PD003),
+        ("PDV004", CheckCodePrefix::PD004),
+        ("PDV007", CheckCodePrefix::PD007),
+        ("PDV008", CheckCodePrefix::PD008),
+        ("PDV009", CheckCodePrefix::PD009),
+        ("PDV010", CheckCodePrefix::PD010),
+        ("PDV011", CheckCodePrefix::PD011),
+        ("PDV012", CheckCodePrefix::PD012),
+        ("PDV013", CheckCodePrefix::PD013),
+        ("PDV015", CheckCodePrefix::PD015),
+        ("PDV901", CheckCodePrefix::PD901),
+        // TODO(charlie): Remove by 2023-02-01.
+        ("R501", CheckCodePrefix::RET501),
+        ("R502", CheckCodePrefix::RET502),
+        ("R503", CheckCodePrefix::RET503),
+        ("R504", CheckCodePrefix::RET504),
+        ("R505", CheckCodePrefix::RET505),
+        ("R506", CheckCodePrefix::RET506),
+        ("R507", CheckCodePrefix::RET507),
+        ("R508", CheckCodePrefix::RET508),
+        ("IC001", CheckCodePrefix::ICN001),
+        ("IC002", CheckCodePrefix::ICN001),
+        ("IC003", CheckCodePrefix::ICN001),
+        ("IC004", CheckCodePrefix::ICN001),
+        // TODO(charlie): Remove by 2023-01-01.
+        ("U", CheckCodePrefix::UP),
+        ("U0", CheckCodePrefix::UP0),
+        ("U00", CheckCodePrefix::UP00),
+        ("U01", CheckCodePrefix::UP01),
+        // TODO(charlie): Remove by 2023-02-01.
+        ("I2", CheckCodePrefix::TID2),
+        ("I25", CheckCodePrefix::TID25),
+        ("M", CheckCodePrefix::RUF100),
+        ("M0", CheckCodePrefix::RUF100),
+        // TODO(charlie): Remove by 2023-02-01.
+        ("PDV", CheckCodePrefix::PD),
+        ("PDV0", CheckCodePrefix::PD0),
+        ("PDV01", CheckCodePrefix::PD01),
+        ("PDV9", CheckCodePrefix::PD9),
+        ("PDV90", CheckCodePrefix::PD90),
+        // TODO(charlie): Remove by 2023-02-01.
+        ("R", CheckCodePrefix::RET),
+        ("R5", CheckCodePrefix::RET5),
+        ("R50", CheckCodePrefix::RET50),
+        // TODO(charlie): Remove by 2023-02-01.
+        ("IC", CheckCodePrefix::ICN),
+        ("IC0", CheckCodePrefix::ICN0),
+    ])
+});
+
 /// A hash map from deprecated to latest `CheckCode`.
 pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(|| {
     FxHashMap::from_iter([
@@ -3078,28 +3152,20 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(
         ("PDV013", CheckCode::PD013),
         ("PDV015", CheckCode::PD015),
         ("PDV901", CheckCode::PD901),
-    ])
-});
-
-/// A hash map from deprecated `CheckCodePrefix` to latest `CheckCodePrefix`.
-pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::new(|| {
-    FxHashMap::from_iter([
-        // TODO(charlie): Remove by 2023-01-01.
-        ("U", "UP"),
-        ("U0", "UP0"),
-        ("U00", "UP00"),
-        ("U01", "UP01"),
         // TODO(charlie): Remove by 2023-02-01.
-        ("I2", "TID2"),
-        ("I25", "TID25"),
-        ("M", "RUF100"),
-        ("M0", "RUF100"),
+        ("R501", CheckCode::RET501),
+        ("R502", CheckCode::RET502),
+        ("R503", CheckCode::RET503),
+        ("R504", CheckCode::RET504),
+        ("R505", CheckCode::RET505),
+        ("R506", CheckCode::RET506),
+        ("R507", CheckCode::RET507),
+        ("R508", CheckCode::RET508),
         // TODO(charlie): Remove by 2023-02-01.
-        ("PDV", "PD"),
-        ("PDV0", "PD0"),
-        ("PDV01", "PD01"),
-        ("PDV9", "PD9"),
-        ("PDV90", "PD90"),
+        ("IC001", CheckCode::ICN001),
+        ("IC002", CheckCode::ICN001),
+        ("IC003", CheckCode::ICN001),
+        ("IC004", CheckCode::ICN001),
     ])
 });
 

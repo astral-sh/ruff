@@ -10,7 +10,7 @@ use anyhow::{ensure, Result};
 use clap::Parser;
 use codegen::{Scope, Type, Variant};
 use itertools::Itertools;
-use ruff::checks::{CheckCode, CODE_REDIRECTS, PREFIX_REDIRECTS};
+use ruff::checks::{CheckCode, PREFIX_REDIRECTS};
 use strum::IntoEnumIterator;
 
 #[derive(Parser)]
@@ -40,18 +40,7 @@ pub fn main(cli: &Cli) -> Result<()> {
     }
 
     // Add any prefix aliases (e.g., "U" to "UP").
-    for (alias, source) in PREFIX_REDIRECTS.iter() {
-        prefix_to_codes.insert(
-            (*alias).to_string(),
-            prefix_to_codes
-                .get(&(*source).to_string())
-                .unwrap_or_else(|| panic!("Unknown CheckCode: {source:?}"))
-                .clone(),
-        );
-    }
-
-    // Add any check code aliases (e.g., "U001" to "UP001").
-    for (alias, check_code) in CODE_REDIRECTS.iter() {
+    for (alias, check_code) in PREFIX_REDIRECTS.iter() {
         prefix_to_codes.insert(
             (*alias).to_string(),
             prefix_to_codes
@@ -105,25 +94,13 @@ pub fn main(cli: &Cli) -> Result<()> {
         .line("#[allow(clippy::match_same_arms)]")
         .line("match self {");
     for (prefix, codes) in &prefix_to_codes {
-        if let Some(target) = CODE_REDIRECTS.get(&prefix.as_str()) {
+        if let Some(target) = PREFIX_REDIRECTS.get(&prefix.as_str()) {
             gen = gen.line(format!(
                 "CheckCodePrefix::{prefix} => {{ one_time_warning!(\"{{}}{{}} {{}}\", \
                  \"warning\".yellow().bold(), \":\".bold(), \"`{}` has been remapped to \
                  `{}`\".bold()); \n vec![{}] }}",
                 prefix,
                 target.as_ref(),
-                codes
-                    .iter()
-                    .map(|code| format!("CheckCode::{}", code.as_ref()))
-                    .join(", ")
-            ));
-        } else if let Some(target) = PREFIX_REDIRECTS.get(&prefix.as_str()) {
-            gen = gen.line(format!(
-                "CheckCodePrefix::{prefix} => {{ one_time_warning!(\"{{}}{{}} {{}}\", \
-                 \"warning\".yellow().bold(), \":\".bold(), \"`{}` has been remapped to \
-                 `{}`\".bold()); \n vec![{}] }}",
-                prefix,
-                target,
                 codes
                     .iter()
                     .map(|code| format!("CheckCode::{}", code.as_ref()))

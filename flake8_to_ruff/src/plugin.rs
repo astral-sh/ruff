@@ -78,11 +78,11 @@ impl Plugin {
             Plugin::Flake8Quotes => CheckCodePrefix::Q,
             Plugin::Flake8Return => CheckCodePrefix::RET,
             Plugin::Flake8Simplify => CheckCodePrefix::SIM,
-            Plugin::Flake8TidyImports => CheckCodePrefix::I25,
+            Plugin::Flake8TidyImports => CheckCodePrefix::TID25,
             Plugin::McCabe => CheckCodePrefix::C9,
             Plugin::PandasVet => CheckCodePrefix::PD,
             Plugin::PEP8Naming => CheckCodePrefix::N,
-            Plugin::Pyupgrade => CheckCodePrefix::U,
+            Plugin::Pyupgrade => CheckCodePrefix::UP,
         }
     }
 
@@ -424,7 +424,6 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin
         Plugin::Flake8TidyImports,
         Plugin::PandasVet,
         Plugin::PEP8Naming,
-        Plugin::Pyupgrade,
     ]
     .into_iter()
     .filter(|plugin| {

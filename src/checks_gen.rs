@@ -291,6 +291,12 @@ pub enum CheckCodePrefix {
     I2,
     I25,
     I252,
+    IC,
+    IC0,
+    IC001,
+    IC002,
+    IC003,
+    IC004,
     ICN,
     ICN0,
     ICN00,
@@ -410,6 +416,17 @@ pub enum CheckCodePrefix {
     Q001,
     Q002,
     Q003,
+    R,
+    R5,
+    R50,
+    R501,
+    R502,
+    R503,
+    R504,
+    R505,
+    R506,
+    R507,
+    R508,
     RET,
     RET5,
     RET50,
@@ -1343,6 +1360,60 @@ impl CheckCodePrefix {
                 );
                 vec![CheckCode::TID252]
             }
+            CheckCodePrefix::IC => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`IC` has been remapped to `ICN`".bold()
+                );
+                vec![CheckCode::ICN001]
+            }
+            CheckCodePrefix::IC0 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`IC0` has been remapped to `ICN0`".bold()
+                );
+                vec![CheckCode::ICN001]
+            }
+            CheckCodePrefix::IC001 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`IC001` has been remapped to `ICN001`".bold()
+                );
+                vec![CheckCode::ICN001]
+            }
+            CheckCodePrefix::IC002 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`IC002` has been remapped to `ICN001`".bold()
+                );
+                vec![CheckCode::ICN001]
+            }
+            CheckCodePrefix::IC003 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`IC003` has been remapped to `ICN001`".bold()
+                );
+                vec![CheckCode::ICN001]
+            }
+            CheckCodePrefix::IC004 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`IC004` has been remapped to `ICN001`".bold()
+                );
+                vec![CheckCode::ICN001]
+            }
             CheckCodePrefix::ICN => vec![CheckCode::ICN001],
             CheckCodePrefix::ICN0 => vec![CheckCode::ICN001],
             CheckCodePrefix::ICN00 => vec![CheckCode::ICN001],
@@ -1764,6 +1835,132 @@ impl CheckCodePrefix {
             CheckCodePrefix::Q001 => vec![CheckCode::Q001],
             CheckCodePrefix::Q002 => vec![CheckCode::Q002],
             CheckCodePrefix::Q003 => vec![CheckCode::Q003],
+            CheckCodePrefix::R => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R` has been remapped to `RET`".bold()
+                );
+                vec![
+                    CheckCode::RET501,
+                    CheckCode::RET502,
+                    CheckCode::RET503,
+                    CheckCode::RET504,
+                    CheckCode::RET505,
+                    CheckCode::RET506,
+                    CheckCode::RET507,
+                    CheckCode::RET508,
+                ]
+            }
+            CheckCodePrefix::R5 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R5` has been remapped to `RET5`".bold()
+                );
+                vec![
+                    CheckCode::RET501,
+                    CheckCode::RET502,
+                    CheckCode::RET503,
+                    CheckCode::RET504,
+                    CheckCode::RET505,
+                    CheckCode::RET506,
+                    CheckCode::RET507,
+                    CheckCode::RET508,
+                ]
+            }
+            CheckCodePrefix::R50 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R50` has been remapped to `RET50`".bold()
+                );
+                vec![
+                    CheckCode::RET501,
+                    CheckCode::RET502,
+                    CheckCode::RET503,
+                    CheckCode::RET504,
+                    CheckCode::RET505,
+                    CheckCode::RET506,
+                    CheckCode::RET507,
+                    CheckCode::RET508,
+                ]
+            }
+            CheckCodePrefix::R501 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R501` has been remapped to `RET501`".bold()
+                );
+                vec![CheckCode::RET501]
+            }
+            CheckCodePrefix::R502 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R502` has been remapped to `RET502`".bold()
+                );
+                vec![CheckCode::RET502]
+            }
+            CheckCodePrefix::R503 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R503` has been remapped to `RET503`".bold()
+                );
+                vec![CheckCode::RET503]
+            }
+            CheckCodePrefix::R504 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R504` has been remapped to `RET504`".bold()
+                );
+                vec![CheckCode::RET504]
+            }
+            CheckCodePrefix::R505 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R505` has been remapped to `RET505`".bold()
+                );
+                vec![CheckCode::RET505]
+            }
+            CheckCodePrefix::R506 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R506` has been remapped to `RET506`".bold()
+                );
+                vec![CheckCode::RET506]
+            }
+            CheckCodePrefix::R507 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R507` has been remapped to `RET507`".bold()
+                );
+                vec![CheckCode::RET507]
+            }
+            CheckCodePrefix::R508 => {
+                one_time_warning!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    "`R508` has been remapped to `RET508`".bold()
+                );
+                vec![CheckCode::RET508]
+            }
             CheckCodePrefix::RET => vec![
                 CheckCode::RET501,
                 CheckCode::RET502,
@@ -2483,6 +2680,12 @@ impl CheckCodePrefix {
             CheckCodePrefix::I2 => SuffixLength::One,
             CheckCodePrefix::I25 => SuffixLength::Two,
             CheckCodePrefix::I252 => SuffixLength::Three,
+            CheckCodePrefix::IC => SuffixLength::Zero,
+            CheckCodePrefix::IC0 => SuffixLength::One,
+            CheckCodePrefix::IC001 => SuffixLength::Three,
+            CheckCodePrefix::IC002 => SuffixLength::Three,
+            CheckCodePrefix::IC003 => SuffixLength::Three,
+            CheckCodePrefix::IC004 => SuffixLength::Three,
             CheckCodePrefix::ICN => SuffixLength::Zero,
             CheckCodePrefix::ICN0 => SuffixLength::One,
             CheckCodePrefix::ICN00 => SuffixLength::Two,
@@ -2602,6 +2805,17 @@ impl CheckCodePrefix {
             CheckCodePrefix::Q001 => SuffixLength::Three,
             CheckCodePrefix::Q002 => SuffixLength::Three,
             CheckCodePrefix::Q003 => SuffixLength::Three,
+            CheckCodePrefix::R => SuffixLength::Zero,
+            CheckCodePrefix::R5 => SuffixLength::One,
+            CheckCodePrefix::R50 => SuffixLength::Two,
+            CheckCodePrefix::R501 => SuffixLength::Three,
+            CheckCodePrefix::R502 => SuffixLength::Three,
+            CheckCodePrefix::R503 => SuffixLength::Three,
+            CheckCodePrefix::R504 => SuffixLength::Three,
+            CheckCodePrefix::R505 => SuffixLength::Three,
+            CheckCodePrefix::R506 => SuffixLength::Three,
+            CheckCodePrefix::R507 => SuffixLength::Three,
+            CheckCodePrefix::R508 => SuffixLength::Three,
             CheckCodePrefix::RET => SuffixLength::Zero,
             CheckCodePrefix::RET5 => SuffixLength::One,
             CheckCodePrefix::RET50 => SuffixLength::Two,

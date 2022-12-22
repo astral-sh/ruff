@@ -275,7 +275,11 @@ mod tests {
 
     #[test]
     fn it_converts_empty() -> Result<()> {
-        let actual = convert(&HashMap::from([]), None, None)?;
+        let actual = convert(
+            &HashMap::from([("flake8".to_string(), HashMap::default())]),
+            None,
+            None,
+        )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
             dummy_variable_rgx: None,
