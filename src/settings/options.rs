@@ -333,39 +333,37 @@ pub struct Options {
     // Plugins
     #[option_group]
     /// Options for the `flake8-annotations` plugin.
-    pub flake8_annotations: Option<flake8_annotations::settings::Flake8AnnotationsOptions>,
+    pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     #[option_group]
     /// Options for the `flake8-bugbear` plugin.
-    pub flake8_bugbear: Option<flake8_bugbear::settings::Flake8BugbearOptions>,
+    pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
     #[option_group]
     /// Options for the `flake8-errmsg` plugin.
-    pub flake8_errmsg: Option<flake8_errmsg::settings::Flake8ErrMsgOptions>,
+    pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     #[option_group]
     /// Options for the `flake8-quotes` plugin.
-    pub flake8_quotes: Option<flake8_quotes::settings::Flake8QuotesOptions>,
+    pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     #[option_group]
     /// Options for the `flake8-tidy-imports` plugin.
-    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Flake8TidyImportsOptions>,
+    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
     #[option_group]
     /// Options for the `flake8-import-conventions` plugin.
-    pub flake8_import_conventions:
-        Option<flake8_import_conventions::settings::Flake8ImportConventionsOptions>,
+    pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
     #[option_group]
     /// Options for the `flake8-unused-arguments` plugin.
-    pub flake8_unused_arguments:
-        Option<flake8_unused_arguments::settings::Flake8UnusedArgumentsOptions>,
+    pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
     #[option_group]
     /// Options for the `isort` plugin.
-    pub isort: Option<isort::settings::IsortOptions>,
+    pub isort: Option<isort::settings::Options>,
     #[option_group]
     /// Options for the `mccabe` plugin.
-    pub mccabe: Option<mccabe::settings::McCabeOptions>,
+    pub mccabe: Option<mccabe::settings::Options>,
     #[option_group]
     /// Options for the `pep8-naming` plugin.
-    pub pep8_naming: Option<pep8_naming::settings::Pep8NamingOptions>,
+    pub pep8_naming: Option<pep8_naming::settings::Options>,
     #[option_group]
     /// Options for the `pyupgrade` plugin.
-    pub pyupgrade: Option<pyupgrade::settings::PyUpgradeOptions>,
+    pub pyupgrade: Option<pyupgrade::settings::Options>,
     // Tables are required to go last.
     #[option(
         doc = r#"

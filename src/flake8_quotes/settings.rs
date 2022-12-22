@@ -14,8 +14,12 @@ pub enum Quote {
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Flake8QuotesOptions {
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "Flake8QuotesOptions"
+)]
+pub struct Options {
     #[option(
         doc = r#"
             Quote style to prefer for inline strings (either "single" (`'`) or "double" (`"`)).
@@ -79,7 +83,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: Flake8QuotesOptions) -> Self {
+    pub fn from_options(options: Options) -> Self {
         Self {
             inline_quotes: options.inline_quotes.unwrap_or(Quote::Double),
             multiline_quotes: options.multiline_quotes.unwrap_or(Quote::Double),

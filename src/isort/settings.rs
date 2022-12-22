@@ -9,8 +9,12 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct IsortOptions {
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "IsortOptions"
+)]
+pub struct Options {
     #[option(
         doc = r#"
             Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
@@ -96,7 +100,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: IsortOptions) -> Self {
+    pub fn from_options(options: Options) -> Self {
         Self {
             combine_as_imports: options.combine_as_imports.unwrap_or_default(),
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or_default(),

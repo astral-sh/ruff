@@ -848,6 +848,7 @@
       "type": "object",
       "properties": {
         "allow-star-arg-any": {
+          "description": "Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs`",
           "type": [
             "boolean",
             "null"
@@ -907,6 +908,7 @@
       "type": "object",
       "properties": {
         "aliases": {
+          "description": "The conventional aliases for imports. These aliases can be extended by the `extend_aliases` option.",
           "type": [
             "object",
             "null"
@@ -916,6 +918,7 @@
           }
         },
         "extend-aliases": {
+          "description": "A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.",
           "type": [
             "object",
             "null"

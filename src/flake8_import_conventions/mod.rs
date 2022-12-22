@@ -31,7 +31,7 @@ mod tests {
             &Settings {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
-                        flake8_import_conventions::settings::Flake8ImportConventionsOptions {
+                        flake8_import_conventions::settings::Options {
                             aliases: None,
                             extend_aliases: Some(FxHashMap::from_iter([
                                 ("dask.array".to_string(), "da".to_string()),
@@ -54,7 +54,7 @@ mod tests {
             &Settings {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
-                        flake8_import_conventions::settings::Flake8ImportConventionsOptions {
+                        flake8_import_conventions::settings::Options {
                             aliases: Some(FxHashMap::from_iter([
                                 ("altair".to_string(), "alt".to_string()),
                                 ("matplotlib.pyplot".to_string(), "plt".to_string()),
@@ -79,7 +79,7 @@ mod tests {
             &Settings {
                 flake8_import_conventions:
                     flake8_import_conventions::settings::Settings::from_options(
-                        flake8_import_conventions::settings::Flake8ImportConventionsOptions {
+                        flake8_import_conventions::settings::Options {
                             aliases: None,
                             extend_aliases: Some(FxHashMap::from_iter([(
                                 "numpy".to_string(),

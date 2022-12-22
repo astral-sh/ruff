@@ -7,8 +7,12 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Flake8ErrMsgOptions {
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "Flake8ErrMsgOptions"
+)]
+pub struct Options {
     #[option(
         doc = r#"
             Maximum string length for string literals in exception messages.
@@ -27,7 +31,7 @@ pub struct Settings {
 
 impl Settings {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: Flake8ErrMsgOptions) -> Self {
+    pub fn from_options(options: Options) -> Self {
         Self {
             max_string_length: options.max_string_length.unwrap_or_default(),
         }

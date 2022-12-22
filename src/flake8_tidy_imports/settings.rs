@@ -14,8 +14,12 @@ pub enum Strictness {
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Flake8TidyImportsOptions {
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "Flake8TidyImportsOptions"
+)]
+pub struct Options {
     #[option(
         doc = r#"
             Whether to ban all relative imports (`"all"`), or only those imports that extend into
@@ -37,7 +41,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: Flake8TidyImportsOptions) -> Self {
+    pub fn from_options(options: Options) -> Self {
         Self {
             ban_relative_imports: options.ban_relative_imports.unwrap_or(Strictness::Parents),
         }

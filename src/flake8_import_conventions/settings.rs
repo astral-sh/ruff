@@ -19,8 +19,12 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Flake8ImportConventionsOptions {
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "Flake8ImportConventionsOptions"
+)]
+pub struct Options {
     #[option(
         doc = "The conventional aliases for imports. These aliases can be extended by the \
                `extend_aliases` option.",
@@ -35,6 +39,8 @@ pub struct Flake8ImportConventionsOptions {
             seaborn = "sns"
         "#
     )]
+    /// The conventional aliases for imports. These aliases can be extended by
+    /// the `extend_aliases` option.
     pub aliases: Option<FxHashMap<String, String>>,
     #[option(
         doc = "A mapping of modules to their conventional import aliases. These aliases will be \
@@ -46,6 +52,8 @@ pub struct Flake8ImportConventionsOptions {
             "dask.dataframe" = "dd"
         "#
     )]
+    /// A mapping of modules to their conventional import aliases. These aliases
+    /// will be added to the `aliases` mapping.
     pub extend_aliases: Option<FxHashMap<String, String>>,
 }
 
@@ -69,7 +77,7 @@ fn default_aliases() -> FxHashMap<String, String> {
         .collect::<FxHashMap<_, _>>()
 }
 
-fn resolve_aliases(options: Flake8ImportConventionsOptions) -> FxHashMap<String, String> {
+fn resolve_aliases(options: Options) -> FxHashMap<String, String> {
     let mut aliases = match options.aliases {
         Some(options_aliases) => options_aliases,
         None => default_aliases(),
@@ -81,7 +89,7 @@ fn resolve_aliases(options: Flake8ImportConventionsOptions) -> FxHashMap<String,
 }
 
 impl Settings {
-    pub fn from_options(options: Flake8ImportConventionsOptions) -> Self {
+    pub fn from_options(options: Options) -> Self {
         Self {
             aliases: resolve_aliases(options),
         }

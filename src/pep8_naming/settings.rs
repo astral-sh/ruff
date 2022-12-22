@@ -26,8 +26,12 @@ const STATICMETHOD_DECORATORS: [&str; 1] = ["staticmethod"];
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Pep8NamingOptions {
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "Pep8NamingOptions"
+)]
+pub struct Options {
     #[option(
         doc = r#"
             A list of names to ignore when considering `pep8-naming` violations.
@@ -77,7 +81,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: Pep8NamingOptions) -> Self {
+    pub fn from_options(options: Options) -> Self {
         Self {
             ignore_names: options
                 .ignore_names

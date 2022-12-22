@@ -7,8 +7,12 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct McCabeOptions {
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "McCabeOptions"
+)]
+pub struct Options {
     #[option(
         doc = "The maximum McCabe complexity to allow before triggering `C901` errors.",
         default = "10",
@@ -27,7 +31,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: &McCabeOptions) -> Self {
+    pub fn from_options(options: &Options) -> Self {
         Self {
             max_complexity: options.max_complexity.unwrap_or_default(),
         }

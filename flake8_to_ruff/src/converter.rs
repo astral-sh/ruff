@@ -87,14 +87,13 @@ pub fn convert(
 
     // Parse each supported option.
     let mut options = Options::default();
-    let mut flake8_annotations = flake8_annotations::settings::Flake8AnnotationsOptions::default();
-    let mut flake8_bugbear = flake8_bugbear::settings::Flake8BugbearOptions::default();
-    let mut flake8_errmsg = flake8_errmsg::settings::Flake8ErrMsgOptions::default();
-    let mut flake8_quotes = flake8_quotes::settings::Flake8QuotesOptions::default();
-    let mut flake8_tidy_imports =
-        flake8_tidy_imports::settings::Flake8TidyImportsOptions::default();
-    let mut mccabe = mccabe::settings::McCabeOptions::default();
-    let mut pep8_naming = pep8_naming::settings::Pep8NamingOptions::default();
+    let mut flake8_annotations = flake8_annotations::settings::Options::default();
+    let mut flake8_bugbear = flake8_bugbear::settings::Options::default();
+    let mut flake8_errmsg = flake8_errmsg::settings::Options::default();
+    let mut flake8_quotes = flake8_quotes::settings::Options::default();
+    let mut flake8_tidy_imports = flake8_tidy_imports::settings::Options::default();
+    let mut mccabe = mccabe::settings::Options::default();
+    let mut pep8_naming = pep8_naming::settings::Options::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
             match key.as_str() {
@@ -230,25 +229,25 @@ pub fn convert(
     // Deduplicate and sort.
     options.select = Some(Vec::from_iter(select));
     options.ignore = Some(Vec::from_iter(ignore));
-    if flake8_annotations != flake8_annotations::settings::Flake8AnnotationsOptions::default() {
+    if flake8_annotations != flake8_annotations::settings::Options::default() {
         options.flake8_annotations = Some(flake8_annotations);
     }
-    if flake8_bugbear != flake8_bugbear::settings::Flake8BugbearOptions::default() {
+    if flake8_bugbear != flake8_bugbear::settings::Options::default() {
         options.flake8_bugbear = Some(flake8_bugbear);
     }
-    if flake8_errmsg != flake8_errmsg::settings::Flake8ErrMsgOptions::default() {
+    if flake8_errmsg != flake8_errmsg::settings::Options::default() {
         options.flake8_errmsg = Some(flake8_errmsg);
     }
-    if flake8_quotes != flake8_quotes::settings::Flake8QuotesOptions::default() {
+    if flake8_quotes != flake8_quotes::settings::Options::default() {
         options.flake8_quotes = Some(flake8_quotes);
     }
-    if flake8_tidy_imports != flake8_tidy_imports::settings::Flake8TidyImportsOptions::default() {
+    if flake8_tidy_imports != flake8_tidy_imports::settings::Options::default() {
         options.flake8_tidy_imports = Some(flake8_tidy_imports);
     }
-    if mccabe != mccabe::settings::McCabeOptions::default() {
+    if mccabe != mccabe::settings::Options::default() {
         options.mccabe = Some(mccabe);
     }
-    if pep8_naming != pep8_naming::settings::Pep8NamingOptions::default() {
+    if pep8_naming != pep8_naming::settings::Options::default() {
         options.pep8_naming = Some(pep8_naming);
     }
 
@@ -535,7 +534,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
-            flake8_quotes: Some(flake8_quotes::settings::Flake8QuotesOptions {
+            flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
                 docstring_quotes: None,
@@ -688,7 +687,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
-            flake8_quotes: Some(flake8_quotes::settings::Flake8QuotesOptions {
+            flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
                 docstring_quotes: None,

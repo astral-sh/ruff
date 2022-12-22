@@ -47,19 +47,17 @@ pub struct Configuration {
     pub target_version: Option<PythonVersion>,
     pub unfixable: Option<Vec<CheckCodePrefix>>,
     // Plugins
-    pub flake8_annotations: Option<flake8_annotations::settings::Flake8AnnotationsOptions>,
-    pub flake8_bugbear: Option<flake8_bugbear::settings::Flake8BugbearOptions>,
-    pub flake8_errmsg: Option<flake8_errmsg::settings::Flake8ErrMsgOptions>,
-    pub flake8_import_conventions:
-        Option<flake8_import_conventions::settings::Flake8ImportConventionsOptions>,
-    pub flake8_quotes: Option<flake8_quotes::settings::Flake8QuotesOptions>,
-    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Flake8TidyImportsOptions>,
-    pub flake8_unused_arguments:
-        Option<flake8_unused_arguments::settings::Flake8UnusedArgumentsOptions>,
-    pub isort: Option<isort::settings::IsortOptions>,
-    pub mccabe: Option<mccabe::settings::McCabeOptions>,
-    pub pep8_naming: Option<pep8_naming::settings::Pep8NamingOptions>,
-    pub pyupgrade: Option<pyupgrade::settings::PyUpgradeOptions>,
+    pub flake8_annotations: Option<flake8_annotations::settings::Options>,
+    pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
+    pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
+    pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
+    pub flake8_quotes: Option<flake8_quotes::settings::Options>,
+    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
+    pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
+    pub isort: Option<isort::settings::Options>,
+    pub mccabe: Option<mccabe::settings::Options>,
+    pub pep8_naming: Option<pep8_naming::settings::Options>,
+    pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
 
 impl Configuration {
@@ -234,7 +232,7 @@ impl Configuration {
             self.line_length = Some(line_length);
         }
         if let Some(max_complexity) = overrides.max_complexity {
-            self.mccabe = Some(mccabe::settings::McCabeOptions {
+            self.mccabe = Some(mccabe::settings::Options {
                 max_complexity: Some(max_complexity),
             });
         }
