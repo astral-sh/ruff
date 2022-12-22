@@ -1553,6 +1553,12 @@ where
                     pyupgrade::plugins::remove_six_compat(self, expr);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::UP017)
+                    && self.settings.target_version >= PythonVersion::Py311
+                {
+                    pyupgrade::plugins::datetime_utc_alias(self, expr);
+                }
+
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }

@@ -105,4 +105,18 @@ mod tests {
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
+
+    #[test]
+    fn datetime_utc_alias_py311() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/pyupgrade/UP017.py"),
+            &settings::Settings {
+                target_version: PythonVersion::Py311,
+                ..settings::Settings::for_rule(CheckCode::UP017)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
 }

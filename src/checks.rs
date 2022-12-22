@@ -225,6 +225,7 @@ pub enum CheckCode {
     UP014,
     UP015,
     UP016,
+    UP017,
     // pydocstyle
     D100,
     D101,
@@ -827,6 +828,7 @@ pub enum CheckKind {
     ConvertNamedTupleFunctionalToClass(String),
     RedundantOpenModes,
     RemoveSixCompat,
+    DatetimeTimezoneUTC,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1200,6 +1202,7 @@ impl CheckCode {
             CheckCode::UP014 => CheckKind::ConvertNamedTupleFunctionalToClass("...".to_string()),
             CheckCode::UP015 => CheckKind::RedundantOpenModes,
             CheckCode::UP016 => CheckKind::RemoveSixCompat,
+            CheckCode::UP017 => CheckKind::DatetimeTimezoneUTC,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1617,6 +1620,7 @@ impl CheckCode {
             CheckCode::UP014 => CheckCategory::Pyupgrade,
             CheckCode::UP015 => CheckCategory::Pyupgrade,
             CheckCode::UP016 => CheckCategory::Pyupgrade,
+            CheckCode::UP017 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1827,6 +1831,7 @@ impl CheckKind {
             CheckKind::ConvertNamedTupleFunctionalToClass(_) => &CheckCode::UP014,
             CheckKind::RedundantOpenModes => &CheckCode::UP015,
             CheckKind::RemoveSixCompat => &CheckCode::UP016,
+            CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -2549,6 +2554,7 @@ impl CheckKind {
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
             CheckKind::RedundantOpenModes => "Unnecessary open mode parameters".to_string(),
             CheckKind::RemoveSixCompat => "Unnecessary `six` compatibility usage".to_string(),
+            CheckKind::DatetimeTimezoneUTC => "Use datetime.UTC alias".to_string(),
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
             }
@@ -2985,6 +2991,7 @@ impl CheckKind {
                 | CheckKind::RedundantOpenModes
                 | CheckKind::RedundantTupleInExceptionHandler(..)
                 | CheckKind::RemoveSixCompat
+                | CheckKind::DatetimeTimezoneUTC
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
                 | CheckKind::SectionUnderlineAfterName(..)
@@ -3068,6 +3075,7 @@ pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCodePrefix>> = La
         ("U014", CheckCodePrefix::UP014),
         ("U015", CheckCodePrefix::UP015),
         ("U016", CheckCodePrefix::UP016),
+        ("U017", CheckCodePrefix::UP017),
         // TODO(charlie): Remove by 2023-02-01.
         ("I252", CheckCodePrefix::TID252),
         ("M001", CheckCodePrefix::RUF100),
@@ -3142,6 +3150,7 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(
         ("U014", CheckCode::UP014),
         ("U015", CheckCode::UP015),
         ("U016", CheckCode::UP016),
+        ("U017", CheckCode::UP017),
         // TODO(charlie): Remove by 2023-02-01.
         ("I252", CheckCode::TID252),
         ("M001", CheckCode::RUF100),
