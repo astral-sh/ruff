@@ -224,7 +224,13 @@ fn inner_main() -> Result<ExitCode> {
 
         // Generate lint violations.
         let diagnostics = if is_stdin {
-            commands::run_stdin(cli.stdin_filename.as_deref(), &pyproject_strategy, autofix)?
+            commands::run_stdin(
+                cli.stdin_filename.as_deref(),
+                &pyproject_strategy,
+                &file_strategy,
+                &overrides,
+                autofix,
+            )?
         } else {
             commands::run(
                 &cli.files,
