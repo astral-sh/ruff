@@ -20,26 +20,26 @@ expression: checks
   fix: ~
 - kind: CallDatetimeWithoutTzinfo
   location:
-    row: 10
+    row: 13
     column: 0
   end_location:
-    row: 10
+    row: 13
     column: 37
   fix: ~
 - kind: CallDatetimeWithoutTzinfo
   location:
-    row: 13
+    row: 16
     column: 0
   end_location:
-    row: 13
+    row: 16
     column: 42
   fix: ~
 - kind: CallDatetimeWithoutTzinfo
   location:
-    row: 18
+    row: 21
     column: 0
   end_location:
-    row: 18
+    row: 21
     column: 29
   fix: ~
 
