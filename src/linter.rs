@@ -59,6 +59,9 @@ pub(crate) fn check_path(
     autofix: flags::Autofix,
     noqa: flags::Noqa,
 ) -> Result<Vec<Check>> {
+    // Validate the `Settings` and return any errors.
+    settings.validate()?;
+
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
 
@@ -175,6 +178,9 @@ pub fn lint_path(
     cache: flags::Cache,
     autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
+    // Validate the `Settings` and return any errors.
+    settings.validate()?;
+
     let metadata = path.metadata()?;
 
     // Check the cache.
@@ -202,6 +208,9 @@ pub fn lint_path(
 
 /// Add any missing `#noqa` pragmas to the source code at the given `Path`.
 pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
+    // Validate the `Settings` and return any errors.
+    settings.validate()?;
+
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
@@ -241,7 +250,10 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
 }
 
 /// Apply autoformatting to the source code at the given `Path`.
-pub fn autoformat_path(path: &Path, _settings: &Settings) -> Result<()> {
+pub fn autoformat_path(path: &Path, settings: &Settings) -> Result<()> {
+    // Validate the `Settings` and return any errors.
+    settings.validate()?;
+
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
@@ -266,6 +278,9 @@ pub fn lint_stdin(
     settings: &Settings,
     autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
+    // Validate the `Settings` and return any errors.
+    settings.validate()?;
+
     // Read the file from disk.
     let contents = stdin.to_string();
 

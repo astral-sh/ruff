@@ -1,5 +1,6 @@
 use std::env;
 use std::hash::Hash;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -163,5 +164,25 @@ impl Default for SerializationFormat {
             }
         }
         Self::Text
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(try_from = "String")]
+pub struct Version(String);
+
+impl TryFrom<String> for Version {
+    type Error = semver::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        semver::Version::parse(&value).map(|_| Self(value))
+    }
+}
+
+impl Deref for Version {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

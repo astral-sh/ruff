@@ -38,14 +38,8 @@ pub fn run(
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
-    // Discover the package root for each Python file.
-    let package_roots = packages::detect_package_roots(
-        &paths
-            .iter()
-            .flatten()
-            .map(ignore::DirEntry::path)
-            .collect::<Vec<_>>(),
-    );
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
 
     // Initialize the cache.
     if matches!(cache, flags::Cache::Enabled) {
@@ -70,6 +64,15 @@ pub fn run(
             }
         }
     };
+
+    // Discover the package root for each Python file.
+    let package_roots = packages::detect_package_roots(
+        &paths
+            .iter()
+            .flatten()
+            .map(ignore::DirEntry::path)
+            .collect::<Vec<_>>(),
+    );
 
     let start = Instant::now();
     let mut diagnostics: Diagnostics = par_iter(&paths)
@@ -176,6 +179,9 @@ pub fn add_noqa(
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
+
     let start = Instant::now();
     let modifications: usize = par_iter(&paths)
         .flatten()
@@ -212,6 +218,9 @@ pub fn autoformat(
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
+
     let start = Instant::now();
     let modifications = par_iter(&paths)
         .flatten()
@@ -245,6 +254,9 @@ pub fn show_settings(
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
 
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
+
     // Print the list of files.
     let Some(entry) = paths
         .iter()
@@ -268,8 +280,11 @@ pub fn show_files(
     overrides: &Overrides,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) =
+    let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
 
     // Print the list of files.
     for entry in paths

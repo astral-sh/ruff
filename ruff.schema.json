@@ -288,6 +288,17 @@
         }
       ]
     },
+    "required-version": {
+      "description": "Require a specific version of Ruff to be running (useful for unifying results across many environments, e.g., with a `pyproject.toml` file).",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Version"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "respect-gitignore": {
       "description": "Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`, `.git/info/exclude`, and global `gitignore` files. Enabled by default.",
       "type": [
@@ -1196,6 +1207,9 @@
         "parents",
         "all"
       ]
+    },
+    "Version": {
+      "type": "string"
     }
   }
 }

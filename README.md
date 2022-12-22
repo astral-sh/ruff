@@ -1965,6 +1965,25 @@ when considering any matching files.
 
 ---
 
+#### [`required-version`](#required-version)
+
+Require a specific version of Ruff to be running (useful for unifying
+results across many environments, e.g., with a `pyproject.toml`
+file).
+
+**Default value**: `None`
+
+**Type**: `String`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+required-version = "0.0.193"
+```
+
+---
+
 #### [`respect-gitignore`](#respect-gitignore)
 
 Whether to automatically exclude files that are ignored by `.ignore`,
