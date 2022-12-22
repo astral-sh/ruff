@@ -2554,7 +2554,7 @@ impl CheckKind {
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
             CheckKind::RedundantOpenModes => "Unnecessary open mode parameters".to_string(),
             CheckKind::RemoveSixCompat => "Unnecessary `six` compatibility usage".to_string(),
-            CheckKind::DatetimeTimezoneUTC => "Use datetime.UTC alias".to_string(),
+            CheckKind::DatetimeTimezoneUTC => "Use `datetime.UTC` alias".to_string(),
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
             }
