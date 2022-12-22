@@ -24,9 +24,7 @@ pub fn main(cli: &Cli) -> Result<()> {
             .parent()
             .expect("Failed to find root directory")
             .join("ruff.schema.json");
-        if fs::read(&file).map_or(true, |old| old != schema_string.as_bytes()) {
-            fs::write(&file, schema_string.as_bytes())?;
-        }
+        fs::write(&file, schema_string.as_bytes())?;
     }
     Ok(())
 }
