@@ -628,6 +628,15 @@ where
                 }
             }
             StmtKind::Import { names } => {
+                if self.settings.enabled.contains(&CheckCode::E401) {
+                    if names.len() > 1 {
+                        self.add_check(Check::new(
+                            CheckKind::MultipleImportsOnOneLine,
+                            Range::from_located(stmt),
+                        ));
+                    }
+                }
+
                 if self.settings.enabled.contains(&CheckCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
                         self.add_check(Check::new(

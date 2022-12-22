@@ -1,0 +1,29 @@
+---
+source: src/pycodestyle/mod.rs
+expression: checks
+---
+- kind: ModuleImportNotAtTopOfFile
+  location:
+    row: 55
+    column: 0
+  end_location:
+    row: 55
+    column: 10
+  fix: ~
+- kind: ModuleImportNotAtTopOfFile
+  location:
+    row: 57
+    column: 0
+  end_location:
+    row: 57
+    column: 10
+  fix: ~
+- kind: ModuleImportNotAtTopOfFile
+  location:
+    row: 61
+    column: 0
+  end_location:
+    row: 61
+    column: 10
+  fix: ~
+

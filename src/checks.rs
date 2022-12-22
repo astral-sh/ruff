@@ -33,6 +33,7 @@ use crate::pyupgrade::types::Primitive;
 )]
 pub enum CheckCode {
     // pycodestyle errors
+    E401,
     E402,
     E501,
     E711,
@@ -644,6 +645,7 @@ pub enum CheckKind {
     IOError(String),
     LineTooLong(usize, usize),
     ModuleImportNotAtTopOfFile,
+    MultipleImportsOnOneLine,
     NoneComparison(RejectedCmpop),
     NotInTest,
     NotIsTest,
@@ -978,6 +980,7 @@ impl CheckCode {
     pub fn kind(&self) -> CheckKind {
         match self {
             // pycodestyle errors
+            CheckCode::E401 => CheckKind::MultipleImportsOnOneLine,
             CheckCode::E402 => CheckKind::ModuleImportNotAtTopOfFile,
             CheckCode::E501 => CheckKind::LineTooLong(89, 88),
             CheckCode::E711 => CheckKind::NoneComparison(RejectedCmpop::Eq),
@@ -1462,6 +1465,7 @@ impl CheckCode {
             CheckCode::DTZ007 => CheckCategory::Flake8Datetimez,
             CheckCode::DTZ011 => CheckCategory::Flake8Datetimez,
             CheckCode::DTZ012 => CheckCategory::Flake8Datetimez,
+            CheckCode::E401 => CheckCategory::Pycodestyle,
             CheckCode::E402 => CheckCategory::Pycodestyle,
             CheckCode::E501 => CheckCategory::Pycodestyle,
             CheckCode::E711 => CheckCategory::Pycodestyle,
@@ -1657,6 +1661,7 @@ impl CheckKind {
             CheckKind::IsLiteral => &CheckCode::F632,
             CheckKind::LateFutureImport => &CheckCode::F404,
             CheckKind::LineTooLong(..) => &CheckCode::E501,
+            CheckKind::MultipleImportsOnOneLine => &CheckCode::E401,
             CheckKind::ModuleImportNotAtTopOfFile => &CheckCode::E402,
             CheckKind::MultiValueRepeatedKeyLiteral => &CheckCode::F601,
             CheckKind::MultiValueRepeatedKeyVariable(_) => &CheckCode::F602,
@@ -2016,6 +2021,7 @@ impl CheckKind {
             CheckKind::ModuleImportNotAtTopOfFile => {
                 "Module level import not at top of file".to_string()
             }
+            CheckKind::MultipleImportsOnOneLine => "Multiple imports on one line".to_string(),
             CheckKind::MultiValueRepeatedKeyLiteral => {
                 "Dictionary key literal repeated".to_string()
             }
