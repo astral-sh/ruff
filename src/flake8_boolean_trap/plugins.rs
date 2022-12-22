@@ -5,7 +5,18 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-const FUNC_NAME_ALLOWLIST: &[&str] = &["get", "setdefault", "pop", "fromkeys"];
+const FUNC_NAME_ALLOWLIST: &[&str] = &[
+    "assertEqual",
+    "assertEquals",
+    "assertNotEqual",
+    "assertNotEquals",
+    "failIfEqual",
+    "failUnlessEqual",
+    "fromkeys",
+    "get",
+    "pop",
+    "setdefault",
+];
 
 /// Returns `true` if an argument is allowed to use a boolean trap. To return
 /// `true`, the function name must be explicitly allowed, and the argument must
