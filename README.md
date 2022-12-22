@@ -39,9 +39,11 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Zulip](https://github.com/zulip/zulip)
 - [Pydantic](https://github.com/pydantic/pydantic)
-- [Saleor](https://github.com/saleor/saleor)
 - [Hatch](https://github.com/pypa/hatch)
-- [Jupyter Server](https://github.com/jupyter-server/jupyter_server)
+- [Jupyter](https://github.com/jupyter-server/jupyter_server)
+- [Synapse](https://github.com/matrix-org/synapse)
+- [Ibis](https://github.com/ibis-project/ibis)
+- [Saleor](https://github.com/saleor/saleor)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
