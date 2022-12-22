@@ -2,12 +2,15 @@
 //! command-line options. Structure mirrors the user-facing representation of
 //! the various parameters.
 
+use std::borrow::Cow;
+use std::env::VarError;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
 use shellexpand;
+use shellexpand::LookupError;
 
 use crate::checks_gen::CheckCodePrefix;
 use crate::cli::{collect_per_file_ignores, Overrides};
@@ -274,9 +277,13 @@ impl Configuration {
 /// Given a list of source paths, which could include glob patterns, resolve the
 /// matching paths.
 pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
-    let globs = src
+    let expansions = src
         .iter()
-        .map(Path::new)
+        .map(shellexpand::full)
+        .collect::<Result<Vec<Cow<'_, str>>, LookupError<VarError>>>()?;
+    let globs = expansions
+        .iter()
+        .map(|path| Path::new(path.as_ref()))
         .map(|path| fs::normalize_path_to(path, project_root))
         .map(|path| glob(&path.to_string_lossy()))
         .collect::<Result<Vec<Paths>, PatternError>>()?;
