@@ -3,6 +3,7 @@ use std::str::FromStr;
 use anyhow::{bail, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use ruff::checks::PREFIX_REDIRECTS;
 use ruff::checks_gen::CheckCodePrefix;
 use ruff::settings::types::PatternPrefixPair;
 use rustc_hash::FxHashMap;
@@ -18,7 +19,9 @@ pub fn parse_prefix_codes(value: &str) -> Vec<CheckCodePrefix> {
         if code.is_empty() {
             continue;
         }
-        if let Ok(code) = CheckCodePrefix::from_str(code) {
+        if let Some(code) = PREFIX_REDIRECTS.get(code) {
+            codes.push(code.clone());
+        } else if let Ok(code) = CheckCodePrefix::from_str(code) {
             codes.push(code);
         } else {
             eprintln!("Unsupported prefix code: {code}");
@@ -83,16 +86,22 @@ impl State {
     fn parse(&self) -> Vec<PatternPrefixPair> {
         let mut codes: Vec<PatternPrefixPair> = vec![];
         for code in &self.codes {
-            match CheckCodePrefix::from_str(code) {
-                Ok(code) => {
-                    for filename in &self.filenames {
-                        codes.push(PatternPrefixPair {
-                            pattern: filename.clone(),
-                            prefix: code.clone(),
-                        });
-                    }
+            if let Some(code) = PREFIX_REDIRECTS.get(code.as_str()) {
+                for filename in &self.filenames {
+                    codes.push(PatternPrefixPair {
+                        pattern: filename.clone(),
+                        prefix: code.clone(),
+                    });
                 }
-                Err(_) => eprintln!("Skipping unrecognized prefix: {code}"),
+            } else if let Ok(code) = CheckCodePrefix::from_str(code) {
+                for filename in &self.filenames {
+                    codes.push(PatternPrefixPair {
+                        pattern: filename.clone(),
+                        prefix: code.clone(),
+                    });
+                }
+            } else {
+                eprintln!("Unsupported prefix code: {code}");
             }
         }
         codes
