@@ -160,11 +160,13 @@ ruff path/to/code/ --watch
 Ruff also works with [pre-commit](https://pre-commit.com):
 
 ```yaml
-repos:
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.191
-    hooks:
-      - id: ruff
+- repo: https://github.com/charliermarsh/ruff-pre-commit
+  # Ruff version.
+  rev: 'v0.0.191'
+  hooks:
+    - id: ruff
+      # Respect `exclude` and `extend-exclude` settings.
+      args: ["--force-exclude"]
 ```
 
 ## Configuration
