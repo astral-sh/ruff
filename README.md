@@ -517,6 +517,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| E401 | MultipleImportsOnOneLine | Multiple imports on one line |  |
 | E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |  |
 | E501 | LineTooLong | Line too long (89 > 88 characters) |  |
 | E711 | NoneComparison | Comparison to `None` should be `cond is None` | 🛠 |

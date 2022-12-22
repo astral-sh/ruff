@@ -1,0 +1,13 @@
+---
+source: src/pycodestyle/mod.rs
+expression: checks
+---
+- kind: MultipleImportsOnOneLine
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 14
+  fix: ~
+
