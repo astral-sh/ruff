@@ -1971,7 +1971,8 @@ when resolving imports, `my_package.foo` is considered a first-party import.
 
 This field supports globs. For example, if you have a series of Python packages in
 a `python_modules` directory, `src = ["python_modules/*"]` would expand to incorporate
-all of the packages in that directory.
+all of the packages in that directory. User home directory and environment variables
+will also be expanded.
 
 **Default value**: `["."]`
 
