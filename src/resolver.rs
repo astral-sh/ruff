@@ -190,7 +190,7 @@ pub fn python_files_in_path(
     overrides: &Overrides,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
-    let paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).collect();
+    let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).collect();
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
@@ -204,6 +204,40 @@ pub fn python_files_in_path(
                     resolver.add(root, settings);
                 }
             }
+        }
+    }
+
+    // Omit any paths that are nested within excluded ancestors. This ensures that
+    // if we pass `subdir/file.py`, and `subdir` is excluded, then we don't
+    // "miss" that exclusion when walking from `subdir/file.py` below.
+    if file_strategy.force_exclude {
+        paths.retain(|path| {
+            for path in path.ancestors() {
+                let settings = resolver.resolve(path, pyproject_strategy);
+                match fs::extract_path_names(path) {
+                    Ok((file_path, file_basename)) => {
+                        if !settings.exclude.is_empty()
+                            && is_excluded(file_path, file_basename, &settings.exclude)
+                        {
+                            debug!("Ignored path via `exclude`: {:?}", path);
+                            return false;
+                        } else if !settings.extend_exclude.is_empty()
+                            && is_excluded(file_path, file_basename, &settings.extend_exclude)
+                        {
+                            debug!("Ignored path via `extend-exclude`: {:?}", path);
+                            return false;
+                        }
+                    }
+                    Err(err) => {
+                        debug!("Ignored path due to error in parsing: {:?}: {}", path, err);
+                        return false;
+                    }
+                }
+            }
+            true
+        });
+        if paths.is_empty() {
+            return Ok((vec![], resolver));
         }
     }
 
