@@ -8,7 +8,7 @@ use schemars::schema_for;
 
 #[derive(Args)]
 pub struct Cli {
-    /// Write the generated table to stdout (rather than to `README.md`).
+    /// Write the generated table to stdout (rather than to `ruff.schema.json`).
     #[arg(long)]
     dry_run: bool,
 }
