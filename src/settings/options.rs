@@ -168,6 +168,7 @@ pub struct Options {
             format = "grouped"
         "#
     )]
+    /// The style in which violation messages should be formatted.
     pub format: Option<SerializationFormat>,
     #[option(
         doc = r#"
@@ -202,6 +203,7 @@ pub struct Options {
             ignore = ["F841"]
         "#
     )]
+    /// A list of check code prefixes to ignore.
     pub ignore: Option<Vec<CheckCodePrefix>>,
     #[option(
         doc = r#"
@@ -226,6 +228,7 @@ pub struct Options {
             line-length = 120
         "#
     )]
+    /// The line length to use when enforcing long-lines violations and fixes.
     pub line_length: Option<usize>,
     #[option(
         doc = r#"
@@ -254,6 +257,7 @@ pub struct Options {
             select = ["E", "F", "B", "Q"]
         "#
     )]
+    /// A list of check code prefixes to enable.
     pub select: Option<Vec<CheckCodePrefix>>,
     #[option(
         doc = r#"
@@ -313,6 +317,7 @@ pub struct Options {
             target-version = "py37"
         "#
     )]
+    /// The Python version to target, e.g., when considering automatic code upgrades.
     pub target_version: Option<PythonVersion>,
     #[option(
         doc = "A list of check code prefixes to consider un-autofix-able.",
@@ -326,28 +331,39 @@ pub struct Options {
     pub unfixable: Option<Vec<CheckCodePrefix>>,
     // Plugins
     #[option_group]
+    /// Options for the `flake8-annotations` plugin.
     pub flake8_annotations: Option<flake8_annotations::settings::Flake8AnnotationsOptions>,
     #[option_group]
+    /// Options for the `flake8-bugbear` plugin.
     pub flake8_bugbear: Option<flake8_bugbear::settings::Flake8BugbearOptions>,
     #[option_group]
+    /// Options for the `flake8-errmsg` plugin.
     pub flake8_errmsg: Option<flake8_errmsg::settings::Flake8ErrMsgOptions>,
     #[option_group]
+    /// Options for the `flake8-quotes` plugin.
     pub flake8_quotes: Option<flake8_quotes::settings::Flake8QuotesOptions>,
     #[option_group]
+    /// Options for the `flake8-tidy-imports` plugin.
     pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Flake8TidyImportsOptions>,
     #[option_group]
+    /// Options for the `flake8-import-conventions` plugin.
     pub flake8_import_conventions:
         Option<flake8_import_conventions::settings::Flake8ImportConventionsOptions>,
     #[option_group]
+    /// Options for the `flake8-unused-arguments` plugin.
     pub flake8_unused_arguments:
         Option<flake8_unused_arguments::settings::Flake8UnusedArgumentsOptions>,
     #[option_group]
+    /// Options for the `isort` plugin.
     pub isort: Option<isort::settings::IsortOptions>,
     #[option_group]
+    /// Options for the `mccabe` plugin.
     pub mccabe: Option<mccabe::settings::McCabeOptions>,
     #[option_group]
+    /// Options for the `pep8-naming` plugin.
     pub pep8_naming: Option<pep8_naming::settings::Pep8NamingOptions>,
     #[option_group]
+    /// Options for the `pyupgrade` plugin.
     pub pyupgrade: Option<pyupgrade::settings::PyUpgradeOptions>,
     // Tables are required to go last.
     #[option(

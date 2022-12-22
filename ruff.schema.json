@@ -87,6 +87,7 @@
       }
     },
     "flake8-annotations": {
+      "description": "Options for the `flake8-annotations` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8AnnotationsOptions"
@@ -97,6 +98,7 @@
       ]
     },
     "flake8-bugbear": {
+      "description": "Options for the `flake8-bugbear` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8BugbearOptions"
@@ -107,6 +109,7 @@
       ]
     },
     "flake8-errmsg": {
+      "description": "Options for the `flake8-errmsg` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ErrMsgOptions"
@@ -117,6 +120,7 @@
       ]
     },
     "flake8-import-conventions": {
+      "description": "Options for the `flake8-import-conventions` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ImportConventionsOptions"
@@ -127,6 +131,7 @@
       ]
     },
     "flake8-quotes": {
+      "description": "Options for the `flake8-quotes` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8QuotesOptions"
@@ -137,6 +142,7 @@
       ]
     },
     "flake8-tidy-imports": {
+      "description": "Options for the `flake8-tidy-imports` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8TidyImportsOptions"
@@ -147,6 +153,7 @@
       ]
     },
     "flake8-unused-arguments": {
+      "description": "Options for the `flake8-unused-arguments` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8UnusedArgumentsOptions"
@@ -163,6 +170,7 @@
       ]
     },
     "format": {
+      "description": "The style in which violation messages should be formatted.",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -173,6 +181,7 @@
       ]
     },
     "ignore": {
+      "description": "A list of check code prefixes to ignore.",
       "type": [
         "array",
         "null"
@@ -188,6 +197,7 @@
       ]
     },
     "isort": {
+      "description": "Options for the `isort` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/IsortOptions"
@@ -198,6 +208,7 @@
       ]
     },
     "line-length": {
+      "description": "The line length to use when enforcing long-lines violations and fixes.",
       "type": [
         "integer",
         "null"
@@ -206,6 +217,7 @@
       "minimum": 0.0
     },
     "mccabe": {
+      "description": "Options for the `mccabe` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/McCabeOptions"
@@ -216,6 +228,7 @@
       ]
     },
     "pep8-naming": {
+      "description": "Options for the `pep8-naming` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Pep8NamingOptions"
@@ -238,6 +251,7 @@
       }
     },
     "pyupgrade": {
+      "description": "Options for the `pyupgrade` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/PyUpgradeOptions"
@@ -254,6 +268,7 @@
       ]
     },
     "select": {
+      "description": "A list of check code prefixes to enable.",
       "type": [
         "array",
         "null"
@@ -278,6 +293,7 @@
       }
     },
     "target-version": {
+      "description": "The Python version to target, e.g., when considering automatic code upgrades.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -915,12 +931,14 @@
       "type": "object",
       "properties": {
         "avoid-escape": {
+          "description": "Whether to avoid using single quotes if a string contains single quotes, or vice-versa.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "docstring-quotes": {
+          "description": "Quote style to prefer for docstrings.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -931,6 +949,7 @@
           ]
         },
         "inline-quotes": {
+          "description": "Quote style to prefer for inline strings.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -941,6 +960,7 @@
           ]
         },
         "multiline-quotes": {
+          "description": "Quote style to prefer for multiline strings.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"

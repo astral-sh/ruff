@@ -26,6 +26,7 @@ pub struct Flake8QuotesOptions {
             inline-quotes = "single"
         "#
     )]
+    /// Quote style to prefer for inline strings.
     pub inline_quotes: Option<Quote>,
     #[option(
         doc = r#"
@@ -37,6 +38,7 @@ pub struct Flake8QuotesOptions {
             multiline-quotes = "single"
         "#
     )]
+    /// Quote style to prefer for multiline strings.
     pub multiline_quotes: Option<Quote>,
     #[option(
         doc = r#"
@@ -48,6 +50,7 @@ pub struct Flake8QuotesOptions {
             docstring-quotes = "single"
         "#
     )]
+    /// Quote style to prefer for docstrings.
     pub docstring_quotes: Option<Quote>,
     #[option(
         doc = r#"
@@ -62,6 +65,7 @@ pub struct Flake8QuotesOptions {
             avoid-escape = false
         "#
     )]
+    /// Whether to avoid using single quotes if a string contains single quotes, or vice-versa.
     pub avoid_escape: Option<bool>,
 }
 
