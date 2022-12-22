@@ -317,7 +317,8 @@ pub struct Options {
             target-version = "py37"
         "#
     )]
-    /// The Python version to target, e.g., when considering automatic code upgrades.
+    /// The Python version to target, e.g., when considering automatic code
+    /// upgrades.
     pub target_version: Option<PythonVersion>,
     #[option(
         doc = "A list of check code prefixes to consider un-autofix-able.",

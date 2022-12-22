@@ -65,7 +65,8 @@ pub struct Flake8QuotesOptions {
             avoid-escape = false
         "#
     )]
-    /// Whether to avoid using single quotes if a string contains single quotes, or vice-versa.
+    /// Whether to avoid using single quotes if a string contains single quotes,
+    /// or vice-versa.
     pub avoid_escape: Option<bool>,
 }
 
