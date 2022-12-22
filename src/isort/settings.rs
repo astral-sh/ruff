@@ -3,11 +3,14 @@
 use std::collections::BTreeSet;
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Options {
+pub struct IsortOptions {
     #[option(
         doc = r#"
             Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
@@ -93,7 +96,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: Options) -> Self {
+    pub fn from_options(options: IsortOptions) -> Self {
         Self {
             combine_as_imports: options.combine_as_imports.unwrap_or_default(),
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or_default(),

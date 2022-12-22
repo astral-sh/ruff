@@ -1,11 +1,14 @@
 //! Settings for the `flake8-errmsg` plugin.
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Options {
+pub struct Flake8ErrMsgOptions {
     #[option(
         doc = r#"
             Maximum string length for string literals in exception messages.
@@ -24,7 +27,7 @@ pub struct Settings {
 
 impl Settings {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: Options) -> Self {
+    pub fn from_options(options: Flake8ErrMsgOptions) -> Self {
         Self {
             max_string_length: options.max_string_length.unwrap_or_default(),
         }

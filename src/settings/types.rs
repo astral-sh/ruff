@@ -7,13 +7,16 @@ use anyhow::{anyhow, bail, Result};
 use clap::ValueEnum;
 use globset::{Glob, GlobSetBuilder};
 use rustc_hash::FxHashSet;
+use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
 use crate::fs;
 
-#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(
+    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum PythonVersion {
     Py33,
@@ -142,7 +145,7 @@ impl FromStr for PatternPrefixPair {
     }
 }
 
-#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum SerializationFormat {
     Text,

@@ -1,11 +1,14 @@
 //! Settings for the `flake-annotations` plugin.
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Options {
+pub struct Flake8AnnotationsOptions {
     #[option(
         doc = r#"
             Whether to allow the omission of a return type hint for `__init__` if at least one
@@ -60,7 +63,7 @@ pub struct Settings {
 
 impl Settings {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: Options) -> Self {
+    pub fn from_options(options: Flake8AnnotationsOptions) -> Self {
         Self {
             mypy_init_return: options.mypy_init_return.unwrap_or_default(),
             suppress_dummy_args: options.suppress_dummy_args.unwrap_or_default(),

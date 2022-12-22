@@ -48,6 +48,7 @@ rustc-hash = { version = "1.1.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "c01f014b1269eedcf4bdb45d5fbc62ae2beecf31" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "c01f014b1269eedcf4bdb45d5fbc62ae2beecf31" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "c01f014b1269eedcf4bdb45d5fbc62ae2beecf31" }
+schemars = "0.8.11"
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }
 shellexpand = { version = "3.0.0" }

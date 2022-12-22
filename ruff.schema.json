@@ -1,0 +1,1127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Options",
+  "type": "object",
+  "properties": {
+    "allowed-confusables": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string",
+        "maxLength": 1,
+        "minLength": 1
+      }
+    },
+    "dummy-variable-rgx": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "exclude": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "extend": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "extend-exclude": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "extend-ignore": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/CheckCodePrefix"
+      }
+    },
+    "extend-select": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/CheckCodePrefix"
+      }
+    },
+    "external": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "fix": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "fixable": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/CheckCodePrefix"
+      }
+    },
+    "flake8-annotations": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8AnnotationsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-bugbear": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8BugbearOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-errmsg": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8ErrMsgOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-import-conventions": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8ImportConventionsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-quotes": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8QuotesOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-tidy-imports": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8TidyImportsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-unused-arguments": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8UnusedArgumentsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "force-exclude": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "format": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/SerializationFormat"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ignore": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/CheckCodePrefix"
+      }
+    },
+    "ignore-init-module-imports": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "isort": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/IsortOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "line-length": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint",
+      "minimum": 0.0
+    },
+    "mccabe": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/McCabeOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pep8-naming": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Pep8NamingOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "per-file-ignores": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/CheckCodePrefix"
+        }
+      }
+    },
+    "pyupgrade": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PyUpgradeOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "respect-gitignore": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "select": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/CheckCodePrefix"
+      }
+    },
+    "show-source": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "src": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "target-version": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PythonVersion"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "unfixable": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/CheckCodePrefix"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "CheckCodePrefix": {
+      "type": "string",
+      "enum": [
+        "A",
+        "A0",
+        "A00",
+        "A001",
+        "A002",
+        "A003",
+        "ANN",
+        "ANN0",
+        "ANN00",
+        "ANN001",
+        "ANN002",
+        "ANN003",
+        "ANN1",
+        "ANN10",
+        "ANN101",
+        "ANN102",
+        "ANN2",
+        "ANN20",
+        "ANN201",
+        "ANN202",
+        "ANN204",
+        "ANN205",
+        "ANN206",
+        "ANN4",
+        "ANN40",
+        "ANN401",
+        "ARG",
+        "ARG0",
+        "ARG00",
+        "ARG001",
+        "ARG002",
+        "ARG003",
+        "ARG004",
+        "ARG005",
+        "B",
+        "B0",
+        "B00",
+        "B002",
+        "B003",
+        "B004",
+        "B005",
+        "B006",
+        "B007",
+        "B008",
+        "B009",
+        "B01",
+        "B010",
+        "B011",
+        "B012",
+        "B013",
+        "B014",
+        "B015",
+        "B016",
+        "B017",
+        "B018",
+        "B019",
+        "B02",
+        "B020",
+        "B021",
+        "B022",
+        "B023",
+        "B024",
+        "B025",
+        "B026",
+        "B027",
+        "B9",
+        "B90",
+        "B904",
+        "B905",
+        "BLE",
+        "BLE0",
+        "BLE00",
+        "BLE001",
+        "C",
+        "C4",
+        "C40",
+        "C400",
+        "C401",
+        "C402",
+        "C403",
+        "C404",
+        "C405",
+        "C406",
+        "C408",
+        "C409",
+        "C41",
+        "C410",
+        "C411",
+        "C413",
+        "C414",
+        "C415",
+        "C416",
+        "C417",
+        "C9",
+        "C90",
+        "C901",
+        "D",
+        "D1",
+        "D10",
+        "D100",
+        "D101",
+        "D102",
+        "D103",
+        "D104",
+        "D105",
+        "D106",
+        "D107",
+        "D2",
+        "D20",
+        "D200",
+        "D201",
+        "D202",
+        "D203",
+        "D204",
+        "D205",
+        "D206",
+        "D207",
+        "D208",
+        "D209",
+        "D21",
+        "D210",
+        "D211",
+        "D212",
+        "D213",
+        "D214",
+        "D215",
+        "D3",
+        "D30",
+        "D300",
+        "D301",
+        "D4",
+        "D40",
+        "D400",
+        "D402",
+        "D403",
+        "D404",
+        "D405",
+        "D406",
+        "D407",
+        "D408",
+        "D409",
+        "D41",
+        "D410",
+        "D411",
+        "D412",
+        "D413",
+        "D414",
+        "D415",
+        "D416",
+        "D417",
+        "D418",
+        "D419",
+        "DTZ",
+        "DTZ0",
+        "DTZ00",
+        "DTZ001",
+        "DTZ002",
+        "DTZ003",
+        "DTZ004",
+        "DTZ005",
+        "DTZ006",
+        "DTZ007",
+        "DTZ01",
+        "DTZ011",
+        "DTZ012",
+        "E",
+        "E4",
+        "E40",
+        "E401",
+        "E402",
+        "E5",
+        "E50",
+        "E501",
+        "E7",
+        "E71",
+        "E711",
+        "E712",
+        "E713",
+        "E714",
+        "E72",
+        "E721",
+        "E722",
+        "E73",
+        "E731",
+        "E74",
+        "E741",
+        "E742",
+        "E743",
+        "E9",
+        "E90",
+        "E902",
+        "E99",
+        "E999",
+        "EM",
+        "EM1",
+        "EM10",
+        "EM101",
+        "EM102",
+        "EM103",
+        "ERA",
+        "ERA0",
+        "ERA00",
+        "ERA001",
+        "F",
+        "F4",
+        "F40",
+        "F401",
+        "F402",
+        "F403",
+        "F404",
+        "F405",
+        "F406",
+        "F407",
+        "F5",
+        "F50",
+        "F501",
+        "F502",
+        "F503",
+        "F504",
+        "F505",
+        "F506",
+        "F507",
+        "F508",
+        "F509",
+        "F52",
+        "F521",
+        "F522",
+        "F523",
+        "F524",
+        "F525",
+        "F54",
+        "F541",
+        "F6",
+        "F60",
+        "F601",
+        "F602",
+        "F62",
+        "F621",
+        "F622",
+        "F63",
+        "F631",
+        "F632",
+        "F633",
+        "F634",
+        "F7",
+        "F70",
+        "F701",
+        "F702",
+        "F704",
+        "F706",
+        "F707",
+        "F72",
+        "F722",
+        "F8",
+        "F81",
+        "F811",
+        "F82",
+        "F821",
+        "F822",
+        "F823",
+        "F83",
+        "F831",
+        "F84",
+        "F841",
+        "F842",
+        "F9",
+        "F90",
+        "F901",
+        "FBT",
+        "FBT0",
+        "FBT00",
+        "FBT001",
+        "FBT002",
+        "FBT003",
+        "I",
+        "I0",
+        "I00",
+        "I001",
+        "I2",
+        "I25",
+        "I252",
+        "IC",
+        "IC0",
+        "IC001",
+        "IC002",
+        "IC003",
+        "IC004",
+        "ICN",
+        "ICN0",
+        "ICN00",
+        "ICN001",
+        "M",
+        "M0",
+        "M001",
+        "N",
+        "N8",
+        "N80",
+        "N801",
+        "N802",
+        "N803",
+        "N804",
+        "N805",
+        "N806",
+        "N807",
+        "N81",
+        "N811",
+        "N812",
+        "N813",
+        "N814",
+        "N815",
+        "N816",
+        "N817",
+        "N818",
+        "PD",
+        "PD0",
+        "PD00",
+        "PD002",
+        "PD003",
+        "PD004",
+        "PD007",
+        "PD008",
+        "PD009",
+        "PD01",
+        "PD010",
+        "PD011",
+        "PD012",
+        "PD013",
+        "PD015",
+        "PD9",
+        "PD90",
+        "PD901",
+        "PDV",
+        "PDV0",
+        "PDV002",
+        "PDV003",
+        "PDV004",
+        "PDV007",
+        "PDV008",
+        "PDV009",
+        "PDV01",
+        "PDV010",
+        "PDV011",
+        "PDV012",
+        "PDV013",
+        "PDV015",
+        "PDV9",
+        "PDV90",
+        "PDV901",
+        "PGH",
+        "PGH0",
+        "PGH00",
+        "PGH001",
+        "PGH002",
+        "PGH003",
+        "PLC",
+        "PLC0",
+        "PLC04",
+        "PLC041",
+        "PLC0414",
+        "PLC2",
+        "PLC22",
+        "PLC220",
+        "PLC2201",
+        "PLC3",
+        "PLC30",
+        "PLC300",
+        "PLC3002",
+        "PLE",
+        "PLE0",
+        "PLE01",
+        "PLE011",
+        "PLE0117",
+        "PLE0118",
+        "PLE1",
+        "PLE11",
+        "PLE114",
+        "PLE1142",
+        "PLR",
+        "PLR0",
+        "PLR02",
+        "PLR020",
+        "PLR0206",
+        "PLR04",
+        "PLR040",
+        "PLR0402",
+        "PLR1",
+        "PLR17",
+        "PLR170",
+        "PLR1701",
+        "PLR172",
+        "PLR1722",
+        "PLW",
+        "PLW0",
+        "PLW01",
+        "PLW012",
+        "PLW0120",
+        "PLW06",
+        "PLW060",
+        "PLW0602",
+        "Q",
+        "Q0",
+        "Q00",
+        "Q000",
+        "Q001",
+        "Q002",
+        "Q003",
+        "R",
+        "R5",
+        "R50",
+        "R501",
+        "R502",
+        "R503",
+        "R504",
+        "R505",
+        "R506",
+        "R507",
+        "R508",
+        "RET",
+        "RET5",
+        "RET50",
+        "RET501",
+        "RET502",
+        "RET503",
+        "RET504",
+        "RET505",
+        "RET506",
+        "RET507",
+        "RET508",
+        "RUF",
+        "RUF0",
+        "RUF00",
+        "RUF001",
+        "RUF002",
+        "RUF003",
+        "RUF1",
+        "RUF10",
+        "RUF100",
+        "S",
+        "S1",
+        "S10",
+        "S101",
+        "S102",
+        "S104",
+        "S105",
+        "S106",
+        "S107",
+        "SIM",
+        "SIM1",
+        "SIM11",
+        "SIM118",
+        "T",
+        "T1",
+        "T10",
+        "T100",
+        "T2",
+        "T20",
+        "T201",
+        "T203",
+        "TID",
+        "TID2",
+        "TID25",
+        "TID252",
+        "U",
+        "U0",
+        "U00",
+        "U001",
+        "U003",
+        "U004",
+        "U005",
+        "U006",
+        "U007",
+        "U008",
+        "U009",
+        "U01",
+        "U010",
+        "U011",
+        "U012",
+        "U013",
+        "U014",
+        "U015",
+        "U016",
+        "UP",
+        "UP0",
+        "UP00",
+        "UP001",
+        "UP003",
+        "UP004",
+        "UP005",
+        "UP006",
+        "UP007",
+        "UP008",
+        "UP009",
+        "UP01",
+        "UP010",
+        "UP011",
+        "UP012",
+        "UP013",
+        "UP014",
+        "UP015",
+        "UP016",
+        "W",
+        "W2",
+        "W29",
+        "W292",
+        "W6",
+        "W60",
+        "W605",
+        "YTT",
+        "YTT1",
+        "YTT10",
+        "YTT101",
+        "YTT102",
+        "YTT103",
+        "YTT2",
+        "YTT20",
+        "YTT201",
+        "YTT202",
+        "YTT203",
+        "YTT204",
+        "YTT3",
+        "YTT30",
+        "YTT301",
+        "YTT302",
+        "YTT303"
+      ]
+    },
+    "Flake8AnnotationsOptions": {
+      "type": "object",
+      "properties": {
+        "allow-star-arg-any": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "mypy-init-return": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "suppress-dummy-args": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "suppress-none-returning": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8BugbearOptions": {
+      "type": "object",
+      "properties": {
+        "extend-immutable-calls": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8ErrMsgOptions": {
+      "type": "object",
+      "properties": {
+        "max-string-length": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8ImportConventionsOptions": {
+      "type": "object",
+      "properties": {
+        "aliases": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "extend-aliases": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8QuotesOptions": {
+      "type": "object",
+      "properties": {
+        "avoid-escape": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "docstring-quotes": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quote"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inline-quotes": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quote"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "multiline-quotes": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quote"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8TidyImportsOptions": {
+      "type": "object",
+      "properties": {
+        "ban-relative-imports": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Strictness"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8UnusedArgumentsOptions": {
+      "type": "object",
+      "properties": {
+        "ignore-variadic-names": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "IsortOptions": {
+      "type": "object",
+      "properties": {
+        "combine-as-imports": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "extra-standard-library": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "force-wrap-aliases": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "known-first-party": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "known-third-party": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "McCabeOptions": {
+      "type": "object",
+      "properties": {
+        "max-complexity": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Pep8NamingOptions": {
+      "type": "object",
+      "properties": {
+        "classmethod-decorators": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignore-names": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "staticmethod-decorators": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PyUpgradeOptions": {
+      "type": "object",
+      "properties": {
+        "keep-runtime-typing": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PythonVersion": {
+      "type": "string",
+      "enum": [
+        "py33",
+        "py34",
+        "py35",
+        "py36",
+        "py37",
+        "py38",
+        "py39",
+        "py310",
+        "py311"
+      ]
+    },
+    "Quote": {
+      "type": "string",
+      "enum": [
+        "single",
+        "double"
+      ]
+    },
+    "SerializationFormat": {
+      "type": "string",
+      "enum": [
+        "text",
+        "json",
+        "junit",
+        "grouped",
+        "github"
+      ]
+    },
+    "Strictness": {
+      "type": "string",
+      "enum": [
+        "parents",
+        "all"
+      ]
+    }
+  }
+}

@@ -1,11 +1,14 @@
 //! Settings for the `pyupgrade` plugin.
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Options {
+pub struct PyUpgradeOptions {
     #[option(
         doc = r#"
             Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively.
@@ -26,7 +29,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: &Options) -> Self {
+    pub fn from_options(options: &PyUpgradeOptions) -> Self {
         Self {
             keep_runtime_typing: options.keep_runtime_typing.unwrap_or_default(),
         }

@@ -14,5 +14,7 @@ ruff = { path = ".." }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "c01f014b1269eedcf4bdb45d5fbc62ae2beecf31" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "c01f014b1269eedcf4bdb45d5fbc62ae2beecf31" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "c01f014b1269eedcf4bdb45d5fbc62ae2beecf31" }
+schemars = "0.8.11"
+serde_json = "1.0.91"
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }

@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 use itertools::Itertools;
 use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
@@ -15,9 +16,11 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("seaborn", "sns"),
 ];
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Options {
+pub struct Flake8ImportConventionsOptions {
     #[option(
         doc = "The conventional aliases for imports. These aliases can be extended by the \
                `extend_aliases` option.",
@@ -66,7 +69,7 @@ fn default_aliases() -> FxHashMap<String, String> {
         .collect::<FxHashMap<_, _>>()
 }
 
-fn resolve_aliases(options: Options) -> FxHashMap<String, String> {
+fn resolve_aliases(options: Flake8ImportConventionsOptions) -> FxHashMap<String, String> {
     let mut aliases = match options.aliases {
         Some(options_aliases) => options_aliases,
         None => default_aliases(),
@@ -78,7 +81,7 @@ fn resolve_aliases(options: Options) -> FxHashMap<String, String> {
 }
 
 impl Settings {
-    pub fn from_options(options: Options) -> Self {
+    pub fn from_options(options: Flake8ImportConventionsOptions) -> Self {
         Self {
             aliases: resolve_aliases(options),
         }

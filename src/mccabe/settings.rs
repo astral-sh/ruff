@@ -1,11 +1,14 @@
 //! Settings for the `mccabe` plugin.
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Options {
+pub struct McCabeOptions {
     #[option(
         doc = "The maximum McCabe complexity to allow before triggering `C901` errors.",
         default = "10",
@@ -24,7 +27,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: &Options) -> Self {
+    pub fn from_options(options: &McCabeOptions) -> Self {
         Self {
             max_complexity: options.max_complexity.unwrap_or_default(),
         }

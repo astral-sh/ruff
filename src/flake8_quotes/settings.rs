@@ -1,18 +1,21 @@
 //! Settings for the `flake8-quotes` plugin.
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Quote {
     Single,
     Double,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Options {
+pub struct Flake8QuotesOptions {
     #[option(
         doc = r#"
             Quote style to prefer for inline strings (either "single" (`'`) or "double" (`"`)).
@@ -71,7 +74,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: Options) -> Self {
+    pub fn from_options(options: Flake8QuotesOptions) -> Self {
         Self {
             inline_quotes: options.inline_quotes.unwrap_or(Quote::Double),
             multiline_quotes: options.multiline_quotes.unwrap_or(Quote::Double),

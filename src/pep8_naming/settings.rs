@@ -1,6 +1,7 @@
 //! Settings for the `pep8-naming` plugin.
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 const IGNORE_NAMES: [&str; 12] = [
@@ -22,9 +23,11 @@ const CLASSMETHOD_DECORATORS: [&str; 1] = ["classmethod"];
 
 const STATICMETHOD_DECORATORS: [&str; 1] = ["staticmethod"];
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Options {
+pub struct Pep8NamingOptions {
     #[option(
         doc = r#"
             A list of names to ignore when considering `pep8-naming` violations.
@@ -74,7 +77,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_options(options: Options) -> Self {
+    pub fn from_options(options: Pep8NamingOptions) -> Self {
         Self {
             ignore_names: options
                 .ignore_names

@@ -425,40 +425,44 @@ other-attribute = 1
                 target_version: None,
                 show_source: None,
                 flake8_annotations: None,
-                flake8_bugbear: Some(flake8_bugbear::settings::Options {
+                flake8_bugbear: Some(flake8_bugbear::settings::Flake8BugbearOptions {
                     extend_immutable_calls: Some(vec![
                         "fastapi.Depends".to_string(),
                         "fastapi.Query".to_string(),
                     ]),
                 }),
-                flake8_errmsg: Some(flake8_errmsg::settings::Options {
+                flake8_errmsg: Some(flake8_errmsg::settings::Flake8ErrMsgOptions {
                     max_string_length: Some(20),
                 }),
-                flake8_quotes: Some(flake8_quotes::settings::Options {
+                flake8_quotes: Some(flake8_quotes::settings::Flake8QuotesOptions {
                     inline_quotes: Some(Quote::Single),
                     multiline_quotes: Some(Quote::Double),
                     docstring_quotes: Some(Quote::Double),
                     avoid_escape: Some(true),
                 }),
-                flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
-                    ban_relative_imports: Some(Strictness::Parents)
-                }),
-                flake8_import_conventions: Some(flake8_import_conventions::settings::Options {
-                    aliases: Some(FxHashMap::from_iter([(
-                        "pandas".to_string(),
-                        "pd".to_string(),
-                    )])),
-                    extend_aliases: Some(FxHashMap::from_iter([(
-                        "dask.dataframe".to_string(),
-                        "dd".to_string(),
-                    )])),
-                }),
+                flake8_tidy_imports: Some(
+                    flake8_tidy_imports::settings::Flake8TidyImportsOptions {
+                        ban_relative_imports: Some(Strictness::Parents)
+                    }
+                ),
+                flake8_import_conventions: Some(
+                    flake8_import_conventions::settings::Flake8ImportConventionsOptions {
+                        aliases: Some(FxHashMap::from_iter([(
+                            "pandas".to_string(),
+                            "pd".to_string(),
+                        )])),
+                        extend_aliases: Some(FxHashMap::from_iter([(
+                            "dask.dataframe".to_string(),
+                            "dd".to_string(),
+                        )])),
+                    }
+                ),
                 flake8_unused_arguments: None,
                 isort: None,
-                mccabe: Some(mccabe::settings::Options {
+                mccabe: Some(mccabe::settings::McCabeOptions {
                     max_complexity: Some(10),
                 }),
-                pep8_naming: Some(pep8_naming::settings::Options {
+                pep8_naming: Some(pep8_naming::settings::Pep8NamingOptions {
                     ignore_names: Some(vec![
                         "setUp".to_string(),
                         "tearDown".to_string(),

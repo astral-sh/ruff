@@ -2,6 +2,7 @@
 
 use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::checks_gen::CheckCodePrefix;
@@ -11,7 +12,9 @@ use crate::{
     flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pyupgrade,
 };
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
     #[option(
@@ -323,27 +326,29 @@ pub struct Options {
     pub unfixable: Option<Vec<CheckCodePrefix>>,
     // Plugins
     #[option_group]
-    pub flake8_annotations: Option<flake8_annotations::settings::Options>,
+    pub flake8_annotations: Option<flake8_annotations::settings::Flake8AnnotationsOptions>,
     #[option_group]
-    pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
+    pub flake8_bugbear: Option<flake8_bugbear::settings::Flake8BugbearOptions>,
     #[option_group]
-    pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
+    pub flake8_errmsg: Option<flake8_errmsg::settings::Flake8ErrMsgOptions>,
     #[option_group]
-    pub flake8_quotes: Option<flake8_quotes::settings::Options>,
+    pub flake8_quotes: Option<flake8_quotes::settings::Flake8QuotesOptions>,
     #[option_group]
-    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
+    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Flake8TidyImportsOptions>,
     #[option_group]
-    pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
+    pub flake8_import_conventions:
+        Option<flake8_import_conventions::settings::Flake8ImportConventionsOptions>,
     #[option_group]
-    pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
+    pub flake8_unused_arguments:
+        Option<flake8_unused_arguments::settings::Flake8UnusedArgumentsOptions>,
     #[option_group]
-    pub isort: Option<isort::settings::Options>,
+    pub isort: Option<isort::settings::IsortOptions>,
     #[option_group]
-    pub mccabe: Option<mccabe::settings::Options>,
+    pub mccabe: Option<mccabe::settings::McCabeOptions>,
     #[option_group]
-    pub pep8_naming: Option<pep8_naming::settings::Options>,
+    pub pep8_naming: Option<pep8_naming::settings::Pep8NamingOptions>,
     #[option_group]
-    pub pyupgrade: Option<pyupgrade::settings::Options>,
+    pub pyupgrade: Option<pyupgrade::settings::PyUpgradeOptions>,
     // Tables are required to go last.
     #[option(
         doc = r#"
