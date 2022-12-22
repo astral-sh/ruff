@@ -65,7 +65,8 @@ pub fn main(cli: &Cli) -> Result<()> {
         .derive("Ord")
         .derive("Clone")
         .derive("Serialize")
-        .derive("Deserialize");
+        .derive("Deserialize")
+        .derive("JsonSchema");
     for prefix in prefix_to_codes.keys() {
         gen = gen.push_variant(Variant::new(prefix.to_string()));
     }
@@ -151,6 +152,8 @@ pub fn main(cli: &Cli) -> Result<()> {
     output.push('\n');
     output.push('\n');
     output.push_str("use colored::Colorize;");
+    output.push('\n');
+    output.push_str("use schemars::JsonSchema;");
     output.push('\n');
     output.push_str("use serde::{Deserialize, Serialize};");
     output.push('\n');
