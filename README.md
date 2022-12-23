@@ -1038,6 +1038,8 @@ Upon successful installation, you should see Ruff's diagnostics surfaced directl
 
 ![Code Actions available in Neovim](https://user-images.githubusercontent.com/1309177/208278707-25fa37e4-079d-4597-ad35-b95dba066960.png)
 
+To use `ruff-lsp` with other editors, see the [`ruff-lsp` documentation](https://github.com/charliermarsh/ruff-lsp#installation-and-usage).
+
 ### Language Server Protocol (Unofficial)
 
 Ruff is also available as the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff)
