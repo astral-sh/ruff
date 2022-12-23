@@ -1067,17 +1067,11 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::EM101)
-                    | self.settings.enabled.contains(&CheckCode::EM102)
-                    | self.settings.enabled.contains(&CheckCode::EM103)
+                    || self.settings.enabled.contains(&CheckCode::EM102)
+                    || self.settings.enabled.contains(&CheckCode::EM103)
                 {
                     if let Some(exc) = exc {
-                        self.add_checks(
-                            flake8_errmsg::checks::check_string_in_exception(
-                                exc,
-                                self.settings.flake8_errmsg.max_string_length,
-                            )
-                            .into_iter(),
-                        );
+                        flake8_errmsg::plugins::string_in_exception(self, exc);
                     }
                 }
             }
