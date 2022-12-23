@@ -48,8 +48,8 @@ prior to merging.
 There are four phases to adding a new lint rule:
 
 1. Define the rule in `src/checks.rs`.
-2. Define the _logic_ for triggering the rule in `src/check_ast.rs` (for AST-based checks),
-   `src/check_tokens.rs` (for token-based checks), or `src/check_lines.rs` (for text-based checks).
+2. Define the _logic_ for triggering the rule in `src/checkers/ast.rs` (for AST-based checks),
+   `src/checkers/tokens.rs` (for token-based checks), or `src/checkers/lines.rs` (for text-based checks).
 3. Add a test fixture.
 4. Update the generated files (documentation and generated code).
 
