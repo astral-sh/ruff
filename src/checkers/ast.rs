@@ -1644,6 +1644,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP016) {
                     pyupgrade::plugins::remove_six_compat(self, expr);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP018) {
+                    pyupgrade::plugins::native_literals(self, expr, func, args, keywords);
+                }
 
                 // flake8-super
                 if self.settings.enabled.contains(&CheckCode::UP008) {

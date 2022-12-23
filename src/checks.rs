@@ -226,6 +226,7 @@ pub enum CheckCode {
     UP015,
     UP016,
     UP017,
+    UP018,
     // pydocstyle
     D100,
     D101,
@@ -829,6 +830,7 @@ pub enum CheckKind {
     RedundantOpenModes,
     RemoveSixCompat,
     DatetimeTimezoneUTC,
+    NativeLiterals,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1203,6 +1205,7 @@ impl CheckCode {
             CheckCode::UP015 => CheckKind::RedundantOpenModes,
             CheckCode::UP016 => CheckKind::RemoveSixCompat,
             CheckCode::UP017 => CheckKind::DatetimeTimezoneUTC,
+            CheckCode::UP018 => CheckKind::NativeLiterals,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1621,6 +1624,7 @@ impl CheckCode {
             CheckCode::UP015 => CheckCategory::Pyupgrade,
             CheckCode::UP016 => CheckCategory::Pyupgrade,
             CheckCode::UP017 => CheckCategory::Pyupgrade,
+            CheckCode::UP018 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1832,6 +1836,7 @@ impl CheckKind {
             CheckKind::RedundantOpenModes => &CheckCode::UP015,
             CheckKind::RemoveSixCompat => &CheckCode::UP016,
             CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
+            CheckKind::NativeLiterals => &CheckCode::UP018,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(_) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(_) => &CheckCode::D410,
@@ -2555,6 +2560,7 @@ impl CheckKind {
             CheckKind::RedundantOpenModes => "Unnecessary open mode parameters".to_string(),
             CheckKind::RemoveSixCompat => "Unnecessary `six` compatibility usage".to_string(),
             CheckKind::DatetimeTimezoneUTC => "Use `datetime.UTC` alias".to_string(),
+            CheckKind::NativeLiterals => "Unnecessary call to `str` and `bytes`".to_string(),
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
             }
@@ -2956,6 +2962,7 @@ impl CheckKind {
                 | CheckKind::ConvertNamedTupleFunctionalToClass(..)
                 | CheckKind::ConvertTypedDictFunctionalToClass(..)
                 | CheckKind::DashedUnderlineAfterSection(..)
+                | CheckKind::DatetimeTimezoneUTC
                 | CheckKind::DeprecatedUnittestAlias(..)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DoNotAssignLambda
@@ -2969,6 +2976,7 @@ impl CheckKind {
                 | CheckKind::KeyInDict(..)
                 | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::MissingReturnTypeSpecialMethod(..)
+                | CheckKind::NativeLiterals
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
@@ -2991,7 +2999,6 @@ impl CheckKind {
                 | CheckKind::RedundantOpenModes
                 | CheckKind::RedundantTupleInExceptionHandler(..)
                 | CheckKind::RemoveSixCompat
-                | CheckKind::DatetimeTimezoneUTC
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
                 | CheckKind::SectionUnderlineAfterName(..)
