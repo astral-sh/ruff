@@ -629,6 +629,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
 | UP016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
 | UP017 | DatetimeTimezoneUTC | Use `datetime.UTC` alias | 🛠 |
+| UP018 | NativeLiterals | Unnecessary call to `str` and `bytes` | 🛠 |
 
 ### pep8-naming (N)
 
@@ -1232,7 +1233,7 @@ natively, including:
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (17/33)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (18/33)
 - [`yesqa`](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different error code prefixes than would be found in the
