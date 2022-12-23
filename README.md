@@ -1078,18 +1078,6 @@ require'lspconfig'.pylsp.setup {
 }
 ```
 
-### PyCharm
-
-Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
-in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
-add a new tool with the following configuration:
-
-![Install Ruff as an External Tool](https://user-images.githubusercontent.com/1309177/193155720-336e43f0-1a8d-46b4-bc12-e60f9ae01f7e.png)
-
-Ruff should then appear as a runnable action:
-
-![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
-
 ### Vim & Neovim
 
 Ruff can be integrated into any editor that supports the Language Server Protocol via [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp)
@@ -1151,6 +1139,24 @@ null_ls.setup({
 ```
 
 </details>
+
+
+### PyCharm (External Tool)
+
+Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
+in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
+add a new tool with the following configuration:
+
+![Install Ruff as an External Tool](https://user-images.githubusercontent.com/1309177/193155720-336e43f0-1a8d-46b4-bc12-e60f9ae01f7e.png)
+
+Ruff should then appear as a runnable action:
+
+![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
+
+### PyCharm (Unofficial)
+
+Ruff is also available as the [Ruff](https://plugins.jetbrains.com/plugin/20574-ruff) plugin on the
+IntelliJ Marketplace (maintained by @koxudaxi).
 
 ### GitHub Actions
 
