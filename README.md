@@ -17,7 +17,7 @@ An extremely fast Python linter, written in Rust.
 
 - ⚡️  10-100x faster than existing linters
 - 🐍  Installable via `pip`
-- 🤝  Python 3.10 compatibility
+- 🤝  Python 3.11 compatibility
 - 🛠️  `pyproject.toml` support
 - 📦  Built-in caching, to avoid re-analyzing unchanged files
 - 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
@@ -1175,7 +1175,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
