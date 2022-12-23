@@ -138,8 +138,12 @@ fn inner_main() -> Result<ExitCode> {
     }
 
     // Initialize the cache.
+    let cache_dir = match &pyproject_strategy {
+        PyprojectDiscovery::Fixed(settings) => &settings.cache_dir,
+        PyprojectDiscovery::Hierarchical(settings) => &settings.cache_dir,
+    };
     let mut cache_enabled: bool = !cli.no_cache;
-    if cache_enabled && cache::init().is_err() {
+    if cache_enabled && cache::init(cache_dir).is_err() {
         eprintln!("Unable to initialize cache; disabling...");
         cache_enabled = false;
     }

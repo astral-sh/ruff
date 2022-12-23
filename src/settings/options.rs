@@ -321,6 +321,13 @@ pub struct Options {
         "#
     )]
     pub unfixable: Option<Vec<CheckCodePrefix>>,
+    #[option(
+        doc = "A path to the cache directory.",
+        default = ".ruff_cache",
+        value_type = "PathBuf",
+        example = r#"cache-dir = "~/.cache/ruff""#
+    )]
+    pub cache_dir: Option<String>,
     // Plugins
     #[option_group]
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,

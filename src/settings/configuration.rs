@@ -46,6 +46,7 @@ pub struct Configuration {
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub unfixable: Option<Vec<CheckCodePrefix>>,
+    pub cache_dir: Option<PathBuf>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
@@ -130,6 +131,14 @@ impl Configuration {
                 .transpose()?,
             target_version: options.target_version,
             unfixable: options.unfixable,
+            cache_dir: options
+                .cache_dir
+                .map(|dir| {
+                    let dir = shellexpand::full(&dir);
+                    dir.map(|dir| PathBuf::from(dir.as_ref()))
+                })
+                .transpose()
+                .map_err(|e| anyhow!("Invalid `cache-dir` value: {e}"))?,
             // Plugins
             flake8_annotations: options.flake8_annotations,
             flake8_bugbear: options.flake8_bugbear,
@@ -184,6 +193,7 @@ impl Configuration {
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
             unfixable: self.unfixable.or(config.unfixable),
+            cache_dir: self.cache_dir.or(config.cache_dir),
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
             flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
@@ -253,6 +263,9 @@ impl Configuration {
         }
         if let Some(unfixable) = overrides.unfixable {
             self.unfixable = Some(unfixable);
+        }
+        if let Some(cache_dir) = overrides.cache_dir {
+            self.cache_dir = Some(cache_dir);
         }
         // Special-case: `extend_ignore` and `extend_select` are parallel arrays, so
         // push an empty array if only one of the two is provided.
