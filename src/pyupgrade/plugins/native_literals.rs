@@ -18,9 +18,9 @@ pub fn native_literals(
     let ExprKind::Name { id, .. } = &func.node else { return; };
 
     if (id == "str" || id == "bytes")
-        && checker.is_builtin(id)
         && keywords.is_empty()
         && args.len() <= 1
+        && checker.is_builtin(id)
     {
         let Some(arg) = args.get(0) else {
             let mut check = Check::new(CheckKind::NativeLiterals, Range::from_located(expr));
