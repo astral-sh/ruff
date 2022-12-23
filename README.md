@@ -1038,7 +1038,7 @@ Upon successful installation, you should see Ruff's diagnostics surfaced directl
 
 ![Code Actions available in Neovim](https://user-images.githubusercontent.com/1309177/208278707-25fa37e4-079d-4597-ad35-b95dba066960.png)
 
-To use `ruff-lsp` with other editors, see the [`ruff-lsp` documentation](https://github.com/charliermarsh/ruff-lsp#installation-and-usage).
+To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the [`ruff-lsp` documentation](https://github.com/charliermarsh/ruff-lsp#installation-and-usage).
 
 ### Language Server Protocol (Unofficial)
 
@@ -1081,9 +1081,12 @@ require'lspconfig'.pylsp.setup {
 ### Vim & Neovim
 
 Ruff can be integrated into any editor that supports the Language Server Protocol via [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp)
-(see: [Language Server Protocol](#language-server-protocol-official)).
+(see: [Language Server Protocol](#language-server-protocol-official)), including Vim and Neovim.
 
-Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
+It's recommended that you use [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp), the
+officially supported LSP server for Ruff.
+
+However, Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
 extension for `coc.nvim`.
 
 <details>
@@ -1100,7 +1103,6 @@ tools:
     format-command: 'ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -'
     format-stdin: true
 ```
-
 </details>
 
 <details>
@@ -1137,7 +1139,6 @@ null_ls.setup({
     }
 })
 ```
-
 </details>
 
 
