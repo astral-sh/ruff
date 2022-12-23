@@ -536,7 +536,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
 | E902 | IOError | IOError: `...` |  |
 | E999 | SyntaxError | SyntaxError: `...` |  |
-| W292 | NoNewLineAtEndOfFile | No newline at end of file |  |
+| W292 | NoNewLineAtEndOfFile | No newline at end of file | 🛠 |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' |  |
 
 ### mccabe (C90)

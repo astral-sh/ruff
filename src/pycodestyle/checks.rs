@@ -5,8 +5,11 @@ use rustpython_ast::{Located, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
+use crate::autofix::Fix;
+use crate::checks::{Check, CheckCode, CheckKind};
+use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
+use crate::Settings;
 
 static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
 
@@ -134,18 +137,30 @@ pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
 }
 
 /// W292
-pub fn no_newline_at_end_of_file(contents: &str) -> Option<Check> {
+pub fn no_newline_at_end_of_file(
+    contents: &str,
+    settings: &Settings,
+    autofix: flags::Autofix,
+) -> Option<Check> {
     if !contents.ends_with('\n') {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
         if let Some(line) = contents.lines().last() {
-            return Some(Check::new(
+            // Both locations are at the end of the file (and thus the same)
+            let file_end_location = Location::new(contents.lines().count(), line.len() + 1);
+            let mut check = Check::new(
                 CheckKind::NoNewLineAtEndOfFile,
                 Range {
-                    location: Location::new(contents.lines().count(), line.len() + 1),
-                    end_location: Location::new(contents.lines().count(), line.len() + 1),
+                    location: file_end_location,
+                    end_location: file_end_location,
                 },
-            ));
+            );
+            if matches!(autofix, flags::Autofix::Enabled)
+                && settings.fixable.contains(&CheckCode::W292)
+            {
+                check.amend(Fix::insertion("\n".to_string(), file_end_location));
+            }
+            return Some(check);
         }
     }
     None

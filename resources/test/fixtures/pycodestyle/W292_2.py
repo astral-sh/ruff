@@ -1,2 +1,3 @@
 def fn() -> None:
-    pass
+    print("there is a newline (no issues)")
+

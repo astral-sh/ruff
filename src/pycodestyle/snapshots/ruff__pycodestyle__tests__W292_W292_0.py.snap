@@ -9,5 +9,12 @@ expression: checks
   end_location:
     row: 2
     column: 9
-  fix: ~
+  fix:
+    content: "\n"
+    location:
+      row: 2
+      column: 9
+    end_location:
+      row: 2
+      column: 9
 
