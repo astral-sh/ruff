@@ -16,34 +16,6 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct Options {
     #[option(
-        doc = r#"
-            Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
-            option.
-        "#,
-        default = r#"false"#,
-        value_type = "bool",
-        example = r#"
-            combine-as-imports = true
-        "#
-    )]
-    pub combine_as_imports: Option<bool>,
-    #[option(
-        doc = r#"
-            Force `import from` statements with multiple members and at least one alias (e.g.,
-            `import A as B`) to wrap such that every line contains exactly one member. For example,
-            this formatting would be retained, rather than condensing to a single line:
-
-            ```py
-            from .utils import (
-                test_directory as test_directory,
-                test_id as test_id
-            )
-            ```
-
-            Note that this setting is only effective when combined with `combine-as-imports = true`.
-            When `combine-as-imports` isn't enabled, every aliased `import from` will be given its
-            own line, in which case, wrapping is not necessary.
-        "#,
         default = r#"false"#,
         value_type = "bool",
         example = r#"
@@ -51,42 +23,60 @@ pub struct Options {
             combine-as-imports = true
         "#
     )]
+    /// Force `import from` statements with multiple members and at least one alias (e.g.,
+    /// `import A as B`) to wrap such that every line contains exactly one member. For example,
+    /// this formatting would be retained, rather than condensing to a single line:
+    ///
+    /// ```py
+    /// from .utils import (
+    ///     test_directory as test_directory,
+    ///     test_id as test_id
+    /// )
+    /// ```
+    ///
+    /// Note that this setting is only effective when combined with `combine-as-imports = true`.
+    /// When `combine-as-imports` isn't enabled, every aliased `import from` will be given its
+    /// own line, in which case, wrapping is not necessary.
     pub force_wrap_aliases: Option<bool>,
     #[option(
-        doc = r#"
-            A list of modules to consider first-party, regardless of whether they can be identified
-            as such via introspection of the local filesystem.
-        "#,
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            combine-as-imports = true
+        "#
+    )]
+    /// Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
+    /// option.
+    pub combine_as_imports: Option<bool>,
+    #[option(
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
             known-first-party = ["src"]
         "#
     )]
+    /// A list of modules to consider first-party, regardless of whether they can be identified
+    /// as such via introspection of the local filesystem.
     pub known_first_party: Option<Vec<String>>,
     #[option(
-        doc = r#"
-            A list of modules to consider third-party, regardless of whether they can be identified
-            as such via introspection of the local filesystem.
-        "#,
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
             known-third-party = ["src"]
         "#
     )]
+    /// A list of modules to consider third-party, regardless of whether they can be identified
+    /// as such via introspection of the local filesystem.
     pub known_third_party: Option<Vec<String>>,
     #[option(
-        doc = r#"
-            A list of modules to consider standard-library, in addition to those known to Ruff in
-            advance.
-        "#,
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
             extra-standard-library = ["path"]
         "#
     )]
+    /// A list of modules to consider standard-library, in addition to those known to Ruff in
+    /// advance.
     pub extra_standard_library: Option<Vec<String>>,
 }
 

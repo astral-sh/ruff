@@ -14,13 +14,11 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct Options {
     #[option(
-        doc = r#"
-            Maximum string length for string literals in exception messages.
-        "#,
         default = "0",
         value_type = "usize",
         example = "max-string-length = 20"
     )]
+    /// Maximum string length for string literals in exception messages.
     pub max_string_length: Option<usize>,
 }
 

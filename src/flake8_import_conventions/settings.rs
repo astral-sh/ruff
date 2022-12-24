@@ -26,8 +26,6 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
 )]
 pub struct Options {
     #[option(
-        doc = "The conventional aliases for imports. These aliases can be extended by the \
-               `extend_aliases` option.",
         default = r#"{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}"#,
         value_type = "FxHashMap<String, String>",
         example = r#"
@@ -43,8 +41,6 @@ pub struct Options {
     /// the `extend_aliases` option.
     pub aliases: Option<FxHashMap<String, String>>,
     #[option(
-        doc = "A mapping of modules to their conventional import aliases. These aliases will be \
-               added to the `aliases` mapping.",
         default = r#"{}"#,
         value_type = "FxHashMap<String, String>",
         example = r#"

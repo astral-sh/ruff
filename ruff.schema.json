@@ -4,6 +4,7 @@
   "type": "object",
   "properties": {
     "allowed-confusables": {
+      "description": "A list of allowed \"confusable\" Unicode characters to ignore when enforcing `RUF001`, `RUF002`, and `RUF003`.",
       "type": [
         "array",
         "null"
@@ -14,13 +15,22 @@
         "minLength": 1
       }
     },
+    "cache-dir": {
+      "description": "A path to the cache directory.\n\nBy default, Ruff stores cache results in a `.ruff_cache` directory in the current project root.\n\nHowever, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes precedence over that default.\n\nThis setting will override even the `RUFF_CACHE_DIR` environment variable, if set.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "dummy-variable-rgx": {
+      "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when evaluating (e.g.) unused-variable checks. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
       "type": [
         "string",
         "null"
       ]
     },
     "exclude": {
+      "description": "A list of file patterns to exclude from linting.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
       "type": [
         "array",
         "null"
@@ -30,12 +40,14 @@
       }
     },
     "extend": {
+      "description": "A path to a local `pyproject.toml` file to merge into this configuration. User home directory and environment variables will be expanded.\n\nTo resolve the current `pyproject.toml` file, Ruff will first resolve this base configuration file, then merge in any properties defined in the current configuration file.",
       "type": [
         "string",
         "null"
       ]
     },
     "extend-exclude": {
+      "description": "A list of file patterns to omit from linting, in addition to those specified by `exclude`.",
       "type": [
         "array",
         "null"
@@ -45,6 +57,7 @@
       }
     },
     "extend-ignore": {
+      "description": "A list of check code prefixes to ignore, in addition to those specified by `ignore`.",
       "type": [
         "array",
         "null"
@@ -54,6 +67,7 @@
       }
     },
     "extend-select": {
+      "description": "A list of check code prefixes to enable, in addition to those specified by `select`.",
       "type": [
         "array",
         "null"
@@ -63,6 +77,7 @@
       }
     },
     "external": {
+      "description": "A list of check codes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented in Ruff.",
       "type": [
         "array",
         "null"
@@ -72,12 +87,14 @@
       }
     },
     "fix": {
+      "description": "Enable autofix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags).",
       "type": [
         "boolean",
         "null"
       ]
     },
     "fixable": {
+      "description": "A list of check code prefixes to consider autofix-able.",
       "type": [
         "array",
         "null"
@@ -87,7 +104,7 @@
       }
     },
     "flake8-annotations": {
-      "description": "Options for the `flake8-annotations` plugin.",
+      "description": "Plugins Options for the `flake8-annotations` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8AnnotationsOptions"
@@ -164,13 +181,14 @@
       ]
     },
     "force-exclude": {
+      "description": "Whether to enforce `exclude` and `extend-exclude` patterns, even for paths that are passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to respect these exclusions unequivocally.\n\nThis is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all changed files to the [`ruff-pre-commit`](https://github.com/charliermarsh/ruff-pre-commit) plugin, regardless of whether they're marked as excluded by Ruff's own settings.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "format": {
-      "description": "The style in which violation messages should be formatted.",
+      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), or `\"github\"` (GitHub Actions annotations).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -181,7 +199,7 @@
       ]
     },
     "ignore": {
-      "description": "A list of check code prefixes to ignore.",
+      "description": "A list of check code prefixes to ignore. Prefixes can specify exact checks (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled checks (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
       "type": [
         "array",
         "null"
@@ -191,6 +209,7 @@
       }
     },
     "ignore-init-module-imports": {
+      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be +flagged, but with a dedicated message suggesting that the import is either added to the module' +`__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
       "type": [
         "boolean",
         "null"
@@ -208,7 +227,7 @@
       ]
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations and fixes.",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`).",
       "type": [
         "integer",
         "null"
@@ -239,6 +258,7 @@
       ]
     },
     "per-file-ignores": {
+      "description": "A list of mappings from file pattern to check code prefixes to exclude, when considering any matching files.",
       "type": [
         "object",
         "null"
@@ -262,13 +282,14 @@
       ]
     },
     "respect-gitignore": {
+      "description": "Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`, `.git/info/exclude`, and global `gitignore` files. Enabled by default.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "select": {
-      "description": "A list of check code prefixes to enable.",
+      "description": "A list of check code prefixes to enable. Prefixes can specify exact checks (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled checks (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
       "type": [
         "array",
         "null"
@@ -278,12 +299,14 @@
       }
     },
     "show-source": {
+      "description": "Whether to show source code snippets when reporting lint error violations (overridden by the `--show-source` command-line flag).",
       "type": [
         "boolean",
         "null"
       ]
     },
     "src": {
+      "description": "The source code paths to consider, e.g., when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_package/ pyproject.toml src/ my_package/ __init__.py foo.py bar.py ```\n\nThe `src` directory should be included in `source` (e.g., `source = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
       "type": [
         "array",
         "null"
@@ -293,7 +316,7 @@
       }
     },
     "target-version": {
-      "description": "The Python version to target, e.g., when considering automatic code upgrades.",
+      "description": "The Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Note that the target version will _not_ be inferred from the _current_ Python version, and instead must be specified explicitly (as seen below).",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -304,6 +327,7 @@
       ]
     },
     "unfixable": {
+      "description": "A list of check code prefixes to consider un-autofix-able.",
       "type": [
         "array",
         "null"
@@ -799,6 +823,7 @@
         "U014",
         "U015",
         "U016",
+        "U017",
         "UP",
         "UP0",
         "UP00",
@@ -818,6 +843,8 @@
         "UP014",
         "UP015",
         "UP016",
+        "UP017",
+        "UP018",
         "W",
         "W2",
         "W29",
@@ -848,25 +875,28 @@
       "type": "object",
       "properties": {
         "allow-star-arg-any": {
-          "description": "Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs`",
+          "description": "Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "mypy-init-return": {
+          "description": "Whether to allow the omission of a return type hint for `__init__` if at least one argument is annotated.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "suppress-dummy-args": {
+          "description": "Whether to suppress `ANN000`-level errors for arguments matching the \"dummy\" variable regex (like `_`).",
           "type": [
             "boolean",
             "null"
           ]
         },
         "suppress-none-returning": {
+          "description": "Whether to suppress `ANN200`-level errors for functions that meet either of the following criteria:\n\n- Contain no `return` statement. - Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
           "type": [
             "boolean",
             "null"
@@ -879,6 +909,7 @@
       "type": "object",
       "properties": {
         "extend-immutable-calls": {
+          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., `no-mutable-default-argument` checks (`B006`).",
           "type": [
             "array",
             "null"
@@ -894,6 +925,7 @@
       "type": "object",
       "properties": {
         "max-string-length": {
+          "description": "Maximum string length for string literals in exception messages.",
           "type": [
             "integer",
             "null"
@@ -934,14 +966,14 @@
       "type": "object",
       "properties": {
         "avoid-escape": {
-          "description": "Whether to avoid using single quotes if a string contains single quotes, or vice-versa.",
+          "description": "Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "docstring-quotes": {
-          "description": "Quote style to prefer for docstrings.",
+          "description": "Quote style to prefer for docstrings (either \"single\" (`'`) or \"double\" (`\"`)).",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -952,7 +984,7 @@
           ]
         },
         "inline-quotes": {
-          "description": "Quote style to prefer for inline strings.",
+          "description": "Quote style to prefer for inline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -963,7 +995,7 @@
           ]
         },
         "multiline-quotes": {
-          "description": "Quote style to prefer for multiline strings.",
+          "description": "Quote style to prefer for multiline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -980,6 +1012,7 @@
       "type": "object",
       "properties": {
         "ban-relative-imports": {
+          "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module and beyond (`\"parents\"`).",
           "anyOf": [
             {
               "$ref": "#/definitions/Strictness"
@@ -996,6 +1029,7 @@
       "type": "object",
       "properties": {
         "ignore-variadic-names": {
+          "description": "Whether to allow unused variadic arguments, like `*args` and `**kwargs`.",
           "type": [
             "boolean",
             "null"
@@ -1008,12 +1042,14 @@
       "type": "object",
       "properties": {
         "combine-as-imports": {
+          "description": "Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports) option.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "extra-standard-library": {
+          "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.",
           "type": [
             "array",
             "null"
@@ -1023,12 +1059,14 @@
           }
         },
         "force-wrap-aliases": {
+          "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```py from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "known-first-party": {
+          "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
           "type": [
             "array",
             "null"
@@ -1038,6 +1076,7 @@
           }
         },
         "known-third-party": {
+          "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
           "type": [
             "array",
             "null"
@@ -1053,6 +1092,7 @@
       "type": "object",
       "properties": {
         "max-complexity": {
+          "description": "The maximum McCabe complexity to allow before triggering `C901` errors.",
           "type": [
             "integer",
             "null"
@@ -1067,6 +1107,7 @@
       "type": "object",
       "properties": {
         "classmethod-decorators": {
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method. For example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
           "type": [
             "array",
             "null"
@@ -1076,6 +1117,7 @@
           }
         },
         "ignore-names": {
+          "description": "A list of names to ignore when considering `pep8-naming` violations.",
           "type": [
             "array",
             "null"
@@ -1085,6 +1127,7 @@
           }
         },
         "staticmethod-decorators": {
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method. For example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
           "type": [
             "array",
             "null"
@@ -1100,6 +1143,7 @@
       "type": "object",
       "properties": {
         "keep-runtime-typing": {
+          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively.",
           "type": [
             "boolean",
             "null"

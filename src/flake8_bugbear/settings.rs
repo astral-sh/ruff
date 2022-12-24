@@ -14,10 +14,6 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct Options {
     #[option(
-        doc = r#"
-            Additional callable functions to consider "immutable" when evaluating, e.g.,
-            `no-mutable-default-argument` checks (`B006`).
-        "#,
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
@@ -25,6 +21,8 @@ pub struct Options {
             extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
         "#
     )]
+    /// Additional callable functions to consider "immutable" when evaluating, e.g.,
+    /// `no-mutable-default-argument` checks (`B006`).
     pub extend_immutable_calls: Option<Vec<String>>,
 }
 

@@ -21,47 +21,33 @@ pub enum Quote {
 )]
 pub struct Options {
     #[option(
-        doc = r#"
-            Quote style to prefer for inline strings (either "single" (`'`) or "double" (`"`)).
-        "#,
         default = r#""double""#,
         value_type = "Quote",
         example = r#"
             inline-quotes = "single"
         "#
     )]
-    /// Quote style to prefer for inline strings.
+    /// Quote style to prefer for inline strings (either "single" (`'`) or "double" (`"`)).
     pub inline_quotes: Option<Quote>,
     #[option(
-        doc = r#"
-            Quote style to prefer for multiline strings (either "single" (`'`) or "double" (`"`)).
-        "#,
         default = r#""double""#,
         value_type = "Quote",
         example = r#"
             multiline-quotes = "single"
         "#
     )]
-    /// Quote style to prefer for multiline strings.
+    /// Quote style to prefer for multiline strings (either "single" (`'`) or "double" (`"`)).
     pub multiline_quotes: Option<Quote>,
     #[option(
-        doc = r#"
-            Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
-        "#,
         default = r#""double""#,
         value_type = "Quote",
         example = r#"
             docstring-quotes = "single"
         "#
     )]
-    /// Quote style to prefer for docstrings.
+    /// Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
     pub docstring_quotes: Option<Quote>,
     #[option(
-        doc = r#"
-            Whether to avoid using single quotes if a string contains single quotes, or vice-versa
-            with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
-            This minimizes the need to escape quotation marks within strings.
-        "#,
         default = r#"true"#,
         value_type = "bool",
         example = r#"
@@ -69,8 +55,9 @@ pub struct Options {
             avoid-escape = false
         "#
     )]
-    /// Whether to avoid using single quotes if a string contains single quotes,
-    /// or vice-versa.
+    /// Whether to avoid using single quotes if a string contains single quotes, or vice-versa
+    /// with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+    /// This minimizes the need to escape quotation marks within strings.
     pub avoid_escape: Option<bool>,
 }
 

@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct Options {
     #[option(
-        doc = "The maximum McCabe complexity to allow before triggering `C901` errors.",
         default = "10",
         value_type = "usize",
         example = r#"
@@ -22,6 +21,7 @@ pub struct Options {
             max-complexity = 5
         "#
     )]
+    /// The maximum McCabe complexity to allow before triggering `C901` errors.
     pub max_complexity: Option<usize>,
 }
 

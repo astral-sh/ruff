@@ -114,6 +114,21 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
     }
 }
 
+/// Parse a `doc` attribute into it a string literal.
+fn parse_doc(doc: &Attribute) -> syn::Result<String> {
+    let doc = doc
+        .parse_meta()
+        .map_err(|e| syn::Error::new(doc.span(), e))?;
+
+    match doc {
+        syn::Meta::NameValue(syn::MetaNameValue {
+            lit: Lit::Str(lit_str),
+            ..
+        }) => Ok(lit_str.value()),
+        _ => Err(syn::Error::new(doc.span(), "Expected doc attribute.")),
+    }
+}
+
 /// Parse an `#[option(doc="...", default="...", value_type="...",
 /// example="...")]` attribute and return data in the form of an `OptionField`.
 fn handle_option(
@@ -121,29 +136,18 @@ fn handle_option(
     attr: &Attribute,
     docs: Vec<&Attribute>,
 ) -> syn::Result<proc_macro2::TokenStream> {
-    /// Convert the `doc` attribute into its raw string value.
-    fn get_doc(doc: &Attribute) -> syn::Result<String> {
-        let doc = doc
-            .parse_meta()
-            .map_err(|e| syn::Error::new(doc.span(), e))?;
+    // Convert the list of `doc` attributes into a single string.
+    let doc = textwrap::dedent(
+        &docs
+            .into_iter()
+            .map(parse_doc)
+            .collect::<syn::Result<Vec<_>>>()?
+            .join("\n"),
+    )
+    .trim_matches('\n')
+    .to_string();
 
-        match doc {
-            syn::Meta::NameValue(syn::MetaNameValue {
-                lit: syn::Lit::Str(lit_str),
-                ..
-            }) => Ok(lit_str.value()),
-            _ => Err(syn::Error::new(doc.span(), "Expected doc attribute.")),
-        }
-    }
-
-    // Convert the list of `doc` attributes itno a single string.
-    let doc = docs
-        .into_iter()
-        .map(get_doc)
-        .collect::<syn::Result<Vec<_>>>()?
-        .join("\n");
-
-    // unwrap is safe because we're only going over named fields
+    // `unwrap` is safe because we're only going over named fields
     let ident = field.ident.as_ref().unwrap();
 
     let FieldAttributes {
@@ -167,7 +171,6 @@ fn handle_option(
 
 #[derive(Debug)]
 struct FieldAttributes {
-    doc: String,
     default: String,
     value_type: String,
     example: String,
@@ -175,8 +178,6 @@ struct FieldAttributes {
 
 impl Parse for FieldAttributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let doc = _parse_key_value(input, "doc")?;
-        input.parse::<Comma>()?;
         let default = _parse_key_value(input, "default")?;
         input.parse::<Comma>()?;
         let value_type = _parse_key_value(input, "value_type")?;
@@ -187,7 +188,6 @@ impl Parse for FieldAttributes {
         }
 
         Ok(FieldAttributes {
-            doc: textwrap::dedent(&doc).trim_matches('\n').to_string(),
             default,
             value_type,
             example: textwrap::dedent(&example).trim_matches('\n').to_string(),

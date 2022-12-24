@@ -33,22 +33,15 @@ const STATICMETHOD_DECORATORS: [&str; 1] = ["staticmethod"];
 )]
 pub struct Options {
     #[option(
-        doc = r#"
-            A list of names to ignore when considering `pep8-naming` violations.
-        "#,
         default = r#"["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]"#,
         value_type = "Vec<String>",
         example = r#"
             ignore-names = ["callMethod"]
         "#
     )]
+    /// A list of names to ignore when considering `pep8-naming` violations.
     pub ignore_names: Option<Vec<String>>,
     #[option(
-        doc = r#"
-            A list of decorators that, when applied to a method, indicate that the method should be
-            treated as a class method. For example, Ruff will expect that any method decorated by a
-            decorator in this list takes a `cls` argument as its first argument.
-        "#,
         default = r#"["classmethod"]"#,
         value_type = "Vec<String>",
         example = r#"
@@ -56,13 +49,11 @@ pub struct Options {
             classmethod-decorators = ["classmethod", "pydantic.validator"]
         "#
     )]
+    /// A list of decorators that, when applied to a method, indicate that the method should be
+    /// treated as a class method. For example, Ruff will expect that any method decorated by a
+    /// decorator in this list takes a `cls` argument as its first argument.
     pub classmethod_decorators: Option<Vec<String>>,
     #[option(
-        doc = r#"
-            A list of decorators that, when applied to a method, indicate that the method should be
-            treated as a static method. For example, Ruff will expect that any method decorated by a
-            decorator in this list has no `self` or `cls` argument.
-        "#,
         default = r#"["staticmethod"]"#,
         value_type = "Vec<String>",
         example = r#"
@@ -70,6 +61,9 @@ pub struct Options {
             staticmethod-decorators = ["staticmethod", "stcmthd"]
         "#
     )]
+    /// A list of decorators that, when applied to a method, indicate that the method should be
+    /// treated as a static method. For example, Ruff will expect that any method decorated by a
+    /// decorator in this list has no `self` or `cls` argument.
     pub staticmethod_decorators: Option<Vec<String>>,
 }
 
