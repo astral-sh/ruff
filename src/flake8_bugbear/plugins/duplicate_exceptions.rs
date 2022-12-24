@@ -20,7 +20,6 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
     )
 }
 
-#[allow(clippy::map_entry)]
 fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
