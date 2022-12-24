@@ -16,7 +16,7 @@ impl Default for TrailingComma {
     }
 }
 
-#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct ImportFromData<'a> {
     pub module: Option<&'a String>,
     pub level: Option<&'a usize>,
@@ -28,7 +28,7 @@ pub struct AliasData<'a> {
     pub asname: Option<&'a String>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CommentSet<'a> {
     pub atop: Vec<Cow<'a, str>>,
     pub inline: Vec<Cow<'a, str>>,

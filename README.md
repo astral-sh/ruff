@@ -2467,6 +2467,23 @@ extra-standard-library = ["path"]
 
 ---
 
+#### [`force-single-line`](#force-single-line)
+
+Forces all from imports to appear on their own line.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+force-single-line = true
+```
+
+---
+
 #### [`force-wrap-aliases`](#force-wrap-aliases)
 
 Force `import from` statements with multiple members and at least one
