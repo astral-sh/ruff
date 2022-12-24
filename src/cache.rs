@@ -3,7 +3,7 @@ use std::fs;
 use std::fs::{create_dir_all, File, Metadata};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use filetime::FileTime;
@@ -36,8 +36,12 @@ struct CheckResult {
     messages: Vec<Message>,
 }
 
-pub fn cache_dir() -> &'static Path {
-    Path::new(CACHE_DIR.as_ref().map_or(".ruff_cache", String::as_str))
+/// Return the cache directory for a given project root. Defers to the `RUFF_CACHE_DIR` environment
+/// variable, if set.
+pub fn cache_dir(project_root: &Path) -> PathBuf {
+    CACHE_DIR
+        .as_ref()
+        .map_or_else(|| project_root.join(".ruff_cache"), PathBuf::from)
 }
 
 fn content_dir() -> &'static Path {

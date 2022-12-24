@@ -142,9 +142,7 @@ impl Settings {
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
             target_version: config.target_version.unwrap_or(PythonVersion::Py310),
             show_source: config.show_source.unwrap_or_default(),
-            cache_dir: config
-                .cache_dir
-                .unwrap_or_else(|| cache_dir().to_path_buf()),
+            cache_dir: config.cache_dir.unwrap_or_else(|| cache_dir(project_root)),
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
@@ -214,7 +212,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
-            cache_dir: cache_dir().to_path_buf(),
+            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
@@ -248,7 +246,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
-            cache_dir: cache_dir().to_path_buf(),
+            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
