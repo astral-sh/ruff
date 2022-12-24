@@ -343,7 +343,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     context_expr: Located {
                         location: Location {
                             row: 5,
-                            column: 7,
+                            column: 5,
                         },
                         end_location: Some(
                             Location {
@@ -452,7 +452,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     context_expr: Located {
                         location: Location {
                             row: 6,
-                            column: 7,
+                            column: 5,
                         },
                         end_location: Some(
                             Location {

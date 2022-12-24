@@ -731,7 +731,7 @@ YieldExpr: ast::Expr = {
 };
 
 Test<Goal>: ast::Expr = {
-    <body:OrTest<"all">> <location:@L> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::Expr {
+    <location:@L> <body:OrTest<"all">> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::Expr {
         location,
         end_location: Some(end_location),
         custom: (),
