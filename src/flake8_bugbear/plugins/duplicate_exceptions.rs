@@ -35,7 +35,7 @@ fn duplicate_handler_exceptions<'a>(
             if seen.contains_key(&call_path) {
                 duplicates.insert(call_path);
             } else {
-                seen.insert(call_path, type_);
+                seen.entry(call_path).or_insert(type_);
                 unique_elts.push(type_);
             }
         }
