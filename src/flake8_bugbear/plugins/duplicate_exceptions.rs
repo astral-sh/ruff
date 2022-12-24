@@ -24,8 +24,8 @@ fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
-) -> FxHashMap<Vec<&'a str>, Vec<&'a Expr>> {
-    let mut seen: FxHashMap<Vec<&str>, Vec<&Expr>> = FxHashMap::default();
+) -> FxHashMap<Vec<&'a str>, &'a Expr> {
+    let mut seen: FxHashMap<Vec<&str>, &Expr> = FxHashMap::default();
     let mut duplicates: FxHashSet<Vec<&str>> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
@@ -34,7 +34,7 @@ fn duplicate_handler_exceptions<'a>(
             if seen.contains_key(&call_path) {
                 duplicates.insert(call_path);
             } else {
-                seen.entry(call_path).or_default().push(type_);
+                seen.insert(call_path, type_);
                 unique_elts.push(type_);
             }
         }
@@ -94,9 +94,9 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
                 }
             }
             ExprKind::Tuple { elts, .. } => {
-                for (name, exprs) in duplicate_handler_exceptions(checker, type_, elts) {
+                for (name, expr) in duplicate_handler_exceptions(checker, type_, elts) {
                     if seen.contains(&name) {
-                        duplicates.entry(name).or_default().extend(exprs);
+                        duplicates.entry(name).or_default().push(expr);
                     } else {
                         seen.insert(name);
                     }
