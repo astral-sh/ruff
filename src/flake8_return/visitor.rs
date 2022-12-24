@@ -1,4 +1,4 @@
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Expr, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::visitor;
@@ -10,6 +10,7 @@ pub struct Stack<'a> {
     pub ifs: Vec<&'a Stmt>,
     pub elifs: Vec<&'a Stmt>,
     pub refs: FxHashMap<&'a str, Vec<Location>>,
+    pub non_locals: FxHashSet<&'a str>,
     pub assigns: FxHashMap<&'a str, Vec<Location>>,
     pub loops: Vec<(Location, Location)>,
     pub tries: Vec<(Location, Location)>,
@@ -48,6 +49,11 @@ impl<'a> ReturnVisitor<'a> {
 impl<'a> Visitor<'a> for ReturnVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match &stmt.node {
+            StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
+                self.stack
+                    .non_locals
+                    .extend(names.iter().map(std::string::String::as_str));
+            }
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
                 // Don't recurse.
             }

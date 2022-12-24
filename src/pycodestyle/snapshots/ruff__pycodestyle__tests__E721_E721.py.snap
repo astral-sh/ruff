@@ -44,14 +44,6 @@ expression: checks
   fix: ~
 - kind: TypeComparison
   location:
-    row: 18
-    column: 35
-  end_location:
-    row: 18
-    column: 58
-  fix: ~
-- kind: TypeComparison
-  location:
     row: 20
     column: 7
   end_location:

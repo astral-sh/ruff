@@ -5,37 +5,37 @@ expression: checks
 - kind:
     DuplicateTryBlockException: ValueError
   location:
-    row: 15
-    column: 0
+    row: 19
+    column: 7
   end_location:
-    row: 20
-    column: 9
+    row: 19
+    column: 17
   fix: ~
 - kind:
     DuplicateTryBlockException: pickle.PickleError
   location:
-    row: 22
-    column: 0
+    row: 28
+    column: 7
   end_location:
-    row: 29
-    column: 9
-  fix: ~
-- kind:
-    DuplicateTryBlockException: TypeError
-  location:
-    row: 31
-    column: 0
-  end_location:
-    row: 38
-    column: 9
+    row: 28
+    column: 25
   fix: ~
 - kind:
     DuplicateTryBlockException: ValueError
   location:
-    row: 31
-    column: 0
+    row: 35
+    column: 7
   end_location:
-    row: 38
-    column: 9
+    row: 35
+    column: 17
+  fix: ~
+- kind:
+    DuplicateTryBlockException: TypeError
+  location:
+    row: 37
+    column: 17
+  end_location:
+    row: 37
+    column: 26
   fix: ~
 

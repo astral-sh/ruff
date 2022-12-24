@@ -1151,7 +1151,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::B014)
                     || self.settings.enabled.contains(&CheckCode::B025)
                 {
-                    flake8_bugbear::plugins::duplicate_exceptions(self, stmt, handlers);
+                    flake8_bugbear::plugins::duplicate_exceptions(self, handlers);
                 }
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
