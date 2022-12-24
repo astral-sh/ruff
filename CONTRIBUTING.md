@@ -105,7 +105,8 @@ You may also want to add the new configuration option to the `flake8-to-ruff` to
 responsible for converting `flake8` configuration files to Ruff's TOML format. This logic
 lives in `flake8_to_ruff/src/converter.rs`.
 
-To update the documentation for supported configuration options, run `cargo dev generate-options`.
+Run `cargo dev generate-options` to update the documentation for supported configuration options,
+and `cargo dev generate-json-schema` to update the JSON schema for `tool.ruff` in `pyproject.toml`.
 
 ## Release process
 

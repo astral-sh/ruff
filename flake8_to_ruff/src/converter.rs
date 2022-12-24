@@ -67,10 +67,7 @@ pub fn convert(
                     }
                     let from_codes = plugin::infer_plugins_from_codes(&referenced_codes);
                     if !from_codes.is_empty() {
-                        eprintln!(
-                            "Inferred plugins from referenced check codes: {:#?}",
-                            from_codes
-                        );
+                        eprintln!("Inferred plugins from referenced check codes: {from_codes:#?}");
                     }
                     from_options.into_iter().chain(from_codes).collect()
                 }),

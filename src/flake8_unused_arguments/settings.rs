@@ -1,19 +1,24 @@
 //! Settings for the `flake8-unused-arguments` plugin.
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "Flake8UnusedArgumentsOptions"
+)]
 pub struct Options {
     #[option(
-        doc = r#"
-            Whether to allow unused variadic arguments, like `*args` and `**kwargs`.
-        "#,
         default = "false",
         value_type = "bool",
         example = "ignore-variadic-names = true"
     )]
+    /// Whether to allow unused variadic arguments, like `*args` and `**kwargs`.
     pub ignore_variadic_names: Option<bool>,
 }
 
