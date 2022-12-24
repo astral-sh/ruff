@@ -1,8 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{
-    Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location, Stmt,
-};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
@@ -77,7 +75,7 @@ fn duplicate_handler_exceptions<'a>(
     seen
 }
 
-pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Excepthandler]) {
+pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
     let mut seen: FxHashSet<Vec<&str>> = FxHashSet::default();
     let mut duplicates: FxHashMap<Vec<&str>, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
@@ -89,7 +87,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, stmt: &Stmt, handlers: &[Exce
                 let call_path = helpers::collect_call_paths(type_);
                 if !call_path.is_empty() {
                     if seen.contains(&call_path) {
-                        duplicates.entry(call_path).or_default().push(type_)
+                        duplicates.entry(call_path).or_default().push(type_);
                     } else {
                         seen.insert(call_path);
                     }
