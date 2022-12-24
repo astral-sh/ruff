@@ -321,6 +321,23 @@ pub struct Options {
         "#
     )]
     pub unfixable: Option<Vec<CheckCodePrefix>>,
+    #[option(
+        doc = r#"
+            A path to the cache directory.
+
+            By default, Ruff stores cache results in a `.ruff_cache` directory in the current
+            project root.
+
+            However, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes
+            precedence over that default.
+
+            This setting will override even the `RUFF_CACHE_DIR` environment variable, if set.
+        "#,
+        default = ".ruff_cache",
+        value_type = "PathBuf",
+        example = r#"cache-dir = "~/.cache/ruff""#
+    )]
+    pub cache_dir: Option<String>,
     // Plugins
     #[option_group]
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,

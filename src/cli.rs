@@ -133,6 +133,9 @@ pub struct Cli {
     /// Generate shell completion
     #[arg(long, hide = true, value_name = "SHELL")]
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
+    /// Path to the cache directory.
+    #[arg(long)]
+    pub cache_dir: Option<PathBuf>,
 }
 
 impl Cli {
@@ -180,6 +183,7 @@ impl Cli {
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 format: self.format,
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
+                cache_dir: self.cache_dir,
             },
         )
     }
@@ -238,6 +242,7 @@ pub struct Overrides {
     pub fix: Option<bool>,
     pub format: Option<SerializationFormat>,
     pub force_exclude: Option<bool>,
+    pub cache_dir: Option<PathBuf>,
 }
 
 /// Map the CLI settings to a `LogLevel`.

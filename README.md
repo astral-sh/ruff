@@ -318,6 +318,8 @@ Options:
           Show violations with source code
       --respect-gitignore
           Respect file exclusions via `.gitignore` and other standard ignore files
+      --force-exclude
+          Enforce exclusions, even for paths passed to Ruff directly on the command-line
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
@@ -336,6 +338,8 @@ Options:
           The name of the file when passing it through stdin
       --explain <EXPLAIN>
           Explain a rule
+      --cache-dir <CACHE_DIR>
+          Path to the cache directory
   -h, --help
           Print help information
   -V, --version
@@ -1591,6 +1595,31 @@ A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF0
 # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
 # which could be confused for "-", "p", and "*", respectively.
 allowed-confusables = ["−", "ρ", "∗"]
+```
+
+---
+
+#### [`cache-dir`](#cache-dir)
+
+A path to the cache directory.
+
+By default, Ruff stores cache results in a `.ruff_cache` directory in the current
+project root.
+
+However, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes
+precedence over that default.
+
+This setting will override even the `RUFF_CACHE_DIR` environment variable, if set.
+
+**Default value**: `.ruff_cache`
+
+**Type**: `PathBuf`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+cache-dir = "~/.cache/ruff"
 ```
 
 ---

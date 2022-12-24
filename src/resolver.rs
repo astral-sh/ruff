@@ -86,6 +86,11 @@ impl Resolver {
                 .unwrap_or(default),
         }
     }
+
+    /// Return an iterator over the resolved `Settings` in this `Resolver`.
+    pub fn iter(&self) -> impl Iterator<Item = &Settings> {
+        self.settings.values()
+    }
 }
 
 /// Recursively resolve a `Configuration` from a `pyproject.toml` file at the
