@@ -137,11 +137,7 @@ pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
 }
 
 /// W292
-pub fn no_newline_at_end_of_file(
-    contents: &str,
-    settings: &Settings,
-    autofix: flags::Autofix,
-) -> Option<Check> {
+pub fn no_newline_at_end_of_file(contents: &str, autofix: bool) -> Option<Check> {
     if !contents.ends_with('\n') {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
@@ -155,9 +151,7 @@ pub fn no_newline_at_end_of_file(
                     end_location: location,
                 },
             );
-            if matches!(autofix, flags::Autofix::Enabled)
-                && settings.fixable.contains(&CheckCode::W292)
-            {
+            if autofix {
                 check.amend(Fix::insertion("\n".to_string(), location));
             }
             return Some(check);
