@@ -2972,6 +2972,7 @@ impl CheckKind {
                 | CheckKind::GetAttrWithConstant
                 | CheckKind::ImplicitReturn
                 | CheckKind::ImplicitReturnValue
+                | CheckKind::InvalidEscapeSequence(..)
                 | CheckKind::IsLiteral
                 | CheckKind::KeyInDict(..)
                 | CheckKind::MisplacedComparisonConstant(..)

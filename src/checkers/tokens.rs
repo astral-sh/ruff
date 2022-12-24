@@ -89,7 +89,11 @@ pub fn check_tokens(
         if enforce_invalid_escape_sequence {
             if matches!(tok, Tok::String { .. }) {
                 checks.extend(pycodestyle::checks::invalid_escape_sequence(
-                    locator, start, end,
+                    locator,
+                    start,
+                    end,
+                    matches!(autofix, flags::Autofix::Enabled)
+                        && settings.fixable.contains(&CheckCode::W605),
                 ));
             }
         }

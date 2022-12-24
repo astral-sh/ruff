@@ -188,6 +188,7 @@ pub fn invalid_escape_sequence(
     locator: &SourceCodeLocator,
     start: Location,
     end: Location,
+    autofix: bool,
 ) -> Vec<Check> {
     let mut checks = vec![];
 
@@ -235,13 +236,17 @@ pub fn invalid_escape_sequence(
                 };
                 let location = Location::new(start.row() + row_offset, col);
                 let end_location = Location::new(location.row(), location.column() + 2);
-                checks.push(Check::new(
+                let mut check = Check::new(
                     CheckKind::InvalidEscapeSequence(next_char),
                     Range {
                         location,
                         end_location,
                     },
-                ));
+                );
+                if autofix {
+                    check.amend(Fix::insertion(r"\".to_string(), location));
+                }
+                checks.push(check);
             }
         }
     }
