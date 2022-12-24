@@ -147,7 +147,7 @@ pub fn no_newline_at_end_of_file(
         // want to raise W292 anyway).
         if let Some(line) = contents.lines().last() {
             // Both locations are at the end of the file (and thus the same).
-            let location = Location::new(contents.lines().count(), line.len() + 1);
+            let location = Location::new(contents.lines().count(), line.len());
             let mut check = Check::new(
                 CheckKind::NoNewLineAtEndOfFile,
                 Range {
