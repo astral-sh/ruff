@@ -14,6 +14,7 @@ use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
 };
+use crate::SourceCodeLocator;
 
 mod categorize;
 mod comments;
@@ -469,9 +470,16 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
+fn check_last_char(whole: &str, part: &str, match_char: &str) -> bool {
+    let idx = whole.find(part).unwrap();
+    let selected = whole.chars().nth(idx + part.len()).unwrap();
+    selected.to_string() == match_char
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn format_imports(
     block: &Block,
+    locator: &SourceCodeLocator,
     comments: Vec<Comment>,
     line_length: usize,
     src: &[PathBuf],
@@ -502,6 +510,8 @@ pub fn format_imports(
 
     // Generate replacement source code.
     let mut is_first_block = true;
+    let the_str = locator.to_string();
+
     for import_block in block_by_type.into_values() {
         let import_block = sort_imports(import_block);
 
@@ -522,6 +532,8 @@ pub fn format_imports(
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, aliases) in &import_block.import_from {
+            let all_commas = aliases.iter().all(|(data, _)| check_last_char(&the_str, data.name, ","));
+            println!("All commas: {}", all_commas);
             output.append(&format::format_import_from(
                 import_from,
                 comments,
@@ -529,6 +541,7 @@ pub fn format_imports(
                 line_length,
                 force_wrap_aliases,
                 is_first_statement,
+                all_commas,
             ));
             is_first_statement = false;
         }
@@ -587,6 +600,7 @@ mod tests {
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
+    #[test_case(Path::new("magic_trailing_comma.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let mut checks = test_path(
