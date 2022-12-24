@@ -203,6 +203,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
             return;
         }
 
+        if stack.non_locals.contains(id.as_str()) {
+            return;
+        }
+
         checker.add_check(Check::new(
             CheckKind::UnnecessaryAssign,
             Range::from_located(expr),

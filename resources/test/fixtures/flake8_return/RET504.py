@@ -237,3 +237,15 @@ def close(self):
             any_failed = True
             report(traceback.format_exc())
     return any_failed
+
+def global_assignment():
+    global X
+    X = 1
+    return X
+
+def nonlocal_assignment():
+    X = 1
+    def inner():
+        nonlocal X
+        X = 1
+        return X
