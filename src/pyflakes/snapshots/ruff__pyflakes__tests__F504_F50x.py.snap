@@ -7,7 +7,7 @@ expression: checks
       - baz
   location:
     row: 8
-    column: 10
+    column: 0
   end_location:
     row: 8
     column: 32

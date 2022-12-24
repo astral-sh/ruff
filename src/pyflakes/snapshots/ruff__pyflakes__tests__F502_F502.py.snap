@@ -5,7 +5,7 @@ expression: checks
 - kind: PercentFormatExpectedMapping
   location:
     row: 6
-    column: 10
+    column: 0
   end_location:
     row: 6
     column: 19
@@ -13,7 +13,7 @@ expression: checks
 - kind: PercentFormatExpectedMapping
   location:
     row: 7
-    column: 10
+    column: 0
   end_location:
     row: 7
     column: 20
@@ -21,7 +21,7 @@ expression: checks
 - kind: PercentFormatExpectedMapping
   location:
     row: 8
-    column: 10
+    column: 0
   end_location:
     row: 8
     column: 19
@@ -29,7 +29,7 @@ expression: checks
 - kind: PercentFormatExpectedMapping
   location:
     row: 9
-    column: 10
+    column: 0
   end_location:
     row: 9
     column: 22
@@ -37,7 +37,7 @@ expression: checks
 - kind: PercentFormatExpectedMapping
   location:
     row: 11
-    column: 10
+    column: 0
   end_location:
     row: 11
     column: 37
@@ -45,7 +45,7 @@ expression: checks
 - kind: PercentFormatExpectedMapping
   location:
     row: 12
-    column: 10
+    column: 0
   end_location:
     row: 12
     column: 37
@@ -53,7 +53,7 @@ expression: checks
 - kind: PercentFormatExpectedMapping
   location:
     row: 13
-    column: 10
+    column: 0
   end_location:
     row: 13
     column: 37
