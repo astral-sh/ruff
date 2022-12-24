@@ -470,6 +470,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
+/// Confirms that the character after the first instance of the given part matches the match_char
 fn check_last_char(whole: &str, part: &str, match_char: &str) -> bool {
     let idx = whole.find(part).unwrap();
     let selected = whole.chars().nth(idx + part.len()).unwrap();
