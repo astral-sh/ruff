@@ -9,7 +9,6 @@ use rustpython_ast::Location;
 
 use crate::ast::types::Range;
 
-#[derive(Debug)]
 pub struct SourceCodeLocator<'a> {
     contents: &'a str,
     rope: OnceCell<Rope>,
