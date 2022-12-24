@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
@@ -20,6 +21,22 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
     )
 }
 
+/// Given a list of imports (like `foo.bar.baz`), ensure that there's only one import per module
+/// (i.e., if we see `foo.bar.baz`, flag `foo.bop` as a duplicate).
+fn detect_duplicates(members: &[&str]) {
+    let mut seen: HashMap<String, &str> = HashMap::default();
+    let mut duplicates: HashSet<String> = HashSet::default();
+    for member in members {
+        let module = member.split('.').next().unwrap().to_string();
+        if seen.contains_key(&module) {
+            duplicates.insert(module);
+        } else {
+            seen.insert(module, member);
+        }
+    }
+    // Do something with `seen`, etc.
+}
+
 fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
@@ -28,17 +45,17 @@ fn duplicate_handler_exceptions<'a>(
     let mut seen: FxHashMap<Vec<&str>, &Expr> = FxHashMap::default();
     let mut duplicates: FxHashSet<Vec<&str>> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
-    for type_ in elts {
-        let call_path = helpers::collect_call_paths(type_);
-        if !call_path.is_empty() {
-            if seen.contains_key(&call_path) {
-                duplicates.insert(call_path);
-            } else {
-                seen.insert(call_path, type_);
-                unique_elts.push(type_);
-            }
-        }
-    }
+    // for type_ in elts {
+    //     let call_path = helpers::collect_call_paths(type_);
+    //     if !call_path.is_empty() {
+    //         if seen.contains_key(&call_path) {
+    //             duplicates.insert(call_path);
+    //         } else {
+    //             seen.insert(call_path, type_);
+    //             unique_elts.push(type_);
+    //         }
+    //     }
+    // }
 
     if checker.settings.enabled.contains(&CheckCode::B014) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
