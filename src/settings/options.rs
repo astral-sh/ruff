@@ -26,8 +26,8 @@ pub struct Options {
             allowed-confusables = ["−", "ρ", "∗"]
         "#
     )]
-    /// A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`,
-    /// `RUF002`, and `RUF003`.
+    /// A list of allowed "confusable" Unicode characters to ignore when
+    /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     pub allowed_confusables: Option<Vec<char>>,
     #[option(
         default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
@@ -37,9 +37,9 @@ pub struct Options {
             dummy-variable-rgx = "^_$"
         "#
     )]
-    /// A regular expression used to identify "dummy" variables, or those which should be
-    /// ignored when evaluating (e.g.) unused-variable checks. The default expression matches
-    /// `_`, `__`, and `_var`, but not `_var_`.
+    /// A regular expression used to identify "dummy" variables, or those which
+    /// should be ignored when evaluating (e.g.) unused-variable checks. The
+    /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     pub dummy_variable_rgx: Option<String>,
     #[option(
         default = r#"[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
@@ -52,15 +52,16 @@ pub struct Options {
     ///
     /// Exclusions are based on globs, and can be either:
     ///
-    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the
-    ///   tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching
-    ///   `foo_*.py` ).
-    /// - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py`
-    ///   (to exclude any Python files in `directory`). Note that these paths are relative to the
-    ///   project root (e.g., the directory containing your `pyproject.toml`).
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
     ///
-    /// Note that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify
-    /// the excluded paths.
+    /// Note that you'll typically want to use
+    /// [`extend-exclude`](#extend-exclude) to modify the excluded paths.
     pub exclude: Option<Vec<String>>,
     #[option(
         default = r#"None"#,
@@ -72,12 +73,13 @@ pub struct Options {
             line-length = 100
         "#
     )]
-    /// A path to a local `pyproject.toml` file to merge into this configuration. User home
-    /// directory and environment variables will be expanded.
+    /// A path to a local `pyproject.toml` file to merge into this
+    /// configuration. User home directory and environment variables will be
+    /// expanded.
     ///
-    /// To resolve the current `pyproject.toml` file, Ruff will first resolve this base
-    /// configuration file, then merge in any properties defined in the current configuration
-    /// file.
+    /// To resolve the current `pyproject.toml` file, Ruff will first resolve
+    /// this base configuration file, then merge in any properties defined
+    /// in the current configuration file.
     pub extend: Option<String>,
     #[option(
         default = "[]",
@@ -87,7 +89,8 @@ pub struct Options {
             extend-exclude = ["tests", "src/bad.py"]
         "#
     )]
-    /// A list of file patterns to omit from linting, in addition to those specified by `exclude`.
+    /// A list of file patterns to omit from linting, in addition to those
+    /// specified by `exclude`.
     pub extend_exclude: Option<Vec<String>>,
     #[option(
         default = "[]",
@@ -97,7 +100,8 @@ pub struct Options {
             extend-ignore = ["F841"]
         "#
     )]
-    /// A list of check code prefixes to ignore, in addition to those specified by `ignore`.
+    /// A list of check code prefixes to ignore, in addition to those specified
+    /// by `ignore`.
     pub extend_ignore: Option<Vec<CheckCodePrefix>>,
     #[option(
         default = "[]",
@@ -107,7 +111,8 @@ pub struct Options {
             extend-select = ["B", "Q"]
         "#
     )]
-    /// A list of check code prefixes to enable, in addition to those specified by `select`.
+    /// A list of check code prefixes to enable, in addition to those specified
+    /// by `select`.
     pub extend_select: Option<Vec<CheckCodePrefix>>,
     #[option(
         default = "[]",
@@ -118,9 +123,10 @@ pub struct Options {
             external = ["V101"]
         "#
     )]
-    /// A list of check codes that are unsupported by Ruff, but should be preserved when (e.g.)
-    /// validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not
-    /// yet implemented in Ruff.
+    /// A list of check codes that are unsupported by Ruff, but should be
+    /// preserved when (e.g.) validating `# noqa` directives. Useful for
+    /// retaining `# noqa` directives that cover plugins not yet implemented
+    /// in Ruff.
     pub external: Option<Vec<String>>,
     #[option(default = "false", value_type = "bool", example = "fix = true")]
     /// Enable autofix behavior by-default when running `ruff` (overridden
@@ -144,9 +150,10 @@ pub struct Options {
             format = "grouped"
         "#
     )]
-    /// The style in which violation messages should be formatted: `"text"` (default),
-    /// `"grouped"` (group messages by file), `"json"` (machine-readable), `"junit"`
-    /// (machine-readable XML), or `"github"` (GitHub Actions annotations).
+    /// The style in which violation messages should be formatted: `"text"`
+    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// (machine-readable), `"junit"` (machine-readable XML), or `"github"`
+    /// (GitHub Actions annotations).
     pub format: Option<SerializationFormat>,
     #[option(
         default = r#"false"#,
@@ -155,14 +162,16 @@ pub struct Options {
             force-exclude = true
         "#
     )]
-    /// Whether to enforce `exclude` and `extend-exclude` patterns, even for paths that are
-    /// passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even
-    /// if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to
+    /// Whether to enforce `exclude` and `extend-exclude` patterns, even for
+    /// paths that are passed to Ruff explicitly. Typically, Ruff will lint
+    /// any paths passed in directly, even if they would typically be
+    /// excluded. Setting `force-exclude = true` will cause Ruff to
     /// respect these exclusions unequivocally.
     ///
     /// This is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all
     /// changed files to the [`ruff-pre-commit`](https://github.com/charliermarsh/ruff-pre-commit)
-    /// plugin, regardless of whether they're marked as excluded by Ruff's own settings.
+    /// plugin, regardless of whether they're marked as excluded by Ruff's own
+    /// settings.
     pub force_exclude: Option<bool>,
     #[option(
         default = "[]",
@@ -172,11 +181,13 @@ pub struct Options {
             ignore = ["F841"]
         "#
     )]
-    /// A list of check code prefixes to ignore. Prefixes can specify exact checks (like
-    /// `F841`), entire categories (like `F`), or anything in between.
+    /// A list of check code prefixes to ignore. Prefixes can specify exact
+    /// checks (like `F841`), entire categories (like `F`), or anything in
+    /// between.
     ///
-    /// When breaking ties between enabled and disabled checks (via `select` and `ignore`,
-    /// respectively), more specific prefixes override less specific prefixes.
+    /// When breaking ties between enabled and disabled checks (via `select` and
+    /// `ignore`, respectively), more specific prefixes override less
+    /// specific prefixes.
     pub ignore: Option<Vec<CheckCodePrefix>>,
     #[option(
         default = "false",
@@ -185,10 +196,11 @@ pub struct Options {
             ignore-init-module-imports = true
         "#
     )]
-    /// Avoid automatically removing unused imports in `__init__.py` files. Such imports will
-    /// still be +flagged, but with a dedicated message suggesting that the import is either
-    /// added to the module' +`__all__` symbol, or re-exported with a redundant alias (e.g.,
-    /// `import os as os`).
+    /// Avoid automatically removing unused imports in `__init__.py` files. Such
+    /// imports will still be +flagged, but with a dedicated message
+    /// suggesting that the import is either added to the module' +`__all__`
+    /// symbol, or re-exported with a redundant alias (e.g., `import os as
+    /// os`).
     pub ignore_init_module_imports: Option<bool>,
     #[option(
         default = "88",
@@ -198,7 +210,8 @@ pub struct Options {
             line-length = 120
         "#
     )]
-    /// The line length to use when enforcing long-lines violations (like `E501`).
+    /// The line length to use when enforcing long-lines violations (like
+    /// `E501`).
     pub line_length: Option<usize>,
     #[option(
         default = "true",
@@ -207,8 +220,9 @@ pub struct Options {
             respect_gitignore = false
         "#
     )]
-    /// Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`,
-    /// `.git/info/exclude`, and global `gitignore` files. Enabled by default.
+    /// Whether to automatically exclude files that are ignored by `.ignore`,
+    /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+    /// Enabled by default.
     pub respect_gitignore: Option<bool>,
     #[option(
         default = r#"["E", "F"]"#,
@@ -218,11 +232,13 @@ pub struct Options {
             select = ["E", "F", "B", "Q"]
         "#
     )]
-    /// A list of check code prefixes to enable. Prefixes can specify exact checks (like
-    /// `F841`), entire categories (like `F`), or anything in between.
+    /// A list of check code prefixes to enable. Prefixes can specify exact
+    /// checks (like `F841`), entire categories (like `F`), or anything in
+    /// between.
     ///
-    /// When breaking ties between enabled and disabled checks (via `select` and `ignore`,
-    /// respectively), more specific prefixes override less specific prefixes.
+    /// When breaking ties between enabled and disabled checks (via `select` and
+    /// `ignore`, respectively), more specific prefixes override less
+    /// specific prefixes.
     pub select: Option<Vec<CheckCodePrefix>>,
     #[option(
         default = "false",
@@ -232,8 +248,8 @@ pub struct Options {
             show-source = true
         "#
     )]
-    /// Whether to show source code snippets when reporting lint error violations (overridden by
-    /// the `--show-source` command-line flag).
+    /// Whether to show source code snippets when reporting lint error
+    /// violations (overridden by the `--show-source` command-line flag).
     pub show_source: Option<bool>,
     #[option(
         default = r#"["."]"#,
@@ -243,7 +259,8 @@ pub struct Options {
             src = ["src", "test"]
         "#
     )]
-    /// The source code paths to consider, e.g., when resolving first- vs. third-party imports.
+    /// The source code paths to consider, e.g., when resolving first- vs.
+    /// third-party imports.
     ///
     /// As an example: given a Python package structure like:
     ///
@@ -257,13 +274,15 @@ pub struct Options {
     ///       bar.py
     /// ```
     ///
-    /// The `src` directory should be included in `source` (e.g., `source = ["src"]`), such that
-    /// when resolving imports, `my_package.foo` is considered a first-party import.
+    /// The `src` directory should be included in `source` (e.g., `source =
+    /// ["src"]`), such that when resolving imports, `my_package.foo` is
+    /// considered a first-party import.
     ///
-    /// This field supports globs. For example, if you have a series of Python packages in
-    /// a `python_modules` directory, `src = ["python_modules/*"]` would expand to incorporate
-    /// all of the packages in that directory. User home directory and environment variables
-    /// will also be expanded.
+    /// This field supports globs. For example, if you have a series of Python
+    /// packages in a `python_modules` directory, `src =
+    /// ["python_modules/*"]` would expand to incorporate all of the
+    /// packages in that directory. User home directory and environment
+    /// variables will also be expanded.
     pub src: Option<Vec<String>>,
     #[option(
         default = r#""py310""#,
@@ -273,9 +292,10 @@ pub struct Options {
             target-version = "py37"
         "#
     )]
-    /// The Python version to target, e.g., when considering automatic code upgrades, like
-    /// rewriting type annotations. Note that the target version will _not_ be inferred from the
-    /// _current_ Python version, and instead must be specified explicitly (as seen below).
+    /// The Python version to target, e.g., when considering automatic code
+    /// upgrades, like rewriting type annotations. Note that the target
+    /// version will _not_ be inferred from the _current_ Python version,
+    /// and instead must be specified explicitly (as seen below).
     pub target_version: Option<PythonVersion>,
     #[option(
         default = "[]",
@@ -294,13 +314,14 @@ pub struct Options {
     )]
     /// A path to the cache directory.
     ///
-    /// By default, Ruff stores cache results in a `.ruff_cache` directory in the current
-    /// project root.
+    /// By default, Ruff stores cache results in a `.ruff_cache` directory in
+    /// the current project root.
     ///
-    /// However, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes
-    /// precedence over that default.
+    /// However, Ruff will also respect the `RUFF_CACHE_DIR` environment
+    /// variable, which takes precedence over that default.
     ///
-    /// This setting will override even the `RUFF_CACHE_DIR` environment variable, if set.
+    /// This setting will override even the `RUFF_CACHE_DIR` environment
+    /// variable, if set.
     pub cache_dir: Option<String>,
     /// Plugins
     #[option_group]
@@ -347,7 +368,7 @@ pub struct Options {
             "path/to/file.py" = ["E402"]
         "#
     )]
-    /// A list of mappings from file pattern to check code prefixes to exclude, when considering
-    /// any matching files.
+    /// A list of mappings from file pattern to check code prefixes to exclude,
+    /// when considering any matching files.
     pub per_file_ignores: Option<FxHashMap<String, Vec<CheckCodePrefix>>>,
 }

@@ -27,7 +27,8 @@ pub struct Options {
             inline-quotes = "single"
         "#
     )]
-    /// Quote style to prefer for inline strings (either "single" (`'`) or "double" (`"`)).
+    /// Quote style to prefer for inline strings (either "single" (`'`) or
+    /// "double" (`"`)).
     pub inline_quotes: Option<Quote>,
     #[option(
         default = r#""double""#,
@@ -36,7 +37,8 @@ pub struct Options {
             multiline-quotes = "single"
         "#
     )]
-    /// Quote style to prefer for multiline strings (either "single" (`'`) or "double" (`"`)).
+    /// Quote style to prefer for multiline strings (either "single" (`'`) or
+    /// "double" (`"`)).
     pub multiline_quotes: Option<Quote>,
     #[option(
         default = r#""double""#,
@@ -45,7 +47,8 @@ pub struct Options {
             docstring-quotes = "single"
         "#
     )]
-    /// Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
+    /// Quote style to prefer for docstrings (either "single" (`'`) or "double"
+    /// (`"`)).
     pub docstring_quotes: Option<Quote>,
     #[option(
         default = r#"true"#,
@@ -55,8 +58,8 @@ pub struct Options {
             avoid-escape = false
         "#
     )]
-    /// Whether to avoid using single quotes if a string contains single quotes, or vice-versa
-    /// with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+    /// Whether to avoid using single quotes if a string contains single quotes,
+    /// or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
     /// This minimizes the need to escape quotation marks within strings.
     pub avoid_escape: Option<bool>,
 }

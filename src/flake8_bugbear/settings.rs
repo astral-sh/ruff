@@ -21,8 +21,8 @@ pub struct Options {
             extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
         "#
     )]
-    /// Additional callable functions to consider "immutable" when evaluating, e.g.,
-    /// `no-mutable-default-argument` checks (`B006`).
+    /// Additional callable functions to consider "immutable" when evaluating,
+    /// e.g., `no-mutable-default-argument` checks (`B006`).
     pub extend_immutable_calls: Option<Vec<String>>,
 }
 

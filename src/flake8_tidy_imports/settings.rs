@@ -28,8 +28,8 @@ pub struct Options {
             ban-relative-imports = "all"
         "#
     )]
-    /// Whether to ban all relative imports (`"all"`), or only those imports that extend into
-    /// the parent module and beyond (`"parents"`).
+    /// Whether to ban all relative imports (`"all"`), or only those imports
+    /// that extend into the parent module and beyond (`"parents"`).
     pub ban_relative_imports: Option<Strictness>,
 }
 

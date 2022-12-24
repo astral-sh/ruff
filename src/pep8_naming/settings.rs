@@ -49,9 +49,10 @@ pub struct Options {
             classmethod-decorators = ["classmethod", "pydantic.validator"]
         "#
     )]
-    /// A list of decorators that, when applied to a method, indicate that the method should be
-    /// treated as a class method. For example, Ruff will expect that any method decorated by a
-    /// decorator in this list takes a `cls` argument as its first argument.
+    /// A list of decorators that, when applied to a method, indicate that the
+    /// method should be treated as a class method. For example, Ruff will
+    /// expect that any method decorated by a decorator in this list takes a
+    /// `cls` argument as its first argument.
     pub classmethod_decorators: Option<Vec<String>>,
     #[option(
         default = r#"["staticmethod"]"#,
@@ -61,9 +62,10 @@ pub struct Options {
             staticmethod-decorators = ["staticmethod", "stcmthd"]
         "#
     )]
-    /// A list of decorators that, when applied to a method, indicate that the method should be
-    /// treated as a static method. For example, Ruff will expect that any method decorated by a
-    /// decorator in this list has no `self` or `cls` argument.
+    /// A list of decorators that, when applied to a method, indicate that the
+    /// method should be treated as a static method. For example, Ruff will
+    /// expect that any method decorated by a decorator in this list has no
+    /// `self` or `cls` argument.
     pub staticmethod_decorators: Option<Vec<String>>,
 }
 
