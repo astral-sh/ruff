@@ -5,6 +5,7 @@ use rustpython_ast::{Located, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
+use crate::autofix::Fix;
 use crate::checks::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -134,18 +135,24 @@ pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
 }
 
 /// W292
-pub fn no_newline_at_end_of_file(contents: &str) -> Option<Check> {
+pub fn no_newline_at_end_of_file(contents: &str, autofix: bool) -> Option<Check> {
     if !contents.ends_with('\n') {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
         if let Some(line) = contents.lines().last() {
-            return Some(Check::new(
+            // Both locations are at the end of the file (and thus the same).
+            let location = Location::new(contents.lines().count(), line.len());
+            let mut check = Check::new(
                 CheckKind::NoNewLineAtEndOfFile,
                 Range {
-                    location: Location::new(contents.lines().count(), line.len() + 1),
-                    end_location: Location::new(contents.lines().count(), line.len() + 1),
+                    location,
+                    end_location: location,
                 },
-            ));
+            );
+            if autofix {
+                check.amend(Fix::insertion("\n".to_string(), location));
+            }
+            return Some(check);
         }
     }
     None

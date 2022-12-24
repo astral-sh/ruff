@@ -6,7 +6,7 @@ expression: checks
     PercentFormatInvalidFormat: incomplete format
   location:
     row: 1
-    column: 9
+    column: 0
   end_location:
     row: 1
     column: 25

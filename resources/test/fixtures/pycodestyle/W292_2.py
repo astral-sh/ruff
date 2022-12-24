@@ -1,2 +1,2 @@
 def fn() -> None:
-    pass
+    print("Newline present (no W292)")

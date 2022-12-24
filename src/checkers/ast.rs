@@ -1067,17 +1067,11 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::EM101)
-                    | self.settings.enabled.contains(&CheckCode::EM102)
-                    | self.settings.enabled.contains(&CheckCode::EM103)
+                    || self.settings.enabled.contains(&CheckCode::EM102)
+                    || self.settings.enabled.contains(&CheckCode::EM103)
                 {
                     if let Some(exc) = exc {
-                        self.add_checks(
-                            flake8_errmsg::checks::check_string_in_exception(
-                                exc,
-                                self.settings.flake8_errmsg.max_string_length,
-                            )
-                            .into_iter(),
-                        );
+                        flake8_errmsg::plugins::string_in_exception(self, exc);
                     }
                 }
             }
@@ -1553,6 +1547,12 @@ where
                     pyupgrade::plugins::remove_six_compat(self, expr);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::UP017)
+                    && self.settings.target_version >= PythonVersion::Py311
+                {
+                    pyupgrade::plugins::datetime_utc_alias(self, expr);
+                }
+
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
@@ -1643,6 +1643,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP016) {
                     pyupgrade::plugins::remove_six_compat(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP018) {
+                    pyupgrade::plugins::native_literals(self, expr, func, args, keywords);
                 }
 
                 // flake8-super

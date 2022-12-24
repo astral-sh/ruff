@@ -20,7 +20,7 @@ use crate::message::Message;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{packages, resolver};
+use crate::{cache, packages, resolver};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -46,6 +46,30 @@ pub fn run(
             .map(ignore::DirEntry::path)
             .collect::<Vec<_>>(),
     );
+
+    // Initialize the cache.
+    if matches!(cache, flags::Cache::Enabled) {
+        match &pyproject_strategy {
+            PyprojectDiscovery::Fixed(settings) => {
+                if let Err(e) = cache::init(&settings.cache_dir) {
+                    error!(
+                        "Failed to initialize cache at {}: {e:?}",
+                        settings.cache_dir.to_string_lossy()
+                    );
+                }
+            }
+            PyprojectDiscovery::Hierarchical(default) => {
+                for settings in std::iter::once(default).chain(resolver.iter()) {
+                    if let Err(e) = cache::init(&settings.cache_dir) {
+                        error!(
+                            "Failed to initialize cache at {}: {e:?}",
+                            settings.cache_dir.to_string_lossy()
+                        );
+                    }
+                }
+            }
+        }
+    };
 
     let start = Instant::now();
     let mut diagnostics: Diagnostics = par_iter(&paths)
@@ -115,17 +139,24 @@ fn read_from_stdin() -> Result<String> {
 /// Run the linter over a single file, read from `stdin`.
 pub fn run_stdin(
     filename: Option<&Path>,
-    strategy: &PyprojectDiscovery,
+    pyproject_strategy: &PyprojectDiscovery,
+    file_strategy: &FileDiscovery,
+    overrides: &Overrides,
     autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
-    let package_root = filename
-        .and_then(std::path::Path::parent)
-        .and_then(packages::detect_package_root);
-    let stdin = read_from_stdin()?;
-    let settings = match strategy {
+    if let Some(filename) = filename {
+        if !resolver::python_file_at_path(filename, pyproject_strategy, file_strategy, overrides)? {
+            return Ok(Diagnostics::default());
+        }
+    }
+    let settings = match pyproject_strategy {
         PyprojectDiscovery::Fixed(settings) => settings,
         PyprojectDiscovery::Hierarchical(settings) => settings,
     };
+    let package_root = filename
+        .and_then(Path::parent)
+        .and_then(packages::detect_package_root);
+    let stdin = read_from_stdin()?;
     let mut diagnostics = lint_stdin(filename, package_root, &stdin, settings, autofix)?;
     diagnostics.messages.sort_unstable();
     Ok(diagnostics)

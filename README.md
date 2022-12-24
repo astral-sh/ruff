@@ -17,7 +17,7 @@ An extremely fast Python linter, written in Rust.
 
 - ⚡️  10-100x faster than existing linters
 - 🐍  Installable via `pip`
-- 🤝  Python 3.10 compatibility
+- 🤝  Python 3.11 compatibility
 - 🛠️  `pyproject.toml` support
 - 📦  Built-in caching, to avoid re-analyzing unchanged files
 - 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
@@ -160,11 +160,13 @@ ruff path/to/code/ --watch
 Ruff also works with [pre-commit](https://pre-commit.com):
 
 ```yaml
-repos:
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.191
-    hooks:
-      - id: ruff
+- repo: https://github.com/charliermarsh/ruff-pre-commit
+  # Ruff version.
+  rev: 'v0.0.192'
+  hooks:
+    - id: ruff
+      # Respect `exclude` and `extend-exclude` settings.
+      args: ["--force-exclude"]
 ```
 
 ## Configuration
@@ -316,6 +318,8 @@ Options:
           Show violations with source code
       --respect-gitignore
           Respect file exclusions via `.gitignore` and other standard ignore files
+      --force-exclude
+          Enforce exclusions, even for paths passed to Ruff directly on the command-line
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
@@ -334,6 +338,8 @@ Options:
           The name of the file when passing it through stdin
       --explain <EXPLAIN>
           Explain a rule
+      --cache-dir <CACHE_DIR>
+          Path to the cache directory
   -h, --help
           Print help information
   -V, --version
@@ -534,7 +540,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
 | E902 | IOError | IOError: `...` |  |
 | E999 | SyntaxError | SyntaxError: `...` |  |
-| W292 | NoNewLineAtEndOfFile | No newline at end of file |  |
+| W292 | NoNewLineAtEndOfFile | No newline at end of file | 🛠 |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' |  |
 
 ### mccabe (C90)
@@ -626,6 +632,8 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
 | UP015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
 | UP016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
+| UP017 | DatetimeTimezoneUTC | Use `datetime.UTC` alias | 🛠 |
+| UP018 | NativeLiterals | Unnecessary call to `str` and `bytes` | 🛠 |
 
 ### pep8-naming (N)
 
@@ -1015,19 +1023,17 @@ local configs = require 'lspconfig.configs'
 if not configs.ruff_lsp then
   configs.ruff_lsp = {
     default_config = {
-    cmd = { "ruff-lsp" },
-    filetypes = {'python'},
-    root_dir = require('lspconfig').util.find_git_ancestor,
-    settings = {
-      ruff_lsp = {
-        -- Any extra CLI arguments for `ruff` go here.
-        args = {}
+      cmd = { 'ruff-lsp' },
+      filetypes = { 'python' },
+      root_dir = require('lspconfig').util.find_git_ancestor,
+      init_options = {
+        settings = {
+          args = {}
+        }
       }
     }
   }
-}
 end
-
 require('lspconfig').ruff_lsp.setup {
   on_attach = on_attach,
 }
@@ -1036,6 +1042,8 @@ require('lspconfig').ruff_lsp.setup {
 Upon successful installation, you should see Ruff's diagnostics surfaced directly in your editor:
 
 ![Code Actions available in Neovim](https://user-images.githubusercontent.com/1309177/208278707-25fa37e4-079d-4597-ad35-b95dba066960.png)
+
+To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the [`ruff-lsp` documentation](https://github.com/charliermarsh/ruff-lsp#installation-and-usage).
 
 ### Language Server Protocol (Unofficial)
 
@@ -1075,24 +1083,15 @@ require'lspconfig'.pylsp.setup {
 }
 ```
 
-### PyCharm
-
-Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
-in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
-add a new tool with the following configuration:
-
-![Install Ruff as an External Tool](https://user-images.githubusercontent.com/1309177/193155720-336e43f0-1a8d-46b4-bc12-e60f9ae01f7e.png)
-
-Ruff should then appear as a runnable action:
-
-![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
-
 ### Vim & Neovim
 
 Ruff can be integrated into any editor that supports the Language Server Protocol via [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp)
-(see: [Language Server Protocol](#language-server-protocol-official)).
+(see: [Language Server Protocol](#language-server-protocol-official)), including Vim and Neovim.
 
-Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
+It's recommended that you use [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp), the
+officially supported LSP server for Ruff.
+
+However, Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
 extension for `coc.nvim`.
 
 <details>
@@ -1109,7 +1108,6 @@ tools:
     format-command: 'ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -'
     format-stdin: true
 ```
-
 </details>
 
 <details>
@@ -1146,8 +1144,25 @@ null_ls.setup({
     }
 })
 ```
-
 </details>
+
+
+### PyCharm (External Tool)
+
+Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
+in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
+add a new tool with the following configuration:
+
+![Install Ruff as an External Tool](https://user-images.githubusercontent.com/1309177/193155720-336e43f0-1a8d-46b4-bc12-e60f9ae01f7e.png)
+
+Ruff should then appear as a runnable action:
+
+![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
+
+### PyCharm (Unofficial)
+
+Ruff is also available as the [Ruff](https://plugins.jetbrains.com/plugin/20574-ruff) plugin on the
+IntelliJ Marketplace (maintained by @koxudaxi).
 
 ### GitHub Actions
 
@@ -1164,7 +1179,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -1222,7 +1237,7 @@ natively, including:
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (18/33)
 - [`yesqa`](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different error code prefixes than would be found in the
@@ -1279,7 +1294,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 Ruff can also replace [`isort`](https://pypi.org/project/isort/),
 [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
 [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10), and a subset of the rules
-implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (16/33).
+implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (17/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 
@@ -1580,6 +1595,31 @@ A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF0
 # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
 # which could be confused for "-", "p", and "*", respectively.
 allowed-confusables = ["−", "ρ", "∗"]
+```
+
+---
+
+#### [`cache-dir`](#cache-dir)
+
+A path to the cache directory.
+
+By default, Ruff stores cache results in a `.ruff_cache` directory in the current
+project root.
+
+However, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes
+precedence over that default.
+
+This setting will override even the `RUFF_CACHE_DIR` environment variable, if set.
+
+**Default value**: `.ruff_cache`
+
+**Type**: `PathBuf`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+cache-dir = "~/.cache/ruff"
 ```
 
 ---

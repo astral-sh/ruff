@@ -3,7 +3,7 @@ use std::fs;
 use std::fs::{create_dir_all, File, Metadata};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use filetime::FileTime;
@@ -36,8 +36,12 @@ struct CheckResult {
     messages: Vec<Message>,
 }
 
-fn cache_dir() -> &'static Path {
-    Path::new(CACHE_DIR.as_ref().map_or(".ruff_cache", String::as_str))
+/// Return the cache directory for a given project root. Defers to the
+/// `RUFF_CACHE_DIR` environment variable, if set.
+pub fn cache_dir(project_root: &Path) -> PathBuf {
+    CACHE_DIR
+        .as_ref()
+        .map_or_else(|| project_root.join(".ruff_cache"), PathBuf::from)
 }
 
 fn content_dir() -> &'static Path {
@@ -53,10 +57,8 @@ fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: fixer::Mode)
     hasher.finish()
 }
 
-/// Initialize the cache directory.
-pub fn init() -> Result<()> {
-    let path = cache_dir();
-
+/// Initialize the cache at the specified `Path`.
+pub fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
     create_dir_all(path.join(content_dir()))?;
 
@@ -75,15 +77,15 @@ pub fn init() -> Result<()> {
     Ok(())
 }
 
-fn write_sync(key: u64, value: &[u8]) -> Result<(), std::io::Error> {
+fn write_sync(cache_dir: &Path, key: u64, value: &[u8]) -> Result<(), std::io::Error> {
     fs::write(
-        cache_dir().join(content_dir()).join(format!("{key:x}")),
+        cache_dir.join(content_dir()).join(format!("{key:x}")),
         value,
     )
 }
 
-fn read_sync(key: u64) -> Result<Vec<u8>, std::io::Error> {
-    fs::read(cache_dir().join(content_dir()).join(format!("{key:x}")))
+fn read_sync(cache_dir: &Path, key: u64) -> Result<Vec<u8>, std::io::Error> {
+    fs::read(cache_dir.join(content_dir()).join(format!("{key:x}")))
 }
 
 /// Get a value from the cache.
@@ -98,7 +100,7 @@ pub fn get<P: AsRef<Path>>(
         return None;
     };
 
-    let encoded = read_sync(cache_key(path, settings, autofix)).ok()?;
+    let encoded = read_sync(&settings.cache_dir, cache_key(path, settings, autofix)).ok()?;
     let (mtime, messages) = match bincode::deserialize::<CheckResult>(&encoded[..]) {
         Ok(CheckResult {
             metadata: CacheMetadata { mtime },
@@ -135,6 +137,7 @@ pub fn set<P: AsRef<Path>>(
         messages,
     };
     if let Err(e) = write_sync(
+        &settings.cache_dir,
         cache_key(path, settings, autofix),
         &bincode::serialize(&check_result).unwrap(),
     ) {

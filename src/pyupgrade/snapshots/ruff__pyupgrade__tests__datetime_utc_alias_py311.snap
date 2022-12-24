@@ -1,0 +1,35 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind: DatetimeTimezoneUTC
+  location:
+    row: 10
+    column: 6
+  end_location:
+    row: 10
+    column: 27
+  fix:
+    content: datetime.UTC
+    location:
+      row: 10
+      column: 6
+    end_location:
+      row: 10
+      column: 27
+- kind: DatetimeTimezoneUTC
+  location:
+    row: 11
+    column: 6
+  end_location:
+    row: 11
+    column: 21
+  fix:
+    content: dt.UTC
+    location:
+      row: 11
+      column: 6
+    end_location:
+      row: 11
+      column: 21
+

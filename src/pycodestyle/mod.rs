@@ -31,6 +31,8 @@ mod tests {
     #[test_case(CheckCode::W292, Path::new("W292_0.py"))]
     #[test_case(CheckCode::W292, Path::new("W292_1.py"))]
     #[test_case(CheckCode::W292, Path::new("W292_2.py"))]
+    #[test_case(CheckCode::W292, Path::new("W292_3.py"))]
+    #[test_case(CheckCode::W292, Path::new("W292_4.py"))]
     #[test_case(CheckCode::W605, Path::new("W605_0.py"))]
     #[test_case(CheckCode::W605, Path::new("W605_1.py"))]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
