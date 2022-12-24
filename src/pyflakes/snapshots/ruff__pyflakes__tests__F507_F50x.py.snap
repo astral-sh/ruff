@@ -8,7 +8,7 @@ expression: checks
       - 1
   location:
     row: 5
-    column: 8
+    column: 0
   end_location:
     row: 5
     column: 14
@@ -19,7 +19,7 @@ expression: checks
       - 3
   location:
     row: 6
-    column: 8
+    column: 0
   end_location:
     row: 6
     column: 19

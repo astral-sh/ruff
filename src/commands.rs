@@ -20,7 +20,7 @@ use crate::message::Message;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{packages, resolver};
+use crate::{cache, packages, resolver};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -46,6 +46,30 @@ pub fn run(
             .map(ignore::DirEntry::path)
             .collect::<Vec<_>>(),
     );
+
+    // Initialize the cache.
+    if matches!(cache, flags::Cache::Enabled) {
+        match &pyproject_strategy {
+            PyprojectDiscovery::Fixed(settings) => {
+                if let Err(e) = cache::init(&settings.cache_dir) {
+                    error!(
+                        "Failed to initialize cache at {}: {e:?}",
+                        settings.cache_dir.to_string_lossy()
+                    );
+                }
+            }
+            PyprojectDiscovery::Hierarchical(default) => {
+                for settings in std::iter::once(default).chain(resolver.iter()) {
+                    if let Err(e) = cache::init(&settings.cache_dir) {
+                        error!(
+                            "Failed to initialize cache at {}: {e:?}",
+                            settings.cache_dir.to_string_lossy()
+                        );
+                    }
+                }
+            }
+        }
+    };
 
     let start = Instant::now();
     let mut diagnostics: Diagnostics = par_iter(&paths)

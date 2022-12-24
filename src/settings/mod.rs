@@ -13,6 +13,7 @@ use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 
+use crate::cache::cache_dir;
 use crate::checks::CheckCode;
 use crate::checks_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
 use crate::settings::configuration::Configuration;
@@ -49,6 +50,7 @@ pub struct Settings {
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+    pub cache_dir: PathBuf,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
@@ -140,6 +142,7 @@ impl Settings {
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
             target_version: config.target_version.unwrap_or(PythonVersion::Py310),
             show_source: config.show_source.unwrap_or_default(),
+            cache_dir: config.cache_dir.unwrap_or_else(|| cache_dir(project_root)),
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
@@ -209,6 +212,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
@@ -242,6 +246,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),

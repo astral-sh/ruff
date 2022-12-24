@@ -5,7 +5,7 @@ expression: checks
 - kind: PercentFormatStarRequiresSequence
   location:
     row: 11
-    column: 11
+    column: 0
   end_location:
     row: 11
     column: 27
