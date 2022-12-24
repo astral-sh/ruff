@@ -1,11 +1,13 @@
 //! `NoQA` enforcement and validation.
 
+use std::str::FromStr;
+
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checks::{Check, CheckCode, CheckKind, CODE_REDIRECTS};
+use crate::checks::{Check, CheckCode, CheckKind, UnusedCodes, CODE_REDIRECTS};
 use crate::noqa;
 use crate::noqa::{is_file_exempt, Directive};
 use crate::settings::{flags, Settings};
@@ -98,18 +100,29 @@ pub fn check_noqa(
                     }
                 }
                 Directive::Codes(spaces, start, end, codes) => {
-                    let mut invalid_codes = vec![];
+                    let mut disabled_codes = vec![];
+                    let mut unknown_codes = vec![];
+                    let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
                     let mut self_ignore = false;
                     for code in codes {
                         let code = CODE_REDIRECTS.get(code).map_or(code, AsRef::as_ref);
                         if code == CheckCode::RUF100.as_ref() {
                             self_ignore = true;
+                            break;
+                        }
+
+                        if matches.contains(&code) || settings.external.contains(code) {
+                            valid_codes.push(code);
                         } else {
-                            if matches.contains(&code) || settings.external.contains(code) {
-                                valid_codes.push(code);
+                            if let Ok(check_code) = CheckCode::from_str(code) {
+                                if settings.enabled.contains(&check_code) {
+                                    unmatched_codes.push(code);
+                                } else {
+                                    disabled_codes.push(code);
+                                }
                             } else {
-                                invalid_codes.push(code);
+                                unknown_codes.push(code);
                             }
                         }
                     }
@@ -118,14 +131,25 @@ pub fn check_noqa(
                         continue;
                     }
 
-                    if !invalid_codes.is_empty() {
+                    if !(disabled_codes.is_empty()
+                        && unknown_codes.is_empty()
+                        && unmatched_codes.is_empty())
+                    {
                         let mut check = Check::new(
-                            CheckKind::UnusedNOQA(Some(
-                                invalid_codes
+                            CheckKind::UnusedNOQA(Some(UnusedCodes {
+                                disabled: disabled_codes
                                     .iter()
                                     .map(|code| (*code).to_string())
                                     .collect(),
-                            )),
+                                unknown: unknown_codes
+                                    .iter()
+                                    .map(|code| (*code).to_string())
+                                    .collect(),
+                                unmatched: unmatched_codes
+                                    .iter()
+                                    .map(|code| (*code).to_string())
+                                    .collect(),
+                            })),
                             Range {
                                 location: Location::new(row + 1, start),
                                 end_location: Location::new(row + 1, end),
