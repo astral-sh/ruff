@@ -40,20 +40,21 @@ fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             let mut output = vec![];
 
             for field in fields.named.iter() {
-                let ident = field.ident.as_ref().unwrap();
-                // .expect(&format!("Expected a doc attribute on {ident}"));
-
                 let docs: Vec<&Attribute> = field
                     .attrs
                     .iter()
-                    .filter(|a| a.path.is_ident("doc"))
+                    .filter(|attr| attr.path.is_ident("doc"))
                     .collect();
 
-                if let Some(attr) = field.attrs.iter().find(|a| a.path.is_ident("option")) {
+                if let Some(attr) = field.attrs.iter().find(|attr| attr.path.is_ident("option")) {
                     output.push(handle_option(field, attr, docs)?);
                 };
 
-                if field.attrs.iter().any(|a| a.path.is_ident("option_group")) {
+                if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.path.is_ident("option_group"))
+                {
                     output.push(handle_option_group(field)?);
                 };
             }
