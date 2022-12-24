@@ -1,0 +1,20 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 14
+    column: 0
+  fix:
+    content: "from os import environ, execl, execv, path\nfrom sys import (\n    argv,\n    exit,\n    stderr,\n    stdout,\n)\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 14
+      column: 0
+
