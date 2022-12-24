@@ -318,6 +318,8 @@ Options:
           Show violations with source code
       --respect-gitignore
           Respect file exclusions via `.gitignore` and other standard ignore files
+      --force-exclude
+          Enforce exclusions, even for paths passed to Ruff directly on the command-line
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
