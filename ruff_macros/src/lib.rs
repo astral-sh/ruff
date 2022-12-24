@@ -13,13 +13,14 @@
 
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
+use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{
     parse_macro_input, AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput,
     Field, Fields, Lit, LitStr, Path, PathArguments, PathSegment, Token, Type, TypePath,
 };
 
-#[proc_macro_derive(ConfigurationOptions, attributes(option, option_group))]
+#[proc_macro_derive(ConfigurationOptions, attributes(option, doc, option_group))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -39,8 +40,17 @@ fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             let mut output = vec![];
 
             for field in fields.named.iter() {
+                let ident = field.ident.as_ref().unwrap();
+                // .expect(&format!("Expected a doc attribute on {ident}"));
+
+                let docs: Vec<&Attribute> = field
+                    .attrs
+                    .iter()
+                    .filter(|a| a.path.is_ident("doc"))
+                    .collect();
+
                 if let Some(attr) = field.attrs.iter().find(|a| a.path.is_ident("option")) {
-                    output.push(handle_option(field, attr)?);
+                    output.push(handle_option(field, attr, docs)?);
                 };
 
                 if field.attrs.iter().any(|a| a.path.is_ident("option_group")) {
@@ -105,15 +115,41 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
 
 /// Parse an `#[option(doc="...", default="...", value_type="...",
 /// example="...")]` attribute and return data in the form of an `OptionField`.
-fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::TokenStream> {
+fn handle_option(
+    field: &Field,
+    attr: &Attribute,
+    docs: Vec<&Attribute>,
+) -> syn::Result<proc_macro2::TokenStream> {
+    /// Convert the `doc` attribute into its raw string value.
+    fn get_doc(doc: &Attribute) -> syn::Result<String> {
+        let doc = doc
+            .parse_meta()
+            .map_err(|e| syn::Error::new(doc.span(), e))?;
+
+        match doc {
+            syn::Meta::NameValue(syn::MetaNameValue {
+                lit: syn::Lit::Str(lit_str),
+                ..
+            }) => Ok(lit_str.value()),
+            _ => Err(syn::Error::new(doc.span(), "Expected doc attribute.")),
+        }
+    }
+
+    // Convert the list of `doc` attributes itno a single string.
+    let doc = docs
+        .into_iter()
+        .map(get_doc)
+        .collect::<syn::Result<Vec<_>>>()?
+        .join("\n");
+
     // unwrap is safe because we're only going over named fields
     let ident = field.ident.as_ref().unwrap();
 
     let FieldAttributes {
-        doc,
         default,
         value_type,
         example,
+        ..
     } = attr.parse_args::<FieldAttributes>()?;
     let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 

@@ -18,10 +18,7 @@ use crate::{
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Options {
     #[option(
-        doc = r#"
-            A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`,
-            `RUF002`, and `RUF003`.
-        "#,
+        doc = r#""#,
         default = r#"[]"#,
         value_type = "Vec<char>",
         example = r#"
@@ -30,6 +27,8 @@ pub struct Options {
             allowed-confusables = ["−", "ρ", "∗"]
         "#
     )]
+    /// A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`,
+    /// `RUF002`, and `RUF003`.
     pub allowed_confusables: Option<Vec<char>>,
     #[option(
         doc = r#"
