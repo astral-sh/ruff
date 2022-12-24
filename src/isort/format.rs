@@ -41,7 +41,7 @@ pub fn format_import_from(
     line_length: usize,
     force_wrap_aliases: bool,
     is_first: bool,
-    last_comma: bool
+    last_comma: bool,
 ) -> String {
     if aliases.len() == 1
         && aliases
