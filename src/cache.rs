@@ -36,8 +36,8 @@ struct CheckResult {
     messages: Vec<Message>,
 }
 
-/// Return the cache directory for a given project root. Defers to the `RUFF_CACHE_DIR` environment
-/// variable, if set.
+/// Return the cache directory for a given project root. Defers to the
+/// `RUFF_CACHE_DIR` environment variable, if set.
 pub fn cache_dir(project_root: &Path) -> PathBuf {
     CACHE_DIR
         .as_ref()
@@ -57,7 +57,7 @@ fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: fixer::Mode)
     hasher.finish()
 }
 
-/// Initialize the cache directory.
+/// Initialize the cache at the specified `Path`.
 pub fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
     create_dir_all(path.join(content_dir()))?;

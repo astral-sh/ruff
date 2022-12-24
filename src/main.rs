@@ -18,6 +18,7 @@ use std::sync::mpsc::channel;
 
 use ::ruff::autofix::fixer;
 use ::ruff::cli::{extract_log_level, Cli, Overrides};
+use ::ruff::commands;
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::printer::Printer;
 use ::ruff::resolver::{resolve_settings, FileDiscovery, PyprojectDiscovery, Relativity};
@@ -26,7 +27,6 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
-use ::ruff::{cache, commands};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
@@ -123,6 +123,7 @@ fn inner_main() -> Result<ExitCode> {
     } else {
         fixer::Mode::None
     };
+    let cache = !cli.no_cache;
 
     if let Some(code) = cli.explain {
         commands::explain(&code, &format)?;
@@ -135,17 +136,6 @@ fn inner_main() -> Result<ExitCode> {
     if cli.show_files {
         commands::show_files(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
         return Ok(ExitCode::SUCCESS);
-    }
-
-    // Initialize the cache.
-    let cache_dir = match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => &settings.cache_dir,
-        PyprojectDiscovery::Hierarchical(settings) => &settings.cache_dir,
-    };
-    let mut cache_enabled: bool = !cli.no_cache;
-    if cache_enabled && cache::init(cache_dir).is_err() {
-        eprintln!("Unable to initialize cache; disabling...");
-        cache_enabled = false;
     }
 
     let printer = Printer::new(&format, &log_level);
@@ -172,7 +162,7 @@ fn inner_main() -> Result<ExitCode> {
             &pyproject_strategy,
             &file_strategy,
             &overrides,
-            cache_enabled.into(),
+            cache.into(),
             fixer::Mode::None,
         )?;
         printer.write_continuously(&messages)?;
@@ -202,7 +192,7 @@ fn inner_main() -> Result<ExitCode> {
                             &pyproject_strategy,
                             &file_strategy,
                             &overrides,
-                            cache_enabled.into(),
+                            cache.into(),
                             fixer::Mode::None,
                         )?;
                         printer.write_continuously(&messages)?;
@@ -241,7 +231,7 @@ fn inner_main() -> Result<ExitCode> {
                 &pyproject_strategy,
                 &file_strategy,
                 &overrides,
-                cache_enabled.into(),
+                cache.into(),
                 autofix,
             )?
         };
