@@ -46,6 +46,13 @@ fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                     .filter(|attr| attr.path.is_ident("doc"))
                     .collect();
 
+                if docs.is_empty() {
+                    return Err(syn::Error::new(
+                        field.span(),
+                        "Missing documentation for field",
+                    ));
+                }
+
                 if let Some(attr) = field.attrs.iter().find(|attr| attr.path.is_ident("option")) {
                     output.push(handle_option(field, attr, docs)?);
                 };
@@ -81,8 +88,10 @@ fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 /// deriving `ConfigurationOptions`, create code that calls retrieves options
 /// from that group: `Foobar::get_available_options()`
 fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
-    // unwrap is safe because we're only going over named fields
-    let ident = field.ident.as_ref().unwrap();
+    let ident = field
+        .ident
+        .as_ref()
+        .expect("Expected to handle named fields");
 
     match &field.ty {
         Type::Path(TypePath {
@@ -147,8 +156,10 @@ fn handle_option(
     .trim_matches('\n')
     .to_string();
 
-    // `unwrap` is safe because we're only going over named fields
-    let ident = field.ident.as_ref().unwrap();
+    let ident = field
+        .ident
+        .as_ref()
+        .expect("Expected to handle named fields");
 
     let FieldAttributes {
         default,

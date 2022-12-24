@@ -139,8 +139,7 @@ pub fn main(cli: &Cli) -> Result<()> {
             _ => panic!("Invalid prefix: {prefix}"),
         };
         gen = gen.line(format!(
-            "CheckCodePrefix::{prefix} => SuffixLength::{},",
-            specificity
+            "CheckCodePrefix::{prefix} => SuffixLength::{specificity},"
         ));
     }
     gen.line("}");
