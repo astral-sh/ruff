@@ -533,7 +533,6 @@ pub fn format_imports(
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, aliases) in &import_block.import_from {
             let all_commas = aliases.iter().all(|(data, _)| check_last_char(&the_str, data.name, ","));
-            println!("All commas: {}", all_commas);
             output.append(&format::format_import_from(
                 import_from,
                 comments,

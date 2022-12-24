@@ -1,13 +1,13 @@
-from sys import (
-    stderr,
-    argv,
-    stdout,
-    exit,
-)
-
 from os import (
-    path,
     environ,
     execl,
     execv,
+    path,
+)
+
+from sys import (
+    argv,
+    exit,
+    stderr,
+    stdout
 )
