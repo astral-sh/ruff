@@ -5,7 +5,7 @@ expression: checks
 - kind: PercentFormatExpectedSequence
   location:
     row: 17
-    column: 8
+    column: 0
   end_location:
     row: 17
     column: 24
@@ -13,7 +13,7 @@ expression: checks
 - kind: PercentFormatExpectedSequence
   location:
     row: 18
-    column: 8
+    column: 0
   end_location:
     row: 18
     column: 28
@@ -21,7 +21,7 @@ expression: checks
 - kind: PercentFormatExpectedSequence
   location:
     row: 23
-    column: 8
+    column: 0
   end_location:
     row: 23
     column: 42
