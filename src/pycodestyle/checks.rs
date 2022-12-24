@@ -6,10 +6,8 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checks::{Check, CheckCode, CheckKind};
-use crate::settings::flags;
+use crate::checks::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
-use crate::Settings;
 
 static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
 
