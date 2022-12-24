@@ -146,19 +146,19 @@ pub fn no_newline_at_end_of_file(
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
         if let Some(line) = contents.lines().last() {
-            // Both locations are at the end of the file (and thus the same)
-            let file_end_location = Location::new(contents.lines().count(), line.len() + 1);
+            // Both locations are at the end of the file (and thus the same).
+            let location = Location::new(contents.lines().count(), line.len() + 1);
             let mut check = Check::new(
                 CheckKind::NoNewLineAtEndOfFile,
                 Range {
-                    location: file_end_location,
-                    end_location: file_end_location,
+                    location,
+                    end_location: location,
                 },
             );
             if matches!(autofix, flags::Autofix::Enabled)
                 && settings.fixable.contains(&CheckCode::W292)
             {
-                check.amend(Fix::insertion("\n".to_string(), file_end_location));
+                check.amend(Fix::insertion("\n".to_string(), location));
             }
             return Some(check);
         }
