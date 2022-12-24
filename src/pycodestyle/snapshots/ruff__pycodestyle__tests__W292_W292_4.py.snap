@@ -4,17 +4,17 @@ expression: checks
 ---
 - kind: NoNewLineAtEndOfFile
   location:
-    row: 2
-    column: 8
+    row: 1
+    column: 1
   end_location:
-    row: 2
-    column: 8
+    row: 1
+    column: 1
   fix:
     content: "\n"
     location:
-      row: 2
-      column: 8
+      row: 1
+      column: 1
     end_location:
-      row: 2
-      column: 8
+      row: 1
+      column: 1
 

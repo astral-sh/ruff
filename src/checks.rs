@@ -2983,6 +2983,7 @@ impl CheckKind {
                 | CheckKind::NoBlankLineBeforeClass(..)
                 | CheckKind::NoBlankLineBeforeFunction(..)
                 | CheckKind::NoBlankLinesBetweenHeaderAndContent(..)
+                | CheckKind::NoNewLineAtEndOfFile
                 | CheckKind::NoOverIndentation
                 | CheckKind::NoSurroundingWhitespace
                 | CheckKind::NoUnderIndentation
