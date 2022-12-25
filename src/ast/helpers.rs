@@ -402,16 +402,22 @@ pub fn excepthandler_name_range(
     handler: &Excepthandler,
     locator: &SourceCodeLocator,
 ) -> Option<Range> {
-    let contents = locator.slice_source_code_range(&Range::from_located(handler));
-    let range = lexer::make_tokenizer(&contents)
-        .flatten()
-        .tuple_windows()
-        .find(|(tok, next_tok)| matches!(tok.1, Tok::As) && matches!(next_tok.1, Tok::Name { .. }))
-        .map(|((..), (start, _, end))| Range {
-            location: to_absolute(start, handler.location),
-            end_location: to_absolute(end, handler.location),
-        });
-    range
+    if let ExcepthandlerKind::ExceptHandler { name: None, .. } = &handler.node {
+        None
+    } else {
+        let contents = locator.slice_source_code_range(&Range::from_located(handler));
+        let range = lexer::make_tokenizer(&contents)
+            .flatten()
+            .tuple_windows()
+            .find(|(tok, next_tok)| {
+                matches!(tok.1, Tok::As) && matches!(next_tok.1, Tok::Name { .. })
+            })
+            .map(|((..), (start, _, end))| Range {
+                location: to_absolute(start, handler.location),
+                end_location: to_absolute(end, handler.location),
+            });
+        range
+    }
 }
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
