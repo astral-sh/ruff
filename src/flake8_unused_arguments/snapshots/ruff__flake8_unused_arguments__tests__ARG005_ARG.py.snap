@@ -5,10 +5,10 @@ expression: checks
 - kind:
     UnusedLambdaArgument: x
   location:
-    row: 27
+    row: 28
     column: 7
   end_location:
-    row: 27
+    row: 28
     column: 8
   fix: ~
 
