@@ -470,11 +470,40 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
-/// Confirms that the character after the first instance of the given part matches the match_char
-fn check_last_char(whole: &str, part: &str, match_char: &str) -> bool {
-    let idx = whole.find(part).unwrap();
-    let selected = whole.chars().nth(idx + part.len()).unwrap();
-    selected.to_string() == match_char
+/// Checks if the character after the first instance of a given word is `next_char`.
+/// An offset can be added to check characters after the next line
+fn next_char_is(whole: &str, part: &str, next_char: &str, offset: usize) -> bool {
+    let idx = match whole.find(part) {
+        None => return false,
+        Some(item) => item
+    };
+    let selected = match whole.chars().nth(idx + part.len() + offset) {
+        None => return false,
+        Some(item) => item
+    };
+    selected.to_string() == next_char
+}
+
+fn check_magic_commas(whole: &str, aliases: &Vec<(AliasData<'_>, CommentSet<'_>)>) -> bool {
+    let mut at_least_one = false;
+    for alias in aliases {
+        // If the next character, and the one after is a comma we have at least one column
+        // for a multi-line import
+        if next_char_is(whole, alias.0.name, ",", 0) {
+            if next_char_is(whole, alias.0.name, "\n", 1) {
+                at_least_one = true;
+            }
+        } else {
+            // If there is no comma, but there is a parenthese after we know this is a normal
+            // multiline import
+            let next_is_nl = next_char_is(whole, alias.0.name, "\n", 0);
+            let after_is_close = next_char_is(whole, alias.0.name, ")", 1);
+            if !(next_is_nl && !after_is_close) {
+                return false;
+            }
+        }
+    }
+    true && at_least_one
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -533,9 +562,7 @@ pub fn format_imports(
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, aliases) in &import_block.import_from {
-            let all_commas = aliases
-                .iter()
-                .all(|(data, _)| check_last_char(&the_str, data.name, ","));
+            let all_commas = check_magic_commas(&the_str, aliases);
             output.append(&format::format_import_from(
                 import_from,
                 comments,
