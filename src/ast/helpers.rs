@@ -397,7 +397,7 @@ pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
     Range::from_located(stmt)
 }
 
-/// Return the `Range` for `name` in an exception handler.
+/// Return the `Range` of `name` in `Excepthandler`.
 pub fn excepthandler_name_range(
     handler: &Excepthandler,
     locator: &SourceCodeLocator,
