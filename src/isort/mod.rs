@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 use itertools::Itertools;
 use ropey::RopeBuilder;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Stmt, StmtKind};
+use rustpython_ast::{Stmt, StmtKind, Location};
 
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::sorting::{member_key, module_key};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
-    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
+    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock, LocationWrapper
 };
 use crate::SourceCodeLocator;
 
@@ -46,6 +46,7 @@ pub enum AnnotatedImport<'a> {
         level: Option<&'a usize>,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
+        location: Vec<Location>,
     },
 }
 
@@ -138,6 +139,7 @@ fn annotate_imports<'a>(
                     module: module.as_ref(),
                     names: aliases,
                     level: level.as_ref(),
+                    location: names.iter().map(|name| name.end_location.unwrap()).collect(),
                     atop,
                     inline,
                 });
@@ -147,6 +149,7 @@ fn annotate_imports<'a>(
     }
     annotated
 }
+
 
 fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) -> ImportBlock {
     let mut block = ImportBlock::default();
@@ -191,13 +194,15 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                 level,
                 atop,
                 inline,
+                location,
             } => {
                 // Associate the comments with the first alias (best effort).
+                let locations = LocationWrapper::new_vec(location);
                 if let Some(alias) = names.first() {
                     if alias.name == "*" {
                         let entry = block
                             .import_from_star
-                            .entry(ImportFromData { module, level })
+                            .entry(ImportFromData { module, level, locations: locations.clone() })
                             .or_default();
                         for comment in atop {
                             entry.atop.push(comment.value);
@@ -208,7 +213,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     } else if alias.asname.is_none() || combine_as_imports {
                         let entry = &mut block
                             .import_from
-                            .entry(ImportFromData { module, level })
+                            .entry(ImportFromData { module, level, locations: locations.clone() })
                             .or_default()
                             .0;
                         for comment in atop {
@@ -221,7 +226,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                         let entry = block
                             .import_from_as
                             .entry((
-                                ImportFromData { module, level },
+                                ImportFromData { module, level, locations: locations.clone() },
                                 AliasData {
                                     name: alias.name,
                                     asname: alias.asname,
@@ -242,7 +247,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     if alias.name == "*" {
                         let entry = block
                             .import_from_star
-                            .entry(ImportFromData { module, level })
+                            .entry(ImportFromData { module, level, locations: locations.clone() })
                             .or_default();
                         for comment in alias.atop {
                             entry.atop.push(comment.value);
@@ -253,7 +258,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     } else if alias.asname.is_none() || combine_as_imports {
                         let entry = block
                             .import_from
-                            .entry(ImportFromData { module, level })
+                            .entry(ImportFromData { module, level, locations: locations.clone() })
                             .or_default()
                             .1
                             .entry(AliasData {
@@ -271,7 +276,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                         let entry = block
                             .import_from_as
                             .entry((
-                                ImportFromData { module, level },
+                                ImportFromData { module, level, locations: locations.clone() },
                                 AliasData {
                                     name: alias.name,
                                     asname: alias.asname,
@@ -466,15 +471,24 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                 )
             }),
     );
-
     ordered
 }
 
-/// Confirms that the character after the first instance of the given part matches the match_char
-fn check_last_char(whole: &str, part: &str, match_char: &str) -> bool {
-    let idx = whole.find(part).unwrap();
-    let selected = whole.chars().nth(idx + part.len()).unwrap();
-    selected.to_string() == match_char
+/// Confirms that the character after a certain location matches the match_char
+fn check_last_char(whole: &str, location: &LocationWrapper, match_char: char) -> bool {
+    let mut current = Location::new(1, 0);
+    for character in whole.chars() {
+        if location == current {
+            println!("{}", character);
+            return character == match_char;
+        }
+        if character == '\n' {
+            current.newline();
+        } else {
+            current.go_right();
+        }
+    }
+    false
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -511,7 +525,7 @@ pub fn format_imports(
 
     // Generate replacement source code.
     let mut is_first_block = true;
-    let the_str = locator.to_string();
+    let whole_text = locator.to_string();
 
     for import_block in block_by_type.into_values() {
         let import_block = sort_imports(import_block);
@@ -533,9 +547,10 @@ pub fn format_imports(
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, aliases) in &import_block.import_from {
-            let all_commas = aliases
+            println!("{:?}", import_from);
+            let all_commas = import_from.locations
                 .iter()
-                .all(|(data, _)| check_last_char(&the_str, data.name, ","));
+                .all(|location| check_last_char(&whole_text, location, ','));
             output.append(&format::format_import_from(
                 import_from,
                 comments,

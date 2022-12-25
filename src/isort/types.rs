@@ -1,13 +1,41 @@
 use std::borrow::Cow;
 
 use rustc_hash::FxHashMap;
+use rustpython_ast::Location;
 
 use crate::ast;
+
+#[derive(Hash, Eq, PartialOrd, PartialEq, Ord, Debug, Clone)]
+pub struct LocationWrapper {
+    row: usize,
+    column: usize
+}
+
+impl LocationWrapper {
+    pub fn new(location: Location) -> Self {
+        Self { row: location.row(), column: location.column() }
+    }
+
+    pub fn new_vec(locations: Vec<Location>) -> Vec<Self> {
+        let mut new_locations: Vec<Self> = Vec::new();
+        for location in locations {
+            new_locations.push(Self::new(location));
+        }
+        new_locations
+    }
+}
+
+impl PartialEq<Location> for &LocationWrapper {
+    fn eq(&self, other: &Location) -> bool {
+        self.row == other.row() && self.column == other.column()
+    }
+}
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ImportFromData<'a> {
     pub module: Option<&'a String>,
     pub level: Option<&'a usize>,
+    pub locations: Vec<LocationWrapper>,
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
