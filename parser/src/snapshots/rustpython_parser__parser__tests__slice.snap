@@ -1,0 +1,115 @@
+---
+source: compiler/parser/src/parser.rs
+expression: parse_ast
+---
+Located {
+    location: Location {
+        row: 1,
+        column: 0,
+    },
+    end_location: Some(
+        Location {
+            row: 1,
+            column: 8,
+        },
+    ),
+    custom: (),
+    node: Subscript {
+        value: Located {
+            location: Location {
+                row: 1,
+                column: 0,
+            },
+            end_location: Some(
+                Location {
+                    row: 1,
+                    column: 1,
+                },
+            ),
+            custom: (),
+            node: Name {
+                id: "x",
+                ctx: Load,
+            },
+        },
+        slice: Located {
+            location: Location {
+                row: 1,
+                column: 2,
+            },
+            end_location: Some(
+                Location {
+                    row: 1,
+                    column: 7,
+                },
+            ),
+            custom: (),
+            node: Slice {
+                lower: Some(
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 2,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 3,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
+                        },
+                    },
+                ),
+                upper: Some(
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 4,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 5,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                2,
+                            ),
+                            kind: None,
+                        },
+                    },
+                ),
+                step: Some(
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 6,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 7,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                3,
+                            ),
+                            kind: None,
+                        },
+                    },
+                ),
+            },
+        },
+        ctx: Load,
+    },
+}
