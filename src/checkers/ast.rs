@@ -2664,12 +2664,15 @@ where
 
                         self.check_builtin_shadowing(name, excepthandler, false);
 
+                        let name_range =
+                            helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
+
                         if self.current_scope().values.contains_key(&name.as_str()) {
                             self.handle_node_store(
                                 name,
                                 &Expr::new(
-                                    excepthandler.location,
-                                    excepthandler.end_location.unwrap(),
+                                    name_range.location,
+                                    name_range.end_location,
                                     ExprKind::Name {
                                         id: name.to_string(),
                                         ctx: ExprContext::Store,
@@ -2682,8 +2685,8 @@ where
                         self.handle_node_store(
                             name,
                             &Expr::new(
-                                excepthandler.location,
-                                excepthandler.end_location.unwrap(),
+                                name_range.location,
+                                name_range.end_location,
                                 ExprKind::Name {
                                     id: name.to_string(),
                                     ctx: ExprContext::Store,
@@ -2702,7 +2705,7 @@ where
                                 if self.settings.enabled.contains(&CheckCode::F841) {
                                     self.add_check(Check::new(
                                         CheckKind::UnusedVariable(name.to_string()),
-                                        Range::from_located(excepthandler),
+                                        name_range,
                                     ));
                                 }
                             }
