@@ -43,6 +43,12 @@ pub struct Cli {
     fix: bool,
     #[clap(long, overrides_with("fix"), hide = true)]
     no_fix: bool,
+    /// Fix any fixable lint errors, but don't report on leftover violations.
+    /// Implies `--fix`.
+    #[arg(long, overrides_with("no_fix_only"))]
+    fix_only: bool,
+    #[clap(long, overrides_with("fix_only"), hide = true)]
+    no_fix_only: bool,
     /// Disable cache reads.
     #[arg(short, long)]
     pub no_cache: bool,
@@ -181,6 +187,7 @@ impl Cli {
                 unfixable: self.unfixable,
                 // TODO(charlie): Included in `pyproject.toml`, but not inherited.
                 fix: resolve_bool_arg(self.fix, self.no_fix),
+                fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
                 format: self.format,
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 cache_dir: self.cache_dir,
@@ -240,6 +247,7 @@ pub struct Overrides {
     pub unfixable: Option<Vec<CheckCodePrefix>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     pub fix: Option<bool>,
+    pub fix_only: Option<bool>,
     pub format: Option<SerializationFormat>,
     pub force_exclude: Option<bool>,
     pub cache_dir: Option<PathBuf>,

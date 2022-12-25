@@ -93,6 +93,13 @@
         "null"
       ]
     },
+    "fix-only": {
+      "description": "Like `fix`, but disables reporting on leftover violation. Implies `fix`.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "fixable": {
       "description": "A list of check code prefixes to consider autofix-able.",
       "type": [

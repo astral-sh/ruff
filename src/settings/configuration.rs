@@ -33,6 +33,7 @@ pub struct Configuration {
     pub extend_select: Vec<Vec<CheckCodePrefix>>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
+    pub fix_only: Option<bool>,
     pub fixable: Option<Vec<CheckCodePrefix>>,
     pub format: Option<SerializationFormat>,
     pub force_exclude: Option<bool>,
@@ -107,6 +108,7 @@ impl Configuration {
             extend_select: vec![options.extend_select.unwrap_or_default()],
             external: options.external,
             fix: options.fix,
+            fix_only: options.fix_only,
             fixable: options.fixable,
             format: options.format,
             force_exclude: options.force_exclude,
@@ -179,6 +181,7 @@ impl Configuration {
                 .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),
+            fix_only: self.fix_only.or(config.fix_only),
             fixable: self.fixable.or(config.fixable),
             format: self.format.or(config.format),
             force_exclude: self.force_exclude.or(config.force_exclude),
@@ -225,6 +228,9 @@ impl Configuration {
         }
         if let Some(fix) = overrides.fix {
             self.fix = Some(fix);
+        }
+        if let Some(fix_only) = overrides.fix_only {
+            self.fix_only = Some(fix_only);
         }
         if let Some(fixable) = overrides.fixable {
             self.fixable = Some(fixable);
