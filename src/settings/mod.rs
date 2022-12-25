@@ -40,6 +40,7 @@ pub struct Settings {
     pub extend_exclude: GlobSet,
     pub external: FxHashSet<String>,
     pub fix: bool,
+    pub fix_only: bool,
     pub fixable: FxHashSet<CheckCode>,
     pub format: SerializationFormat,
     pub force_exclude: bool,
@@ -122,6 +123,7 @@ impl Settings {
             extend_exclude: resolve_globset(config.extend_exclude)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()),
             fix: config.fix.unwrap_or(false),
+            fix_only: config.fix_only.unwrap_or(false),
             fixable: resolve_codes(
                 [CheckCodeSpec {
                     select: &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
@@ -202,6 +204,7 @@ impl Settings {
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
             fix: false,
+            fix_only: false,
             fixable: FxHashSet::from_iter([check_code]),
             format: SerializationFormat::Text,
             force_exclude: false,
@@ -236,6 +239,7 @@ impl Settings {
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
             fix: false,
+            fix_only: false,
             fixable: FxHashSet::from_iter(check_codes),
             format: SerializationFormat::Text,
             force_exclude: false,

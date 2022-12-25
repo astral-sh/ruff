@@ -20,7 +20,7 @@ use ::ruff::autofix::fixer;
 use ::ruff::cli::{extract_log_level, Cli, Overrides};
 use ::ruff::commands;
 use ::ruff::logging::{set_up_logging, LogLevel};
-use ::ruff::printer::Printer;
+use ::ruff::printer::{Printer, Violations};
 use ::ruff::resolver::{resolve_settings, FileDiscovery, PyprojectDiscovery, Relativity};
 use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::SerializationFormat;
@@ -112,16 +112,23 @@ fn inner_main() -> Result<ExitCode> {
             PyprojectDiscovery::Hierarchical(settings) => settings.respect_gitignore,
         },
     };
-    let (fix, format) = match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => (settings.fix, settings.format),
-        PyprojectDiscovery::Hierarchical(settings) => (settings.fix, settings.format),
+    let (fix, fix_only, format) = match &pyproject_strategy {
+        PyprojectDiscovery::Fixed(settings) => (settings.fix, settings.fix_only, settings.format),
+        PyprojectDiscovery::Hierarchical(settings) => {
+            (settings.fix, settings.fix_only, settings.format)
+        }
     };
-    let autofix = if fix {
+    let autofix = if fix || fix_only {
         fixer::Mode::Apply
     } else if matches!(format, SerializationFormat::Json) {
         fixer::Mode::Generate
     } else {
         fixer::Mode::None
+    };
+    let violations = if fix_only {
+        Violations::Hide
+    } else {
+        Violations::Show
     };
     let cache = !cli.no_cache;
 
@@ -138,13 +145,13 @@ fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    let printer = Printer::new(&format, &log_level);
+    let printer = Printer::new(&format, &log_level, &autofix, &violations);
     if cli.watch {
         if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
         if cli.add_noqa {
-            eprintln!("Warning: --no-qa is not enabled in watch mode.");
+            eprintln!("Warning: --add-noqa is not enabled in watch mode.");
         }
         if cli.autoformat {
             eprintln!("Warning: --autoformat is not enabled in watch mode.");
@@ -240,7 +247,7 @@ fn inner_main() -> Result<ExitCode> {
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, fixer::Mode::Apply)) {
-            printer.write_once(&diagnostics, autofix)?;
+            printer.write_once(&diagnostics)?;
         }
 
         // Check for updates if we're in a non-silent log level.
@@ -249,7 +256,7 @@ fn inner_main() -> Result<ExitCode> {
             drop(updates::check_for_updates());
         }
 
-        if !diagnostics.messages.is_empty() && !cli.exit_zero {
+        if !diagnostics.messages.is_empty() && !cli.exit_zero && !fix_only {
             return Ok(ExitCode::FAILURE);
         }
     }

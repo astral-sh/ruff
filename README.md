@@ -1798,6 +1798,23 @@ fix = true
 
 ---
 
+#### [`fix-only`](#fix-only)
+
+Like `fix`, but disables reporting on leftover violation. Implies `fix`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+fix-only = true
+```
+
+---
+
 #### [`fixable`](#fixable)
 
 A list of check code prefixes to consider autofix-able.
