@@ -1,0 +1,20 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind: TypingTextStrAlias
+  location:
+    row: 3
+    column: 21
+  end_location:
+    row: 3
+    column: 25
+  fix:
+    content: str
+    location:
+      row: 3
+      column: 21
+    end_location:
+      row: 3
+      column: 25
+

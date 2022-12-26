@@ -210,6 +210,7 @@ pub enum CheckCode {
     SIM118,
     // pyupgrade
     UP001,
+    UP002,
     UP003,
     UP004,
     UP005,
@@ -822,6 +823,7 @@ pub enum CheckKind {
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UselessMetaclassType,
+    TypingTextStrAlias,
     DeprecatedUnittestAlias(String, String),
     UselessObjectInheritance(String),
     UsePEP585Annotation(String),
@@ -1193,6 +1195,7 @@ impl CheckCode {
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             // pyupgrade
             CheckCode::UP001 => CheckKind::UselessMetaclassType,
+            CheckCode::UP002 => CheckKind::TypingTextStrAlias,
             CheckCode::UP003 => CheckKind::TypeOfPrimitive(Primitive::Str),
             CheckCode::UP004 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::UP005 => CheckKind::DeprecatedUnittestAlias(
@@ -1615,6 +1618,7 @@ impl CheckCode {
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
             CheckCode::UP001 => CheckCategory::Pyupgrade,
+            CheckCode::UP002 => CheckCategory::Pyupgrade,
             CheckCode::UP003 => CheckCategory::Pyupgrade,
             CheckCode::UP004 => CheckCategory::Pyupgrade,
             CheckCode::UP005 => CheckCategory::Pyupgrade,
@@ -1828,6 +1832,7 @@ impl CheckKind {
             // pyupgrade
             CheckKind::TypeOfPrimitive(..) => &CheckCode::UP003,
             CheckKind::UselessMetaclassType => &CheckCode::UP001,
+            CheckKind::TypingTextStrAlias => &CheckCode::UP002,
             CheckKind::DeprecatedUnittestAlias(..) => &CheckCode::UP005,
             CheckKind::UsePEP585Annotation(..) => &CheckCode::UP006,
             CheckKind::UsePEP604Annotation => &CheckCode::UP007,
@@ -2533,6 +2538,7 @@ impl CheckKind {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
             }
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
+            CheckKind::TypingTextStrAlias => "`typing.Text` is depreciated use `str`".to_string(),
             CheckKind::DeprecatedUnittestAlias(alias, target) => {
                 format!("`{alias}` is deprecated, use `{target}` instead")
             }
@@ -3101,6 +3107,7 @@ pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCodePrefix>> = La
     FxHashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
         ("U001", CheckCodePrefix::UP001),
+        ("U002", CheckCodePrefix::UP002),
         ("U003", CheckCodePrefix::UP003),
         ("U004", CheckCodePrefix::UP004),
         ("U005", CheckCodePrefix::UP005),
@@ -3176,6 +3183,7 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(
     FxHashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
         ("U001", CheckCode::UP001),
+        ("U002", CheckCode::UP002),
         ("U003", CheckCode::UP003),
         ("U004", CheckCode::UP004),
         ("U005", CheckCode::UP005),

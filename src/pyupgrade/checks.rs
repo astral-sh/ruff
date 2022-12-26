@@ -4,9 +4,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Constant, KeywordData, Location};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::helpers;
+use crate::ast::helpers::{self, match_module_member};
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::pyupgrade::types::Primitive;
 use crate::settings::types::PythonVersion;
@@ -29,6 +30,21 @@ pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -
         return None;
     }
     Some(Check::new(CheckKind::UselessMetaclassType, location))
+}
+
+/// UP002
+pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr, location: Range) -> Option<Check> {
+    if match_module_member(
+        expr,
+        "typing",
+        "Text",
+        &checker.from_imports,
+        &checker.import_aliases,
+    ) {
+        Some(Check::new(CheckKind::TypingTextStrAlias, location))
+    } else {
+        None
+    }
 }
 
 /// UP003

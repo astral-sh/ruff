@@ -1487,6 +1487,10 @@ where
             ExprKind::Name { id, ctx } => {
                 match ctx {
                     ExprContext::Load => {
+                        if self.settings.enabled.contains(&CheckCode::UP002) {
+                            pyupgrade::plugins::typing_text_str_alias(self, expr);
+                        }
+
                         // Ex) List[...]
                         if !self.in_deferred_string_type_definition
                             && self.settings.enabled.contains(&CheckCode::UP006)

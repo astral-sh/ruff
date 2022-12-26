@@ -18,6 +18,7 @@ mod tests {
     use crate::settings::types::PythonVersion;
 
     #[test_case(CheckCode::UP001, Path::new("UP001.py"); "UP001")]
+    #[test_case(CheckCode::UP002, Path::new("UP002.py"); "UP002")]
     #[test_case(CheckCode::UP003, Path::new("UP003.py"); "UP003")]
     #[test_case(CheckCode::UP004, Path::new("UP004.py"); "UP004")]
     #[test_case(CheckCode::UP005, Path::new("UP005.py"); "UP005")]

@@ -11,7 +11,7 @@
     clippy::too_many_lines
 )]
 
-use std::io::{self};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
