@@ -191,6 +191,8 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                 atop,
                 inline,
             } => {
+                let single_import = names.len() == 1;
+
                 // Associate the comments with the first alias (best effort).
                 if let Some(alias) = names.first() {
                     let entry = if alias.name == "*" {
@@ -220,8 +222,13 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     for comment in atop {
                         entry.atop.push(comment.value);
                     }
-                    for comment in inline {
-                        entry.inline.push(comment.value);
+
+                    // Only associate inline comments with first alias if multiple names have been
+                    // imported, i.e. the comment applies to all names
+                    if !single_import {
+                        for comment in &inline {
+                            entry.inline.push(comment.value.clone());
+                        }
                     }
                 }
 
@@ -255,6 +262,14 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                             ))
                             .or_default()
                     };
+
+                    // We only have one name imported, inline comments stay associated with that
+                    // entry.
+                    if single_import {
+                        for comment in &inline {
+                            entry.inline.push(comment.value.clone());
+                        }
+                    }
 
                     for comment in alias.atop {
                         entry.atop.push(comment.value);
