@@ -519,8 +519,8 @@ fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
         } else if the_char != ',' {
             return false;
         // If there is a comma, and it is a multi-line import, then this counts
-        // towards the magic comma. This avoids issues where a single line import
-        // with multiple imports mistakenly triggers the code
+        // towards the magic comma. This avoids issues where a single line
+        // import with multiple imports mistakenly triggers the code
         } else {
             if clean_whole.get(index.unwrap() + 1) == Some(&'\n') {
                 at_least_one_comma = true;
