@@ -292,6 +292,8 @@ Options:
           Run in watch mode by re-running whenever files change
       --fix
           Attempt to automatically fix lint errors
+      --fix-only
+          Fix any fixable lint errors, but don't report on leftover violations. Implies `--fix`
   -n, --no-cache
           Disable cache reads
       --select <SELECT>
