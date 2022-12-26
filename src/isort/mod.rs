@@ -545,6 +545,7 @@ pub fn format_imports(
     force_wrap_aliases: bool,
     split_on_trailing_comma: bool,
 ) -> String {
+    println!("Split on trailing: {}", split_on_trailing_comma);
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments);
 
@@ -708,6 +709,28 @@ mod tests {
                 isort: isort::settings::Settings {
                     force_wrap_aliases: true,
                     combine_as_imports: true,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+    #[test_case(Path::new("magic_trailing_comma.py"))]
+    fn split_on_trailing_comma(path: &Path) -> Result<()> {
+        let snapshot = format!("split_on_trailing_comma_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    force_wrap_aliases: false,
+                    combine_as_imports: false,
+                    split_on_trailing_comma: true,
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
