@@ -37,6 +37,11 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
             "type": 'Vec<String>',
         },
         {
+            "name": "fix-only",
+            "default": 'false',
+            "type": 'bool',
+        },
+        {
             "name": "ignore",
             "default": '[]',
             "type": 'Vec<CheckCodePrefix>',
@@ -45,6 +50,11 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
             "name": "line-length",
             "default": '88',
             "type": 'usize',
+        },
+        {
+            "name": "required-version",
+            "default": 'None',
+            "type": 'String',
         },
         {
             "name": "select",
@@ -171,6 +181,11 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
             "name": "known-third-party",
             "default": '[]',
             "type": 'Vec<String>',
+        },
+        {
+            "name": "split-on-trailing-comma",
+            "default": 'true',
+            "type": 'bool',
         },
     ]},
     {"name": "mccabe", "fields": [

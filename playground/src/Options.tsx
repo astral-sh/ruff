@@ -6,13 +6,13 @@ function OptionEntry({
   defaultConfig,
   groupName,
   fieldName,
-  onOptionChange,
+  onChange,
 }: {
   config: Config | null;
   defaultConfig: Config;
   groupName: string;
   fieldName: string;
-  onOptionChange: (groupName: string, fieldName: string, value: string) => void;
+  onChange: (groupName: string, fieldName: string, value: string) => void;
 }) {
   const value =
     config && config[groupName] && config[groupName][fieldName]
@@ -28,7 +28,7 @@ function OptionEntry({
           placeholder={defaultConfig[groupName][fieldName]}
           type="text"
           onChange={(event) => {
-            onOptionChange(groupName, fieldName, event.target.value);
+            onChange(groupName, fieldName, event.target.value);
           }}
         />
       </label>
@@ -39,11 +39,11 @@ function OptionEntry({
 export function Options({
   config,
   defaultConfig,
-  onOptionChange,
+  onChange,
 }: {
   config: Config | null;
   defaultConfig: Config;
-  onOptionChange: (groupName: string, fieldName: string, value: string) => void;
+  onChange: (groupName: string, fieldName: string, value: string) => void;
 }) {
   return (
     <div className="options">
@@ -59,7 +59,7 @@ export function Options({
                     defaultConfig={defaultConfig}
                     groupName={group.name}
                     fieldName={field.name}
-                    onOptionChange={onOptionChange}
+                    onChange={onChange}
                   />
                 </li>
               ))}

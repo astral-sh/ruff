@@ -14,7 +14,7 @@ export function getDefaultConfig(availableOptions: OptionGroup[]): Config {
 }
 
 /**
- * Convert the config in the application to something ruff accepts.
+ * Convert the config in the application to something Ruff accepts.
  *
  * Application config is always nested one level. Ruff allows for some
  * top-level options.

@@ -3,6 +3,7 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import { MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api";
 import { useEffect, useState, useCallback } from "react";
 
+// @ts-ignore
 import init, { Check, check } from "./pkg/ruff.js";
 import { AVAILABLE_OPTIONS } from "./ruff_options";
 import { Config, getDefaultConfig, toRuffConfig } from "./config";
@@ -34,7 +35,7 @@ function persistConfigAndSource(config: Config, source: string) {
 
 const defaultConfig = getDefaultConfig(AVAILABLE_OPTIONS);
 
-function App() {
+export default function App() {
   const monaco = useMonaco();
   const [ruffInitialized, setRuffInitialized] = useState<boolean>(false);
   const [config, setConfig] = useState<Config | null>(null);
@@ -124,7 +125,7 @@ function App() {
       <Options
         config={config}
         defaultConfig={defaultConfig}
-        onOptionChange={handleOptionChange}
+        onChange={handleOptionChange}
       />
       <Editor
         options={{ readOnly: false, minimap: { enabled: false } }}
@@ -138,5 +139,3 @@ function App() {
     </div>
   );
 }
-
-export default App;
