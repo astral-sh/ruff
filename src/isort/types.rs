@@ -13,7 +13,10 @@ pub struct LocationHash {
 
 impl LocationHash {
     pub fn new(location: Location) -> Self {
-        Self { row: location.row(), column: location.column() }
+        Self {
+            row: location.row(),
+            column: location.column(),
+        }
     }
 }
 
@@ -25,7 +28,7 @@ impl PartialEq<Location> for &LocationHash {
 
 #[derive(Hash, Eq, PartialOrd, PartialEq, Ord, Debug, Clone, Default)]
 pub struct LocationWrapper {
-    pub location: Vec<LocationHash>
+    pub location: Vec<LocationHash>,
 }
 
 impl LocationWrapper {
@@ -34,7 +37,9 @@ impl LocationWrapper {
         for location in locations {
             new_locations.push(LocationHash::new(location));
         }
-        Self { location: new_locations }
+        Self {
+            location: new_locations,
+        }
     }
 
     pub fn add_locations(&mut self, wrapper: LocationWrapper) {
@@ -92,8 +97,14 @@ pub struct ImportBlock<'a> {
     pub import: FxHashMap<AliasData<'a>, CommentSet<'a>>,
     // Map from (module, level) to `AliasData`, used to track 'from' imports.
     // Ex) `from module import member`
-    pub import_from:
-        FxHashMap<ImportFromData<'a>, (CommentSet<'a>, FxHashMap<AliasData<'a>, CommentSet<'a>>, LocationWrapper)>,
+    pub import_from: FxHashMap<
+        ImportFromData<'a>,
+        (
+            CommentSet<'a>,
+            FxHashMap<AliasData<'a>, CommentSet<'a>>,
+            LocationWrapper,
+        ),
+    >,
     // Set of (module, level, name, asname), used to track re-exported 'from' imports.
     // Ex) `from module import member as member`
     pub import_from_as: FxHashMap<(ImportFromData<'a>, AliasData<'a>), CommentSet<'a>>,

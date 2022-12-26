@@ -5,14 +5,15 @@ use std::path::{Path, PathBuf};
 use itertools::Itertools;
 use ropey::RopeBuilder;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Stmt, StmtKind, Location};
+use rustpython_ast::{Location, Stmt, StmtKind};
 
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::sorting::{cmp_import_froms, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
-    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock, LocationWrapper, LocationHash
+    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, LocationHash, LocationWrapper,
+    OrderedImportBlock,
 };
 use crate::SourceCodeLocator;
 
@@ -139,7 +140,10 @@ fn annotate_imports<'a>(
                     module: module.as_ref(),
                     names: aliases,
                     level: level.as_ref(),
-                    location: names.iter().map(|name| name.end_location.unwrap()).collect(),
+                    location: names
+                        .iter()
+                        .map(|name| name.end_location.unwrap())
+                        .collect(),
                     atop,
                     inline,
                 });
@@ -149,7 +153,6 @@ fn annotate_imports<'a>(
     }
     annotated
 }
-
 
 fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) -> ImportBlock {
     let mut block = ImportBlock::default();
@@ -422,7 +425,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
-                              LocationWrapper::default() 
+                                LocationWrapper::default(),
                             ),
                         )
                     }),
@@ -450,7 +453,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
-                               LocationWrapper::default() 
+                                LocationWrapper::default(),
                             ),
                         )
                     }),
@@ -467,16 +470,18 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
             })
-            .sorted_by(|(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
-                cmp_import_froms(import_from1, import_from2).then_with(|| {
-                    match (aliases1.first(), aliases2.first()) {
-                        (None, None) => Ordering::Equal,
-                        (None, Some(_)) => Ordering::Less,
-                        (Some(_), None) => Ordering::Greater,
-                        (Some((alias1, _)), Some((alias2, _))) => cmp_members(alias1, alias2),
-                    }
-                })
-            }),
+            .sorted_by(
+                |(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
+                    cmp_import_froms(import_from1, import_from2).then_with(|| {
+                        match (aliases1.first(), aliases2.first()) {
+                            (None, None) => Ordering::Equal,
+                            (None, Some(_)) => Ordering::Less,
+                            (Some(_), None) => Ordering::Greater,
+                            (Some((alias1, _)), Some((alias2, _))) => cmp_members(alias1, alias2),
+                        }
+                    })
+                },
+            ),
     );
     ordered
 }
@@ -486,7 +491,6 @@ fn check_last_char(whole: &str, location: &LocationHash, match_char: char) -> bo
     let mut current = Location::new(1, 0);
     for character in whole.chars() {
         if location == current {
-            println!("{}", character);
             return character == match_char;
         }
         if character == '\n' {
@@ -517,7 +521,6 @@ pub fn format_imports(
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports);
-    // println!("{:?}", block);
 
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
@@ -528,7 +531,6 @@ pub fn format_imports(
         known_third_party,
         extra_standard_library,
     );
-    // println!("{:?}", block_by_type);
 
     let mut output = RopeBuilder::new();
 
@@ -556,10 +558,8 @@ pub fn format_imports(
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, locations, aliases) in &import_block.import_from {
-            println!("Import from: {:?}", import_from);
-            // println!("Aliases: {:?}", aliases);
-            println!("Locations: {:?}\n", locations);
-            let all_commas = locations.location
+            let all_commas = locations
+                .location
                 .iter()
                 .all(|location| check_last_char(&whole_text, location, ','));
             output.append(&format::format_import_from(
