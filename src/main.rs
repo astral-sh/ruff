@@ -100,6 +100,12 @@ fn inner_main() -> Result<ExitCode> {
         cli.stdin_filename.as_deref(),
     )?;
 
+    // Validate the `Settings` and return any errors.
+    match &pyproject_strategy {
+        PyprojectDiscovery::Fixed(settings) => settings.validate()?,
+        PyprojectDiscovery::Hierarchical(settings) => settings.validate()?,
+    };
+
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
     let file_strategy = FileDiscovery {

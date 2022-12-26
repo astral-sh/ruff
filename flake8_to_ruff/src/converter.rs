@@ -303,6 +303,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -359,6 +360,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -415,6 +417,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -471,6 +474,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -527,6 +531,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -591,6 +596,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::D100,
@@ -683,6 +689,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,

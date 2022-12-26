@@ -16,7 +16,9 @@ use crate::checks_gen::CheckCodePrefix;
 use crate::cli::{collect_per_file_ignores, Overrides};
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
+use crate::settings::types::{
+    FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
+};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
     flake8_tidy_imports, flake8_unused_arguments, fs, isort, mccabe, pep8_naming, pyupgrade,
@@ -41,6 +43,7 @@ pub struct Configuration {
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
+    pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<CheckCodePrefix>>,
     pub show_source: Option<bool>,
@@ -124,6 +127,7 @@ impl Configuration {
                     })
                     .collect()
             }),
+            required_version: options.required_version,
             respect_gitignore: options.respect_gitignore,
             select: options.select,
             show_source: options.show_source,
@@ -162,7 +166,6 @@ impl Configuration {
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
             exclude: self.exclude.or(config.exclude),
-            respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
             extend: self.extend.or(config.extend),
             extend_exclude: config
                 .extend_exclude
@@ -191,6 +194,8 @@ impl Configuration {
                 .or(config.ignore_init_module_imports),
             line_length: self.line_length.or(config.line_length),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
+            required_version: self.required_version.or(config.required_version),
+            respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
             select: self.select.or(config.select),
             show_source: self.show_source.or(config.show_source),
             src: self.src.or(config.src),

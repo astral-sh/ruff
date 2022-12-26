@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::checks_gen::CheckCodePrefix;
-use crate::settings::types::{PythonVersion, SerializationFormat};
+use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
     flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pyupgrade,
@@ -216,6 +216,17 @@ pub struct Options {
     /// The line length to use when enforcing long-lines violations (like
     /// `E501`).
     pub line_length: Option<usize>,
+    #[option(
+        default = "None",
+        value_type = "String",
+        example = r#"
+            required-version = "0.0.193"
+        "#
+    )]
+    /// Require a specific version of Ruff to be running (useful for unifying
+    /// results across many environments, e.g., with a `pyproject.toml`
+    /// file).
+    pub required_version: Option<Version>,
     #[option(
         default = "true",
         value_type = "bool",
