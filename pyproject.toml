@@ -34,11 +34,7 @@ bindings = "bin"
 strip = true
 
 [tool.ruff]
-#required-version = "0.0.192"
 
 [tool.ruff.isort]
 force-wrap-aliases = true
 combine-as-imports = true
-
-[tool.black]
-required-version = "22.12.1"
