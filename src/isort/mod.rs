@@ -193,31 +193,19 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
             } => {
                 // Associate the comments with the first alias (best effort).
                 if let Some(alias) = names.first() {
-                    if alias.name == "*" {
-                        let entry = block
+                    let entry = if alias.name == "*" {
+                        block
                             .import_from_star
                             .entry(ImportFromData { module, level })
-                            .or_default();
-                        for comment in atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
+                            .or_default()
                     } else if alias.asname.is_none() || combine_as_imports {
-                        let entry = &mut block
+                        &mut block
                             .import_from
                             .entry(ImportFromData { module, level })
                             .or_default()
-                            .0;
-                        for comment in atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
+                            .0
                     } else {
-                        let entry = block
+                        block
                             .import_from_as
                             .entry((
                                 ImportFromData { module, level },
@@ -226,31 +214,26 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                                     asname: alias.asname,
                                 },
                             ))
-                            .or_default();
-                        for comment in atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
+                            .or_default()
+                    };
+
+                    for comment in atop {
+                        entry.atop.push(comment.value);
+                    }
+                    for comment in inline {
+                        entry.inline.push(comment.value);
                     }
                 }
 
                 // Create an entry for every alias.
                 for alias in names {
-                    if alias.name == "*" {
-                        let entry = block
+                    let entry = if alias.name == "*" {
+                        block
                             .import_from_star
                             .entry(ImportFromData { module, level })
-                            .or_default();
-                        for comment in alias.atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in alias.inline {
-                            entry.inline.push(comment.value);
-                        }
+                            .or_default()
                     } else if alias.asname.is_none() || combine_as_imports {
-                        let entry = block
+                        block
                             .import_from
                             .entry(ImportFromData { module, level })
                             .or_default()
@@ -259,15 +242,9 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                                 name: alias.name,
                                 asname: alias.asname,
                             })
-                            .or_default();
-                        for comment in alias.atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in alias.inline {
-                            entry.inline.push(comment.value);
-                        }
+                            .or_default()
                     } else {
-                        let entry = block
+                        block
                             .import_from_as
                             .entry((
                                 ImportFromData { module, level },
@@ -276,13 +253,14 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                                     asname: alias.asname,
                                 },
                             ))
-                            .or_default();
-                        entry
-                            .atop
-                            .extend(alias.atop.into_iter().map(|comment| comment.value));
-                        for comment in alias.inline {
-                            entry.inline.push(comment.value);
-                        }
+                            .or_default()
+                    };
+
+                    for comment in alias.atop {
+                        entry.atop.push(comment.value);
+                    }
+                    for comment in alias.inline {
+                        entry.inline.push(comment.value);
                     }
                 }
             }
