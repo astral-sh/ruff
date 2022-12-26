@@ -54,9 +54,10 @@ pub fn format_import_from(
 
     // We can only inline if: (1) none of the aliases have atop comments, and (3)
     // only the last alias (if any) has inline comments.
-    if aliases
-        .iter()
-        .all(|(_, CommentSet { atop, .. })| atop.is_empty())
+    if !trailing_comma
+        && aliases
+            .iter()
+            .all(|(_, CommentSet { atop, .. })| atop.is_empty())
         && aliases
             .iter()
             .rev()
@@ -65,7 +66,6 @@ pub fn format_import_from(
         && (!force_wrap_aliases
             || aliases.len() == 1
             || aliases.iter().all(|(alias, _)| alias.asname.is_none()))
-        && !trailing_comma
     {
         let (single_line, import_length) =
             format_single_line(import_from, comments, aliases, is_first);

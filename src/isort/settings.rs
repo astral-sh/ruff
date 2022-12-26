@@ -94,7 +94,7 @@ pub struct Options {
     pub extra_standard_library: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash, Default)]
+#[derive(Debug, Hash)]
 pub struct Settings {
     pub combine_as_imports: bool,
     pub force_wrap_aliases: bool,
@@ -115,6 +115,19 @@ impl Settings {
             extra_standard_library: BTreeSet::from_iter(
                 options.extra_standard_library.unwrap_or_default(),
             ),
+        }
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            combine_as_imports: false,
+            force_wrap_aliases: false,
+            split_on_trailing_comma: true,
+            known_first_party: BTreeSet::new(),
+            known_third_party: BTreeSet::new(),
+            extra_standard_library: BTreeSet::new(),
         }
     }
 }
