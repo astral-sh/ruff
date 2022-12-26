@@ -32,6 +32,9 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     // Load the relevant `Settings` for the given `Path`.
     let settings = resolve(path)?;
 
+    // Validate the `Settings` and return any errors.
+    settings.validate()?;
+
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);
 
