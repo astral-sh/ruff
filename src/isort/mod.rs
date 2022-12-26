@@ -229,7 +229,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     // imported, i.e., the comment applies to all names; otherwise, associate
                     // with the alias.
                     if single_import
-                        && (alias.name != "*" && alias.asname.is_none() || combine_as_imports)
+                        && (alias.name != "*" && (alias.asname.is_none() || combine_as_imports))
                     {
                         let entry = block
                             .import_from
