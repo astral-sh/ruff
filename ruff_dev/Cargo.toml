@@ -18,3 +18,4 @@ schemars = { version = "0.8.11" }
 serde_json = {version="1.0.91"}
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
+textwrap = { version = "0.16.0" }

@@ -1,3 +1,5 @@
+#![cfg(not(target_family = "wasm"))]
+
 use std::str;
 
 use anyhow::Result;
