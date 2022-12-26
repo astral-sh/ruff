@@ -7,8 +7,8 @@ use crate::ast;
 
 #[derive(Hash, Eq, PartialOrd, PartialEq, Ord, Debug, Clone, Default)]
 pub struct LocationHash {
-    row: usize,
-    column: usize,
+    pub row: usize,
+    pub column: usize,
 }
 
 impl LocationHash {
@@ -25,7 +25,7 @@ impl PartialEq<Location> for &LocationHash {
 
 #[derive(Hash, Eq, PartialOrd, PartialEq, Ord, Debug, Clone, Default)]
 pub struct LocationWrapper {
-    location: Vec<LocationHash>
+    pub location: Vec<LocationHash>
 }
 
 impl LocationWrapper {

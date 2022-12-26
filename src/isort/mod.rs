@@ -563,12 +563,9 @@ pub fn format_imports(
             println!("Import from: {:?}", import_from);
             // println!("Aliases: {:?}", aliases);
             println!("Locations: {:?}\n", locations);
-            /*
-            let all_commas = import_from.locations
+            let all_commas = locations.location
                 .iter()
                 .all(|location| check_last_char(&whole_text, location, ','));
-            */
-            let all_commas = false;
             output.append(&format::format_import_from(
                 import_from,
                 comments,
