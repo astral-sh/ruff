@@ -14,6 +14,7 @@
 pub mod generate_check_code_prefix;
 pub mod generate_json_schema;
 pub mod generate_options;
+pub mod generate_playground_options;
 pub mod generate_rules_table;
 pub mod generate_source_code;
 pub mod print_ast;
