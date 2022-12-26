@@ -1,4 +1,4 @@
-name: Playground
+name: "[Playground] Release"
 
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: 'npm'
+          cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: actions/cache@v3
         env:
