@@ -5,7 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::pyupgrade::checks;
 
-/// UP002
+/// UP019
 pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
     let location = Range::from_located(expr);
     let Some(mut check) = checks::typing_text_str_alias(checker, expr, location) else {

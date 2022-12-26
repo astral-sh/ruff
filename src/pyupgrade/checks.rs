@@ -32,7 +32,7 @@ pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -
     Some(Check::new(CheckKind::UselessMetaclassType, location))
 }
 
-/// UP002
+/// UP019
 pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr, location: Range) -> Option<Check> {
     if match_module_member(
         expr,

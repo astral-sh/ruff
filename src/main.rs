@@ -11,8 +11,6 @@
     clippy::too_many_lines
 )]
 
-use std::io;
-use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use cfg_if::cfg_if;

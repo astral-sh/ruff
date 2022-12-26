@@ -210,7 +210,6 @@ pub enum CheckCode {
     SIM118,
     // pyupgrade
     UP001,
-    UP002,
     UP003,
     UP004,
     UP005,
@@ -227,6 +226,7 @@ pub enum CheckCode {
     UP016,
     UP017,
     UP018,
+    UP019,
     // pydocstyle
     D100,
     D101,
@@ -1195,7 +1195,6 @@ impl CheckCode {
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             // pyupgrade
             CheckCode::UP001 => CheckKind::UselessMetaclassType,
-            CheckCode::UP002 => CheckKind::TypingTextStrAlias,
             CheckCode::UP003 => CheckKind::TypeOfPrimitive(Primitive::Str),
             CheckCode::UP004 => CheckKind::UselessObjectInheritance("...".to_string()),
             CheckCode::UP005 => CheckKind::DeprecatedUnittestAlias(
@@ -1215,6 +1214,7 @@ impl CheckCode {
             CheckCode::UP016 => CheckKind::RemoveSixCompat,
             CheckCode::UP017 => CheckKind::DatetimeTimezoneUTC,
             CheckCode::UP018 => CheckKind::NativeLiterals,
+            CheckCode::UP019 => CheckKind::TypingTextStrAlias,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1618,7 +1618,6 @@ impl CheckCode {
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
             CheckCode::UP001 => CheckCategory::Pyupgrade,
-            CheckCode::UP002 => CheckCategory::Pyupgrade,
             CheckCode::UP003 => CheckCategory::Pyupgrade,
             CheckCode::UP004 => CheckCategory::Pyupgrade,
             CheckCode::UP005 => CheckCategory::Pyupgrade,
@@ -1635,6 +1634,7 @@ impl CheckCode {
             CheckCode::UP016 => CheckCategory::Pyupgrade,
             CheckCode::UP017 => CheckCategory::Pyupgrade,
             CheckCode::UP018 => CheckCategory::Pyupgrade,
+            CheckCode::UP019 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1832,7 +1832,6 @@ impl CheckKind {
             // pyupgrade
             CheckKind::TypeOfPrimitive(..) => &CheckCode::UP003,
             CheckKind::UselessMetaclassType => &CheckCode::UP001,
-            CheckKind::TypingTextStrAlias => &CheckCode::UP002,
             CheckKind::DeprecatedUnittestAlias(..) => &CheckCode::UP005,
             CheckKind::UsePEP585Annotation(..) => &CheckCode::UP006,
             CheckKind::UsePEP604Annotation => &CheckCode::UP007,
@@ -1848,6 +1847,7 @@ impl CheckKind {
             CheckKind::RemoveSixCompat => &CheckCode::UP016,
             CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
             CheckKind::NativeLiterals => &CheckCode::UP018,
+            CheckKind::TypingTextStrAlias => &CheckCode::UP019,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -3107,7 +3107,6 @@ pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCodePrefix>> = La
     FxHashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
         ("U001", CheckCodePrefix::UP001),
-        ("U002", CheckCodePrefix::UP002),
         ("U003", CheckCodePrefix::UP003),
         ("U004", CheckCodePrefix::UP004),
         ("U005", CheckCodePrefix::UP005),
@@ -3123,6 +3122,7 @@ pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCodePrefix>> = La
         ("U015", CheckCodePrefix::UP015),
         ("U016", CheckCodePrefix::UP016),
         ("U017", CheckCodePrefix::UP017),
+        ("U019", CheckCodePrefix::UP019),
         // TODO(charlie): Remove by 2023-02-01.
         ("I252", CheckCodePrefix::TID252),
         ("M001", CheckCodePrefix::RUF100),
@@ -3183,7 +3183,6 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(
     FxHashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
         ("U001", CheckCode::UP001),
-        ("U002", CheckCode::UP002),
         ("U003", CheckCode::UP003),
         ("U004", CheckCode::UP004),
         ("U005", CheckCode::UP005),
@@ -3199,6 +3198,7 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(
         ("U015", CheckCode::UP015),
         ("U016", CheckCode::UP016),
         ("U017", CheckCode::UP017),
+        ("U019", CheckCode::UP019),
         // TODO(charlie): Remove by 2023-02-01.
         ("I252", CheckCode::TID252),
         ("M001", CheckCode::RUF100),

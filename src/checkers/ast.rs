@@ -1487,7 +1487,7 @@ where
             ExprKind::Name { id, ctx } => {
                 match ctx {
                     ExprContext::Load => {
-                        if self.settings.enabled.contains(&CheckCode::UP002) {
+                        if self.settings.enabled.contains(&CheckCode::UP019) {
                             pyupgrade::plugins::typing_text_str_alias(self, expr);
                         }
 
@@ -1547,7 +1547,7 @@ where
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::UP002) {
+                if self.settings.enabled.contains(&CheckCode::UP019) {
                     pyupgrade::plugins::typing_text_str_alias(self, expr);
                 }
                 if self.settings.enabled.contains(&CheckCode::UP016) {
