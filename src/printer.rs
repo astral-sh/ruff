@@ -18,6 +18,12 @@ use crate::message::Message;
 use crate::settings::types::SerializationFormat;
 use crate::tell_user;
 
+/// Enum to control whether lint violations are shown to the user.
+pub enum Violations {
+    Show,
+    Hide,
+}
+
 #[derive(Serialize)]
 struct ExpandedMessage<'a> {
     code: &'a CheckCode,
@@ -31,11 +37,23 @@ struct ExpandedMessage<'a> {
 pub struct Printer<'a> {
     format: &'a SerializationFormat,
     log_level: &'a LogLevel,
+    autofix: &'a fixer::Mode,
+    violations: &'a Violations,
 }
 
 impl<'a> Printer<'a> {
-    pub fn new(format: &'a SerializationFormat, log_level: &'a LogLevel) -> Self {
-        Self { format, log_level }
+    pub fn new(
+        format: &'a SerializationFormat,
+        log_level: &'a LogLevel,
+        autofix: &'a fixer::Mode,
+        violations: &'a Violations,
+    ) -> Self {
+        Self {
+            format,
+            log_level,
+            autofix,
+            violations,
+        }
     }
 
     pub fn write_to_user(&self, message: &str) {
@@ -44,32 +62,52 @@ impl<'a> Printer<'a> {
         }
     }
 
-    fn post_text(&self, diagnostics: &Diagnostics, autofix: fixer::Mode) {
+    fn post_text(&self, diagnostics: &Diagnostics) {
         if self.log_level >= &LogLevel::Default {
-            let fixed = diagnostics.fixed;
-            let remaining = diagnostics.messages.len();
-            let total = fixed + remaining;
-            if fixed > 0 {
-                println!("Found {total} error(s) ({fixed} fixed, {remaining} remaining).");
-            } else if remaining > 0 {
-                println!("Found {remaining} error(s).");
-            }
+            match self.violations {
+                Violations::Show => {
+                    let fixed = diagnostics.fixed;
+                    let remaining = diagnostics.messages.len();
+                    let total = fixed + remaining;
+                    if fixed > 0 {
+                        println!("Found {total} error(s) ({fixed} fixed, {remaining} remaining).");
+                    } else if remaining > 0 {
+                        println!("Found {remaining} error(s).");
+                    }
 
-            if !matches!(autofix, fixer::Mode::Apply) {
-                let num_fixable = diagnostics
-                    .messages
-                    .iter()
-                    .filter(|message| message.kind.fixable())
-                    .count();
-                if num_fixable > 0 {
-                    println!("{num_fixable} potentially fixable with the --fix option.");
+                    if !matches!(self.autofix, fixer::Mode::Apply) {
+                        let num_fixable = diagnostics
+                            .messages
+                            .iter()
+                            .filter(|message| message.kind.fixable())
+                            .count();
+                        if num_fixable > 0 {
+                            println!("{num_fixable} potentially fixable with the --fix option.");
+                        }
+                    }
+                }
+                Violations::Hide => {
+                    let fixed = diagnostics.fixed;
+                    if fixed > 0 {
+                        println!("Fixed {fixed} error(s).");
+                    }
                 }
             }
         }
     }
 
-    pub fn write_once(&self, diagnostics: &Diagnostics, autofix: fixer::Mode) -> Result<()> {
+    pub fn write_once(&self, diagnostics: &Diagnostics) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
+            return Ok(());
+        }
+
+        if matches!(self.violations, Violations::Hide) {
+            if matches!(
+                self.format,
+                SerializationFormat::Text | SerializationFormat::Grouped
+            ) {
+                self.post_text(diagnostics);
+            }
             return Ok(());
         }
 
@@ -142,7 +180,7 @@ impl<'a> Printer<'a> {
                     print_message(message);
                 }
 
-                self.post_text(diagnostics, autofix);
+                self.post_text(diagnostics);
             }
             SerializationFormat::Grouped => {
                 // Group by filename.
@@ -182,7 +220,7 @@ impl<'a> Printer<'a> {
                     println!();
                 }
 
-                self.post_text(diagnostics, autofix);
+                self.post_text(diagnostics);
             }
             SerializationFormat::Github => {
                 // Generate error workflow command in GitHub Actions format

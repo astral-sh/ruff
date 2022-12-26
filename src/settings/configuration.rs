@@ -16,7 +16,9 @@ use crate::checks_gen::CheckCodePrefix;
 use crate::cli::{collect_per_file_ignores, Overrides};
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
+use crate::settings::types::{
+    FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
+};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
     flake8_tidy_imports, flake8_unused_arguments, fs, isort, mccabe, pep8_naming, pyupgrade,
@@ -33,6 +35,7 @@ pub struct Configuration {
     pub extend_select: Vec<Vec<CheckCodePrefix>>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
+    pub fix_only: Option<bool>,
     pub fixable: Option<Vec<CheckCodePrefix>>,
     pub format: Option<SerializationFormat>,
     pub force_exclude: Option<bool>,
@@ -40,12 +43,14 @@ pub struct Configuration {
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
+    pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<CheckCodePrefix>>,
     pub show_source: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub unfixable: Option<Vec<CheckCodePrefix>>,
+    pub cache_dir: Option<PathBuf>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
@@ -106,6 +111,7 @@ impl Configuration {
             extend_select: vec![options.extend_select.unwrap_or_default()],
             external: options.external,
             fix: options.fix,
+            fix_only: options.fix_only,
             fixable: options.fixable,
             format: options.format,
             force_exclude: options.force_exclude,
@@ -121,6 +127,7 @@ impl Configuration {
                     })
                     .collect()
             }),
+            required_version: options.required_version,
             respect_gitignore: options.respect_gitignore,
             select: options.select,
             show_source: options.show_source,
@@ -130,6 +137,14 @@ impl Configuration {
                 .transpose()?,
             target_version: options.target_version,
             unfixable: options.unfixable,
+            cache_dir: options
+                .cache_dir
+                .map(|dir| {
+                    let dir = shellexpand::full(&dir);
+                    dir.map(|dir| PathBuf::from(dir.as_ref()))
+                })
+                .transpose()
+                .map_err(|e| anyhow!("Invalid `cache-dir` value: {e}"))?,
             // Plugins
             flake8_annotations: options.flake8_annotations,
             flake8_bugbear: options.flake8_bugbear,
@@ -151,7 +166,6 @@ impl Configuration {
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
             exclude: self.exclude.or(config.exclude),
-            respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
             extend: self.extend.or(config.extend),
             extend_exclude: config
                 .extend_exclude
@@ -170,6 +184,7 @@ impl Configuration {
                 .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),
+            fix_only: self.fix_only.or(config.fix_only),
             fixable: self.fixable.or(config.fixable),
             format: self.format.or(config.format),
             force_exclude: self.force_exclude.or(config.force_exclude),
@@ -179,11 +194,14 @@ impl Configuration {
                 .or(config.ignore_init_module_imports),
             line_length: self.line_length.or(config.line_length),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
+            required_version: self.required_version.or(config.required_version),
+            respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
             select: self.select.or(config.select),
             show_source: self.show_source.or(config.show_source),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
             unfixable: self.unfixable.or(config.unfixable),
+            cache_dir: self.cache_dir.or(config.cache_dir),
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
             flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
@@ -215,6 +233,9 @@ impl Configuration {
         }
         if let Some(fix) = overrides.fix {
             self.fix = Some(fix);
+        }
+        if let Some(fix_only) = overrides.fix_only {
+            self.fix_only = Some(fix_only);
         }
         if let Some(fixable) = overrides.fixable {
             self.fixable = Some(fixable);
@@ -253,6 +274,9 @@ impl Configuration {
         }
         if let Some(unfixable) = overrides.unfixable {
             self.unfixable = Some(unfixable);
+        }
+        if let Some(cache_dir) = overrides.cache_dir {
+            self.cache_dir = Some(cache_dir);
         }
         // Special-case: `extend_ignore` and `extend_select` are parallel arrays, so
         // push an empty array if only one of the two is provided.

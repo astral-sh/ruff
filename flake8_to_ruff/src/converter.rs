@@ -67,10 +67,7 @@ pub fn convert(
                     }
                     let from_codes = plugin::infer_plugins_from_codes(&referenced_codes);
                     if !from_codes.is_empty() {
-                        eprintln!(
-                            "Inferred plugins from referenced check codes: {:#?}",
-                            from_codes
-                        );
+                        eprintln!("Inferred plugins from referenced check codes: {from_codes:#?}");
                     }
                     from_options.into_iter().chain(from_codes).collect()
                 }),
@@ -298,6 +295,7 @@ mod tests {
             extend_select: None,
             external: None,
             fix: None,
+            fix_only: None,
             fixable: None,
             format: None,
             force_exclude: None,
@@ -305,6 +303,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -315,6 +314,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            cache_dir: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -352,6 +352,7 @@ mod tests {
             extend_select: None,
             external: None,
             fix: None,
+            fix_only: None,
             fixable: None,
             format: None,
             force_exclude: None,
@@ -359,6 +360,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -369,6 +371,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            cache_dir: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -406,6 +409,7 @@ mod tests {
             extend_select: None,
             external: None,
             fix: None,
+            fix_only: None,
             fixable: None,
             format: None,
             force_exclude: None,
@@ -413,6 +417,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: Some(100),
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -423,6 +428,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            cache_dir: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -460,6 +466,7 @@ mod tests {
             extend_select: None,
             external: None,
             fix: None,
+            fix_only: None,
             fixable: None,
             format: None,
             force_exclude: None,
@@ -467,6 +474,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -477,6 +485,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            cache_dir: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -514,6 +523,7 @@ mod tests {
             extend_select: None,
             external: None,
             fix: None,
+            fix_only: None,
             fixable: None,
             format: None,
             force_exclude: None,
@@ -521,6 +531,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -531,6 +542,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            cache_dir: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -576,6 +588,7 @@ mod tests {
             extend_select: None,
             external: None,
             fix: None,
+            fix_only: None,
             fixable: None,
             format: None,
             force_exclude: None,
@@ -583,6 +596,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::D100,
@@ -629,6 +643,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            cache_dir: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -666,6 +681,7 @@ mod tests {
             extend_select: None,
             external: None,
             fix: None,
+            fix_only: None,
             fixable: None,
             format: None,
             force_exclude: None,
@@ -673,6 +689,7 @@ mod tests {
             ignore_init_module_imports: None,
             line_length: None,
             per_file_ignores: None,
+            required_version: None,
             respect_gitignore: None,
             select: Some(vec![
                 CheckCodePrefix::E,
@@ -684,6 +701,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            cache_dir: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,

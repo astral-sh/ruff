@@ -13,13 +13,14 @@
 
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
+use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{
     parse_macro_input, AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput,
     Field, Fields, Lit, LitStr, Path, PathArguments, PathSegment, Token, Type, TypePath,
 };
 
-#[proc_macro_derive(ConfigurationOptions, attributes(option, option_group))]
+#[proc_macro_derive(ConfigurationOptions, attributes(option, doc, option_group))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -39,11 +40,28 @@ fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             let mut output = vec![];
 
             for field in fields.named.iter() {
-                if let Some(attr) = field.attrs.iter().find(|a| a.path.is_ident("option")) {
-                    output.push(handle_option(field, attr)?);
+                let docs: Vec<&Attribute> = field
+                    .attrs
+                    .iter()
+                    .filter(|attr| attr.path.is_ident("doc"))
+                    .collect();
+
+                if docs.is_empty() {
+                    return Err(syn::Error::new(
+                        field.span(),
+                        "Missing documentation for field",
+                    ));
+                }
+
+                if let Some(attr) = field.attrs.iter().find(|attr| attr.path.is_ident("option")) {
+                    output.push(handle_option(field, attr, docs)?);
                 };
 
-                if field.attrs.iter().any(|a| a.path.is_ident("option_group")) {
+                if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.path.is_ident("option_group"))
+                {
                     output.push(handle_option_group(field)?);
                 };
             }
@@ -70,8 +88,10 @@ fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 /// deriving `ConfigurationOptions`, create code that calls retrieves options
 /// from that group: `Foobar::get_available_options()`
 fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
-    // unwrap is safe because we're only going over named fields
-    let ident = field.ident.as_ref().unwrap();
+    let ident = field
+        .ident
+        .as_ref()
+        .expect("Expected to handle named fields");
 
     match &field.ty {
         Type::Path(TypePath {
@@ -103,17 +123,49 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
     }
 }
 
+/// Parse a `doc` attribute into it a string literal.
+fn parse_doc(doc: &Attribute) -> syn::Result<String> {
+    let doc = doc
+        .parse_meta()
+        .map_err(|e| syn::Error::new(doc.span(), e))?;
+
+    match doc {
+        syn::Meta::NameValue(syn::MetaNameValue {
+            lit: Lit::Str(lit_str),
+            ..
+        }) => Ok(lit_str.value()),
+        _ => Err(syn::Error::new(doc.span(), "Expected doc attribute.")),
+    }
+}
+
 /// Parse an `#[option(doc="...", default="...", value_type="...",
 /// example="...")]` attribute and return data in the form of an `OptionField`.
-fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::TokenStream> {
-    // unwrap is safe because we're only going over named fields
-    let ident = field.ident.as_ref().unwrap();
+fn handle_option(
+    field: &Field,
+    attr: &Attribute,
+    docs: Vec<&Attribute>,
+) -> syn::Result<proc_macro2::TokenStream> {
+    // Convert the list of `doc` attributes into a single string.
+    let doc = textwrap::dedent(
+        &docs
+            .into_iter()
+            .map(parse_doc)
+            .collect::<syn::Result<Vec<_>>>()?
+            .join("\n"),
+    )
+    .trim_matches('\n')
+    .to_string();
+
+    let ident = field
+        .ident
+        .as_ref()
+        .expect("Expected to handle named fields");
 
     let FieldAttributes {
-        doc,
         default,
         value_type,
         example,
+        ..
     } = attr.parse_args::<FieldAttributes>()?;
     let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
@@ -130,7 +182,6 @@ fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::To
 
 #[derive(Debug)]
 struct FieldAttributes {
-    doc: String,
     default: String,
     value_type: String,
     example: String,
@@ -138,8 +189,6 @@ struct FieldAttributes {
 
 impl Parse for FieldAttributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let doc = _parse_key_value(input, "doc")?;
-        input.parse::<Comma>()?;
         let default = _parse_key_value(input, "default")?;
         input.parse::<Comma>()?;
         let value_type = _parse_key_value(input, "value_type")?;
@@ -150,7 +199,6 @@ impl Parse for FieldAttributes {
         }
 
         Ok(FieldAttributes {
-            doc: textwrap::dedent(&doc).trim_matches('\n').to_string(),
             default,
             value_type,
             example: textwrap::dedent(&example).trim_matches('\n').to_string(),

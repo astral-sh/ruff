@@ -5,10 +5,10 @@ expression: checks
 - kind:
     UnusedClassMethodArgument: x
   location:
-    row: 44
+    row: 45
     column: 15
   end_location:
-    row: 44
+    row: 45
     column: 16
   fix: ~
 

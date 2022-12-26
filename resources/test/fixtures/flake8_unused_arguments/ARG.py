@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from typing import overload
 from typing_extensions import override
 
 
@@ -135,3 +136,20 @@ class C:
     @override
     def f(x):
         print("Hello, world!")
+
+
+###
+# Unused arguments attached to overloads (OK).
+###
+@overload
+def f(a: str, b: str) -> str:
+    ...
+
+
+@overload
+def f(a: int, b: int) -> str:
+    ...
+
+
+def f(a, b):
+    return f"{a}{b}"

@@ -15,7 +15,7 @@ import types
 if type(res) is not types.ListType:
     pass
 #: E721
-assert type(res) == type(False) or type(res) == type(None)
+assert type(res) == type(False)
 #: E721
 assert type(res) == type([])
 #: E721
@@ -52,3 +52,5 @@ if isinstance(res, types.MethodType):
     pass
 if type(a) != type(b) or type(a) == type(ccc):
     pass
+
+assert type(res) == type(None)

@@ -1,4 +1,4 @@
-use std::cmp::Reverse;
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -9,7 +9,7 @@ use rustpython_ast::{Stmt, StmtKind, Location};
 
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
-use crate::isort::sorting::{member_key, module_key};
+use crate::isort::sorting::{cmp_import_froms, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock, LocationWrapper, LocationHash
@@ -393,7 +393,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
         block
             .import
             .into_iter()
-            .sorted_by_cached_key(|(alias, _)| module_key(alias.name, alias.asname)),
+            .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2)),
     );
 
     // Sort `StmtKind::ImportFrom`.
@@ -463,23 +463,19 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                     locations,
                     aliases
                         .into_iter()
-                        .sorted_by_cached_key(|(alias, _)| member_key(alias.name, alias.asname))
+                        .sorted_by(|(alias1, _), (alias2, _)| cmp_members(alias1, alias2))
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
             })
-            .sorted_by_cached_key(|(import_from, _, _, aliases)| {
-                // Sort each `StmtKind::ImportFrom` by module key, breaking ties based on
-                // members.
-                (
-                    Reverse(import_from.level),
-                    import_from
-                        .module
-                        .as_ref()
-                        .map(|module| module_key(module, None)),
-                    aliases
-                        .first()
-                        .map(|(alias, _)| member_key(alias.name, alias.asname)),
-                )
+            .sorted_by(|(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
+                cmp_import_froms(import_from1, import_from2).then_with(|| {
+                    match (aliases1.first(), aliases2.first()) {
+                        (None, None) => Ordering::Equal,
+                        (None, Some(_)) => Ordering::Less,
+                        (Some(_), None) => Ordering::Greater,
+                        (Some((alias1, _)), Some((alias2, _))) => cmp_members(alias1, alias2),
+                    }
+                })
             }),
     );
     ordered
@@ -614,6 +610,7 @@ mod tests {
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
+    #[test_case(Path::new("natural_order.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
     #[test_case(Path::new("no_wrap_star.py"))]
     #[test_case(Path::new("order_by_type.py"))]

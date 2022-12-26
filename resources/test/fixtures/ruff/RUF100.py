@@ -15,8 +15,8 @@ def f() -> None:
     # Invalid
     d = 1  # noqa: F841, E501
 
-    # Invalid (and unimplemented)
-    d = 1  # noqa: F841, W191
+    # Invalid (and unimplemented or not enabled)
+    d = 1  # noqa: F841, W191, F821
 
     # Invalid (but external)
     d = 1  # noqa: F841, V101

@@ -6,10 +6,10 @@ expression: checks
     UnusedVariable: e
   location:
     row: 3
-    column: 0
+    column: 21
   end_location:
-    row: 4
-    column: 8
+    row: 3
+    column: 22
   fix: ~
 - kind:
     UnusedVariable: foo

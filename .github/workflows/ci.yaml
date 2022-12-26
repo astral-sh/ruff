@@ -42,6 +42,9 @@ jobs:
       - run: ./target/release/ruff_dev generate-check-code-prefix
       - run: git diff --quiet src/checks_gen.rs || echo "::error file=src/checks_gen.rs::This file is outdated. You may have to rerun 'cargo dev generate-check-code-prefix'."
       - run: git diff --exit-code -- README.md src/checks_gen.rs
+      - run: ./target/release/ruff_dev generate-json-schema
+      - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. You may have to rerun 'cargo dev generate-json-schema'."
+      - run: git diff --exit-code -- ruff.schema.json
 
   cargo_fmt:
     name: "cargo fmt"

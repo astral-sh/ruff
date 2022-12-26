@@ -86,6 +86,31 @@ impl Resolver {
                 .unwrap_or(default),
         }
     }
+
+    /// Return an iterator over the resolved `Settings` in this `Resolver`.
+    pub fn iter(&self) -> impl Iterator<Item = &Settings> {
+        self.settings.values()
+    }
+
+    /// Validate all resolved `Settings` in this `Resolver`.
+    pub fn validate(&self, strategy: &PyprojectDiscovery) -> Result<()> {
+        // TODO(charlie): This risks false positives (but not false negatives), since
+        // some of the `Settings` in the path may ultimately be unused (or, e.g., they
+        // could have their `required_version` overridden by other `Settings` in
+        // the path). It'd be preferable to validate once we've determined the
+        // `Settings` for each path, but that's more expensive.
+        match &strategy {
+            PyprojectDiscovery::Fixed(settings) => {
+                settings.validate()?;
+            }
+            PyprojectDiscovery::Hierarchical(default) => {
+                for settings in std::iter::once(default).chain(self.iter()) {
+                    settings.validate()?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Recursively resolve a `Configuration` from a `pyproject.toml` file at the

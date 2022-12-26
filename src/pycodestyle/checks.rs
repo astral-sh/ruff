@@ -1,10 +1,11 @@
 use itertools::izip;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Located, Location, Stmt, StmtKind};
+use rustpython_ast::{Constant, Located, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
+use crate::autofix::Fix;
 use crate::checks::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -54,7 +55,14 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                     if id == "type" {
                         if let Some(arg) = args.first() {
                             // Allow comparison for types which are not obvious.
-                            if !matches!(arg.node, ExprKind::Name { .. }) {
+                            if !matches!(
+                                arg.node,
+                                ExprKind::Name { .. }
+                                    | ExprKind::Constant {
+                                        value: Constant::None,
+                                        kind: None
+                                    }
+                            ) {
                                 checks.push(Check::new(CheckKind::TypeComparison, location));
                             }
                         }
@@ -134,18 +142,24 @@ pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
 }
 
 /// W292
-pub fn no_newline_at_end_of_file(contents: &str) -> Option<Check> {
+pub fn no_newline_at_end_of_file(contents: &str, autofix: bool) -> Option<Check> {
     if !contents.ends_with('\n') {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
         if let Some(line) = contents.lines().last() {
-            return Some(Check::new(
+            // Both locations are at the end of the file (and thus the same).
+            let location = Location::new(contents.lines().count(), line.len());
+            let mut check = Check::new(
                 CheckKind::NoNewLineAtEndOfFile,
                 Range {
-                    location: Location::new(contents.lines().count(), line.len() + 1),
-                    end_location: Location::new(contents.lines().count(), line.len() + 1),
+                    location,
+                    end_location: location,
                 },
-            ));
+            );
+            if autofix {
+                check.amend(Fix::insertion("\n".to_string(), location));
+            }
+            return Some(check);
         }
     }
     None
@@ -174,6 +188,7 @@ pub fn invalid_escape_sequence(
     locator: &SourceCodeLocator,
     start: Location,
     end: Location,
+    autofix: bool,
 ) -> Vec<Check> {
     let mut checks = vec![];
 
@@ -221,13 +236,17 @@ pub fn invalid_escape_sequence(
                 };
                 let location = Location::new(start.row() + row_offset, col);
                 let end_location = Location::new(location.row(), location.column() + 2);
-                checks.push(Check::new(
+                let mut check = Check::new(
                     CheckKind::InvalidEscapeSequence(next_char),
                     Range {
                         location,
                         end_location,
                     },
-                ));
+                );
+                if autofix {
+                    check.amend(Fix::insertion(r"\".to_string(), location));
+                }
+                checks.push(check);
             }
         }
     }

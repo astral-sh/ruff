@@ -5,7 +5,7 @@
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use globset::{Glob, GlobMatcher, GlobSet};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -13,10 +13,13 @@ use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 
+use crate::cache::cache_dir;
 use crate::checks::CheckCode;
 use crate::checks_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{FilePattern, PerFileIgnore, PythonVersion, SerializationFormat};
+use crate::settings::types::{
+    FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
+};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
     flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pyupgrade,
@@ -29,6 +32,8 @@ pub mod options_base;
 pub mod pyproject;
 pub mod types;
 
+const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Debug)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
@@ -39,16 +44,19 @@ pub struct Settings {
     pub extend_exclude: GlobSet,
     pub external: FxHashSet<String>,
     pub fix: bool,
+    pub fix_only: bool,
     pub fixable: FxHashSet<CheckCode>,
     pub format: SerializationFormat,
     pub force_exclude: bool,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>,
+    pub required_version: Option<Version>,
     pub respect_gitignore: bool,
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+    pub cache_dir: PathBuf,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
@@ -120,6 +128,7 @@ impl Settings {
             extend_exclude: resolve_globset(config.extend_exclude)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()),
             fix: config.fix.unwrap_or(false),
+            fix_only: config.fix_only.unwrap_or(false),
             fixable: resolve_codes(
                 [CheckCodeSpec {
                     select: &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
@@ -135,11 +144,13 @@ impl Settings {
                 config.per_file_ignores.unwrap_or_default(),
             )?,
             respect_gitignore: config.respect_gitignore.unwrap_or(true),
+            required_version: config.required_version,
             src: config
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
             target_version: config.target_version.unwrap_or(PythonVersion::Py310),
             show_source: config.show_source.unwrap_or_default(),
+            cache_dir: config.cache_dir.unwrap_or_else(|| cache_dir(project_root)),
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
@@ -199,16 +210,19 @@ impl Settings {
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
             fix: false,
+            fix_only: false,
             fixable: FxHashSet::from_iter([check_code]),
             format: SerializationFormat::Text,
             force_exclude: false,
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
+            required_version: None,
             respect_gitignore: true,
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
@@ -232,16 +246,19 @@ impl Settings {
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
             fix: false,
+            fix_only: false,
             fixable: FxHashSet::from_iter(check_codes),
             format: SerializationFormat::Text,
             force_exclude: false,
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
+            required_version: None,
             respect_gitignore: true,
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
@@ -254,6 +271,19 @@ impl Settings {
             pep8_naming: pep8_naming::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if let Some(required_version) = &self.required_version {
+            if &**required_version != CARGO_PKG_VERSION {
+                return Err(anyhow!(
+                    "Required version `{}` does not match the running version `{}`",
+                    &**required_version,
+                    CARGO_PKG_VERSION
+                ));
+            }
+        }
+        Ok(())
     }
 }
 

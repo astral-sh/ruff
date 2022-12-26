@@ -1,16 +1,19 @@
 //! Settings for the `flake8-bugbear` plugin.
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "Flake8BugbearOptions"
+)]
 pub struct Options {
     #[option(
-        doc = r#"
-            Additional callable functions to consider "immutable" when evaluating, e.g.,
-            `no-mutable-default-argument` checks (`B006`).
-        "#,
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
@@ -18,6 +21,8 @@ pub struct Options {
             extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
         "#
     )]
+    /// Additional callable functions to consider "immutable" when evaluating,
+    /// e.g., `no-mutable-default-argument` checks (`B006`).
     pub extend_immutable_calls: Option<Vec<String>>,
 }
 

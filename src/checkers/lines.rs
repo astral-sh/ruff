@@ -55,7 +55,11 @@ pub fn check_lines(
     }
 
     if enforce_no_newline_at_end_of_file {
-        if let Some(check) = no_newline_at_end_of_file(contents) {
+        if let Some(check) = no_newline_at_end_of_file(
+            contents,
+            matches!(autofix, flags::Autofix::Enabled)
+                && settings.fixable.contains(&CheckCode::W292),
+        ) {
             checks.push(check);
         }
     }

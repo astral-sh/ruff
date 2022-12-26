@@ -645,6 +645,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
+name = "dyn-clone"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9b0705efd4599c15a38151f4721f7bc388306f61084d3bfd50bd07fbca5cb60"
+
+[[package]]
 name = "either"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -724,7 +730,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.192-dev.0"
+version = "0.0.194-dev.0"
 dependencies = [
  "anyhow",
  "clap 4.0.29",
@@ -1227,6 +1233,12 @@ dependencies = [
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys",
 ]
+
+[[package]]
+name = "natord"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "308d96db8debc727c3fd9744aac51751243420e46edf401010908da7f8d5e57c"
 
 [[package]]
 name = "new_debug_unreachable"
@@ -1847,7 +1859,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.192"
+version = "0.0.194"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1874,6 +1886,7 @@ dependencies = [
  "itertools",
  "libcst",
  "log",
+ "natord",
  "nohash-hasher",
  "notify",
  "num-bigint",
@@ -1888,6 +1901,8 @@ dependencies = [
  "rustpython-ast",
  "rustpython-common",
  "rustpython-parser",
+ "schemars",
+ "semver",
  "serde",
  "serde_json",
  "shellexpand",
@@ -1904,7 +1919,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.192"
+version = "0.0.194"
 dependencies = [
  "anyhow",
  "clap 4.0.29",
@@ -1916,13 +1931,15 @@ dependencies = [
  "rustpython-ast",
  "rustpython-common",
  "rustpython-parser",
+ "schemars",
+ "serde_json",
  "strum",
  "strum_macros",
 ]
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.192"
+version = "0.0.194"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1965,7 +1982,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.1.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c01f014b1269eedcf4bdb45d5fbc62ae2beecf31#c01f014b1269eedcf4bdb45d5fbc62ae2beecf31"
+source = "git+https://github.com/RustPython/RustPython.git?rev=1b6cb170e925a43d605b3fed9f6b878e63e47744#1b6cb170e925a43d605b3fed9f6b878e63e47744"
 dependencies = [
  "num-bigint",
  "rustpython-common",
@@ -1975,7 +1992,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.0.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c01f014b1269eedcf4bdb45d5fbc62ae2beecf31#c01f014b1269eedcf4bdb45d5fbc62ae2beecf31"
+source = "git+https://github.com/RustPython/RustPython.git?rev=1b6cb170e925a43d605b3fed9f6b878e63e47744#1b6cb170e925a43d605b3fed9f6b878e63e47744"
 dependencies = [
  "ascii",
  "cfg-if 1.0.0",
@@ -1998,7 +2015,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c01f014b1269eedcf4bdb45d5fbc62ae2beecf31#c01f014b1269eedcf4bdb45d5fbc62ae2beecf31"
+source = "git+https://github.com/RustPython/RustPython.git?rev=1b6cb170e925a43d605b3fed9f6b878e63e47744#1b6cb170e925a43d605b3fed9f6b878e63e47744"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2015,7 +2032,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c01f014b1269eedcf4bdb45d5fbc62ae2beecf31#c01f014b1269eedcf4bdb45d5fbc62ae2beecf31"
+source = "git+https://github.com/RustPython/RustPython.git?rev=1b6cb170e925a43d605b3fed9f6b878e63e47744#1b6cb170e925a43d605b3fed9f6b878e63e47744"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2059,6 +2076,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "schemars"
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a5fb6c61f29e723026dc8e923d94c694313212abbecbbe5f55a7748eec5b307"
+dependencies = [
+ "dyn-clone",
+ "schemars_derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f188d036977451159430f3b8dc82ec76364a42b7e289c2b18a9a18f4470058e9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2082,9 +2123,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.14"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e25dfac463d778e353db5be2449d1cce89bd6fd23c9f1ea21310ce6e5a1b29c4"
+checksum = "58bc9567378fc7690d6b2addae4e60ac2eeea07becb2c64b9f218b53865cba2a"
 
 [[package]]
 name = "serde"
@@ -2107,10 +2148,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_json"
-version = "1.0.89"
+name = "serde_derive_internals"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "020ff22c755c2ed3f8cf162dbb41a7268d934702f3ed3631656ea597e08fc3db"
+checksum = "85bf8229e7920a9f636479437026331ce11aa132b4dde37d121944a44d6e5f3c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.91"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "877c235533714907a8c2464236f5c4b2a17262ef1bd71f38f35ea592c8da6883"
 dependencies = [
  "itoa",
  "ryu",

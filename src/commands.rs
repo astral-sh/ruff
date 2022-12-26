@@ -20,7 +20,7 @@ use crate::message::Message;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{packages, resolver};
+use crate::{cache, packages, resolver};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -37,6 +37,33 @@ pub fn run(
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
+
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
+
+    // Initialize the cache.
+    if matches!(cache, flags::Cache::Enabled) {
+        match &pyproject_strategy {
+            PyprojectDiscovery::Fixed(settings) => {
+                if let Err(e) = cache::init(&settings.cache_dir) {
+                    error!(
+                        "Failed to initialize cache at {}: {e:?}",
+                        settings.cache_dir.to_string_lossy()
+                    );
+                }
+            }
+            PyprojectDiscovery::Hierarchical(default) => {
+                for settings in std::iter::once(default).chain(resolver.iter()) {
+                    if let Err(e) = cache::init(&settings.cache_dir) {
+                        error!(
+                            "Failed to initialize cache at {}: {e:?}",
+                            settings.cache_dir.to_string_lossy()
+                        );
+                    }
+                }
+            }
+        }
+    };
 
     // Discover the package root for each Python file.
     let package_roots = packages::detect_package_roots(
@@ -152,6 +179,9 @@ pub fn add_noqa(
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
+
     let start = Instant::now();
     let modifications: usize = par_iter(&paths)
         .flatten()
@@ -188,6 +218,9 @@ pub fn autoformat(
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
+
     let start = Instant::now();
     let modifications = par_iter(&paths)
         .flatten()
@@ -221,6 +254,9 @@ pub fn show_settings(
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
 
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
+
     // Print the list of files.
     let Some(entry) = paths
         .iter()
@@ -244,8 +280,11 @@ pub fn show_files(
     overrides: &Overrides,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) =
+    let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+
+    // Validate the `Settings` and return any errors.
+    resolver.validate(pyproject_strategy)?;
 
     // Print the list of files.
     for entry in paths
