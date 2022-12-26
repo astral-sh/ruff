@@ -18,6 +18,22 @@ impl LocationHash {
             column: location.column(),
         }
     }
+
+    /// Gets the char in a given string for a given location
+    pub fn get_char(&self, whole: &str) -> (Option<char>, Option<usize>) {
+        let mut current = Location::new(1, 0);
+        for (i, character )in whole.chars().enumerate() {
+            if self == current {
+                return (Some(character), Some(i));
+            }
+            if character == '\n' {
+                current.newline();
+            } else {
+                current.go_right();
+            }
+        }
+        (None, None)
+    }
 }
 
 impl PartialEq<Location> for &LocationHash {

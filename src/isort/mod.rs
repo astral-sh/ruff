@@ -486,29 +486,49 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
-/// Confirms that the character after a certain location matches the `match_char`
-fn check_last_char(whole: &str, location: &LocationHash, match_char: char) -> bool {
-    let mut current = Location::new(1, 0);
-    for character in whole.chars() {
-        if location == current {
-            return character == match_char;
-        }
-        if character == '\n' {
-            current.newline();
-        } else {
-            current.go_right();
-        }
-    }
-    false
-}
 
 fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
+    let clean_whole: Vec<char> = whole.chars().collect();
+    let mut at_least_one_comma = false;
     for location in locations {
-        if !check_last_char(whole, location, ',') {
-            return false;
+        let (raw_char, index) = location.get_char(whole);
+        let the_char = match raw_char {
+            None => return false,
+            Some(c) => c,
+        };
+        println!("Char: {:?}", clean_whole.get(index.unwrap()));
+        // If the import does not have a comma after it, we need to understand whether
+        // it is a multi-line import or without a magic comma, or a separate single 
+        // import that needs to be merged as a magic comma. This avoids the issue
+        // where having a separate import, outside of magic comma import, causes the
+        // magic comma to fail
+        if the_char == '\n' {
+            let mut i = 1;
+            loop {
+                let next_char = clean_whole.get(index.unwrap() + i);
+                println!("Next Char: {:?}", next_char);
+                println!("{}", i);
+                if next_char == Some(&')') {
+                    return false
+                } else if next_char != Some(&'\n') {
+                    break;
+                } else {
+                    i += 1;
+                }
+            }
+        }
+        else if the_char != ',' {
+            return false
+        // If there is a comma, and it is a multi-line import, then this counts
+        // towards the magic comma. This avoids issues where a single line import
+        // with multiple imports mistakenly triggers the code
+        } else {
+            if clean_whole.get(index.unwrap() + 1) == Some(&'\n') {
+                at_least_one_comma = true;
+            }
         }
     }
-    true
+    at_least_one_comma
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -568,6 +588,7 @@ pub fn format_imports(
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, locations, aliases) in &import_block.import_from {
             let all_commas = check_all_commas(&whole_text, &locations.location);
+            println!("{:?}: {}", import_from, all_commas);
             output.append(&format::format_import_from(
                 import_from,
                 comments,
