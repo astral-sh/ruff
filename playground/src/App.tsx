@@ -61,17 +61,17 @@ const defaultConfig = getDefaultConfig(AVAILABLE_OPTIONS);
 
 export default function App() {
   const monaco = useMonaco();
-  const [ruffInitialized, setRuffInitialized] = useState<boolean>(false);
+  const [initialized, setInitialized] = useState<boolean>(false);
   const [config, setConfig] = useState<Config | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    init().then(() => setRuffInitialized(true));
+    init().then(() => setInitialized(true));
   }, []);
 
   useEffect(() => {
-    if (source === null && config === null && monaco) {
+    if (source == null && config == null && monaco) {
       const [config, source] = restoreConfigAndSource();
       setConfig(config);
       setSource(source);
@@ -87,13 +87,7 @@ export default function App() {
   useEffect(() => {
     const editor = monaco?.editor;
     const model = editor?.getModels()[0];
-    if (
-      !editor ||
-      !model ||
-      !ruffInitialized ||
-      source === null ||
-      config === null
-    ) {
+    if (!editor || !model || !initialized || source == null || config == null) {
       return;
     }
 
@@ -118,11 +112,52 @@ export default function App() {
         severity: MarkerSeverity.Error,
       }))
     );
-  }, [config, source, monaco, ruffInitialized]);
+
+    const codeActionProvider = monaco?.languages.registerCodeActionProvider(
+      "python",
+      {
+        // @ts-expect-error: The type definition is wrong.
+        provideCodeActions: function (model, position) {
+          const actions = checks
+            .filter((check) => position.startLineNumber === check.location.row)
+            .filter((check) => check.fix)
+            .map((check) => ({
+              title: `Fix ${check.code}`,
+              id: `fix-${check.code}`,
+              kind: "quickfix",
+              edit: check.fix
+                ? {
+                    edits: [
+                      {
+                        resource: model.uri,
+                        versionId: model.getVersionId(),
+                        edit: {
+                          range: {
+                            startLineNumber: check.fix.location.row,
+                            startColumn: check.fix.location.column + 1,
+                            endLineNumber: check.fix.end_location.row,
+                            endColumn: check.fix.end_location.column + 1,
+                          },
+                          text: check.fix.content,
+                        },
+                      },
+                    ],
+                  }
+                : undefined,
+            }));
+          return { actions, dispose: () => {} };
+        },
+      }
+    );
+
+    return () => {
+      codeActionProvider?.dispose();
+    };
+  }, [config, source, monaco, initialized]);
 
   const handleEditorChange = useCallback(
     (value: string | undefined) => {
-      value && setSource(value);
+      setSource(value || "");
     },
     [setSource]
   );

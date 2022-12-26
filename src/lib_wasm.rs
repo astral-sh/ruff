@@ -5,6 +5,7 @@ use rustpython_parser::lexer::LexResult;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+use crate::autofix::Fix;
 use crate::checks::CheckCode;
 use crate::directives;
 use crate::linter::check_path;
@@ -27,6 +28,17 @@ export interface Check {
         row: number;
         column: number;
     };
+    fix: {
+        content: string;
+        location: {
+            row: number;
+            column: number;
+        };
+        end_location: {
+            row: number;
+            column: number;
+        };
+    } | null;
 };
 "#;
 
@@ -36,6 +48,7 @@ struct Message {
     message: String,
     location: Location,
     end_location: Location,
+    fix: Option<Fix>,
 }
 
 #[wasm_bindgen(start)]
@@ -71,7 +84,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         &locator,
         &directives,
         &settings,
-        false.into(),
+        flags::Autofix::Enabled,
         flags::Noqa::Enabled,
     )
     .map_err(|e| e.to_string())?;
@@ -83,6 +96,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
             message: check.kind.body(),
             location: check.location,
             end_location: check.end_location,
+            fix: check.fix,
         })
         .collect();
 
@@ -118,7 +132,8 @@ mod test {
                 code: CheckCode::F634,
                 message: "If test is a tuple, which is always `True`".to_string(),
                 location: Location::new(1, 0),
-                end_location: Location::new(1, 15)
+                end_location: Location::new(1, 15),
+                fix: None,
             }]
         );
     }
