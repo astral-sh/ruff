@@ -545,7 +545,6 @@ pub fn format_imports(
     force_wrap_aliases: bool,
     split_on_trailing_comma: bool,
 ) -> String {
-    println!("Split on trailing: {}", split_on_trailing_comma);
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments);
 
