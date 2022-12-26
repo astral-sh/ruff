@@ -502,6 +502,12 @@ fn check_last_char(whole: &str, location: &LocationHash, match_char: char) -> bo
     false
 }
 
+fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
+    locations
+        .iter()
+        .all(|location| check_last_char(whole, location, ','))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn format_imports(
     block: &Block,
@@ -558,10 +564,7 @@ pub fn format_imports(
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, locations, aliases) in &import_block.import_from {
-            let all_commas = locations
-                .location
-                .iter()
-                .all(|location| check_last_char(&whole_text, location, ','));
+            let all_commas = check_all_commas(&whole_text, &locations.location);
             output.append(&format::format_import_from(
                 import_from,
                 comments,
