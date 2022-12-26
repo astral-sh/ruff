@@ -17,7 +17,7 @@ pub enum Convention {
 #[serde(deny_unknown_fields, rename_all = "kebab-case", rename = "Pydocstyle")]
 pub struct Options {
     #[option(
-        default = r#""convention""#,
+        default = r#"None"#,
         value_type = "Convention",
         example = r#"
             # Use Google-style docstrings.
