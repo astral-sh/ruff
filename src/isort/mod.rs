@@ -503,9 +503,12 @@ fn check_last_char(whole: &str, location: &LocationHash, match_char: char) -> bo
 }
 
 fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
-    locations
-        .iter()
-        .all(|location| check_last_char(whole, location, ','))
+    for location in locations {
+        if !check_last_char(whole, location, ',') {
+            return false;
+        }
+    }
+    true
 }
 
 #[allow(clippy::too_many_arguments)]
