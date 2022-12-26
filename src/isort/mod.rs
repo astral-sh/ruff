@@ -495,7 +495,6 @@ fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
             None => return false,
             Some(c) => c,
         };
-        println!("Char: {:?}", clean_whole.get(index.unwrap()));
         // If the import does not have a comma after it, we need to understand whether
         // it is a multi-line import or without a magic comma, or a separate single
         // import that needs to be merged as a magic comma. This avoids the issue
@@ -505,8 +504,6 @@ fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
             let mut i = 1;
             loop {
                 let next_char = clean_whole.get(index.unwrap() + i);
-                println!("Next Char: {:?}", next_char);
-                println!("{}", i);
                 if next_char == Some(&')') {
                     return false;
                 } else if next_char != Some(&'\n') {
@@ -541,6 +538,7 @@ pub fn format_imports(
     extra_standard_library: &BTreeSet<String>,
     combine_as_imports: bool,
     force_wrap_aliases: bool,
+    split_on_trailing_comma: bool,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments);
@@ -584,8 +582,11 @@ pub fn format_imports(
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, locations, aliases) in &import_block.import_from {
-            let all_commas = check_all_commas(&whole_text, &locations.location);
-            println!("{:?}: {}", import_from, all_commas);
+            let mut all_commas = false;
+            // Only check for magic commas if the `split_on_trailing_comma` flag is set
+            if split_on_trailing_comma {
+                all_commas = check_all_commas(&whole_text, &locations.location);
+            }
             output.append(&format::format_import_from(
                 import_from,
                 comments,
