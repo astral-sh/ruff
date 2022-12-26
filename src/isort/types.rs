@@ -5,29 +5,40 @@ use rustpython_ast::Location;
 
 use crate::ast;
 
-#[derive(Hash, Eq, PartialOrd, PartialEq, Ord, Debug, Clone)]
-pub struct LocationWrapper {
+#[derive(Hash, Eq, PartialOrd, PartialEq, Ord, Debug, Clone, Default)]
+pub struct LocationHash {
     row: usize,
-    column: usize
+    column: usize,
 }
 
-impl LocationWrapper {
+impl LocationHash {
     pub fn new(location: Location) -> Self {
         Self { row: location.row(), column: location.column() }
     }
+}
 
-    pub fn new_vec(locations: Vec<Location>) -> Vec<Self> {
-        let mut new_locations: Vec<Self> = Vec::new();
-        for location in locations {
-            new_locations.push(Self::new(location));
-        }
-        new_locations
+impl PartialEq<Location> for &LocationHash {
+    fn eq(&self, other: &Location) -> bool {
+        self.row == other.row() && self.column == other.column()
     }
 }
 
-impl PartialEq<Location> for &LocationWrapper {
-    fn eq(&self, other: &Location) -> bool {
-        self.row == other.row() && self.column == other.column()
+#[derive(Hash, Eq, PartialOrd, PartialEq, Ord, Debug, Clone, Default)]
+pub struct LocationWrapper {
+    location: Vec<LocationHash>
+}
+
+impl LocationWrapper {
+    pub fn new(locations: Vec<Location>) -> Self {
+        let mut new_locations: Vec<LocationHash> = Vec::new();
+        for location in locations {
+            new_locations.push(LocationHash::new(location));
+        }
+        Self { location: new_locations }
+    }
+
+    pub fn add_locations(&mut self, wrapper: LocationWrapper) {
+        self.location.extend(wrapper.location);
     }
 }
 
@@ -35,7 +46,6 @@ impl PartialEq<Location> for &LocationWrapper {
 pub struct ImportFromData<'a> {
     pub module: Option<&'a String>,
     pub level: Option<&'a usize>,
-    pub locations: Vec<LocationWrapper>,
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -83,7 +93,7 @@ pub struct ImportBlock<'a> {
     // Map from (module, level) to `AliasData`, used to track 'from' imports.
     // Ex) `from module import member`
     pub import_from:
-        FxHashMap<ImportFromData<'a>, (CommentSet<'a>, FxHashMap<AliasData<'a>, CommentSet<'a>>)>,
+        FxHashMap<ImportFromData<'a>, (CommentSet<'a>, FxHashMap<AliasData<'a>, CommentSet<'a>>, LocationWrapper)>,
     // Set of (module, level, name, asname), used to track re-exported 'from' imports.
     // Ex) `from module import member as member`
     pub import_from_as: FxHashMap<(ImportFromData<'a>, AliasData<'a>), CommentSet<'a>>,
@@ -100,6 +110,7 @@ pub struct OrderedImportBlock<'a> {
     pub import_from: Vec<(
         ImportFromData<'a>,
         CommentSet<'a>,
+        LocationWrapper,
         Vec<AliasDataWithComments<'a>>,
     )>,
 }

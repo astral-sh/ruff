@@ -12,7 +12,7 @@ use crate::isort::comments::Comment;
 use crate::isort::sorting::{member_key, module_key};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
-    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock, LocationWrapper
+    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock, LocationWrapper, LocationHash
 };
 use crate::SourceCodeLocator;
 
@@ -197,12 +197,20 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                 location,
             } => {
                 // Associate the comments with the first alias (best effort).
-                let locations = LocationWrapper::new_vec(location);
+                let locations = LocationWrapper::new(location);
+                {
+                    let loc_entry = &mut block
+                        .import_from
+                        .entry(ImportFromData { module, level })
+                        .or_default()
+                        .2;
+                    loc_entry.add_locations(locations);
+                }
                 if let Some(alias) = names.first() {
                     if alias.name == "*" {
                         let entry = block
                             .import_from_star
-                            .entry(ImportFromData { module, level, locations: locations.clone() })
+                            .entry(ImportFromData { module, level })
                             .or_default();
                         for comment in atop {
                             entry.atop.push(comment.value);
@@ -213,7 +221,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     } else if alias.asname.is_none() || combine_as_imports {
                         let entry = &mut block
                             .import_from
-                            .entry(ImportFromData { module, level, locations: locations.clone() })
+                            .entry(ImportFromData { module, level })
                             .or_default()
                             .0;
                         for comment in atop {
@@ -226,7 +234,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                         let entry = block
                             .import_from_as
                             .entry((
-                                ImportFromData { module, level, locations: locations.clone() },
+                                ImportFromData { module, level },
                                 AliasData {
                                     name: alias.name,
                                     asname: alias.asname,
@@ -247,7 +255,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     if alias.name == "*" {
                         let entry = block
                             .import_from_star
-                            .entry(ImportFromData { module, level, locations: locations.clone() })
+                            .entry(ImportFromData { module, level })
                             .or_default();
                         for comment in alias.atop {
                             entry.atop.push(comment.value);
@@ -258,7 +266,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     } else if alias.asname.is_none() || combine_as_imports {
                         let entry = block
                             .import_from
-                            .entry(ImportFromData { module, level, locations: locations.clone() })
+                            .entry(ImportFromData { module, level })
                             .or_default()
                             .1
                             .entry(AliasData {
@@ -276,7 +284,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                         let entry = block
                             .import_from_as
                             .entry((
-                                ImportFromData { module, level, locations: locations.clone() },
+                                ImportFromData { module, level },
                                 AliasData {
                                     name: alias.name,
                                     asname: alias.asname,
@@ -414,6 +422,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
+                              LocationWrapper::default() 
                             ),
                         )
                     }),
@@ -441,22 +450,24 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
+                               LocationWrapper::default() 
                             ),
                         )
                     }),
             )
-            .map(|(import_from, (comments, aliases))| {
+            .map(|(import_from, (comments, aliases, locations))| {
                 // Within each `StmtKind::ImportFrom`, sort the members.
                 (
                     import_from,
                     comments,
+                    locations,
                     aliases
                         .into_iter()
                         .sorted_by_cached_key(|(alias, _)| member_key(alias.name, alias.asname))
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
             })
-            .sorted_by_cached_key(|(import_from, _, aliases)| {
+            .sorted_by_cached_key(|(import_from, _, _, aliases)| {
                 // Sort each `StmtKind::ImportFrom` by module key, breaking ties based on
                 // members.
                 (
@@ -475,7 +486,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
 }
 
 /// Confirms that the character after a certain location matches the match_char
-fn check_last_char(whole: &str, location: &LocationWrapper, match_char: char) -> bool {
+fn check_last_char(whole: &str, location: &LocationHash, match_char: char) -> bool {
     let mut current = Location::new(1, 0);
     for character in whole.chars() {
         if location == current {
@@ -510,6 +521,7 @@ pub fn format_imports(
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports);
+    // println!("{:?}", block);
 
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
@@ -520,6 +532,7 @@ pub fn format_imports(
         known_third_party,
         extra_standard_library,
     );
+    // println!("{:?}", block_by_type);
 
     let mut output = RopeBuilder::new();
 
@@ -546,11 +559,16 @@ pub fn format_imports(
         }
 
         // Format `StmtKind::ImportFrom` statements.
-        for (import_from, comments, aliases) in &import_block.import_from {
-            println!("{:?}", import_from);
+        for (import_from, comments, locations, aliases) in &import_block.import_from {
+            println!("Import from: {:?}", import_from);
+            // println!("Aliases: {:?}", aliases);
+            println!("Locations: {:?}\n", locations);
+            /*
             let all_commas = import_from.locations
                 .iter()
                 .all(|location| check_last_char(&whole_text, location, ','));
+            */
+            let all_commas = false;
             output.append(&format::format_import_from(
                 import_from,
                 comments,
