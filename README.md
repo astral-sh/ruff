@@ -214,13 +214,6 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # Assume Python 3.10.
 target-version = "py310"
 
-[tool.ruff.flake8-import-conventions.aliases]
-altair = "alt"
-"matplotlib.pyplot" = "plt"
-numpy = "np"
-pandas = "pd"
-seaborn = "sns"
-
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
@@ -259,6 +252,27 @@ select = ["E", "F", "Q"]
 docstring-quotes = "double"
 ```
 
+As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
+an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the above
+`pyproject.toml` described above would be represented via the following `ruff.toml`:
+
+```toml
+# Enable Pyflakes and pycodestyle rules.
+select = ["E", "F"]
+
+# Never enforce `E501` (line length violations).
+ignore = ["E501"]
+
+# Always autofix, but never try to fix `F401` (unused imports).
+fix = true
+unfixable = ["F401"]
+
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[per-file-ignores]
+"__init__.py" = ["E402"]
+"path/to/file.py" = ["E402"]
+```
+
 For a full list of configurable options, see the [API reference](#reference).
 
 Some common configuration settings can be provided via the command-line:
@@ -279,7 +293,7 @@ Arguments:
 
 Options:
       --config <CONFIG>
-          Path to the `pyproject.toml` file to use for configuration
+          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
   -v, --verbose
           Enable verbose logging
   -q, --quiet
@@ -384,6 +398,9 @@ extend = "../pyproject.toml"
 # But use a different line length.
 line-length = 100
 ```
+
+All of the above rules apply equivalently to `ruff.toml` files. If Ruff detects both a `ruff.toml`
+and `pyproject.toml` file, it will defer to the `ruff.toml`.
 
 ### Python file discovery
 

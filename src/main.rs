@@ -46,7 +46,7 @@ fn resolve(
         // current working directory. (This matches ESLint's behavior.)
         let settings = resolve_settings(pyproject, &Relativity::Cwd, Some(overrides))?;
         Ok(PyprojectDiscovery::Fixed(settings))
-    } else if let Some(pyproject) = pyproject::find_pyproject_toml(
+    } else if let Some(pyproject) = pyproject::find_settings_toml(
         stdin_filename
             .as_ref()
             .unwrap_or(&path_dedot::CWD.as_path()),
@@ -58,7 +58,7 @@ fn resolve(
         // so these act as the "default" settings.)
         let settings = resolve_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
         Ok(PyprojectDiscovery::Hierarchical(settings))
-    } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
+    } else if let Some(pyproject) = pyproject::find_user_settings_toml() {
         // Third priority: find a user-specific `pyproject.toml`, but resolve all paths
         // relative the current working directory. (With `Strategy::Hierarchical`, we'll
         // end up the "closest" `pyproject.toml` file for every Python file later on, so
