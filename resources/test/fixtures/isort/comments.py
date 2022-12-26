@@ -23,3 +23,6 @@ from A import (
     b,  # Comment 10
     c,  # Comment 11
 )
+
+from D import a_long_name_to_force_multiple_lines # Comment 12
+from D import another_long_name_to_force_multiple_lines # Comment 13
