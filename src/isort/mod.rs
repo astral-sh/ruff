@@ -193,7 +193,9 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
             } => {
                 let single_import = names.len() == 1;
 
-                // Associate the comments with the first alias (best effort).
+                // If we're dealing with a multi-import block (i.e., a non-star, non-aliased
+                // import), associate the comments with the first alias (best
+                // effort).
                 if let Some(alias) = names.first() {
                     let entry = if alias.name == "*" {
                         block
@@ -223,11 +225,28 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                         entry.atop.push(comment.value);
                     }
 
-                    // Only associate inline comments with first alias if multiple names have been
-                    // imported, i.e. the comment applies to all names
-                    if !single_import {
-                        for comment in &inline {
-                            entry.inline.push(comment.value.clone());
+                    // Associate inline comments with first alias if multiple names have been
+                    // imported, i.e., the comment applies to all names; otherwise, associate
+                    // with the alias.
+                    if single_import
+                        && (alias.name != "*" && alias.asname.is_none() || combine_as_imports)
+                    {
+                        let entry = block
+                            .import_from
+                            .entry(ImportFromData { module, level })
+                            .or_default()
+                            .1
+                            .entry(AliasData {
+                                name: alias.name,
+                                asname: alias.asname,
+                            })
+                            .or_default();
+                        for comment in inline {
+                            entry.inline.push(comment.value);
+                        }
+                    } else {
+                        for comment in inline {
+                            entry.inline.push(comment.value);
                         }
                     }
                 }
@@ -262,14 +281,6 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                             ))
                             .or_default()
                     };
-
-                    // We only have one name imported, inline comments stay associated with that
-                    // entry.
-                    if single_import {
-                        for comment in &inline {
-                            entry.inline.push(comment.value.clone());
-                        }
-                    }
 
                     for comment in alias.atop {
                         entry.atop.push(comment.value);
