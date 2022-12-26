@@ -1,6 +1,36 @@
 use rustpython_ast::Stmt;
+use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
+use crate::ast::types::Range;
+use crate::isort::types::TrailingComma;
 use crate::source_code_locator::SourceCodeLocator;
+
+/// Return `true` if a `StmtKind::ImportFrom` statement ends with a magic
+/// trailing comma.
+pub fn trailing_comma(stmt: &Stmt, locator: &SourceCodeLocator) -> TrailingComma {
+    let contents = locator.slice_source_code_range(&Range::from_located(stmt));
+    let mut count: usize = 0;
+    let mut trailing_comma = TrailingComma::Absent;
+    for (_, tok, _) in lexer::make_tokenizer(&contents).flatten() {
+        if matches!(tok, Tok::Lpar) {
+            count += 1;
+        }
+        if matches!(tok, Tok::Rpar) {
+            count -= 1;
+        }
+        if count == 1 {
+            if matches!(tok, Tok::Newline | Tok::Indent | Tok::Dedent | Tok::Comment) {
+                continue;
+            } else if matches!(tok, Tok::Comma) {
+                trailing_comma = TrailingComma::Present;
+            } else {
+                trailing_comma = TrailingComma::Absent;
+            }
+        }
+    }
+    trailing_comma
+}
 
 /// Return `true` if a `Stmt` is preceded by a "comment break"
 pub fn has_comment_break(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {

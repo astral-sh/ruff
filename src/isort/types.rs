@@ -5,61 +5,15 @@ use rustpython_ast::Location;
 
 use crate::ast;
 
-#[derive(Hash, Eq, PartialOrd, PartialEq, Ord, Debug, Clone, Default)]
-pub struct LocationHash {
-    pub row: usize,
-    pub column: usize,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrailingComma {
+    Present,
+    Absent,
 }
 
-impl LocationHash {
-    pub fn new(location: Location) -> Self {
-        Self {
-            row: location.row(),
-            column: location.column(),
-        }
-    }
-
-    /// Gets the char in a given string for a given location
-    pub fn get_char(&self, whole: &str) -> (Option<char>, Option<usize>) {
-        let mut current = Location::new(1, 0);
-        for (i, character) in whole.chars().enumerate() {
-            if self == current {
-                return (Some(character), Some(i));
-            }
-            if character == '\n' {
-                current.newline();
-            } else {
-                current.go_right();
-            }
-        }
-        (None, None)
-    }
-}
-
-impl PartialEq<Location> for &LocationHash {
-    fn eq(&self, other: &Location) -> bool {
-        self.row == other.row() && self.column == other.column()
-    }
-}
-
-#[derive(Hash, Eq, PartialOrd, PartialEq, Ord, Debug, Clone, Default)]
-pub struct LocationWrapper {
-    pub location: Vec<LocationHash>,
-}
-
-impl LocationWrapper {
-    pub fn new(locations: Vec<Location>) -> Self {
-        let mut new_locations: Vec<LocationHash> = Vec::new();
-        for location in locations {
-            new_locations.push(LocationHash::new(location));
-        }
-        Self {
-            location: new_locations,
-        }
-    }
-
-    pub fn add_locations(&mut self, wrapper: LocationWrapper) {
-        self.location.extend(wrapper.location);
+impl Default for TrailingComma {
+    fn default() -> Self {
+        TrailingComma::Absent
     }
 }
 
@@ -118,7 +72,7 @@ pub struct ImportBlock<'a> {
         (
             CommentSet<'a>,
             FxHashMap<AliasData<'a>, CommentSet<'a>>,
-            LocationWrapper,
+            TrailingComma,
         ),
     >,
     // Set of (module, level, name, asname), used to track re-exported 'from' imports.
@@ -137,7 +91,7 @@ pub struct OrderedImportBlock<'a> {
     pub import_from: Vec<(
         ImportFromData<'a>,
         CommentSet<'a>,
-        LocationWrapper,
+        TrailingComma,
         Vec<AliasDataWithComments<'a>>,
     )>,
 }

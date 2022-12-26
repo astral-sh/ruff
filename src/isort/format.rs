@@ -41,7 +41,7 @@ pub fn format_import_from(
     line_length: usize,
     force_wrap_aliases: bool,
     is_first: bool,
-    last_comma: bool,
+    trailing_comma: bool,
 ) -> String {
     if aliases.len() == 1
         && aliases
@@ -65,7 +65,7 @@ pub fn format_import_from(
         && (!force_wrap_aliases
             || aliases.len() == 1
             || aliases.iter().all(|(alias, _)| alias.asname.is_none()))
-        && !last_comma
+        && !trailing_comma
     {
         let (single_line, import_length) =
             format_single_line(import_from, comments, aliases, is_first);

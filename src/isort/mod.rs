@@ -9,11 +9,12 @@ use rustpython_ast::{Location, Stmt, StmtKind};
 
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
+use crate::isort::helpers::trailing_comma;
 use crate::isort::sorting::{cmp_import_froms, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
-    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, LocationHash, LocationWrapper,
-    OrderedImportBlock,
+    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
+    TrailingComma,
 };
 use crate::SourceCodeLocator;
 
@@ -34,6 +35,7 @@ pub struct AnnotatedAliasData<'a> {
     pub atop: Vec<Comment<'a>>,
     pub inline: Vec<Comment<'a>>,
 }
+
 #[derive(Debug)]
 pub enum AnnotatedImport<'a> {
     Import {
@@ -47,13 +49,14 @@ pub enum AnnotatedImport<'a> {
         level: Option<&'a usize>,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
-        location: Vec<Location>,
+        trailing_comma: TrailingComma,
     },
 }
 
 fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
+    locator: &SourceCodeLocator,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut annotated = vec![];
     let mut comments_iter = comments.into_iter().peekable();
@@ -140,10 +143,7 @@ fn annotate_imports<'a>(
                     module: module.as_ref(),
                     names: aliases,
                     level: level.as_ref(),
-                    location: names
-                        .iter()
-                        .map(|name| name.end_location.unwrap())
-                        .collect(),
+                    trailing_comma: trailing_comma(&import, locator),
                     atop,
                     inline,
                 });
@@ -197,18 +197,9 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                 level,
                 atop,
                 inline,
-                location,
+                trailing_comma,
             } => {
                 // Associate the comments with the first alias (best effort).
-                let locations = LocationWrapper::new(location);
-                {
-                    let loc_entry = &mut block
-                        .import_from
-                        .entry(ImportFromData { module, level })
-                        .or_default()
-                        .2;
-                    loc_entry.add_locations(locations);
-                }
                 let single_import = names.len() == 1;
 
                 // If we're dealing with a multi-import block (i.e., a non-star, non-aliased
@@ -305,6 +296,15 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     }
                     for comment in alias.inline {
                         entry.inline.push(comment.value);
+                    }
+                }
+
+                // Propagate trailing commas.
+                if matches!(trailing_comma, TrailingComma::Present) {
+                    if let Some(entry) =
+                        block.import_from.get_mut(&ImportFromData { module, level })
+                    {
+                        entry.2 = trailing_comma;
                     }
                 }
             }
@@ -430,7 +430,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
-                                LocationWrapper::default(),
+                                TrailingComma::Absent,
                             ),
                         )
                     }),
@@ -458,7 +458,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
-                                LocationWrapper::default(),
+                                TrailingComma::Absent,
                             ),
                         )
                     }),
@@ -491,45 +491,6 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
-fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
-    let clean_whole: Vec<char> = whole.chars().collect();
-    let mut at_least_one_comma = false;
-    for location in locations {
-        let (raw_char, index) = location.get_char(whole);
-        let the_char = match raw_char {
-            None => return false,
-            Some(c) => c,
-        };
-        // If the import does not have a comma after it, we need to understand whether
-        // it is a multi-line import or without a magic comma, or a separate single
-        // import that needs to be merged as a magic comma. This avoids the issue
-        // where having a separate import, outside of magic comma import, causes the
-        // magic comma to fail
-        if the_char == '\n' {
-            let mut i = 1;
-            loop {
-                let next_char = clean_whole.get(index.unwrap() + i);
-                if next_char == Some(&')') {
-                    return false;
-                } else if next_char != Some(&'\n') {
-                    break;
-                }
-                i += 1;
-            }
-        } else if the_char != ',' {
-            return false;
-        // If there is a comma, and it is a multi-line import, then this counts
-        // towards the magic comma. This avoids issues where a single line import
-        // with multiple imports mistakenly triggers the code
-        } else {
-            if clean_whole.get(index.unwrap() + 1) == Some(&'\n') {
-                at_least_one_comma = true;
-            }
-        }
-    }
-    at_least_one_comma
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn format_imports(
     block: &Block,
@@ -545,9 +506,8 @@ pub fn format_imports(
     force_wrap_aliases: bool,
     split_on_trailing_comma: bool,
 ) -> String {
-    println!("Split on trailing: {}", split_on_trailing_comma);
     let trailer = &block.trailer;
-    let block = annotate_imports(&block.imports, comments);
+    let block = annotate_imports(&block.imports, comments, locator);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports);
@@ -566,8 +526,6 @@ pub fn format_imports(
 
     // Generate replacement source code.
     let mut is_first_block = true;
-    let whole_text = locator.to_string();
-
     for import_block in block_by_type.into_values() {
         let import_block = sort_imports(import_block);
 
@@ -587,12 +545,7 @@ pub fn format_imports(
         }
 
         // Format `StmtKind::ImportFrom` statements.
-        for (import_from, comments, locations, aliases) in &import_block.import_from {
-            let mut all_commas = false;
-            // Only check for magic commas if the `split_on_trailing_comma` flag is set
-            if split_on_trailing_comma {
-                all_commas = check_all_commas(&whole_text, &locations.location);
-            }
+        for (import_from, comments, trailing_comma, aliases) in &import_block.import_from {
             output.append(&format::format_import_from(
                 import_from,
                 comments,
@@ -600,7 +553,7 @@ pub fn format_imports(
                 line_length,
                 force_wrap_aliases,
                 is_first_statement,
-                all_commas,
+                split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
             ));
             is_first_statement = false;
         }

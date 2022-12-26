@@ -24,7 +24,7 @@ from glob import (
 from foo import bar
 from foo import baz
 
-# These will be combined, _with_ a trailing comma, I think? Follow `isort` here.
+# These will be combined, _with_ a trailing comma.
 from a import b
 from a import (
     c,
