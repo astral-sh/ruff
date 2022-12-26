@@ -11,9 +11,6 @@ pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
     let Some(mut check) = checks::typing_text_str_alias(checker, expr, location) else {
         return;
     };
-    // HELP-WANTED: I do not understand what I need to do to get this
-    // to evalutate to true, do you mind pointing me in the right
-    // direction?
     if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             "str".to_string(),

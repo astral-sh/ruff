@@ -1547,6 +1547,9 @@ where
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::UP002) {
+                    pyupgrade::plugins::typing_text_str_alias(self, expr);
+                }
                 if self.settings.enabled.contains(&CheckCode::UP016) {
                     pyupgrade::plugins::remove_six_compat(self, expr);
                 }
