@@ -499,8 +499,8 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
 #[allow(clippy::too_many_arguments)]
 pub fn format_imports(
     block: &Block,
-    locator: &SourceCodeLocator,
     comments: Vec<Comment>,
+    locator: &SourceCodeLocator,
     line_length: usize,
     src: &[PathBuf],
     package: Option<&Path>,
