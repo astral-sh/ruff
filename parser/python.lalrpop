@@ -164,6 +164,11 @@ TestOrStarExpr: ast::Expr = {
     StarExpr,
 };
 
+NamedOrStarExpr: ast::Expr = {
+    NamedExpression,
+    StarExpr,
+};
+
 TestOrStarNamedExpr: ast::Expr = {
     NamedExpressionTest,
     StarExpr,
@@ -518,7 +523,7 @@ WithItems: Vec<ast::Withitem> = {
 
 #[inline]
 WithItemsNoAs: Vec<ast::Withitem> = {
-    <OneOrMore<NamedExpressionTest>> => {
+    <OneOrMore<Test<"all">>> => {
         <>.into_iter().map(|context_expr| ast::Withitem { context_expr, optional_vars: None }).collect()
     },
 }
@@ -746,26 +751,27 @@ Test<Goal>: ast::Expr = {
 };
 
 NamedExpressionTest: ast::Expr = {
-    <location:@L> <left: (Identifier ":=")?> <right:Test<"all">> <end_location:@R> => {
-        if let Some(l) = left {
-            ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::NamedExpr {
-                    target: Box::new(ast::Expr::new(
-                        location,
-                        end_location,
-                        ast::ExprKind::Name { id: l.0, ctx: ast::ExprContext::Store },
-                    )),
-                    value: Box::new(right),
-                }
-            }
-        } else {
-            right
-        }
-    }
+    NamedExpression,
+    Test<"all">,
 }
+
+NamedExpression: ast::Expr = {
+    <location:@L> <id:Identifier> ":=" <value:Test<"all">> <end_location:@R> => {
+        ast::Expr {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::ExprKind::NamedExpr {
+                target: Box::new(ast::Expr::new(
+                    location,
+                    end_location,
+                    ast::ExprKind::Name { id, ctx: ast::ExprContext::Store },
+                )),
+                value: Box::new(value),
+            }
+        }
+    },
+};
 
 LambdaDef: ast::Expr = {
     <location:@L> "lambda" <p:ParameterList<UntypedParameter>?> ":" <body:Test<"all">> <end_location:@R> => {
@@ -1066,7 +1072,7 @@ Atom<Goal>: ast::Expr = {
             node: ast::ExprKind::ListComp { elt: Box::new(elt), generators }
         }
     },
-    <location:@L> "(" <elts:OneOrMore<NamedExpressionTest>> <trailing_comma:","?> ")" <end_location:@R> if Goal != "no-withitems" => {
+    <location:@L> "(" <elts:OneOrMore<Test<"all">>> <trailing_comma:","?> ")" <end_location:@R> if Goal != "no-withitems" => {
         if elts.len() == 1 && trailing_comma.is_none() {
             elts.into_iter().next().unwrap()
         } else {
@@ -1077,19 +1083,23 @@ Atom<Goal>: ast::Expr = {
             )
         }
     },
-    <location:@L> "(" <left:(<OneOrMore<NamedExpressionTest>> ",")?> <mid:StarExpr> <right:("," <TestOrStarNamedExpr>)*> <trailing_comma:","?> ")" <end_location:@R> =>? {
+    <location:@L> "(" <left:(<OneOrMore<Test<"all">>> ",")?> <mid:NamedOrStarExpr> <right:("," <TestOrStarNamedExpr>)*> <trailing_comma:","?> ")" <end_location:@R> =>? {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
-            Err(LexicalError{
-                error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
-                location: mid.location,
-            })?
+            if matches!(mid.node, ast::ExprKind::Starred { .. }) {
+                Err(LexicalError{
+                    error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
+                    location: mid.location,
+                })?
+            }
+            Ok(mid)
+        } else {
+            let elts = left.into_iter().flatten().chain([mid]).chain(right).collect();
+            Ok(ast::Expr::new(
+                location,
+                end_location,
+                ast::ExprKind::Tuple { elts, ctx: ast::ExprContext::Load },
+            ))
         }
-        let elts = left.into_iter().flatten().chain([mid]).chain(right).collect();
-        Ok(ast::Expr::new(
-            location,
-            end_location,
-            ast::ExprKind::Tuple { elts, ctx: ast::ExprContext::Load },
-        ))
     },
     <location:@L> "(" ")" <end_location:@R> => ast::Expr::new(
         location,
