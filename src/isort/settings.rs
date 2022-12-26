@@ -51,6 +51,17 @@ pub struct Options {
     /// option.
     pub combine_as_imports: Option<bool>,
     #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            split-on-trailing-comma = true
+        "#
+    )]
+    /// If a comma is placed after the last mulit-line import, then the imports
+    /// will never be folded into one line.
+    /// See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma)
+    pub split_on_trailing_comma: Option<bool>,
+    #[option(
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
@@ -86,6 +97,7 @@ pub struct Options {
 pub struct Settings {
     pub combine_as_imports: bool,
     pub force_wrap_aliases: bool,
+    pub split_on_trailing_comma: bool,
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
     pub extra_standard_library: BTreeSet<String>,
@@ -96,6 +108,7 @@ impl Settings {
         Self {
             combine_as_imports: options.combine_as_imports.unwrap_or_default(),
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or_default(),
+            split_on_trailing_comma: options.split_on_trailing_comma.unwrap_or_default(),
             known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
             known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
             extra_standard_library: BTreeSet::from_iter(
