@@ -149,7 +149,7 @@ jobs:
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
-      - run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: jetli/wasm-pack-action@v0.4.0
       - run: wasm-pack test --node
 
   maturin-build:
