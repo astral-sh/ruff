@@ -1,6 +1,7 @@
 name: Playground
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -11,7 +12,6 @@ env:
 
 jobs:
   build:
-    name: "playground build"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -38,10 +38,18 @@ jobs:
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
-      - run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      - run: wasm-pack build --target web --out-dir playground/src/pkg
-      - run: cd playground/ && npm install && npm run build
-      - uses: cloudflare/wrangler-action@2.0.0
+      - name: "Install wasm-pack"
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: "Run wasm-pack"
+        run: wasm-pack build --target web --out-dir playground/src/pkg
+      - name: "Install Node dependencies"
+        run: npm ci
+        working-directory: playground
+      - name: "Build JavaScript bundle"
+        run: npm run build
+        working-directory: playground
+      - name: "Deploy to Cloudflare Pages"
+        uses: cloudflare/wrangler-action@2.0.0
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
