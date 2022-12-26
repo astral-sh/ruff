@@ -89,10 +89,10 @@ pub mod visibility;
 
 /// Load the relevant `Settings` for a given `Path`.
 fn resolve(path: &Path) -> Result<Settings> {
-    if let Some(pyproject) = pyproject::find_pyproject_toml(path)? {
+    if let Some(pyproject) = pyproject::find_settings_toml(path)? {
         // First priority: `pyproject.toml` in the current `Path`.
         resolver::resolve_settings(&pyproject, &Relativity::Parent, None)
-    } else if let Some(pyproject) = pyproject::find_user_pyproject_toml() {
+    } else if let Some(pyproject) = pyproject::find_user_settings_toml() {
         // Second priority: user-specific `pyproject.toml`.
         resolver::resolve_settings(&pyproject, &Relativity::Cwd, None)
     } else {

@@ -66,8 +66,8 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn from_pyproject(pyproject: &Path, project_root: &Path) -> Result<Self> {
-        Self::from_options(load_options(pyproject)?, project_root)
+    pub fn from_toml(path: &Path, project_root: &Path) -> Result<Self> {
+        Self::from_options(load_options(path)?, project_root)
     }
 
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
