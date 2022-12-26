@@ -2538,7 +2538,7 @@ impl CheckKind {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
             }
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
-            CheckKind::TypingTextStrAlias => "`typing.Text` is depreciated use `str`".to_string(),
+            CheckKind::TypingTextStrAlias => "`typing.Text` is deprecated, use `str`".to_string(),
             CheckKind::DeprecatedUnittestAlias(alias, target) => {
                 format!("`{alias}` is deprecated, use `{target}` instead")
             }
