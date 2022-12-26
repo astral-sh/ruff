@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use itertools::Itertools;
 use ropey::RopeBuilder;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Location, Stmt, StmtKind};
+use rustpython_ast::{Stmt, StmtKind};
 
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
@@ -143,7 +143,7 @@ fn annotate_imports<'a>(
                     module: module.as_ref(),
                     names: aliases,
                     level: level.as_ref(),
-                    trailing_comma: trailing_comma(&import, locator),
+                    trailing_comma: trailing_comma(import, locator),
                     atop,
                     inline,
                 });

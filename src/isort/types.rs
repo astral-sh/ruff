@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use rustc_hash::FxHashMap;
-use rustpython_ast::Location;
 
 use crate::ast;
 
