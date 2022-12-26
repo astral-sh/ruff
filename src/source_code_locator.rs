@@ -1,7 +1,6 @@
 //! Struct used to efficiently slice source code at (row, column) Locations.
 
 use std::borrow::Cow;
-use std::fmt;
 
 use once_cell::unsync::OnceCell;
 use ropey::Rope;
@@ -12,12 +11,6 @@ use crate::ast::types::Range;
 pub struct SourceCodeLocator<'a> {
     contents: &'a str,
     rope: OnceCell<Rope>,
-}
-
-impl fmt::Display for SourceCodeLocator<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.contents)
-    }
 }
 
 impl<'a> SourceCodeLocator<'a> {

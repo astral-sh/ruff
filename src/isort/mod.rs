@@ -551,8 +551,6 @@ pub fn format_imports(
 
         // Format `StmtKind::ImportFrom` statements.
         for (import_from, comments, trailing_comma, aliases) in &import_block.import_from {
-            println!("import_from: {:?}", import_from);
-            println!("trailing_comma: {:?}", trailing_comma);
             output.append(&format::format_import_from(
                 import_from,
                 comments,

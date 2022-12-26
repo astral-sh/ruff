@@ -2532,11 +2532,12 @@ known-third-party = ["src"]
 
 #### [`split-on-trailing-comma`](#split-on-trailing-comma)
 
-If a comma is placed after the last mulit-line import, then the imports
-will never be folded into one line.
-See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma)
+If a comma is placed after the last member in a multi-line import, then
+the imports will never be folded into one line.
 
-**Default value**: `false`
+See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.
+
+**Default value**: `true`
 
 **Type**: `bool`
 
@@ -2544,7 +2545,7 @@ See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/confi
 
 ```toml
 [tool.ruff.isort]
-split-on-trailing-comma = true
+split-on-trailing-comma = false
 ```
 
 ---
