@@ -486,7 +486,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
-/// Confirms that the character after a certain location matches the match_char
+/// Confirms that the character after a certain location matches the `match_char`
 fn check_last_char(whole: &str, location: &LocationHash, match_char: char) -> bool {
     let mut current = Location::new(1, 0);
     for character in whole.chars() {
