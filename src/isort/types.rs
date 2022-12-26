@@ -22,7 +22,7 @@ impl LocationHash {
     /// Gets the char in a given string for a given location
     pub fn get_char(&self, whole: &str) -> (Option<char>, Option<usize>) {
         let mut current = Location::new(1, 0);
-        for (i, character )in whole.chars().enumerate() {
+        for (i, character) in whole.chars().enumerate() {
             if self == current {
                 return (Some(character), Some(i));
             }

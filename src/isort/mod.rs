@@ -486,7 +486,6 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
-
 fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
     let clean_whole: Vec<char> = whole.chars().collect();
     let mut at_least_one_comma = false;
@@ -498,7 +497,7 @@ fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
         };
         println!("Char: {:?}", clean_whole.get(index.unwrap()));
         // If the import does not have a comma after it, we need to understand whether
-        // it is a multi-line import or without a magic comma, or a separate single 
+        // it is a multi-line import or without a magic comma, or a separate single
         // import that needs to be merged as a magic comma. This avoids the issue
         // where having a separate import, outside of magic comma import, causes the
         // magic comma to fail
@@ -509,16 +508,14 @@ fn check_all_commas(whole: &str, locations: &Vec<LocationHash>) -> bool {
                 println!("Next Char: {:?}", next_char);
                 println!("{}", i);
                 if next_char == Some(&')') {
-                    return false
+                    return false;
                 } else if next_char != Some(&'\n') {
                     break;
-                } else {
-                    i += 1;
                 }
+                i += 1;
             }
-        }
-        else if the_char != ',' {
-            return false
+        } else if the_char != ',' {
+            return false;
         // If there is a comma, and it is a multi-line import, then this counts
         // towards the magic comma. This avoids issues where a single line import
         // with multiple imports mistakenly triggers the code
