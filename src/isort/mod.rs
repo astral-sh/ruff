@@ -9,11 +9,14 @@ use rustpython_ast::{Stmt, StmtKind};
 
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
+use crate::isort::helpers::trailing_comma;
 use crate::isort::sorting::{cmp_import_froms, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
+    TrailingComma,
 };
+use crate::SourceCodeLocator;
 
 mod categorize;
 mod comments;
@@ -32,6 +35,7 @@ pub struct AnnotatedAliasData<'a> {
     pub atop: Vec<Comment<'a>>,
     pub inline: Vec<Comment<'a>>,
 }
+
 #[derive(Debug)]
 pub enum AnnotatedImport<'a> {
     Import {
@@ -45,12 +49,15 @@ pub enum AnnotatedImport<'a> {
         level: Option<&'a usize>,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
+        trailing_comma: TrailingComma,
     },
 }
 
 fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
+    locator: &SourceCodeLocator,
+    split_on_trailing_comma: bool,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut annotated = vec![];
     let mut comments_iter = comments.into_iter().peekable();
@@ -137,6 +144,11 @@ fn annotate_imports<'a>(
                     module: module.as_ref(),
                     names: aliases,
                     level: level.as_ref(),
+                    trailing_comma: if split_on_trailing_comma {
+                        trailing_comma(import, locator)
+                    } else {
+                        TrailingComma::default()
+                    },
                     atop,
                     inline,
                 });
@@ -190,6 +202,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                 level,
                 atop,
                 inline,
+                trailing_comma,
             } => {
                 let single_import = names.len() == 1;
 
@@ -287,6 +300,15 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     }
                     for comment in alias.inline {
                         entry.inline.push(comment.value);
+                    }
+                }
+
+                // Propagate trailing commas.
+                if matches!(trailing_comma, TrailingComma::Present) {
+                    if let Some(entry) =
+                        block.import_from.get_mut(&ImportFromData { module, level })
+                    {
+                        entry.2 = trailing_comma;
                     }
                 }
             }
@@ -412,6 +434,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
+                                TrailingComma::Absent,
                             ),
                         )
                     }),
@@ -439,33 +462,36 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
+                                TrailingComma::Absent,
                             ),
                         )
                     }),
             )
-            .map(|(import_from, (comments, aliases))| {
+            .map(|(import_from, (comments, aliases, locations))| {
                 // Within each `StmtKind::ImportFrom`, sort the members.
                 (
                     import_from,
                     comments,
+                    locations,
                     aliases
                         .into_iter()
                         .sorted_by(|(alias1, _), (alias2, _)| cmp_members(alias1, alias2))
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
             })
-            .sorted_by(|(import_from1, _, aliases1), (import_from2, _, aliases2)| {
-                cmp_import_froms(import_from1, import_from2).then_with(|| {
-                    match (aliases1.first(), aliases2.first()) {
-                        (None, None) => Ordering::Equal,
-                        (None, Some(_)) => Ordering::Less,
-                        (Some(_), None) => Ordering::Greater,
-                        (Some((alias1, _)), Some((alias2, _))) => cmp_members(alias1, alias2),
-                    }
-                })
-            }),
+            .sorted_by(
+                |(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
+                    cmp_import_froms(import_from1, import_from2).then_with(|| {
+                        match (aliases1.first(), aliases2.first()) {
+                            (None, None) => Ordering::Equal,
+                            (None, Some(_)) => Ordering::Less,
+                            (Some(_), None) => Ordering::Greater,
+                            (Some((alias1, _)), Some((alias2, _))) => cmp_members(alias1, alias2),
+                        }
+                    })
+                },
+            ),
     );
-
     ordered
 }
 
@@ -473,6 +499,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
 pub fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
+    locator: &SourceCodeLocator,
     line_length: usize,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -481,9 +508,10 @@ pub fn format_imports(
     extra_standard_library: &BTreeSet<String>,
     combine_as_imports: bool,
     force_wrap_aliases: bool,
+    split_on_trailing_comma: bool,
 ) -> String {
     let trailer = &block.trailer;
-    let block = annotate_imports(&block.imports, comments);
+    let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports);
@@ -521,7 +549,7 @@ pub fn format_imports(
         }
 
         // Format `StmtKind::ImportFrom` statements.
-        for (import_from, comments, aliases) in &import_block.import_from {
+        for (import_from, comments, trailing_comma, aliases) in &import_block.import_from {
             output.append(&format::format_import_from(
                 import_from,
                 comments,
@@ -529,6 +557,7 @@ pub fn format_imports(
                 line_length,
                 force_wrap_aliases,
                 is_first_statement,
+                split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
             ));
             is_first_statement = false;
         }
@@ -588,6 +617,7 @@ mod tests {
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
+    #[test_case(Path::new("magic_trailing_comma.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let mut checks = test_path(
@@ -636,6 +666,27 @@ mod tests {
                 isort: isort::settings::Settings {
                     force_wrap_aliases: true,
                     combine_as_imports: true,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("magic_trailing_comma.py"))]
+    fn no_split_on_trailing_comma(path: &Path) -> Result<()> {
+        let snapshot = format!("split_on_trailing_comma_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    split_on_trailing_comma: false,
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],

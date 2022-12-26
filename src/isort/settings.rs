@@ -51,6 +51,18 @@ pub struct Options {
     /// option.
     pub combine_as_imports: Option<bool>,
     #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = r#"
+            split-on-trailing-comma = false
+        "#
+    )]
+    /// If a comma is placed after the last member in a multi-line import, then
+    /// the imports will never be folded into one line.
+    ///
+    /// See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.
+    pub split_on_trailing_comma: Option<bool>,
+    #[option(
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
@@ -82,10 +94,11 @@ pub struct Options {
     pub extra_standard_library: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash, Default)]
+#[derive(Debug, Hash)]
 pub struct Settings {
     pub combine_as_imports: bool,
     pub force_wrap_aliases: bool,
+    pub split_on_trailing_comma: bool,
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
     pub extra_standard_library: BTreeSet<String>,
@@ -94,13 +107,27 @@ pub struct Settings {
 impl Settings {
     pub fn from_options(options: Options) -> Self {
         Self {
-            combine_as_imports: options.combine_as_imports.unwrap_or_default(),
-            force_wrap_aliases: options.force_wrap_aliases.unwrap_or_default(),
+            combine_as_imports: options.combine_as_imports.unwrap_or(false),
+            force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
+            split_on_trailing_comma: options.split_on_trailing_comma.unwrap_or(true),
             known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
             known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
             extra_standard_library: BTreeSet::from_iter(
                 options.extra_standard_library.unwrap_or_default(),
             ),
+        }
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            combine_as_imports: false,
+            force_wrap_aliases: false,
+            split_on_trailing_comma: true,
+            known_first_party: BTreeSet::new(),
+            known_third_party: BTreeSet::new(),
+            extra_standard_library: BTreeSet::new(),
         }
     }
 }

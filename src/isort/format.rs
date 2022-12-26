@@ -41,6 +41,7 @@ pub fn format_import_from(
     line_length: usize,
     force_wrap_aliases: bool,
     is_first: bool,
+    trailing_comma: bool,
 ) -> String {
     if aliases.len() == 1
         && aliases
@@ -53,9 +54,10 @@ pub fn format_import_from(
 
     // We can only inline if: (1) none of the aliases have atop comments, and (3)
     // only the last alias (if any) has inline comments.
-    if aliases
-        .iter()
-        .all(|(_, CommentSet { atop, .. })| atop.is_empty())
+    if !trailing_comma
+        && aliases
+            .iter()
+            .all(|(_, CommentSet { atop, .. })| atop.is_empty())
         && aliases
             .iter()
             .rev()

@@ -2530,6 +2530,26 @@ known-third-party = ["src"]
 
 ---
 
+#### [`split-on-trailing-comma`](#split-on-trailing-comma)
+
+If a comma is placed after the last member in a multi-line import, then
+the imports will never be folded into one line.
+
+See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+split-on-trailing-comma = false
+```
+
+---
+
 ### `mccabe`
 
 #### [`max-complexity`](#max-complexity)
