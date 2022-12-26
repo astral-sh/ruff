@@ -236,6 +236,10 @@ where
         lxr.window.slide();
         lxr.window.slide();
         lxr.window.slide();
+        // TODO: Handle possible mismatch between BOM and explicit encoding declaration.
+        if let Some('\u{feff}') = lxr.window[0] {
+            lxr.window.slide();
+        }
         // Start at top row (=1) left column (=1)
         lxr.location.reset();
         lxr
