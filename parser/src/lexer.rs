@@ -236,7 +236,7 @@ where
         lxr.window.slide();
         lxr.window.slide();
         lxr.window.slide();
-        // Check if BOM exists
+        // TODO: Handle possible mismatch between BOM and explicit encoding declaration.
         if let Some('\u{feff}') = lxr.window[0] {
             lxr.window.slide();
         }
