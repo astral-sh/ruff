@@ -1981,7 +1981,7 @@ file).
 
 ```toml
 [tool.ruff]
-required-version = "0.0.194"
+required-version = "0.0.193"
 ```
 
 ---
