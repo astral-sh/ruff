@@ -20,7 +20,10 @@ expression: checks
       column: 17
 - kind:
     UnusedNOQA:
-      - E501
+      unknown: []
+      disabled: []
+      unmatched:
+        - E501
   location:
     row: 13
     column: 11
@@ -37,8 +40,11 @@ expression: checks
       column: 23
 - kind:
     UnusedNOQA:
-      - F841
-      - E501
+      unknown: []
+      disabled: []
+      unmatched:
+        - F841
+        - E501
   location:
     row: 16
     column: 11
@@ -55,14 +61,18 @@ expression: checks
       column: 29
 - kind:
     UnusedNOQA:
-      - F841
-      - W191
+      unknown:
+        - W191
+      disabled:
+        - F821
+      unmatched:
+        - F841
   location:
     row: 19
     column: 11
   end_location:
     row: 19
-    column: 29
+    column: 35
   fix:
     content: ""
     location:
@@ -70,11 +80,14 @@ expression: checks
       column: 9
     end_location:
       row: 19
-      column: 29
+      column: 35
 - kind:
     UnusedNOQA:
-      - F841
-      - V101
+      unknown:
+        - V101
+      disabled: []
+      unmatched:
+        - F841
   location:
     row: 22
     column: 11
@@ -91,7 +104,10 @@ expression: checks
       column: 29
 - kind:
     UnusedNOQA:
-      - E501
+      unknown: []
+      disabled: []
+      unmatched:
+        - E501
   location:
     row: 26
     column: 9
@@ -117,7 +133,10 @@ expression: checks
   fix: ~
 - kind:
     UnusedNOQA:
-      - E501
+      unknown: []
+      disabled: []
+      unmatched:
+        - E501
   location:
     row: 29
     column: 32
@@ -134,7 +153,10 @@ expression: checks
       column: 44
 - kind:
     UnusedNOQA:
-      - F841
+      unknown: []
+      disabled: []
+      unmatched:
+        - F841
   location:
     row: 55
     column: 5
@@ -151,7 +173,10 @@ expression: checks
       column: 23
 - kind:
     UnusedNOQA:
-      - E501
+      unknown: []
+      disabled: []
+      unmatched:
+        - E501
   location:
     row: 63
     column: 5

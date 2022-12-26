@@ -1,0 +1,20 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 39
+    column: 0
+  fix:
+    content: "from glob import (\n    escape,  # Ends with a comment, should still treat as magic trailing comma.\n    glob,\n    iglob,\n)\n\n# No magic comma, this will be rolled into one line.\nfrom os import environ, execl, execv, path\nfrom sys import argv, exit, stderr, stdout\n\n# These will be combined, but without a trailing comma.\nfrom foo import bar, baz\n\n# These will be combined, _with_ a trailing comma.\nfrom module1 import member1, member2, member3\n\n# These will be combined, _with_ a trailing comma.\nfrom module2 import member1, member2, member3\n"
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 39
+      column: 0
+

@@ -1,4 +1,4 @@
-use std::cmp::Reverse;
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -9,11 +9,14 @@ use rustpython_ast::{Stmt, StmtKind};
 
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
-use crate::isort::sorting::{member_key, module_key};
+use crate::isort::helpers::trailing_comma;
+use crate::isort::sorting::{cmp_import_froms, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
+    TrailingComma,
 };
+use crate::SourceCodeLocator;
 
 mod categorize;
 mod comments;
@@ -32,6 +35,7 @@ pub struct AnnotatedAliasData<'a> {
     pub atop: Vec<Comment<'a>>,
     pub inline: Vec<Comment<'a>>,
 }
+
 #[derive(Debug)]
 pub enum AnnotatedImport<'a> {
     Import {
@@ -45,12 +49,15 @@ pub enum AnnotatedImport<'a> {
         level: Option<&'a usize>,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
+        trailing_comma: TrailingComma,
     },
 }
 
 fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
+    locator: &SourceCodeLocator,
+    split_on_trailing_comma: bool,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut annotated = vec![];
     let mut comments_iter = comments.into_iter().peekable();
@@ -137,6 +144,11 @@ fn annotate_imports<'a>(
                     module: module.as_ref(),
                     names: aliases,
                     level: level.as_ref(),
+                    trailing_comma: if split_on_trailing_comma {
+                        trailing_comma(import, locator)
+                    } else {
+                        TrailingComma::default()
+                    },
                     atop,
                     inline,
                 });
@@ -190,34 +202,27 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                 level,
                 atop,
                 inline,
+                trailing_comma,
             } => {
-                // Associate the comments with the first alias (best effort).
+                let single_import = names.len() == 1;
+
+                // If we're dealing with a multi-import block (i.e., a non-star, non-aliased
+                // import), associate the comments with the first alias (best
+                // effort).
                 if let Some(alias) = names.first() {
-                    if alias.name == "*" {
-                        let entry = block
+                    let entry = if alias.name == "*" {
+                        block
                             .import_from_star
                             .entry(ImportFromData { module, level })
-                            .or_default();
-                        for comment in atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
+                            .or_default()
                     } else if alias.asname.is_none() || combine_as_imports {
-                        let entry = &mut block
+                        &mut block
                             .import_from
                             .entry(ImportFromData { module, level })
                             .or_default()
-                            .0;
-                        for comment in atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
+                            .0
                     } else {
-                        let entry = block
+                        block
                             .import_from_as
                             .entry((
                                 ImportFromData { module, level },
@@ -226,30 +231,19 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                                     asname: alias.asname,
                                 },
                             ))
-                            .or_default();
-                        for comment in atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
-                    }
-                }
+                            .or_default()
+                    };
 
-                // Create an entry for every alias.
-                for alias in names {
-                    if alias.name == "*" {
-                        let entry = block
-                            .import_from_star
-                            .entry(ImportFromData { module, level })
-                            .or_default();
-                        for comment in alias.atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in alias.inline {
-                            entry.inline.push(comment.value);
-                        }
-                    } else if alias.asname.is_none() || combine_as_imports {
+                    for comment in atop {
+                        entry.atop.push(comment.value);
+                    }
+
+                    // Associate inline comments with first alias if multiple names have been
+                    // imported, i.e., the comment applies to all names; otherwise, associate
+                    // with the alias.
+                    if single_import
+                        && (alias.name != "*" && (alias.asname.is_none() || combine_as_imports))
+                    {
                         let entry = block
                             .import_from
                             .entry(ImportFromData { module, level })
@@ -260,14 +254,36 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                                 asname: alias.asname,
                             })
                             .or_default();
-                        for comment in alias.atop {
-                            entry.atop.push(comment.value);
-                        }
-                        for comment in alias.inline {
+                        for comment in inline {
                             entry.inline.push(comment.value);
                         }
                     } else {
-                        let entry = block
+                        for comment in inline {
+                            entry.inline.push(comment.value);
+                        }
+                    }
+                }
+
+                // Create an entry for every alias.
+                for alias in names {
+                    let entry = if alias.name == "*" {
+                        block
+                            .import_from_star
+                            .entry(ImportFromData { module, level })
+                            .or_default()
+                    } else if alias.asname.is_none() || combine_as_imports {
+                        block
+                            .import_from
+                            .entry(ImportFromData { module, level })
+                            .or_default()
+                            .1
+                            .entry(AliasData {
+                                name: alias.name,
+                                asname: alias.asname,
+                            })
+                            .or_default()
+                    } else {
+                        block
                             .import_from_as
                             .entry((
                                 ImportFromData { module, level },
@@ -276,13 +292,23 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                                     asname: alias.asname,
                                 },
                             ))
-                            .or_default();
-                        entry
-                            .atop
-                            .extend(alias.atop.into_iter().map(|comment| comment.value));
-                        for comment in alias.inline {
-                            entry.inline.push(comment.value);
-                        }
+                            .or_default()
+                    };
+
+                    for comment in alias.atop {
+                        entry.atop.push(comment.value);
+                    }
+                    for comment in alias.inline {
+                        entry.inline.push(comment.value);
+                    }
+                }
+
+                // Propagate trailing commas.
+                if matches!(trailing_comma, TrailingComma::Present) {
+                    if let Some(entry) =
+                        block.import_from.get_mut(&ImportFromData { module, level })
+                    {
+                        entry.2 = trailing_comma;
                     }
                 }
             }
@@ -379,7 +405,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
         block
             .import
             .into_iter()
-            .sorted_by_cached_key(|(alias, _)| module_key(alias.name, alias.asname)),
+            .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2)),
     );
 
     // Sort `StmtKind::ImportFrom`.
@@ -408,6 +434,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
+                                TrailingComma::Absent,
                             ),
                         )
                     }),
@@ -435,37 +462,36 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                                         inline: comments.inline,
                                     },
                                 )]),
+                                TrailingComma::Absent,
                             ),
                         )
                     }),
             )
-            .map(|(import_from, (comments, aliases))| {
+            .map(|(import_from, (comments, aliases, locations))| {
                 // Within each `StmtKind::ImportFrom`, sort the members.
                 (
                     import_from,
                     comments,
+                    locations,
                     aliases
                         .into_iter()
-                        .sorted_by_cached_key(|(alias, _)| member_key(alias.name, alias.asname))
+                        .sorted_by(|(alias1, _), (alias2, _)| cmp_members(alias1, alias2))
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
             })
-            .sorted_by_cached_key(|(import_from, _, aliases)| {
-                // Sort each `StmtKind::ImportFrom` by module key, breaking ties based on
-                // members.
-                (
-                    Reverse(import_from.level),
-                    import_from
-                        .module
-                        .as_ref()
-                        .map(|module| module_key(module, None)),
-                    aliases
-                        .first()
-                        .map(|(alias, _)| member_key(alias.name, alias.asname)),
-                )
-            }),
+            .sorted_by(
+                |(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
+                    cmp_import_froms(import_from1, import_from2).then_with(|| {
+                        match (aliases1.first(), aliases2.first()) {
+                            (None, None) => Ordering::Equal,
+                            (None, Some(_)) => Ordering::Less,
+                            (Some(_), None) => Ordering::Greater,
+                            (Some((alias1, _)), Some((alias2, _))) => cmp_members(alias1, alias2),
+                        }
+                    })
+                },
+            ),
     );
-
     ordered
 }
 
@@ -473,6 +499,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
 pub fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
+    locator: &SourceCodeLocator,
     line_length: usize,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -481,9 +508,10 @@ pub fn format_imports(
     extra_standard_library: &BTreeSet<String>,
     combine_as_imports: bool,
     force_wrap_aliases: bool,
+    split_on_trailing_comma: bool,
 ) -> String {
     let trailer = &block.trailer;
-    let block = annotate_imports(&block.imports, comments);
+    let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports);
@@ -521,7 +549,7 @@ pub fn format_imports(
         }
 
         // Format `StmtKind::ImportFrom` statements.
-        for (import_from, comments, aliases) in &import_block.import_from {
+        for (import_from, comments, trailing_comma, aliases) in &import_block.import_from {
             output.append(&format::format_import_from(
                 import_from,
                 comments,
@@ -529,6 +557,7 @@ pub fn format_imports(
                 line_length,
                 force_wrap_aliases,
                 is_first_statement,
+                split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
             ));
             is_first_statement = false;
         }
@@ -569,6 +598,7 @@ mod tests {
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
+    #[test_case(Path::new("natural_order.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
     #[test_case(Path::new("no_wrap_star.py"))]
     #[test_case(Path::new("order_by_type.py"))]
@@ -587,6 +617,7 @@ mod tests {
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
+    #[test_case(Path::new("magic_trailing_comma.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let mut checks = test_path(
@@ -635,6 +666,27 @@ mod tests {
                 isort: isort::settings::Settings {
                     force_wrap_aliases: true,
                     combine_as_imports: true,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("magic_trailing_comma.py"))]
+    fn no_split_on_trailing_comma(path: &Path) -> Result<()> {
+        let snapshot = format!("split_on_trailing_comma_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    split_on_trailing_comma: false,
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],

@@ -1,7 +1,7 @@
 use itertools::izip;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Located, Location, Stmt, StmtKind};
+use rustpython_ast::{Constant, Located, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -55,7 +55,14 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                     if id == "type" {
                         if let Some(arg) = args.first() {
                             // Allow comparison for types which are not obvious.
-                            if !matches!(arg.node, ExprKind::Name { .. }) {
+                            if !matches!(
+                                arg.node,
+                                ExprKind::Name { .. }
+                                    | ExprKind::Constant {
+                                        value: Constant::None,
+                                        kind: None
+                                    }
+                            ) {
                                 checks.push(Check::new(CheckKind::TypeComparison, location));
                             }
                         }
@@ -181,6 +188,7 @@ pub fn invalid_escape_sequence(
     locator: &SourceCodeLocator,
     start: Location,
     end: Location,
+    autofix: bool,
 ) -> Vec<Check> {
     let mut checks = vec![];
 
@@ -228,13 +236,17 @@ pub fn invalid_escape_sequence(
                 };
                 let location = Location::new(start.row() + row_offset, col);
                 let end_location = Location::new(location.row(), location.column() + 2);
-                checks.push(Check::new(
+                let mut check = Check::new(
                     CheckKind::InvalidEscapeSequence(next_char),
                     Range {
                         location,
                         end_location,
                     },
-                ));
+                );
+                if autofix {
+                    check.amend(Fix::insertion(r"\".to_string(), location));
+                }
+                checks.push(check);
             }
         }
     }

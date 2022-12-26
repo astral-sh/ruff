@@ -1,51 +1,53 @@
 //! Settings for the `flake-annotations` plugin.
 
 use ruff_macros::ConfigurationOptions;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+)]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "kebab-case",
+    rename = "Flake8AnnotationsOptions"
+)]
 pub struct Options {
     #[option(
-        doc = r#"
-            Whether to allow the omission of a return type hint for `__init__` if at least one
-            argument is annotated.
-        "#,
         default = "false",
         value_type = "bool",
         example = "mypy-init-return = true"
     )]
+    /// Whether to allow the omission of a return type hint for `__init__` if at
+    /// least one argument is annotated.
     pub mypy_init_return: Option<bool>,
     #[option(
-        doc = r#"
-            Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable
-            regex (like `_`).
-        "#,
         default = "false",
         value_type = "bool",
         example = "suppress-dummy-args = true"
     )]
+    /// Whether to suppress `ANN000`-level errors for arguments matching the
+    /// "dummy" variable regex (like `_`).
     pub suppress_dummy_args: Option<bool>,
     #[option(
-        doc = r#"
-            Whether to suppress `ANN200`-level errors for functions that meet either of the
-            following criteria:
-
-            - Contain no `return` statement.
-            - Explicit `return` statement(s) all return `None` (explicitly or implicitly).
-        "#,
         default = "false",
         value_type = "bool",
         example = "suppress-none-returning = true"
     )]
+    /// Whether to suppress `ANN200`-level errors for functions that meet either
+    /// of the following criteria:
+    ///
+    /// - Contain no `return` statement.
+    /// - Explicit `return` statement(s) all return `None` (explicitly or
+    ///   implicitly).
     pub suppress_none_returning: Option<bool>,
     #[option(
-        doc = "Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` \
-               arguments.",
         default = "false",
         value_type = "bool",
         example = "allow-star-arg-any = true"
     )]
+    /// Whether to suppress `ANN401` for dynamically typed `*args` and
+    /// `**kwargs` arguments.
     pub allow_star_arg_any: Option<bool>,
 }
 

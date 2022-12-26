@@ -4,6 +4,18 @@ use rustc_hash::FxHashMap;
 
 use crate::ast;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrailingComma {
+    Present,
+    Absent,
+}
+
+impl Default for TrailingComma {
+    fn default() -> Self {
+        TrailingComma::Absent
+    }
+}
+
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ImportFromData<'a> {
     pub module: Option<&'a String>,
@@ -54,8 +66,14 @@ pub struct ImportBlock<'a> {
     pub import: FxHashMap<AliasData<'a>, CommentSet<'a>>,
     // Map from (module, level) to `AliasData`, used to track 'from' imports.
     // Ex) `from module import member`
-    pub import_from:
-        FxHashMap<ImportFromData<'a>, (CommentSet<'a>, FxHashMap<AliasData<'a>, CommentSet<'a>>)>,
+    pub import_from: FxHashMap<
+        ImportFromData<'a>,
+        (
+            CommentSet<'a>,
+            FxHashMap<AliasData<'a>, CommentSet<'a>>,
+            TrailingComma,
+        ),
+    >,
     // Set of (module, level, name, asname), used to track re-exported 'from' imports.
     // Ex) `from module import member as member`
     pub import_from_as: FxHashMap<(ImportFromData<'a>, AliasData<'a>), CommentSet<'a>>,
@@ -72,6 +90,7 @@ pub struct OrderedImportBlock<'a> {
     pub import_from: Vec<(
         ImportFromData<'a>,
         CommentSet<'a>,
+        TrailingComma,
         Vec<AliasDataWithComments<'a>>,
     )>,
 }

@@ -14,7 +14,7 @@ use rustc_hash::FxHashSet;
 use crate::cli::Overrides;
 use crate::fs;
 use crate::settings::configuration::Configuration;
-use crate::settings::pyproject::has_ruff_section;
+use crate::settings::pyproject::settings_toml;
 use crate::settings::{pyproject, Settings};
 
 /// The strategy used to discover Python files in the filesystem..
@@ -90,6 +90,26 @@ impl Resolver {
     /// Return an iterator over the resolved `Settings` in this `Resolver`.
     pub fn iter(&self) -> impl Iterator<Item = &Settings> {
         self.settings.values()
+    }
+
+    /// Validate all resolved `Settings` in this `Resolver`.
+    pub fn validate(&self, strategy: &PyprojectDiscovery) -> Result<()> {
+        // TODO(charlie): This risks false positives (but not false negatives), since
+        // some of the `Settings` in the path may ultimately be unused (or, e.g., they
+        // could have their `required_version` overridden by other `Settings` in
+        // the path). It'd be preferable to validate once we've determined the
+        // `Settings` for each path, but that's more expensive.
+        match &strategy {
+            PyprojectDiscovery::Fixed(settings) => {
+                settings.validate()?;
+            }
+            PyprojectDiscovery::Hierarchical(default) => {
+                for settings in std::iter::once(default).chain(self.iter()) {
+                    settings.validate()?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -201,13 +221,10 @@ pub fn python_files_in_path(
     let mut resolver = Resolver::default();
     for path in &paths {
         for ancestor in path.ancestors() {
-            let pyproject = ancestor.join("pyproject.toml");
-            if pyproject.is_file() {
-                if has_ruff_section(&pyproject)? {
-                    let (root, settings) =
-                        resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
-                    resolver.add(root, settings);
-                }
+            if let Some(pyproject) = settings_toml(ancestor)? {
+                let (root, settings) =
+                    resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
+                resolver.add(root, settings);
             }
         }
     }
@@ -247,29 +264,24 @@ pub fn python_files_in_path(
                     .file_type()
                     .map_or(false, |file_type| file_type.is_dir())
                 {
-                    let pyproject = entry.path().join("pyproject.toml");
-                    if pyproject.is_file() {
-                        match has_ruff_section(&pyproject) {
-                            Ok(false) => {}
-                            Ok(true) => {
-                                match resolve_scoped_settings(
-                                    &pyproject,
-                                    &Relativity::Parent,
-                                    Some(overrides),
-                                ) {
-                                    Ok((root, settings)) => {
-                                        resolver.write().unwrap().add(root, settings);
-                                    }
-                                    Err(err) => {
-                                        *error.lock().unwrap() = Err(err);
-                                        return WalkState::Quit;
-                                    }
-                                }
+                    match settings_toml(entry.path()) {
+                        Ok(Some(pyproject)) => match resolve_scoped_settings(
+                            &pyproject,
+                            &Relativity::Parent,
+                            Some(overrides),
+                        ) {
+                            Ok((root, settings)) => {
+                                resolver.write().unwrap().add(root, settings);
                             }
                             Err(err) => {
                                 *error.lock().unwrap() = Err(err);
                                 return WalkState::Quit;
                             }
+                        },
+                        Ok(None) => {}
+                        Err(err) => {
+                            *error.lock().unwrap() = Err(err);
+                            return WalkState::Quit;
                         }
                     }
                 }
@@ -337,13 +349,10 @@ pub fn python_file_at_path(
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
     for ancestor in path.ancestors() {
-        let pyproject = ancestor.join("pyproject.toml");
-        if pyproject.is_file() {
-            if has_ruff_section(&pyproject)? {
-                let (root, settings) =
-                    resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
-                resolver.add(root, settings);
-            }
+        if let Some(pyproject) = settings_toml(ancestor)? {
+            let (root, settings) =
+                resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
+            resolver.add(root, settings);
         }
     }
 

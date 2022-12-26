@@ -1,0 +1,20 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 17
+    column: 0
+  fix:
+    content: "import numpy1\nimport numpy2\nimport numpy10\nfrom numpy import (\n    cos,\n    int8,\n    int16,\n    int32,\n    int64,\n    sin,\n    tan,\n    uint8,\n    uint16,\n    uint32,\n    uint64,\n)\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 17
+      column: 0
+

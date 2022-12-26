@@ -41,6 +41,10 @@ jobs:
       - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. You may have to rerun 'cargo dev generate-options' and/or 'cargo dev generate-rules-table'."
       - run: ./target/release/ruff_dev generate-check-code-prefix
       - run: git diff --quiet src/checks_gen.rs || echo "::error file=src/checks_gen.rs::This file is outdated. You may have to rerun 'cargo dev generate-check-code-prefix'."
+      - run: git diff --exit-code -- README.md src/checks_gen.rs
+      - run: ./target/release/ruff_dev generate-json-schema
+      - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. You may have to rerun 'cargo dev generate-json-schema'."
+      - run: git diff --exit-code -- ruff.schema.json
       - run: ./target/release/ruff_dev generate-playground-options
       - run: git diff --quiet playground/src/ruff_options.rs || echo "::error file=playground/src/ruff_options.ts::This file is outdated. You may have to rerun 'cargo dev generate-playground-options'."
       - run: git diff --exit-code -- README.md src/checks_gen.rs playground/src/ruff_options.ts

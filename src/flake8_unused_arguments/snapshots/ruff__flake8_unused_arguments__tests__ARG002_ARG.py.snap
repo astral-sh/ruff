@@ -5,28 +5,28 @@ expression: checks
 - kind:
     UnusedMethodArgument: x
   location:
-    row: 34
+    row: 35
     column: 16
   end_location:
-    row: 34
+    row: 35
     column: 17
   fix: ~
 - kind:
     UnusedMethodArgument: x
   location:
-    row: 37
+    row: 38
     column: 19
   end_location:
-    row: 37
+    row: 38
     column: 20
   fix: ~
 - kind:
     UnusedMethodArgument: x
   location:
-    row: 40
+    row: 41
     column: 15
   end_location:
-    row: 40
+    row: 41
     column: 16
   fix: ~
 

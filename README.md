@@ -162,7 +162,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.192'
+  rev: 'v0.0.194'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -214,13 +214,6 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # Assume Python 3.10.
 target-version = "py310"
 
-[tool.ruff.flake8-import-conventions.aliases]
-altair = "alt"
-"matplotlib.pyplot" = "plt"
-numpy = "np"
-pandas = "pd"
-seaborn = "sns"
-
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
@@ -259,6 +252,27 @@ select = ["E", "F", "Q"]
 docstring-quotes = "double"
 ```
 
+As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
+an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the above
+`pyproject.toml` described above would be represented via the following `ruff.toml`:
+
+```toml
+# Enable Pyflakes and pycodestyle rules.
+select = ["E", "F"]
+
+# Never enforce `E501` (line length violations).
+ignore = ["E501"]
+
+# Always autofix, but never try to fix `F401` (unused imports).
+fix = true
+unfixable = ["F401"]
+
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[per-file-ignores]
+"__init__.py" = ["E402"]
+"path/to/file.py" = ["E402"]
+```
+
 For a full list of configurable options, see the [API reference](#reference).
 
 Some common configuration settings can be provided via the command-line:
@@ -279,7 +293,7 @@ Arguments:
 
 Options:
       --config <CONFIG>
-          Path to the `pyproject.toml` file to use for configuration
+          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
   -v, --verbose
           Enable verbose logging
   -q, --quiet
@@ -292,6 +306,8 @@ Options:
           Run in watch mode by re-running whenever files change
       --fix
           Attempt to automatically fix lint errors
+      --fix-only
+          Fix any fixable lint errors, but don't report on leftover violations. Implies `--fix`
   -n, --no-cache
           Disable cache reads
       --select <SELECT>
@@ -382,6 +398,9 @@ extend = "../pyproject.toml"
 # But use a different line length.
 line-length = 100
 ```
+
+All of the above rules apply equivalently to `ruff.toml` files. If Ruff detects both a `ruff.toml`
+and `pyproject.toml` file, it will defer to the `ruff.toml`.
 
 ### Python file discovery
 
@@ -541,7 +560,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E902 | IOError | IOError: `...` |  |
 | E999 | SyntaxError | SyntaxError: `...` |  |
 | W292 | NoNewLineAtEndOfFile | No newline at end of file | 🛠 |
-| W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' |  |
+| W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' | 🛠 |
 
 ### mccabe (C90)
 
@@ -957,7 +976,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
-| RUF100 | UnusedNOQA | Unused `noqa` directive | 🛠 |
+| RUF100 | UnusedNOQA | Unused blanket `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
 
@@ -1581,8 +1600,8 @@ Summary
 
 #### [`allowed-confusables`](#allowed-confusables)
 
-A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`,
-`RUF002`, and `RUF003`.
+A list of allowed "confusable" Unicode characters to ignore when
+enforcing `RUF001`, `RUF002`, and `RUF003`.
 
 **Default value**: `[]`
 
@@ -1603,13 +1622,14 @@ allowed-confusables = ["−", "ρ", "∗"]
 
 A path to the cache directory.
 
-By default, Ruff stores cache results in a `.ruff_cache` directory in the current
-project root.
+By default, Ruff stores cache results in a `.ruff_cache` directory in
+the current project root.
 
-However, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes
-precedence over that default.
+However, Ruff will also respect the `RUFF_CACHE_DIR` environment
+variable, which takes precedence over that default.
 
-This setting will override even the `RUFF_CACHE_DIR` environment variable, if set.
+This setting will override even the `RUFF_CACHE_DIR` environment
+variable, if set.
 
 **Default value**: `.ruff_cache`
 
@@ -1626,9 +1646,9 @@ cache-dir = "~/.cache/ruff"
 
 #### [`dummy-variable-rgx`](#dummy-variable-rgx)
 
-A regular expression used to identify "dummy" variables, or those which should be
-ignored when evaluating (e.g.) unused-variable checks. The default expression matches
-`_`, `__`, and `_var`, but not `_var_`.
+A regular expression used to identify "dummy" variables, or those which
+should be ignored when evaluating (e.g.) unused-variable checks. The
+default expression matches `_`, `__`, and `_var`, but not `_var_`.
 
 **Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"`
 
@@ -1650,15 +1670,16 @@ A list of file patterns to exclude from linting.
 
 Exclusions are based on globs, and can be either:
 
-- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the
-  tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching
-  `foo_*.py` ).
-- Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py`
-  (to exclude any Python files in `directory`). Note that these paths are relative to the
-  project root (e.g., the directory containing your `pyproject.toml`).
+- Single-path patterns, like `.mypy_cache` (to exclude any directory
+  named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+  `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+- Relative patterns, like `directory/foo.py` (to exclude that specific
+  file) or `directory/*.py` (to exclude any Python files in
+  `directory`). Note that these paths are relative to the project root
+  (e.g., the directory containing your `pyproject.toml`).
 
-Note that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify
-the excluded paths.
+Note that you'll typically want to use
+[`extend-exclude`](#extend-exclude) to modify the excluded paths.
 
 **Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
 
@@ -1675,12 +1696,13 @@ exclude = [".venv"]
 
 #### [`extend`](#extend)
 
-A path to a local `pyproject.toml` file to merge into this configuration. User home
-directory and environment variables will be expanded.
+A path to a local `pyproject.toml` file to merge into this
+configuration. User home directory and environment variables will be
+expanded.
 
-To resolve the current `pyproject.toml` file, Ruff will first resolve this base
-configuration file, then merge in any properties defined in the current configuration
-file.
+To resolve the current `pyproject.toml` file, Ruff will first resolve
+this base configuration file, then merge in any properties defined
+in the current configuration file.
 
 **Default value**: `None`
 
@@ -1700,7 +1722,8 @@ line-length = 100
 
 #### [`extend-exclude`](#extend-exclude)
 
-A list of file patterns to omit from linting, in addition to those specified by `exclude`.
+A list of file patterns to omit from linting, in addition to those
+specified by `exclude`.
 
 **Default value**: `[]`
 
@@ -1718,7 +1741,8 @@ extend-exclude = ["tests", "src/bad.py"]
 
 #### [`extend-ignore`](#extend-ignore)
 
-A list of check code prefixes to ignore, in addition to those specified by `ignore`.
+A list of check code prefixes to ignore, in addition to those specified
+by `ignore`.
 
 **Default value**: `[]`
 
@@ -1736,7 +1760,8 @@ extend-ignore = ["F841"]
 
 #### [`extend-select`](#extend-select)
 
-A list of check code prefixes to enable, in addition to those specified by `select`.
+A list of check code prefixes to enable, in addition to those specified
+by `select`.
 
 **Default value**: `[]`
 
@@ -1754,9 +1779,10 @@ extend-select = ["B", "Q"]
 
 #### [`external`](#external)
 
-A list of check codes that are unsupported by Ruff, but should be preserved when (e.g.)
-validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not
-yet implemented in Ruff.
+A list of check codes that are unsupported by Ruff, but should be
+preserved when (e.g.) validating `# noqa` directives. Useful for
+retaining `# noqa` directives that cover plugins not yet implemented
+in Ruff.
 
 **Default value**: `[]`
 
@@ -1791,6 +1817,23 @@ fix = true
 
 ---
 
+#### [`fix-only`](#fix-only)
+
+Like `fix`, but disables reporting on leftover violation. Implies `fix`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+fix-only = true
+```
+
+---
+
 #### [`fixable`](#fixable)
 
 A list of check code prefixes to consider autofix-able.
@@ -1811,14 +1854,16 @@ fixable = ["E", "F"]
 
 #### [`force-exclude`](#force-exclude)
 
-Whether to enforce `exclude` and `extend-exclude` patterns, even for paths that are
-passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even
-if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to
+Whether to enforce `exclude` and `extend-exclude` patterns, even for
+paths that are passed to Ruff explicitly. Typically, Ruff will lint
+any paths passed in directly, even if they would typically be
+excluded. Setting `force-exclude = true` will cause Ruff to
 respect these exclusions unequivocally.
 
 This is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all
 changed files to the [`ruff-pre-commit`](https://github.com/charliermarsh/ruff-pre-commit)
-plugin, regardless of whether they're marked as excluded by Ruff's own settings.
+plugin, regardless of whether they're marked as excluded by Ruff's own
+settings.
 
 **Default value**: `false`
 
@@ -1835,9 +1880,10 @@ force-exclude = true
 
 #### [`format`](#format)
 
-The style in which violation messages should be formatted: `"text"` (default),
-`"grouped"` (group messages by file), `"json"` (machine-readable), `"junit"`
-(machine-readable XML), or `"github"` (GitHub Actions annotations).
+The style in which violation messages should be formatted: `"text"`
+(default), `"grouped"` (group messages by file), `"json"`
+(machine-readable), `"junit"` (machine-readable XML), or `"github"`
+(GitHub Actions annotations).
 
 **Default value**: `"text"`
 
@@ -1855,11 +1901,13 @@ format = "grouped"
 
 #### [`ignore`](#ignore)
 
-A list of check code prefixes to ignore. Prefixes can specify exact checks (like
-`F841`), entire categories (like `F`), or anything in between.
+A list of check code prefixes to ignore. Prefixes can specify exact
+checks (like `F841`), entire categories (like `F`), or anything in
+between.
 
-When breaking ties between enabled and disabled checks (via `select` and `ignore`,
-respectively), more specific prefixes override less specific prefixes.
+When breaking ties between enabled and disabled checks (via `select` and
+`ignore`, respectively), more specific prefixes override less
+specific prefixes.
 
 **Default value**: `[]`
 
@@ -1877,10 +1925,11 @@ ignore = ["F841"]
 
 #### [`ignore-init-module-imports`](#ignore-init-module-imports)
 
-Avoid automatically removing unused imports in `__init__.py` files. Such imports will
-still be +flagged, but with a dedicated message suggesting that the import is either
-added to the module' +`__all__` symbol, or re-exported with a redundant alias (e.g.,
-`import os as os`).
+Avoid automatically removing unused imports in `__init__.py` files. Such
+imports will still be +flagged, but with a dedicated message
+suggesting that the import is either added to the module' +`__all__`
+symbol, or re-exported with a redundant alias (e.g., `import os as
+os`).
 
 **Default value**: `false`
 
@@ -1897,7 +1946,8 @@ ignore-init-module-imports = true
 
 #### [`line-length`](#line-length)
 
-The line length to use when enforcing long-lines violations (like E501).
+The line length to use when enforcing long-lines violations (like
+`E501`).
 
 **Default value**: `88`
 
@@ -1915,8 +1965,8 @@ line-length = 120
 
 #### [`per-file-ignores`](#per-file-ignores)
 
-A list of mappings from file pattern to check code prefixes to exclude, when considering
-any matching files.
+A list of mappings from file pattern to check code prefixes to exclude,
+when considering any matching files.
 
 **Default value**: `{}`
 
@@ -1934,10 +1984,30 @@ any matching files.
 
 ---
 
+#### [`required-version`](#required-version)
+
+Require a specific version of Ruff to be running (useful for unifying
+results across many environments, e.g., with a `pyproject.toml`
+file).
+
+**Default value**: `None`
+
+**Type**: `String`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+required-version = "0.0.193"
+```
+
+---
+
 #### [`respect-gitignore`](#respect-gitignore)
 
-Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`,
-`.git/info/exclude`, and global `gitignore` files. Enabled by default.
+Whether to automatically exclude files that are ignored by `.ignore`,
+`.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+Enabled by default.
 
 **Default value**: `true`
 
@@ -1954,11 +2024,13 @@ respect_gitignore = false
 
 #### [`select`](#select)
 
-A list of check code prefixes to enable. Prefixes can specify exact checks (like
-`F841`), entire categories (like `F`), or anything in between.
+A list of check code prefixes to enable. Prefixes can specify exact
+checks (like `F841`), entire categories (like `F`), or anything in
+between.
 
-When breaking ties between enabled and disabled checks (via `select` and `ignore`,
-respectively), more specific prefixes override less specific prefixes.
+When breaking ties between enabled and disabled checks (via `select` and
+`ignore`, respectively), more specific prefixes override less
+specific prefixes.
 
 **Default value**: `["E", "F"]`
 
@@ -1976,8 +2048,8 @@ select = ["E", "F", "B", "Q"]
 
 #### [`show-source`](#show-source)
 
-Whether to show source code snippets when reporting lint error violations (overridden by
-the `--show-source` command-line flag).
+Whether to show source code snippets when reporting lint error
+violations (overridden by the `--show-source` command-line flag).
 
 **Default value**: `false`
 
@@ -1995,7 +2067,8 @@ show-source = true
 
 #### [`src`](#src)
 
-The source code paths to consider, e.g., when resolving first- vs. third-party imports.
+The source code paths to consider, e.g., when resolving first- vs.
+third-party imports.
 
 As an example: given a Python package structure like:
 
@@ -2009,13 +2082,15 @@ my_package/
       bar.py
 ```
 
-The `src` directory should be included in `source` (e.g., `source = ["src"]`), such that
-when resolving imports, `my_package.foo` is considered a first-party import.
+The `src` directory should be included in `source` (e.g., `source =
+["src"]`), such that when resolving imports, `my_package.foo` is
+considered a first-party import.
 
-This field supports globs. For example, if you have a series of Python packages in
-a `python_modules` directory, `src = ["python_modules/*"]` would expand to incorporate
-all of the packages in that directory. User home directory and environment variables
-will also be expanded.
+This field supports globs. For example, if you have a series of Python
+packages in a `python_modules` directory, `src =
+["python_modules/*"]` would expand to incorporate all of the
+packages in that directory. User home directory and environment
+variables will also be expanded.
 
 **Default value**: `["."]`
 
@@ -2033,9 +2108,10 @@ src = ["src", "test"]
 
 #### [`target-version`](#target-version)
 
-The Python version to target, e.g., when considering automatic code upgrades, like
-rewriting type annotations. Note that the target version will _not_ be inferred from the
-_current_ Python version, and instead must be specified explicitly (as seen below).
+The Python version to target, e.g., when considering automatic code
+upgrades, like rewriting type annotations. Note that the target
+version will _not_ be inferred from the _current_ Python version,
+and instead must be specified explicitly (as seen below).
 
 **Default value**: `"py310"`
 
@@ -2073,7 +2149,8 @@ unfixable = ["F401"]
 
 #### [`allow-star-arg-any`](#allow-star-arg-any)
 
-Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.
+Whether to suppress `ANN401` for dynamically typed `*args` and
+`**kwargs` arguments.
 
 **Default value**: `false`
 
@@ -2090,8 +2167,8 @@ allow-star-arg-any = true
 
 #### [`mypy-init-return`](#mypy-init-return)
 
-Whether to allow the omission of a return type hint for `__init__` if at least one
-argument is annotated.
+Whether to allow the omission of a return type hint for `__init__` if at
+least one argument is annotated.
 
 **Default value**: `false`
 
@@ -2108,8 +2185,8 @@ mypy-init-return = true
 
 #### [`suppress-dummy-args`](#suppress-dummy-args)
 
-Whether to suppress `ANN000`-level errors for arguments matching the "dummy" variable
-regex (like `_`).
+Whether to suppress `ANN000`-level errors for arguments matching the
+"dummy" variable regex (like `_`).
 
 **Default value**: `false`
 
@@ -2126,11 +2203,12 @@ suppress-dummy-args = true
 
 #### [`suppress-none-returning`](#suppress-none-returning)
 
-Whether to suppress `ANN200`-level errors for functions that meet either of the
-following criteria:
+Whether to suppress `ANN200`-level errors for functions that meet either
+of the following criteria:
 
 - Contain no `return` statement.
-- Explicit `return` statement(s) all return `None` (explicitly or implicitly).
+- Explicit `return` statement(s) all return `None` (explicitly or
+  implicitly).
 
 **Default value**: `false`
 
@@ -2149,8 +2227,8 @@ suppress-none-returning = true
 
 #### [`extend-immutable-calls`](#extend-immutable-calls)
 
-Additional callable functions to consider "immutable" when evaluating, e.g.,
-`no-mutable-default-argument` checks (`B006`).
+Additional callable functions to consider "immutable" when evaluating,
+e.g., `no-mutable-default-argument` checks (`B006`).
 
 **Default value**: `[]`
 
@@ -2189,7 +2267,8 @@ max-string-length = 20
 
 #### [`aliases`](#aliases)
 
-The conventional aliases for imports. These aliases can be extended by the `extend_aliases` option.
+The conventional aliases for imports. These aliases can be extended by
+the `extend_aliases` option.
 
 **Default value**: `{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}`
 
@@ -2211,7 +2290,8 @@ seaborn = "sns"
 
 #### [`extend-aliases`](#extend-aliases)
 
-A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.
+A mapping of modules to their conventional import aliases. These aliases
+will be added to the `aliases` mapping.
 
 **Default value**: `{}`
 
@@ -2231,8 +2311,8 @@ A mapping of modules to their conventional import aliases. These aliases will be
 
 #### [`avoid-escape`](#avoid-escape)
 
-Whether to avoid using single quotes if a string contains single quotes, or vice-versa
-with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+Whether to avoid using single quotes if a string contains single quotes,
+or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
 This minimizes the need to escape quotation marks within strings.
 
 **Default value**: `true`
@@ -2251,7 +2331,8 @@ avoid-escape = false
 
 #### [`docstring-quotes`](#docstring-quotes)
 
-Quote style to prefer for docstrings (either "single" (`'`) or "double" (`"`)).
+Quote style to prefer for docstrings (either "single" (`'`) or "double"
+(`"`)).
 
 **Default value**: `"double"`
 
@@ -2268,7 +2349,8 @@ docstring-quotes = "single"
 
 #### [`inline-quotes`](#inline-quotes)
 
-Quote style to prefer for inline strings (either "single" (`'`) or "double" (`"`)).
+Quote style to prefer for inline strings (either "single" (`'`) or
+"double" (`"`)).
 
 **Default value**: `"double"`
 
@@ -2285,7 +2367,8 @@ inline-quotes = "single"
 
 #### [`multiline-quotes`](#multiline-quotes)
 
-Quote style to prefer for multiline strings (either "single" (`'`) or "double" (`"`)).
+Quote style to prefer for multiline strings (either "single" (`'`) or
+"double" (`"`)).
 
 **Default value**: `"double"`
 
@@ -2304,8 +2387,8 @@ multiline-quotes = "single"
 
 #### [`ban-relative-imports`](#ban-relative-imports)
 
-Whether to ban all relative imports (`"all"`), or only those imports that extend into
-the parent module and beyond (`"parents"`).
+Whether to ban all relative imports (`"all"`), or only those imports
+that extend into the parent module and beyond (`"parents"`).
 
 **Default value**: `"parents"`
 
@@ -2362,8 +2445,8 @@ combine-as-imports = true
 
 #### [`extra-standard-library`](#extra-standard-library)
 
-A list of modules to consider standard-library, in addition to those known to Ruff in
-advance.
+A list of modules to consider standard-library, in addition to those
+known to Ruff in advance.
 
 **Default value**: `[]`
 
@@ -2380,9 +2463,10 @@ extra-standard-library = ["path"]
 
 #### [`force-wrap-aliases`](#force-wrap-aliases)
 
-Force `import from` statements with multiple members and at least one alias (e.g.,
-`import A as B`) to wrap such that every line contains exactly one member. For example,
-this formatting would be retained, rather than condensing to a single line:
+Force `import from` statements with multiple members and at least one
+alias (e.g., `import A as B`) to wrap such that every line contains
+exactly one member. For example, this formatting would be retained,
+rather than condensing to a single line:
 
 ```py
 from .utils import (
@@ -2391,9 +2475,10 @@ from .utils import (
 )
 ```
 
-Note that this setting is only effective when combined with `combine-as-imports = true`.
-When `combine-as-imports` isn't enabled, every aliased `import from` will be given its
-own line, in which case, wrapping is not necessary.
+Note that this setting is only effective when combined with
+`combine-as-imports = true`. When `combine-as-imports` isn't
+enabled, every aliased `import from` will be given its own line, in
+which case, wrapping is not necessary.
 
 **Default value**: `false`
 
@@ -2411,8 +2496,8 @@ combine-as-imports = true
 
 #### [`known-first-party`](#known-first-party)
 
-A list of modules to consider first-party, regardless of whether they can be identified
-as such via introspection of the local filesystem.
+A list of modules to consider first-party, regardless of whether they
+can be identified as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
@@ -2429,8 +2514,8 @@ known-first-party = ["src"]
 
 #### [`known-third-party`](#known-third-party)
 
-A list of modules to consider third-party, regardless of whether they can be identified
-as such via introspection of the local filesystem.
+A list of modules to consider third-party, regardless of whether they
+can be identified as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
@@ -2441,6 +2526,26 @@ as such via introspection of the local filesystem.
 ```toml
 [tool.ruff.isort]
 known-third-party = ["src"]
+```
+
+---
+
+#### [`split-on-trailing-comma`](#split-on-trailing-comma)
+
+If a comma is placed after the last member in a multi-line import, then
+the imports will never be folded into one line.
+
+See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+split-on-trailing-comma = false
 ```
 
 ---
@@ -2469,9 +2574,10 @@ max-complexity = 5
 
 #### [`classmethod-decorators`](#classmethod-decorators)
 
-A list of decorators that, when applied to a method, indicate that the method should be
-treated as a class method. For example, Ruff will expect that any method decorated by a
-decorator in this list takes a `cls` argument as its first argument.
+A list of decorators that, when applied to a method, indicate that the
+method should be treated as a class method. For example, Ruff will
+expect that any method decorated by a decorator in this list takes a
+`cls` argument as its first argument.
 
 **Default value**: `["classmethod"]`
 
@@ -2506,9 +2612,10 @@ ignore-names = ["callMethod"]
 
 #### [`staticmethod-decorators`](#staticmethod-decorators)
 
-A list of decorators that, when applied to a method, indicate that the method should be
-treated as a static method. For example, Ruff will expect that any method decorated by a
-decorator in this list has no `self` or `cls` argument.
+A list of decorators that, when applied to a method, indicate that the
+method should be treated as a static method. For example, Ruff will
+expect that any method decorated by a decorator in this list has no
+`self` or `cls` argument.
 
 **Default value**: `["staticmethod"]`
 
@@ -2528,7 +2635,11 @@ staticmethod-decorators = ["staticmethod", "stcmthd"]
 
 #### [`keep-runtime-typing`](#keep-runtime-typing)
 
-Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively.
+Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604
+(`Optional[str]` -> `str | None`) rewrites even if a file imports `from
+__future__ import annotations`. Note that this setting is only
+applicable when the target Python version is below 3.9 and 3.10
+respectively.
 
 **Default value**: `false`
 

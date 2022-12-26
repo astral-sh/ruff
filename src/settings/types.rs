@@ -1,5 +1,6 @@
 use std::env;
 use std::hash::Hash;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -7,13 +8,16 @@ use anyhow::{anyhow, bail, Result};
 use clap::ValueEnum;
 use globset::{Glob, GlobSetBuilder};
 use rustc_hash::FxHashSet;
+use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
 use crate::fs;
 
-#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(
+    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum PythonVersion {
     Py33,
@@ -142,7 +146,7 @@ impl FromStr for PatternPrefixPair {
     }
 }
 
-#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum SerializationFormat {
     Text,
@@ -160,5 +164,25 @@ impl Default for SerializationFormat {
             }
         }
         Self::Text
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(try_from = "String")]
+pub struct Version(String);
+
+impl TryFrom<String> for Version {
+    type Error = semver::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        semver::Version::parse(&value).map(|_| Self(value))
+    }
+}
+
+impl Deref for Version {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
