@@ -204,7 +204,6 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                 inline,
                 trailing_comma,
             } => {
-                // Associate the comments with the first alias (best effort).
                 let single_import = names.len() == 1;
 
                 // If we're dealing with a multi-import block (i.e., a non-star, non-aliased
