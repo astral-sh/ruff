@@ -57,6 +57,7 @@ fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
     locator: &SourceCodeLocator,
+    split_on_trailing_comma: bool,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut annotated = vec![];
     let mut comments_iter = comments.into_iter().peekable();
@@ -143,7 +144,11 @@ fn annotate_imports<'a>(
                     module: module.as_ref(),
                     names: aliases,
                     level: level.as_ref(),
-                    trailing_comma: trailing_comma(import, locator),
+                    trailing_comma: if split_on_trailing_comma {
+                        trailing_comma(import, locator)
+                    } else {
+                        TrailingComma::default()
+                    },
                     atop,
                     inline,
                 });
@@ -507,7 +512,7 @@ pub fn format_imports(
     split_on_trailing_comma: bool,
 ) -> String {
     let trailer = &block.trailer;
-    let block = annotate_imports(&block.imports, comments, locator);
+    let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports);
@@ -672,8 +677,9 @@ mod tests {
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
+
     #[test_case(Path::new("magic_trailing_comma.py"))]
-    fn split_on_trailing_comma(path: &Path) -> Result<()> {
+    fn no_split_on_trailing_comma(path: &Path) -> Result<()> {
         let snapshot = format!("split_on_trailing_comma_{}", path.to_string_lossy());
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/isort")
@@ -681,9 +687,7 @@ mod tests {
                 .as_path(),
             &Settings {
                 isort: isort::settings::Settings {
-                    force_wrap_aliases: false,
-                    combine_as_imports: false,
-                    split_on_trailing_comma: true,
+                    split_on_trailing_comma: false,
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
