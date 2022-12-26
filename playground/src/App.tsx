@@ -3,7 +3,6 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import { MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api";
 import { useEffect, useState, useCallback } from "react";
 
-// @ts-ignore
 import init, { Check, check } from "./pkg/ruff.js";
 import { AVAILABLE_OPTIONS } from "./ruff_options";
 import { Config, getDefaultConfig, toRuffConfig } from "./config";
@@ -12,14 +11,14 @@ import { Options } from "./Options";
 const DEFAULT_SOURCE = "print(1 + 2)";
 
 function restoreConfigAndSource(): [Config, string] {
-  let value = lzstring.decompressFromEncodedURIComponent(
+  const value = lzstring.decompressFromEncodedURIComponent(
     window.location.hash.slice(1)
   );
   let config = {};
   let source = DEFAULT_SOURCE;
 
   if (value) {
-    let parts = value.split("$$$");
+    const parts = value.split("$$$");
     config = JSON.parse(parts[0]);
     source = parts[1];
   }
@@ -48,7 +47,7 @@ export default function App() {
 
   useEffect(() => {
     if (source === null && config === null && monaco) {
-      let [config, source] = restoreConfigAndSource();
+      const [config, source] = restoreConfigAndSource();
       setConfig(config);
       setSource(source);
     }
@@ -61,8 +60,8 @@ export default function App() {
   }, [config, source]);
 
   useEffect(() => {
-    let editor = monaco?.editor;
-    let model = editor?.getModels()[0];
+    const editor = monaco?.editor;
+    const model = editor?.getModels()[0];
     if (
       !editor ||
       !model ||
@@ -105,7 +104,7 @@ export default function App() {
 
   const handleOptionChange = useCallback(
     (groupName: string, fieldName: string, value: string) => {
-      let group = Object.assign({}, (config || {})[groupName]);
+      const group = Object.assign({}, (config || {})[groupName]);
       if (value === defaultConfig[groupName][fieldName] || value === "") {
         delete group[fieldName];
       } else {
