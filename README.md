@@ -162,7 +162,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.193'
+  rev: 'v0.0.194'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -1981,7 +1981,7 @@ file).
 
 ```toml
 [tool.ruff]
-required-version = "0.0.193"
+required-version = "0.0.194"
 ```
 
 ---
