@@ -1,3 +1,5 @@
+#![cfg(not(target_family = "wasm"))]
+
 use std::io::{ErrorKind, Read};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};

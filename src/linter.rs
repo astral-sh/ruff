@@ -5,7 +5,6 @@ use std::ops::AddAssign;
 use std::path::Path;
 
 use anyhow::Result;
-#[cfg(not(target_family = "wasm"))]
 use log::debug;
 use rustpython_parser::lexer::LexResult;
 

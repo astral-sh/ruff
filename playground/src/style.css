@@ -1,0 +1,60 @@
+* {
+  box-sizing: border-box;
+}
+
+body,
+html,
+#root,
+#app {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+#app {
+  display: flex;
+}
+
+.options {
+  height: 100vh;
+  overflow-y: scroll;
+  padding: 1em;
+  min-width: 300px;
+  border-right: 1px solid lightgray;
+}
+
+.options ul {
+  padding-left: 1em;
+  list-style-type: none;
+}
+
+.options li {
+  margin-bottom: 0.3em;
+}
+
+.options details {
+  margin-bottom: 1em;
+}
+
+.options summary {
+  font-size: 1.3rem;
+}
+
+.options input {
+  display: block;
+  width: 100%;
+}
+
+.editor {
+  padding: 1em;
+}
+
+#error {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  min-height: 1em;
+  padding: 1em;
+  background: darkred;
+  color: white;
+}

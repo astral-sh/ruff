@@ -12,6 +12,7 @@ rust-version = "1.65.0"
 
 [lib]
 name = "ruff"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 annotate-snippets = { version = "0.9.1", features = ["color"] }
@@ -20,9 +21,10 @@ atty = { version = "0.2.14" }
 bincode = { version = "1.3.3" }
 bitflags = { version = "1.3.2" }
 cachedir = { version = "0.3.0" }
+cfg-if = { version = "1.0.0" }
 chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
 clap = { version = "4.0.1", features = ["derive"] }
-clap_complete_command = "0.4.0"
+clap_complete_command = { version = "0.4.0" }
 colored = { version = "2.0.0" }
 common-path = { version = "1.0.0" }
 dirs = { version = "4.0.0" }
@@ -41,7 +43,6 @@ num-bigint = { version = "0.4.3" }
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 quick-junit = { version = "0.3.2" }
-rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
 ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
 ruff_macros = { version = "0.0.194", path = "ruff_macros" }
@@ -59,23 +60,32 @@ strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
 titlecase = { version = "2.2.1" }
 toml = { version = "0.5.9" }
-update-informer = { version = "0.5.0", default-features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-clearscreen = { version = "1.0.10" } # uses which
+clearscreen = { version = "1.0.10" }
+rayon = { version = "1.5.3" }
+update-informer = { version = "0.5.0", default-features = false, features = ["pypi"], optional = true }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 # For (future) wasm-pack support
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2.7", features = ["js"] }
+console_error_panic_hook = { version = "0.1.7" }
+console_log = { version = "0.2.0" }
+serde-wasm-bindgen = { version = "0.4" }
+js-sys = { version = "0.3.60" }
+wasm-bindgen = { version = "0.2.83" }
 
 [dev-dependencies]
-assert_cmd = { version = "2.0.4" }
-criterion = { version = "0.4.0" }
 insta = { version = "1.19.1", features = ["yaml"] }
 test-case = { version = "2.2.2" }
 ureq = { version = "2.5.0", features = [] }
+wasm-bindgen-test = { version = "0.3.33" }
+
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+assert_cmd = { version = "2.0.4" }
+criterion = { version = "0.4.0" }
 
 [features]
 default = ["update-informer"]
@@ -92,6 +102,11 @@ opt-level = 3
 
 [profile.dev.package.similar]
 opt-level = 3
+
+# Reduce complexity of a parser function that would trigger a locals limit in a wasm tool.
+# https://github.com/bytecodealliance/wasm-tools/blob/b5c3d98e40590512a3b12470ef358d5c7b983b15/crates/wasmparser/src/limits.rs#L29
+[profile.dev.package.rustpython-parser]
+opt-level = 1
 
 [[bench]]
 name = "source_code_locator"
