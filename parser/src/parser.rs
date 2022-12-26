@@ -233,4 +233,11 @@ class Foo(A, B):
         let parse_ast = parse_expression(&source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
+
+    #[test]
+    fn test_slice() {
+        let source = String::from("x[1:2:3]");
+        let parse_ast = parse_expression(&source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }
