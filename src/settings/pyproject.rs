@@ -28,53 +28,97 @@ impl Pyproject {
     }
 }
 
+/// Parse a `ruff.toml` file.
+fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
+    let contents = fs::read_file(path)?;
+    toml::from_str(&contents).map_err(std::convert::Into::into)
+}
+
+/// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
     toml::from_str(&contents).map_err(std::convert::Into::into)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
-pub fn has_ruff_section<P: AsRef<Path>>(path: P) -> Result<bool> {
+pub fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
     let pyproject = parse_pyproject_toml(path)?;
     Ok(pyproject.tool.and_then(|tool| tool.ruff).is_some())
 }
 
-/// Find the path to the `pyproject.toml` file, if such a file exists.
-pub fn find_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
+/// Return the path to the `pyproject.toml` or `ruff.toml` file in a given
+/// directory.
+pub fn settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
+    // Check for `ruff.toml`.
+    let ruff_toml = path.as_ref().join("ruff.toml");
+    if ruff_toml.is_file() {
+        return Ok(Some(ruff_toml));
+    }
+
+    // Check for `pyproject.toml`.
+    let pyproject_toml = path.as_ref().join("pyproject.toml");
+    if pyproject_toml.is_file() && ruff_enabled(&pyproject_toml)? {
+        return Ok(Some(pyproject_toml));
+    }
+
+    Ok(None)
+}
+
+/// Find the path to the `pyproject.toml` or `ruff.toml` file, if such a file
+/// exists.
+pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     for directory in path.as_ref().ancestors() {
-        let pyproject = directory.join("pyproject.toml");
-        if pyproject.is_file() && has_ruff_section(&pyproject)? {
+        if let Some(pyproject) = settings_toml(directory)? {
             return Ok(Some(pyproject));
         }
     }
     Ok(None)
 }
 
-/// Find the path to the user-specific `pyproject.toml`, if it exists.
-pub fn find_user_pyproject_toml() -> Option<PathBuf> {
+/// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
+/// exists.
+pub fn find_user_settings_toml() -> Option<PathBuf> {
+    // Search for a user-specific `ruff.toml`.
+    let mut path = dirs::config_dir()?;
+    path.push("ruff");
+    path.push("ruff.toml");
+    if path.is_file() {
+        return Some(path);
+    }
+
+    // Search for a user-specific `pyproject.toml`.
     let mut path = dirs::config_dir()?;
     path.push("ruff");
     path.push("pyproject.toml");
     if path.is_file() {
-        Some(path)
-    } else {
-        None
+        return Some(path);
     }
+
+    None
 }
 
-/// Load `Options` from a `pyproject.toml`.
-pub fn load_options<P: AsRef<Path>>(pyproject: P) -> Result<Options> {
-    Ok(parse_pyproject_toml(&pyproject)
-        .map_err(|err| {
+/// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
+pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
+    if path.as_ref().ends_with("ruff.toml") {
+        parse_ruff_toml(path)
+    } else if path.as_ref().ends_with("pyproject.toml") {
+        let pyproject = parse_pyproject_toml(&path).map_err(|err| {
             anyhow!(
                 "Failed to parse `{}`: {}",
-                pyproject.as_ref().to_string_lossy(),
+                path.as_ref().to_string_lossy(),
                 err
             )
-        })?
-        .tool
-        .and_then(|tool| tool.ruff)
-        .unwrap_or_default())
+        })?;
+        Ok(pyproject
+            .tool
+            .and_then(|tool| tool.ruff)
+            .unwrap_or_default())
+    } else {
+        Err(anyhow!(
+            "Unrecognized settings file: `{}`",
+            path.as_ref().to_string_lossy()
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -89,7 +133,7 @@ mod tests {
     use crate::flake8_quotes::settings::Quote;
     use crate::flake8_tidy_imports::settings::Strictness;
     use crate::settings::pyproject::{
-        find_pyproject_toml, parse_pyproject_toml, Options, Pyproject, Tools,
+        find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
     use crate::{
@@ -399,14 +443,14 @@ other-attribute = 1
     fn find_and_parse_pyproject_toml() -> Result<()> {
         let cwd = current_dir()?;
         let pyproject =
-            find_pyproject_toml(cwd.join("resources/test/fixtures/__init__.py"))?.unwrap();
+            find_settings_toml(cwd.join("resources/test/fixtures/__init__.py"))?.unwrap();
         assert_eq!(
             pyproject,
             cwd.join("resources/test/fixtures/pyproject.toml")
         );
 
         let pyproject = parse_pyproject_toml(&pyproject)?;
-        let config = pyproject.tool.and_then(|tool| tool.ruff).unwrap();
+        let config = pyproject.tool.unwrap().ruff.unwrap();
         assert_eq!(
             config,
             Options {

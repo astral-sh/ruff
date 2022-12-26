@@ -1,4 +1,3 @@
-[tool.ruff]
 extend = "../../pyproject.toml"
 src = ["."]
 # Enable I001, and re-enable F841, to test extension priority.

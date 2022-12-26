@@ -19,7 +19,8 @@ use crate::settings::types::{
 pub struct Cli {
     #[arg(required_unless_present_any = ["explain", "generate_shell_completion"])]
     pub files: Vec<PathBuf>,
-    /// Path to the `pyproject.toml` file to use for configuration.
+    /// Path to the `pyproject.toml` or `ruff.toml` file to use for
+    /// configuration.
     #[arg(long)]
     pub config: Option<PathBuf>,
     /// Enable verbose logging.
