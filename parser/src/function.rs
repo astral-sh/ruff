@@ -55,6 +55,7 @@ pub fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, Lexi
 
     let mut keyword_names =
         FxHashSet::with_capacity_and_hasher(func_args.len(), Default::default());
+    let mut double_starred = false;
     for (name, value) in func_args {
         match name {
             Some((start, end, name)) => {
@@ -67,6 +68,8 @@ pub fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, Lexi
                     }
 
                     keyword_names.insert(keyword_name.clone());
+                } else {
+                    double_starred = true;
                 }
 
                 keywords.push(ast::Keyword::new(
@@ -76,10 +79,16 @@ pub fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, Lexi
                 ));
             }
             None => {
-                // Allow starred args after keyword arguments.
+                // Allow starred arguments after keyword arguments but
+                // not after double-starred arguments.
                 if !keywords.is_empty() && !is_starred(&value) {
                     return Err(LexicalError {
                         error: LexicalErrorType::PositionalArgumentError,
+                        location: value.location,
+                    });
+                } else if double_starred {
+                    return Err(LexicalError {
+                        error: LexicalErrorType::UnpackedArgumentError,
                         location: value.location,
                     });
                 }
