@@ -4,7 +4,7 @@ use std::fmt;
 
 use rustc_hash::FxHashSet;
 
-use crate::vendored::format::{
+use crate::vendor::format::{
     FieldName, FieldType, FormatParseError, FormatPart, FormatString, FromTemplate,
 };
 
@@ -82,7 +82,7 @@ impl TryFrom<&str> for FormatSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vendored::format::FromTemplate;
+    use crate::vendor::format::FromTemplate;
 
     #[test]
     fn test_format_summary() {

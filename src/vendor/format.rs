@@ -1,5 +1,5 @@
 //! Vendored from [format.rs in rustpython-vm](https://github.com/RustPython/RustPython/blob/f54b5556e28256763c5506813ea977c9e1445af0/vm/src/format.rs).
-//! The only changes we make are to remove dead code and code involving the vm.
+//! The only changes we make are to remove dead code and code involving the VM.
 use itertools::{Itertools, PeekingNext};
 
 #[derive(Debug, PartialEq)]

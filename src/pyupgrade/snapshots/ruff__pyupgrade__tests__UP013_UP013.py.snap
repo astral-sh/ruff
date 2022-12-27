@@ -75,7 +75,7 @@ expression: checks
     row: 17
     column: 46
   fix:
-    content: "class MyType5(TypedDict):\n    a: 'hello'"
+    content: "class MyType5(TypedDict):\n    a: \"hello\""
     location:
       row: 17
       column: 0
@@ -91,7 +91,7 @@ expression: checks
     row: 18
     column: 41
   fix:
-    content: "class MyType6(TypedDict):\n    a: 'hello'"
+    content: "class MyType6(TypedDict):\n    a: \"hello\""
     location:
       row: 18
       column: 0
@@ -139,7 +139,7 @@ expression: checks
     row: 30
     column: 59
   fix:
-    content: "class MyType10(TypedDict):\n    key: Literal['value']"
+    content: "class MyType10(TypedDict):\n    key: Literal[\"value\"]"
     location:
       row: 30
       column: 0

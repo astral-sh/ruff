@@ -27,7 +27,7 @@ expression: checks
     row: 12
     column: 1
   fix:
-    content: "class NT2(NamedTuple):\n    a: int\n    b: str = 'foo'\n    c: list[bool] = [True]"
+    content: "class NT2(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
     location:
       row: 8
       column: 0
