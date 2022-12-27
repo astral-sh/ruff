@@ -1023,7 +1023,7 @@ SubscriptList: ast::Expr = {
 };
 
 Subscript: ast::Expr = {
-    Test<"all">,
+    NamedExpressionTest,
     <location:@L> <e1:Test<"all">?> ":" <e2:Test<"all">?> <e3:SliceOp?> <end_location:@R> => {
         let lower = e1.map(Box::new);
         let upper = e2.map(Box::new);
