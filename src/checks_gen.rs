@@ -2416,7 +2416,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::UP017 => vec![CheckCode::UP017],
             CheckCodePrefix::UP018 => vec![CheckCode::UP018],
             CheckCodePrefix::UP019 => vec![CheckCode::UP019],
-            CheckCodePrefix::UP02 => vec![CheckCode::UP020],
+            CheckCodePrefix::UP02 => vec![CheckCode::UP020, CheckCode::UP021],
             CheckCodePrefix::UP020 => vec![CheckCode::UP020],
             CheckCodePrefix::UP021 => vec![CheckCode::UP021],
             CheckCodePrefix::W => vec![CheckCode::W292, CheckCode::W605],
