@@ -644,7 +644,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
 | UP003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
 | UP004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
-| UP005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` instead | 🛠 |
+| UP005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` | 🛠 |
 | UP006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
 | UP007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
 | UP008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
@@ -659,7 +659,8 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP017 | DatetimeTimezoneUTC | Use `datetime.UTC` alias | 🛠 |
 | UP018 | NativeLiterals | Unnecessary call to `str` and `bytes` | 🛠 |
 | UP019 | TypingTextStrAlias | `typing.Text` is deprecated, use `str` | 🛠 |
-| UP020 | OpenAlias | Use builtin `open` instead | 🛠 |
+| UP020 | OpenAlias | Use builtin `open` | 🛠 |
+| UP021 | ReplaceUniversalNewlines | `universal_newlines` is deprecated, use `text` | 🛠 |
 
 ### pep8-naming (N)
 

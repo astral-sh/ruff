@@ -1,0 +1,65 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind: ReplaceUniversalNewlines
+  location:
+    row: 6
+    column: 24
+  end_location:
+    row: 6
+    column: 42
+  fix:
+    content: text
+    location:
+      row: 6
+      column: 24
+    end_location:
+      row: 6
+      column: 42
+- kind: ReplaceUniversalNewlines
+  location:
+    row: 7
+    column: 22
+  end_location:
+    row: 7
+    column: 40
+  fix:
+    content: text
+    location:
+      row: 7
+      column: 22
+    end_location:
+      row: 7
+      column: 40
+- kind: ReplaceUniversalNewlines
+  location:
+    row: 9
+    column: 13
+  end_location:
+    row: 9
+    column: 31
+  fix:
+    content: text
+    location:
+      row: 9
+      column: 13
+    end_location:
+      row: 9
+      column: 31
+- kind: ReplaceUniversalNewlines
+  location:
+    row: 10
+    column: 21
+  end_location:
+    row: 10
+    column: 39
+  fix:
+    content: text
+    location:
+      row: 10
+      column: 21
+    end_location:
+      row: 10
+      column: 39
+

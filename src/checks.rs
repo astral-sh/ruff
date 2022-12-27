@@ -228,6 +228,7 @@ pub enum CheckCode {
     UP018,
     UP019,
     UP020,
+    UP021,
     // pydocstyle
     D100,
     D101,
@@ -841,6 +842,7 @@ pub enum CheckKind {
     DatetimeTimezoneUTC,
     NativeLiterals,
     OpenAlias,
+    ReplaceUniversalNewlines,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1218,6 +1220,7 @@ impl CheckCode {
             CheckCode::UP018 => CheckKind::NativeLiterals,
             CheckCode::UP019 => CheckKind::TypingTextStrAlias,
             CheckCode::UP020 => CheckKind::OpenAlias,
+            CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1639,6 +1642,7 @@ impl CheckCode {
             CheckCode::UP018 => CheckCategory::Pyupgrade,
             CheckCode::UP019 => CheckCategory::Pyupgrade,
             CheckCode::UP020 => CheckCategory::Pyupgrade,
+            CheckCode::UP021 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1853,6 +1857,7 @@ impl CheckKind {
             CheckKind::NativeLiterals => &CheckCode::UP018,
             CheckKind::TypingTextStrAlias => &CheckCode::UP019,
             CheckKind::OpenAlias => &CheckCode::UP020,
+            CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2545,7 +2550,7 @@ impl CheckKind {
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
             CheckKind::TypingTextStrAlias => "`typing.Text` is deprecated, use `str`".to_string(),
             CheckKind::DeprecatedUnittestAlias(alias, target) => {
-                format!("`{alias}` is deprecated, use `{target}` instead")
+                format!("`{alias}` is deprecated, use `{target}`")
             }
             CheckKind::UselessObjectInheritance(name) => {
                 format!("Class `{name}` inherits from object")
@@ -2578,9 +2583,12 @@ impl CheckKind {
             CheckKind::RemoveSixCompat => "Unnecessary `six` compatibility usage".to_string(),
             CheckKind::DatetimeTimezoneUTC => "Use `datetime.UTC` alias".to_string(),
             CheckKind::NativeLiterals => "Unnecessary call to `str` and `bytes`".to_string(),
-            CheckKind::OpenAlias => "Use builtin `open` instead".to_string(),
+            CheckKind::OpenAlias => "Use builtin `open`".to_string(),
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
+            }
+            CheckKind::ReplaceUniversalNewlines => {
+                "`universal_newlines` is deprecated, use `text`".to_string()
             }
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
@@ -3023,6 +3031,7 @@ impl CheckKind {
                 | CheckKind::NativeLiterals
                 | CheckKind::OpenAlias
                 | CheckKind::NewLineAfterLastParagraph
+                | CheckKind::ReplaceUniversalNewlines
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
                 | CheckKind::NoBlankLineBeforeClass(..)
