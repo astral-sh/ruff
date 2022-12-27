@@ -1,0 +1,3 @@
+recursive-include ruff *
+global-exclude __pycache__
+global-exclude *.py[co]
