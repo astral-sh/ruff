@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use rustc_hash::FxHashSet;
 
-use crate::vendored::cformat::{
+use crate::vendor::cformat::{
     CFormatError, CFormatPart, CFormatQuantity, CFormatSpec, CFormatString,
 };
 

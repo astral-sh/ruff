@@ -33,7 +33,7 @@ use crate::python::typing::SubscriptKind;
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
-use crate::vendored::cformat::{CFormatError, CFormatErrorType};
+use crate::vendor::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,

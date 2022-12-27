@@ -25,7 +25,7 @@ expression: checks
     row: 10
     column: 12
   fix:
-    content: "raise AssertionError('message')"
+    content: "raise AssertionError(\"message\")"
     location:
       row: 10
       column: 0

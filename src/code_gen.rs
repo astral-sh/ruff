@@ -3,11 +3,12 @@ use std::string::FromUtf8Error;
 
 use anyhow::Result;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Suite, Withitem};
-use rustpython_common::str;
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Expr, ExprKind,
     Operator, Stmt, StmtKind,
 };
+
+use crate::vendor::{bytes, str};
 
 mod precedence {
     macro_rules! precedence {
@@ -788,6 +789,12 @@ impl SourceGenerator {
                     {
                         self.p(&value.to_string().replace("inf", inf_str));
                     }
+                    Constant::Bytes(b) => {
+                        self.p(&bytes::repr(b));
+                    }
+                    Constant::Str(s) => {
+                        self.p(&format!("{}", str::repr(s)));
+                    }
                     _ => self.p(&format!("{value}")),
                 }
             }
@@ -1008,5 +1015,37 @@ impl SourceGenerator {
             self.p(" as ");
             self.unparse_expr(optional_vars, precedence::EXPR);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use anyhow::Result;
+    use rustpython_parser::parser;
+
+    use crate::code_gen::SourceGenerator;
+
+    fn round_trip(contents: &str) -> Result<String> {
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let mut generator = SourceGenerator::new();
+        generator.unparse_stmt(stmt);
+        generator.generate().map_err(std::convert::Into::into)
+    }
+
+    #[test]
+    fn dquote() -> Result<()> {
+        assert_eq!(round_trip(r#""hello""#)?, r#""hello""#);
+        assert_eq!(round_trip(r#"'hello'"#)?, r#""hello""#);
+        assert_eq!(round_trip(r#"u'hello'"#)?, r#"u"hello""#);
+        assert_eq!(round_trip(r#"r'hello'"#)?, r#""hello""#);
+        assert_eq!(round_trip(r#"b'hello'"#)?, r#"b"hello""#);
+        assert_eq!(round_trip(r#"("abc" "def" "ghi")"#)?, r#""abcdefghi""#);
+        assert_eq!(round_trip(r#""he\"llo""#)?, r#"'he"llo'"#);
+        assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#)?, r#"f'abc{"def"}{1}'"#);
+        assert_eq!(round_trip(r#"f"abc{'def'}{1}""#)?, r#"f'abc{"def"}{1}'"#);
+
+        Ok(())
     }
 }

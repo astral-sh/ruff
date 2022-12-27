@@ -1,7 +1,7 @@
 //! Implementation of Printf-Style string formatting
 //! as per the [Python Docs](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting).
 //! Vendored from [cformat.rs in rustpython-vm](https://github.com/RustPython/RustPython/blob/f54b5556e28256763c5506813ea977c9e1445af0/vm/src/cformat.rs).
-//! The only changes we make are to remove dead code and code involving the vm.
+//! The only changes we make are to remove dead code and code involving the VM.
 use std::fmt;
 use std::iter::{Enumerate, Peekable};
 use std::str::FromStr;

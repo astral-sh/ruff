@@ -71,7 +71,7 @@ mod ruff;
 mod rustpython_helpers;
 pub mod settings;
 pub mod source_code_locator;
-mod vendored;
+mod vendor;
 pub mod visibility;
 
 cfg_if! {
