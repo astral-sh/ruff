@@ -19,7 +19,7 @@ pub struct Cli {
     /// Write the generated source code to stdout (rather than to
     /// `src/checks_gen.rs`).
     #[arg(long)]
-    dry_run: bool,
+    pub(crate) dry_run: bool,
 }
 
 pub fn main(cli: &Cli) -> Result<()> {

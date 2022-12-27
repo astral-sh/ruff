@@ -14,9 +14,9 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use ruff_dev::{
-    generate_check_code_prefix, generate_json_schema, generate_options,
-    generate_playground_options, generate_rules_table, generate_source_code, print_ast, print_cst,
-    print_tokens,
+    generate_all, generate_check_code_prefix, generate_json_schema, generate_options,
+    generate_playground_options, generate_rules_table, print_ast, print_cst, print_tokens,
+    round_trip,
 };
 
 #[derive(Parser)]
@@ -29,6 +29,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Run all code and documentation generation steps.
+    GenerateAll(generate_all::Cli),
     /// Generate the `CheckCodePrefix` enum.
     GenerateCheckCodePrefix(generate_check_code_prefix::Cli),
     /// Generate JSON schema for the TOML configuration file.
@@ -40,28 +42,29 @@ enum Commands {
     /// Generate typescript file defining options to be used by the web
     /// playground.
     GeneratePlaygroundOptions(generate_playground_options::Cli),
-    /// Run round-trip source code generation on a given Python file.
-    GenerateSourceCode(generate_source_code::Cli),
     /// Print the AST for a given Python file.
     PrintAST(print_ast::Cli),
     /// Print the LibCST CST for a given Python file.
     PrintCST(print_cst::Cli),
     /// Print the token stream for a given Python file.
     PrintTokens(print_tokens::Cli),
+    /// Run round-trip source code generation on a given Python file.
+    RoundTrip(round_trip::Cli),
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match &cli.command {
+        Commands::GenerateAll(args) => generate_all::main(args)?,
         Commands::GenerateCheckCodePrefix(args) => generate_check_code_prefix::main(args)?,
         Commands::GenerateJSONSchema(args) => generate_json_schema::main(args)?,
         Commands::GenerateRulesTable(args) => generate_rules_table::main(args)?,
-        Commands::GenerateSourceCode(args) => generate_source_code::main(args)?,
         Commands::GenerateOptions(args) => generate_options::main(args)?,
         Commands::GeneratePlaygroundOptions(args) => generate_playground_options::main(args)?,
         Commands::PrintAST(args) => print_ast::main(args)?,
         Commands::PrintCST(args) => print_cst::main(args)?,
         Commands::PrintTokens(args) => print_tokens::main(args)?,
+        Commands::RoundTrip(args) => round_trip::main(args)?,
     }
     Ok(())
 }

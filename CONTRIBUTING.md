@@ -59,9 +59,9 @@ pattern implemented therein.
 
 To trigger the rule, you'll likely want to augment the logic in `src/check_ast.rs`, which defines
 the Python AST visitor, responsible for iterating over the abstract syntax tree and collecting
-lint-rule violations as it goes. If you need to inspect the AST, you can run `cargo dev print-ast`
-with a Python file. Grep for the `Check::new` invocations to understand how other, similar rules
-are implemented.
+lint-rule violations as it goes. If you need to inspect the AST, you can run
+`cargo +nightly dev print-ast` with a Python file. Grep for the `Check::new` invocations to
+understand how other, similar rules are implemented.
 
 To add a test fixture, create a file under `resources/test/fixtures`, named to match the `CheckCode`
 you defined earlier (e.g., `E402.py`). This file should contain a variety of violations and
@@ -79,9 +79,7 @@ Then, run `cargo test`. Your test will fail, but you'll be prompted to follow-up
 `cargo insta review`. Accept the generated snapshot, then commit the snapshot file alongside the
 rest of your changes.
 
-Finally, to update the documentation, run `cargo dev generate-rules-table` from the repo root. To
-update the generated prefix map, run `cargo +nightly dev generate-check-code-prefix`. Both of these commands
-should be run whenever a new check is added to the codebase.
+Finally, regenerate the documentation and generated code with `cargo +nightly dev generate-all`.
 
 ### Example: Adding a new configuration option
 
@@ -105,8 +103,7 @@ You may also want to add the new configuration option to the `flake8-to-ruff` to
 responsible for converting `flake8` configuration files to Ruff's TOML format. This logic
 lives in `flake8_to_ruff/src/converter.rs`.
 
-Run `cargo dev generate-options` to update the documentation for supported configuration options,
-and `cargo dev generate-json-schema` to update the JSON schema for `tool.ruff` in `pyproject.toml`.
+Finally, regenerate the documentation and generated code with `cargo +nightly dev generate-all`.
 
 ## Release process
 
