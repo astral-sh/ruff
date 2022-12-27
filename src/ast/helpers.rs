@@ -412,15 +412,15 @@ pub fn excepthandler_name_range(
                 location: type_end_location,
                 end_location: body[0].location,
             });
-            let range = lexer::make_tokenizer(&contents)
+            let range = lexer::make_tokenizer_located(&contents, type_end_location)
                 .flatten()
                 .tuple_windows()
                 .find(|(tok, next_tok)| {
                     matches!(tok.1, Tok::As) && matches!(next_tok.1, Tok::Name { .. })
                 })
-                .map(|((..), (start, _, end))| Range {
-                    location: to_absolute(start, type_end_location),
-                    end_location: to_absolute(end, type_end_location),
+                .map(|((..), (location, _, end_location))| Range {
+                    location,
+                    end_location,
                 });
             range
         }
