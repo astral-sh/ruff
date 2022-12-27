@@ -2553,6 +2553,23 @@ known-third-party = ["src"]
 
 ---
 
+#### [`single-line-exclusions`](#single-line-exclusions)
+
+One or more modules to exclude from the single line rule.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+single-line-exclusions = ["os", "json"]
+```
+
+---
+
 #### [`split-on-trailing-comma`](#split-on-trailing-comma)
 
 If a comma is placed after the last member in a multi-line import, then

@@ -48,6 +48,15 @@ pub struct Options {
     /// Forces all from imports to appear on their own line.
     pub force_single_line: Option<bool>,
     #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"
+            single-line-exclusions = ["os", "json"]
+        "#
+    )]
+    /// One or more modules to exclude from the single line rule.
+    pub single_line_exclusions: Option<Vec<String>>,
+    #[option(
         default = r#"false"#,
         value_type = "bool",
         example = r#"
@@ -108,6 +117,7 @@ pub struct Settings {
     pub force_wrap_aliases: bool,
     pub split_on_trailing_comma: bool,
     pub force_single_line: bool,
+    pub single_line_exclusions: BTreeSet<String>,
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
     pub extra_standard_library: BTreeSet<String>,
@@ -120,6 +130,9 @@ impl Settings {
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
             split_on_trailing_comma: options.split_on_trailing_comma.unwrap_or(true),
             force_single_line: options.force_single_line.unwrap_or(false),
+            single_line_exclusions: BTreeSet::from_iter(
+                options.single_line_exclusions.unwrap_or_default(),
+            ),
             known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
             known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
             extra_standard_library: BTreeSet::from_iter(
@@ -136,6 +149,7 @@ impl Default for Settings {
             force_wrap_aliases: false,
             split_on_trailing_comma: true,
             force_single_line: false,
+            single_line_exclusions: BTreeSet::new(),
             known_first_party: BTreeSet::new(),
             known_third_party: BTreeSet::new(),
             extra_standard_library: BTreeSet::new(),

@@ -188,6 +188,11 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
             "type": 'Vec<String>',
         },
         {
+            "name": "single-line-exclusions",
+            "default": '[]',
+            "type": 'Vec<String>',
+        },
+        {
             "name": "split-on-trailing-comma",
             "default": 'true',
             "type": 'bool',
