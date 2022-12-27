@@ -5,7 +5,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
-use crate::code_gen::SourceGenerator;
+use crate::source_code_generator::SourceCodeGenerator;
 
 fn optional(expr: &Expr) -> Expr {
     Expr::new(
@@ -65,7 +65,8 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
     if checker.match_typing_call_path(&call_path, "Optional") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch(check.kind.code()) {
-            let mut generator = SourceGenerator::new();
+            let mut generator =
+                SourceCodeGenerator::new(checker.style.indentation(), checker.style.quote());
             generator.unparse_expr(&optional(slice), 0);
             if let Ok(content) = generator.generate() {
                 check.amend(Fix::replacement(
@@ -84,7 +85,10 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     // Invalid type annotation.
                 }
                 ExprKind::Tuple { elts, .. } => {
-                    let mut generator = SourceGenerator::new();
+                    let mut generator = SourceCodeGenerator::new(
+                        checker.style.indentation(),
+                        checker.style.quote(),
+                    );
                     generator.unparse_expr(&union(elts), 0);
                     if let Ok(content) = generator.generate() {
                         check.amend(Fix::replacement(
@@ -96,7 +100,10 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                 }
                 _ => {
                     // Single argument.
-                    let mut generator = SourceGenerator::new();
+                    let mut generator = SourceCodeGenerator::new(
+                        checker.style.indentation(),
+                        checker.style.quote(),
+                    );
                     generator.unparse_expr(slice, 0);
                     if let Ok(content) = generator.generate() {
                         check.amend(Fix::replacement(

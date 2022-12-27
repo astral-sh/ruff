@@ -6,11 +6,17 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
-use crate::code_gen::SourceGenerator;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
+use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code_style::SourceCodeStyleDetector;
 
-fn assignment(obj: &Expr, name: &str, value: &Expr) -> Result<String> {
+fn assignment(
+    obj: &Expr,
+    name: &str,
+    value: &Expr,
+    stylist: &SourceCodeStyleDetector,
+) -> Result<String> {
     let stmt = Stmt::new(
         Location::default(),
         Location::default(),
@@ -28,7 +34,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr) -> Result<String> {
             type_comment: None,
         },
     );
-    let mut generator = SourceGenerator::new();
+    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
     generator.unparse_stmt(&stmt);
     generator.generate().map_err(std::convert::Into::into)
 }
@@ -63,7 +69,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         if expr == child.as_ref() {
             let mut check = Check::new(CheckKind::SetAttrWithConstant, Range::from_located(expr));
             if checker.patch(check.kind.code()) {
-                match assignment(obj, name, value) {
+                match assignment(obj, name, value, checker.style) {
                     Ok(content) => check.amend(Fix::replacement(
                         content,
                         expr.location,

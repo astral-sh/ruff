@@ -12,9 +12,15 @@ use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind, RejectedCmpop};
-use crate::code_gen::SourceGenerator;
+use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code_style::SourceCodeStyleDetector;
 
-fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr]) -> Option<String> {
+fn compare(
+    left: &Expr,
+    ops: &[Cmpop],
+    comparators: &[Expr],
+    stylist: &SourceCodeStyleDetector,
+) -> Option<String> {
     let cmp = Expr::new(
         Location::default(),
         Location::default(),
@@ -24,7 +30,7 @@ fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr]) -> Option<String> {
             comparators: comparators.to_vec(),
         },
     );
-    let mut generator = SourceGenerator::new();
+    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
     generator.unparse_expr(&cmp, 0);
     generator.generate().ok()
 }
@@ -194,7 +200,7 @@ pub fn literal_comparisons(
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .cloned()
             .collect::<Vec<_>>();
-        if let Some(content) = compare(left, &ops, comparators) {
+        if let Some(content) = compare(left, &ops, comparators, checker.style) {
             for check in &mut checks {
                 check.amend(Fix::replacement(
                     content.to_string(),
@@ -233,7 +239,9 @@ pub fn not_tests(
                             let mut check =
                                 Check::new(CheckKind::NotInTest, Range::from_located(operand));
                             if checker.patch(check.kind.code()) && should_fix {
-                                if let Some(content) = compare(left, &[Cmpop::NotIn], comparators) {
+                                if let Some(content) =
+                                    compare(left, &[Cmpop::NotIn], comparators, checker.style)
+                                {
                                     check.amend(Fix::replacement(
                                         content,
                                         expr.location,
@@ -249,7 +257,9 @@ pub fn not_tests(
                             let mut check =
                                 Check::new(CheckKind::NotIsTest, Range::from_located(operand));
                             if checker.patch(check.kind.code()) && should_fix {
-                                if let Some(content) = compare(left, &[Cmpop::IsNot], comparators) {
+                                if let Some(content) =
+                                    compare(left, &[Cmpop::IsNot], comparators, checker.style)
+                                {
                                     check.amend(Fix::replacement(
                                         content,
                                         expr.location,
@@ -267,7 +277,12 @@ pub fn not_tests(
     }
 }
 
-fn function(name: &str, args: &Arguments, body: &Expr) -> Result<String> {
+fn function(
+    name: &str,
+    args: &Arguments,
+    body: &Expr,
+    stylist: &SourceCodeStyleDetector,
+) -> Result<String> {
     let body = Stmt::new(
         Location::default(),
         Location::default(),
@@ -287,7 +302,7 @@ fn function(name: &str, args: &Arguments, body: &Expr) -> Result<String> {
             type_comment: None,
         },
     );
-    let mut generator = SourceGenerator::new();
+    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
     generator.unparse_stmt(&func);
     Ok(generator.generate()?)
 }
@@ -301,7 +316,7 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                 if !match_leading_content(stmt, checker.locator)
                     && !match_trailing_content(stmt, checker.locator)
                 {
-                    match function(id, args, body) {
+                    match function(id, args, body, checker.style) {
                         Ok(content) => {
                             let first_line = checker.locator.slice_source_code_range(&Range {
                                 location: Location::new(stmt.location.row(), 0),

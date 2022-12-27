@@ -33,6 +33,7 @@ use crate::python::typing::SubscriptKind;
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::vendor::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
@@ -56,6 +57,7 @@ pub struct Checker<'a> {
     pub(crate) settings: &'a Settings,
     pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
     pub(crate) locator: &'a SourceCodeLocator<'a>,
+    pub(crate) style: &'a SourceCodeStyleDetector<'a>,
     // Computed checks.
     checks: Vec<Check>,
     // Function and class definition tracking (e.g., for docstring enforcement).
@@ -107,6 +109,7 @@ impl<'a> Checker<'a> {
         noqa: flags::Noqa,
         path: &'a Path,
         locator: &'a SourceCodeLocator,
+        style: &'a SourceCodeStyleDetector,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -115,6 +118,7 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             locator,
+            style,
             checks: vec![],
             definitions: vec![],
             deletions: FxHashSet::default(),
@@ -3926,16 +3930,26 @@ impl<'a> Checker<'a> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn check_ast(
     python_ast: &Suite,
     locator: &SourceCodeLocator,
+    stylist: &SourceCodeStyleDetector,
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     path: &Path,
 ) -> Vec<Check> {
-    let mut checker = Checker::new(settings, noqa_line_for, autofix, noqa, path, locator);
+    let mut checker = Checker::new(
+        settings,
+        noqa_line_for,
+        autofix,
+        noqa,
+        path,
+        locator,
+        stylist,
+    );
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 

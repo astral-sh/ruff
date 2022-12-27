@@ -7,7 +7,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckCode, CheckKind};
-use crate::code_gen::SourceGenerator;
+use crate::source_code_generator::SourceCodeGenerator;
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
     Expr::new(
@@ -54,7 +54,8 @@ fn duplicate_handler_exceptions<'a>(
                 Range::from_located(expr),
             );
             if checker.patch(check.kind.code()) {
-                let mut generator = SourceGenerator::new();
+                let mut generator =
+                    SourceCodeGenerator::new(checker.style.indentation(), checker.style.quote());
                 if unique_elts.len() == 1 {
                     generator.unparse_expr(unique_elts[0], 0);
                 } else {

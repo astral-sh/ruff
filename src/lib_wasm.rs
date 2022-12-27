@@ -14,6 +14,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code_style::SourceCodeStyleDetector;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -69,8 +70,11 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);
 
-    // Initialize the SourceCodeLocator (which computes offsets lazily).
+    // Map row and column locations to byte slices (lazily).
     let locator = SourceCodeLocator::new(contents);
+
+    // Detect the current code style (lazily).
+    let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(&tokens, &locator, directives::Flags::empty());
@@ -82,6 +86,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         contents,
         tokens,
         &locator,
+        &stylist,
         &directives,
         &settings,
         flags::Autofix::Enabled,

@@ -9,9 +9,10 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
-use crate::code_gen::SourceGenerator;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
+use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code_style::SourceCodeStyleDetector;
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
 /// assignment.
@@ -196,8 +197,9 @@ fn convert_to_class(
     body: Vec<Stmt>,
     total_keyword: Option<KeywordData>,
     base_class: &ExprKind,
+    stylist: &SourceCodeStyleDetector,
 ) -> Result<Fix> {
-    let mut generator = SourceGenerator::new();
+    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
     generator.unparse_stmt(&create_class_def_stmt(
         class_name,
         body,
@@ -236,7 +238,14 @@ pub fn convert_typed_dict_functional_to_class(
         Range::from_located(stmt),
     );
     if checker.patch(check.kind.code()) {
-        match convert_to_class(stmt, class_name, body, total_keyword, base_class) {
+        match convert_to_class(
+            stmt,
+            class_name,
+            body,
+            total_keyword,
+            base_class,
+            checker.style,
+        ) {
             Ok(fix) => check.amend(fix),
             Err(err) => error!("Failed to convert TypedDict: {err}"),
         };
