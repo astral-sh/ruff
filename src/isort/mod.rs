@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use ropey::RopeBuilder;
 use rustc_hash::FxHashMap;
@@ -499,38 +500,46 @@ fn force_single_line_imports<'a>(
     block: OrderedImportBlock<'a>,
     single_line_exclusions: &BTreeSet<String>,
 ) -> OrderedImportBlock<'a> {
-    let mut import_from = vec![];
-
-    block.import_from.into_iter().for_each(
-        |(from_data, comment_set, trailing_comma, alias_data)| {
-            if from_data
-                .module
-                .map_or(false, |m| single_line_exclusions.contains(m))
-            {
-                import_from.push((from_data, comment_set, trailing_comma, alias_data));
-            } else {
-                import_from.extend(alias_data.into_iter().enumerate().map(|(i, f)| {
-                    (
-                        from_data.clone(),
-                        if i == 0 {
-                            comment_set.clone()
-                        } else {
-                            CommentSet {
-                                atop: vec![],
-                                inline: vec![],
-                            }
-                        },
-                        TrailingComma::Absent,
-                        vec![f],
-                    )
-                }));
-            }
-        },
-    );
-
     OrderedImportBlock {
         import: block.import,
-        import_from,
+        import_from: block
+            .import_from
+            .into_iter()
+            .flat_map(|(from_data, comment_set, trailing_comma, alias_data)| {
+                if from_data
+                    .module
+                    .map_or(false, |module| single_line_exclusions.contains(module))
+                {
+                    Left(std::iter::once((
+                        from_data,
+                        comment_set,
+                        trailing_comma,
+                        alias_data,
+                    )))
+                } else {
+                    Right(
+                        alias_data
+                            .into_iter()
+                            .enumerate()
+                            .map(move |(index, alias_data)| {
+                                (
+                                    from_data.clone(),
+                                    if index == 0 {
+                                        comment_set.clone()
+                                    } else {
+                                        CommentSet {
+                                            atop: vec![],
+                                            inline: vec![],
+                                        }
+                                    },
+                                    TrailingComma::Absent,
+                                    vec![alias_data],
+                                )
+                            }),
+                    )
+                }
+            })
+            .collect(),
     }
 }
 
