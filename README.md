@@ -1437,6 +1437,18 @@ extend-ignore = [
 ]
 ```
 
+Note that Ruff _also_ supports a [`convention`](#convention) setting:
+
+```toml
+[tool.ruff.pydocstyle]
+convention = "google"
+```
+
+However, this setting is purely used to implement robust detection of Google and NumPy-style
+sections, and thus avoid the [false negatives](https://github.com/PyCQA/pydocstyle/issues/459) seen
+in `pydocstyle`; it does not affect which errors are enabled, which is driven by the `select` and
+`ignore` settings, as described above.
+
 ## Development
 
 Ruff is written in Rust (1.65.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
@@ -1452,8 +1464,8 @@ For development, we use [nightly Rust](https://rust-lang.github.io/rustup/concep
 
 ```shell
 cargo +nightly fmt
-cargo +nightly clippy
-cargo +nightly test
+cargo +nightly clippy --fix --workspace --all-targets --all-features -- -W clippy::pedantic
+cargo +nightly test --all
 ```
 
 ## Releases
@@ -2668,6 +2680,28 @@ expect that any method decorated by a decorator in this list has no
 [tool.ruff.pep8-naming]
 # Allow a shorthand alias, `@stcmthd`, to trigger static method treatment.
 staticmethod-decorators = ["staticmethod", "stcmthd"]
+```
+
+---
+
+### `pydocstyle`
+
+#### [`convention`](#convention)
+
+Whether to use Google-style or Numpy-style conventions when detecting
+docstring sections. By default, conventions will be inferred from
+the available sections.
+
+**Default value**: `"convention"`
+
+**Type**: `Convention`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pydocstyle]
+# Use Google-style docstrings.
+convention = "google"
 ```
 
 ---

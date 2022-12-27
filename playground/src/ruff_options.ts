@@ -222,6 +222,13 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
             "type": 'Vec<String>',
         },
     ]},
+    {"name": "pydocstyle", "fields": [
+        {
+            "name": "convention",
+            "default": '"convention"',
+            "type": 'Convention',
+        },
+    ]},
     {"name": "pyupgrade", "fields": [
         {
             "name": "keep-runtime-typing",

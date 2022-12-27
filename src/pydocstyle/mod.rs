@@ -1,5 +1,6 @@
 pub mod helpers;
 pub mod plugins;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -11,6 +12,7 @@ mod tests {
 
     use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::pydocstyle::settings::{Convention, Settings};
     use crate::settings;
 
     #[test_case(CheckCode::D100, Path::new("D.py"); "D100")]
@@ -70,6 +72,56 @@ mod tests {
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d417_unspecified() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/pydocstyle/D417.py"),
+            &settings::Settings {
+                // When inferring the convention, we'll see a few false negatives.
+                // See: https://github.com/PyCQA/pydocstyle/issues/459.
+                pydocstyle: Settings { convention: None },
+                ..settings::Settings::for_rule(CheckCode::D417)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d417_google() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/pydocstyle/D417.py"),
+            &settings::Settings {
+                // With explicit Google convention, we should flag every function.
+                pydocstyle: Settings {
+                    convention: Some(Convention::Google),
+                },
+                ..settings::Settings::for_rule(CheckCode::D417)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn d417_numpy() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/pydocstyle/D417.py"),
+            &settings::Settings {
+                // With explicit Google convention, we shouldn't flag anything.
+                pydocstyle: Settings {
+                    convention: Some(Convention::Numpy),
+                },
+                ..settings::Settings::for_rule(CheckCode::D417)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 }

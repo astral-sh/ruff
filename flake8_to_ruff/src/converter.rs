@@ -325,6 +325,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pydocstyle: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -382,6 +383,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pydocstyle: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -439,6 +441,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pydocstyle: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -496,6 +499,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pydocstyle: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -558,6 +562,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pydocstyle: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -654,6 +659,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pydocstyle: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -717,6 +723,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pydocstyle: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);

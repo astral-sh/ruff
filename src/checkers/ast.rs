@@ -3876,7 +3876,11 @@ impl<'a> Checker<'a> {
                     || self.settings.enabled.contains(&CheckCode::D416)
                     || self.settings.enabled.contains(&CheckCode::D417)
                 {
-                    pydocstyle::plugins::sections(self, &docstring);
+                    pydocstyle::plugins::sections(
+                        self,
+                        &docstring,
+                        self.settings.pydocstyle.convention.as_ref(),
+                    );
                 }
             }
         }
