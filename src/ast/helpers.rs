@@ -382,10 +382,8 @@ pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
             | StmtKind::AsyncFunctionDef { .. }
     ) {
         let contents = locator.slice_source_code_range(&Range::from_located(stmt));
-        for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt.location).flatten() {
             if matches!(tok, Tok::Name { .. }) {
-                let start = to_absolute(start, stmt.location);
-                let end = to_absolute(end, stmt.location);
                 return Range {
                     location: start,
                     end_location: end,

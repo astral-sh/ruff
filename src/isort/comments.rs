@@ -4,7 +4,6 @@ use rustpython_ast::Location;
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
-use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::SourceCodeLocator;
 
@@ -18,12 +17,10 @@ pub struct Comment<'a> {
 /// Collect all comments in an import block.
 pub fn collect_comments<'a>(range: &Range, locator: &'a SourceCodeLocator) -> Vec<Comment<'a>> {
     let contents = locator.slice_source_code_range(range);
-    lexer::make_tokenizer(&contents)
+    lexer::make_tokenizer_located(&contents, range.location)
         .flatten()
         .filter_map(|(start, tok, end)| {
             if matches!(tok, Tok::Comment) {
-                let start = helpers::to_absolute(start, range.location);
-                let end = helpers::to_absolute(end, range.location);
                 Some(Comment {
                     value: locator.slice_source_code_range(&Range {
                         location: start,

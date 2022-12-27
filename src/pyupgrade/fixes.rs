@@ -7,7 +7,6 @@ use rustpython_ast::{Expr, Keyword, Location, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
-use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::{self, Fix};
 use crate::cst::matchers::match_module;
@@ -28,10 +27,10 @@ pub fn remove_class_def_base(
         let mut fix_start = None;
         let mut fix_end = None;
         let mut count: usize = 0;
-        for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt_at).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
-                    fix_start = Some(helpers::to_absolute(start, stmt_at));
+                    fix_start = Some(start);
                 }
                 count += 1;
             }
@@ -39,7 +38,7 @@ pub fn remove_class_def_base(
             if matches!(tok, Tok::Rpar) {
                 count -= 1;
                 if count == 0 {
-                    fix_end = Some(helpers::to_absolute(end, stmt_at));
+                    fix_end = Some(end);
                     break;
                 }
             }
@@ -61,8 +60,7 @@ pub fn remove_class_def_base(
         let mut fix_start: Option<Location> = None;
         let mut fix_end: Option<Location> = None;
         let mut seen_comma = false;
-        for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
-            let start = helpers::to_absolute(start, stmt_at);
+        for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt_at).flatten() {
             if seen_comma {
                 if matches!(tok, Tok::Newline) {
                     fix_end = Some(end);
@@ -88,9 +86,7 @@ pub fn remove_class_def_base(
         // isn't a comma.
         let mut fix_start: Option<Location> = None;
         let mut fix_end: Option<Location> = None;
-        for (start, tok, end) in lexer::make_tokenizer(&contents).flatten() {
-            let start = helpers::to_absolute(start, stmt_at);
-            let end = helpers::to_absolute(end, stmt_at);
+        for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt_at).flatten() {
             if start == expr_at {
                 fix_end = Some(end);
                 break;
