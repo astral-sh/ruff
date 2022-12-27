@@ -277,6 +277,17 @@
         }
       }
     },
+    "pydocstyle": {
+      "description": "Options for the `pydocstyle` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Pydocstyle"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pyupgrade": {
       "description": "Options for the `pyupgrade` plugin.",
       "anyOf": [
@@ -893,6 +904,13 @@
         "YTT303"
       ]
     },
+    "Convention": {
+      "type": "string",
+      "enum": [
+        "google",
+        "numpy"
+      ]
+    },
     "Flake8AnnotationsOptions": {
       "type": "object",
       "properties": {
@@ -1193,6 +1211,23 @@
           "type": [
             "boolean",
             "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Pydocstyle": {
+      "type": "object",
+      "properties": {
+        "convention": {
+          "description": "Whether to use Google-style or Numpy-style conventions when detecting docstring sections. By default, conventions will be inferred from the available sections.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Convention"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },

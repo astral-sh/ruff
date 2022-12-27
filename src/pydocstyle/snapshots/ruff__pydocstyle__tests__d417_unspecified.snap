@@ -1,0 +1,37 @@
+---
+source: src/pydocstyle/mod.rs
+expression: checks
+---
+- kind:
+    DocumentAllArguments:
+      - x
+      - y
+      - z
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 36
+    column: 12
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
+    row: 65
+    column: 0
+  end_location:
+    row: 74
+    column: 12
+  fix: ~
+- kind:
+    DocumentAllArguments:
+      - y
+  location:
+    row: 77
+    column: 0
+  end_location:
+    row: 84
+    column: 12
+  fix: ~
+
