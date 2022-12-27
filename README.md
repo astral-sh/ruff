@@ -660,6 +660,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP018 | NativeLiterals | Unnecessary call to `str` and `bytes` | 🛠 |
 | UP019 | TypingTextStrAlias | `typing.Text` is deprecated, use `str` | 🛠 |
 | UP020 | OpenAlias | Use builtin `open` instead | 🛠 |
+| UP021 | ReplaceUniversalNewlines | 'universal_newlines' is deprecated, use 'text' | 🛠 |
 
 ### pep8-naming (N)
 
