@@ -168,6 +168,11 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
             "type": 'Vec<String>',
         },
         {
+            "name": "force-single-line",
+            "default": 'false',
+            "type": 'bool',
+        },
+        {
             "name": "force-wrap-aliases",
             "default": 'false',
             "type": 'bool',
@@ -179,6 +184,11 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
         },
         {
             "name": "known-third-party",
+            "default": '[]',
+            "type": 'Vec<String>',
+        },
+        {
+            "name": "single-line-exclusions",
             "default": '[]',
             "type": 'Vec<String>',
         },

@@ -2468,6 +2468,23 @@ extra-standard-library = ["path"]
 
 ---
 
+#### [`force-single-line`](#force-single-line)
+
+Forces all from imports to appear on their own line.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+force-single-line = true
+```
+
+---
+
 #### [`force-wrap-aliases`](#force-wrap-aliases)
 
 Force `import from` statements with multiple members and at least one
@@ -2533,6 +2550,23 @@ can be identified as such via introspection of the local filesystem.
 ```toml
 [tool.ruff.isort]
 known-third-party = ["src"]
+```
+
+---
+
+#### [`single-line-exclusions`](#single-line-exclusions)
+
+One or more modules to exclude from the single line rule.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+single-line-exclusions = ["os", "json"]
 ```
 
 ---

@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use ropey::RopeBuilder;
 use rustc_hash::FxHashMap;
@@ -495,7 +496,54 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
     ordered
 }
 
-#[allow(clippy::too_many_arguments)]
+fn force_single_line_imports<'a>(
+    block: OrderedImportBlock<'a>,
+    single_line_exclusions: &BTreeSet<String>,
+) -> OrderedImportBlock<'a> {
+    OrderedImportBlock {
+        import: block.import,
+        import_from: block
+            .import_from
+            .into_iter()
+            .flat_map(|(from_data, comment_set, trailing_comma, alias_data)| {
+                if from_data
+                    .module
+                    .map_or(false, |module| single_line_exclusions.contains(module))
+                {
+                    Left(std::iter::once((
+                        from_data,
+                        comment_set,
+                        trailing_comma,
+                        alias_data,
+                    )))
+                } else {
+                    Right(
+                        alias_data
+                            .into_iter()
+                            .enumerate()
+                            .map(move |(index, alias_data)| {
+                                (
+                                    from_data.clone(),
+                                    if index == 0 {
+                                        comment_set.clone()
+                                    } else {
+                                        CommentSet {
+                                            atop: vec![],
+                                            inline: vec![],
+                                        }
+                                    },
+                                    TrailingComma::Absent,
+                                    vec![alias_data],
+                                )
+                            }),
+                    )
+                }
+            })
+            .collect(),
+    }
+}
+
+#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 pub fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
@@ -509,6 +557,8 @@ pub fn format_imports(
     combine_as_imports: bool,
     force_wrap_aliases: bool,
     split_on_trailing_comma: bool,
+    force_single_line: bool,
+    single_line_exclusions: &BTreeSet<String>,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -531,7 +581,10 @@ pub fn format_imports(
     // Generate replacement source code.
     let mut is_first_block = true;
     for import_block in block_by_type.into_values() {
-        let import_block = sort_imports(import_block);
+        let mut import_block = sort_imports(import_block);
+        if force_single_line {
+            import_block = force_single_line_imports(import_block, single_line_exclusions);
+        }
 
         // Add a blank line between every section.
         if is_first_block {
@@ -577,6 +630,7 @@ pub fn format_imports(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
@@ -687,6 +741,30 @@ mod tests {
             &Settings {
                 isort: isort::settings::Settings {
                     split_on_trailing_comma: false,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("force_single_line.py"))]
+    fn force_single_line(path: &Path) -> Result<()> {
+        let snapshot = format!("force_single_line_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    force_single_line: true,
+                    single_line_exclusions: vec!["os".to_string(), "logging.handlers".to_string()]
+                        .into_iter()
+                        .collect::<BTreeSet<_>>(),
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
