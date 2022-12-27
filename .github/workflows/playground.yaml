@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 
 env:
   CARGO_INCREMENTAL: 0
@@ -15,6 +13,8 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -41,9 +41,7 @@ jobs:
         run: npm run build
         working-directory: playground
       - name: "Deploy to Cloudflare Pages"
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-        if: ${{ env.CF_API_TOKEN }} != null
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
         uses: cloudflare/wrangler-action@2.0.0
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}

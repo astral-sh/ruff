@@ -80,7 +80,7 @@ Then, run `cargo test`. Your test will fail, but you'll be prompted to follow-up
 rest of your changes.
 
 Finally, to update the documentation, run `cargo dev generate-rules-table` from the repo root. To
-update the generated prefix map, run `cargo dev generate-check-code-prefix`. Both of these commands
+update the generated prefix map, run `cargo +nightly dev generate-check-code-prefix`. Both of these commands
 should be run whenever a new check is added to the codebase.
 
 ### Example: Adding a new configuration option
