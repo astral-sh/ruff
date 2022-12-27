@@ -1926,6 +1926,10 @@ where
                     pyupgrade::plugins::redundant_open_modes(self, expr);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::UP020) {
+                    pyupgrade::plugins::open_alias(self, expr, func);
+                }
+
                 // flake8-boolean-trap
                 if self.settings.enabled.contains(&CheckCode::FBT003) {
                     flake8_boolean_trap::plugins::check_boolean_positional_value_in_function_call(
