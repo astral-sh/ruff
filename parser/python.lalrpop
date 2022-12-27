@@ -1185,7 +1185,7 @@ Atom<Goal>: ast::Expr = {
         custom: (),
         node: ast::ExprKind::Set { elts }
     },
-    <location:@L> "{" <elt:Test<"all">> <generators:CompFor> "}" <end_location:@R> => {
+    <location:@L> "{" <elt:NamedExpressionTest> <generators:CompFor> "}" <end_location:@R> => {
         ast::Expr {
             location,
             end_location: Some(end_location),
