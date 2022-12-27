@@ -3,23 +3,47 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import { MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api";
 import { useEffect, useState, useCallback } from "react";
 
-// @ts-ignore
 import init, { Check, check } from "./pkg/ruff.js";
 import { AVAILABLE_OPTIONS } from "./ruff_options";
 import { Config, getDefaultConfig, toRuffConfig } from "./config";
 import { Options } from "./Options";
 
-const DEFAULT_SOURCE = "print(1 + 2)";
+const DEFAULT_SOURCE =
+  "# Define a function that takes an integer n and returns the nth number in the Fibonacci\n" +
+  "# sequence.\n" +
+  "def fibonacci(n):\n" +
+  "  if n == 0:\n" +
+  "    return 0\n" +
+  "  elif n == 1:\n" +
+  "    return 1\n" +
+  "  else:\n" +
+  "    return fibonacci(n-1) + fibonacci(n-2)\n" +
+  "\n" +
+  "# Use a for loop to generate and print the first 10 numbers in the Fibonacci sequence.\n" +
+  "for i in range(10):\n" +
+  "  print(fibonacci(i))\n" +
+  "\n" +
+  "# Output:\n" +
+  "# 0\n" +
+  "# 1\n" +
+  "# 1\n" +
+  "# 2\n" +
+  "# 3\n" +
+  "# 5\n" +
+  "# 8\n" +
+  "# 13\n" +
+  "# 21\n" +
+  "# 34\n";
 
 function restoreConfigAndSource(): [Config, string] {
-  let value = lzstring.decompressFromEncodedURIComponent(
+  const value = lzstring.decompressFromEncodedURIComponent(
     window.location.hash.slice(1)
   );
   let config = {};
   let source = DEFAULT_SOURCE;
 
   if (value) {
-    let parts = value.split("$$$");
+    const parts = value.split("$$$");
     config = JSON.parse(parts[0]);
     source = parts[1];
   }
@@ -37,18 +61,18 @@ const defaultConfig = getDefaultConfig(AVAILABLE_OPTIONS);
 
 export default function App() {
   const monaco = useMonaco();
-  const [ruffInitialized, setRuffInitialized] = useState<boolean>(false);
+  const [initialized, setInitialized] = useState<boolean>(false);
   const [config, setConfig] = useState<Config | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    init().then(() => setRuffInitialized(true));
+    init().then(() => setInitialized(true));
   }, []);
 
   useEffect(() => {
-    if (source === null && config === null && monaco) {
-      let [config, source] = restoreConfigAndSource();
+    if (source == null && config == null && monaco) {
+      const [config, source] = restoreConfigAndSource();
       setConfig(config);
       setSource(source);
     }
@@ -61,15 +85,9 @@ export default function App() {
   }, [config, source]);
 
   useEffect(() => {
-    let editor = monaco?.editor;
-    let model = editor?.getModels()[0];
-    if (
-      !editor ||
-      !model ||
-      !ruffInitialized ||
-      source === null ||
-      config === null
-    ) {
+    const editor = monaco?.editor;
+    const model = editor?.getModels()[0];
+    if (!editor || !model || !initialized || source == null || config == null) {
       return;
     }
 
@@ -94,18 +112,59 @@ export default function App() {
         severity: MarkerSeverity.Error,
       }))
     );
-  }, [config, source, monaco, ruffInitialized]);
+
+    const codeActionProvider = monaco?.languages.registerCodeActionProvider(
+      "python",
+      {
+        // @ts-expect-error: The type definition is wrong.
+        provideCodeActions: function (model, position) {
+          const actions = checks
+            .filter((check) => position.startLineNumber === check.location.row)
+            .filter((check) => check.fix)
+            .map((check) => ({
+              title: `Fix ${check.code}`,
+              id: `fix-${check.code}`,
+              kind: "quickfix",
+              edit: check.fix
+                ? {
+                    edits: [
+                      {
+                        resource: model.uri,
+                        versionId: model.getVersionId(),
+                        edit: {
+                          range: {
+                            startLineNumber: check.fix.location.row,
+                            startColumn: check.fix.location.column + 1,
+                            endLineNumber: check.fix.end_location.row,
+                            endColumn: check.fix.end_location.column + 1,
+                          },
+                          text: check.fix.content,
+                        },
+                      },
+                    ],
+                  }
+                : undefined,
+            }));
+          return { actions, dispose: () => {} };
+        },
+      }
+    );
+
+    return () => {
+      codeActionProvider?.dispose();
+    };
+  }, [config, source, monaco, initialized]);
 
   const handleEditorChange = useCallback(
     (value: string | undefined) => {
-      value && setSource(value);
+      setSource(value || "");
     },
     [setSource]
   );
 
   const handleOptionChange = useCallback(
     (groupName: string, fieldName: string, value: string) => {
-      let group = Object.assign({}, (config || {})[groupName]);
+      const group = Object.assign({}, (config || {})[groupName]);
       if (value === defaultConfig[groupName][fieldName] || value === "") {
         delete group[fieldName];
       } else {

@@ -28,9 +28,9 @@ export function toRuffConfig(config: Config): any {
     return value === "None" ? null : JSON.parse(value);
   };
 
-  let result: any = {};
+  const result: any = {};
   Object.keys(config).forEach((group_name) => {
-    let fields = config[group_name];
+    const fields = config[group_name];
     if (!fields || Object.keys(fields).length === 0) {
       return;
     }

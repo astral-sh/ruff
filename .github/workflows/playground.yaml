@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 env:
   CARGO_INCREMENTAL: 0
@@ -11,7 +13,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -26,24 +28,14 @@ jobs:
           node-version: 18
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
-      - uses: actions/cache@v3
-        env:
-          cache-name: cache-cargo
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
-      - name: "Install wasm-pack"
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: jetli/wasm-pack-action@v0.4.0
       - name: "Run wasm-pack"
         run: wasm-pack build --target web --out-dir playground/src/pkg
       - name: "Install Node dependencies"
         run: npm ci
+        working-directory: playground
+      - name: "Run TypeScript checks"
+        run: npm run check
         working-directory: playground
       - name: "Build JavaScript bundle"
         run: npm run build
@@ -53,5 +45,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: playground
-          command: pages publish dist --project-name=ruff
+          command: pages publish playground/dist --project-name=ruff --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}
