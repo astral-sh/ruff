@@ -1654,6 +1654,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP018) {
                     pyupgrade::plugins::native_literals(self, expr, func, args, keywords);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP021) {
+                    pyupgrade::plugins::replace_universal_newlines(self, expr, keywords);
+                }
 
                 // flake8-super
                 if self.settings.enabled.contains(&CheckCode::UP008) {

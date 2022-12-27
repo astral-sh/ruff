@@ -527,6 +527,7 @@ pub enum CheckCodePrefix {
     UP017,
     UP018,
     UP019,
+    UP021,
     W,
     W2,
     W29,
@@ -2104,6 +2105,7 @@ impl CheckCodePrefix {
                     CheckCode::UP017,
                     CheckCode::UP018,
                     CheckCode::UP019,
+                    CheckCode::UP021,
                 ]
             }
             CheckCodePrefix::U0 => {
@@ -2132,6 +2134,7 @@ impl CheckCodePrefix {
                     CheckCode::UP017,
                     CheckCode::UP018,
                     CheckCode::UP019,
+                    CheckCode::UP021,
                 ]
             }
             CheckCodePrefix::U00 => {
@@ -2344,6 +2347,7 @@ impl CheckCodePrefix {
                 CheckCode::UP017,
                 CheckCode::UP018,
                 CheckCode::UP019,
+                CheckCode::UP021,
             ],
             CheckCodePrefix::UP0 => vec![
                 CheckCode::UP001,
@@ -2364,6 +2368,7 @@ impl CheckCodePrefix {
                 CheckCode::UP017,
                 CheckCode::UP018,
                 CheckCode::UP019,
+                CheckCode::UP021,
             ],
             CheckCodePrefix::UP00 => vec![
                 CheckCode::UP001,
@@ -2405,6 +2410,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::UP017 => vec![CheckCode::UP017],
             CheckCodePrefix::UP018 => vec![CheckCode::UP018],
             CheckCodePrefix::UP019 => vec![CheckCode::UP019],
+            CheckCodePrefix::UP021 => vec![CheckCode::UP021],
             CheckCodePrefix::W => vec![CheckCode::W292, CheckCode::W605],
             CheckCodePrefix::W2 => vec![CheckCode::W292],
             CheckCodePrefix::W29 => vec![CheckCode::W292],
@@ -2963,6 +2969,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::UP017 => SuffixLength::Three,
             CheckCodePrefix::UP018 => SuffixLength::Three,
             CheckCodePrefix::UP019 => SuffixLength::Three,
+            CheckCodePrefix::UP021 => SuffixLength::Three,
             CheckCodePrefix::W => SuffixLength::Zero,
             CheckCodePrefix::W2 => SuffixLength::One,
             CheckCodePrefix::W29 => SuffixLength::Two,

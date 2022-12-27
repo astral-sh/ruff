@@ -227,6 +227,7 @@ pub enum CheckCode {
     UP017,
     UP018,
     UP019,
+    UP021,
     // pydocstyle
     D100,
     D101,
@@ -839,6 +840,7 @@ pub enum CheckKind {
     RemoveSixCompat,
     DatetimeTimezoneUTC,
     NativeLiterals,
+    ReplaceUniversalNewlines,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1215,6 +1217,7 @@ impl CheckCode {
             CheckCode::UP017 => CheckKind::DatetimeTimezoneUTC,
             CheckCode::UP018 => CheckKind::NativeLiterals,
             CheckCode::UP019 => CheckKind::TypingTextStrAlias,
+            CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1635,6 +1638,7 @@ impl CheckCode {
             CheckCode::UP017 => CheckCategory::Pyupgrade,
             CheckCode::UP018 => CheckCategory::Pyupgrade,
             CheckCode::UP019 => CheckCategory::Pyupgrade,
+            CheckCode::UP021 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1848,6 +1852,7 @@ impl CheckKind {
             CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
             CheckKind::NativeLiterals => &CheckCode::UP018,
             CheckKind::TypingTextStrAlias => &CheckCode::UP019,
+            CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2576,6 +2581,9 @@ impl CheckKind {
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
             }
+            CheckKind::ReplaceUniversalNewlines => {
+                "'universal_newlines' is deprecated, use 'text'".to_string()
+            }
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
@@ -3016,6 +3024,7 @@ impl CheckKind {
                 | CheckKind::MissingReturnTypeSpecialMethod(..)
                 | CheckKind::NativeLiterals
                 | CheckKind::NewLineAfterLastParagraph
+                | CheckKind::ReplaceUniversalNewlines
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
                 | CheckKind::NoBlankLineBeforeClass(..)
