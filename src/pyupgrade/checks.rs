@@ -4,7 +4,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Constant, KeywordData, Location};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::helpers;
+use crate::ast::helpers::{self};
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::autofix::Fix;
 use crate::checks::{Check, CheckKind};

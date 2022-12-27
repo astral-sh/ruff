@@ -1,0 +1,65 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind: TypingTextStrAlias
+  location:
+    row: 7
+    column: 21
+  end_location:
+    row: 7
+    column: 25
+  fix:
+    content: str
+    location:
+      row: 7
+      column: 21
+    end_location:
+      row: 7
+      column: 25
+- kind: TypingTextStrAlias
+  location:
+    row: 11
+    column: 28
+  end_location:
+    row: 11
+    column: 39
+  fix:
+    content: str
+    location:
+      row: 11
+      column: 28
+    end_location:
+      row: 11
+      column: 39
+- kind: TypingTextStrAlias
+  location:
+    row: 15
+    column: 27
+  end_location:
+    row: 15
+    column: 37
+  fix:
+    content: str
+    location:
+      row: 15
+      column: 27
+    end_location:
+      row: 15
+      column: 37
+- kind: TypingTextStrAlias
+  location:
+    row: 19
+    column: 28
+  end_location:
+    row: 19
+    column: 35
+  fix:
+    content: str
+    location:
+      row: 19
+      column: 28
+    end_location:
+      row: 19
+      column: 35
+

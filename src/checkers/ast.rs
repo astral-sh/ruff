@@ -1487,6 +1487,10 @@ where
             ExprKind::Name { id, ctx } => {
                 match ctx {
                     ExprContext::Load => {
+                        if self.settings.enabled.contains(&CheckCode::UP019) {
+                            pyupgrade::plugins::typing_text_str_alias(self, expr);
+                        }
+
                         // Ex) List[...]
                         if !self.in_deferred_string_type_definition
                             && self.settings.enabled.contains(&CheckCode::UP006)
@@ -1543,6 +1547,9 @@ where
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::UP019) {
+                    pyupgrade::plugins::typing_text_str_alias(self, expr);
+                }
                 if self.settings.enabled.contains(&CheckCode::UP016) {
                     pyupgrade::plugins::remove_six_compat(self, expr);
                 }
