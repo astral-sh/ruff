@@ -23,6 +23,7 @@ An extremely fast Python linter, written in Rust.
 - 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
 - ⚖️  [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
 - 🔌  Native re-implementations of popular Flake8 plugins, like [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
+- 🌎  Monorepo-friendly configuration via hierarchical and cascading settings
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface. Ruff can be used to replace Flake8 (plus a variety
