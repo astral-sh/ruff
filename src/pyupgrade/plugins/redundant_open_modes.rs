@@ -6,7 +6,6 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, KeywordData, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
-use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
@@ -112,9 +111,7 @@ fn create_remove_param_fix(
     let mut fix_end: Option<Location> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (start, tok, end) in lexer::make_tokenizer(&content).flatten() {
-        let start = helpers::to_absolute(start, expr.location);
-        let end = helpers::to_absolute(end, expr.location);
+    for (start, tok, end) in lexer::make_tokenizer_located(&content, expr.location).flatten() {
         if start == mode_param.location {
             if is_first_arg {
                 delete_first_arg = true;

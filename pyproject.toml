@@ -38,3 +38,8 @@ strip = true
 [tool.ruff.isort]
 force-wrap-aliases = true
 combine-as-imports = true
+force-single-line = true
+single-line-exclusions = ["os", "logging.handlers"]
+
+[tool.ruff.pydocstyle]
+convention = "google"

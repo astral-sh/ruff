@@ -277,6 +277,17 @@
         }
       }
     },
+    "pydocstyle": {
+      "description": "Options for the `pydocstyle` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Pydocstyle"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pyupgrade": {
       "description": "Options for the `pyupgrade` plugin.",
       "anyOf": [
@@ -894,6 +905,13 @@
         "YTT303"
       ]
     },
+    "Convention": {
+      "type": "string",
+      "enum": [
+        "google",
+        "numpy"
+      ]
+    },
     "Flake8AnnotationsOptions": {
       "type": "object",
       "properties": {
@@ -1081,6 +1099,13 @@
             "type": "string"
           }
         },
+        "force-single-line": {
+          "description": "Forces all from imports to appear on their own line.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "force-wrap-aliases": {
           "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```py from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
           "type": [
@@ -1100,6 +1125,16 @@
         },
         "known-third-party": {
           "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "single-line-exclusions": {
+          "description": "One or more modules to exclude from the single line rule.",
           "type": [
             "array",
             "null"
@@ -1177,6 +1212,23 @@
           "type": [
             "boolean",
             "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Pydocstyle": {
+      "type": "object",
+      "properties": {
+        "convention": {
+          "description": "Whether to use Google-style or Numpy-style conventions when detecting docstring sections. By default, conventions will be inferred from the available sections.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Convention"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },

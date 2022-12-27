@@ -82,6 +82,8 @@ pub fn check_imports(
         settings.isort.combine_as_imports,
         settings.isort.force_wrap_aliases,
         settings.isort.split_on_trailing_comma,
+        settings.isort.force_single_line,
+        &settings.isort.single_line_exclusions,
     );
 
     // Expand the span the entire range, including leading and trailing space.

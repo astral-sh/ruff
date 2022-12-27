@@ -21,7 +21,7 @@ const TOC_END_PRAGMA: &str = "<!-- End auto-generated table of contents. -->";
 pub struct Cli {
     /// Write the generated table to stdout (rather than to `README.md`).
     #[arg(long)]
-    dry_run: bool,
+    pub(crate) dry_run: bool,
 }
 
 pub fn main(cli: &Cli) -> Result<()> {

@@ -22,7 +22,8 @@ use crate::settings::types::{
 };
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pyupgrade,
+    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pydocstyle,
+    pyupgrade,
 };
 
 pub mod configuration;
@@ -68,6 +69,7 @@ pub struct Settings {
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
+    pub pydocstyle: pydocstyle::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
 }
 
@@ -193,6 +195,10 @@ impl Settings {
                 .pep8_naming
                 .map(pep8_naming::settings::Settings::from_options)
                 .unwrap_or_default(),
+            pydocstyle: config
+                .pydocstyle
+                .map(pydocstyle::settings::Settings::from_options)
+                .unwrap_or_default(),
             pyupgrade: config
                 .pyupgrade
                 .as_ref()
@@ -233,6 +239,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pydocstyle: pydocstyle::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }
     }
@@ -269,6 +276,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pydocstyle: pydocstyle::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }
     }
@@ -326,6 +334,7 @@ impl Hash for Settings {
         self.isort.hash(state);
         self.mccabe.hash(state);
         self.pep8_naming.hash(state);
+        self.pydocstyle.hash(state);
         self.pyupgrade.hash(state);
     }
 }

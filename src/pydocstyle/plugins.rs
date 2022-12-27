@@ -15,6 +15,7 @@ use crate::docstrings::definition::{Definition, DefinitionKind, Docstring};
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
 use crate::pydocstyle::helpers::{leading_quote, logical_line};
+use crate::pydocstyle::settings::Convention;
 use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
@@ -855,7 +856,7 @@ pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
 
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
-pub fn sections(checker: &mut Checker, docstring: &Docstring) {
+pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option<&Convention>) {
     let body = docstring.body;
 
     let lines: Vec<&str> = LinesWithTrailingNewline::from(body).collect();
@@ -863,17 +864,31 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring) {
         return;
     }
 
-    // First, interpret as NumPy-style sections.
-    let mut found_numpy_section = false;
-    for context in &section_contexts(&lines, &SectionStyle::NumPy) {
-        found_numpy_section = true;
-        numpy_section(checker, docstring, context);
-    }
+    match convention {
+        Some(Convention::Google) => {
+            for context in &section_contexts(&lines, &SectionStyle::Google) {
+                google_section(checker, docstring, context);
+            }
+        }
+        Some(Convention::Numpy) => {
+            for context in &section_contexts(&lines, &SectionStyle::NumPy) {
+                numpy_section(checker, docstring, context);
+            }
+        }
+        None => {
+            // First, interpret as NumPy-style sections.
+            let mut found_numpy_section = false;
+            for context in &section_contexts(&lines, &SectionStyle::NumPy) {
+                found_numpy_section = true;
+                numpy_section(checker, docstring, context);
+            }
 
-    // If no such sections were identified, interpret as Google-style sections.
-    if !found_numpy_section {
-        for context in &section_contexts(&lines, &SectionStyle::Google) {
-            google_section(checker, docstring, context);
+            // If no such sections were identified, interpret as Google-style sections.
+            if !found_numpy_section {
+                for context in &section_contexts(&lines, &SectionStyle::Google) {
+                    google_section(checker, docstring, context);
+                }
+            }
         }
     }
 }
