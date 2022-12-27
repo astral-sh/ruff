@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, Keyword, Located};
+use rustpython_ast::{Expr, Keyword, Location};
 
 use crate::ast::helpers::{find_keyword, match_module_member};
 use crate::ast::types::Range;
@@ -15,20 +15,21 @@ pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[
         &checker.from_imports,
         &checker.import_aliases,
     ) {
-        let Some(the_kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
-        // The kwarg end location includes the value, which we do not want to
-        // remove, so we need to find the start of the next value, and then
-        // move one to the left so that the '=' sign is not removed.
-        let start = the_kwarg.location;
-        let mut end = the_kwarg.node.value.location;
-        end.go_left();
-        let location: Located<u8> = Located::new(start, end, 0);
-        let mut check = Check::new(
-            CheckKind::ReplaceUniversalNewlines,
-            Range::from_located(&location),
-        );
+        let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
+        let range = Range {
+            location: kwarg.location,
+            end_location: Location::new(
+                kwarg.location.row(),
+                kwarg.location.column() + "universal_newlines".len(),
+            ),
+        };
+        let mut check = Check::new(CheckKind::ReplaceUniversalNewlines, range);
         if checker.patch(check.kind.code()) {
-            check.amend(Fix::replacement("text".to_string(), start, end));
+            check.amend(Fix::replacement(
+                "text".to_string(),
+                range.location,
+                range.end_location,
+            ));
         }
         checker.add_check(check);
     }

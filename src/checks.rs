@@ -2550,7 +2550,7 @@ impl CheckKind {
             CheckKind::UselessMetaclassType => "`__metaclass__ = type` is implied".to_string(),
             CheckKind::TypingTextStrAlias => "`typing.Text` is deprecated, use `str`".to_string(),
             CheckKind::DeprecatedUnittestAlias(alias, target) => {
-                format!("`{alias}` is deprecated, use `{target}` instead")
+                format!("`{alias}` is deprecated, use `{target}`")
             }
             CheckKind::UselessObjectInheritance(name) => {
                 format!("Class `{name}` inherits from object")
@@ -2583,12 +2583,12 @@ impl CheckKind {
             CheckKind::RemoveSixCompat => "Unnecessary `six` compatibility usage".to_string(),
             CheckKind::DatetimeTimezoneUTC => "Use `datetime.UTC` alias".to_string(),
             CheckKind::NativeLiterals => "Unnecessary call to `str` and `bytes`".to_string(),
-            CheckKind::OpenAlias => "Use builtin `open` instead".to_string(),
+            CheckKind::OpenAlias => "Use builtin `open`".to_string(),
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
             }
             CheckKind::ReplaceUniversalNewlines => {
-                "'universal_newlines' is deprecated, use 'text'".to_string()
+                "`universal_newlines` is deprecated, use `text`".to_string()
             }
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
