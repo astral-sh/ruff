@@ -60,7 +60,7 @@ mod pandas_vet;
 pub mod pep8_naming;
 pub mod printer;
 mod pycodestyle;
-mod pydocstyle;
+pub mod pydocstyle;
 mod pyflakes;
 mod pygrep_hooks;
 mod pylint;
