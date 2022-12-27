@@ -2241,6 +2241,7 @@ impl CheckCodePrefix {
                     CheckCode::UP016,
                     CheckCode::UP017,
                     CheckCode::UP018,
+                    CheckCode::UP019,
                 ]
             }
             CheckCodePrefix::U010 => {
@@ -2322,7 +2323,7 @@ impl CheckCodePrefix {
                     ":".bold(),
                     "`U019` has been remapped to `UP019`".bold()
                 );
-                vec![CheckCode::UP017]
+                vec![CheckCode::UP019]
             }
             CheckCodePrefix::UP => vec![
                 CheckCode::UP001,

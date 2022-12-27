@@ -653,6 +653,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
 | UP017 | DatetimeTimezoneUTC | Use `datetime.UTC` alias | 🛠 |
 | UP018 | NativeLiterals | Unnecessary call to `str` and `bytes` | 🛠 |
+| UP019 | TypingTextStrAlias | `typing.Text` is deprecated, use `str` | 🛠 |
 
 ### pep8-naming (N)
 

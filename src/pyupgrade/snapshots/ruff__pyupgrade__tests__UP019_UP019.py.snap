@@ -4,62 +4,62 @@ expression: checks
 ---
 - kind: TypingTextStrAlias
   location:
-    row: 6
+    row: 7
     column: 21
   end_location:
-    row: 6
+    row: 7
     column: 25
   fix:
     content: str
     location:
-      row: 6
+      row: 7
       column: 21
     end_location:
-      row: 6
+      row: 7
       column: 25
 - kind: TypingTextStrAlias
   location:
-    row: 9
+    row: 11
     column: 28
   end_location:
-    row: 9
+    row: 11
     column: 39
   fix:
     content: str
     location:
-      row: 9
+      row: 11
       column: 28
     end_location:
-      row: 9
+      row: 11
       column: 39
 - kind: TypingTextStrAlias
   location:
-    row: 12
+    row: 15
     column: 27
   end_location:
-    row: 12
+    row: 15
     column: 37
   fix:
     content: str
     location:
-      row: 12
+      row: 15
       column: 27
     end_location:
-      row: 12
+      row: 15
       column: 37
 - kind: TypingTextStrAlias
   location:
-    row: 15
+    row: 19
     column: 28
   end_location:
-    row: 15
+    row: 19
     column: 35
   fix:
     content: str
     location:
-      row: 15
+      row: 19
       column: 28
     end_location:
-      row: 15
+      row: 19
       column: 35
 
