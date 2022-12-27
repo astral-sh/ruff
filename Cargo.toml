@@ -112,6 +112,3 @@ opt-level = 1
 [[bench]]
 name = "source_code_locator"
 harness = false
-
-[package.metadata.maturin]
-name = "ruff._ruff"

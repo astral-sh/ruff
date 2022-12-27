@@ -17,21 +17,18 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Software Development :: Quality Assurance",
 ]
-author = "Charlie Marsh"
-author_email = "charlie.r.marsh@gmail.com"
+authors = [
+  {name = "Charlie Marsh", email= "charlie.r.marsh@gmail.com" }
+]
 description = "An extremely fast Python linter, written in Rust."
 requires-python = ">=3.7"
+version = "0.0.195"
 
 [project.urls]
 repository = "https://github.com/charliermarsh/ruff"
 
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
-build-backend = "maturin"
-
-[tool.maturin]
-bindings = "bin"
-strip = true
+requires = ["setuptools", "wheel", "setuptools-rust"]
 
 [tool.ruff]
 
