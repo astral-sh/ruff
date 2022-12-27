@@ -10,7 +10,7 @@ use schemars::schema_for;
 pub struct Cli {
     /// Write the generated table to stdout (rather than to `ruff.schema.json`).
     #[arg(long)]
-    dry_run: bool,
+    pub(crate) dry_run: bool,
 }
 
 pub fn main(cli: &Cli) -> Result<()> {

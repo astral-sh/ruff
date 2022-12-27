@@ -14,7 +14,7 @@ use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionFiel
 pub struct Cli {
     /// Write the generated table to stdout (rather than to `TODO`).
     #[arg(long)]
-    dry_run: bool,
+    pub(crate) dry_run: bool,
 }
 
 fn emit_field(output: &mut String, field: &OptionField) {

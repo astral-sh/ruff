@@ -18,7 +18,7 @@ const END_PRAGMA: &str = "<!-- End auto-generated options sections. -->";
 pub struct Cli {
     /// Write the generated table to stdout (rather than to `README.md`).
     #[arg(long)]
-    dry_run: bool,
+    pub(crate) dry_run: bool,
 }
 
 fn emit_field(output: &mut String, field: &OptionField, group_name: Option<&str>) {
