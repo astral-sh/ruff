@@ -4,11 +4,12 @@ use anyhow::Result;
 use ruff::checks_gen::CheckCodePrefix;
 use ruff::flake8_quotes::settings::Quote;
 use ruff::flake8_tidy_imports::settings::Strictness;
+use ruff::pydocstyle::settings::Convention;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
 use ruff::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_quotes, flake8_tidy_imports, mccabe,
-    pep8_naming,
+    pep8_naming, pydocstyle,
 };
 
 use crate::black::Black;
@@ -91,6 +92,7 @@ pub fn convert(
     let mut flake8_tidy_imports = flake8_tidy_imports::settings::Options::default();
     let mut mccabe = mccabe::settings::Options::default();
     let mut pep8_naming = pep8_naming::settings::Options::default();
+    let mut pydocstyle = pydocstyle::settings::Options::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
             match key.as_str() {
@@ -200,9 +202,12 @@ pub fn convert(
                     _ => eprintln!("Unexpected '{key}' value: {value}"),
                 },
                 // flake8-docstrings
-                "docstring-convention" => {
-                    // No-op (handled above).
-                }
+                "docstring-convention" => match value.trim() {
+                    "google" => pydocstyle.convention = Some(Convention::Google),
+                    "numpy" => pydocstyle.convention = Some(Convention::Numpy),
+                    "pep257" | "all" => pydocstyle.convention = None,
+                    _ => eprintln!("Unexpected '{key}' value: {value}"),
+                },
                 // mccabe
                 "max-complexity" | "max_complexity" => match value.clone().parse::<usize>() {
                     Ok(max_complexity) => mccabe.max_complexity = Some(max_complexity),
@@ -246,6 +251,9 @@ pub fn convert(
     }
     if pep8_naming != pep8_naming::settings::Options::default() {
         options.pep8_naming = Some(pep8_naming);
+    }
+    if pydocstyle != pydocstyle::settings::Options::default() {
+        options.pydocstyle = Some(pydocstyle);
     }
 
     // Extract any settings from the existing `pyproject.toml`.
