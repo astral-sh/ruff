@@ -3,7 +3,6 @@ use rustpython_ast::Stmt;
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
-use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::source_code_locator::SourceCodeLocator;
@@ -17,13 +16,10 @@ pub fn add_return_none_annotation(locator: &SourceCodeLocator, stmt: &Stmt) -> R
     let mut seen_lpar = false;
     let mut seen_rpar = false;
     let mut count: usize = 0;
-    for (start, tok, ..) in lexer::make_tokenizer(&contents).flatten() {
+    for (start, tok, ..) in lexer::make_tokenizer_located(&contents, range.location).flatten() {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {
-                return Ok(Fix::insertion(
-                    " -> None".to_string(),
-                    helpers::to_absolute(start, range.location),
-                ));
+                return Ok(Fix::insertion(" -> None".to_string(), start));
             }
         }
 
