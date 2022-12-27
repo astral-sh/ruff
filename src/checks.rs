@@ -227,6 +227,7 @@ pub enum CheckCode {
     UP017,
     UP018,
     UP019,
+    UP020,
     // pydocstyle
     D100,
     D101,
@@ -839,6 +840,7 @@ pub enum CheckKind {
     RemoveSixCompat,
     DatetimeTimezoneUTC,
     NativeLiterals,
+    OpenAlias,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1215,6 +1217,7 @@ impl CheckCode {
             CheckCode::UP017 => CheckKind::DatetimeTimezoneUTC,
             CheckCode::UP018 => CheckKind::NativeLiterals,
             CheckCode::UP019 => CheckKind::TypingTextStrAlias,
+            CheckCode::UP020 => CheckKind::OpenAlias,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1635,6 +1638,7 @@ impl CheckCode {
             CheckCode::UP017 => CheckCategory::Pyupgrade,
             CheckCode::UP018 => CheckCategory::Pyupgrade,
             CheckCode::UP019 => CheckCategory::Pyupgrade,
+            CheckCode::UP020 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1848,6 +1852,7 @@ impl CheckKind {
             CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
             CheckKind::NativeLiterals => &CheckCode::UP018,
             CheckKind::TypingTextStrAlias => &CheckCode::UP019,
+            CheckKind::OpenAlias => &CheckCode::UP020,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2573,6 +2578,7 @@ impl CheckKind {
             CheckKind::RemoveSixCompat => "Unnecessary `six` compatibility usage".to_string(),
             CheckKind::DatetimeTimezoneUTC => "Use `datetime.UTC` alias".to_string(),
             CheckKind::NativeLiterals => "Unnecessary call to `str` and `bytes`".to_string(),
+            CheckKind::OpenAlias => "Use builtin `open` instead".to_string(),
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
             }
@@ -3015,6 +3021,7 @@ impl CheckKind {
                 | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::MissingReturnTypeSpecialMethod(..)
                 | CheckKind::NativeLiterals
+                | CheckKind::OpenAlias
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
