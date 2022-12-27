@@ -26,7 +26,7 @@ impl FStringParser {
         mut chars: iter::Peekable<str::Chars<'a>>,
         nested: u8,
     ) -> Result<(Vec<Expr>, iter::Peekable<str::Chars<'a>>), FStringErrorType> {
-        let mut expression = String::from("{");
+        let mut expression = String::new();
         let mut spec = None;
         let mut delims = Vec::new();
         let mut conversion = ConversionFlag::None;
@@ -67,14 +67,14 @@ impl FStringParser {
                         Some('a') => ConversionFlag::Ascii,
                         Some('r') => ConversionFlag::Repr,
                         Some(_) => {
-                            return Err(if expression[1..].trim().is_empty() {
+                            return Err(if expression.trim().is_empty() {
                                 EmptyExpression
                             } else {
                                 InvalidConversionFlag
                             });
                         }
                         None => {
-                            return Err(if expression[1..].trim().is_empty() {
+                            return Err(if expression.trim().is_empty() {
                                 EmptyExpression
                             } else {
                                 UnclosedLbrace
@@ -84,14 +84,14 @@ impl FStringParser {
 
                     if let Some(&peek) = chars.peek() {
                         if peek != '}' && peek != ':' {
-                            return Err(if expression[1..].trim().is_empty() {
+                            return Err(if expression.trim().is_empty() {
                                 EmptyExpression
                             } else {
                                 UnclosedLbrace
                             });
                         }
                     } else {
-                        return Err(if expression[1..].trim().is_empty() {
+                        return Err(if expression.trim().is_empty() {
                             EmptyExpression
                         } else {
                             UnclosedLbrace
@@ -156,15 +156,14 @@ impl FStringParser {
                     }
                 }
                 '}' => {
-                    if expression[1..].trim().is_empty() {
+                    if expression.trim().is_empty() {
                         return Err(EmptyExpression);
                     }
-                    expression.push(ch);
 
                     let ret = if !self_documenting {
                         vec![self.expr(ExprKind::FormattedValue {
                             value: Box::new(
-                                parse_fstring_expr(&expression[1..expression.len() - 1])
+                                parse_fstring_expr(&expression)
                                     .map_err(|e| InvalidExpression(Box::new(e.error)))?,
                             ),
                             conversion: conversion as _,
@@ -173,9 +172,7 @@ impl FStringParser {
                     } else {
                         vec![
                             self.expr(ExprKind::Constant {
-                                value: Constant::Str(
-                                    expression[1..expression.len() - 1].to_owned() + "=",
-                                ),
+                                value: Constant::Str(expression.to_owned() + "="),
                                 kind: None,
                             }),
                             self.expr(ExprKind::Constant {
@@ -184,7 +181,7 @@ impl FStringParser {
                             }),
                             self.expr(ExprKind::FormattedValue {
                                 value: Box::new(
-                                    parse_fstring_expr(&expression[1..expression.len() - 1])
+                                    parse_fstring_expr(&expression)
                                         .map_err(|e| InvalidExpression(Box::new(e.error)))?,
                                 ),
                                 conversion: (if conversion == ConversionFlag::None && spec.is_none()
@@ -226,7 +223,7 @@ impl FStringParser {
                 }
             }
         }
-        Err(if expression[1..].trim().is_empty() {
+        Err(if expression.trim().is_empty() {
             EmptyExpression
         } else {
             UnclosedLbrace
