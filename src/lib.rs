@@ -84,6 +84,9 @@ cfg_if! {
 
         mod lib_native;
         pub use lib_native::check;
+
+        mod lib_python;
+        pub use lib_python::_ruff;
     } else {
         mod lib_wasm;
         pub use lib_wasm::check;
