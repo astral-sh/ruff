@@ -279,9 +279,10 @@ mod tests {
 
     use anyhow::Result;
     use ruff::checks_gen::CheckCodePrefix;
-    use ruff::flake8_quotes;
+    use ruff::pydocstyle::settings::Convention;
     use ruff::settings::options::Options;
     use ruff::settings::pyproject::Pyproject;
+    use ruff::{flake8_quotes, pydocstyle};
 
     use crate::converter::convert;
     use crate::plugin::Plugin;
@@ -667,7 +668,9 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
-            pydocstyle: None,
+            pydocstyle: Some(pydocstyle::settings::Options {
+                convention: Some(Convention::Numpy),
+            }),
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
