@@ -1,6 +1,6 @@
 use rustpython_ast::{Expr, Keyword, Located};
 
-use crate::ast::helpers::match_module_member;
+use crate::ast::helpers::{find_keyword, match_module_member};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
@@ -15,17 +15,10 @@ pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[
         &checker.from_imports,
         &checker.import_aliases,
     ) {
-        let filtered_kwargs = kwargs
-            .iter()
-            .filter(|kw| kw.node.arg == Some("universal_newlines".to_string()))
-            .collect::<Vec<_>>();
-        if filtered_kwargs.is_empty() {
-            return;
-        }
+        let Some(the_kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
         // The kwarg end location includes the value, which we do not want to
         // remove, so we need to find the start of the next value, and then
         // move one to the left so that the '=' sign is not removed.
-        let the_kwarg = filtered_kwargs.get(0).unwrap();
         let start = the_kwarg.location;
         let mut end = the_kwarg.node.value.location;
         end.go_left();
