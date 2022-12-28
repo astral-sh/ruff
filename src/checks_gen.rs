@@ -760,6 +760,7 @@ impl CheckCodePrefix {
                 CheckCode::UP019,
                 CheckCode::UP020,
                 CheckCode::UP021,
+                CheckCode::UP022,
                 CheckCode::D100,
                 CheckCode::D101,
                 CheckCode::D102,
