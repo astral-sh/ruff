@@ -24,7 +24,6 @@ mod checkers;
 pub mod checks;
 pub mod checks_gen;
 pub mod cli;
-pub mod code_gen;
 mod cst;
 mod directives;
 mod docstrings;
@@ -70,7 +69,9 @@ pub mod resolver;
 mod ruff;
 mod rustpython_helpers;
 pub mod settings;
+pub mod source_code_generator;
 pub mod source_code_locator;
+pub mod source_code_style;
 mod vendor;
 pub mod visibility;
 

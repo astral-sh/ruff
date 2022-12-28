@@ -379,6 +379,7 @@ fn resolve_codes<'a>(specs: impl Iterator<Item = CheckCodeSpec<'a>>) -> FxHashSe
     let mut codes: FxHashSet<CheckCode> = FxHashSet::default();
     for spec in specs {
         for specificity in [
+            SuffixLength::None,
             SuffixLength::Zero,
             SuffixLength::One,
             SuffixLength::Two,

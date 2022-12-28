@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
-use rustpython_ast::Location;
+use rustpython_ast::{Expr, ExprKind, Keyword, KeywordData, Location};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -1678,5 +1678,27 @@ pub fn ambiguous_unicode_character(
         }
     }
 
+    checks
+}
+
+/// RUF004
+pub fn keyword_argument_before_star_argument(args: &[Expr], keywords: &[Keyword]) -> Vec<Check> {
+    let mut checks = vec![];
+    if let Some(arg) = args
+        .iter()
+        .rfind(|arg| matches!(arg.node, ExprKind::Starred { .. }))
+    {
+        for keyword in keywords {
+            if keyword.location < arg.location {
+                let KeywordData { arg, .. } = &keyword.node;
+                if let Some(arg) = arg {
+                    checks.push(Check::new(
+                        CheckKind::KeywordArgumentBeforeStarArgument(arg.to_string()),
+                        Range::from_located(keyword),
+                    ));
+                }
+            }
+        }
+    }
     checks
 }

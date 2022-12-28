@@ -1,14 +1,15 @@
 //! Vendored from [bytes.rs in rustpython-common](https://github.com/RustPython/RustPython/blob/1d8269fb729c91fc56064e975172d3a11bd62d07/common/src/bytes.rs).
-//! The only changes we make are to remove dead code and change the default
-//! quote type (from squote to dquote).
+//! The only changes we make are to remove dead code and make the default quote
+//! type configurable.
 
 use crate::vendor;
+use crate::vendor::str::Quote;
 
-pub fn repr(b: &[u8]) -> String {
-    repr_with(b, &[], "")
+pub fn repr(b: &[u8], quote: Quote) -> String {
+    repr_with(b, &[], "", quote)
 }
 
-pub fn repr_with(b: &[u8], prefixes: &[&str], suffix: &str) -> String {
+pub fn repr_with(b: &[u8], prefixes: &[&str], suffix: &str, quote: Quote) -> String {
     use std::fmt::Write;
 
     let mut out_len = 0usize;
@@ -33,7 +34,7 @@ pub fn repr_with(b: &[u8], prefixes: &[&str], suffix: &str) -> String {
         out_len = out_len.checked_add(incr).unwrap();
     }
 
-    let (quote, num_escaped_quotes) = vendor::str::choose_quotes_for_repr(squote, dquote);
+    let (quote, num_escaped_quotes) = vendor::str::choose_quotes_for_repr(squote, dquote, quote);
     // we'll be adding backslashes in front of the existing inner quotes
     out_len += num_escaped_quotes;
 

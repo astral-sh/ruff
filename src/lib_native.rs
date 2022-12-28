@@ -11,6 +11,7 @@ use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::{flags, pyproject, Settings};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{directives, packages, resolver};
 
 /// Load the relevant `Settings` for a given `Path`.
@@ -38,8 +39,11 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);
 
-    // Initialize the SourceCodeLocator (which computes offsets lazily).
+    // Map row and column locations to byte slices (lazily).
     let locator = SourceCodeLocator::new(contents);
+
+    // Detect the current code style (lazily).
+    let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
@@ -55,6 +59,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         contents,
         tokens,
         &locator,
+        &stylist,
         &directives,
         &settings,
         autofix.into(),

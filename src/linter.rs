@@ -17,12 +17,13 @@ use crate::checkers::lines::check_lines;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::tokens::check_tokens;
 use crate::checks::{Check, CheckCode, CheckKind, LintSource};
-use crate::code_gen::SourceGenerator;
 use crate::directives::Directives;
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::settings::{flags, Settings};
+use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{cache, directives, fs, rustpython_helpers};
 
 #[derive(Debug, Default)]
@@ -53,6 +54,7 @@ pub(crate) fn check_path(
     contents: &str,
     tokens: Vec<LexResult>,
     locator: &SourceCodeLocator,
+    stylist: &SourceCodeStyleDetector,
     directives: &Directives,
     settings: &Settings,
     autofix: flags::Autofix,
@@ -89,6 +91,7 @@ pub(crate) fn check_path(
                     checks.extend(check_ast(
                         &python_ast,
                         locator,
+                        stylist,
                         &directives.noqa_line_for,
                         settings,
                         autofix,
@@ -216,8 +219,11 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     // Tokenize once.
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
 
-    // Initialize the SourceCodeLocator (which computes offsets lazily).
+    // Map row and column locations to byte slices (lazily).
     let locator = SourceCodeLocator::new(&contents);
+
+    // Detect the current code style (lazily).
+    let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
@@ -233,6 +239,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &contents,
         tokens,
         &locator,
+        &stylist,
         &directives,
         settings,
         flags::Autofix::Disabled,
@@ -259,9 +266,15 @@ pub fn autoformat_path(path: &Path, settings: &Settings) -> Result<()> {
     // Tokenize once.
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
 
+    // Map row and column locations to byte slices (lazily).
+    let locator = SourceCodeLocator::new(&contents);
+
+    // Detect the current code style (lazily).
+    let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
+
     // Generate the AST.
     let python_ast = rustpython_helpers::parse_program_tokens(tokens, "<filename>")?;
-    let mut generator = SourceGenerator::default();
+    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
     generator.unparse_suite(&python_ast);
     write(path, generator.generate()?)?;
 
@@ -318,8 +331,11 @@ fn lint(
         // Tokenize once.
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
 
-        // Initialize the SourceCodeLocator (which computes offsets lazily).
+        // Map row and column locations to byte slices (lazily).
         let locator = SourceCodeLocator::new(&contents);
+
+        // Detect the current code style (lazily).
+        let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
@@ -335,6 +351,7 @@ fn lint(
             &contents,
             tokens,
             &locator,
+            &stylist,
             &directives,
             settings,
             autofix.into(),
@@ -381,6 +398,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
+    let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
     let directives = directives::extract_directives(
         &tokens,
         &locator,
@@ -392,6 +410,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
         &contents,
         tokens,
         &locator,
+        &stylist,
         &directives,
         settings,
         flags::Autofix::Enabled,

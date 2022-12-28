@@ -7,9 +7,10 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
-use crate::code_gen::SourceGenerator;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
+use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code_style::SourceCodeStyleDetector;
 
 /// Return the typename, args, keywords and mother class
 fn match_named_tuple_assign<'a>(
@@ -163,8 +164,9 @@ fn convert_to_class(
     typename: &str,
     body: Vec<Stmt>,
     base_class: &ExprKind,
+    stylist: &SourceCodeStyleDetector,
 ) -> Result<Fix> {
-    let mut generator = SourceGenerator::new();
+    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
     generator.unparse_stmt(&create_class_def_stmt(typename, body, base_class));
     let content = generator.generate()?;
     Ok(Fix::replacement(
@@ -194,7 +196,7 @@ pub fn convert_named_tuple_functional_to_class(
                     Range::from_located(stmt),
                 );
                 if checker.patch(check.kind.code()) {
-                    match convert_to_class(stmt, typename, properties, base_class) {
+                    match convert_to_class(stmt, typename, properties, base_class, checker.style) {
                         Ok(fix) => check.amend(fix),
                         Err(err) => error!("Failed to convert `NamedTuple`: {err}"),
                     }

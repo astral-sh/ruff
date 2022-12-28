@@ -1,4 +1,7 @@
+//! Generate Python source code from an abstract syntax tree (AST).
+
 use std::fmt;
+use std::ops::Deref;
 use std::string::FromUtf8Error;
 
 use anyhow::Result;
@@ -8,6 +11,7 @@ use rustpython_parser::ast::{
     Operator, Stmt, StmtKind,
 };
 
+use crate::source_code_style::{Indentation, Quote};
 use crate::vendor::{bytes, str};
 
 mod precedence {
@@ -28,25 +32,27 @@ mod precedence {
     pub const EXPR: u8 = BOR;
 }
 
-pub struct SourceGenerator {
+pub struct SourceCodeGenerator<'a> {
+    /// The indentation style to use.
+    indent: &'a Indentation,
+    /// The quote style to use for string literals.
+    quote: &'a Quote,
     buffer: Vec<u8>,
-    indentation: usize,
-    new_lines: usize,
+    indent_depth: usize,
+    num_newlines: usize,
     initial: bool,
 }
 
-impl Default for SourceGenerator {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl SourceGenerator {
-    pub fn new() -> Self {
-        SourceGenerator {
+impl<'a> SourceCodeGenerator<'a> {
+    pub fn new(indent: &'a Indentation, quote: &'a Quote) -> Self {
+        SourceCodeGenerator {
+            // Style preferences.
+            indent,
+            quote,
+            // Internal state.
             buffer: vec![],
-            indentation: 0,
-            new_lines: 0,
+            indent_depth: 0,
+            num_newlines: 0,
             initial: true,
         }
     }
@@ -57,30 +63,30 @@ impl SourceGenerator {
 
     fn newline(&mut self) {
         if !self.initial {
-            self.new_lines = std::cmp::max(self.new_lines, 1);
+            self.num_newlines = std::cmp::max(self.num_newlines, 1);
         }
     }
 
     fn newlines(&mut self, extra: usize) {
         if !self.initial {
-            self.new_lines = std::cmp::max(self.new_lines, 1 + extra);
+            self.num_newlines = std::cmp::max(self.num_newlines, 1 + extra);
         }
     }
 
     fn body<U>(&mut self, stmts: &[Stmt<U>]) {
-        self.indentation += 1;
+        self.indent_depth += 1;
         for stmt in stmts {
             self.unparse_stmt(stmt);
         }
-        self.indentation -= 1;
+        self.indent_depth -= 1;
     }
 
     fn p(&mut self, s: &str) {
-        if self.new_lines > 0 {
-            for _ in 0..self.new_lines {
+        if self.num_newlines > 0 {
+            for _ in 0..self.num_newlines {
                 self.buffer.extend("\n".as_bytes());
             }
-            self.new_lines = 0;
+            self.num_newlines = 0;
         }
         self.buffer.extend(s.as_bytes());
     }
@@ -109,7 +115,7 @@ impl SourceGenerator {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline();
-                self.p(&"    ".repeat(self.indentation));
+                self.p(&self.indent.deref().repeat(self.indent_depth));
                 $body
                 self.initial = false;
             }};
@@ -124,7 +130,7 @@ impl SourceGenerator {
                 ..
             } => {
                 // TODO(charlie): Handle decorators.
-                self.newlines(if self.indentation == 0 { 2 } else { 1 });
+                self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 statement!({
                     self.p("def ");
                     self.p(name);
@@ -138,7 +144,7 @@ impl SourceGenerator {
                     self.p(":");
                 });
                 self.body(body);
-                if self.indentation == 0 {
+                if self.indent_depth == 0 {
                     self.newlines(2);
                 }
             }
@@ -150,7 +156,7 @@ impl SourceGenerator {
                 ..
             } => {
                 // TODO(charlie): Handle decorators.
-                self.newlines(if self.indentation == 0 { 2 } else { 1 });
+                self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 statement!({
                     self.p("async def ");
                     self.p(name);
@@ -164,7 +170,7 @@ impl SourceGenerator {
                     self.p(":");
                 });
                 self.body(body);
-                if self.indentation == 0 {
+                if self.indent_depth == 0 {
                     self.newlines(2);
                 }
             }
@@ -176,7 +182,7 @@ impl SourceGenerator {
                 ..
             } => {
                 // TODO(charlie): Handle decorators.
-                self.newlines(if self.indentation == 0 { 2 } else { 1 });
+                self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 statement!({
                     self.p("class ");
                     self.p(name);
@@ -201,7 +207,7 @@ impl SourceGenerator {
                     self.p(":");
                 });
                 self.body(body);
-                if self.indentation == 0 {
+                if self.indent_depth == 0 {
                     self.newlines(2);
                 }
             }
@@ -790,10 +796,10 @@ impl SourceGenerator {
                         self.p(&value.to_string().replace("inf", inf_str));
                     }
                     Constant::Bytes(b) => {
-                        self.p(&bytes::repr(b));
+                        self.p(&bytes::repr(b, self.quote.into()));
                     }
                     Constant::Str(s) => {
-                        self.p(&format!("{}", str::repr(s)));
+                        self.p(&format!("{}", str::repr(s, self.quote.into())));
                     }
                     _ => self.p(&format!("{value}")),
                 }
@@ -938,7 +944,7 @@ impl SourceGenerator {
     }
 
     fn unparse_formatted<U>(&mut self, val: &Expr<U>, conversion: usize, spec: Option<&Expr<U>>) {
-        let mut generator = SourceGenerator::default();
+        let mut generator = SourceCodeGenerator::new(self.indent, self.quote);
         generator.unparse_expr(val, precedence::TEST + 1);
         let brace = if generator.buffer.starts_with("{".as_bytes()) {
             // put a space to avoid escaping the bracket
@@ -994,10 +1000,10 @@ impl SourceGenerator {
             self.unparse_fstring_body(values, is_spec);
         } else {
             self.p("f");
-            let mut generator = SourceGenerator::default();
+            let mut generator = SourceCodeGenerator::new(self.indent, self.quote);
             generator.unparse_fstring_body(values, is_spec);
             let body = std::str::from_utf8(&generator.buffer).unwrap();
-            self.p(&format!("{}", str::repr(body)));
+            self.p(&format!("{}", str::repr(body, self.quote.into())));
         }
     }
 
@@ -1024,18 +1030,29 @@ mod tests {
     use anyhow::Result;
     use rustpython_parser::parser;
 
-    use crate::code_gen::SourceGenerator;
+    use crate::source_code_generator::SourceCodeGenerator;
+    use crate::source_code_style::{Indentation, Quote};
 
     fn round_trip(contents: &str) -> Result<String> {
+        let indentation = Indentation::default();
+        let quote = Quote::default();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let mut generator = SourceGenerator::new();
+        let mut generator = SourceCodeGenerator::new(&indentation, &quote);
+        generator.unparse_stmt(stmt);
+        generator.generate().map_err(std::convert::Into::into)
+    }
+
+    fn round_trip_with(indentation: &Indentation, quote: &Quote, contents: &str) -> Result<String> {
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let mut generator = SourceCodeGenerator::new(indentation, quote);
         generator.unparse_stmt(stmt);
         generator.generate().map_err(std::convert::Into::into)
     }
 
     #[test]
-    fn dquote() -> Result<()> {
+    fn quote() -> Result<()> {
         assert_eq!(round_trip(r#""hello""#)?, r#""hello""#);
         assert_eq!(round_trip(r#"'hello'"#)?, r#""hello""#);
         assert_eq!(round_trip(r#"u'hello'"#)?, r#"u"hello""#);
@@ -1045,6 +1062,99 @@ mod tests {
         assert_eq!(round_trip(r#""he\"llo""#)?, r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#)?, r#"f'abc{"def"}{1}'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#)?, r#"f'abc{"def"}{1}'"#);
+        Ok(())
+    }
+
+    #[test]
+    fn indent() -> Result<()> {
+        assert_eq!(
+            round_trip(
+                r#"
+if True:
+  pass
+"#
+                .trim(),
+            )?,
+            r#"
+if True:
+    pass
+"#
+            .trim()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn set_quote() -> Result<()> {
+        assert_eq!(
+            round_trip_with(&Indentation::default(), &Quote::Double, r#""hello""#)?,
+            r#""hello""#
+        );
+        assert_eq!(
+            round_trip_with(&Indentation::default(), &Quote::Single, r#""hello""#)?,
+            r#"'hello'"#
+        );
+        assert_eq!(
+            round_trip_with(&Indentation::default(), &Quote::Double, r#"'hello'"#)?,
+            r#""hello""#
+        );
+        assert_eq!(
+            round_trip_with(&Indentation::default(), &Quote::Single, r#"'hello'"#)?,
+            r#"'hello'"#
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn set_indent() -> Result<()> {
+        assert_eq!(
+            round_trip_with(
+                &Indentation::new("    ".to_string()),
+                &Quote::default(),
+                r#"
+if True:
+  pass
+"#
+                .trim(),
+            )?,
+            r#"
+if True:
+    pass
+"#
+            .trim()
+        );
+        assert_eq!(
+            round_trip_with(
+                &Indentation::new("  ".to_string()),
+                &Quote::default(),
+                r#"
+if True:
+  pass
+"#
+                .trim(),
+            )?,
+            r#"
+if True:
+  pass
+"#
+            .trim()
+        );
+        assert_eq!(
+            round_trip_with(
+                &Indentation::new("\t".to_string()),
+                &Quote::default(),
+                r#"
+if True:
+  pass
+"#
+                .trim(),
+            )?,
+            r#"
+if True:
+	pass
+"#
+            .trim()
+        );
 
         Ok(())
     }

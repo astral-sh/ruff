@@ -33,6 +33,7 @@ use crate::python::typing::SubscriptKind;
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::vendor::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
@@ -40,7 +41,8 @@ use crate::{
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
     flake8_debugger, flake8_errmsg, flake8_import_conventions, flake8_print, flake8_return,
     flake8_simplify, flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet,
-    pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, visibility,
+    pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff,
+    visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -56,6 +58,7 @@ pub struct Checker<'a> {
     pub(crate) settings: &'a Settings,
     pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
     pub(crate) locator: &'a SourceCodeLocator<'a>,
+    pub(crate) style: &'a SourceCodeStyleDetector<'a>,
     // Computed checks.
     checks: Vec<Check>,
     // Function and class definition tracking (e.g., for docstring enforcement).
@@ -107,6 +110,7 @@ impl<'a> Checker<'a> {
         noqa: flags::Noqa,
         path: &'a Path,
         locator: &'a SourceCodeLocator,
+        style: &'a SourceCodeStyleDetector,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -115,6 +119,7 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             locator,
+            style,
             checks: vec![],
             definitions: vec![],
             deletions: FxHashSet::default(),
@@ -1642,11 +1647,20 @@ where
                 }
 
                 // pyupgrade
+                if self.settings.enabled.contains(&CheckCode::UP003) {
+                    pyupgrade::plugins::type_of_primitive(self, expr, func, args);
+                }
                 if self.settings.enabled.contains(&CheckCode::UP005) {
                     pyupgrade::plugins::deprecated_unittest_alias(self, func);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP008) {
+                    pyupgrade::plugins::super_call_with_parameters(self, expr, func, args);
+                }
                 if self.settings.enabled.contains(&CheckCode::UP012) {
                     pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP015) {
+                    pyupgrade::plugins::redundant_open_modes(self, expr);
                 }
                 if self.settings.enabled.contains(&CheckCode::UP016) {
                     pyupgrade::plugins::remove_six_compat(self, expr);
@@ -1654,16 +1668,14 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP018) {
                     pyupgrade::plugins::native_literals(self, expr, func, args, keywords);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP020) {
+                    pyupgrade::plugins::open_alias(self, expr, func);
+                }
                 if self.settings.enabled.contains(&CheckCode::UP021) {
                     pyupgrade::plugins::replace_universal_newlines(self, expr, keywords);
                 }
                 if self.settings.enabled.contains(&CheckCode::UP022) {
                     pyupgrade::plugins::replace_stdout_stderr(self, expr, keywords);
-                }
-
-                // flake8-super
-                if self.settings.enabled.contains(&CheckCode::UP008) {
-                    pyupgrade::plugins::super_call_with_parameters(self, expr, func, args);
                 }
 
                 // flake8-print
@@ -1728,7 +1740,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C401) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_set(
                         expr,
@@ -1742,7 +1753,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C402) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_dict(
                         expr,
@@ -1756,7 +1766,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C403) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_set(
@@ -1772,7 +1781,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C404) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_dict(
@@ -1788,7 +1796,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C405) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_set(
                         expr,
@@ -1802,7 +1809,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C406) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_dict(
                         expr,
@@ -1816,7 +1822,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C408) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_collection_call(
                         expr,
@@ -1830,7 +1835,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C409) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_literal_within_tuple_call(
@@ -1845,7 +1849,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C410) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_literal_within_list_call(
@@ -1860,7 +1863,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C411) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_list_call(
                         expr,
@@ -1873,7 +1875,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C413) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_call_around_sorted(
@@ -1888,7 +1889,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C414) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_double_cast_or_process(
@@ -1900,7 +1900,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C415) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_subscript_reversal(
@@ -1912,7 +1911,6 @@ where
                         self.add_check(check);
                     };
                 }
-
                 if self.settings.enabled.contains(&CheckCode::C417) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_map(
                         func,
@@ -1921,19 +1919,6 @@ where
                     ) {
                         self.add_check(check);
                     };
-                }
-
-                // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::UP003) {
-                    pyupgrade::plugins::type_of_primitive(self, expr, func, args);
-                }
-
-                if self.settings.enabled.contains(&CheckCode::UP015) {
-                    pyupgrade::plugins::redundant_open_modes(self, expr);
-                }
-
-                if self.settings.enabled.contains(&CheckCode::UP020) {
-                    pyupgrade::plugins::open_alias(self, expr, func);
                 }
 
                 // flake8-boolean-trap
@@ -1966,7 +1951,6 @@ where
                 if self.settings.enabled.contains(&CheckCode::PD002) {
                     self.add_checks(pandas_vet::checks::inplace_argument(keywords).into_iter());
                 }
-
                 for (code, name) in vec![
                     (CheckCode::PD003, "isnull"),
                     (CheckCode::PD004, "notnull"),
@@ -1983,7 +1967,6 @@ where
                         }
                     }
                 }
-
                 if self.settings.enabled.contains(&CheckCode::PD015) {
                     if let Some(check) = pandas_vet::checks::use_of_pd_merge(func) {
                         self.add_check(check);
@@ -2076,6 +2059,14 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::PLR1722) {
                     pylint::plugins::use_sys_exit(self, func);
+                }
+
+                // ruff
+                if self.settings.enabled.contains(&CheckCode::RUF004) {
+                    self.add_checks(
+                        ruff::checks::keyword_argument_before_star_argument(args, keywords)
+                            .into_iter(),
+                    );
                 }
             }
             ExprKind::Dict { keys, .. } => {
@@ -3929,16 +3920,26 @@ impl<'a> Checker<'a> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn check_ast(
     python_ast: &Suite,
     locator: &SourceCodeLocator,
+    stylist: &SourceCodeStyleDetector,
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     path: &Path,
 ) -> Vec<Check> {
-    let mut checker = Checker::new(settings, noqa_line_for, autofix, noqa, path, locator);
+    let mut checker = Checker::new(
+        settings,
+        noqa_line_for,
+        autofix,
+        noqa,
+        path,
+        locator,
+        stylist,
+    );
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 
