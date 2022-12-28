@@ -667,7 +667,7 @@ TypedParameter: ast::Arg = {
 // TODO: figure out another grammar that makes this inline no longer required.
 #[inline]
 ParameterListStarArgs<ArgType>: (Option<Box<ast::Arg>>, Vec<ast::Arg>, Vec<ast::Expr>, Option<Box<ast::Arg>>) = {
-    "*" <va:ArgType?> <kw:("," ParameterDef<ArgType>)*> <kwarg:("," KwargParameter<ArgType>)?> => {
+    <location:@L> "*" <va:ArgType?> <kw:("," ParameterDef<ArgType>)*> <kwarg:("," KwargParameter<ArgType>)?> =>? {
         // Extract keyword arguments:
         let mut kwonlyargs = Vec::new();
         let mut kw_defaults = Vec::new();
@@ -685,7 +685,14 @@ ParameterListStarArgs<ArgType>: (Option<Box<ast::Arg>>, Vec<ast::Arg>, Vec<ast::
         let kwarg = kwarg.map(|n| n.1).flatten();
         let va = va.map(Box::new);
 
-        (va, kwargs, kw_defaults, kwarg)
+        if va==None && kwargs.is_empty() && kwarg==None {
+            Err(LexicalError {
+                error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
+                location: location,
+            })?
+        }
+
+        Ok((va, kwargs, kw_defaults, kwarg))
     }
 };
 
