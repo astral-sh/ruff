@@ -97,6 +97,17 @@ impl<'a> Printer<'a> {
         }
     }
 
+    fn group_messages_by_filename(messages: &Vec<Message>) -> BTreeMap<&String, Vec<&Message>> {
+        let mut grouped_messages = BTreeMap::default();
+        for message in messages {
+            grouped_messages
+                .entry(&message.filename)
+                .or_insert_with(Vec::new)
+                .push(message);
+        }
+        grouped_messages
+    }
+
     pub fn write_once(&self, diagnostics: &Diagnostics) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -135,15 +146,7 @@ impl<'a> Printer<'a> {
             SerializationFormat::Junit => {
                 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
-                // Group by filename.
-                let mut grouped_messages = BTreeMap::default();
-                for message in &diagnostics.messages {
-                    grouped_messages
-                        .entry(&message.filename)
-                        .or_insert_with(Vec::new)
-                        .push(message);
-                }
-
+                let grouped_messages = Self::group_messages_by_filename(&diagnostics.messages);
                 let mut report = Report::new("ruff");
                 for (filename, messages) in grouped_messages {
                     let mut test_suite = TestSuite::new(filename);
@@ -184,14 +187,7 @@ impl<'a> Printer<'a> {
                 self.post_text(diagnostics);
             }
             SerializationFormat::Grouped => {
-                // Group by filename.
-                let mut grouped_messages = BTreeMap::default();
-                for message in &diagnostics.messages {
-                    grouped_messages
-                        .entry(&message.filename)
-                        .or_insert_with(Vec::new)
-                        .push(message);
-                }
+                let grouped_messages = Self::group_messages_by_filename(&diagnostics.messages);
 
                 for (filename, messages) in grouped_messages {
                     // Compute the maximum number of digits in the row and column, for messages in
