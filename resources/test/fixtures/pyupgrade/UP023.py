@@ -1,16 +1,17 @@
-from xml.etree.cElementTree import XML
+# These two imports have something after cElementTree, so they should be fixed
+from xml.etree.cElementTree import XML, Element, SubElement
 import xml.etree.cElementTree as ET
-from xml.etree import cElementTree
-from xml import etree
-import xml
 
-def parser(f1: xml.etree.cElementTree, f2: etree.cElementTree, f3: cElementTree, f4: ET) -> None:
-    pass
+# Weird spacing should not cause issues
+from   xml.etree.cElementTree    import  XML
+import    xml.etree.cElementTree       as      ET
 
+# Multi line imports should also work fine
+from xml.etree.cElementTree import (
+    XML,
+    Element,
+    SubElement,
+)
 
-w = xml.etree.cElementTree
-x = etree.cElementTree
-y = cElementTree
-z = ET
-
-cElementTree.dump(None)
+# This does not have anything after cElementTree, so it should not be fixed
+import xml.etree.cElementTree
