@@ -1,0 +1,31 @@
+use rustpython_ast::Expr;
+
+use crate::ast::helpers::match_module_member;
+use crate::ast::types::Range;
+use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
+use crate::checks::{Check, CheckKind};
+
+const ERROR_NAMES: &'static [&'static str] = &["EnvironmentError", "IOError", "WindowsError"];
+const ERROR_MODULES: &'static [&'static str] = &["mmap", "select", "socket"];
+
+/// UP024
+pub fn os_error_alias(checker: &mut Checker, expr: &Expr) {
+    if match_module_member(
+        expr,
+        "typing",
+        "Text",
+        &checker.from_imports,
+        &checker.import_aliases,
+    ) {
+        let mut check = Check::new(CheckKind::TypingTextStrAlias, Range::from_located(expr));
+        if checker.patch(check.kind.code()) {
+            check.amend(Fix::replacement(
+                "str".to_string(),
+                expr.location,
+                expr.end_location.unwrap(),
+            ));
+        }
+        checker.add_check(check);
+    }
+}
