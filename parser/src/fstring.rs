@@ -207,14 +207,12 @@ impl<'a> FStringParser<'a> {
                 '"' | '\'' => {
                     expression.push(ch);
                     loop {
-                        match self.next_char() {
-                            Some(c) => {
-                                expression.push(c);
-                                if c == ch {
-                                    break;
-                                }
-                            }
-                            None => return Err(UnterminatedString),
+                        let Some(c) = self.next_char() else {
+                            return Err(UnterminatedString);
+                        };
+                        expression.push(c);
+                        if c == ch {
+                            break;
                         }
                     }
                 }
