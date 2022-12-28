@@ -328,6 +328,7 @@ pub enum CheckCode {
     RUF001,
     RUF002,
     RUF003,
+    RUF004,
     RUF100,
     // pygrep-hooks
     PGH001,
@@ -955,6 +956,7 @@ pub enum CheckKind {
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
     AmbiguousUnicodeCharacterComment(char, char),
+    KeywordArgumentBeforeStarArgument(String),
     UnusedNOQA(Option<UnusedCodes>),
     // flake8-datetimez
     CallDatetimeWithoutTzinfo,
@@ -1360,6 +1362,7 @@ impl CheckCode {
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
             CheckCode::RUF003 => CheckKind::AmbiguousUnicodeCharacterComment('𝐁', 'B'),
+            CheckCode::RUF004 => CheckKind::KeywordArgumentBeforeStarArgument("...".to_string()),
             CheckCode::RUF100 => CheckKind::UnusedNOQA(None),
         }
     }
@@ -1612,6 +1615,7 @@ impl CheckCode {
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
             CheckCode::RUF003 => CheckCategory::Ruff,
+            CheckCode::RUF004 => CheckCategory::Ruff,
             CheckCode::RUF100 => CheckCategory::Ruff,
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
@@ -1980,6 +1984,7 @@ impl CheckKind {
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
             CheckKind::AmbiguousUnicodeCharacterComment(..) => &CheckCode::RUF003,
+            CheckKind::KeywordArgumentBeforeStarArgument(..) => &CheckCode::RUF004,
             CheckKind::UnusedNOQA(..) => &CheckCode::RUF100,
         }
     }
@@ -2881,6 +2886,9 @@ impl CheckKind {
                     "Comment contains ambiguous unicode character '{confusable}' (did you mean \
                      '{representant}'?)"
                 )
+            }
+            CheckKind::KeywordArgumentBeforeStarArgument(name) => {
+                format!("Keyword argument `{name}` must come after starred arguments")
             }
             CheckKind::UnusedNOQA(codes) => match codes {
                 None => "Unused blanket `noqa` directive".to_string(),
