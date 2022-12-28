@@ -7,7 +7,7 @@ use crate::{
 use std::{iter, mem, str};
 
 struct FStringParser<'a> {
-    source: iter::Peekable<str::Chars<'a>>,
+    chars: iter::Peekable<str::Chars<'a>>,
     str_start: Location,
     str_end: Location,
 }
@@ -15,18 +15,18 @@ struct FStringParser<'a> {
 impl<'a> FStringParser<'a> {
     fn new(source: &'a str, str_start: Location, str_end: Location) -> Self {
         Self {
-            source: source.chars().peekable(),
+            chars: source.chars().peekable(),
             str_start,
             str_end,
         }
     }
 
     fn next_char(&mut self) -> Option<char> {
-        self.source.next()
+        self.chars.next()
     }
 
     fn peek(&mut self) -> Option<&char> {
-        self.source.peek()
+        self.chars.peek()
     }
 
     #[inline]
