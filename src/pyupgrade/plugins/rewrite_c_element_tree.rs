@@ -17,15 +17,25 @@ pub fn replace_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
             let item = names.get(0).unwrap();
             if item.node.name == "xml.etree.cElementTree" && item.node.asname.is_some() {
                 range = Some(Range::from_located(stmt));
-                selected_contents = Some(checker.locator.slice_source_code_range(&range.unwrap()).to_string());
+                selected_contents = Some(
+                    checker
+                        .locator
+                        .slice_source_code_range(&range.unwrap())
+                        .to_string(),
+                );
             }
-        },
+        }
         StmtKind::ImportFrom { module, .. } => {
             if module == &Some("xml.etree.cElementTree".to_string()) {
                 range = Some(Range::from_located(stmt));
-                selected_contents = Some(checker.locator.slice_source_code_range(&range.unwrap()).to_string());
+                selected_contents = Some(
+                    checker
+                        .locator
+                        .slice_source_code_range(&range.unwrap())
+                        .to_string(),
+                );
             }
-        },
+        }
         _ => (),
     }
     if let Some(selection) = selected_contents {
