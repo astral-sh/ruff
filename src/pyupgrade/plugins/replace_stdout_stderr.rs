@@ -6,6 +6,28 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+fn dirty_count(iter: impl Iterator<Item = char>) -> u32 {
+    let mut the_count = 0;
+    for current_char in iter {
+        if current_char == ' ' || current_char == ',' || current_char == '\n' {
+            the_count += 1;
+        } else {
+            break;
+        }
+    }
+    the_count
+}
+
+fn clean_middle_args(checker: &Checker, range: &Range) -> String {
+    let contents = checker.locator.slice_source_code_range(&range).to_string();
+    println!("{:?}", contents);
+    let start_gap = dirty_count(contents.chars());
+    let is_multi_line = contents.contains('\n');
+    println!("{}: {}", is_multi_line, start_gap);
+    println!("{:?}\n", range);
+    String::new()
+}
+
 /// UP022
 pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
     if match_module_member(
@@ -25,28 +47,31 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
                 &checker.from_imports,
                 &checker.import_aliases,
             );
-            println!("{:?}", kwarg);
             if is_pipe {
                 kwarg_vec.push(kwarg);
             } else {
                 return;
             }
         }
-        let range1 = Range::from_located(kwarg_vec.get(0).unwrap());
-        let range2 = Range::from_located(kwarg_vec.get(1).unwrap());
-        let mut check1 = Check::new(CheckKind::ReplaceStdoutStderr, range1);
-        let mut check2 = Check::new(CheckKind::ReplaceStdoutStderr, range2);
-        let stdout = kwarg_vec.get(0).unwrap();
-        let stderr = kwarg_vec.get(1).unwrap();
-        if checker.patch(check1.kind.code()) {
-            check1.amend(Fix::replacement(
+        kwarg_vec.sort_by(|a, b| a.location.cmp(&b.location));
+        let replace_range = Range {
+            location: kwarg_vec.first().unwrap().location,
+            end_location: kwarg_vec.last().unwrap().end_location.unwrap(),
+        };
+        let keep_range = Range {
+            location: kwarg_vec.first().unwrap().end_location.unwrap(),
+            end_location: kwarg_vec.last().unwrap().location,
+        };
+        let middle_str = clean_middle_args(checker, &keep_range);
+
+        let mut check = Check::new(CheckKind::ReplaceStdoutStderr, replace_range);
+        if checker.patch(check.kind.code()) {
+            check.amend(Fix::replacement(
                 "capture_output=True".to_string(),
-                stdout.location,
-                stdout.end_location.unwrap(),
+                replace_range.location,
+                replace_range.end_location,
             ));
-            check2.amend(Fix::deletion(stderr.location, stderr.end_location.unwrap()));
         }
-        checker.add_check(check1);
-        checker.add_check(check2);
+        checker.add_check(check);
     }
 }
