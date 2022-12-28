@@ -20,6 +20,7 @@ mod tests {
     use crate::linter::{check_path, test_path};
     use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
+    use crate::source_code_style::SourceCodeStyleDetector;
     use crate::{directives, rustpython_helpers, settings};
 
     #[test_case(CheckCode::F401, Path::new("F401_0.py"); "F401_0")]
@@ -171,6 +172,7 @@ mod tests {
         let settings = settings::Settings::for_rules(CheckCodePrefix::F.codes());
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = SourceCodeLocator::new(&contents);
+        let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
         let directives = directives::extract_directives(
             &tokens,
             &locator,
@@ -182,6 +184,7 @@ mod tests {
             &contents,
             tokens,
             &locator,
+            &stylist,
             &directives,
             &settings,
             flags::Autofix::Enabled,

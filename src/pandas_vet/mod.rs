@@ -14,6 +14,7 @@ mod tests {
     use crate::linter::check_path;
     use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
+    use crate::source_code_style::SourceCodeStyleDetector;
     use crate::{directives, rustpython_helpers, settings};
 
     fn check_code(contents: &str, expected: &[CheckCode]) -> Result<()> {
@@ -21,6 +22,7 @@ mod tests {
         let settings = settings::Settings::for_rules(CheckCodePrefix::PD.codes());
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = SourceCodeLocator::new(&contents);
+        let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
         let directives = directives::extract_directives(
             &tokens,
             &locator,
@@ -32,6 +34,7 @@ mod tests {
             &contents,
             tokens,
             &locator,
+            &stylist,
             &directives,
             &settings,
             flags::Autofix::Enabled,

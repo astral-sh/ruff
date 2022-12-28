@@ -4,7 +4,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
-use crate::code_gen::SourceGenerator;
+use crate::source_code_generator::SourceCodeGenerator;
 
 /// B013
 pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[Excepthandler]) {
@@ -23,7 +23,8 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             Range::from_located(type_),
         );
         if checker.patch(check.kind.code()) {
-            let mut generator = SourceGenerator::new();
+            let mut generator =
+                SourceCodeGenerator::new(checker.style.indentation(), checker.style.quote());
             generator.unparse_expr(elt, 0);
             if let Ok(content) = generator.generate() {
                 check.amend(Fix::replacement(
