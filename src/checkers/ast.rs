@@ -1679,6 +1679,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP021) {
                     pyupgrade::plugins::replace_universal_newlines(self, expr, keywords);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP022) {
+                    pyupgrade::plugins::replace_stdout_stderr(self, expr, keywords);
+                }
 
                 // flake8-print
                 if self.settings.enabled.contains(&CheckCode::T201)
