@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, Keyword, KeywordData, Located};
+use rustpython_ast::{Expr, Keyword};
 
 use crate::ast::helpers::{find_keyword, match_module_member};
 use crate::ast::types::Range;
@@ -6,50 +6,39 @@ use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
-//
-// #[derive(Debug)]
-// struct MiddleContent {
-//     content: Option<String>,
-//     is_multi_line: bool,
-// }
-//
-// impl MiddleContent {
-//     fn new(content: Option<String>, is_multi_line: bool) -> Self {
-//         Self {
-//             content,
-//             is_multi_line,
-//         }
-//     }
-// }
-//
-// fn dirty_count(iter: impl Iterator<Item = char>) -> usize {
-//     let mut the_count = 0;
-//     for current_char in iter {
-//         if current_char == ' ' || current_char == ',' || current_char == '\n' {
-//             the_count += 1;
-//         } else {
-//             break;
-//         }
-//     }
-//     the_count
-// }
-//
-// fn clean_middle_args(checker: &Checker, range: &Range) -> Option<MiddleContent> {
-//     let mut contents = checker.locator.slice_source_code_range(range);
-//     let is_multi_line = contents.contains('\n');
-//     let start_gap = dirty_count(contents.chars());
-//     if contents.len() == start_gap {
-//         return None;
-//     }
-//     for _ in 0..start_gap {
-//         contents.remove(0);
-//     }
-//     let end_gap = dirty_count(contents.chars().rev());
-//     for _ in 0..end_gap {
-//         contents.pop();
-//     }
-//     MiddleContent::new(contents, is_multi_line)
-// }
+
+#[derive(Debug)]
+struct MiddleContent<'a> {
+    contents: &'a str,
+    multi_line: bool,
+}
+
+/// Return the number of "dirty" characters.
+fn dirty_count(iter: impl Iterator<Item = char>) -> usize {
+    let mut the_count = 0;
+    for current_char in iter {
+        if current_char == ' ' || current_char == ',' || current_char == '\n' {
+            the_count += 1;
+        } else {
+            break;
+        }
+    }
+    the_count
+}
+
+/// Extract the `Middle` content between two arguments.
+fn extract_middle(contents: &str) -> Option<MiddleContent> {
+    let multi_line = contents.contains('\n');
+    let start_gap = dirty_count(contents.chars());
+    if contents.len() == start_gap {
+        return None;
+    }
+    let end_gap = dirty_count(contents.chars().rev());
+    Some(MiddleContent {
+        contents: &contents[start_gap..contents.len() - end_gap],
+        multi_line,
+    })
+}
 
 /// UP022
 pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
@@ -97,22 +86,25 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
             } else {
                 stderr
             };
-            let replace_range = Range {
-                location: first.location,
-                end_location: last.end_location.unwrap(),
-            };
-            let keep_range = Range {
+            let mut contents = String::from("capture_output=True");
+            if let Some(middle) = extract_middle(&checker.locator.slice_source_code_range(&Range {
                 location: first.end_location.unwrap(),
                 end_location: last.location,
-            };
-
-            let mut replace_str = String::from("capture_output=True");
-            replace_str.push_str(&checker.locator.slice_source_code_range(&keep_range));
-
+            })) {
+                if middle.multi_line {
+                    contents.push(',');
+                    contents.push('\n');
+                    contents.push_str(&indentation(checker, first));
+                } else {
+                    contents.push(',');
+                    contents.push(' ');
+                }
+                contents.push_str(middle.contents);
+            }
             check.amend(Fix::replacement(
-                replace_str,
-                replace_range.location,
-                replace_range.end_location,
+                contents,
+                first.location,
+                last.end_location.unwrap(),
             ));
         }
         checker.add_check(check);

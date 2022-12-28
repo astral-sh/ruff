@@ -5,10 +5,10 @@ expression: checks
 - kind: ReplaceStdoutStderr
   location:
     row: 4
-    column: 22
+    column: 9
   end_location:
     row: 4
-    column: 68
+    column: 69
   fix:
     content: capture_output=True
     location:
@@ -20,10 +20,10 @@ expression: checks
 - kind: ReplaceStdoutStderr
   location:
     row: 6
-    column: 33
+    column: 9
   end_location:
     row: 6
-    column: 79
+    column: 80
   fix:
     content: capture_output=True
     location:
@@ -35,10 +35,10 @@ expression: checks
 - kind: ReplaceStdoutStderr
   location:
     row: 8
-    column: 24
+    column: 9
   end_location:
     row: 8
-    column: 85
+    column: 86
   fix:
     content: "capture_output=True, args=[\"foo\"]"
     location:
@@ -49,11 +49,11 @@ expression: checks
       column: 85
 - kind: ReplaceStdoutStderr
   location:
-    row: 11
-    column: 13
+    row: 10
+    column: 9
   end_location:
-    row: 11
-    column: 71
+    row: 12
+    column: 1
   fix:
     content: "capture_output=True, check=True"
     location:
@@ -64,11 +64,11 @@ expression: checks
       column: 71
 - kind: ReplaceStdoutStderr
   location:
-    row: 15
-    column: 13
+    row: 14
+    column: 9
   end_location:
-    row: 15
-    column: 71
+    row: 16
+    column: 1
   fix:
     content: "capture_output=True, check=True"
     location:
@@ -79,11 +79,11 @@ expression: checks
       column: 71
 - kind: ReplaceStdoutStderr
   location:
-    row: 20
-    column: 4
+    row: 18
+    column: 9
   end_location:
-    row: 22
-    column: 26
+    row: 26
+    column: 1
   fix:
     content: "capture_output=True,\n    check=True"
     location:
@@ -94,11 +94,11 @@ expression: checks
       column: 26
 - kind: ReplaceStdoutStderr
   location:
-    row: 31
-    column: 8
+    row: 29
+    column: 13
   end_location:
-    row: 33
-    column: 30
+    row: 36
+    column: 5
   fix:
     content: "capture_output=True,\n        check=True"
     location:
