@@ -1,11 +1,14 @@
 use std::path::Path;
 
 use anyhow::Result;
+use path_absolutize::path_dedot;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
+use pythonize::depythonize;
 use rustpython_parser::lexer::LexResult;
 
 use crate::checks::{Check, CheckCode};
+use crate::lib_native::resolve;
 use crate::linter::check_path;
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
@@ -46,13 +49,18 @@ impl IntoPy<PyObject> for CheckCode {
     }
 }
 
-fn inner_check<P>(contents: &str, path: P) -> Result<Vec<Check>>
-where
-    P: AsRef<Path>,
-{
-    // let configuration = Configuration::from_options(options, path.as_ref())?;
-    let configuration = Configuration::default();
-    let settings = Settings::from_configuration(configuration, path.as_ref())?;
+fn inner_check(
+    contents: &str,
+    path: Option<&Path>,
+    options: Option<Options>,
+) -> Result<Vec<Check>> {
+    let filename = path.unwrap_or_else(|| Path::new("<filename>"));
+    let path = path.unwrap_or(&path_dedot::CWD);
+
+    let settings = match options {
+        Some(opt) => Settings::from_configuration(Configuration::from_options(opt, path)?, path)?,
+        None => resolve(path)?,
+    };
 
     // Tokenize once.
     let tokens: Vec<LexResult> = tokenize(contents);
@@ -68,8 +76,8 @@ where
 
     // Generate checks.
     let checks = check_path(
-        path.as_ref(),
-        packages::detect_package_root(path.as_ref()),
+        filename,
+        packages::detect_package_root(path),
         contents,
         tokens,
         &locator,
@@ -84,26 +92,29 @@ where
 }
 
 #[pyfunction]
-fn check(contents: &str, path: Option<&str>) -> PyResult<Vec<Message>> {
-    // TODO(rgerecke): Accept settings
-    Ok(
-        inner_check(contents, path.unwrap_or("<filename>")).map(|r| {
-            r.iter()
-                .map(|check| Message {
-                    code: check.kind.code().clone(),
-                    message: check.kind.body(),
-                    location: Location {
-                        row: check.location.row(),
-                        column: check.location.column(),
-                    },
-                    end_location: Location {
-                        row: check.end_location.row(),
-                        column: check.end_location.column(),
-                    },
-                })
-                .collect::<Vec<_>>()
-        })?,
-    )
+fn check(contents: &str, path: Option<&str>, options: Option<&PyAny>) -> PyResult<Vec<Message>> {
+    let path = path.map(Path::new);
+    let options = match options {
+        Some(v) => depythonize(v)?,
+        None => None,
+    };
+
+    Ok(inner_check(contents, path, options).map(|r| {
+        r.iter()
+            .map(|check| Message {
+                code: check.kind.code().clone(),
+                message: check.kind.body(),
+                location: Location {
+                    row: check.location.row(),
+                    column: check.location.column(),
+                },
+                end_location: Location {
+                    row: check.end_location.row(),
+                    column: check.end_location.column(),
+                },
+            })
+            .collect::<Vec<_>>()
+    })?)
 }
 
 #[pymodule]

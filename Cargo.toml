@@ -67,6 +67,7 @@ clearscreen = { version = "1.0.10" }
 rayon = { version = "1.5.3" }
 update-informer = { version = "0.5.0", default-features = false, features = ["pypi"], optional = true }
 pyo3 = { version = "0.17.3", features = ["extension-module", "abi3", "abi3-py37", "anyhow"] }
+pythonize = "0.17.0"
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 # For (future) wasm-pack support

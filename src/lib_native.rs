@@ -15,7 +15,9 @@ use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{directives, packages, resolver};
 
 /// Load the relevant `Settings` for a given `Path`.
-fn resolve(path: &Path) -> Result<Settings> {
+/// TODO(rgerecke): Move this somewhere else as to not make it part of public
+/// API
+pub fn resolve(path: &Path) -> Result<Settings> {
     if let Some(pyproject) = pyproject::find_settings_toml(path)? {
         // First priority: `pyproject.toml` in the current `Path`.
         resolver::resolve_settings(&pyproject, &Relativity::Parent, None)
