@@ -1225,7 +1225,7 @@ impl CheckCode {
             CheckCode::UP019 => CheckKind::TypingTextStrAlias,
             CheckCode::UP020 => CheckKind::OpenAlias,
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
-            CheckCode::UP024 => CheckKind::OSErrorAlias,
+            CheckCode::UP024 => CheckKind::OSErrorAlias("Error".to_string()),
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1866,7 +1866,7 @@ impl CheckKind {
             CheckKind::TypingTextStrAlias => &CheckCode::UP019,
             CheckKind::OpenAlias => &CheckCode::UP020,
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
-            CheckKind::OSErrorAlias => &CheckCode::UP024,
+            CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2601,7 +2601,7 @@ impl CheckKind {
                 "`universal_newlines` is deprecated, use `text`".to_string()
             }
             CheckKind::OSErrorAlias(name) => {
-                format!("`{name}` is deprecated, use `text`", name)
+                format!("`{name}` is deprecated, use `text`")
             }
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")

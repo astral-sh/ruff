@@ -279,6 +279,8 @@ where
         }
 
         // Pre-visit.
+        println!("{:?}", stmt);
+        println!("================");
         match &stmt.node {
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
