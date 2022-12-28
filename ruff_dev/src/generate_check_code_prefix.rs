@@ -13,7 +13,7 @@ use itertools::Itertools;
 use ruff::checks::{CheckCode, PREFIX_REDIRECTS};
 use strum::IntoEnumIterator;
 
-const ALL: &'static str = "ALL";
+const ALL: &str = "ALL";
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
