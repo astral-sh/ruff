@@ -13,6 +13,8 @@ use itertools::Itertools;
 use ruff::checks::{CheckCode, PREFIX_REDIRECTS};
 use strum::IntoEnumIterator;
 
+const ALL: &'static str = "ALL";
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
@@ -34,9 +36,15 @@ pub fn main(cli: &Cli) -> Result<()> {
         let code_suffix_len = code_str.len() - code_prefix_len;
         for i in 0..=code_suffix_len {
             let prefix = code_str[..code_prefix_len + i].to_string();
-            let entry = prefix_to_codes.entry(prefix).or_default();
-            entry.insert(check_code.clone());
+            prefix_to_codes
+                .entry(prefix)
+                .or_default()
+                .insert(check_code.clone());
         }
+        prefix_to_codes
+            .entry(ALL.to_string())
+            .or_default()
+            .insert(check_code.clone());
     }
 
     // Add any prefix aliases (e.g., "U" to "UP").
@@ -79,6 +87,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         .derive("Eq")
         .derive("PartialOrd")
         .derive("Ord")
+        .push_variant(Variant::new("None"))
         .push_variant(Variant::new("Zero"))
         .push_variant(Variant::new("One"))
         .push_variant(Variant::new("Two"))
@@ -129,14 +138,18 @@ pub fn main(cli: &Cli) -> Result<()> {
         .line("#[allow(clippy::match_same_arms)]")
         .line("match self {");
     for prefix in prefix_to_codes.keys() {
-        let num_numeric = prefix.chars().filter(|char| char.is_numeric()).count();
-        let specificity = match num_numeric {
-            0 => "Zero",
-            1 => "One",
-            2 => "Two",
-            3 => "Three",
-            4 => "Four",
-            _ => panic!("Invalid prefix: {prefix}"),
+        let specificity = if prefix == "ALL" {
+            "None"
+        } else {
+            let num_numeric = prefix.chars().filter(|char| char.is_numeric()).count();
+            match num_numeric {
+                0 => "Zero",
+                1 => "One",
+                2 => "Two",
+                3 => "Three",
+                4 => "Four",
+                _ => panic!("Invalid prefix: {prefix}"),
+            }
         };
         gen = gen.line(format!(
             "CheckCodePrefix::{prefix} => SuffixLength::{specificity},"
