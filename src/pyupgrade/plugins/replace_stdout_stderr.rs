@@ -6,7 +6,22 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-fn dirty_count(iter: impl Iterator<Item = char>) -> u32 {
+#[derive(Debug)]
+struct MiddleContent {
+    content: Option<String>,
+    is_multi_line: bool,
+}
+
+impl MiddleContent {
+    fn new(content: Option<String>, is_multi_line: bool) -> Self {
+        Self {
+            content,
+            is_multi_line,
+        }
+    }
+}
+
+fn dirty_count(iter: impl Iterator<Item = char>) -> usize {
     let mut the_count = 0;
     for current_char in iter {
         if current_char == ' ' || current_char == ',' || current_char == '\n' {
@@ -18,14 +33,19 @@ fn dirty_count(iter: impl Iterator<Item = char>) -> u32 {
     the_count
 }
 
-fn clean_middle_args(checker: &Checker, range: &Range) -> String {
-    let contents = checker.locator.slice_source_code_range(&range).to_string();
-    println!("{:?}", contents);
-    let start_gap = dirty_count(contents.chars());
+fn clean_middle_args(checker: &Checker, range: &Range) -> MiddleContent {
+    let mut contents = checker.locator.slice_source_code_range(&range).to_string();
     let is_multi_line = contents.contains('\n');
-    println!("{}: {}", is_multi_line, start_gap);
-    println!("{:?}\n", range);
-    String::new()
+    let start_gap = dirty_count(contents.chars());
+    if contents.len() == start_gap { return MiddleContent::new(None, false); }
+    for _ in 0..start_gap {
+        contents.remove(0);
+    }
+    let end_gap = dirty_count(contents.chars().rev());
+    for _ in 0..end_gap {
+        contents.pop();
+    }
+    MiddleContent::new(Some(contents), is_multi_line)
 }
 
 /// UP022
@@ -63,6 +83,7 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
             end_location: kwarg_vec.last().unwrap().location,
         };
         let middle_str = clean_middle_args(checker, &keep_range);
+        println!("{:?}\n", middle_str);
 
         let mut check = Check::new(CheckKind::ReplaceStdoutStderr, replace_range);
         if checker.patch(check.kind.code()) {
