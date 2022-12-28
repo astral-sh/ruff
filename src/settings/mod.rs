@@ -138,7 +138,7 @@ impl Settings {
                 }]
                 .into_iter(),
             ),
-            format: config.format.unwrap_or(SerializationFormat::Text),
+            format: config.format.unwrap_or_default(),
             force_exclude: config.force_exclude.unwrap_or(false),
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
             line_length: config.line_length.unwrap_or(88),
