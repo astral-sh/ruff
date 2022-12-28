@@ -10,6 +10,39 @@ pub struct ArgumentList {
 type ParameterDefs = (Vec<ast::Arg>, Vec<ast::Arg>, Vec<ast::Expr>);
 type ParameterDef = (ast::Arg, Option<ast::Expr>);
 
+pub fn validate_arguments(
+    arguments: ast::Arguments
+) -> Result<ast::Arguments, LexicalError> {
+    let mut all_args: Vec<&ast::Located<ast::ArgData>> = vec![];
+
+    all_args.extend(arguments.posonlyargs.iter());
+    all_args.extend(arguments.args.iter());
+
+    if let Some(a) = &arguments.vararg {
+        all_args.push(a);
+    }
+
+    all_args.extend(arguments.kwonlyargs.iter());
+
+    if let Some(a) = &arguments.kwarg {
+        all_args.push(a);
+    }
+
+    let mut all_arg_names =
+        FxHashSet::with_hasher(Default::default());
+    for arg in all_args {
+        let arg_name = arg.node.arg.clone();
+        if !all_arg_names.insert(arg_name) {
+            return Err(LexicalError {
+                error: LexicalErrorType::DuplicateArgumentError,
+                location: arg.location,
+            });
+        }
+    }
+
+    return Ok(arguments);
+}
+
 pub fn parse_params(
     params: (Vec<ParameterDef>, Vec<ParameterDef>),
 ) -> Result<ParameterDefs, LexicalError> {

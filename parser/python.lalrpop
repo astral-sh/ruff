@@ -6,7 +6,7 @@
 use crate::{
     ast,
     error::{LexicalError, LexicalErrorType},
-    function::{ArgumentList, parse_args, parse_params},
+    function::{ArgumentList, parse_args, parse_params, validate_arguments},
     lexer,
     context::set_context,
     string::parse_strings,
@@ -552,16 +552,20 @@ FuncDef: ast::Stmt = {
 };
 
 Parameters: ast::Arguments = {
-    "(" <a: (ParameterList<TypedParameter>)?> ")" => {
-        a.unwrap_or_else(|| ast::Arguments {
-            posonlyargs: vec![],
-            args: vec![],
-            vararg: None,
-            kwonlyargs: vec![],
-            kw_defaults: vec![],
-            kwarg: None,
-            defaults: vec![]
-        })
+    "(" <a: (ParameterList<TypedParameter>)?> ")" =>? {
+        let args = validate_arguments(
+            a.unwrap_or_else(|| ast::Arguments {
+                posonlyargs: vec![],
+                args: vec![],
+                vararg: None,
+                kwonlyargs: vec![],
+                kw_defaults: vec![],
+                kwarg: None,
+                defaults: vec![]
+            })
+        )?;
+
+        Ok(args)
     }
 };
 
@@ -774,19 +778,22 @@ NamedExpression: ast::Expr = {
 };
 
 LambdaDef: ast::Expr = {
-    <location:@L> "lambda" <p:ParameterList<UntypedParameter>?> ":" <body:Test<"all">> <end_location:@R> => {
-        let p = p.unwrap_or_else(|| {
-            ast::Arguments {
-                posonlyargs: vec![],
-                args: vec![],
-                vararg: None,
-                kwonlyargs: vec![],
-                kw_defaults: vec![],
-                kwarg: None,
-                defaults: vec![]
+    <location:@L> "lambda" <p:ParameterList<UntypedParameter>?> ":" <body:Test<"all">> <end_location:@R> =>? {
+        let p = validate_arguments(
+            p.unwrap_or_else(|| {
+                ast::Arguments {
+                    posonlyargs: vec![],
+                    args: vec![],
+                    vararg: None,
+                    kwonlyargs: vec![],
+                    kw_defaults: vec![],
+                    kwarg: None,
+                    defaults: vec![]
+                }
             }
-        });
-        ast::Expr {
+        ))?;
+
+        Ok(ast::Expr {
             location,
             end_location: Some(end_location),
             custom: (),
@@ -794,7 +801,7 @@ LambdaDef: ast::Expr = {
                 args: Box::new(p),
                 body: Box::new(body)
             }
-        }
+        })
     }
 }
 

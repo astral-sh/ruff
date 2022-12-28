@@ -21,6 +21,7 @@ pub enum LexicalErrorType {
     TabError,
     TabsAfterSpaces,
     DefaultArgumentError,
+    DuplicateArgumentError,
     PositionalArgumentError,
     UnpackedArgumentError,
     DuplicateKeywordArgumentError,
@@ -49,6 +50,9 @@ impl fmt::Display for LexicalErrorType {
             }
             LexicalErrorType::DefaultArgumentError => {
                 write!(f, "non-default argument follows default argument")
+            }
+            LexicalErrorType::DuplicateArgumentError => {
+                write!(f, "duplicate argument in function definition")
             }
             LexicalErrorType::DuplicateKeywordArgumentError => {
                 write!(f, "keyword argument repeated")
