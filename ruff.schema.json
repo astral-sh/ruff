@@ -111,7 +111,7 @@
       }
     },
     "flake8-annotations": {
-      "description": "Plugins Options for the `flake8-annotations` plugin.",
+      "description": "Options for the `flake8-annotations` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8AnnotationsOptions"
@@ -881,6 +881,8 @@
         "UP02",
         "UP020",
         "UP021",
+        "UP022",
+        "UP023",
         "W",
         "W2",
         "W29",

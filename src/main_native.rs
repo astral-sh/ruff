@@ -123,6 +123,14 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
             (settings.fix, settings.fix_only, settings.format)
         }
     };
+    // Autofix rules are as follows:
+    // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
+    //   print them to stdout, if we're reading from stdin).
+    // - Otherwise, if `--format json` is set, generate the fixes (so we print them
+    //   out as part of the JSON payload), but don't write them to disk.
+    // TODO(charlie): Consider adding ESLint's `--fix-dry-run`, which would generate
+    // but not apply fixes. That would allow us to avoid special-casing JSON
+    // here.
     let autofix = if fix || fix_only {
         fixer::Mode::Apply
     } else if matches!(format, SerializationFormat::Json) {

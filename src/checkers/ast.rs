@@ -650,6 +650,9 @@ where
                         ));
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::UP023) {
+                    pyupgrade::plugins::replace_c_element_tree(self, stmt);
+                }
 
                 for alias in names {
                     if alias.node.name.contains('.') && alias.node.asname.is_none() {
@@ -819,6 +822,9 @@ where
             } => {
                 // Track `import from` statements, to ensure that we can correctly attribute
                 // references like `from typing import Union`.
+                if self.settings.enabled.contains(&CheckCode::UP023) {
+                    pyupgrade::plugins::replace_c_element_tree(self, stmt);
+                }
                 if level.map(|level| level == 0).unwrap_or(true) {
                     if let Some(module) = module {
                         self.from_imports
@@ -1555,9 +1561,6 @@ where
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::UP019) {
-                    pyupgrade::plugins::typing_text_str_alias(self, expr);
-                }
                 if self.settings.enabled.contains(&CheckCode::UP016) {
                     pyupgrade::plugins::remove_six_compat(self, expr);
                 }
@@ -1567,7 +1570,9 @@ where
                 {
                     pyupgrade::plugins::datetime_utc_alias(self, expr);
                 }
-
+                if self.settings.enabled.contains(&CheckCode::UP019) {
+                    pyupgrade::plugins::typing_text_str_alias(self, expr);
+                }
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
@@ -1676,6 +1681,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP021) {
                     pyupgrade::plugins::replace_universal_newlines(self, expr, keywords);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP022) {
+                    pyupgrade::plugins::replace_stdout_stderr(self, expr, keywords);
                 }
 
                 // flake8-print

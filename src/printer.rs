@@ -135,17 +135,8 @@ impl<'a> Printer<'a> {
             SerializationFormat::Junit => {
                 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
-                // Group by filename.
-                let mut grouped_messages = BTreeMap::default();
-                for message in &diagnostics.messages {
-                    grouped_messages
-                        .entry(&message.filename)
-                        .or_insert_with(Vec::new)
-                        .push(message);
-                }
-
                 let mut report = Report::new("ruff");
-                for (filename, messages) in grouped_messages {
+                for (filename, messages) in group_messages_by_filename(&diagnostics.messages) {
                     let mut test_suite = TestSuite::new(filename);
                     test_suite
                         .extra
@@ -184,16 +175,7 @@ impl<'a> Printer<'a> {
                 self.post_text(diagnostics);
             }
             SerializationFormat::Grouped => {
-                // Group by filename.
-                let mut grouped_messages = BTreeMap::default();
-                for message in &diagnostics.messages {
-                    grouped_messages
-                        .entry(&message.filename)
-                        .or_insert_with(Vec::new)
-                        .push(message);
-                }
-
-                for (filename, messages) in grouped_messages {
+                for (filename, messages) in group_messages_by_filename(&diagnostics.messages) {
                     // Compute the maximum number of digits in the row and column, for messages in
                     // this file.
                     let row_length = num_digits(
@@ -302,6 +284,17 @@ impl<'a> Printer<'a> {
         clearscreen::clear()?;
         Ok(())
     }
+}
+
+fn group_messages_by_filename(messages: &Vec<Message>) -> BTreeMap<&String, Vec<&Message>> {
+    let mut grouped_messages = BTreeMap::default();
+    for message in messages {
+        grouped_messages
+            .entry(&message.filename)
+            .or_insert_with(Vec::new)
+            .push(message);
+    }
+    grouped_messages
 }
 
 fn num_digits(n: usize) -> usize {

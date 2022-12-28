@@ -229,6 +229,8 @@ pub enum CheckCode {
     UP019,
     UP020,
     UP021,
+    UP022,
+    UP023,
     UP024,
     // pydocstyle
     D100,
@@ -845,6 +847,8 @@ pub enum CheckKind {
     NativeLiterals,
     OpenAlias,
     ReplaceUniversalNewlines,
+    ReplaceStdoutStderr,
+    RewriteCElementTree,
     OSErrorAlias(String),
     // pydocstyle
     BlankLineAfterLastSection(String),
@@ -1225,6 +1229,8 @@ impl CheckCode {
             CheckCode::UP019 => CheckKind::TypingTextStrAlias,
             CheckCode::UP020 => CheckKind::OpenAlias,
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
+            CheckCode::UP022 => CheckKind::ReplaceStdoutStderr,
+            CheckCode::UP023 => CheckKind::RewriteCElementTree,
             CheckCode::UP024 => CheckKind::OSErrorAlias("Error".to_string()),
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
@@ -1650,6 +1656,8 @@ impl CheckCode {
             CheckCode::UP019 => CheckCategory::Pyupgrade,
             CheckCode::UP020 => CheckCategory::Pyupgrade,
             CheckCode::UP021 => CheckCategory::Pyupgrade,
+            CheckCode::UP022 => CheckCategory::Pyupgrade,
+            CheckCode::UP023 => CheckCategory::Pyupgrade,
             CheckCode::UP024 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
@@ -1866,6 +1874,8 @@ impl CheckKind {
             CheckKind::TypingTextStrAlias => &CheckCode::UP019,
             CheckKind::OpenAlias => &CheckCode::UP020,
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
+            CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
+            CheckKind::RewriteCElementTree => &CheckCode::UP023,
             CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
@@ -2600,6 +2610,12 @@ impl CheckKind {
             CheckKind::ReplaceUniversalNewlines => {
                 "`universal_newlines` is deprecated, use `text`".to_string()
             }
+            CheckKind::ReplaceStdoutStderr => {
+                "Sending stdout and stderr to pipe is deprecated, use `capture_output`".to_string()
+            }
+            CheckKind::RewriteCElementTree => {
+                "`cElementTree` is deprecated, use `ElementTree`".to_string()
+            }
             CheckKind::OSErrorAlias(name) => {
                 format!("`{name}` is deprecated, use `text`")
             }
@@ -3048,6 +3064,8 @@ impl CheckKind {
                 | CheckKind::OpenAlias
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::ReplaceUniversalNewlines
+                | CheckKind::ReplaceStdoutStderr
+                | CheckKind::RewriteCElementTree
                 | CheckKind::OSErrorAlias(..)
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)

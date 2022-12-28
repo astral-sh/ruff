@@ -121,33 +121,35 @@ jobs:
       - run: cargo test --all
       - run: cargo test --package ruff --test black_compatibility_test -- --ignored
 
-  wasm-pack-test:
-    name: "wasm-pack test"
-    runs-on: ubuntu-latest
-    env:
-      WASM_BINDGEN_TEST_TIMEOUT: 60
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2022-11-01
-          override: true
-      - uses: actions/cache@v3
-        env:
-          cache-name: cache-cargo
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
-      - uses: jetli/wasm-pack-action@v0.4.0
-      - uses: jetli/wasm-bindgen-action@v0.2.0
-      - run: wasm-pack test --node --lib
+# TODO(charlie): Re-enable the `wasm-pack` tests.
+# See: https://github.com/charliermarsh/ruff/issues/1425
+#  wasm-pack-test:
+#    name: "wasm-pack test"
+#    runs-on: ubuntu-latest
+#    env:
+#      WASM_BINDGEN_TEST_TIMEOUT: 60
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: nightly-2022-11-01
+#          override: true
+#      - uses: actions/cache@v3
+#        env:
+#          cache-name: cache-cargo
+#        with:
+#          path: |
+#            ~/.cargo/registry
+#            ~/.cargo/git
+#          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
+#          restore-keys: |
+#            ${{ runner.os }}-build-${{ env.cache-name }}-
+#            ${{ runner.os }}-build-
+#            ${{ runner.os }}-
+#      - uses: jetli/wasm-pack-action@v0.4.0
+#      - uses: jetli/wasm-bindgen-action@v0.2.0
+#      - run: wasm-pack test --node
 
   maturin-build:
     name: "maturin build"
