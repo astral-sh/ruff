@@ -5,6 +5,7 @@ try:
 except EnvironmentError:
     pass
 
+"""
 try:
     pass
 except IOError:
@@ -32,6 +33,7 @@ except socket.error:
 
 # Should NOT be in parentheses when replaced
 
+"""
 try:
     pass
 except (IOError,):
@@ -41,6 +43,7 @@ try:
     pass
 except (EnvironmentError, IOError, OSError):
     pass
+"""
 
 # Should be kept in parentheses (because multiple)
 
@@ -88,3 +91,4 @@ try:
     pass
 except (IOError, error):
     pass
+"""

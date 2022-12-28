@@ -279,8 +279,6 @@ where
         }
 
         // Pre-visit.
-        println!("{:?}", stmt);
-        println!("================");
         match &stmt.node {
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
@@ -1162,6 +1160,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    pyupgrade::plugins::os_error_alias(self, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
