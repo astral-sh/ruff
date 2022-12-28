@@ -1369,6 +1369,22 @@ src = ["src", "tests"]
 known-first-party = ["my_module1", "my_module2"]
 ```
 
+### Does Ruff support Jupyter Notebooks?
+
+Ruff is integrated into [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
+code formatters over Jupyter Notebooks.
+
+After installing `ruff` and `nbqa`, you can run Ruff over a notebook like so:
+
+```shell
+> nbqa ruff Untitled.ipynb
+Untitled.ipynb:cell_1:2:5: F841 Local variable `x` is assigned to but never used
+Untitled.ipynb:cell_2:1:1: E402 Module level import not at top of file
+Untitled.ipynb:cell_2:1:8: F401 `os` imported but unused
+Found 3 error(s).
+1 potentially fixable with the --fix option.
+```
+
 ### Does Ruff support NumPy- or Google-style docstrings?
 
 Yes! To enable a specific docstring convention, start by enabling all `pydocstyle` error codes, and
