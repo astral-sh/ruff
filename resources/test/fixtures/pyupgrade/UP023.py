@@ -12,6 +12,17 @@ from xml.etree.cElementTree import (
     Element,
     SubElement,
 )
+if True:
+    import xml.etree.cElementTree as ET
+    from xml.etree import cElementTree as CET
 
-# This does not have anything after cElementTree, so it should not be fixed
+from xml.etree import cElementTree as ET
+
+import contextlib, xml.etree.cElementTree as ET
+
+# The below items shoudl NOT be changed
 import xml.etree.cElementTree
+
+from .xml.etree.cElementTree import XML
+
+from xml.etree import cElementTree
