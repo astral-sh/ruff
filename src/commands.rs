@@ -332,6 +332,9 @@ pub fn explain(code: &CheckCode, format: &SerializationFormat) -> Result<()> {
         SerializationFormat::Github => {
             bail!("`--explain` does not support GitHub format")
         }
+        SerializationFormat::Gitlab => {
+            bail!("`--explain` does not support GitLab format")
+        }
     };
     Ok(())
 }

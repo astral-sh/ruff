@@ -8,6 +8,7 @@ use colored::Colorize;
 use itertools::iterate;
 use rustpython_parser::ast::Location;
 use serde::Serialize;
+use serde_json::json;
 
 use crate::autofix::{fixer, Fix};
 use crate::checks::CheckCode;
@@ -238,6 +239,34 @@ impl<'a> Printer<'a> {
                         message.kind.body(),
                     );
                 });
+            }
+            SerializationFormat::Gitlab => {
+                // Generate JSON with errors in GitLab CI format
+                // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implementing-a-custom-tool
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &diagnostics
+                            .messages
+                            .iter()
+                            .map(|message| {
+                                json!({
+                                    "description": format!("({}) {}", message.kind.code(), message.kind.body()),
+                                    "severity": "major",
+                                    "fingerprint": message.kind.code(),
+                                    "location": {
+                                        "path": relativize_path(Path::new(&message.filename)),
+                                        "lines": {
+                                            "begin": message.location.row(),
+                                            "end": message.end_location.row()
+                                        }
+                                    }
+                                })
+                            }
+                        )
+                        .collect::<Vec<_>>()
+                    )?
+                );
             }
         }
 

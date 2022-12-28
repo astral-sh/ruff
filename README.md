@@ -1929,8 +1929,9 @@ force-exclude = true
 
 The style in which violation messages should be formatted: `"text"`
 (default), `"grouped"` (group messages by file), `"json"`
-(machine-readable), `"junit"` (machine-readable XML), or `"github"`
-(GitHub Actions annotations).
+(machine-readable), `"junit"` (machine-readable XML), `"github"`
+(GitHub Actions annotations) or `"gitlab"`
+(GitLab CI code quality report).
 
 **Default value**: `"text"`
 
