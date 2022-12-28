@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fs::write;
 use std::io;
 use std::io::Write;
@@ -7,6 +8,7 @@ use std::path::Path;
 use anyhow::Result;
 use log::debug;
 use rustpython_parser::lexer::LexResult;
+use similar::TextDiff;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
@@ -195,14 +197,24 @@ pub fn lint_path(
     let contents = fs::read_file(path)?;
 
     // Lint the file.
-    let (contents, fixed, messages) = lint(contents, path, package, settings, autofix)?;
+    let (transformed, fixed, messages) = lint(&contents, path, package, settings, autofix)?;
 
     // Re-populate the cache.
     cache::set(path, &metadata, settings, autofix, &messages, cache);
 
     // If we applied any fixes, write the contents back to disk.
     if fixed > 0 {
-        write(path, contents)?;
+        if matches!(autofix, fixer::Mode::Apply) {
+            write(path, transformed)?;
+        } else if matches!(autofix, fixer::Mode::Diff) {
+            let mut stdout = io::stdout().lock();
+            TextDiff::from_lines(&contents, &transformed)
+                .unified_diff()
+                .header(&fs::relativize_path(path), &fs::relativize_path(path))
+                .to_writer(&mut stdout)?;
+            stdout.write_all(b"\n")?;
+            stdout.flush()?;
+        }
     }
 
     Ok(Diagnostics { messages, fixed })
@@ -286,18 +298,15 @@ pub fn autoformat_path(path: &Path, settings: &Settings) -> Result<()> {
 pub fn lint_stdin(
     path: Option<&Path>,
     package: Option<&Path>,
-    stdin: &str,
+    contents: &str,
     settings: &Settings,
     autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
     // Validate the `Settings` and return any errors.
     settings.validate()?;
 
-    // Read the file from disk.
-    let contents = stdin.to_string();
-
     // Lint the file.
-    let (contents, fixed, messages) = lint(
+    let (transformed, fixed, messages) = lint(
         contents,
         path.unwrap_or_else(|| Path::new("-")),
         package,
@@ -307,19 +316,30 @@ pub fn lint_stdin(
 
     // Write the fixed contents to stdout.
     if matches!(autofix, fixer::Mode::Apply) {
-        io::stdout().write_all(contents.as_bytes())?;
+        io::stdout().write_all(transformed.as_bytes())?;
+    } else if matches!(autofix, fixer::Mode::Diff) {
+        let header = path.map_or_else(|| Cow::from("stdin"), fs::relativize_path);
+        let mut stdout = io::stdout().lock();
+        TextDiff::from_lines(contents, &transformed)
+            .unified_diff()
+            .header(&header, &header)
+            .to_writer(&mut stdout)?;
+        stdout.write_all(b"\n")?;
+        stdout.flush()?;
     }
 
     Ok(Diagnostics { messages, fixed })
 }
 
 fn lint(
-    mut contents: String,
+    contents: &str,
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
     autofix: fixer::Mode,
 ) -> Result<(String, usize, Vec<Message>)> {
+    let mut contents = contents.to_string();
+
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;
 
@@ -359,7 +379,8 @@ fn lint(
         )?;
 
         // Apply autofix.
-        if matches!(autofix, fixer::Mode::Apply) && iterations < MAX_ITERATIONS {
+        if matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff) && iterations < MAX_ITERATIONS
+        {
             if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
                 // Count the number of fixed errors.
                 fixed += applied;
@@ -376,7 +397,7 @@ fn lint(
         }
 
         // Convert to messages.
-        let filename = path.to_string_lossy().to_string();
+        let path = path.to_string_lossy();
         break checks
             .into_iter()
             .map(|check| {
@@ -385,7 +406,7 @@ fn lint(
                 } else {
                     None
                 };
-                Message::from_check(check, filename.clone(), source)
+                Message::from_check(check, path.to_string(), source)
             })
             .collect();
     };

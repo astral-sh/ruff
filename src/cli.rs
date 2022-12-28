@@ -50,6 +50,10 @@ pub struct Cli {
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
     no_fix_only: bool,
+    /// Avoid writing any fixed files back; instead, output a diff for each
+    /// changed file to stdout.
+    #[arg(long)]
+    pub diff: bool,
     /// Disable cache reads.
     #[arg(short, long)]
     pub no_cache: bool,
@@ -154,6 +158,7 @@ impl Cli {
                 add_noqa: self.add_noqa,
                 autoformat: self.autoformat,
                 config: self.config,
+                diff: self.diff,
                 exit_zero: self.exit_zero,
                 explain: self.explain,
                 files: self.files,
@@ -213,6 +218,7 @@ pub struct Arguments {
     pub add_noqa: bool,
     pub autoformat: bool,
     pub config: Option<PathBuf>,
+    pub diff: bool,
     pub exit_zero: bool,
     pub explain: Option<CheckCode>,
     pub files: Vec<PathBuf>,

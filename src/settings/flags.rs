@@ -20,7 +20,7 @@ impl From<bool> for Autofix {
 impl From<fixer::Mode> for Autofix {
     fn from(value: fixer::Mode) -> Self {
         match value {
-            fixer::Mode::Generate | fixer::Mode::Apply => Autofix::Enabled,
+            fixer::Mode::Generate | fixer::Mode::Diff | fixer::Mode::Apply => Autofix::Enabled,
             fixer::Mode::None => Autofix::Disabled,
         }
     }

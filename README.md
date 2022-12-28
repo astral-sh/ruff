@@ -323,6 +323,8 @@ Options:
           Attempt to automatically fix lint errors
       --fix-only
           Fix any fixable lint errors, but don't report on leftover violations. Implies `--fix`
+      --diff
+          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
   -n, --no-cache
           Disable cache reads
       --select <SELECT>
@@ -344,7 +346,7 @@ Options:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for error messages [possible values: text, json, junit, grouped, github]
+          Output serialization format for error messages [possible values: text, json, junit, grouped, github, gitlab]
       --show-source
           Show violations with source code
       --respect-gitignore
