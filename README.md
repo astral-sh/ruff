@@ -672,6 +672,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP020 | OpenAlias | Use builtin `open` | 🛠 |
 | UP021 | ReplaceUniversalNewlines | `universal_newlines` is deprecated, use `text` | 🛠 |
 | UP022 | ReplaceStdoutStderr | Sending stdout and stderr to pipe is deprecated, use `capture_output` | 🛠 |
+| UP023 | RewriteCElementTree | `cElementTree` is deprecated, use `ElementTree` | 🛠 |
 
 ### pep8-naming (N)
 
@@ -1930,8 +1931,9 @@ force-exclude = true
 
 The style in which violation messages should be formatted: `"text"`
 (default), `"grouped"` (group messages by file), `"json"`
-(machine-readable), `"junit"` (machine-readable XML), or `"github"`
-(GitHub Actions annotations).
+(machine-readable), `"junit"` (machine-readable XML), `"github"`
+(GitHub Actions annotations) or `"gitlab"`
+(GitLab CI code quality report).
 
 **Default value**: `"text"`
 

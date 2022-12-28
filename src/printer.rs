@@ -8,6 +8,7 @@ use colored::Colorize;
 use itertools::iterate;
 use rustpython_parser::ast::Location;
 use serde::Serialize;
+use serde_json::json;
 
 use crate::autofix::{fixer, Fix};
 use crate::checks::CheckCode;
@@ -134,17 +135,8 @@ impl<'a> Printer<'a> {
             SerializationFormat::Junit => {
                 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
-                // Group by filename.
-                let mut grouped_messages = BTreeMap::default();
-                for message in &diagnostics.messages {
-                    grouped_messages
-                        .entry(&message.filename)
-                        .or_insert_with(Vec::new)
-                        .push(message);
-                }
-
                 let mut report = Report::new("ruff");
-                for (filename, messages) in grouped_messages {
+                for (filename, messages) in group_messages_by_filename(&diagnostics.messages) {
                     let mut test_suite = TestSuite::new(filename);
                     test_suite
                         .extra
@@ -183,16 +175,7 @@ impl<'a> Printer<'a> {
                 self.post_text(diagnostics);
             }
             SerializationFormat::Grouped => {
-                // Group by filename.
-                let mut grouped_messages = BTreeMap::default();
-                for message in &diagnostics.messages {
-                    grouped_messages
-                        .entry(&message.filename)
-                        .or_insert_with(Vec::new)
-                        .push(message);
-                }
-
-                for (filename, messages) in grouped_messages {
+                for (filename, messages) in group_messages_by_filename(&diagnostics.messages) {
                     // Compute the maximum number of digits in the row and column, for messages in
                     // this file.
                     let row_length = num_digits(
@@ -239,6 +222,34 @@ impl<'a> Printer<'a> {
                     );
                 });
             }
+            SerializationFormat::Gitlab => {
+                // Generate JSON with errors in GitLab CI format
+                // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implementing-a-custom-tool
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &diagnostics
+                            .messages
+                            .iter()
+                            .map(|message| {
+                                json!({
+                                    "description": format!("({}) {}", message.kind.code(), message.kind.body()),
+                                    "severity": "major",
+                                    "fingerprint": message.kind.code(),
+                                    "location": {
+                                        "path": relativize_path(Path::new(&message.filename)),
+                                        "lines": {
+                                            "begin": message.location.row(),
+                                            "end": message.end_location.row()
+                                        }
+                                    }
+                                })
+                            }
+                        )
+                        .collect::<Vec<_>>()
+                    )?
+                );
+            }
         }
 
         Ok(())
@@ -273,6 +284,17 @@ impl<'a> Printer<'a> {
         clearscreen::clear()?;
         Ok(())
     }
+}
+
+fn group_messages_by_filename(messages: &Vec<Message>) -> BTreeMap<&String, Vec<&Message>> {
+    let mut grouped_messages = BTreeMap::default();
+    for message in messages {
+        grouped_messages
+            .entry(&message.filename)
+            .or_insert_with(Vec::new)
+            .push(message);
+    }
+    grouped_messages
 }
 
 fn num_digits(n: usize) -> usize {

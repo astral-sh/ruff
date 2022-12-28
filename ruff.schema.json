@@ -111,7 +111,7 @@
       }
     },
     "flake8-annotations": {
-      "description": "Plugins Options for the `flake8-annotations` plugin.",
+      "description": "Options for the `flake8-annotations` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8AnnotationsOptions"
@@ -195,7 +195,7 @@
       ]
     },
     "format": {
-      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), or `\"github\"` (GitHub Actions annotations).",
+      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations) or `\"gitlab\"` (GitLab CI code quality report).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -881,7 +881,7 @@
         "UP02",
         "UP020",
         "UP021",
-        "UP022",
+        "UP023",
         "W",
         "W2",
         "W29",
@@ -1265,7 +1265,8 @@
         "json",
         "junit",
         "grouped",
-        "github"
+        "github",
+        "gitlab"
       ]
     },
     "Strictness": {

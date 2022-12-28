@@ -156,8 +156,9 @@ pub struct Options {
     )]
     /// The style in which violation messages should be formatted: `"text"`
     /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), or `"github"`
-    /// (GitHub Actions annotations).
+    /// (machine-readable), `"junit"` (machine-readable XML), `"github"`
+    /// (GitHub Actions annotations) or `"gitlab"`
+    /// (GitLab CI code quality report).
     pub format: Option<SerializationFormat>,
     #[option(
         default = r#"false"#,
@@ -338,7 +339,6 @@ pub struct Options {
     /// This setting will override even the `RUFF_CACHE_DIR` environment
     /// variable, if set.
     pub cache_dir: Option<String>,
-    /// Plugins
     #[option_group]
     /// Options for the `flake8-annotations` plugin.
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
