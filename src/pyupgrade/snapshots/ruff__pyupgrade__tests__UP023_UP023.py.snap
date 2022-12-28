@@ -20,15 +20,15 @@ expression: checks
 - kind: RewriteCElementTree
   location:
     row: 3
-    column: 0
+    column: 7
   end_location:
     row: 3
     column: 35
   fix:
-    content: import xml.etree.ElementTree as ET
+    content: xml.etree.ElementTree as ET
     location:
       row: 3
-      column: 0
+      column: 7
     end_location:
       row: 3
       column: 35
@@ -50,15 +50,15 @@ expression: checks
 - kind: RewriteCElementTree
   location:
     row: 7
-    column: 0
+    column: 10
   end_location:
     row: 7
     column: 49
   fix:
-    content: import    xml.etree.ElementTree       as      ET
+    content: xml.etree.ElementTree       as      ET
     location:
       row: 7
-      column: 0
+      column: 10
     end_location:
       row: 7
       column: 49
@@ -80,61 +80,76 @@ expression: checks
 - kind: RewriteCElementTree
   location:
     row: 16
-    column: 4
+    column: 11
   end_location:
     row: 16
     column: 39
   fix:
-    content: import xml.etree.ElementTree as ET
+    content: xml.etree.ElementTree as ET
     location:
       row: 16
-      column: 4
+      column: 11
     end_location:
       row: 16
       column: 39
 - kind: RewriteCElementTree
   location:
     row: 17
-    column: 4
+    column: 26
   end_location:
     row: 17
     column: 45
   fix:
-    content: from xml.etree import ElementTree as CET
+    content: ElementTree as CET
     location:
       row: 17
-      column: 4
+      column: 26
     end_location:
       row: 17
       column: 45
 - kind: RewriteCElementTree
   location:
     row: 19
-    column: 0
+    column: 22
   end_location:
     row: 19
     column: 40
   fix:
-    content: from xml.etree import ElementTree as ET
+    content: ElementTree as ET
     location:
       row: 19
-      column: 0
+      column: 22
     end_location:
       row: 19
       column: 40
 - kind: RewriteCElementTree
   location:
     row: 21
-    column: 0
+    column: 19
   end_location:
     row: 21
     column: 47
   fix:
-    content: "import contextlib, xml.etree.ElementTree as ET"
+    content: xml.etree.ElementTree as ET
     location:
       row: 21
-      column: 0
+      column: 19
     end_location:
       row: 21
       column: 47
+- kind: RewriteCElementTree
+  location:
+    row: 24
+    column: 31
+  end_location:
+    row: 24
+    column: 59
+  fix:
+    content: xml.etree.ElementTree as ET
+    location:
+      row: 24
+      column: 31
+    end_location:
+      row: 24
+      column: 59
 
