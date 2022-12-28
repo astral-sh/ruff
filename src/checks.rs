@@ -229,6 +229,7 @@ pub enum CheckCode {
     UP019,
     UP020,
     UP021,
+    UP022,
     // pydocstyle
     D100,
     D101,
@@ -843,6 +844,7 @@ pub enum CheckKind {
     NativeLiterals,
     OpenAlias,
     ReplaceUniversalNewlines,
+    ReplaceStdoutStderr,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1221,6 +1223,7 @@ impl CheckCode {
             CheckCode::UP019 => CheckKind::TypingTextStrAlias,
             CheckCode::UP020 => CheckKind::OpenAlias,
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
+            CheckCode::UP022 => CheckKind::ReplaceStdoutStderr,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1643,6 +1646,7 @@ impl CheckCode {
             CheckCode::UP019 => CheckCategory::Pyupgrade,
             CheckCode::UP020 => CheckCategory::Pyupgrade,
             CheckCode::UP021 => CheckCategory::Pyupgrade,
+            CheckCode::UP022 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1858,6 +1862,7 @@ impl CheckKind {
             CheckKind::TypingTextStrAlias => &CheckCode::UP019,
             CheckKind::OpenAlias => &CheckCode::UP020,
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
+            CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2590,6 +2595,9 @@ impl CheckKind {
             CheckKind::ReplaceUniversalNewlines => {
                 "`universal_newlines` is deprecated, use `text`".to_string()
             }
+            CheckKind::ReplaceStdoutStderr => {
+                "Sending stdout and stderr to pipe is deprecated, use `capture_output`".to_string()
+            }
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
@@ -3032,6 +3040,7 @@ impl CheckKind {
                 | CheckKind::OpenAlias
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::ReplaceUniversalNewlines
+                | CheckKind::ReplaceStdoutStderr
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
                 | CheckKind::NoBlankLineBeforeClass(..)
