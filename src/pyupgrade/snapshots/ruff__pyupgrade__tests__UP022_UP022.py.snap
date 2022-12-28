@@ -4,92 +4,107 @@ expression: checks
 ---
 - kind: ReplaceStdoutStderr
   location:
-    row: 3
+    row: 4
+    column: 22
+  end_location:
+    row: 4
+    column: 68
+  fix:
+    content: capture_output=True
+    location:
+      row: 4
+      column: 22
+    end_location:
+      row: 4
+      column: 68
+- kind: ReplaceStdoutStderr
+  location:
+    row: 6
     column: 33
   end_location:
-    row: 3
+    row: 6
     column: 79
   fix:
     content: capture_output=True
     location:
-      row: 3
+      row: 6
       column: 33
     end_location:
-      row: 3
+      row: 6
       column: 79
 - kind: ReplaceStdoutStderr
   location:
-    row: 5
+    row: 8
     column: 24
   end_location:
-    row: 5
+    row: 8
     column: 85
   fix:
     content: "capture_output=True, args=[\"foo\"]"
     location:
-      row: 5
+      row: 8
       column: 24
     end_location:
-      row: 5
+      row: 8
       column: 85
 - kind: ReplaceStdoutStderr
   location:
-    row: 8
+    row: 11
     column: 13
   end_location:
-    row: 8
+    row: 11
     column: 71
   fix:
     content: "capture_output=True, check=True"
     location:
-      row: 8
+      row: 11
       column: 13
     end_location:
-      row: 8
+      row: 11
       column: 71
 - kind: ReplaceStdoutStderr
   location:
-    row: 12
+    row: 15
     column: 13
   end_location:
-    row: 12
+    row: 15
     column: 71
   fix:
     content: "capture_output=True, check=True"
     location:
-      row: 12
+      row: 15
       column: 13
     end_location:
-      row: 12
+      row: 15
       column: 71
 - kind: ReplaceStdoutStderr
   location:
-    row: 17
+    row: 20
     column: 4
   end_location:
-    row: 19
+    row: 22
     column: 26
   fix:
     content: "capture_output=True,\n    check=True"
     location:
-      row: 17
+      row: 20
       column: 4
     end_location:
-      row: 19
+      row: 22
       column: 26
 - kind: ReplaceStdoutStderr
   location:
-    row: 28
+    row: 31
     column: 8
   end_location:
-    row: 30
+    row: 33
     column: 30
   fix:
     content: "capture_output=True,\n        check=True"
     location:
-      row: 28
+      row: 31
       column: 8
     end_location:
-      row: 30
+      row: 33
       column: 30
 

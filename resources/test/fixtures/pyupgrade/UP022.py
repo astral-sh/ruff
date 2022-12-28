@@ -1,4 +1,7 @@
+from subprocess import run
 import subprocess
+
+output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -31,3 +34,9 @@ if output:
         text=True,
         encoding="utf-8",
     )
+
+
+# Examples that should NOT trigger the rule
+from foo import PIPE
+subprocess.run(["foo"], stdout=PIPE, stderr=PIPE)
+run(["foo"], stdout=None, stderr=PIPE)
