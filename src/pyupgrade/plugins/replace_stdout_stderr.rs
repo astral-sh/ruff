@@ -6,50 +6,50 @@ use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
-
-#[derive(Debug)]
-struct MiddleContent {
-    content: Option<String>,
-    is_multi_line: bool,
-}
-
-impl MiddleContent {
-    fn new(content: Option<String>, is_multi_line: bool) -> Self {
-        Self {
-            content,
-            is_multi_line,
-        }
-    }
-}
-
-fn dirty_count(iter: impl Iterator<Item = char>) -> usize {
-    let mut the_count = 0;
-    for current_char in iter {
-        if current_char == ' ' || current_char == ',' || current_char == '\n' {
-            the_count += 1;
-        } else {
-            break;
-        }
-    }
-    the_count
-}
-
-fn clean_middle_args(checker: &Checker, range: &Range) -> MiddleContent {
-    let mut contents = checker.locator.slice_source_code_range(range).to_string();
-    let is_multi_line = contents.contains('\n');
-    let start_gap = dirty_count(contents.chars());
-    if contents.len() == start_gap {
-        return MiddleContent::new(None, false);
-    }
-    for _ in 0..start_gap {
-        contents.remove(0);
-    }
-    let end_gap = dirty_count(contents.chars().rev());
-    for _ in 0..end_gap {
-        contents.pop();
-    }
-    MiddleContent::new(Some(contents), is_multi_line)
-}
+//
+// #[derive(Debug)]
+// struct MiddleContent {
+//     content: Option<String>,
+//     is_multi_line: bool,
+// }
+//
+// impl MiddleContent {
+//     fn new(content: Option<String>, is_multi_line: bool) -> Self {
+//         Self {
+//             content,
+//             is_multi_line,
+//         }
+//     }
+// }
+//
+// fn dirty_count(iter: impl Iterator<Item = char>) -> usize {
+//     let mut the_count = 0;
+//     for current_char in iter {
+//         if current_char == ' ' || current_char == ',' || current_char == '\n' {
+//             the_count += 1;
+//         } else {
+//             break;
+//         }
+//     }
+//     the_count
+// }
+//
+// fn clean_middle_args(checker: &Checker, range: &Range) -> Option<MiddleContent> {
+//     let mut contents = checker.locator.slice_source_code_range(range);
+//     let is_multi_line = contents.contains('\n');
+//     let start_gap = dirty_count(contents.chars());
+//     if contents.len() == start_gap {
+//         return None;
+//     }
+//     for _ in 0..start_gap {
+//         contents.remove(0);
+//     }
+//     let end_gap = dirty_count(contents.chars().rev());
+//     for _ in 0..end_gap {
+//         contents.pop();
+//     }
+//     MiddleContent::new(contents, is_multi_line)
+// }
 
 /// UP022
 pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
@@ -60,46 +60,55 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
         &checker.from_imports,
         &checker.import_aliases,
     ) {
-        let mut kwarg_vec: Vec<&Located<KeywordData>> = vec![];
-        for item in &["stdout", "stderr"] {
-            let Some(kwarg) = find_keyword(kwargs, item) else { return; };
-            let is_pipe = match_module_member(
-                &kwarg.node.value,
-                "subprocess",
-                "PIPE",
-                &checker.from_imports,
-                &checker.import_aliases,
-            );
-            if is_pipe {
-                kwarg_vec.push(kwarg);
-            } else {
-                return;
-            }
-        }
-        kwarg_vec.sort_by(|a, b| a.location.cmp(&b.location));
-        let replace_range = Range {
-            location: kwarg_vec.first().unwrap().location,
-            end_location: kwarg_vec.last().unwrap().end_location.unwrap(),
+        // Find `stdout` and `stderr` kwargs.
+        let Some(stdout) = find_keyword(kwargs, "stdout") else {
+            return;
         };
-        let keep_range = Range {
-            location: kwarg_vec.first().unwrap().end_location.unwrap(),
-            end_location: kwarg_vec.last().unwrap().location,
+        let Some(stderr) = find_keyword(kwargs, "stderr") else {
+            return;
         };
-        let indent_str = indentation(checker, kwarg_vec.first().unwrap());
-        let mut replace_str = String::from("capture_output=True");
-        let middle_content = clean_middle_args(checker, &keep_range);
-        if let Some(middle_str) = middle_content.content {
-            if middle_content.is_multi_line {
-                replace_str.push_str(",\n");
-                replace_str.push_str(&indent_str);
-            } else {
-                replace_str.push_str(", ");
-            }
-            replace_str.push_str(&middle_str);
+
+        // Verify that they're both set to `subprocess.PIPE`.
+        if !match_module_member(
+            &stdout.node.value,
+            "subprocess",
+            "PIPE",
+            &checker.from_imports,
+            &checker.import_aliases,
+        ) || !match_module_member(
+            &stderr.node.value,
+            "subprocess",
+            "PIPE",
+            &checker.from_imports,
+            &checker.import_aliases,
+        ) {
+            return;
         }
 
-        let mut check = Check::new(CheckKind::ReplaceStdoutStderr, replace_range);
+        let mut check = Check::new(CheckKind::ReplaceStdoutStderr, Range::from_located(expr));
         if checker.patch(check.kind.code()) {
+            let first = if stdout.location < stderr.location {
+                stdout
+            } else {
+                stderr
+            };
+            let last = if stdout.location > stderr.location {
+                stdout
+            } else {
+                stderr
+            };
+            let replace_range = Range {
+                location: first.location,
+                end_location: last.end_location.unwrap(),
+            };
+            let keep_range = Range {
+                location: first.end_location.unwrap(),
+                end_location: last.location,
+            };
+
+            let mut replace_str = String::from("capture_output=True");
+            replace_str.push_str(&checker.locator.slice_source_code_range(&keep_range));
+
             check.amend(Fix::replacement(
                 replace_str,
                 replace_range.location,
