@@ -5,7 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-fn check_from_import(module: &Option<String>, names: &Vec<Located<AliasData>>) -> bool {
+fn check_from_import(module: &Option<String>, names: &[Located<AliasData>]) -> bool {
     if module == &Some("xml.etree.cElementTree".to_string()) {
         return true;
     } else if module == &Some("xml.etree".to_string()) {
