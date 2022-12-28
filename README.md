@@ -225,8 +225,8 @@ max-complexity = 10
 ```
 
 As an example, the following would configure Ruff to: (1) avoid checking for line-length
-violations (`E501`); (2), always autofix, but never remove unused imports (`F401`); and (3) ignore
-import-at-top-of-file errors (`E402`) in `__init__.py` files:
+violations (`E501`); (2) never remove unused imports (`F401`); and (3) ignore import-at-top-of-file
+errors (`E402`) in `__init__.py` files:
 
 ```toml
 [tool.ruff]
@@ -236,8 +236,7 @@ select = ["E", "F"]
 # Never enforce `E501` (line length violations).
 ignore = ["E501"]
 
-# Always autofix, but never try to fix `F401` (unused imports).
-fix = true
+# Never try to fix `F401` (unused imports).
 unfixable = ["F401"]
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
@@ -256,6 +255,17 @@ select = ["E", "F", "Q"]
 [tool.ruff.flake8-quotes]
 docstring-quotes = "double"
 ```
+
+Ruff mirrors Flake8's error code system, in which each error code consists of a one-to-three letter
+prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the error
+code (e.g., `F` for Pyflakes, `E` for `pycodestyle`, `ANN` for `flake8-annotations`). The set of
+enabled errors is determined by the `select` and `ignore` options, which support both the full
+error code (e.g., `F401`) and the prefix (e.g., `F`).
+
+As a special-case, Ruff also supports the `ALL` error code, which enables all error codes. Note that
+some of the `pydocstyle` error codes are conflicting (e.g., `D203` and `D211`) as they represent
+alternative docstring formats. Enabling `ALL` without further configuration may result in suboptimal
+behavior, especially for the `pydocstyle` plugin.
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
 an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the above
