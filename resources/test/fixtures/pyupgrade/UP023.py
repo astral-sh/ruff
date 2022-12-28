@@ -20,6 +20,9 @@ from xml.etree import cElementTree as ET
 
 import contextlib, xml.etree.cElementTree as ET
 
+# This should fix the second, but not the first invocation.
+import xml.etree.cElementTree, xml.etree.cElementTree as ET
+
 # The below items should NOT be changed.
 import xml.etree.cElementTree
 
