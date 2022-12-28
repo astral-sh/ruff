@@ -5,19 +5,28 @@ expression: checks
 - kind:
     KeywordArgumentBeforeStarArgument: kw
   location:
-    row: 12
+    row: 13
     column: 2
   end_location:
-    row: 12
+    row: 13
     column: 6
   fix: ~
 - kind:
     KeywordArgumentBeforeStarArgument: kw
   location:
-    row: 13
+    row: 14
     column: 2
   end_location:
-    row: 13
+    row: 14
     column: 6
+  fix: ~
+- kind:
+    KeywordArgumentBeforeStarArgument: kw
+  location:
+    row: 15
+    column: 6
+  end_location:
+    row: 15
+    column: 10
   fix: ~
 
