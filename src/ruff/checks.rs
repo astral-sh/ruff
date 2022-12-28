@@ -1686,7 +1686,7 @@ pub fn keyword_argument_before_star_argument(args: &[Expr], keywords: &[Keyword]
     let mut checks = vec![];
     if let Some(arg) = args
         .iter()
-        .find(|arg| matches!(arg.node, ExprKind::Starred { .. }))
+        .rfind(|arg| matches!(arg.node, ExprKind::Starred { .. }))
     {
         for keyword in keywords {
             if keyword.location < arg.location {
