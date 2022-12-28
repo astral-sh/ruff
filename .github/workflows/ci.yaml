@@ -147,7 +147,7 @@ jobs:
             ${{ runner.os }}-
       - uses: jetli/wasm-pack-action@v0.4.0
       - uses: jetli/wasm-bindgen-action@v0.2.0
-      - run: wasm-pack test --node
+      - run: wasm-pack test --node --lib
 
   maturin-build:
     name: "maturin build"
