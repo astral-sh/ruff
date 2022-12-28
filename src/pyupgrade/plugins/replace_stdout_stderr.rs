@@ -2,6 +2,7 @@ use rustpython_ast::{Expr, Keyword, KeywordData, Located};
 
 use crate::ast::helpers::{find_keyword, match_module_member};
 use crate::ast::types::Range;
+use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
@@ -34,10 +35,12 @@ fn dirty_count(iter: impl Iterator<Item = char>) -> usize {
 }
 
 fn clean_middle_args(checker: &Checker, range: &Range) -> MiddleContent {
-    let mut contents = checker.locator.slice_source_code_range(&range).to_string();
+    let mut contents = checker.locator.slice_source_code_range(range).to_string();
     let is_multi_line = contents.contains('\n');
     let start_gap = dirty_count(contents.chars());
-    if contents.len() == start_gap { return MiddleContent::new(None, false); }
+    if contents.len() == start_gap {
+        return MiddleContent::new(None, false);
+    }
     for _ in 0..start_gap {
         contents.remove(0);
     }
@@ -82,13 +85,23 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
             location: kwarg_vec.first().unwrap().end_location.unwrap(),
             end_location: kwarg_vec.last().unwrap().location,
         };
-        let middle_str = clean_middle_args(checker, &keep_range);
-        println!("{:?}\n", middle_str);
+        let indent_str = indentation(checker, kwarg_vec.first().unwrap());
+        let mut replace_str = String::from("capture_output=True");
+        let middle_content = clean_middle_args(checker, &keep_range);
+        if let Some(middle_str) = middle_content.content {
+            if middle_content.is_multi_line {
+                replace_str.push_str(",\n");
+                replace_str.push_str(&indent_str);
+            } else {
+                replace_str.push_str(", ");
+            }
+            replace_str.push_str(&middle_str);
+        }
 
         let mut check = Check::new(CheckKind::ReplaceStdoutStderr, replace_range);
         if checker.patch(check.kind.code()) {
             check.amend(Fix::replacement(
-                "capture_output=True".to_string(),
+                replace_str,
                 replace_range.location,
                 replace_range.end_location,
             ));

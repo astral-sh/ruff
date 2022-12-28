@@ -2379,6 +2379,7 @@ impl CheckCodePrefix {
                 CheckCode::UP019,
                 CheckCode::UP020,
                 CheckCode::UP021,
+                CheckCode::UP022,
             ],
             CheckCodePrefix::UP00 => vec![
                 CheckCode::UP001,

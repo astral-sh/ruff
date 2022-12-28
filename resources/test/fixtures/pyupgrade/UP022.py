@@ -21,3 +21,13 @@ output = subprocess.run(
     encoding="utf-8",
     close_fds=True,
 )
+
+if output:
+    output = subprocess.run(
+        ["foo"],
+        stdout=subprocess.PIPE,
+        check=True,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    )

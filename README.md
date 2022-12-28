@@ -661,6 +661,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP019 | TypingTextStrAlias | `typing.Text` is deprecated, use `str` | 🛠 |
 | UP020 | OpenAlias | Use builtin `open` | 🛠 |
 | UP021 | ReplaceUniversalNewlines | `universal_newlines` is deprecated, use `text` | 🛠 |
+| UP022 | ReplaceStdoutStderr | Sending stdout and stderr to pipe is deprecated, use `capture_output` | 🛠 |
 
 ### pep8-naming (N)
 
