@@ -1,7 +1,7 @@
 /// Simple flags used to drive program behavior.
 use crate::autofix::fixer;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Hash)]
 pub enum Autofix {
     Enabled,
     Disabled,
@@ -26,7 +26,7 @@ impl From<fixer::Mode> for Autofix {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Hash)]
 pub enum Noqa {
     Enabled,
     Disabled,
@@ -42,7 +42,7 @@ impl From<bool> for Noqa {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Hash)]
 pub enum Cache {
     Enabled,
     Disabled,
