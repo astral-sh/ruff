@@ -2,6 +2,7 @@
 
 use std::hash::{Hash, Hasher};
 
+use itertools::Itertools;
 use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
@@ -86,9 +87,9 @@ impl Default for Settings {
 impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.ban_relative_imports.hash(state);
-        for (k, v) in &self.banned_api {
-            k.hash(state);
-            v.hash(state);
+        for key in self.banned_api.keys().sorted() {
+            key.hash(state);
+            self.banned_api[key].hash(state);
         }
     }
 }
