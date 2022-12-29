@@ -71,6 +71,11 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
             "default": '[]',
             "type": 'Vec<CheckCodePrefix>',
         },
+        {
+            "name": "update-check",
+            "default": 'true',
+            "type": 'bool',
+        },
     ]},
     {"name": "flake8-annotations", "fields": [
         {

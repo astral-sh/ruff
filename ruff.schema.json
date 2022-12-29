@@ -364,6 +364,13 @@
       "items": {
         "$ref": "#/definitions/CheckCodePrefix"
       }
+    },
+    "update-check": {
+      "description": "Enable or disable automatic update checks (overridden by the `--update-check` and `--no-update-check` command-line flags).",
+      "type": [
+        "boolean",
+        "null"
+      ]
     }
   },
   "additionalProperties": false,

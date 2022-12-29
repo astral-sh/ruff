@@ -28,6 +28,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct Configuration {
     pub allowed_confusables: Option<Vec<char>>,
+    pub cache_dir: Option<PathBuf>,
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend: Option<PathBuf>,
@@ -38,8 +39,8 @@ pub struct Configuration {
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
     pub fixable: Option<Vec<CheckCodePrefix>>,
-    pub format: Option<SerializationFormat>,
     pub force_exclude: Option<bool>,
+    pub format: Option<SerializationFormat>,
     pub ignore: Option<Vec<CheckCodePrefix>>,
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
@@ -51,7 +52,7 @@ pub struct Configuration {
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub unfixable: Option<Vec<CheckCodePrefix>>,
-    pub cache_dir: Option<PathBuf>,
+    pub update_check: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
@@ -75,6 +76,14 @@ impl Configuration {
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         Ok(Configuration {
             allowed_confusables: options.allowed_confusables,
+            cache_dir: options
+                .cache_dir
+                .map(|dir| {
+                    let dir = shellexpand::full(&dir);
+                    dir.map(|dir| PathBuf::from(dir.as_ref()))
+                })
+                .transpose()
+                .map_err(|e| anyhow!("Invalid `cache-dir` value: {e}"))?,
             dummy_variable_rgx: options
                 .dummy_variable_rgx
                 .map(|pattern| Regex::new(&pattern))
@@ -139,14 +148,7 @@ impl Configuration {
                 .transpose()?,
             target_version: options.target_version,
             unfixable: options.unfixable,
-            cache_dir: options
-                .cache_dir
-                .map(|dir| {
-                    let dir = shellexpand::full(&dir);
-                    dir.map(|dir| PathBuf::from(dir.as_ref()))
-                })
-                .transpose()
-                .map_err(|e| anyhow!("Invalid `cache-dir` value: {e}"))?,
+            update_check: options.update_check,
             // Plugins
             flake8_annotations: options.flake8_annotations,
             flake8_bugbear: options.flake8_bugbear,
@@ -167,6 +169,7 @@ impl Configuration {
     pub fn combine(self, config: Configuration) -> Self {
         Self {
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
+            cache_dir: self.cache_dir.or(config.cache_dir),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
             exclude: self.exclude.or(config.exclude),
             extend: self.extend.or(config.extend),
@@ -204,7 +207,7 @@ impl Configuration {
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
             unfixable: self.unfixable.or(config.unfixable),
-            cache_dir: self.cache_dir.or(config.cache_dir),
+            update_check: self.update_check.or(config.update_check),
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
             flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
@@ -226,6 +229,9 @@ impl Configuration {
     }
 
     pub fn apply(&mut self, overrides: Overrides) {
+        if let Some(cache_dir) = overrides.cache_dir {
+            self.cache_dir = Some(cache_dir);
+        }
         if let Some(dummy_variable_rgx) = overrides.dummy_variable_rgx {
             self.dummy_variable_rgx = Some(dummy_variable_rgx);
         }
@@ -279,8 +285,8 @@ impl Configuration {
         if let Some(unfixable) = overrides.unfixable {
             self.unfixable = Some(unfixable);
         }
-        if let Some(cache_dir) = overrides.cache_dir {
-            self.cache_dir = Some(cache_dir);
+        if let Some(update_check) = overrides.update_check {
+            self.update_check = Some(update_check);
         }
         // Special-case: `extend_ignore` and `extend_select` are parallel arrays, so
         // push an empty array if only one of the two is provided.

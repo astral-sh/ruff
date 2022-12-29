@@ -353,6 +353,8 @@ Options:
           Respect file exclusions via `.gitignore` and other standard ignore files
       --force-exclude
           Enforce exclusions, even for paths passed to Ruff directly on the command-line
+      --update-check
+          Enable or disable automatic update checks
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
@@ -2194,6 +2196,24 @@ A list of check code prefixes to consider un-autofix-able.
 [tool.ruff]
 # Disable autofix for unused imports (`F401`).
 unfixable = ["F401"]
+```
+
+---
+
+#### [`update-check`](#update-check)
+
+Enable or disable automatic update checks (overridden by the
+`--update-check` and `--no-update-check` command-line flags).
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+update-check = false
 ```
 
 ---

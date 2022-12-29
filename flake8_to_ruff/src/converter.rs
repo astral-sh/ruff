@@ -296,6 +296,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend: None,
@@ -323,7 +324,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
-            cache_dir: None,
+            update_check: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -354,6 +355,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend: None,
@@ -381,7 +383,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
-            cache_dir: None,
+            update_check: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -412,6 +414,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend: None,
@@ -439,7 +442,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
-            cache_dir: None,
+            update_check: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -470,6 +473,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend: None,
@@ -497,7 +501,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
-            cache_dir: None,
+            update_check: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -528,6 +532,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend: None,
@@ -555,7 +560,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
-            cache_dir: None,
+            update_check: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -594,6 +599,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend: None,
@@ -657,7 +663,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
-            cache_dir: None,
+            update_check: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
@@ -690,6 +696,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
             extend: None,
@@ -718,7 +725,7 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
-            cache_dir: None,
+            update_check: None,
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
