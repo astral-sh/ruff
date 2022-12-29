@@ -22,6 +22,7 @@ pub enum LexicalErrorType {
     TabsAfterSpaces,
     DefaultArgumentError,
     PositionalArgumentError,
+    UnpackedArgumentError,
     DuplicateKeywordArgumentError,
     UnrecognizedToken { tok: char },
     FStringError(FStringErrorType),
@@ -54,6 +55,12 @@ impl fmt::Display for LexicalErrorType {
             }
             LexicalErrorType::PositionalArgumentError => {
                 write!(f, "positional argument follows keyword argument")
+            }
+            LexicalErrorType::UnpackedArgumentError => {
+                write!(
+                    f,
+                    "iterable argument unpacking follows keyword argument unpacking"
+                )
             }
             LexicalErrorType::UnrecognizedToken { tok } => {
                 write!(f, "Got unexpected token {tok}")
