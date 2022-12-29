@@ -1,7 +1,7 @@
 use itertools::Itertools;
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind, Located};
 
-use rustpython_ast::{Located, Excepthandler, ExcepthandlerKind, ExprKind};
-
+use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
@@ -19,59 +19,86 @@ fn get_correct_name(original: &str) -> String {
 }
 
 fn get_before_replace(elts: &Vec<Located<ExprKind>>) -> Vec<String> {
-    elts.iter().map(|elt| {
-        if let ExprKind::Name{ id, .. } = &elt.node {
-            id.to_string()
-        } else {
-            "".to_string()
-        }
-    }).collect()
+    elts.iter()
+        .map(|elt| {
+            if let ExprKind::Name { id, .. } = &elt.node {
+                id.to_string()
+            } else {
+                "".to_string()
+            }
+        })
+        .collect()
 }
 
 /// UP024
 pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
     // Each separate except block is a separate error and fix
     for handler in handlers {
-        let ExcepthandlerKind::ExceptHandler{ type_, .. } = &handler.node;
+        let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
         let error_handlers = match type_.as_ref() {
             None => return,
             Some(expr) => expr,
         };
+        // The first part creates list of all the exceptions being caught, and
+        // what they should be changed to
         let mut replacements: Vec<String> = vec![];
         let mut before_replace: Vec<String> = vec![];
         match &error_handlers.node {
-            ExprKind::Name{ id, .. } => {
+            ExprKind::Name { id, .. } => {
                 let new_name = get_correct_name(id);
                 replacements.push(new_name);
-            },
+                before_replace.push(id.to_string());
+            }
+            ExprKind::Attribute { .. } => {
+                for module in ERROR_MODULES.iter() {
+                    if match_module_member(
+                        &error_handlers,
+                        module,
+                        "error",
+                        &checker.from_imports,
+                        &checker.import_aliases,
+                    ) {
+                        replacements.push("OSError".to_string());
+                        before_replace.push(format!("{}.error", module));
+                        break;
+                    }
+                }
+            }
             ExprKind::Tuple { elts, .. } => {
                 before_replace = get_before_replace(elts);
                 for elt in elts {
-                    if let ExprKind::Name{ id, .. } = &elt.node {
+                    if let ExprKind::Name { id, .. } = &elt.node {
                         let new_name = get_correct_name(id);
                         replacements.push(new_name);
                     }
                 }
-            },
+            }
             _ => return,
         }
-        replacements = replacements.iter().unique().map(|x| x.to_string()).collect();
-        if before_replace != replacements {
+        replacements = replacements
+            .iter()
+            .unique()
+            .map(|x| x.to_string())
+            .collect();
+
+        // This part checks if there are differences between what there is and
+        // what there should be. Where differences, the changes are applied
+        if before_replace != replacements && replacements.len() > 0 {
             println!("Before: {:?}", before_replace);
             println!("Replacements: {:?}\n", replacements);
             let mut final_str: String;
-            let message_str: String;
             if replacements.len() == 1 {
                 final_str = replacements.get(0).unwrap().to_string();
-                message_str = final_str.clone();
             } else {
                 final_str = replacements.join(", ");
-                message_str = final_str.clone();
                 final_str.insert(0, '(');
                 final_str.push(')');
             }
-            let range = Range::new(error_handlers.location, error_handlers.end_location.unwrap());
-            let mut check = Check::new(CheckKind::OSErrorAlias(message_str), range);
+            let range = Range::new(
+                error_handlers.location,
+                error_handlers.end_location.unwrap(),
+            );
+            let mut check = Check::new(CheckKind::OSErrorAlias, range);
             if checker.patch(check.kind.code()) {
                 check.amend(Fix::replacement(
                     final_str,

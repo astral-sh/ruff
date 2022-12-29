@@ -849,7 +849,7 @@ pub enum CheckKind {
     ReplaceUniversalNewlines,
     ReplaceStdoutStderr,
     RewriteCElementTree,
-    OSErrorAlias(String),
+    OSErrorAlias,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1231,7 +1231,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
             CheckCode::UP022 => CheckKind::ReplaceStdoutStderr,
             CheckCode::UP023 => CheckKind::RewriteCElementTree,
-            CheckCode::UP024 => CheckKind::OSErrorAlias("Error".to_string()),
+            CheckCode::UP024 => CheckKind::OSErrorAlias,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1876,7 +1876,7 @@ impl CheckKind {
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
-            CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
+            CheckKind::OSErrorAlias => &CheckCode::UP024,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2616,9 +2616,7 @@ impl CheckKind {
             CheckKind::RewriteCElementTree => {
                 "`cElementTree` is deprecated, use `ElementTree`".to_string()
             }
-            CheckKind::OSErrorAlias(name) => {
-                format!("`{name}` is deprecated, use `text`")
-            }
+            CheckKind::OSErrorAlias => "`Replacing deprecated errors with `OSError`".to_string(),
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
@@ -3066,7 +3064,7 @@ impl CheckKind {
                 | CheckKind::ReplaceUniversalNewlines
                 | CheckKind::ReplaceStdoutStderr
                 | CheckKind::RewriteCElementTree
-                | CheckKind::OSErrorAlias(..)
+                | CheckKind::OSErrorAlias
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
                 | CheckKind::NoBlankLineBeforeClass(..)

@@ -1,11 +1,11 @@
 import mmap, select, socket
+from mmap import error
 # These should be fixed
 try:
     pass
 except EnvironmentError:
     pass
 
-"""
 try:
     pass
 except IOError:
@@ -31,9 +31,13 @@ try:
 except socket.error:
     pass
 
+try:
+    pass
+except error:
+    pass
+
 # Should NOT be in parentheses when replaced
 
-"""
 try:
     pass
 except (IOError,):
@@ -43,7 +47,6 @@ try:
     pass
 except (EnvironmentError, IOError, OSError):
     pass
-"""
 
 # Should be kept in parentheses (because multiple)
 
@@ -91,4 +94,3 @@ try:
     pass
 except (IOError, error):
     pass
-"""
