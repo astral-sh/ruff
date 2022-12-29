@@ -918,10 +918,21 @@
       ]
     },
     "Convention": {
-      "type": "string",
-      "enum": [
-        "google",
-        "numpy"
+      "oneOf": [
+        {
+          "description": "Use Google-style docstrings.",
+          "type": "string",
+          "enum": [
+            "google"
+          ]
+        },
+        {
+          "description": "Use NumPy-style docstrings.",
+          "type": "string",
+          "enum": [
+            "numpy"
+          ]
+        }
       ]
     },
     "Flake8AnnotationsOptions": {
@@ -1065,7 +1076,7 @@
       "type": "object",
       "properties": {
         "ban-relative-imports": {
-          "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module and beyond (`\"parents\"`).",
+          "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module or beyond (`\"parents\"`).",
           "anyOf": [
             {
               "$ref": "#/definitions/Strictness"
@@ -1261,10 +1272,21 @@
       ]
     },
     "Quote": {
-      "type": "string",
-      "enum": [
-        "single",
-        "double"
+      "oneOf": [
+        {
+          "description": "Use single quotes (`'`).",
+          "type": "string",
+          "enum": [
+            "single"
+          ]
+        },
+        {
+          "description": "Use double quotes (`\"`).",
+          "type": "string",
+          "enum": [
+            "double"
+          ]
+        }
       ]
     },
     "SerializationFormat": {
@@ -1279,10 +1301,21 @@
       ]
     },
     "Strictness": {
-      "type": "string",
-      "enum": [
-        "parents",
-        "all"
+      "oneOf": [
+        {
+          "description": "Ban imports that extend into the parent module or beyond.",
+          "type": "string",
+          "enum": [
+            "parents"
+          ]
+        },
+        {
+          "description": "Ban all relative imports.",
+          "type": "string",
+          "enum": [
+            "all"
+          ]
+        }
       ]
     },
     "Version": {

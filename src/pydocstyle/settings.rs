@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Convention {
+    /// Use Google-style docstrings.
     Google,
+    /// Use NumPy-style docstrings.
     Numpy,
 }
 
