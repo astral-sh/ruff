@@ -1,7 +1,7 @@
 import lzstring from "lz-string";
 import { OptionGroup } from "../ruff_options";
 
-export type Config = { [K: string]: any };
+export type Settings = { [K: string]: any };
 
 /**
  * Parse an encoded value from the options export.
@@ -16,31 +16,31 @@ function parse(value: any): any {
 }
 
 /**
- * The default configuration for the playground.
+ * The default settings for the playground.
  */
-export function defaultConfig(availableOptions: OptionGroup[]): Config {
-  const config: Config = {};
+export function defaultSettings(availableOptions: OptionGroup[]): Settings {
+  const settings: Settings = {};
   for (const group of availableOptions) {
     if (group.name == "globals") {
       for (const field of group.fields) {
-        config[field.name] = parse(field.default);
+        settings[field.name] = parse(field.default);
       }
     } else {
-      config[group.name] = {};
+      settings[group.name] = {};
       for (const field of group.fields) {
-        config[group.name][field.name] = parse(field.default);
+        settings[group.name][field.name] = parse(field.default);
       }
     }
   }
-  return config;
+  return settings;
 }
 
 /**
  * Persist the configuration to a URL.
  */
-export function persist(configSource: string, pythonSource: string) {
+export function persist(settingsSource: string, pythonSource: string) {
   window.location.hash = lzstring.compressToEncodedURIComponent(
-    configSource + "$$$" + pythonSource
+    settingsSource + "$$$" + pythonSource
   );
 }
 
@@ -54,9 +54,9 @@ export function restore(): [string, string] | null {
 
   if (value) {
     const parts = value.split("$$$");
-    const configSource = parts[0];
+    const settingsSource = parts[0];
     const pythonSource = parts[1];
-    return [configSource, pythonSource];
+    return [settingsSource, pythonSource];
   } else {
     return null;
   }
