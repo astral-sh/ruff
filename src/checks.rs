@@ -165,6 +165,7 @@ pub enum CheckCode {
     // mccabe
     C901,
     // flake8-tidy-imports
+    TID251,
     TID252,
     // flake8-return
     RET501,
@@ -782,6 +783,11 @@ pub enum CheckKind {
     // flake8-debugger
     Debugger(DebuggerUsingType),
     // flake8-tidy-imports
+    BannedApi {
+        name: String,
+        message: String,
+        attribute_access: bool,
+    },
     BannedRelativeImport(Strictness),
     // flake8-return
     UnnecessaryReturnNone,
@@ -1158,6 +1164,11 @@ impl CheckCode {
             // flake8-debugger
             CheckCode::T100 => CheckKind::Debugger(DebuggerUsingType::Import("...".to_string())),
             // flake8-tidy-imports
+            CheckCode::TID251 => CheckKind::BannedApi {
+                name: "...".to_string(),
+                message: "...".to_string(),
+                attribute_access: false,
+            },
             CheckCode::TID252 => CheckKind::BannedRelativeImport(Strictness::All),
             // flake8-return
             CheckCode::RET501 => CheckKind::UnnecessaryReturnNone,
@@ -1562,6 +1573,7 @@ impl CheckCode {
             CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
             CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
             CheckCode::I001 => CheckCategory::Isort,
+            CheckCode::TID251 => CheckCategory::Flake8TidyImports,
             CheckCode::TID252 => CheckCategory::Flake8TidyImports,
             CheckCode::ICN001 => CheckCategory::Flake8ImportConventions,
             CheckCode::N801 => CheckCategory::PEP8Naming,
@@ -1806,6 +1818,7 @@ impl CheckKind {
             // flake8-debugger
             CheckKind::Debugger(..) => &CheckCode::T100,
             // flake8-tidy-imports
+            CheckKind::BannedApi { .. } => &CheckCode::TID251,
             CheckKind::BannedRelativeImport(..) => &CheckCode::TID252,
             // flake8-return
             CheckKind::UnnecessaryReturnNone => &CheckCode::RET501,
@@ -2432,6 +2445,17 @@ impl CheckKind {
                 DebuggerUsingType::Import(name) => format!("Import for `{name}` found"),
             },
             // flake8-tidy-imports
+            CheckKind::BannedApi {
+                name,
+                message,
+                attribute_access,
+            } => {
+                if *attribute_access {
+                    format!("`{name}` is banned: {message} (this may be a false positive)")
+                } else {
+                    format!("`{name}` is banned: {message}")
+                }
+            }
             CheckKind::BannedRelativeImport(strictness) => match strictness {
                 Strictness::Parents => {
                     "Relative imports from parent modules are banned".to_string()

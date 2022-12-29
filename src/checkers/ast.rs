@@ -723,6 +723,17 @@ where
                         }
                     }
 
+                    // flake8_tidy_imports
+                    if self.settings.enabled.contains(&CheckCode::TID251) {
+                        if let Some(check) = flake8_tidy_imports::checks::name_or_parent_is_banned(
+                            alias,
+                            &alias.node.name,
+                            &self.settings.flake8_tidy_imports.banned_api,
+                        ) {
+                            self.add_check(check);
+                        }
+                    }
+
                     // pylint
                     if self.settings.enabled.contains(&CheckCode::PLC0414) {
                         pylint::plugins::useless_import_alias(self, alias);
@@ -851,6 +862,29 @@ where
                 if let Some("__future__") = module.as_deref() {
                     if self.settings.enabled.contains(&CheckCode::UP010) {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::TID251) {
+                    if let Some(module) = module {
+                        for loc_name in names {
+                            let name = &loc_name.node.name;
+                            if let Some(check) = flake8_tidy_imports::checks::name_is_banned(
+                                loc_name,
+                                format!("{module}.{name}"),
+                                &self.settings.flake8_tidy_imports.banned_api,
+                            ) {
+                                self.add_check(check);
+                            }
+                        }
+
+                        if let Some(check) = flake8_tidy_imports::checks::name_or_parent_is_banned(
+                            stmt,
+                            module,
+                            &self.settings.flake8_tidy_imports.banned_api,
+                        ) {
+                            self.add_check(check);
+                        }
                     }
                 }
 
@@ -1584,6 +1618,17 @@ where
                         if attr == name {
                             self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                         };
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::TID251) {
+                    if let Some(check) = flake8_tidy_imports::checks::banned_attribute_access(
+                        self,
+                        dealias_call_path(collect_call_paths(expr), &self.import_aliases),
+                        expr,
+                        &self.settings.flake8_tidy_imports.banned_api,
+                    ) {
+                        self.add_check(check)
                     }
                 }
             }
